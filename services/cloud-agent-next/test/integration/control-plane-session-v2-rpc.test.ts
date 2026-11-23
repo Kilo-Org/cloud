@@ -783,6 +783,28 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       });
     });
 
+    // The previous turn ends, and a list tool named with the CLI's filePath spelling opens
+    // the next one: the card resolves the basename the same way an edit does.
+    await stub.onEvents({ events: [status('idle')] });
+    await stub.onEvents({
+      events: [
+        notice('msg_v2_list_notice', 6),
+        status('busy'),
+        working('msg_v2_list_answer', 7, {
+          type: 'tool',
+          id: 'call_list',
+          name: 'list',
+          state: { status: 'running', input: { filePath: '/workspace/app/src/index.ts' } },
+        }),
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: { step: { verb: 'searching', target: 'index.ts' } },
+      });
+    });
+
     // That turn ends and another completion opens the next one in the same delivery, so no
     // snapshot sees the root idle; the next snapshot must not carry the finished turn's work.
     await stub.onEvents({

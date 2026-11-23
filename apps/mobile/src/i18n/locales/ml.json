@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ഉപസെഷനുകൾക്കുള്ളിലെ ഉപസെഷനുകളുടെ എണ്ണം അനുവദനീയമായ പരിധിയിലെത്തി.",
+      "maxNestingDepth": "നെസ്റ്റഡ് സെഷനുകളുടെ പരമാവധി ആഴത്തിൽ എത്തി.",
       "modelAccessibility": "മോഡൽ: {{modelLabel}}",
       "openHint": "സബ്ഏജന്റ് സെഷൻ തുറക്കുക",
       "subagent": "സബ്ഏജന്റ്",

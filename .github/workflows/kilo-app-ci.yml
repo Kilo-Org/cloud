@@ -448,9 +448,9 @@ jobs:
   # still cannot slip past CI. The workspace selection usually reports
   # `mobile: true` for a tools/i18n change (OWNED in
   # scripts/affected-workspaces.mjs), so the second term keeps this job from
-  # paying for the audit twice on one change. It installs only the root
-  # project, because the audit reads JSON catalogs and the oxc parser and no
-  # app dependency.
+  # paying for the audit twice on one change. It installs the app as well as
+  # the root project, because the audit reads the plural data the app bundle
+  # ships to decide which plural forms a language can select.
   i18n-catalogs:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.catalogs == 'true' && needs.mobile-changes.outputs.mobile != 'true'
@@ -471,7 +471,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Check i18n catalogs
         run: node tools/i18n/check-catalogs.mjs

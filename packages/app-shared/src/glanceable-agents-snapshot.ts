@@ -83,7 +83,17 @@ export const GLANCEABLE_NEEDS_INPUT_STATUSES = ['question', 'permission', 'retry
 
 export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[number];
 
-export const glanceableAgentsSnapshotSchema = z.object({
+/**
+ * The snapshot fields, declared apart from the schema below so the
+ * cross-field refinement can read their types and so a variant can spread the
+ * same fields. The newest-result pairing is enforced once, by
+ * `refineNewestResultPair`.
+ *
+ * A refined object cannot be reshaped: zod refuses `.omit` on it, and
+ * `.extend` silently drops the refinement. A variant that needs a narrower or
+ * wider snapshot spreads this shape and applies the same refiner itself.
+ */
+export const glanceableAgentsSnapshotShape = {
   schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
   /** Snapshot write time; producers emit the `epochMsToIso` UTC form. */
@@ -150,11 +160,42 @@ export const glanceableAgentsSnapshotSchema = z.object({
   newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
   /**
    * ISO 8601 timestamp or null: when that newest change happened. Null exactly
-   * when `newestResultKind` is null. Optional on input with a null default for
-   * the same reason as the kind.
+   * when `newestResultKind` is null, a pairing that `refineNewestResultPair`
+   * enforces. Optional on input with a null default for the same reason as the
+   * kind.
    */
   newestResultAt: z.string().nullable().default(null),
-});
+};
+
+/**
+ * The shape's own type, so the refinement below reads the field types from the
+ * shape.
+ */
+const glanceableAgentsSnapshotShapeSchema = z.object(glanceableAgentsSnapshotShape);
+
+/**
+ * `newestResultKind` and `newestResultAt` answer one question: which agent
+ * changed state, and when. A payload that sets one without the other describes
+ * a line the card cannot draw — a kind with no instant to show, or an instant
+ * with no kind to label it. The builder (`buildGlanceableSnapshot`) takes the
+ * pair from one row, so this check never rejects what the repository itself
+ * produces; it rejects a payload assembled anywhere else.
+ */
+export function refineNewestResultPair(
+  data: z.infer<typeof glanceableAgentsSnapshotShapeSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if ((data.newestResultKind === null) !== (data.newestResultAt === null)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['newestResultAt'],
+      message: 'newestResultAt is present exactly when newestResultKind is not null',
+    });
+  }
+}
+
+export const glanceableAgentsSnapshotSchema =
+  glanceableAgentsSnapshotShapeSchema.superRefine(refineNewestResultPair);
 
 export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;
 

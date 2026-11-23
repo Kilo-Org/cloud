@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Solicitude aprobada",
       "replied": "Resposta enviada",
+      "empty": "Escribe unha resposta e despois envíaa.",
       "failed": "Non se puido responder. Toca de novo para tentalo de novo.",
       "unavailable": "Esta solicitude xa non está á espera."
     }

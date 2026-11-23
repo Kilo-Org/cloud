@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "An amince da buƙatar",
       "replied": "An tura amsa",
+      "empty": "Rubuta amsa, sannan ka aika.",
       "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
       "unavailable": "Wannan buƙatar ba ta jira ba."
     }

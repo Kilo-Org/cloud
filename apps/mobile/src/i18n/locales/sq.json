@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Kërkesa u miratua",
       "replied": "Përgjigja u dërgua",
+      "empty": "Shkruani një përgjigje dhe më pas dërgojeni.",
       "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
       "unavailable": "Kjo kërkesë nuk pret më."
     }

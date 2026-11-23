@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Anfrage genehmigt",
       "replied": "Antwort gesendet",
+      "empty": "Antwort eingeben und dann senden.",
       "failed": "Konnte nicht antworten. Zum Wiederholen erneut antippen.",
       "unavailable": "Diese Anfrage wartet nicht mehr."
     }

@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Versoek goedgekeur",
       "replied": "Antwoord gestuur",
+      "empty": "Skryf 'n antwoord en stuur dit dan.",
       "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
       "unavailable": "Hierdie versoek wag nie meer nie."
     }

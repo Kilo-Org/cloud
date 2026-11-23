@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Yêu cầu đã được phê duyệt",
       "replied": "Phản hồi đã được gửi",
+      "empty": "Nhập câu trả lời rồi gửi.",
       "failed": "Không thể trả lời. Nhấn lại để thử lại.",
       "unavailable": "Yêu cầu này không còn chờ đợi nữa."
     }

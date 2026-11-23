@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Užklausa patvirtinta",
       "replied": "Atsakymas išsiųstas",
+      "empty": "Įrašykite atsakymą, tada jį siųskite.",
       "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
       "unavailable": "Šios užklausos nebelaukiama."
     }

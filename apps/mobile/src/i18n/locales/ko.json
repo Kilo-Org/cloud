@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "요청이 승인되었습니다",
       "replied": "답장을 보냈습니다",
+      "empty": "답변을 입력한 후 보내세요.",
       "failed": "답변하지 못했습니다. 다시 탭하여 재시도하세요.",
       "unavailable": "이 요청은 더 이상 대기 중이 아닙니다."
     }

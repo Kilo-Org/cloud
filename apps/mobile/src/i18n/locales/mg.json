@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Nankinina ny fangatahana",
       "replied": "Nalefa ny valiny",
+      "empty": "Soraty ny valiny, dia alefaso.",
       "failed": "Tsy nahavaly. Tsindrio indray mba hanandrama.",
       "unavailable": "Tsy miandry intsony ity fangatahana ity."
     }

@@ -10,9 +10,14 @@
  * closed — through `runNeedsInputInteraction` (the same mobile session manager
  * the in-app blocking card drives), and this module replaces the acted-on
  * notification with the result: the confirmation, the retryable failure with
- * the actions kept, or the unavailable body with no buttons. Only the
- * retryable failure keeps the raise's time-sensitive break-through — the
- * user's own action has been taken, so its confirmation stays quiet.
+ * the actions kept, the empty-answer body with the actions kept, or the
+ * unavailable body with no buttons. Only the retryable failure keeps the
+ * raise's time-sensitive break-through — the user's own action has been taken,
+ * so its confirmation stays quiet. Every result is posted with `sound: false`
+ * for the same reason: Android replays the attention channel's sound on every
+ * notify of an existing notification, and a reply result is posted under the
+ * acted-on identifier while an approve result replaces an app-owned
+ * notification, so both are exactly that in-place notify.
  */
 
 import { z } from 'zod';
@@ -21,6 +26,7 @@ import * as Notifications from 'expo-notifications';
 
 import {
   androidChannelIdForPushData,
+  ANSWER_DRAFT_MAX_LENGTH,
   genericPushContentForPushData,
   NEEDS_INPUT_ACTION_IDS,
   type NeedsInputActionId,
@@ -32,6 +38,8 @@ import {
 import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
+import { hasVisibleComposerText } from '@/lib/composer-text';
+import { rememberNeedsInputReplyDraft } from '@/lib/needs-input-reply-draft';
 
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
@@ -280,6 +288,7 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
+      restoreReplyDraftFromData(data);
       // An unparseable PR URL falls back to the session route: the user still
       // lands on the raise instead of nowhere.
       setPendingDeepLink(
@@ -294,6 +303,7 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
+      restoreReplyDraftFromData(data);
       setPendingDeepLink(
         notificationPathForData(data),
         'notification',
@@ -315,6 +325,7 @@ async function dispatchNeedsInputResponse(
     return false;
   }
   Notifications.clearLastNotificationResponse();
+  restoreReplyDraftFromData(data);
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
@@ -390,6 +401,19 @@ export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOp
   return { organizationId: data.organizationId ?? null, sessionBound: true };
 }
 
+/**
+ * Hand the answer an undelivered reply parked in the result's payload to the
+ * session's composer, so the tap opens the raise with the person's text
+ * already typed instead of losing it. Only a retryable reply carries a draft;
+ * every other result has none, and the tap changes nothing.
+ */
+export function restoreReplyDraftFromData(data: PushData): void {
+  if (data.type !== 'cloud_agent_session' || data.answerDraft === undefined) {
+    return;
+  }
+  rememberNeedsInputReplyDraft(data.cliSessionId, data.answerDraft);
+}
+
 /** Dismiss one notification, reporting a failure and never rejecting. */
 async function dismissNotificationContaining(identifier: string): Promise<void> {
   try {
@@ -428,7 +452,8 @@ type ResultPresentation = {
   /**
    * The raise's Focus break-through, kept only while the result still needs
    * the user (the retryable failure). A confirmation of the user's own action
-   * (`ok` / `unavailable`) is ordinary progress and must not break through.
+   * (`ok` / `unavailable`) and a non-answer (`empty`) are ordinary progress and
+   * must not break through.
    */
   interruptionLevel: 'timeSensitive' | null;
 };
@@ -456,6 +481,16 @@ function resultPresentationFor(
         body: i18n.t('notifications.needsInputAction.unavailable'),
         categoryIdentifier: null,
         raiseCleared: true,
+        interruptionLevel: null,
+      };
+    }
+    case 'empty': {
+      return {
+        body: i18n.t('notifications.needsInputAction.empty'),
+        // The raise still waits for an answer, so the actions stay and the
+        // person can tap Reply again.
+        categoryIdentifier: originalCategoryIdentifier ?? null,
+        raiseCleared: false,
         interruptionLevel: null,
       };
     }
@@ -492,6 +527,39 @@ function resultTitleFor(args: {
     return genericPushContentForPushData(args.data, getLanguageSnapshot()).title;
   }
   return args.actedOnTitle ?? i18n.t('notifications.category.agentAttentionTitle');
+}
+
+/**
+ * The payload the posted result carries.
+ *
+ * A reply that failed retryably keeps the text the person typed in the result's
+ * own payload, so a tap on that result hands the text back to the composer: the
+ * failure is the only outcome where the raise still waits for the answer, and
+ * the typed text would otherwise be lost with the tray row. The text stays out
+ * of the body — the result is visible wherever the raise was — and is capped at
+ * the length the push schema admits.
+ */
+function resumeAnswerDraft(
+  data: NeedsInputRaiseData,
+  args: { outcome: NeedsInputActionOutcome; action: NeedsInputAction; text: string | undefined }
+): NeedsInputRaiseData {
+  const { outcome, action, text } = args;
+  // The acted-on payload may already carry an earlier attempt's draft, because
+  // a retryable result is the notification the next tap reads. Only the failure
+  // of a reply that had text may carry one, so every other result drops the
+  // field instead of inheriting a stale answer.
+  const carried =
+    outcome === 'retryable' &&
+    action === 'reply' &&
+    text !== undefined &&
+    hasVisibleComposerText(text)
+      ? text.slice(0, ANSWER_DRAFT_MAX_LENGTH)
+      : undefined;
+  if (carried === undefined) {
+    const { answerDraft: _previousDraft, ...rest } = data;
+    return rest;
+  }
+  return { ...data, answerDraft: carried };
 }
 
 async function runAnswerAction(args: {
@@ -538,7 +606,7 @@ async function runAnswerAction(args: {
       data,
     }),
     body: presentation.body,
-    data,
+    data: resumeAnswerDraft(data, { outcome, action, text: response.userText }),
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
@@ -626,7 +694,14 @@ function resultIdentities(
  *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
- * `ok` / `unavailable` confirmations are quiet.
+ * `ok` / `unavailable` confirmations and the `empty` body are quiet.
+ *
+ * The result is posted with `sound: false`. Android replays the attention
+ * channel's sound on every notify of a notification that already exists, and a
+ * reply result is posted under the acted-on identifier while an approve result
+ * replaces an app-owned notification — both are exactly that in-place notify,
+ * so a sound here would announce the user's own tap back to them. iOS replaces
+ * silently when the request carries no sound, which matches.
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
@@ -656,6 +731,7 @@ async function replaceNotification(args: {
         title,
         body,
         data,
+        sound: false,
         ...(categoryIdentifier === null ? {} : { categoryIdentifier }),
         ...(interruptionLevel === null ? {} : { interruptionLevel }),
       },

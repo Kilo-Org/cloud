@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Codsiga waa la oggolaaday",
       "replied": "Jawaabta waa la diray",
+      "empty": "Qor jawaab, kadibna dir.",
       "failed": "Ma jawaabin karo. Guji mar kale si aad isku daydo.",
       "unavailable": "Codsigaan hadda ma sugayo."
     }

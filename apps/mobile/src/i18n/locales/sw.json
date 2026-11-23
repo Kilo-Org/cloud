@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Ombi limeidhinishwa",
       "replied": "Jibu limetumwa",
+      "empty": "Andika jibu, kisha ulitume.",
       "failed": "Imeshindikana kujibu. Gusa tena kujaribu tena.",
       "unavailable": "Ombi hili halisubiri tena."
     }

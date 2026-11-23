@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Sorğu təsdiqləndi",
       "replied": "Cavab göndərildi",
+      "empty": "Cavab yazın, sonra göndərin.",
       "failed": "Cavab vermək olmadı. Yenidən cəhd etmək üçün yenidən toxunun.",
       "unavailable": "Bu sorğu artıq gözləmir."
     }

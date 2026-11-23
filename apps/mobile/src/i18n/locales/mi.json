@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Kua whakaaetia te tono",
       "replied": "Kua tukuna te whakautu",
+      "empty": "Tuhia he whakautu, kātahi ka tuku.",
       "failed": "Kāore i tutuki te whakautu. Pātia anō hei ngana anō.",
       "unavailable": "Kāore te tono nei e tatari anō."
     }

@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Arịrịọ ahụ ekwenyere",
       "replied": "Eziterela azịza",
+      "empty": "Dee azịza wee zipu ya.",
       "failed": "Enweghị ike izaghachi. Pịa ọzọ ka ị nwaa ọzọ.",
       "unavailable": "Arịrịọ a anaghịzi eche."
     }

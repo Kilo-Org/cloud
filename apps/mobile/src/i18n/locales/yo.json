@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Ìbéèrè náà ti fọwọ́ sí",
       "replied": "Ìfèsì ti ránṣẹ́",
+      "empty": "Kọ ìdáhùn kí o sì ránṣẹ́.",
       "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
       "unavailable": "Ìbéèrè yìí kì í retí mọ́."
     }

@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Pieprasījums apstiprināts",
       "replied": "Atbilde nosūtīta",
+      "empty": "Ievadiet atbildi un pēc tam to nosūtiet.",
       "failed": "Neizdevās atbildēt. Pieskarieties vēlreiz, lai mēģinātu vēlreiz.",
       "unavailable": "Šis pieprasījums vairs negaida."
     }

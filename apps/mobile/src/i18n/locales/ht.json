@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Demann an apwouve",
       "replied": "Repons an voye",
+      "empty": "Ekri yon repons epi voye li.",
       "failed": "Pa ka reponn. Touche ankò pou eseye ankò.",
       "unavailable": "Demann sa a pa tann ankò."
     }

@@ -397,11 +397,12 @@ async function canPostNotifications(): Promise<boolean> {
  * reached the OS, so the caller does not remember a raise that never appeared.
  *
  * `replacesPosted` marks a post that replaces a notification already on screen
- * (the plan's `updates`). It carries `sound: false`, and
- * `ExpoNotificationBuilder.applySoundsAndVibrations` then builds it silent —
- * which suppresses Android 8+'s channel sound too, since Android replays the
- * channel's sound on every `notify` of an existing notification. iOS reads the
- * same field and stays quiet as well.
+ * (the plan's `updates`). Such a post must update it quietly in every dimension
+ * the app controls, so it carries `sound: false` and drops the time-sensitive
+ * interruption level. `ExpoNotificationBuilder.applySoundsAndVibrations` then
+ * builds it silent — which suppresses Android 8+'s channel sound too, since
+ * Android replays the channel's sound on every `notify` of an existing
+ * notification. iOS reads the same field and stays quiet as well.
  */
 async function publishRow(
   row: NeedsInputNotificationRow,
@@ -420,8 +421,7 @@ async function publishRow(
         body: content.body,
         data,
         categoryIdentifier: needsInputCategoryId({ kind: row.kind, hasPr: row.prUrl !== null }),
-        interruptionLevel: 'timeSensitive',
-        ...(replacesPosted ? { sound: false } : {}),
+        ...(replacesPosted ? { sound: false } : { interruptionLevel: 'timeSensitive' as const }),
       },
       // A channel-aware trigger delivers immediately on both platforms: Android
       // routes to the shared attention channel, iOS reads it as a null trigger.

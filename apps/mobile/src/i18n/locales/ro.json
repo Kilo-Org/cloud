@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Cerere aprobată",
       "replied": "Răspuns trimis",
+      "empty": "Scrieți un răspuns, apoi trimiteți-l.",
       "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
       "unavailable": "Această cerere nu mai așteaptă."
     }

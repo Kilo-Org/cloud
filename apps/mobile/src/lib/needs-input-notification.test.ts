@@ -706,11 +706,34 @@ describe('applyNeedsInputNotifications', () => {
         }),
       })
     );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.not.objectContaining({ interruptionLevel: 'timeSensitive' }),
+      })
+    );
+  });
+
+  it('keeps the time-sensitive level and the platform sound on a first post', async () => {
+    // No `updates` entry: nothing is replaced, so the raise is new information
+    // and must alert at the time-sensitive level with the platform's own sound.
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ interruptionLevel: 'timeSensitive' }),
+      })
+    );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.not.objectContaining({ sound: false }),
+      })
+    );
   });
 
   it('does not silence a re-post the same plan dismissed', async () => {
     // The dismissal runs before the post, so the notification the post creates
-    // is new: it must carry the sound a fresh raise carries.
+    // is new: it must carry the sound and time-sensitive level a fresh raise
+    // carries.
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow({ organizationId: null })],
       next: [
@@ -733,6 +756,11 @@ describe('applyNeedsInputNotifications', () => {
       expect.objectContaining({
         identifier: 'needs-input:ses_1',
         content: expect.not.objectContaining({ sound: false }),
+      })
+    );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ interruptionLevel: 'timeSensitive' }),
       })
     );
   });

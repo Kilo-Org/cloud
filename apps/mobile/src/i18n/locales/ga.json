@@ -4676,9 +4676,9 @@
       "setupCommands_many": "{{count}} ordú socraithe",
       "setupCommands_other": "{{count}} ordú socraithe",
       "agents_one": "{{count}} gníomhaire",
-      "agents_two": "{{count}} gníomhaire",
-      "agents_few": "{{count}} gníomhaire",
-      "agents_many": "{{count}} gníomhaire",
+      "agents_two": "{{count}} ghníomhaire",
+      "agents_few": "{{count}} ghníomhaire",
+      "agents_many": "{{count}} ngníomhaire",
       "agents_other": "{{count}} gníomhaire"
     },
     "nameLabel": "Ainm próifíle",

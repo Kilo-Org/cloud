@@ -4595,7 +4595,7 @@
       "agents_one": "{{count}} агент",
       "agents_few": "{{count}} агенти",
       "agents_many": "{{count}} агентів",
-      "agents_other": "{{count}} агенти"
+      "agents_other": "{{count}} агентів"
     },
     "nameLabel": "Ім'я профілю",
     "namePlaceholder": "напр. Бекенд налагодження",

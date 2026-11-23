@@ -3994,6 +3994,27 @@
       "accessibility": "채팅 이름 변경: {{title}}",
       "openHint": "채팅을 엽니다. 길게 눌러 이름을 변경하거나 삭제합니다."
     },
+    "sync": {
+      "busyTitle": "다른 기기에서 사용 중",
+      "busyBody": "이 채팅은 다른 기기에서 응답하고 있습니다. 응답이 끝난 후에 메시지를 보내세요.",
+      "liveTitle": "컴퓨터에서 실행 중",
+      "liveBody": "보내는 메시지는 컴퓨터에서 실행 중인 세션으로 전달됩니다.",
+      "divergedTitle": "이 채팅이 두 기기에서 변경되었습니다",
+      "divergedBody": "이 기기와 다른 기기의 메시지를 합칠 수 없습니다. 최신 버전을 불러와 이 기기를 동기화하세요.",
+      "divergedAction": "동기화되지 않은 메시지를 삭제하고 최신 버전 불러오기",
+      "settingTitle": "기기 간 채팅 동기화",
+      "settingDescription": "Kilo CLI를 포함한 모든 기기에서 채팅을 동기화합니다.",
+      "searchPlaceholder": "채팅 검색",
+      "originFilter": "채팅 출처",
+      "originMobile": "모바일",
+      "includeArchived": "보관된 채팅 포함",
+      "deleteEverywhereTitle": "모든 기기에서 이 채팅을 삭제할까요?",
+      "deleteEverywhereBody": "모든 기기에서 삭제되며 복구할 수 없습니다.",
+      "deletedElsewhere": "이 채팅은 다른 기기에서 삭제되었습니다.",
+      "listLoadFailed": "동기화된 채팅을 불러올 수 없습니다.",
+      "noticeBody": "이제 모든 기기에서 채팅이 동기화됩니다.",
+      "noticeAction": "설정에서 이 기능을 끌 수 있습니다."
+    },
     "beta": "베타",
     "details": {
       "title": "채팅 세부 정보",

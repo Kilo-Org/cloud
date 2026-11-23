@@ -4175,6 +4175,7 @@
       "divergedAction": "Discard unsynced messages and load the latest",
       "settingTitle": "Sync chats across devices",
       "settingDescription": "Keep chats in step across your devices, including Kilo CLI.",
+      "settingUnreadable": "Could not read this setting. Tap to try again.",
       "searchPlaceholder": "Search chats",
       "originFilter": "Chat origin",
       "originMobile": "Mobile",

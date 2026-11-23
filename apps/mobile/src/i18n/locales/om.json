@@ -4067,6 +4067,27 @@
       "accessibility": "Maqaa marii jijjiiri: {{title}}",
       "openHint": "Marii ni bana. Maqaa jijjiiruuf ykn haquuf cuqaasii dheeraa godhi."
     },
+    "sync": {
+      "busyTitle": "Meeshaa biraa irratti hojiirra jira",
+      "busyBody": "Haasaan kun meeshaa biraa irratti deebii kennaa jira. Waan tokkollee erguu kee dura akka xumuru eegi.",
+      "liveTitle": "Kompiitara kee irratti hojjechaa jira",
+      "liveBody": "Ergaawwan ati ergitu gara seshinii kompiitara kee irratti hojjechaa jiruutti ergamu.",
+      "divergedTitle": "Haasaan kun meeshaalee lama irratti jijjiirameera",
+      "divergedBody": "Ergaawwan asii fi meeshaa biraa irra jiran walitti makamuu hin danda'an. Meeshaan kun akka wal-simuuf isa haaraa fe'i.",
+      "divergedAction": "Ergaawwan hin walsimne gatii isa haaraa fe'i",
+      "settingTitle": "Haasawwan meeshaalee hunda irratti walsimsiisi",
+      "settingDescription": "Haasawwan meeshaalee kee hunda irratti, Kilo CLI dabalatee, walsimsiisi.",
+      "searchPlaceholder": "Haasawwan barbaadi",
+      "originFilter": "Madda haasaa",
+      "originMobile": "Mobaayilii",
+      "includeArchived": "Kan kuufaman dabali",
+      "deleteEverywhereTitle": "Haasaa kana bakka hundatti haquu?",
+      "deleteEverywhereBody": "Meeshaa hunda irraa haqama, deebi'ee argamuus hin danda'u.",
+      "deletedElsewhere": "Haasaan kun meeshaa biraa irratti haqameera.",
+      "listLoadFailed": "Haasawwan walsimsiifaman fe'uun hin danda'amne.",
+      "noticeBody": "Haasawwan kee amma meeshaalee kee hunda irratti walsimu.",
+      "noticeAction": "Kana Qindaa'ina keessatti dhaamsuu dandeessa."
+    },
     "beta": "Beetaa",
     "details": {
       "title": "Bal'ina chaat",

@@ -112,7 +112,9 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
           </SettingsTarget>
         </Section>
 
-        <ChatSyncSettingRow />
+        <SettingsTarget item={PREFERENCES_HUB_SETTINGS.chatSync}>
+          <ChatSyncSettingRow />
+        </SettingsTarget>
 
         <RowGroup leadingTile>
           <SettingsTarget item={PREFERENCES_HUB_SETTINGS.account}>

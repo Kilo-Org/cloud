@@ -4002,6 +4002,27 @@
       "accessibility": "Yí orúkọ ìjíròrò padà: {{title}}",
       "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti yí orúkọ padà tàbí láti pa á rẹ́."
     },
+    "sync": {
+      "busyTitle": "Ó ń ṣiṣẹ́ lórí ẹ̀rọ mìíràn",
+      "busyBody": "Ìjíròrò yìí ń dáhùn lórí ẹ̀rọ mìíràn. Dúró kí ó parí kí o tó fi ohunkóhun ránṣẹ́.",
+      "liveTitle": "Ó ń ṣiṣẹ́ lórí kọ̀ǹpútà rẹ",
+      "liveBody": "Àwọn ìfiránṣẹ́ tí o bá fi ránṣẹ́ yóò lọ sí ìjíròrò tó ń ṣiṣẹ́ lórí kọ̀ǹpútà rẹ.",
+      "divergedTitle": "Ìjíròrò yìí yí padà lórí ẹ̀rọ méjì",
+      "divergedBody": "A kò lè so àwọn ìfiránṣẹ́ ibí pọ̀ mọ́ ti ẹ̀rọ mìíràn. Gbé èyí tó jẹ́ tuntun jùlọ wọlé kí ẹ̀rọ yìí lè wà ní ìbámu.",
+      "divergedAction": "Pa àwọn ìfiránṣẹ́ tí a kò tíì mú ṣọ̀kan rẹ́, kí o sì gbé tuntun jùlọ wọlé",
+      "settingTitle": "Mú àwọn ìjíròrò ṣọ̀kan lórí gbogbo ẹ̀rọ",
+      "settingDescription": "Jẹ́ kí àwọn ìjíròrò wà ní ìbámu lórí àwọn ẹ̀rọ rẹ, títí kan Kilo CLI.",
+      "searchPlaceholder": "Wá àwọn ìjíròrò",
+      "originFilter": "Orísun ìjíròrò",
+      "originMobile": "Fóònù",
+      "includeArchived": "Ṣàfikún àwọn tí a fi pamọ́",
+      "deleteEverywhereTitle": "Ṣé kí a pa ìjíròrò yìí rẹ́ níbi gbogbo?",
+      "deleteEverywhereBody": "A ó pa á rẹ́ lórí gbogbo ẹ̀rọ, a kò sì ní lè rí i padà.",
+      "deletedElsewhere": "A ti pa ìjíròrò yìí rẹ́ lórí ẹ̀rọ mìíràn.",
+      "listLoadFailed": "A kò lè gbé àwọn ìjíròrò tí a mú ṣọ̀kan wọlé.",
+      "noticeBody": "Àwọn ìjíròrò rẹ ti wà ní ìbámu báyìí lórí gbogbo ẹ̀rọ rẹ.",
+      "noticeAction": "O lè pa èyí nínú Ètò."
+    },
     "beta": "Beta",
     "details": {
       "title": "Àlàyé ìjíròrò",

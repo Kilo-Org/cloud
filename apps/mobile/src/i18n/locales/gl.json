@@ -4067,6 +4067,27 @@
       "accessibility": "Renomear o chat: {{title}}",
       "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
     },
+    "sync": {
+      "busyTitle": "Ocupado noutro dispositivo",
+      "busyBody": "Este chat está respondendo noutro dispositivo. Agarda a que remate antes de enviar nada.",
+      "liveTitle": "En execución no teu ordenador",
+      "liveBody": "As mensaxes que envíes van á sesión que se está executando no teu ordenador.",
+      "divergedTitle": "Este chat cambiou en dous dispositivos",
+      "divergedBody": "Non se poden unir as mensaxes deste dispositivo e as doutro. Carga a versión máis recente para manter este dispositivo sincronizado.",
+      "divergedAction": "Descartar as mensaxes sen sincronizar e cargar a versión máis recente",
+      "settingTitle": "Sincronizar chats entre dispositivos",
+      "settingDescription": "Mantén os chats sincronizados entre os teus dispositivos, incluída a Kilo CLI.",
+      "searchPlaceholder": "Buscar chats",
+      "originFilter": "Orixe do chat",
+      "originMobile": "Móbil",
+      "includeArchived": "Incluír arquivados",
+      "deleteEverywhereTitle": "Queres eliminar este chat en todos os dispositivos?",
+      "deleteEverywhereBody": "Eliminarase en todos os dispositivos e non se poderá recuperar.",
+      "deletedElsewhere": "Este chat eliminouse noutro dispositivo.",
+      "listLoadFailed": "Non se puideron cargar os chats sincronizados.",
+      "noticeBody": "Os teus chats agora sincronízanse entre os teus dispositivos.",
+      "noticeAction": "Podes desactivar isto en Configuración."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detalles do chat",

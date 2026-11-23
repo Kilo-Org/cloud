@@ -4067,6 +4067,27 @@
       "accessibility": "Chat umbenennen: {{title}}",
       "openHint": "Öffnet den Chat. Zum Umbenennen oder Löschen lange drücken."
     },
+    "sync": {
+      "busyTitle": "Auf einem anderen Gerät aktiv",
+      "busyBody": "Dieser Chat antwortet gerade auf einem anderen Gerät. Warte, bis er fertig ist, bevor du etwas sendest.",
+      "liveTitle": "Läuft auf deinem Computer",
+      "liveBody": "Nachrichten, die du sendest, gehen an die Sitzung auf deinem Computer.",
+      "divergedTitle": "Dieser Chat wurde auf zwei Geräten geändert",
+      "divergedBody": "Die Nachrichten hier und auf einem anderen Gerät können nicht zusammengeführt werden. Lade den neuesten Stand, damit dieses Gerät synchron bleibt.",
+      "divergedAction": "Nicht synchronisierte Nachrichten verwerfen und neuesten Stand laden",
+      "settingTitle": "Chats geräteübergreifend synchronisieren",
+      "settingDescription": "Halte deine Chats auf allen Geräten synchron, auch in der Kilo CLI.",
+      "searchPlaceholder": "Chats durchsuchen",
+      "originFilter": "Chat-Herkunft",
+      "originMobile": "Mobil",
+      "includeArchived": "Archivierte einbeziehen",
+      "deleteEverywhereTitle": "Diesen Chat überall löschen?",
+      "deleteEverywhereBody": "Er wird auf allen Geräten gelöscht und kann nicht wiederhergestellt werden.",
+      "deletedElsewhere": "Dieser Chat wurde auf einem anderen Gerät gelöscht.",
+      "listLoadFailed": "Synchronisierte Chats konnten nicht geladen werden.",
+      "noticeBody": "Deine Chats werden jetzt auf allen deinen Geräten synchronisiert.",
+      "noticeAction": "Du kannst das in den Einstellungen deaktivieren."
+    },
     "beta": "Beta",
     "details": {
       "title": "Chat-Details",

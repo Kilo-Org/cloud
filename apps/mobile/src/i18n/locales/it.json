@@ -4145,6 +4145,27 @@
       "accessibility": "Rinomina la chat: {{title}}",
       "openHint": "Apre la chat. Tieni premuto per rinominare o eliminare."
     },
+    "sync": {
+      "busyTitle": "Occupata su un altro dispositivo",
+      "busyBody": "Questa chat sta rispondendo su un altro dispositivo. Attendi che finisca prima di inviare qualcosa.",
+      "liveTitle": "In esecuzione sul tuo computer",
+      "liveBody": "I messaggi che invii vanno alla sessione in esecuzione sul tuo computer.",
+      "divergedTitle": "Questa chat è stata modificata su due dispositivi",
+      "divergedBody": "I messaggi presenti qui e su un altro dispositivo non possono essere uniti. Carica la versione più recente per mantenere allineato questo dispositivo.",
+      "divergedAction": "Scarta i messaggi non sincronizzati e carica la versione più recente",
+      "settingTitle": "Sincronizza le chat tra i dispositivi",
+      "settingDescription": "Mantieni le chat allineate su tutti i tuoi dispositivi, inclusa la Kilo CLI.",
+      "searchPlaceholder": "Cerca chat",
+      "originFilter": "Origine della chat",
+      "originMobile": "Mobile",
+      "includeArchived": "Includi archiviate",
+      "deleteEverywhereTitle": "Eliminare questa chat ovunque?",
+      "deleteEverywhereBody": "Verrà eliminata su tutti i dispositivi e non potrà essere recuperata.",
+      "deletedElsewhere": "Questa chat è stata eliminata su un altro dispositivo.",
+      "listLoadFailed": "Impossibile caricare le chat sincronizzate.",
+      "noticeBody": "Ora le tue chat si sincronizzano su tutti i tuoi dispositivi.",
+      "noticeAction": "Puoi disattivare questa opzione nelle Impostazioni."
+    },
     "beta": "Beta",
     "details": {
       "title": "Dettagli della chat",

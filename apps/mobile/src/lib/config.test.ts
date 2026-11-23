@@ -25,6 +25,8 @@ const REQUIRED_EXTRA = {
   eventServiceUrl: 'https://events.kiloapps.io',
   notificationsUrl: 'https://notifications.kiloapps.io',
   posthogApiKey: 'posthog-key',
+  // The committed production value apps/mobile/.env carries.
+  sessionSyncUrl: 'https://session-sync.kiloapps.io',
 };
 
 const PRODUCTION_MCP_URL = 'https://mcp.kiloapps.io';
@@ -84,20 +86,20 @@ describe('SESSION_SYNC_URL', () => {
   }
 
   it.each([undefined, 'https://session-sync.kiloapps.io', 'http://localhost:8817'])(
-    'keeps release preview unavailable with relay override %s',
+    'uses the committed production endpoint whatever a dev override says (%s)',
     async override => {
       if (override !== undefined) {
         vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', override);
       }
       state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
-      await expect(syncUrl()).resolves.toBeUndefined();
+      await expect(syncUrl()).resolves.toBe('https://session-sync.kiloapps.io');
     }
   );
 
-  it('requires an explicit relay in a development bundle', async () => {
+  it('uses the committed endpoint in a development bundle with no relay override', async () => {
     vi.stubGlobal('__DEV__', true);
     state.extra = REQUIRED_EXTRA;
-    await expect(syncUrl()).resolves.toBeUndefined();
+    await expect(syncUrl()).resolves.toBe('https://session-sync.kiloapps.io');
   });
 
   it('accepts the local relay in a development bundle', async () => {

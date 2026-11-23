@@ -4067,6 +4067,27 @@
       "accessibility": "Chat hernoemen: {{title}}",
       "openHint": "Opent de chat. Lang indrukken om te hernoemen of te verwijderen."
     },
+    "sync": {
+      "busyTitle": "Bezig op een ander apparaat",
+      "busyBody": "Deze chat geeft antwoord op een ander apparaat. Wacht tot dat klaar is voordat je iets verstuurt.",
+      "liveTitle": "Actief op je computer",
+      "liveBody": "Berichten die je verstuurt, gaan naar de sessie die op je computer draait.",
+      "divergedTitle": "Deze chat is op twee apparaten gewijzigd",
+      "divergedBody": "Berichten hier en op een ander apparaat kunnen niet worden samengevoegd. Laad de nieuwste versie om dit apparaat gelijk te houden.",
+      "divergedAction": "Niet-gesynchroniseerde berichten verwijderen en nieuwste versie laden",
+      "settingTitle": "Chats synchroniseren tussen apparaten",
+      "settingDescription": "Houd chats gelijk op al je apparaten, inclusief Kilo CLI.",
+      "searchPlaceholder": "Chats zoeken",
+      "originFilter": "Herkomst van chat",
+      "originMobile": "Mobiel",
+      "includeArchived": "Inclusief gearchiveerd",
+      "deleteEverywhereTitle": "Deze chat overal verwijderen?",
+      "deleteEverywhereBody": "De chat wordt op elk apparaat verwijderd en kan niet worden hersteld.",
+      "deletedElsewhere": "Deze chat is op een ander apparaat verwijderd.",
+      "listLoadFailed": "Kan gesynchroniseerde chats niet laden.",
+      "noticeBody": "Je chats worden nu gesynchroniseerd op al je apparaten.",
+      "noticeAction": "Je kunt dit uitzetten in Instellingen."
+    },
     "beta": "Bèta",
     "details": {
       "title": "Chatdetails",

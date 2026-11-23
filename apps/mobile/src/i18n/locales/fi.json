@@ -4067,6 +4067,27 @@
       "accessibility": "Nimeä keskustelu uudelleen: {{title}}",
       "openHint": "Avaa keskustelun. Nimeä uudelleen tai poista painamalla pitkään."
     },
+    "sync": {
+      "busyTitle": "Käytössä toisella laitteella",
+      "busyBody": "Tähän keskusteluun vastataan parhaillaan toisella laitteella. Odota, että vastaus valmistuu, ennen kuin lähetät mitään.",
+      "liveTitle": "Käynnissä tietokoneellasi",
+      "liveBody": "Lähettämäsi viestit menevät tietokoneellasi käynnissä olevaan istuntoon.",
+      "divergedTitle": "Tätä keskustelua muutettiin kahdella laitteella",
+      "divergedBody": "Tämän ja toisen laitteen viestejä ei voi yhdistää. Lataa uusin versio, jotta tämä laite pysyy ajan tasalla.",
+      "divergedAction": "Hylkää synkronoimattomat viestit ja lataa uusin",
+      "settingTitle": "Synkronoi keskustelut laitteiden välillä",
+      "settingDescription": "Pidä keskustelut ajan tasalla kaikilla laitteillasi, myös Kilo CLI:ssä.",
+      "searchPlaceholder": "Hae keskusteluja",
+      "originFilter": "Keskustelun lähde",
+      "originMobile": "Mobiili",
+      "includeArchived": "Näytä myös arkistoidut",
+      "deleteEverywhereTitle": "Poistetaanko keskustelu kaikkialta?",
+      "deleteEverywhereBody": "Keskustelu poistetaan kaikilta laitteilta, eikä sitä voi palauttaa.",
+      "deletedElsewhere": "Tämä keskustelu poistettiin toisella laitteella.",
+      "listLoadFailed": "Synkronoitujen keskustelujen lataaminen epäonnistui.",
+      "noticeBody": "Keskustelusi synkronoidaan nyt kaikille laitteillesi.",
+      "noticeAction": "Voit poistaa tämän käytöstä asetuksissa."
+    },
     "beta": "Beta",
     "details": {
       "title": "Keskustelun tiedot",

@@ -4067,6 +4067,27 @@
       "accessibility": "Chanje non chat la: {{title}}",
       "openHint": "Louvri chat la. Peze lontan pou chanje non an oswa pou efase."
     },
+    "sync": {
+      "busyTitle": "Okipe sou yon lòt aparèy",
+      "busyBody": "Chat sa a ap reponn sou yon lòt aparèy. Tann li fini anvan ou voye anyen.",
+      "liveTitle": "Ap mache sou òdinatè w",
+      "liveBody": "Mesaj ou voye yo ale nan sesyon k ap mache sou òdinatè w.",
+      "divergedTitle": "Chat sa a chanje sou de aparèy",
+      "divergedBody": "Mesaj ki isit la ak sa ki sou yon lòt aparèy pa ka mete ansanm. Chaje dènye vèsyon an pou aparèy sa a rete ajou.",
+      "divergedAction": "Efase mesaj ki pa senkronize yo epi chaje dènye vèsyon an",
+      "settingTitle": "Senkronize chat yo sou tout aparèy",
+      "settingDescription": "Kenbe chat yo ajou sou tout aparèy ou yo, sa gen ladan Kilo CLI.",
+      "searchPlaceholder": "Chèche chat",
+      "originFilter": "Orijin chat la",
+      "originMobile": "Mobil",
+      "includeArchived": "Mete sa ki achive yo tou",
+      "deleteEverywhereTitle": "Efase chat sa a toupatou?",
+      "deleteEverywhereBody": "L ap efase sou tout aparèy epi ou p ap ka rekipere l.",
+      "deletedElsewhere": "Yo efase chat sa a sou yon lòt aparèy.",
+      "listLoadFailed": "Nou pa t ka chaje chat ki senkronize yo.",
+      "noticeBody": "Kounye a chat ou yo senkronize sou tout aparèy ou yo.",
+      "noticeAction": "Ou ka dezaktive sa nan Paramèt."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detay chat la",

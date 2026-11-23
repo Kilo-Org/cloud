@@ -4145,6 +4145,27 @@
       "accessibility": "Redenumește chatul: {{title}}",
       "openHint": "Deschide chatul. Apasă lung pentru a redenumi sau a șterge."
     },
+    "sync": {
+      "busyTitle": "Ocupat pe alt dispozitiv",
+      "busyBody": "Acest chat răspunde pe alt dispozitiv. Așteaptă să termine înainte de a trimite ceva.",
+      "liveTitle": "Rulează pe computerul tău",
+      "liveBody": "Mesajele pe care le trimiți ajung la sesiunea care rulează pe computerul tău.",
+      "divergedTitle": "Acest chat s-a modificat pe două dispozitive",
+      "divergedBody": "Mesajele de aici și cele de pe alt dispozitiv nu pot fi combinate. Încarcă cea mai recentă versiune ca acest dispozitiv să rămână sincronizat.",
+      "divergedAction": "Renunță la mesajele nesincronizate și încarcă cea mai recentă versiune",
+      "settingTitle": "Sincronizează chaturile pe toate dispozitivele",
+      "settingDescription": "Păstrează chaturile sincronizate pe toate dispozitivele tale, inclusiv în Kilo CLI.",
+      "searchPlaceholder": "Caută în chaturi",
+      "originFilter": "Originea chatului",
+      "originMobile": "Mobil",
+      "includeArchived": "Include arhivate",
+      "deleteEverywhereTitle": "Ștergi acest chat peste tot?",
+      "deleteEverywhereBody": "Va fi șters de pe toate dispozitivele și nu va putea fi recuperat.",
+      "deletedElsewhere": "Acest chat a fost șters pe alt dispozitiv.",
+      "listLoadFailed": "Chaturile sincronizate nu au putut fi încărcate.",
+      "noticeBody": "Chaturile tale se sincronizează acum pe toate dispozitivele.",
+      "noticeAction": "Poți dezactiva această opțiune din Setări."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detaliile chatului",

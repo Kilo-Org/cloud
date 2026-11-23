@@ -4067,6 +4067,27 @@
       "accessibility": "Whakaingoa anō te kōrerorero: {{title}}",
       "openHint": "Ka whakatuwhera i te kōrerorero. Pēhia roa hei whakaingoa anō, hei muku rānei."
     },
+    "sync": {
+      "busyTitle": "Kei te pukumahi i tētahi atu pūrere",
+      "busyBody": "Kei te whakautu tēnei kōrerorero i tētahi atu pūrere. Tatari kia oti i mua i tō tuku i tētahi mea.",
+      "liveTitle": "Kei te rere i tō rorohiko",
+      "liveBody": "Ka tae ngā karere ka tukuna e koe ki te wāhanga e rere ana i tō rorohiko.",
+      "divergedTitle": "I huri tēnei kōrerorero i ngā pūrere e rua",
+      "divergedBody": "Kāore e taea te hono i ngā karere i konei ki ērā i tētahi atu pūrere. Utaina te mea hou kia ōrite tonu tēnei pūrere.",
+      "divergedAction": "Whakakorea ngā karere kāore anō kia tukutahia, ka uta i te mea hou",
+      "settingTitle": "Tukutahia ngā kōrerorero puta noa i ngā pūrere",
+      "settingDescription": "Kia ōrite tonu ngā kōrerorero puta noa i ō pūrere, tae atu ki te Kilo CLI.",
+      "searchPlaceholder": "Rapu kōrerorero",
+      "originFilter": "Pūtake o te kōrerorero",
+      "originMobile": "Waea pūkoro",
+      "includeArchived": "Whakauru i ngā mea kua pūrangatia",
+      "deleteEverywhereTitle": "Me muku tēnei kōrerorero i ngā wāhi katoa?",
+      "deleteEverywhereBody": "Ka mukua i ia pūrere, ā, e kore e taea te whakahoki mai.",
+      "deletedElsewhere": "I mukua tēnei kōrerorero i tētahi atu pūrere.",
+      "listLoadFailed": "Kāore i taea te uta i ngā kōrerorero kua tukutahia.",
+      "noticeBody": "Ka tukutahi ō kōrerorero puta noa i ō pūrere ināianei.",
+      "noticeAction": "Ka taea e koe te whakaweto i tēnei i ngā Tautuhinga."
+    },
     "beta": "Beta",
     "details": {
       "title": "Ngā taipitopito kōrerorero",

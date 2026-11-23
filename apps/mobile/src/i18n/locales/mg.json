@@ -4067,6 +4067,27 @@
       "accessibility": "Ovay ny anaran'ny resaka: {{title}}",
       "openHint": "Manokatra ny resaka. Tsindrio ela mba hanovana ny anarana na hamafana."
     },
+    "sync": {
+      "busyTitle": "Sahirana amin'ny fitaovana hafa",
+      "busyBody": "Mbola mamaly amin'ny fitaovana hafa ity resaka ity. Andraso ho vita aloha vao mandefa zavatra.",
+      "liveTitle": "Mandeha amin'ny solosainao",
+      "liveBody": "Mankany amin'ny resaka mandeha amin'ny solosainao ireo hafatra alefanao.",
+      "divergedTitle": "Niova tamin'ny fitaovana roa ity resaka ity",
+      "divergedBody": "Tsy azo atambatra ireo hafatra eto sy ireo amin'ny fitaovana hafa. Ampidiro ny vaovao indrindra mba hitovy hatrany ity fitaovana ity.",
+      "divergedAction": "Fafao ireo hafatra tsy voarindra ary ampidiro ny vaovao indrindra",
+      "settingTitle": "Ampifanaraho ny resaka amin'ny fitaovana rehetra",
+      "settingDescription": "Ataovy mitovy hatrany ny resaka amin'ny fitaovanao rehetra, anisan'izany ny Kilo CLI.",
+      "searchPlaceholder": "Hitady resaka",
+      "originFilter": "Niavian'ny resaka",
+      "originMobile": "Finday",
+      "includeArchived": "Ampidiro ireo voatahiry",
+      "deleteEverywhereTitle": "Hofafana amin'ny fitaovana rehetra ve ity resaka ity?",
+      "deleteEverywhereBody": "Hofafana amin'ny fitaovana rehetra izy ary tsy azo averina intsony.",
+      "deletedElsewhere": "Voafafa tamin'ny fitaovana hafa ity resaka ity.",
+      "listLoadFailed": "Tsy nahomby ny fampidirana ireo resaka voarindra.",
+      "noticeBody": "Mifanaraka amin'ny fitaovanao rehetra izao ny resakao.",
+      "noticeAction": "Azonao vonoina ao amin'ny Fikirana izany."
+    },
     "beta": "Beta",
     "details": {
       "title": "Antsipirian'ny resaka",

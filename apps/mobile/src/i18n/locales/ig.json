@@ -4000,6 +4000,27 @@
       "accessibility": "Gbanwee aha nkata: {{title}}",
       "openHint": "Na-emeghe nkata ahụ. Pịgide iji gbanwee aha ma ọ bụ hichapụ."
     },
+    "sync": {
+      "busyTitle": "Ọ na-arụ ọrụ na ngwaọrụ ọzọ",
+      "busyBody": "Nkata a na-aza na ngwaọrụ ọzọ. Chere ka o mechaa tupu i zipu ihe ọ bụla.",
+      "liveTitle": "Ọ na-agba na kọmputa gị",
+      "liveBody": "Ozi ndị i zipụrụ na-aga na nnọkọ na-agba na kọmputa gị.",
+      "divergedTitle": "Nkata a gbanwere na ngwaọrụ abụọ",
+      "divergedBody": "Enweghị ike ijikọ ozi ndị dị ebe a na ndị dị na ngwaọrụ ọzọ. Bulite nke kachasị ọhụrụ ka ngwaọrụ a na-adakọ.",
+      "divergedAction": "Tụfuo ozi ndị a na-emekọrịtaghị ma bulite nke kachasị ọhụrụ",
+      "settingTitle": "Mekọrịta nkata n'ofe ngwaọrụ",
+      "settingDescription": "Mee ka nkata gị dakọọ n'ofe ngwaọrụ gị niile, gụnyere Kilo CLI.",
+      "searchPlaceholder": "Chọọ nkata",
+      "originFilter": "Ebe nkata si",
+      "originMobile": "Ekwentị",
+      "includeArchived": "Gụnye ndị echekwara",
+      "deleteEverywhereTitle": "Hichapụ nkata a ebe niile?",
+      "deleteEverywhereBody": "A ga-ehichapụ ya na ngwaọrụ niile, enweghịkwa ike iweghachi ya.",
+      "deletedElsewhere": "E hichapụrụ nkata a na ngwaọrụ ọzọ.",
+      "listLoadFailed": "Enweghị ike ibulite nkata ndị emekọrịtara.",
+      "noticeBody": "A na-emekọrịta nkata gị ugbu a n'ofe ngwaọrụ gị.",
+      "noticeAction": "Ị nwere ike ịgbanyụ nke a na Ntọala."
+    },
     "beta": "Beta",
     "details": {
       "title": "Nkọwa nkata",

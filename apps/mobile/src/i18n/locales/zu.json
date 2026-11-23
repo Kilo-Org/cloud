@@ -4067,6 +4067,27 @@
       "accessibility": "Qamba kabusha ingxoxo: {{title}}",
       "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze uqambe kabusha noma usule."
     },
+    "sync": {
+      "busyTitle": "Imatasa kwenye idivayisi",
+      "busyBody": "Le ngxoxo iphendula kwenye idivayisi. Linda iqede ngaphambi kokuthumela noma yini.",
+      "liveTitle": "Isebenza kukhompyutha yakho",
+      "liveBody": "Imilayezo oyithumelayo iya kuseshini esebenza kukhompyutha yakho.",
+      "divergedTitle": "Le ngxoxo ishintshe kumadivayisi amabili",
+      "divergedBody": "Imilayezo elapha nekwenye idivayisi ayikwazi ukuhlanganiswa. Layisha yakamuva ukuze le divayisi ihambisane.",
+      "divergedAction": "Lahla imilayezo engavunyelanisiwe bese ulayisha yakamuva",
+      "settingTitle": "Vumelanisa izingxoxo kuwo wonke amadivayisi",
+      "settingDescription": "Gcina izingxoxo zihambisana kuwo wonke amadivayisi akho, kuhlanganise ne-Kilo CLI.",
+      "searchPlaceholder": "Sesha izingxoxo",
+      "originFilter": "Umsuka wengxoxo",
+      "originMobile": "Iselula",
+      "includeArchived": "Hlanganisa nezigciniwe",
+      "deleteEverywhereTitle": "Susa le ngxoxo yonke indawo?",
+      "deleteEverywhereBody": "Isuswa kuwo wonke amadivayisi futhi ayikwazi ukubuyiswa.",
+      "deletedElsewhere": "Le ngxoxo isusiwe kwenye idivayisi.",
+      "listLoadFailed": "Akukwazekanga ukulayisha izingxoxo ezivunyelanisiwe.",
+      "noticeBody": "Izingxoxo zakho manje ziyavunyelaniswa kuwo wonke amadivayisi akho.",
+      "noticeAction": "Ungakuvala lokhu kuMasethingi."
+    },
     "beta": "Beta",
     "details": {
       "title": "Imininingwane yengxoxo",

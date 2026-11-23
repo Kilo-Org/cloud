@@ -4067,6 +4067,27 @@
       "accessibility": "Omdøb chat: {{title}}",
       "openHint": "Åbner chatten. Tryk og hold for at omdøbe eller slette."
     },
+    "sync": {
+      "busyTitle": "Optaget på en anden enhed",
+      "busyBody": "Denne chat svarer på en anden enhed. Vent, til den er færdig, før du sender noget.",
+      "liveTitle": "Kører på din computer",
+      "liveBody": "Beskeder, du sender, går til sessionen, der kører på din computer.",
+      "divergedTitle": "Denne chat er ændret på to enheder",
+      "divergedBody": "Beskederne her og på en anden enhed kan ikke flettes sammen. Indlæs den nyeste version for at holde denne enhed synkroniseret.",
+      "divergedAction": "Kassér usynkroniserede beskeder, og indlæs den nyeste version",
+      "settingTitle": "Synkroniser chats på tværs af enheder",
+      "settingDescription": "Hold dine chats synkroniseret på tværs af dine enheder, også Kilo CLI.",
+      "searchPlaceholder": "Søg i chats",
+      "originFilter": "Chattens oprindelse",
+      "originMobile": "Mobil",
+      "includeArchived": "Medtag arkiverede",
+      "deleteEverywhereTitle": "Vil du slette denne chat overalt?",
+      "deleteEverywhereBody": "Den slettes på alle enheder og kan ikke gendannes.",
+      "deletedElsewhere": "Denne chat er slettet på en anden enhed.",
+      "listLoadFailed": "Synkroniserede chats kunne ikke indlæses.",
+      "noticeBody": "Dine chats synkroniseres nu på tværs af dine enheder.",
+      "noticeAction": "Du kan slå det fra under Indstillinger."
+    },
     "beta": "Beta",
     "details": {
       "title": "Chatoplysninger",

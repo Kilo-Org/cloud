@@ -4223,6 +4223,27 @@
       "accessibility": "Zmień nazwę czatu: {{title}}",
       "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby zmienić nazwę lub usunąć."
     },
+    "sync": {
+      "busyTitle": "Zajęty na innym urządzeniu",
+      "busyBody": "Ten czat odpowiada na innym urządzeniu. Zaczekaj, aż skończy, zanim cokolwiek wyślesz.",
+      "liveTitle": "Działa na Twoim komputerze",
+      "liveBody": "Wysyłane wiadomości trafiają do sesji działającej na Twoim komputerze.",
+      "divergedTitle": "Ten czat zmienił się na dwóch urządzeniach",
+      "divergedBody": "Nie można połączyć wiadomości z tego i innego urządzenia. Wczytaj najnowszą wersję, aby to urządzenie było zsynchronizowane.",
+      "divergedAction": "Odrzuć niezsynchronizowane wiadomości i wczytaj najnowszą wersję",
+      "settingTitle": "Synchronizuj czaty między urządzeniami",
+      "settingDescription": "Utrzymuj czaty zsynchronizowane na wszystkich urządzeniach, w tym w Kilo CLI.",
+      "searchPlaceholder": "Szukaj czatów",
+      "originFilter": "Źródło czatu",
+      "originMobile": "Telefon",
+      "includeArchived": "Uwzględnij zarchiwizowane",
+      "deleteEverywhereTitle": "Usunąć ten czat wszędzie?",
+      "deleteEverywhereBody": "Zostanie usunięty na wszystkich urządzeniach i nie będzie można go odzyskać.",
+      "deletedElsewhere": "Ten czat został usunięty na innym urządzeniu.",
+      "listLoadFailed": "Nie udało się wczytać zsynchronizowanych czatów.",
+      "noticeBody": "Twoje czaty są teraz synchronizowane między urządzeniami.",
+      "noticeAction": "Możesz to wyłączyć w Ustawieniach."
+    },
     "beta": "Beta",
     "details": {
       "title": "Szczegóły czatu",

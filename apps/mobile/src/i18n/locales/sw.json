@@ -4067,6 +4067,27 @@
       "accessibility": "Badilisha jina la gumzo: {{title}}",
       "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kubadilisha jina au kufuta."
     },
+    "sync": {
+      "busyTitle": "Inatumika kwenye kifaa kingine",
+      "busyBody": "Gumzo hili linajibu kwenye kifaa kingine. Subiri limalize kabla ya kutuma chochote.",
+      "liveTitle": "Inaendeshwa kwenye kompyuta yako",
+      "liveBody": "Ujumbe unaotuma unaenda kwenye kipindi kinachoendeshwa kwenye kompyuta yako.",
+      "divergedTitle": "Gumzo hili limebadilika kwenye vifaa viwili",
+      "divergedBody": "Ujumbe ulio hapa na kwenye kifaa kingine hauwezi kuunganishwa. Pakia toleo jipya zaidi ili kifaa hiki kiendane na vingine.",
+      "divergedAction": "Futa ujumbe ambao haujasawazishwa na upakie toleo jipya zaidi",
+      "settingTitle": "Sawazisha gumzo kwenye vifaa vyote",
+      "settingDescription": "Weka gumzo zikiendana kwenye vifaa vyako vyote, pamoja na Kilo CLI.",
+      "searchPlaceholder": "Tafuta gumzo",
+      "originFilter": "Chanzo cha gumzo",
+      "originMobile": "Simu",
+      "includeArchived": "Jumuisha zilizohifadhiwa kwenye kumbukumbu",
+      "deleteEverywhereTitle": "Ungependa kufuta gumzo hili kila mahali?",
+      "deleteEverywhereBody": "Litafutwa kwenye kila kifaa na haliwezi kurejeshwa.",
+      "deletedElsewhere": "Gumzo hili lilifutwa kwenye kifaa kingine.",
+      "listLoadFailed": "Imeshindwa kupakia gumzo zilizosawazishwa.",
+      "noticeBody": "Gumzo zako sasa zinasawazishwa kwenye vifaa vyako vyote.",
+      "noticeAction": "Unaweza kuzima hili kwenye Mipangilio."
+    },
     "beta": "Beta",
     "details": {
       "title": "Maelezo ya gumzo",

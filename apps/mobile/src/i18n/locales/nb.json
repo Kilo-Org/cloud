@@ -4067,6 +4067,27 @@
       "accessibility": "Gi chatten nytt navn: {{title}}",
       "openHint": "Åpner chatten. Trykk og hold for å gi nytt navn eller slette."
     },
+    "sync": {
+      "busyTitle": "Opptatt på en annen enhet",
+      "busyBody": "Denne chatten svarer på en annen enhet. Vent til den er ferdig før du sender noe.",
+      "liveTitle": "Kjører på datamaskinen din",
+      "liveBody": "Meldinger du sender, går til økten som kjører på datamaskinen din.",
+      "divergedTitle": "Denne chatten ble endret på to enheter",
+      "divergedBody": "Meldingene her og på en annen enhet kan ikke slås sammen. Last inn den nyeste versjonen for å holde denne enheten i synk.",
+      "divergedAction": "Forkast usynkroniserte meldinger og last inn den nyeste",
+      "settingTitle": "Synkroniser chatter på tvers av enheter",
+      "settingDescription": "Hold chattene i synk på alle enhetene dine, inkludert Kilo CLI.",
+      "searchPlaceholder": "Søk i chatter",
+      "originFilter": "Chattens opprinnelse",
+      "originMobile": "Mobil",
+      "includeArchived": "Inkluder arkiverte",
+      "deleteEverywhereTitle": "Vil du slette denne chatten overalt?",
+      "deleteEverywhereBody": "Den slettes på alle enheter og kan ikke gjenopprettes.",
+      "deletedElsewhere": "Denne chatten ble slettet på en annen enhet.",
+      "listLoadFailed": "Kunne ikke laste inn synkroniserte chatter.",
+      "noticeBody": "Chattene dine synkroniseres nå på tvers av enhetene dine.",
+      "noticeAction": "Du kan slå av dette i Innstillinger."
+    },
     "beta": "Beta",
     "details": {
       "title": "Chatdetaljer",

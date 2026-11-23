@@ -82,6 +82,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+vi.mock('@/lib/chat/use-chat', () => ({
+  useChatPlace: () => null,
+}));
+vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
+  useChatSyncGate: () => ({ state: { kind: 'on' }, enabled: true, decide: async () => undefined }),
+}));
 describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();

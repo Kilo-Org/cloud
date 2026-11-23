@@ -4067,6 +4067,27 @@
       "accessibility": "Byt namn på chatten: {{title}}",
       "openHint": "Öppnar chatten. Tryck länge för att byta namn eller ta bort."
     },
+    "sync": {
+      "busyTitle": "Upptagen på en annan enhet",
+      "busyBody": "Den här chatten svarar på en annan enhet. Vänta tills den är klar innan du skickar något.",
+      "liveTitle": "Körs på din dator",
+      "liveBody": "Meddelanden du skickar går till sessionen som körs på din dator.",
+      "divergedTitle": "Chatten har ändrats på två enheter",
+      "divergedBody": "Meddelandena här och på en annan enhet kan inte slås ihop. Läs in den senaste versionen för att hålla den här enheten synkad.",
+      "divergedAction": "Ta bort osynkade meddelanden och läs in den senaste versionen",
+      "settingTitle": "Synka chattar mellan enheter",
+      "settingDescription": "Håll chattar synkade mellan dina enheter, inklusive Kilo CLI.",
+      "searchPlaceholder": "Sök chattar",
+      "originFilter": "Chattens ursprung",
+      "originMobile": "Mobil",
+      "includeArchived": "Inkludera arkiverade",
+      "deleteEverywhereTitle": "Vill du ta bort chatten överallt?",
+      "deleteEverywhereBody": "Den tas bort på alla enheter och kan inte återställas.",
+      "deletedElsewhere": "Den här chatten har tagits bort på en annan enhet.",
+      "listLoadFailed": "Det gick inte att läsa in synkade chattar.",
+      "noticeBody": "Dina chattar synkas nu mellan dina enheter.",
+      "noticeAction": "Du kan stänga av det här i Inställningar."
+    },
     "beta": "Beta",
     "details": {
       "title": "Chattinformation",

@@ -4145,6 +4145,27 @@
       "accessibility": "Renommer la discussion : {{title}}",
       "openHint": "Ouvre la discussion. Appui long pour renommer ou supprimer."
     },
+    "sync": {
+      "busyTitle": "Occupé sur un autre appareil",
+      "busyBody": "Ce chat est en train de répondre sur un autre appareil. Attendez la fin avant d'envoyer quoi que ce soit.",
+      "liveTitle": "En cours sur votre ordinateur",
+      "liveBody": "Les messages que vous envoyez sont transmis à la session en cours sur votre ordinateur.",
+      "divergedTitle": "Ce chat a été modifié sur deux appareils",
+      "divergedBody": "Les messages de cet appareil et ceux d'un autre appareil ne peuvent pas être fusionnés. Chargez la dernière version pour garder cet appareil synchronisé.",
+      "divergedAction": "Supprimer les messages non synchronisés et charger la dernière version",
+      "settingTitle": "Synchroniser les chats entre appareils",
+      "settingDescription": "Gardez vos chats synchronisés sur tous vos appareils, y compris Kilo CLI.",
+      "searchPlaceholder": "Rechercher des chats",
+      "originFilter": "Origine du chat",
+      "originMobile": "Mobile",
+      "includeArchived": "Inclure les archives",
+      "deleteEverywhereTitle": "Supprimer ce chat partout ?",
+      "deleteEverywhereBody": "Il sera supprimé sur tous les appareils et ne pourra pas être récupéré.",
+      "deletedElsewhere": "Ce chat a été supprimé sur un autre appareil.",
+      "listLoadFailed": "Impossible de charger les chats synchronisés.",
+      "noticeBody": "Vos chats sont désormais synchronisés sur tous vos appareils.",
+      "noticeAction": "Vous pouvez désactiver cette option dans les Réglages."
+    },
     "beta": "Bêta",
     "details": {
       "title": "Détails de la discussion",

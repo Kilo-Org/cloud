@@ -4067,6 +4067,27 @@
       "accessibility": "Berrizendatu txata: {{title}}",
       "openHint": "Txata irekitzen du. Berrizendatzeko edo ezabatzeko, sakatu luze."
     },
+    "sync": {
+      "busyTitle": "Beste gailu batean lanpetuta",
+      "busyBody": "Txat hau beste gailu batean ari da erantzuten. Itxaron amaitu arte ezer bidali aurretik.",
+      "liveTitle": "Zure ordenagailuan exekutatzen",
+      "liveBody": "Bidaltzen dituzun mezuak zure ordenagailuan exekutatzen ari den saiora doaz.",
+      "divergedTitle": "Txat hau bi gailutan aldatu da",
+      "divergedBody": "Hemengo eta beste gailu bateko mezuak ezin dira bateratu. Kargatu azken bertsioa gailu hau sinkronizatuta egoteko.",
+      "divergedAction": "Baztertu sinkronizatu gabeko mezuak eta kargatu azken bertsioa",
+      "settingTitle": "Sinkronizatu txatak gailuen artean",
+      "settingDescription": "Mantendu txatak sinkronizatuta zure gailu guztietan, Kilo CLI barne.",
+      "searchPlaceholder": "Bilatu txatak",
+      "originFilter": "Txataren jatorria",
+      "originMobile": "Mugikorra",
+      "includeArchived": "Sartu artxibatuak",
+      "deleteEverywhereTitle": "Txat hau gailu guztietan ezabatu?",
+      "deleteEverywhereBody": "Gailu guztietan ezabatuko da, eta ezin izango da berreskuratu.",
+      "deletedElsewhere": "Txat hau beste gailu batean ezabatu da.",
+      "listLoadFailed": "Ezin izan dira sinkronizatutako txatak kargatu.",
+      "noticeBody": "Zure txatak gailu guztietan sinkronizatzen dira orain.",
+      "noticeAction": "Ezarpenetan desaktiba dezakezu."
+    },
     "beta": "Beta",
     "details": {
       "title": "Txataren xehetasunak",

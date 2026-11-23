@@ -3996,6 +3996,27 @@
       "accessibility": "チャット「{{title}}」の名前を変更",
       "openHint": "チャットを開きます。長押しで名前の変更または削除ができます。"
     },
+    "sync": {
+      "busyTitle": "別のデバイスで応答中",
+      "busyBody": "このチャットは別のデバイスで応答中です。完了するまで送信をお待ちください。",
+      "liveTitle": "コンピューターで実行中",
+      "liveBody": "送信したメッセージは、コンピューターで実行中のセッションに届きます。",
+      "divergedTitle": "このチャットが2つのデバイスで変更されました",
+      "divergedBody": "このデバイスと別のデバイスのメッセージを統合できません。最新の内容を読み込んで、このデバイスを同期してください。",
+      "divergedAction": "未同期のメッセージを破棄して最新の内容を読み込む",
+      "settingTitle": "デバイス間でチャットを同期",
+      "settingDescription": "Kilo CLIを含むすべてのデバイスでチャットを同期します。",
+      "searchPlaceholder": "チャットを検索",
+      "originFilter": "チャットの作成元",
+      "originMobile": "モバイル",
+      "includeArchived": "アーカイブ済みを含める",
+      "deleteEverywhereTitle": "このチャットをすべてのデバイスから削除しますか？",
+      "deleteEverywhereBody": "すべてのデバイスから削除され、復元できません。",
+      "deletedElsewhere": "このチャットは別のデバイスで削除されました。",
+      "listLoadFailed": "同期済みのチャットを読み込めませんでした。",
+      "noticeBody": "チャットがデバイス間で同期されるようになりました。",
+      "noticeAction": "この機能は設定でオフにできます。"
+    },
     "beta": "ベータ",
     "details": {
       "title": "チャットの詳細",

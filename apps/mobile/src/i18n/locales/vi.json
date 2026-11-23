@@ -4067,6 +4067,27 @@
       "accessibility": "Đổi tên cuộc trò chuyện: {{title}}",
       "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
     },
+    "sync": {
+      "busyTitle": "Đang bận trên thiết bị khác",
+      "busyBody": "Cuộc trò chuyện này đang trả lời trên một thiết bị khác. Hãy đợi hoàn tất rồi mới gửi tin nhắn.",
+      "liveTitle": "Đang chạy trên máy tính của bạn",
+      "liveBody": "Tin nhắn bạn gửi sẽ được chuyển đến phiên đang chạy trên máy tính của bạn.",
+      "divergedTitle": "Cuộc trò chuyện này đã thay đổi trên hai thiết bị",
+      "divergedBody": "Không thể gộp tin nhắn ở đây với tin nhắn trên thiết bị khác. Hãy tải bản mới nhất để thiết bị này luôn đồng bộ.",
+      "divergedAction": "Bỏ tin nhắn chưa đồng bộ và tải bản mới nhất",
+      "settingTitle": "Đồng bộ cuộc trò chuyện giữa các thiết bị",
+      "settingDescription": "Giữ các cuộc trò chuyện đồng bộ trên mọi thiết bị của bạn, kể cả Kilo CLI.",
+      "searchPlaceholder": "Tìm cuộc trò chuyện",
+      "originFilter": "Nguồn cuộc trò chuyện",
+      "originMobile": "Di động",
+      "includeArchived": "Bao gồm đã lưu trữ",
+      "deleteEverywhereTitle": "Xóa cuộc trò chuyện này trên mọi thiết bị?",
+      "deleteEverywhereBody": "Cuộc trò chuyện sẽ bị xóa trên mọi thiết bị và không thể khôi phục.",
+      "deletedElsewhere": "Cuộc trò chuyện này đã bị xóa trên một thiết bị khác.",
+      "listLoadFailed": "Không thể tải các cuộc trò chuyện đã đồng bộ.",
+      "noticeBody": "Giờ đây các cuộc trò chuyện của bạn được đồng bộ trên mọi thiết bị.",
+      "noticeAction": "Bạn có thể tắt tính năng này trong Cài đặt."
+    },
     "beta": "Beta",
     "details": {
       "title": "Chi tiết cuộc trò chuyện",

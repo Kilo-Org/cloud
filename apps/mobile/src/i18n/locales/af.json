@@ -4067,6 +4067,27 @@
       "accessibility": "Hernoem klets: {{title}}",
       "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
     },
+    "sync": {
+      "busyTitle": "Besig op 'n ander toestel",
+      "busyBody": "Hierdie klets antwoord tans op 'n ander toestel. Wag totdat dit klaar is voordat jy iets stuur.",
+      "liveTitle": "Loop op jou rekenaar",
+      "liveBody": "Boodskappe wat jy stuur, gaan na die sessie wat op jou rekenaar loop.",
+      "divergedTitle": "Hierdie klets is op twee toestelle verander",
+      "divergedBody": "Boodskappe hier en op 'n ander toestel kan nie saamgevoeg word nie. Laai die nuutste om hierdie toestel gesinchroniseer te hou.",
+      "divergedAction": "Gooi ongesinchroniseerde boodskappe weg en laai die nuutste",
+      "settingTitle": "Sinchroniseer kletse oor toestelle heen",
+      "settingDescription": "Hou kletse gesinchroniseer oor al jou toestelle, insluitend Kilo CLI.",
+      "searchPlaceholder": "Soek kletse",
+      "originFilter": "Oorsprong van klets",
+      "originMobile": "Selfoon",
+      "includeArchived": "Sluit geargiveerdes in",
+      "deleteEverywhereTitle": "Skrap hierdie klets oral?",
+      "deleteEverywhereBody": "Dit word op elke toestel geskrap en kan nie herstel word nie.",
+      "deletedElsewhere": "Hierdie klets is op 'n ander toestel geskrap.",
+      "listLoadFailed": "Kon nie gesinchroniseerde kletse laai nie.",
+      "noticeBody": "Jou kletse sinchroniseer nou oor al jou toestelle.",
+      "noticeAction": "Jy kan dit in Instellings afskakel."
+    },
     "beta": "Beta",
     "details": {
       "title": "Kletsbesonderhede",

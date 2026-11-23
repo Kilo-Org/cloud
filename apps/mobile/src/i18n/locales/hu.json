@@ -4067,6 +4067,27 @@
       "accessibility": "Csevegés átnevezése: {{title}}",
       "openHint": "Megnyitja a csevegést. Hosszan nyomd meg az átnevezéshez vagy a törléshez."
     },
+    "sync": {
+      "busyTitle": "Egy másik eszközön foglalt",
+      "busyBody": "Ez a csevegés egy másik eszközön éppen válaszol. Várd meg, amíg befejeződik, mielőtt bármit küldenél.",
+      "liveTitle": "A számítógépeden fut",
+      "liveBody": "Az elküldött üzeneteid a számítógépeden futó munkamenetbe kerülnek.",
+      "divergedTitle": "Ez a csevegés két eszközön is módosult",
+      "divergedBody": "Az itteni és a másik eszközön lévő üzenetek nem vonhatók össze. Töltsd be a legújabb állapotot, hogy ez az eszköz szinkronban maradjon.",
+      "divergedAction": "Nem szinkronizált üzenetek elvetése és a legújabb betöltése",
+      "settingTitle": "Csevegések szinkronizálása az eszközök között",
+      "settingDescription": "Tartsd szinkronban a csevegéseidet az összes eszközödön, a Kilo CLI-t is beleértve.",
+      "searchPlaceholder": "Csevegések keresése",
+      "originFilter": "Csevegés forrása",
+      "originMobile": "Mobil",
+      "includeArchived": "Archiváltakkal együtt",
+      "deleteEverywhereTitle": "Törlöd ezt a csevegést mindenhol?",
+      "deleteEverywhereBody": "Minden eszközön törlődik, és nem állítható vissza.",
+      "deletedElsewhere": "Ezt a csevegést egy másik eszközön törölték.",
+      "listLoadFailed": "Nem sikerült betölteni a szinkronizált csevegéseket.",
+      "noticeBody": "A csevegéseid mostantól szinkronizálódnak az eszközeid között.",
+      "noticeAction": "Ezt a Beállításokban kikapcsolhatod."
+    },
     "beta": "Béta",
     "details": {
       "title": "Csevegés részletei",

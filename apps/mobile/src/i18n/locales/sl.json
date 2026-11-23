@@ -4223,6 +4223,27 @@
       "accessibility": "Preimenuj klepet: {{title}}",
       "openHint": "Odpre klepet. Pridržite za preimenovanje ali brisanje."
     },
+    "sync": {
+      "busyTitle": "Zasedeno v drugi napravi",
+      "busyBody": "Ta klepet odgovarja v drugi napravi. Preden karkoli pošljete, počakajte, da konča.",
+      "liveTitle": "Teče v vašem računalniku",
+      "liveBody": "Sporočila, ki jih pošljete, gredo v sejo, ki teče v vašem računalniku.",
+      "divergedTitle": "Ta klepet se je spremenil v dveh napravah",
+      "divergedBody": "Sporočil v tej in drugi napravi ni mogoče združiti. Naložite najnovejšo različico, da bo ta naprava usklajena.",
+      "divergedAction": "Zavrzi neusklajena sporočila in naloži najnovejše",
+      "settingTitle": "Sinhroniziraj klepete med napravami",
+      "settingDescription": "Klepeti ostanejo usklajeni v vseh vaših napravah, vključno s Kilo CLI.",
+      "searchPlaceholder": "Iskanje klepetov",
+      "originFilter": "Izvor klepeta",
+      "originMobile": "Mobilno",
+      "includeArchived": "Vključi arhivirane",
+      "deleteEverywhereTitle": "Želite izbrisati ta klepet povsod?",
+      "deleteEverywhereBody": "Izbrisan bo v vseh napravah in ga ne bo mogoče obnoviti.",
+      "deletedElsewhere": "Ta klepet je bil izbrisan v drugi napravi.",
+      "listLoadFailed": "Sinhroniziranih klepetov ni bilo mogoče naložiti.",
+      "noticeBody": "Vaši klepeti se zdaj sinhronizirajo med vašimi napravami.",
+      "noticeAction": "To lahko izklopite v nastavitvah."
+    },
     "beta": "Beta",
     "details": {
       "title": "Podrobnosti klepeta",

@@ -4067,6 +4067,27 @@
       "accessibility": "Chat nomini o‘zgartirish: {{title}}",
       "openHint": "Chatni ochadi. Nomini o‘zgartirish yoki o‘chirish uchun bosib turing."
     },
+    "sync": {
+      "busyTitle": "Boshqa qurilmada band",
+      "busyBody": "Bu chat boshqa qurilmada javob bermoqda. Biror narsa yuborishdan oldin u tugashini kuting.",
+      "liveTitle": "Kompyuteringizda ishlamoqda",
+      "liveBody": "Siz yuborgan xabarlar kompyuteringizda ishlayotgan seansga boradi.",
+      "divergedTitle": "Bu chat ikki qurilmada o‘zgartirildi",
+      "divergedBody": "Bu yerdagi va boshqa qurilmadagi xabarlarni birlashtirib bo‘lmaydi. Bu qurilmani moslab turish uchun eng so‘nggi versiyani yuklang.",
+      "divergedAction": "Sinxronlanmagan xabarlarni o‘chirib, eng so‘nggisini yuklash",
+      "settingTitle": "Chatlarni qurilmalar o‘rtasida sinxronlash",
+      "settingDescription": "Chatlarni barcha qurilmalaringizda, jumladan Kilo CLI’da ham bir xil holatda saqlang.",
+      "searchPlaceholder": "Chatlarni qidirish",
+      "originFilter": "Chat manbasi",
+      "originMobile": "Mobil",
+      "includeArchived": "Arxivlanganlarni ham ko‘rsatish",
+      "deleteEverywhereTitle": "Bu chat hamma joyda o‘chirilsinmi?",
+      "deleteEverywhereBody": "U barcha qurilmalarda o‘chiriladi va uni qayta tiklab bo‘lmaydi.",
+      "deletedElsewhere": "Bu chat boshqa qurilmada o‘chirilgan.",
+      "listLoadFailed": "Sinxronlangan chatlarni yuklab bo‘lmadi.",
+      "noticeBody": "Endi chatlaringiz barcha qurilmalaringizda sinxronlanadi.",
+      "noticeAction": "Buni Sozlamalarda o‘chirib qo‘yishingiz mumkin."
+    },
     "beta": "Beta",
     "details": {
       "title": "Suhbat tafsilotlari",

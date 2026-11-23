@@ -3996,6 +3996,27 @@
       "accessibility": "重新命名聊天：{{title}}",
       "openHint": "開啟對話。長按可重新命名或刪除。"
     },
+    "sync": {
+      "busyTitle": "正在其他裝置上忙碌中",
+      "busyBody": "此聊天正在其他裝置上回覆。請等待完成後再傳送任何內容。",
+      "liveTitle": "正在你的電腦上執行",
+      "liveBody": "你傳送的訊息會送往在你電腦上執行的工作階段。",
+      "divergedTitle": "此聊天已在兩部裝置上變更",
+      "divergedBody": "此處與其他裝置上的訊息無法合併。載入最新版本，讓此裝置保持同步。",
+      "divergedAction": "捨棄未同步的訊息並載入最新版本",
+      "settingTitle": "跨裝置同步聊天",
+      "settingDescription": "讓你所有裝置（包括 Kilo CLI）上的聊天保持同步。",
+      "searchPlaceholder": "搜尋聊天",
+      "originFilter": "聊天來源",
+      "originMobile": "行動裝置",
+      "includeArchived": "包含已封存",
+      "deleteEverywhereTitle": "要在所有裝置上刪除此聊天嗎？",
+      "deleteEverywhereBody": "此聊天將從所有裝置上刪除，且無法復原。",
+      "deletedElsewhere": "此聊天已在其他裝置上刪除。",
+      "listLoadFailed": "無法載入已同步的聊天。",
+      "noticeBody": "你的聊天現在會在你的所有裝置間同步。",
+      "noticeAction": "你可以在「設定」中關閉此功能。"
+    },
     "beta": "測試版",
     "details": {
       "title": "聊天詳細資料",

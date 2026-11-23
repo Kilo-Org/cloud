@@ -230,6 +230,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+vi.mock('@/lib/chat/use-chat', () => ({
+  useChatPlace: () => null,
+}));
+vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
+  useChatSyncGate: () => ({ state: { kind: 'on' }, enabled: true, decide: async () => undefined }),
+}));
 describe('settings screens announce every control', () => {
   it('labels the back control and every Account settings row', async () => {
     const renderer = await mount(<AccountSettingsScreen />);

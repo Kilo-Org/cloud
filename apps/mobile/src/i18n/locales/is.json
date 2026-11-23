@@ -4067,6 +4067,27 @@
       "accessibility": "Endurnefna spjall: {{title}}",
       "openHint": "Opnar spjallið. Haltu inni til að endurnefna eða eyða."
     },
+    "sync": {
+      "busyTitle": "Upptekið í öðru tæki",
+      "busyBody": "Þetta spjall er að svara í öðru tæki. Bíddu þar til því lýkur áður en þú sendir eitthvað.",
+      "liveTitle": "Keyrir á tölvunni þinni",
+      "liveBody": "Skilaboð sem þú sendir fara í lotuna sem keyrir á tölvunni þinni.",
+      "divergedTitle": "Þessu spjalli var breytt í tveimur tækjum",
+      "divergedBody": "Ekki er hægt að sameina skilaboðin hér og í hinu tækinu. Sæktu nýjustu útgáfuna til að halda þessu tæki samstilltu.",
+      "divergedAction": "Fleygja ósamstilltum skilaboðum og sækja nýjustu útgáfu",
+      "settingTitle": "Samstilla spjöll milli tækja",
+      "settingDescription": "Haltu spjöllum samstilltum milli tækjanna þinna, þar á meðal Kilo CLI.",
+      "searchPlaceholder": "Leita í spjöllum",
+      "originFilter": "Uppruni spjalls",
+      "originMobile": "Farsími",
+      "includeArchived": "Taka með geymd spjöll",
+      "deleteEverywhereTitle": "Eyða þessu spjalli alls staðar?",
+      "deleteEverywhereBody": "Því verður eytt í öllum tækjum og ekki er hægt að endurheimta það.",
+      "deletedElsewhere": "Þessu spjalli var eytt í öðru tæki.",
+      "listLoadFailed": "Ekki tókst að hlaða samstilltum spjöllum.",
+      "noticeBody": "Spjöllin þín samstillast nú milli tækjanna þinna.",
+      "noticeAction": "Þú getur slökkt á þessu í Stillingum."
+    },
     "beta": "Beta",
     "details": {
       "title": "Upplýsingar um spjall",

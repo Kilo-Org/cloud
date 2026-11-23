@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kunne ikke laste inn kredittaktivitet.",
       "appStoreReceipt": "Kvittering fra App Store",
+      "deduction": {
+        "adminCancel": "Saldo lukket av en administrator",
+        "adminDebit": "Kreditter fjernet av en administrator",
+        "codingPlan": "Kodeabonnement: {{plan}}",
+        "correction": "Justering av saldo",
+        "dispute": "Tvist om betaling",
+        "refundAppStore": "Refusjon av kredittpakke fra App Store",
+        "refundGooglePlay": "Refusjon av kredittpakke fra Google Play"
+      },
       "deductionFallback": "Kredittrekk",
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",

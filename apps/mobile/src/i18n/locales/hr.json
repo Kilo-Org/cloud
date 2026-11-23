@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
       "appStoreReceipt": "Račun iz trgovine App Store",
+      "deduction": {
+        "adminCancel": "Administrator je zatvorio saldo",
+        "adminDebit": "Administrator je uklonio kredite",
+        "codingPlan": "Plan za kodiranje: {{plan}}",
+        "correction": "Ispravak salda",
+        "dispute": "Spor oko plaćanja",
+        "refundAppStore": "Povrat paketa kredita iz trgovine App Store",
+        "refundGooglePlay": "Povrat paketa kredita iz trgovine Google Play"
+      },
       "deductionFallback": "Oduzimanje kredita",
       "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",
       "emptyTitle": "Nema povijesti kredita",

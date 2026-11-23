@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Nu am putut încărca activitatea de credite.",
       "appStoreReceipt": "Chitanță din App Store",
+      "deduction": {
+        "adminCancel": "Sold închis de un administrator",
+        "adminDebit": "Credite eliminate de un administrator",
+        "codingPlan": "Plan de coding: {{plan}}",
+        "correction": "Ajustare de sold",
+        "dispute": "Litigiu privind plata",
+        "refundAppStore": "Rambursare pentru pachetul de credite din App Store",
+        "refundGooglePlay": "Rambursare pentru pachetul de credite din Google Play"
+      },
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",

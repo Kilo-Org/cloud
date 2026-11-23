@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "क्रेडिट गतिविधि लोड गर्न सकिएन।",
       "appStoreReceipt": "App Store बाट रसिद",
+      "deduction": {
+        "adminCancel": "प्रशासकद्वारा बन्द गरिएको मौज्दात",
+        "adminDebit": "प्रशासकद्वारा हटाइएका क्रेडिट",
+        "codingPlan": "कोडिङ योजना: {{plan}}",
+        "correction": "मौज्दात समायोजन",
+        "dispute": "भुक्तानी विवाद",
+        "refundAppStore": "App Store बाट क्रेडिट प्याकको फिर्ती",
+        "refundGooglePlay": "Google Play बाट क्रेडिट प्याकको फिर्ती"
+      },
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै क्रेडिट इतिहास छैन",

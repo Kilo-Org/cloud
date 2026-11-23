@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ক্রেডিট কার্যকলাপ লোড করা যায়নি।",
       "appStoreReceipt": "App Store-এর রসিদ",
+      "deduction": {
+        "adminCancel": "অ্যাডমিন কর্তৃক ব্যালেন্স বন্ধ করা হয়েছে",
+        "adminDebit": "অ্যাডমিন কর্তৃক ক্রেডিট সরানো হয়েছে",
+        "codingPlan": "কোডিং প্ল্যান: {{plan}}",
+        "correction": "ব্যালেন্স সংশোধন",
+        "dispute": "পেমেন্ট বিরোধ",
+        "refundAppStore": "App Store থেকে ক্রেডিট প্যাকের অর্থ ফেরত",
+        "refundGooglePlay": "Google Play থেকে ক্রেডিট প্যাকের অর্থ ফেরত"
+      },
       "deductionFallback": "ক্রেডিট কর্তন",
       "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",
       "emptyTitle": "কোনো ক্রেডিট ইতিহাস নেই",

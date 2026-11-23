@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
       "appStoreReceipt": "Rebut de l'App Store",
+      "deduction": {
+        "adminCancel": "Saldo tancat per un administrador",
+        "adminDebit": "Crèdits eliminats per un administrador",
+        "codingPlan": "Pla de programació: {{plan}}",
+        "correction": "Correcció del saldo",
+        "dispute": "Disputa de pagament",
+        "refundAppStore": "Reemborsament del paquet de crèdits de l'App Store",
+        "refundGooglePlay": "Reemborsament del paquet de crèdits de Google Play"
+      },
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",

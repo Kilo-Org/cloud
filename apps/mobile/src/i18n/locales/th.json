@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ไม่สามารถโหลดกิจกรรมเครดิตได้",
       "appStoreReceipt": "ใบเสร็จจาก App Store",
+      "deduction": {
+        "adminCancel": "ยอดคงเหลือถูกปิดโดยผู้ดูแลระบบ",
+        "adminDebit": "เครดิตถูกนำออกโดยผู้ดูแลระบบ",
+        "codingPlan": "แผนการเขียนโค้ด: {{plan}}",
+        "correction": "การปรับปรุงยอดคงเหลือ",
+        "dispute": "ข้อพิพาทการชำระเงิน",
+        "refundAppStore": "การคืนเงินค่าแพ็กเกจเครดิตจาก App Store",
+        "refundGooglePlay": "การคืนเงินค่าแพ็กเกจเครดิตจาก Google Play"
+      },
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",

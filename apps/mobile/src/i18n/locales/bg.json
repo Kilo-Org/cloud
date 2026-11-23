@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Неуспешно зареждане на кредитната активност.",
       "appStoreReceipt": "Разписка от App Store",
+      "deduction": {
+        "adminCancel": "Балансът е закрит от администратор",
+        "adminDebit": "Кредити, премахнати от администратор",
+        "codingPlan": "План за програмиране: {{plan}}",
+        "correction": "Корекция на баланса",
+        "dispute": "Спор за плащане",
+        "refundAppStore": "Възстановяване на пакет кредити от App Store",
+        "refundGooglePlay": "Възстановяване на пакет кредити от Google Play"
+      },
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
       "emptyTitle": "Няма история на кредитите",

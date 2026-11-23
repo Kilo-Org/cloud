@@ -4702,6 +4702,15 @@
     "history": {
       "activityUnavailable": "క్రెడిట్ యాక్టివిటీని లోడ్ చేయలేకపోయాం.",
       "appStoreReceipt": "App Store నుండి రసీదు",
+      "deduction": {
+        "adminCancel": "బ్యాలెన్స్‌ను నిర్వాహకుడు మూసివేశారు",
+        "adminDebit": "క్రెడిట్‌లను నిర్వాహకుడు తీసివేశారు",
+        "codingPlan": "కోడింగ్ ప్లాన్: {{plan}}",
+        "correction": "బ్యాలెన్స్ సర్దుబాటు",
+        "dispute": "చెల్లింపు వివాదం",
+        "refundAppStore": "App Store నుండి క్రెడిట్ ప్యాక్ రీఫండ్",
+        "refundGooglePlay": "Google Play నుండి క్రెడిట్ ప్యాక్ రీఫండ్"
+      },
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",

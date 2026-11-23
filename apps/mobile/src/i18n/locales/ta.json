@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "கிரெடிட் செயல்பாட்டை ஏற்ற முடியவில்லை.",
       "appStoreReceipt": "App Store-இலிருந்து ரசீது",
+      "deduction": {
+        "adminCancel": "இருப்பு நிர்வாகியால் மூடப்பட்டது",
+        "adminDebit": "கிரெடிட்கள் நிர்வாகியால் நீக்கப்பட்டன",
+        "codingPlan": "குறியீட்டுத் திட்டம்: {{plan}}",
+        "correction": "இருப்புச் சரிசெய்தல்",
+        "dispute": "கட்டணத் தகராறு",
+        "refundAppStore": "App Store-இலிருந்து கிரெடிட் பேக் திருப்பிச் செலுத்துதல்",
+        "refundGooglePlay": "Google Play-இலிருந்து கிரெடிட் பேக் திருப்பிச் செலுத்துதல்"
+      },
       "deductionFallback": "கிரெடிட் கழிவு",
       "emptyDescription": "கிரெடிட் வாங்குதல்கள், ரசீதுகள் மற்றும் பயன்பாடு இங்கே தோன்றும்.",
       "emptyTitle": "கிரெடிட் வரலாறு இல்லை",

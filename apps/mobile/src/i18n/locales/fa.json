@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "فعالیت اعتباری بارگذاری نشد.",
       "appStoreReceipt": "رسید از App Store",
+      "deduction": {
+        "adminCancel": "بسته شدن موجودی توسط مدیر",
+        "adminDebit": "حذف اعتبار توسط مدیر",
+        "codingPlan": "طرح کدنویسی: {{plan}}",
+        "correction": "اصلاح موجودی",
+        "dispute": "اختلاف پرداخت",
+        "refundAppStore": "بازپرداخت بستهٔ اعتبار از App Store",
+        "refundGooglePlay": "بازپرداخت بستهٔ اعتبار از Google Play"
+      },
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",

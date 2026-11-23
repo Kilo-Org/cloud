@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "კრედიტების აქტივობის ჩატვირთვა ვერ მოხერხდა.",
       "appStoreReceipt": "ქვითარი App Store-იდან",
+      "deduction": {
+        "adminCancel": "ბალანსი ადმინისტრატორმა დახურა",
+        "adminDebit": "ადმინისტრატორმა კრედიტები წაშალა",
+        "codingPlan": "კოდირების გეგმა: {{plan}}",
+        "correction": "ბალანსის კორექცია",
+        "dispute": "გადახდის დავა",
+        "refundAppStore": "კრედიტების პაკეტის დაბრუნება App Store-იდან",
+        "refundGooglePlay": "კრედიტების პაკეტის დაბრუნება Google Play-დან"
+      },
       "deductionFallback": "კრედიტების ჩამოჭრა",
       "emptyDescription": "კრედიტების შენაძენები, ქვითრები და გამოყენება აქ გამოჩნდება.",
       "emptyTitle": "კრედიტების ისტორია ცარიელია",

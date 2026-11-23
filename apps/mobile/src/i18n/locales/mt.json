@@ -4955,6 +4955,15 @@
     "history": {
       "activityUnavailable": "Ma stajniex nitgħabbu l-attività tal-kreditu.",
       "appStoreReceipt": "Irċevuta mill-App Store",
+      "deduction": {
+        "adminCancel": "Bilanċ magħluq minn amministratur",
+        "adminDebit": "Krediti mneħħija minn amministratur",
+        "codingPlan": "Pjan tal-ikkowdjar: {{plan}}",
+        "correction": "Aġġustament tal-bilanċ",
+        "dispute": "Tilwima dwar il-ħlas",
+        "refundAppStore": "Rifużjoni ta' pakkett ta' krediti mill-App Store",
+        "refundGooglePlay": "Rifużjoni ta' pakkett ta' krediti minn Google Play"
+      },
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",

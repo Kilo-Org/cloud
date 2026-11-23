@@ -29,6 +29,8 @@ function deduction(overrides: Partial<CreditDeduction>): CreditDeduction {
     amount_mUsd: -1_000_000,
     kind: 'deduction',
     expiry: null,
+    reason: null,
+    planName: null,
     purchase: null,
     ...overrides,
   };

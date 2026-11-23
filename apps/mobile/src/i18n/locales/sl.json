@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Kreditne aktivnosti ni bilo mogoče naložiti.",
       "appStoreReceipt": "Potrdilo iz trgovine App Store",
+      "deduction": {
+        "adminCancel": "Stanje je zaprl skrbnik",
+        "adminDebit": "Kredite je odstranil skrbnik",
+        "codingPlan": "Načrt kodiranja: {{plan}}",
+        "correction": "Prilagoditev stanja",
+        "dispute": "Spor o plačilu",
+        "refundAppStore": "Vračilo denarja za paket kreditov iz trgovine App Store",
+        "refundGooglePlay": "Vračilo denarja za paket kreditov iz trgovine Google Play"
+      },
       "deductionFallback": "Odbitek kreditov",
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",

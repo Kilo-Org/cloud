@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditů se nepodařilo načíst.",
       "appStoreReceipt": "Účtenka z App Store",
+      "deduction": {
+        "adminCancel": "Zůstatek uzavřen správcem",
+        "adminDebit": "Kredity odebrány správcem",
+        "codingPlan": "Plán programování: {{plan}}",
+        "correction": "Oprava zůstatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrácení balíčku kreditů z App Store",
+        "refundGooglePlay": "Vrácení balíčku kreditů z Google Play"
+      },
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",

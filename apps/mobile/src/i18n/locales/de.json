@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Credit-Aktivität konnte nicht geladen werden.",
       "appStoreReceipt": "Beleg im App Store",
+      "deduction": {
+        "adminCancel": "Saldo von einem Admin geschlossen",
+        "adminDebit": "Credits von einem Admin entfernt",
+        "codingPlan": "Coding-Plan: {{plan}}",
+        "correction": "Saldo-Korrektur",
+        "dispute": "Zahlungsstreit",
+        "refundAppStore": "Erstattung eines Credit-Pakets im App Store",
+        "refundGooglePlay": "Erstattung eines Credit-Pakets bei Google Play"
+      },
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",

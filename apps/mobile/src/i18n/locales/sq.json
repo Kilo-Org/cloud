@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Nuk u aktivizua dot veprimtaria e kredisë.",
       "appStoreReceipt": "Dëftesë nga App Store",
+      "deduction": {
+        "adminCancel": "Bilanci u mbyll nga një administrator",
+        "adminDebit": "Kreditet u hoqën nga një administrator",
+        "codingPlan": "Plani i kodimit: {{plan}}",
+        "correction": "Rregullim i bilancit",
+        "dispute": "Kontestim i pagesës",
+        "refundAppStore": "Rimbursim për paketë kreditesh nga App Store",
+        "refundGooglePlay": "Rimbursim për paketë kreditesh nga Google Play"
+      },
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",

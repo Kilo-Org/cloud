@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Не вдалося завантажити кредитну активність.",
       "appStoreReceipt": "Квитанція в App Store",
+      "deduction": {
+        "adminCancel": "Баланс закрито адміністратором",
+        "adminDebit": "Кредити вилучено адміністратором",
+        "codingPlan": "План для програмування: {{plan}}",
+        "correction": "Коригування балансу",
+        "dispute": "Спір щодо платежу",
+        "refundAppStore": "Повернення коштів за пакет кредитів з App Store",
+        "refundGooglePlay": "Повернення коштів за пакет кредитів з Google Play"
+      },
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",

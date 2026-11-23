@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Sochii kireeditii hin fe'amne.",
       "appStoreReceipt": "Nagahee App Store irraa",
+      "deduction": {
+        "adminCancel": "Haftee bulchaan cufame",
+        "adminDebit": "Kireeditii bulchaan haqame",
+        "codingPlan": "Karoora koodii: {{plan}}",
+        "correction": "Sirreeffama haftee",
+        "dispute": "Falmii kaffaltii",
+        "refundAppStore": "Paakeejii kireeditii App Store irraa deebisuu",
+        "refundGooglePlay": "Paakeejii kireeditii Google Play irraa deebisuu"
+      },
       "deductionFallback": "Hir'isa kireeditii",
       "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
       "emptyTitle": "Seenaan kireeditii hin jiru",

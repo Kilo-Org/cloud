@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "크레딧 활동을 불러오지 못했습니다.",
       "appStoreReceipt": "App Store 영수증",
+      "deduction": {
+        "adminCancel": "관리자가 잔액을 마감함",
+        "adminDebit": "관리자가 크레딧을 회수함",
+        "codingPlan": "코딩 플랜: {{plan}}",
+        "correction": "잔액 정정",
+        "dispute": "결제 분쟁",
+        "refundAppStore": "App Store 크레딧 팩 환불",
+        "refundGooglePlay": "Google Play 크레딧 팩 환불"
+      },
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",

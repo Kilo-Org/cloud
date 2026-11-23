@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Кредитийн гүйлгээг ачаалж чадсангүй.",
       "appStoreReceipt": "App Store-ын баримт",
+      "deduction": {
+        "adminCancel": "Админы хаасан үлдэгдэл",
+        "adminDebit": "Админы хасан кредит",
+        "codingPlan": "Кодлох багц: {{plan}}",
+        "correction": "Үлдэгдлийн залруулга",
+        "dispute": "Төлбөрийн маргаан",
+        "refundAppStore": "App Store-оос кредит багцын буцаан олголт",
+        "refundGooglePlay": "Google Play-оос кредит багцын буцаан олголт"
+      },
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",

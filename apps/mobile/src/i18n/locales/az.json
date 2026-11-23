@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kredit fəaliyyəti yüklənmədi.",
       "appStoreReceipt": "App Store qəbzi",
+      "deduction": {
+        "adminCancel": "Balans inzibatçı tərəfindən bağlandı",
+        "adminDebit": "Kreditlər inzibatçı tərəfindən silindi",
+        "codingPlan": "Kodlaşdırma planı: {{plan}}",
+        "correction": "Balans düzəlişi",
+        "dispute": "Ödəniş mübahisəsi",
+        "refundAppStore": "App Store-dan kredit paketinin qaytarılması",
+        "refundGooglePlay": "Google Play-dən kredit paketinin qaytarılması"
+      },
       "deductionFallback": "Kredit çıxılması",
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",

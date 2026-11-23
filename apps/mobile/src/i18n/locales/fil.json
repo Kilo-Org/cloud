@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
       "appStoreReceipt": "Resibo mula sa App Store",
+      "deduction": {
+        "adminCancel": "Isinara ng admin ang balanse",
+        "adminDebit": "Inalis ng admin ang mga credit",
+        "codingPlan": "Plano sa coding: {{plan}}",
+        "correction": "Pagwawasto ng balanse",
+        "dispute": "Pagtatalo sa pagbabayad",
+        "refundAppStore": "Refund ng credit pack mula sa App Store",
+        "refundGooglePlay": "Refund ng credit pack mula sa Google Play"
+      },
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",

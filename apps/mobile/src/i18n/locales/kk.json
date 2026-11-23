@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Кредит белсенділігін жүктеу мүмкін болмады.",
       "appStoreReceipt": "App Store түбіртегі",
+      "deduction": {
+        "adminCancel": "Балансты әкімші жапты",
+        "adminDebit": "Әкімші кредиттерді жойды",
+        "codingPlan": "Кодтау жоспары: {{plan}}",
+        "correction": "Балансты түзету",
+        "dispute": "Төлем дауы",
+        "refundAppStore": "App Store-тан кредит пакетінің қайтарылуы",
+        "refundGooglePlay": "Google Play-тен кредит пакетінің қайтарылуы"
+      },
       "deductionFallback": "Кредит шегерімі",
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
       "emptyTitle": "Кредиттер тарихы жоқ",

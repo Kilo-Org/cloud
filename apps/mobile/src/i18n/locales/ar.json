@@ -5040,6 +5040,15 @@
     "history": {
       "activityUnavailable": "تعذّر تحميل نشاط الرصيد.",
       "appStoreReceipt": "الإيصال من App Store",
+      "deduction": {
+        "adminCancel": "أُغلق الرصيد بواسطة مشرف",
+        "adminDebit": "أُزيل رصيد بواسطة مشرف",
+        "codingPlan": "خطة البرمجة: {{plan}}",
+        "correction": "تصحيح الرصيد",
+        "dispute": "نزاع على الدفع",
+        "refundAppStore": "استرداد حزمة رصيد من App Store",
+        "refundGooglePlay": "استرداد حزمة رصيد من Google Play"
+      },
       "deductionFallback": "خصم من الرصيد",
       "emptyDescription": "ستظهر هنا مشتريات الرصيد والإيصالات والاستخدام.",
       "emptyTitle": "لا يوجد سجل للرصيد",

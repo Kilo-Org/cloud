@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kon nie kredietaktiwiteit laai nie.",
       "appStoreReceipt": "Kwitansie van die App Store",
+      "deduction": {
+        "adminCancel": "Saldo gesluit deur 'n administrateur",
+        "adminDebit": "Krediete verwyder deur 'n administrateur",
+        "codingPlan": "Koderingsplan: {{plan}}",
+        "correction": "Saldokorreksie",
+        "dispute": "Betalingsgeskil",
+        "refundAppStore": "Terugbetaling van kredietpakket van die App Store",
+        "refundGooglePlay": "Terugbetaling van kredietpakket van Google Play"
+      },
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",

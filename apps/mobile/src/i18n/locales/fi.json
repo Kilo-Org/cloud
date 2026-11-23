@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Krediittitapahtumia ei voitu ladata.",
       "appStoreReceipt": "Kuitti App Storessa",
+      "deduction": {
+        "adminCancel": "Ylläpitäjän sulkema saldo",
+        "adminDebit": "Ylläpitäjän poistamat krediitit",
+        "codingPlan": "Koodaustilaus: {{plan}}",
+        "correction": "Saldon oikaisu",
+        "dispute": "Maksukiista",
+        "refundAppStore": "Krediittipaketin hyvitys App Storesta",
+        "refundGooglePlay": "Krediittipaketin hyvitys Google Playsta"
+      },
       "deductionFallback": "Krediittien veloitus",
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",

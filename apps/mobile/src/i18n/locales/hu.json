@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Nem sikerült betölteni a kreditaktivitást.",
       "appStoreReceipt": "A nyugta az App Store-ban érhető el",
+      "deduction": {
+        "adminCancel": "Az egyenleget egy adminisztrátor zárta le",
+        "adminDebit": "Egy adminisztrátor eltávolította a krediteket",
+        "codingPlan": "Kódolási csomag: {{plan}}",
+        "correction": "Egyenlegkorrekció",
+        "dispute": "Fizetési vita",
+        "refundAppStore": "Kreditcsomag visszatérítése az App Store-ból",
+        "refundGooglePlay": "Kreditcsomag visszatérítése a Google Playről"
+      },
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",

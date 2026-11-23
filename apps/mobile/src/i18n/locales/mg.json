@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
       "appStoreReceipt": "Rosia avy amin'ny App Store",
+      "deduction": {
+        "adminCancel": "Fanakatonana ambim-bola nataon'ny mpitantana",
+        "adminDebit": "Fanesorana kredita nataon'ny mpitantana",
+        "codingPlan": "Drafitra fandaharana: {{plan}}",
+        "correction": "Fanitsiana ambim-bola",
+        "dispute": "Fifandirana momba ny fandoavana",
+        "refundAppStore": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny App Store",
+        "refundGooglePlay": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny Google Play"
+      },
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",

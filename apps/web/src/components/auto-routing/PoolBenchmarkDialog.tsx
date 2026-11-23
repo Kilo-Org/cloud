@@ -33,6 +33,7 @@ import {
   beginCasePage,
   benchmarkRequestErrorCopy,
   casePageState,
+  keepStartNotice,
   failCasePage,
   mergeCases,
   startFailureCopy,
@@ -111,7 +112,10 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
     trpc.customRouterBenchmarks.start.mutationOptions({
       onSuccess: result => {
         const copy = startFailureCopy(result);
-        if (result.status === 'started' && result.alreadyInProgress === true) {
+        const joinedLiveRequest =
+          result.status === 'already_in_progress' ||
+          (result.status === 'started' && result.alreadyInProgress === true);
+        if (joinedLiveRequest) {
           // Another tab, or a quote taken before this request existed: show the request that
           // is already staging instead of failing. Nothing new was created or charged. The
           // notice is bound to that request and drops as soon as it settles.
@@ -192,17 +196,16 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   }, [progress?.status, organizationId, queryClient, slug, trpc]);
 
   useEffect(() => {
-    // The second-confirmation notice describes one request in flight. Once that request
-    // completes, pauses or fails there is nothing to announce, so it is dropped here rather
-    // than lingering as a stale banner over the settled result.
-    if (startNoticeFor === null) return;
+    // The second-confirmation notice describes one request in flight and is dropped only when
+    // that request has actually settled. A join can also CHANGE the progress query key (the
+    // dialog had no request before), and then `progressQuery.data` is `undefined` for a render
+    // or two: that is "loading", not "settled", so the notice must survive it.
     if (
-      activeProgress === undefined ||
-      activeProgress.id !== startNoticeFor.requestId ||
-      (activeProgress.status !== 'preparing' && activeProgress.status !== 'active')
+      startNoticeFor !== null &&
+      !keepStartNotice(startNoticeFor.requestId, progressQuery.data, progressQuery.isError)
     )
       setStartNoticeFor(null);
-  }, [activeProgress, startNoticeFor]);
+  }, [startNoticeFor, progressQuery.data, progressQuery.isError]);
 
   const pageState = casePageState(pagination, progressId);
   const extraCases = pageState.kind === 'first' ? [] : pageState.cases;
@@ -303,7 +306,7 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
             ) : null}
             {showProgress && activeProgress !== undefined ? (
               <>
-                {startNoticeFor !== null &&
+                {startNoticeFor !== null && startNoticeFor.requestId === activeProgress.id &&
                 (activeProgress.status === 'preparing' || activeProgress.status === 'active') ? (
                   // Neutral, not an error: the pool's own request is simply already in flight.
                   <Alert variant="notice">

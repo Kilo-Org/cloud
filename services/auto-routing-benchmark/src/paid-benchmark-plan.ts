@@ -353,10 +353,11 @@ export function caseCostMicrodollars(input: {
  * rule — the same predicate the run's own prior-case copy uses. Optional case/repetition
  * filters keep a staging slice from rescanning the whole pair.
  *
- * The filters travel as two JSON arrays instead of one bound value per case and repetition:
- * a slice of a wide pool names hundreds of cases, and D1 rejects any statement with more than
- * 100 bound parameters. One binding per list keeps the statement's total at seven whatever
- * the slice or the router's repetition count.
+ * The filters travel as two JSON arrays instead of one bound value per case and repetition: a
+ * slice of a wide pool names hundreds of cases, and D1 rejects any statement with more than 100
+ * bound parameters. One binding per list keeps the statement's total flat: eight values with
+ * both filters (router, engine identity, repetitions, model, variant, the case list, the
+ * repetition list and the minimum-revision map), six with no filter, seven with exactly one.
  */
 export function paidReuseDrawsSql(filters: { caseIds?: boolean; reps?: boolean } = {}): string {
   const caseFilter = filters.caseIds

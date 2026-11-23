@@ -24,6 +24,7 @@ import {
   routeReason,
   routingRows,
   startFailureCopy,
+  keepStartNotice,
   type BenchmarkFailureCopy,
 } from './benchmark-display';
 
@@ -64,12 +65,14 @@ const ZERO_CASE_COUNTS: Record<PaidBenchmarkCaseStatus, number> = {
   paused: 0,
 };
 
+const REQUEST_ID = '00000000-0000-4000-8000-000000000002';
+
 function progress(
   status: Exclude<PaidBenchmarkProgress['status'], 'empty'>,
-  counts: CaseCounts
+  counts: CaseCounts = {}
 ): PaidBenchmarkProgress {
   const fields = {
-    id: '00000000-0000-4000-8000-000000000002',
+    id: REQUEST_ID,
     estimateMicrodollars: 1_000_000,
     maximumMicrodollars: 1_200_000,
     chargedMicrodollars: 0,
@@ -201,6 +204,26 @@ describe('start failure copy', () => {
     expect(copy?.title).toBe('A benchmark is already running for this pool');
     expect(copy?.description).toContain('already in progress');
     expect(copy?.description).toContain('Nothing new was started or charged');
+    expect(copy?.retryable).toBe(false);
+  });
+
+  it('keeps the join notice while the announced request is still loading or live', () => {
+    // The join changes the progress query key, so its data is briefly undefined. That is
+    // "loading", not "settled": the notice must survive it or it would never render.
+    expect(keepStartNotice(REQUEST_ID, undefined, false)).toBe(true);
+    expect(keepStartNotice(REQUEST_ID, progress('preparing', {}), false)).toBe(true);
+    expect(keepStartNotice(REQUEST_ID, progress('active', {}), false)).toBe(true);
+    // A settled or replaced request, or a broken query, ends it.
+    expect(keepStartNotice(REQUEST_ID, progress('completed', {}), false)).toBe(false);
+    expect(keepStartNotice(REQUEST_ID, progress('paused', {}), false)).toBe(false);
+    expect(keepStartNotice('00000000-0000-4000-8000-000000000003', progress('preparing', {}), false)).toBe(false);
+    expect(keepStartNotice(REQUEST_ID, { status: 'empty' }, false)).toBe(false);
+    expect(keepStartNotice(REQUEST_ID, undefined, true)).toBe(false);
+  });
+
+  it('treats a pre-flag worker status as the same join notice', () => {
+    const copy = startFailureCopy({ status: 'already_in_progress', request: progress('active', {}) });
+    expect(copy?.title).toBe('A benchmark is already running for this pool');
     expect(copy?.retryable).toBe(false);
   });
 

@@ -210,9 +210,10 @@ export const customRouterBenchmarksRouter = createTRPCRouter({
    * Worker sees anything. The check fails closed, so a context without a derived credential
    * (an unusual constructor) is also refused. Quotes, reads and pause keep their authority.
    *
-   * A pool holds one live request, so a second confirmation (`already_in_progress`) answers
-   * with that request's progress rather than an error: the UI shows the run in flight and no
-   * second request, quote consumption or charge happens.
+   * A pool holds one live request, so a second confirmation answers with that request's
+   * progress (`status: 'started'` with `alreadyInProgress: true`, plus the tolerated legacy
+   * `already_in_progress` during a worker rollout) rather than an error: the UI shows the run in
+   * flight and no second request, quote consumption or charge happens.
    */
   start: baseProcedure
     .input(StartBenchmarkInput)

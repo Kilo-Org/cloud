@@ -61,11 +61,16 @@ function countingDb(sqlite: DatabaseSync, counts: QueryCounts): D1Database {
 
 const CATALOG = { data: [{ id: 'vendor/one', pricing: { prompt: 1e-6, completion: 2e-6 } }] };
 
-/** The widest observed real pool (68 concrete pairs), every slot unmeasured. */
+/**
+ * The widest observed real pool (68 concrete pairs), every slot unmeasured. `platformCovered`
+ * marks every slot as Kilo-paid instead, which is the fixture that exercises the covered
+ * branch's platform-membership revalidation.
+ */
 function widestPlan(
   router: 'efficient' | 'frontier' = 'efficient',
   repetitions = REPETITIONS,
-  caseCount = CASE_COUNT
+  caseCount = CASE_COUNT,
+  platformCovered = false
 ): PaidBenchmarkPlan {
   const caseIds = Array.from({ length: caseCount }, (_, index) => `case-${index}`);
   const perPair = caseIds.length * repetitions;
@@ -85,10 +90,12 @@ function widestPlan(
       variant: '',
       serving: false,
       missing: filled,
-      covered: empty,
+      covered: platformCovered ? filled : empty,
       cost: caseIds.map(() => 1),
     })),
-    counts: { reused: 0, covered: 0, shared: 0, exclusive: slots },
+    counts: platformCovered
+      ? { reused: 0, covered: slots, shared: 0, exclusive: 0 }
+      : { reused: 0, covered: 0, shared: 0, exclusive: slots },
     estimateMicrodollars: slots,
     maximumMicrodollars: slots,
     aliases: [],
@@ -96,8 +103,11 @@ function widestPlan(
   };
 }
 
-/** One `preparing` request per router shape, plus an `active` one to reconcile. */
-function seedPaidRequests(sqlite: DatabaseSync): void {
+/**
+ * One `preparing` request per router shape, plus an `active` one to reconcile. `platformCovered`
+ * makes every slot Kilo-paid, so the tick runs the covered branch over a full slice.
+ */
+function seedPaidRequests(sqlite: DatabaseSync, platformCovered = false): void {
   const insert = (status: 'preparing' | 'active', plan: PaidBenchmarkPlan) => {
     const requestId = crypto.randomUUID();
     const quoteId = crypto.randomUUID();
@@ -145,11 +155,11 @@ function seedPaidRequests(sqlite: DatabaseSync): void {
       );
     return requestId;
   };
-  // Both router shapes: efficient binds 100 cases over 3 repetitions, frontier 100 cases over
-  // 1, so a staging slice of 100 slots must stay inside D1's 100-bound-parameter limit for
-  // either.
-  insert('preparing', widestPlan('efficient'));
-  insert('preparing', widestPlan('frontier', 1, 294));
+  // Both router shapes: an 88-slot efficient slice names about 30 distinct cases over 3
+  // repetitions, and an 88-slot frontier slice names 88 cases over 1. Both must stay inside
+  // D1's 100-bound-parameter limit, which the harness now enforces.
+  insert('preparing', widestPlan('efficient', REPETITIONS, CASE_COUNT, platformCovered));
+  insert('preparing', widestPlan('frontier', 1, 294, platformCovered));
   insert('active', widestPlan('efficient'));
 }
 
@@ -307,11 +317,21 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     seedPaidRequests(worstSqlite);
     const worst = await runTick(worstSqlite);
 
+    // The covered shape: every slot promised Kilo-paid with no latched platform run, which is
+    // the branch that revalidates the pair's platform membership while staging.
+    const coveredSqlite = newTickDb();
+    seedRunningRuns(coveredSqlite);
+    seedPendingOutputs(coveredSqlite);
+    seedAliasSync(coveredSqlite);
+    seedPaidRequests(coveredSqlite, true);
+    const covered = await runTick(coveredSqlite);
+
     const components = {
       other: other.queries,
       staging: worst.queries - other.queries,
       worst: worst.queries,
       worstStatements: worst.statements,
+      coveredWorst: covered.queries,
     };
     console.error(JSON.stringify(components));
 
@@ -331,6 +351,9 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     // Staging carries the 4,400-slot budget in 50 batches of 88, each with three slice reads
     // and a recount; both router shapes (efficient, 3 repetitions; frontier, 1) are preparing.
     expect(components.staging).toBeLessThanOrEqual(420);
+    // The covered branch reads the pair's platform membership once per slice, not per slot: a
+    // per-slot read would add thousands of queries on this fixture.
+    expect(components.coveredWorst).toBeLessThanOrEqual(700);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);

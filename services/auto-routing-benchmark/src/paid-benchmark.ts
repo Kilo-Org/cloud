@@ -81,39 +81,20 @@ import {
   type PaidBenchmarkPlan,
 } from './paid-benchmark-plan';
 import { drainPaidBillingOutbox } from './paid-billing';
-import { D1_MAX_BOUND_PARAMETERS } from './d1-limits';
+import { STAGE_SLICE_MAX_SLOTS } from './d1-limits';
 import { minimumCaseRevisions } from './measurement-revision';
 import { variantFromStorage } from './reasoning-effort';
 
 /** How long a displayed quote stays confirmable. */
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
 /**
- * Slots a staging slice may name, from D1's bound-parameter ceiling rather than picked.
- *
- * Every slice statement binds a fixed clause plus one value per *distinct case* it names plus
- * one per repetition, so the parameter cost is `fixed + cases + reps`:
- *
- * - `STAGE_SLICE_FIXED_BINDINGS` = 6: `paidReuseDrawsSql`/`paidPendingOutputsSql` bind router,
- *   engine, repetitions, model and variant before their filters; `readOpenCaseRuns` binds
- *   engine, model and variant.
- * - one case binding per slot at most: a slice names at most one distinct case per slot, which
- *   is exact for frontier (1 repetition) and amortised for efficient (3 slots per case).
- * - `STAGE_SLICE_MAX_REPETITION_BINDINGS` = 5: the policy schema caps decider repetitions at
- *   5, so a slice binds at most that many repetition values.
- * - `STAGE_SLICE_MINIMUM_MAP_BINDINGS` = 1: the minimum-revision map is one JSON binding.
- *
- * So a slice is `floor((100 - 6 - 5 - 1) / 1) = 88` slots: frontier binds 6 + 88 + 1 + 1 = 96
- * and efficient 6 + 30 + 3 + 1 = 40, each with margin under the ceiling.
+ * Slots per staging batch: the store's per-batch case cap, which is itself derived from D1's
+ * statement-size ceiling (see `STAGE_SLICE_MAX_SLOTS`). One slice is exactly one accepted
+ * `batch()`, and the slice never grows a statement's binding count: the case and repetition
+ * lists travel as one JSON array each, so the widest statement in a batch binds nine
+ * parameters whatever the slice names.
  */
-const STAGE_SLICE_FIXED_BINDINGS = 6;
-const STAGE_SLICE_MAX_REPETITION_BINDINGS = 5;
-const STAGE_SLICE_MINIMUM_MAP_BINDINGS = 1;
-/** Slots per staging batch, from the arithmetic above (88). */
-const STAGE_BATCH_SLOTS =
-  D1_MAX_BOUND_PARAMETERS -
-  STAGE_SLICE_FIXED_BINDINGS -
-  STAGE_SLICE_MAX_REPETITION_BINDINGS -
-  STAGE_SLICE_MINIMUM_MAP_BINDINGS;
+const STAGE_BATCH_SLOTS = STAGE_SLICE_MAX_SLOTS;
 /** Slots one request or one browser poll may stage, so a maximal pool is paged, not dumped. */
 const STAGE_BUDGET_SLOTS = 400;
 /**
@@ -147,8 +128,17 @@ const CRON_STAGE_MAX_REQUESTS_PER_TICK = 50;
  * A request whose staging makes no progress for this long is closed, never left dangling.
  * Measured from the last slot actually staged (`last_staged_at`, else creation) on a tick that
  * offered the request budget, so a request that waited for the shared budget is not closed.
+ * It applies only while the plan is still incomplete.
  */
 const STAGE_ABANDON_MS = 60 * 60 * 1000;
+/**
+ * How long a fully staged request may wait for activation. Activation normally happens in the
+ * same pass that stages its last slot, so this only covers a persistent failure (a storage
+ * fault on the activation write that every retry hits). Measured from the last staged slot and
+ * deliberately longer than {@link STAGE_ABANDON_MS}: the plan is complete, so the owner is not
+ * asked to redo staging, and nothing has been charged.
+ */
+const STAGE_ACTIVATION_GRACE_MS = 2 * STAGE_ABANDON_MS;
 /** A deferred native usage row lags its response by a moment; poll briefly, then disclose. */
 const RECEIPT_POLL_DELAYS_MS = [250, 500, 1_000];
 
@@ -377,6 +367,25 @@ export async function stagePaidBenchmarkRequest(
 
       const measurable: PaidCaseKey[] = [];
       const reusedSlots: { key: PaidCaseKey; covered: boolean }[] = [];
+      // Kilo's ownership of this pair is one fact about the pair, read once per slice: asking
+      // it per covered slot cost one D1 query per slot (thousands in a wide covered pool), which
+      // alone could exhaust an invocation's query budget. Only a slice that has a covered slot
+      // without its latched platform run needs the answer at all.
+      const platformOwned = group.some(slot => {
+        if (!planSlotIsCovered(plan, slot.pairIndex, slot.caseIndex, slot.rep)) return false;
+        const open = openBySlot.get(
+          slot.caseIndex * plan.repetitions + slot.rep
+        );
+        return !open || open.platform_covered !== 1;
+      })
+        ? await readPlatformRequestedPairs(db, {
+            router: plan.router,
+            engineIdentity: plan.engineIdentity,
+            repetitions: plan.repetitions,
+            pairs: [resolvedPair],
+          })
+        : new Set<string>();
+      const pairIsPlatformOwned = platformOwned.size > 0;
       for (const slot of group) {
         const key = planSlotKey(plan, slot);
         const bit = slot.caseIndex * plan.repetitions + slot.rep;
@@ -399,21 +408,13 @@ export async function stagePaidBenchmarkRequest(
           // The quote promised this slot as Kilo-paid. Revalidate against the same durable
           // source the quote used — a latched case run *or* live platform ownership of the
           // pair at this engine/repetition count — and refuse rather than charge silently if
-          // coverage is gone.
+          // coverage is gone. The ownership read is one per slice (`pairIsPlatformOwned`).
           const open = openBySlot.get(bit);
-          if (!open || open.platform_covered !== 1) {
-            const platformOwned = await readPlatformRequestedPairs(db, {
-              router: plan.router,
-              engineIdentity: plan.engineIdentity,
-              repetitions: plan.repetitions,
-              pairs: [resolvedPair],
-            });
-            if (platformOwned.size === 0)
-              return {
-                status: 'aborted',
-                reason: `Kilo platform coverage for ${pair.model} changed; request a new estimate.`,
-              };
-          }
+          if ((!open || open.platform_covered !== 1) && !pairIsPlatformOwned)
+            return {
+              status: 'aborted',
+              reason: `Kilo platform coverage for ${pair.model} changed; request a new estimate.`,
+            };
           // The platform pays this case run; the request only displays it as covered. The
           // approved covered bit travels with the slot: even if platform membership falls
           // between staging and the permit, the store's selection/admit guard refuses to make
@@ -1304,13 +1305,15 @@ export async function reconcilePaidBenchmarkRequests(
       ORDER BY updated_at, id LIMIT ${CRON_STAGE_MAX_REQUESTS_PER_TICK}`
     )
     .all<PaidBenchmarkRequestRow>();
-  // One tick's staging is hard-capped. Each preparing request is offered exactly its fair share
-  // `floor(TICK_BUDGET / preparing)`: that division already keeps the total under the cap, so a
-  // minimum is only ever a value at or below the share (never a floor that breaks the cap), and
-  // a request the tick cannot reach waits for the next one, which serves it first because the
-  // scan is stalest-first.
+  // One tick's staging is hard-capped. The budget is divided over the requests this tick can
+  // actually serve — `min(preparing, scan cap)` — so the cap is spent, not stranded: dividing
+  // by every preparing request while only `CRON_STAGE_MAX_REQUESTS_PER_TICK` of them are
+  // scanned would leave part of the budget unused. The division itself keeps the total under
+  // the cap, and a request the tick cannot reach waits for the next one, which serves it first
+  // because the scan is stalest-first.
   const preparing = preparingRows.results.length;
-  const fairShare = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, preparing));
+  const served = Math.min(preparing, CRON_STAGE_MAX_REQUESTS_PER_TICK);
+  const fairShare = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, served));
   const offered = Math.min(fairShare, CRON_STAGE_MAX_SLOTS_PER_REQUEST);
   let remainingStageBudget = CRON_STAGE_BUDGET_SLOTS;
   const live = [...preparingRows.results, ...activeRows.results];
@@ -1403,43 +1406,65 @@ async function reconcileOnePaidRequest(
     return;
   }
   if (current.status === 'preparing') {
-    const granted = input.takeStageBudget(input.offeredSlots);
-    // Nothing left: the request waits for the next tick. It is not failed for inactivity,
-    // because waiting is not a stall and its own window only advances on real staging.
-    if (granted === 0) return;
-    // This pass offered the request budget, so it now owns its liveness: a request that had
-    // budget in hand and still staged nothing for a full window is genuinely stuck. Waiting
-    // ticks cannot accumulate that window, because they never reach this check.
     const lastProgress = Date.parse(current.last_staged_at ?? current.created_at);
-    if (now - lastProgress > STAGE_ABANDON_MS) {
-      await db.batch(
-        failPaidBenchmarkRequestStatements(db, {
-          requestId: current.id,
-          reason: 'Benchmark request was never activated.',
-          retryable: true,
-          now,
-        })
-      );
-      summary.closed.push(request.id);
-      return;
+    // A fully staged request needs no more staging: it only has to activate. It is exempt from
+    // the staging-inactivity rule — its last slot is already written, so that clock stopped by
+    // definition — and instead expires on its own, longer window. It also needs no slot budget,
+    // so a tick that skipped it for rotation must still activate it here rather than defer it.
+    if (current.staged_cases >= planSlotCount(plan)) {
+      if (now - lastProgress > STAGE_ACTIVATION_GRACE_MS) {
+        await db.batch(
+          failPaidBenchmarkRequestStatements(db, {
+            requestId: current.id,
+            reason: 'The benchmark was ready but was not activated in time.',
+            retryable: true,
+            now,
+          })
+        );
+        summary.closed.push(request.id);
+        return;
+      }
+      current = await activateIfFullyStaged(env, current, plan, now);
+    } else {
+      const granted = input.takeStageBudget(input.offeredSlots);
+      // Nothing left: the request waits for the next tick. It is not failed for inactivity,
+      // because waiting is not a stall and its own window only advances on real staging.
+      if (granted === 0) return;
+      // This pass offered the request budget, so it now owns its liveness: a request that had
+      // budget in hand and still staged nothing for a full window is genuinely stuck. Waiting
+      // ticks cannot accumulate that window, because they never reach this check.
+      if (now - lastProgress > STAGE_ABANDON_MS) {
+        await db.batch(
+          failPaidBenchmarkRequestStatements(db, {
+            requestId: current.id,
+            reason: 'Benchmark request was never activated.',
+            retryable: true,
+            now,
+          })
+        );
+        summary.closed.push(request.id);
+        return;
+      }
+      const staged = await stagePaidBenchmarkRequest(env, current, plan, {
+        budgetSlots: granted,
+        now,
+      });
+      if (staged.status === 'aborted') {
+        await db.batch(
+          failPaidBenchmarkRequestStatements(db, {
+            requestId: current.id,
+            reason: staged.reason,
+            retryable: true,
+            now,
+          })
+        );
+        summary.failed.push(request.id);
+        return;
+      }
+      // Activation runs in the same pass that wrote the last slot: a request that just became
+      // fully staged is activated now, so no window exists between the two states.
+      current = await activateIfFullyStaged(env, current, plan, now);
     }
-    const staged = await stagePaidBenchmarkRequest(env, current, plan, {
-      budgetSlots: granted,
-      now,
-    });
-    if (staged.status === 'aborted') {
-      await db.batch(
-        failPaidBenchmarkRequestStatements(db, {
-          requestId: current.id,
-          reason: staged.reason,
-          retryable: true,
-          now,
-        })
-      );
-      summary.failed.push(request.id);
-      return;
-    }
-    current = await activateIfFullyStaged(env, current, plan, now);
   }
   summary.staged += 1;
   const finished = await finishPaidBenchmarkRequest(env, current, plan, { now });

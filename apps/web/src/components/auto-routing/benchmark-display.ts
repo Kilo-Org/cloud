@@ -199,20 +199,23 @@ export function benchmarkRequestErrorCopy(error: unknown): BenchmarkFailureCopy 
 }
 
 /** Copy for a `start` result that did not start the request. */
+const ALREADY_IN_PROGRESS_COPY: BenchmarkFailureCopy = {
+  title: 'A benchmark is already running for this pool',
+  description: 'Showing the request already in progress. Nothing new was started or charged.',
+  retryable: false,
+};
+
 export function startFailureCopy(result: PaidBenchmarkStartResult): BenchmarkFailureCopy | null {
   switch (result.status) {
     case 'started':
       // A second confirmation joins the pool's live request instead of creating one. That is
       // a notice, not a failure: the dialog shows it above the running request and drops it
       // when that request settles.
-      if (result.alreadyInProgress === true)
-        return {
-          title: 'A benchmark is already running for this pool',
-          description:
-            'Showing the request already in progress. Nothing new was started or charged.',
-          retryable: false,
-        };
-      return null;
+      return result.alreadyInProgress === true ? ALREADY_IN_PROGRESS_COPY : null;
+    case 'already_in_progress':
+      // A worker that predates `alreadyInProgress` still answers with this status; the web
+      // must show the same live request rather than fail the parse or claim a busy service.
+      return ALREADY_IN_PROGRESS_COPY;
     case 'insufficient_balance': {
       const required =
         result.requiredMicrodollars === undefined
@@ -256,6 +259,26 @@ export function startFailureCopy(result: PaidBenchmarkStartResult): BenchmarkFai
         retryable: result.retryable,
       };
   }
+}
+
+/**
+ * Whether the second-confirmation notice should stay for `requestId`.
+ *
+ * The notice outlives the render that announces it: a join changes the progress query key, so
+ * the data is briefly `undefined`. Only a settled answer for another request, or a terminal
+ * state for this one, ends it; an error ends it too, so a broken query cannot pin a banner that
+ * describes a request the page cannot show.
+ */
+export function keepStartNotice(
+  requestId: string,
+  progress: PaidBenchmarkProgress | undefined,
+  isError: boolean
+): boolean {
+  if (isError) return false;
+  if (progress === undefined) return true;
+  if (progress.status === 'empty') return false;
+  if (progress.id !== requestId) return false;
+  return progress.status === 'preparing' || progress.status === 'active';
 }
 
 export type ProgressTotals = {

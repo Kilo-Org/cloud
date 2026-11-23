@@ -35,7 +35,7 @@ import type {
   PaidCaseRunRowStatus,
   PaidModelRequestState,
 } from './db-schema';
-import { D1_MAX_BOUND_PARAMETERS } from './d1-limits';
+import { STAGE_SLICE_MAX_SLOTS } from './d1-limits';
 
 export type PaidCreditOwner = {
   ownerType: 'user' | 'organization';
@@ -362,10 +362,10 @@ function schedulerGuardParams(input: {
  * thousands of slots, so the controller chunks its plan into these batches. Approval is
  * never inferred from a partial plan: activation requires `staged_cases = plan_cases`.
  *
- * The bound follows the staging slice, which is derived from D1's bound-parameter ceiling in
- * `db.ts` plus a fixed clause, so a slice is always one accepted batch.
+ * The bound is the staging slice itself (`STAGE_SLICE_MAX_SLOTS`), derived once from D1's
+ * statement-size ceiling in `d1-limits.ts`, so a slice is always exactly one accepted batch.
  */
-export const PAID_CASE_BATCH_LIMIT = D1_MAX_BOUND_PARAMETERS - 7;
+export const PAID_CASE_BATCH_LIMIT = STAGE_SLICE_MAX_SLOTS;
 
 /**
  * Recount one request's staged slots and stamp the moment staging last added a slot.

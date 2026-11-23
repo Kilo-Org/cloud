@@ -75,11 +75,16 @@ function collectDeclarations(rule) {
   return declarations;
 }
 
+/** One definition of the rule both theme lookups select: the `:root` rule. */
+function isThemeRootRule(node) {
+  return node.type === 'rule' && node.selector === ':root';
+}
+
 export function readThemeColors() {
   const css = readFileSync(CSS_PATH, 'utf8');
   const root = postcss.parse(css);
 
-  const lightRule = root.nodes.find(node => node.type === 'rule' && node.selector === ':root');
+  const lightRule = root.nodes.find(isThemeRootRule);
   if (!lightRule) {
     throw new Error(`${CSS_PATH}: missing top-level :root block`);
   }
@@ -92,7 +97,7 @@ export function readThemeColors() {
         /prefers-color-scheme\s*:\s*dark/.test(node.params)
     )
     .flatMap(media => media.nodes ?? [])
-    .find(node => node.type === 'rule' && node.selector === ':root');
+    .find(isThemeRootRule);
   if (!darkRule) {
     throw new Error(`${CSS_PATH}: missing :root block inside @media (prefers-color-scheme: dark)`);
   }

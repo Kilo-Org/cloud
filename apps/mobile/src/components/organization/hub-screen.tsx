@@ -409,11 +409,19 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           </RowGroup>
         </Animated.View>
 
+        {/* The grid opens the usage screen only for a role that screen answers
+            organization-wide; every other role reads its own usage through the
+            "usage" row below, which names that scope. The tiles are
+            organization-wide totals for everyone. */}
         <OrgUsageStats
           organizationId={organizationId}
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/organization/usage' as Href);
-          }}
+          onPress={
+            showMoney
+              ? () => {
+                  router.push('/(app)/(tabs)/(3_profile)/organization/usage' as Href);
+                }
+              : undefined
+          }
         />
 
         <RowGroup leadingTile>

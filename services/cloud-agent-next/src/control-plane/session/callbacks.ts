@@ -154,6 +154,10 @@ function redactCallbackTargetUrl(callbackUrl: string): string {
   }
 }
 
+export function lastSeenBranch(metadata: SessionMetadata): string | undefined {
+  return metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName;
+}
+
 export function createMessageCallbacks(
   dependencies: MessageCallbacksDependencies
 ): MessageCallbacks {
@@ -239,7 +243,7 @@ export function createMessageCallbacks(
                 failureStage: failure?.stage,
               }),
             }),
-        lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
+        lastSeenBranch: lastSeenBranch(metadata),
         kiloSessionId,
         lastAssistantMessageText,
         recentActivity,

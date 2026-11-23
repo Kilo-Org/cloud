@@ -321,6 +321,37 @@ test('overlap: text siblings collide, tolerance, absolute sibling', () => {
   assert.deepEqual(run('overlap', [text(0), text(10, { position: 'absolute' })]), []);
 });
 
+test('overlap: a node the platform cannot show the user is not a sibling that collides', () => {
+  // Measured on the to-do detail header: the fit check mounts a zero-opacity
+  // copy of the title, and the platform reports the copy and the text inside it
+  // as not visible to the user. An accessibility snapshot has no style, so
+  // without that flag the copy pairs with the pressable title beside it and
+  // reports the one line they share.
+  const copyRect: [number, number, number, number] = [14.1, 59.81, 383.24, 49.52];
+  const titleRect: [number, number, number, number] = [51.43, 83.81, 345.9, 49.52];
+  const pair = (invisible: boolean): ProbeNode[] => [
+    { parent: 0, tag: 'ViewGroup', rect: copyRect, ...(invisible ? { invisible: true } : {}) },
+    {
+      parent: 1,
+      tag: 'Paragraph',
+      rect: copyRect,
+      text: 'Rework the onboarding checklist',
+      ...(invisible ? { invisible: true } : {}),
+    },
+    {
+      parent: 0,
+      tag: 'Button',
+      rect: titleRect,
+      label: 'Rework the onboarding checklist, Rename task',
+      pressable: true,
+    },
+  ];
+  // The copy is not in the sighted layout, so the title collides with nothing.
+  assert.deepEqual(run('overlap', pair(true)), []);
+  // The same boxes with the flag absent are the collision the gate reported.
+  assert.equal(run('overlap', pair(false))[0]?.measured, 25.52);
+});
+
 test('row-misaligned: centers apart, tolerance, tall row', () => {
   const row = (height: number, secondY: number): ProbeNode[] => [
     { parent: 0, tag: 'View', rect: [0, 0, 400, height], style: { flexDirection: 'row' } },
@@ -514,6 +545,23 @@ test('safe-area: text under the top and bottom insets, tolerance', () => {
   assert.equal(run('safe-area', [text(752)], env)[0]?.measured, 2);
   assert.deepEqual(run('safe-area', [text(751)], env), []);
   assert.deepEqual(run('safe-area', [{ parent: 0, tag: 'View', rect: [0, 0, 400, 100] }], env), []);
+});
+
+test('safe-area: a box the platform reports unseen reaches into no inset', () => {
+  const env = { safeArea: { top: 24, right: 0, bottom: 30, left: 0 } };
+  // An accessibility snapshot carries no style, so an app's hidden measurement
+  // copy — a 2 x 3 px box laid out at the window's own origin — arrives as
+  // ordinary text inside the status bar.
+  const hidden: ProbeNode = {
+    parent: 0,
+    tag: 'Paragraph',
+    rect: [0, 0, 0.76, 1.14],
+    invisible: true,
+  };
+  assert.deepEqual(run('safe-area', [hidden], env), []);
+  // The same box without the platform's answer still reports the inset: the
+  // rule reads the frame it is given, and only the flag excuses it.
+  assert.equal(run('safe-area', [{ ...hidden, invisible: undefined }], env)[0]?.measured, 1.14);
 });
 
 test('safe-area: a presented surface is measured from its own origin', () => {

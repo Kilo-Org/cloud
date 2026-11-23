@@ -2056,11 +2056,12 @@ const appClosureInstall =
 
 test('the kilo-app CI consumers install the app closure', () => {
   // The producer jobs install their own build closure, and the catalog audit
-  // job installs the root project alone because its only readers are JSON
-  // catalogs and the oxc parser. Every other install in this workflow is the
-  // app's, including the typecheck job's: its only program
-  // resolves the app's sources and its workspace dependencies' declarations,
-  // and the two built trees it reads arrive as artifacts.
+  // job installs the app as well as the root project: the audit reads the
+  // plural data the app bundle ships to decide which plural forms a language
+  // can select. Every other install in this workflow is the app's, including
+  // the typecheck job's: its only program resolves the app's sources and its
+  // workspace dependencies' declarations, and the two built trees it reads
+  // arrive as artifacts.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
@@ -2086,8 +2087,8 @@ test('the kilo-app CI consumers install the app closure', () => {
   );
   assert.equal(
     catalogInstall?.run,
-    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
-    'the catalog job installs the root project only: the audit reads JSON catalogs and the oxc parser, no app dependency'
+    'pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs the app too: the audit reads the plural data the app bundle ships to decide which plural forms a language can select'
   );
 });
 
@@ -2494,6 +2495,7 @@ test('the web group checks its programs when the selection names them', t => {
   assert.deepEqual(result.commands, [
     'tsgo --noEmit -p apps/web/tsconfig.json --incremental false',
     'tsgo --noEmit -p scripts/web-env/tsconfig.json',
+    'tsgo --noEmit -p dev/tsconfig.json',
     'pnpm --filter @kilocode/storybook run typecheck',
   ]);
 });

@@ -86,6 +86,7 @@ export const linearRouter = createTRPCRouter({
         actor_id: ctx.user.id,
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
+        details: { id: 'integration.disconnected', integration: 'linear' },
         message: 'Disconnected Linear integration',
       });
     }
@@ -115,6 +116,11 @@ export const linearRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.modelUpdated',
+            integration: 'linear',
+            model: input.modelSlug,
+          },
           message: `Updated Linear integration model to ${input.modelSlug}`,
         });
       }

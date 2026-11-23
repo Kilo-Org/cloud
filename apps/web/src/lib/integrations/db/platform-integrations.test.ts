@@ -23,10 +23,10 @@ import {
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationMetadataForOwner,
-  updateIntegrationRepositories,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import { isPlatformIntegrationActive } from '../core/health';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disconnectGitHubInstallation } from './github-installations';
 import {
@@ -911,36 +911,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       ]);
     }
 
-    // The installation-scoped update matches by installation id, so its
-    // app-type predicate only matters when two rows share one installation id.
-    // That arrangement is legal only across owners (one row per app type).
-    async function seedOrgInstallationSiblings() {
-      await db.insert(platform_integrations).values([
-        {
-          owned_by_organization_id: orgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '1000',
-          platform_account_login: 'org-a',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'standard',
-        },
-        {
-          owned_by_organization_id: otherOrgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '2000',
-          platform_account_login: 'org-b',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'lite',
-        },
-      ]);
-    }
-
     test('deleteIntegration with app type leaves the owner sibling app-type row', async () => {
       await seedOrgSiblings();
 
@@ -1296,26 +1266,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       const lite = rows.find(row => row.github_app_type === 'lite');
       expect(standard?.integration_status).toBe('active');
       expect(lite?.integration_status).toBe('suspended');
-    });
-
-    test('updateIntegrationRepositories with app type updates only the matched row', async () => {
-      await seedOrgInstallationSiblings();
-
-      await updateIntegrationRepositories(
-        'github',
-        destructiveInstallId,
-        [{ id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false }],
-        'standard'
-      );
-
-      const rows = await getRowsByInstallId();
-      expect(rows).toHaveLength(2);
-      const standard = rows.find(row => row.github_app_type === 'standard');
-      const lite = rows.find(row => row.github_app_type === 'lite');
-      expect(standard?.repositories).toEqual([
-        { id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false },
-      ]);
-      expect(lite?.repositories).toBeNull();
     });
 
     // Two rows for the same owner, same app type, but different installation
@@ -1827,5 +1777,98 @@ describe('findGitLabIntegrationByWebhookToken', () => {
     await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
 
     expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
+  });
+});
+
+describe('activation writes of an existing association', () => {
+  afterEach(cleanupDbForTest);
+
+  test('a non-GitHub connect records an active association without a suspension', async () => {
+    const userId = (await insertTestUser()).id;
+    const owner: Owner = { type: 'user', id: userId };
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'linear',
+        integration_type: 'oauth',
+        platform_installation_id: 'linear-org-1',
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'integration-operator',
+        auth_invalid_at: '2026-11-20T00:00:00.000Z',
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .returning({ id: platform_integrations.id });
+
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      platform: 'linear',
+      integrationType: 'oauth',
+      platformInstallationId: 'linear-org-1',
+      platformAccountId: 'linear-org-1',
+      platformAccountLogin: 'linear-workspace',
+      repositoryAccess: 'all',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, row.id));
+    expect(updated).toMatchObject({
+      integration_status: 'active',
+      suspended_at: null,
+      suspended_by: null,
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
+    });
+    expect(isPlatformIntegrationActive(updated)).toBe(true);
+  });
+
+  test('a locally disconnected GitHub association keeps its recorded state', async () => {
+    const userId = (await insertTestUser()).id;
+    const owner: Owner = { type: 'user', id: userId };
+    const installationId = `reactivation-${Date.now()}`;
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'local_disconnect',
+        github_disconnected_at: '2026-11-20T00:00:00.000Z',
+      })
+      .returning({ id: platform_integrations.id });
+
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      platform: 'github',
+      integrationType: 'app',
+      platformInstallationId: installationId,
+      platformAccountId: '12345',
+      platformAccountLogin: 'test-owner',
+      permissions: null,
+      scopes: [],
+      repositoryAccess: 'all',
+      repositories: null,
+      installedAt: new Date().toISOString(),
+      githubAppType: 'standard',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, row.id));
+    expect(updated).toMatchObject({
+      integration_status: 'suspended',
+      suspended_by: 'local_disconnect',
+    });
+    expect(updated.suspended_at).not.toBeNull();
+    expect(updated.github_disconnected_at).not.toBeNull();
   });
 });

@@ -46,10 +46,6 @@ const ENKRYPT_SUMMARY_DETECTOR_BY_NAME = new Map<string, EnkryptDetectorId>(
   Object.entries(ENKRYPT_SUMMARY_DETECTORS)
 );
 
-/**
- * The detector ID of one `summary` key of a detect response, or undefined when Enkrypt reports a
- * detector this map does not know.
- */
 export function enkryptSummaryDetectorId(name: string): EnkryptDetectorId | undefined {
   return ENKRYPT_SUMMARY_DETECTOR_BY_NAME.get(name);
 }

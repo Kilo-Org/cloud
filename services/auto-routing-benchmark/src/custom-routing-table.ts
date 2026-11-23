@@ -98,6 +98,9 @@ export async function assembleCustomRoutingTable(
     readyEntries,
     summaries,
     perCaseResults,
+    // This path reads case rows for exactly these ready entries, so the deployed build saw them
+    // in this sequence; keep it as the tie order instead of sorting variant names.
+    casePairOrder: readyEntries.map(ready => ready.entry),
     complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
 

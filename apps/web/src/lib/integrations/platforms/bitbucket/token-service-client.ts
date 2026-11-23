@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
@@ -26,7 +27,10 @@ export const BitbucketRepositorySchema = z
 
 export const BitbucketRepositoryListResultSchema = z.discriminatedUnion('status', [
   z
-    .object({ status: z.literal('available'), repositories: z.array(BitbucketRepositorySchema) })
+    .object({
+      status: z.literal('available'),
+      repositories: z.array(BitbucketRepositorySchema).max(BITBUCKET_MAX_REPOSITORY_ITEMS),
+    })
     .strict(),
   z.object({ status: z.literal('invalid_request') }).strict(),
   z.object({ status: z.literal('not_connected') }).strict(),
@@ -57,15 +61,18 @@ export async function fetchBitbucketRepositoriesFromTokenService(
         Accept: 'application/json',
         Authorization: `Bearer ${serviceToken}`,
       },
+      redirect: 'manual',
       signal: AbortSignal.timeout(30_000),
     });
   } catch {
     return { status: 'temporarily_unavailable' };
   }
-  if (!response.ok) return { status: 'temporarily_unavailable' };
+  if (!response.ok || response.redirected) return { status: 'temporarily_unavailable' };
 
   try {
-    const parsed = BitbucketRepositoryListResultSchema.safeParse(await response.json());
+    const parsed = BitbucketRepositoryListResultSchema.safeParse(
+      await readBoundedTokenServiceJson(response, BITBUCKET_REPOSITORY_LIST_RESPONSE_MAX_BYTES)
+    );
     return parsed.success ? parsed.data : { status: 'temporarily_unavailable' };
   } catch {
     return { status: 'temporarily_unavailable' };
@@ -80,6 +87,7 @@ export function fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
 }
 
 const BITBUCKET_CODE_REVIEW_RESPONSE_MAX_BYTES = 256_000;
+const BITBUCKET_REPOSITORY_LIST_RESPONSE_MAX_BYTES = 4_194_304;
 const BITBUCKET_CODE_REVIEW_REQUEST_MAX_BYTES = 16_000;
 
 const BitbucketCodeReviewFailureReasonSchema = z.enum([
@@ -205,16 +213,12 @@ type TokenServiceCallOptions<Result> = {
   fallback: Result;
 };
 
-async function readBoundedTokenServiceJson(response: Response): Promise<unknown> {
+async function readBoundedTokenServiceJson(response: Response, maxBytes: number): Promise<unknown> {
   if (!response.body) throw new Error('invalid_response');
   const contentType = response.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
   if (contentType !== 'application/json') throw new Error('invalid_response');
   const contentLength = response.headers.get('Content-Length');
-  if (
-    contentLength &&
-    (!/^[0-9]+$/.test(contentLength) ||
-      Number(contentLength) > BITBUCKET_CODE_REVIEW_RESPONSE_MAX_BYTES)
-  ) {
+  if (contentLength && (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > maxBytes)) {
     throw new Error('invalid_response');
   }
 
@@ -227,7 +231,7 @@ async function readBoundedTokenServiceJson(response: Response): Promise<unknown>
       if (chunk.done) break;
       if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_response');
       totalBytes += chunk.value.byteLength;
-      if (totalBytes > BITBUCKET_CODE_REVIEW_RESPONSE_MAX_BYTES) {
+      if (totalBytes > maxBytes) {
         try {
           await reader.cancel();
         } catch {
@@ -288,7 +292,9 @@ async function callBitbucketCodeReviewTokenService<Result>(
   if (!response.ok || response.redirected) return options.fallback;
 
   try {
-    const parsed = options.resultSchema.safeParse(await readBoundedTokenServiceJson(response));
+    const parsed = options.resultSchema.safeParse(
+      await readBoundedTokenServiceJson(response, BITBUCKET_CODE_REVIEW_RESPONSE_MAX_BYTES)
+    );
     return parsed.success ? parsed.data : options.fallback;
   } catch {
     return options.fallback;

@@ -43,6 +43,10 @@ export type UsageBreakdown = RouterOutputs['usageAnalytics']['getBreakdown'];
 
 export type UsageTable = RouterOutputs['usageAnalytics']['getTable'];
 
+export type BenchmarkChargesOutput = RouterOutputs['usageAnalytics']['getBenchmarkCharges'];
+
+export type BenchmarkPoolCharge = BenchmarkChargesOutput['pools'][number];
+
 export const PERIOD_LABELS: Record<PeriodOption, string> = {
   today: 'Today',
   yesterday: 'Yesterday',

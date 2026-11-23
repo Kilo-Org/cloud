@@ -15,6 +15,10 @@ type ContainerChild = EventEmitter & {
 
 const mocks = vi.hoisted(() => ({
   handler: undefined as undefined | ((req: unknown, res: unknown) => void),
+  // The case-inference reverse proxy starts its own server; tests drive it directly.
+  proxyHandler: undefined as undefined | ((req: unknown, res: unknown) => void),
+  proxyPort: 0,
+  listen: vi.fn(),
   sigterm: undefined as undefined | (() => void),
   serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
@@ -29,9 +33,26 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('node:http', () => ({
-  createServer: (options: ServerOptions, handler: typeof mocks.handler) => {
-    mocks.serverOptions = options;
-    mocks.handler = handler;
+  createServer: (
+    optionsOrHandler: ServerOptions | ((req: unknown, res: unknown) => void),
+    maybeHandler?: (req: unknown, res: unknown) => void
+  ) => {
+    // The runner's own server passes (options, handler); the case-inference proxy passes
+    // only a handler and asks the OS for a port.
+    if (typeof optionsOrHandler === 'function') {
+      mocks.proxyHandler = optionsOrHandler;
+      return {
+        listen: (_port: number, _host: string, ready: () => void) => {
+          mocks.proxyPort = 41000;
+          ready();
+        },
+        address: () => ({ port: mocks.proxyPort }),
+        once: vi.fn(),
+        close: mocks.close,
+      };
+    }
+    mocks.serverOptions = optionsOrHandler;
+    mocks.handler = maybeHandler;
     return { listen: vi.fn(), close: mocks.close };
   },
 }));
@@ -92,8 +113,10 @@ type ContainerResponse = {
     exitCode?: number;
     durationMs?: number;
     stderrTail?: string;
+    stdoutLines?: string[];
     timedOut?: boolean;
     error?: string;
+    stop?: { reason: string; status: number };
   };
 };
 
@@ -132,6 +155,38 @@ async function loadServer() {
   await import(serverPath);
 }
 
+// Drives the case-inference reverse proxy the container started for a running case.
+function proxyRequest(method: string, url: string, body?: string) {
+  if (!mocks.proxyHandler) throw new Error('proxy server was not started');
+  const req = Object.assign(Readable.from(body === undefined ? [] : [Buffer.from(body)]), {
+    method,
+    url,
+    headers: {},
+  });
+  let status = 0;
+  const chunks: Buffer[] = [];
+  const res = Object.assign(new EventEmitter(), {
+    headersSent: false,
+    writeHead: vi.fn((code: number) => {
+      status = code;
+      res.headersSent = true;
+    }),
+    write: vi.fn((chunk: Buffer) => {
+      chunks.push(Buffer.from(chunk));
+      return true;
+    }),
+    end: vi.fn((payload?: string) => {
+      if (typeof payload === 'string' && payload.length > 0) chunks.push(Buffer.from(payload));
+      res.emit('result', { status, body: Buffer.concat(chunks).toString('utf8') });
+    }),
+    destroy: vi.fn(),
+  });
+  const done = Promise.withResolvers<{ status: number; body: string }>();
+  res.once('result', (value: { status: number; body: string }) => done.resolve(value));
+  mocks.proxyHandler(req, res);
+  return done.promise;
+}
+
 async function flushServer() {
   await new Promise<void>(resolve => setImmediate(resolve));
 }
@@ -141,9 +196,20 @@ function stopServer() {
   mocks.sigterm();
 }
 
+// Checks every four-character window of the case key across the returned text.
+function expectNoKeyWindow(body: unknown) {
+  const payload = JSON.stringify(body);
+  const { kiloToken } = runBody;
+  for (let index = 0; index + 4 <= kiloToken.length; index += 1) {
+    expect(payload).not.toContain(kiloToken.slice(index, index + 4));
+  }
+}
+
 beforeEach(() => {
   vi.resetModules();
   mocks.handler = undefined;
+  mocks.proxyHandler = undefined;
+  mocks.proxyPort = 0;
   mocks.sigterm = undefined;
   mocks.serverOptions = undefined;
   mocks.children = [];
@@ -374,6 +440,153 @@ it('settles an asynchronous spawn error once and redacts case authentication', a
   });
   expect(pending.res.end).toHaveBeenCalledOnce();
   expect(mocks.rm).toHaveBeenCalledOnce();
+});
+
+it('replaces the case credential in every captured stream it returns', async () => {
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const eventLine = JSON.stringify({
+    type: 'text',
+    part: { text: `auth ${runBody.kiloToken}`, time: { end: 1 } },
+  });
+  const diagnosticLine = `diagnostic: ${runBody.kiloToken}`;
+  const stderrText = `warning: ${runBody.kiloToken} rejected`;
+  mocks.children[0].stdout.emit('data', Buffer.from(`${eventLine}\n${diagnosticLine}\n`));
+  mocks.children[0].stderr.emit('data', Buffer.from(stderrText));
+  mocks.children[0].emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body).toMatchObject({
+    exitCode: 0,
+    timedOut: false,
+    stdoutLines: [
+      eventLine.replace(runBody.kiloToken, '[redacted]'),
+      diagnosticLine.replace(runBody.kiloToken, '[redacted]'),
+    ],
+    stderrTail: stderrText.replace(runBody.kiloToken, '[redacted]'),
+  });
+  expect(JSON.stringify(response.body)).not.toContain(runBody.kiloToken);
+});
+
+it('keeps whole stdout lines at the 2 MB capture cap', async () => {
+  // The container server keeps at most 2 MB of stdout; the retained text ends inside a line.
+  const stdoutCap = 2 * 1024 * 1024;
+  const { kiloToken } = runBody;
+  const completeLines = 2045;
+  const line = `${'x'.repeat(1024)}\n`;
+  const retainedTailBytes = stdoutCap - completeLines * line.length;
+  const tailLine = `${'x'.repeat(retainedTailBytes - 6)}${kiloToken.slice(0, 6)}${'y'.repeat(10)}`;
+  // The cap keeps this line's first bytes only.
+  expect(tailLine.slice(0, retainedTailBytes).endsWith(kiloToken.slice(0, 6))).toBe(true);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${line.repeat(completeLines)}${tailLine}`));
+  child.stderr.emit('data', Buffer.from('warning: truncated case\n'));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  const stdoutLines = response.body.stdoutLines ?? [];
+  expect(stdoutLines).toHaveLength(completeLines);
+  for (const value of stdoutLines) expect(value).toMatch(/^x+$/u);
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines before the stdout cap', async () => {
+  // The key spans the whole tail line, which the cap cuts.
+  const stdoutCap = 2 * 1024 * 1024;
+  const { kiloToken } = runBody;
+  const completeLines = 2045;
+  const line = `${'x'.repeat(1024)}\n`;
+  const retainedTailBytes = stdoutCap - completeLines * line.length;
+  const prefixBytes = retainedTailBytes - kiloToken.length - 9;
+  const tailLine = `${'x'.repeat(prefixBytes)}${kiloToken}${'x'.repeat(10)}`;
+  expect(completeLines * line.length + tailLine.length).toBe(stdoutCap + 1);
+  // The tail line that holds the key is the line the cap cuts.
+  expect(tailLine.slice(0, retainedTailBytes - 9).endsWith(kiloToken)).toBe(true);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${line.repeat(completeLines)}${tailLine}`));
+  child.stderr.emit('data', Buffer.from('warning: truncated case\n'));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  const stdoutLines = response.body.stdoutLines ?? [];
+  expect(stdoutLines).toHaveLength(completeLines);
+  for (const value of stdoutLines) expect(value).toMatch(/^x+$/u);
+  expect(stdoutLines.join('\n')).not.toContain(kiloToken);
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines at the start of the stderr tail', async () => {
+  // The stderr cap keeps the last 4 KB, whose first line is partial.
+  const stderrCap = 4 * 1024;
+  const { kiloToken } = runBody;
+  const suffix = kiloToken.slice(10);
+  const retainedTail = `${suffix}\n${'z'.repeat(stderrCap - suffix.length - 1)}`;
+  expect(retainedTail).toHaveLength(stderrCap);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stderr.emit(
+    'data',
+    Buffer.from(`${'q'.repeat(10)}${kiloToken}${retainedTail.slice(suffix.length)}`)
+  );
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body.stderrTail).toBe('z'.repeat(stderrCap - suffix.length - 1));
+  expect(response.body.stderrTail).not.toContain('q');
+  expectNoKeyWindow(response.body);
+});
+
+it('keeps only whole lines after the stderr tail start', async () => {
+  // The retained tail starts 9 characters before a whole line that must not survive.
+  const stderrCap = 4 * 1024;
+  const { kiloToken } = runBody;
+  const padding = 9;
+  const retainedTail = `${'q'.repeat(padding)}${kiloToken}\n${'z'.repeat(
+    stderrCap - padding - kiloToken.length - 1
+  )}`;
+  expect(retainedTail).toHaveLength(stderrCap);
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stderr.emit('data', Buffer.from(`w${retainedTail}`));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body.stderrTail).toBe('z'.repeat(stderrCap - padding - kiloToken.length - 1));
+  expect(response.body.stderrTail).not.toContain('q');
+  expect(response.body.stderrTail).not.toContain(kiloToken);
+  expectNoKeyWindow(response.body);
+});
+
+it('returns no captured text when a truncated stream holds no whole line', async () => {
+  // A stream with no newline is one partial line, so both capped edges keep nothing.
+  const { kiloToken } = runBody;
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  child.stdout.emit('data', Buffer.from(`${'x'.repeat(2 * 1024 * 1024)}${kiloToken}`));
+  child.stderr.emit('data', Buffer.from(`${kiloToken}${'y'.repeat(4 * 1024)}`));
+  child.emit('close', 0);
+  const response = await pending.done;
+  expect(response).toMatchObject({ status: 200 });
+  expect(response.body).toMatchObject({ stdoutLines: [], stderrTail: '' });
+  expectNoKeyWindow(response.body);
 });
 
 it('keeps local warmup and real cases in the same serialized CLI lane', async () => {
@@ -1001,4 +1214,522 @@ it('keeps the case timeout and bounds shutdown if the child never closes its pip
   });
   await flushServer();
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+const PARTIAL_EVENT = '{"type":"text","part":{"text":"partial","time":{"end":1}}}';
+
+function paidCallback(attemptStartedAt: number, caseId = resultCallback.execution.caseId) {
+  return {
+    ...resultCallback,
+    execution: { ...resultCallback.execution, caseId, attemptStartedAt },
+  };
+}
+
+function stubResultDelivery() {
+  const fetch = vi.fn(
+    async (_url: string, _init: RequestInit) => new Response(null, { status: 204 })
+  );
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
+it('cancels the running paid case and keeps the output it already produced', async () => {
+  const fetch = stubResultDelivery();
+  await loadServer();
+  const callback = paidCallback(1_000);
+  const running = request('/run', { ...runBody, resultCallback: callback });
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  mocks.children[0].stdout.emit('data', Buffer.from(`${PARTIAL_EVENT}\n`));
+
+  expect(await request('/cancel', { execution: callback.execution }).done).toEqual({
+    status: 200,
+    body: { cancelled: true, state: 'killed' },
+  });
+  expect(mocks.kill).toHaveBeenCalledExactlyOnceWith(-12345, 'SIGKILL');
+  expect(mocks.children[0].kill).not.toHaveBeenCalled();
+
+  mocks.children[0].emit('close', -1);
+  expect(await running.done).toEqual({
+    status: 409,
+    body: { error: 'case cancelled', cancelled: true },
+  });
+  expect(fetch).toHaveBeenCalledOnce();
+  const delivered = JSON.parse(fetch.mock.calls[0][1].body as string);
+  expect(delivered.execution).toEqual(callback.execution);
+  expect(delivered.outcome).toMatchObject({
+    kind: 'cancelled',
+    spawned: true,
+    response: { exitCode: -1, stdoutLines: [PARTIAL_EVENT], cancelled: true },
+  });
+});
+
+it('never starts a case cancelled before it reached the CLI and leaves another generation alone', async () => {
+  const fetch = stubResultDelivery();
+  await loadServer();
+  const runningCallback = paidCallback(1_000);
+  const queuedCallback = paidCallback(1_001, 'queued-case');
+  const running = request('/run', { ...runBody, resultCallback: runningCallback });
+  const queued = request('/run', { ...runBody, resultCallback: queuedCallback });
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+
+  // A stale generation of the running case's slot must not kill the new one.
+  expect(
+    await request('/cancel', {
+      execution: { ...runningCallback.execution, attemptStartedAt: 999 },
+    }).done
+  ).toEqual({ status: 200, body: { cancelled: false, state: 'not_running' } });
+  expect(mocks.kill).not.toHaveBeenCalled();
+
+  expect(await request('/cancel', { execution: queuedCallback.execution }).done).toEqual({
+    status: 200,
+    body: { cancelled: true, state: 'dequeued' },
+  });
+
+  // The cancelled case still waits behind the running one; it settles without spawning.
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  mocks.children[0].emit('close', 0);
+  expect((await running.done).status).toBe(200);
+  expect(await queued.done).toEqual({
+    status: 409,
+    body: { error: 'case cancelled', cancelled: true },
+  });
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  const delivered = new Map(
+    fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(init.body as string);
+      return [body.execution.caseId, body] as const;
+    })
+  );
+  expect(delivered.get(queuedCallback.execution.caseId)).toEqual({
+    execution: queuedCallback.execution,
+    outcome: { kind: 'not_started' },
+  });
+  expect(delivered.get(runningCallback.execution.caseId)?.outcome.kind).toBe('completed');
+});
+
+it('refuses to start a generation whose cancel arrived first', async () => {
+  const fetch = stubResultDelivery();
+  await loadServer();
+  const callback = paidCallback(2_000);
+
+  expect(await request('/cancel', { execution: callback.execution }).done).toEqual({
+    status: 200,
+    body: { cancelled: false, state: 'not_running' },
+  });
+  expect(await request('/run', { ...runBody, resultCallback: callback }).done).toEqual({
+    status: 409,
+    body: { error: 'case cancelled', cancelled: true },
+  });
+
+  expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({
+    execution: callback.execution,
+    outcome: { kind: 'not_started' },
+  });
+});
+
+it('refuses a second subprocess for the same paid generation without reporting it', async () => {
+  const fetch = stubResultDelivery();
+  await loadServer();
+  const callback = paidCallback(4_000);
+  const first = request('/run', { ...runBody, resultCallback: callback });
+  const duplicate = request('/run', { ...runBody, resultCallback: callback });
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+
+  mocks.children[0].emit('close', 0);
+  expect((await first.done).status).toBe(200);
+  expect(await duplicate.done).toEqual({
+    status: 409,
+    body: { error: 'case already running', cancelled: true },
+  });
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  // The duplicate must not report to the callback: a not_started report would clear the
+  // ledger row of the call that is actually running.
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string).outcome.kind).toBe('completed');
+});
+
+it('rejects a malformed inferenceProxy without consuming the generation', async () => {
+  // The regression: validation used to run after `createCaseRunJob`, which registers the
+  // generation in `activeCases`. The early return then left that entry behind with no
+  // release, so the case looked active forever: every later cancel reported 'dequeued' and
+  // a legitimate retry was refused as a duplicate. Nothing below may touch job state.
+  await loadServer();
+  const callback = paidCallback(4_000);
+
+  const malformed = request('/run', {
+    ...runBody,
+    resultCallback: callback,
+    inferenceProxy: { url: 'not a url', authorization: '', invocation: '' },
+  });
+  await flushServer();
+
+  expect(await malformed.done).toEqual({
+    status: 400,
+    body: { error: 'inferenceProxy is malformed' },
+  });
+  // No subprocess started and nothing was reported for this generation.
+  expect(mocks.spawn).not.toHaveBeenCalled();
+
+  // The valid replay of the SAME generation must run, which is only possible if the failed
+  // envelope left no active entry behind.
+  mocks.spawn.mockClear();
+  const valid = request('/run', { ...runBody, resultCallback: callback });
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  mocks.children[0].emit('close', 0);
+  expect((await valid.done).status).toBe(200);
+});
+
+it('leaves the generation cancellable after a malformed inferenceProxy', async () => {
+  // The second half of the leak: a stranded `activeCases` entry with no `stop` made
+  // `cancelCase` answer 'dequeued' for a case that never ran, so a pause looked applied
+  // while nothing was there to stop.
+  await loadServer();
+  const callback = paidCallback(4_000);
+  const malformed = request('/run', {
+    ...runBody,
+    resultCallback: callback,
+    inferenceProxy: { url: 'not a url', authorization: '', invocation: '' },
+  });
+  await flushServer();
+  await malformed.done;
+
+  const cancel = request('/cancel', { execution: callback.execution });
+  await flushServer();
+  // Nothing of this generation was ever active, so the cancel is stale, not 'dequeued'.
+  // With the leak, the stranded entry would have reported 'dequeued' here.
+  expect(await cancel.done).toEqual({
+    status: 200,
+    body: { state: 'not_running', cancelled: false },
+  });
+});
+
+it('refuses a cancel without the ledger generation', async () => {
+  await loadServer();
+
+  expect(await request('/cancel', { execution: resultCallback.execution }).done).toEqual({
+    status: 400,
+    body: {
+      error: 'execution with runId, model, variant, rep, caseId and attemptStartedAt is required',
+    },
+  });
+});
+
+it('still cancels a running case while the container drains', async () => {
+  const fetch = stubResultDelivery();
+  await loadServer();
+  const callback = paidCallback(3_000);
+  const running = request('/run', { ...runBody, resultCallback: callback });
+  await flushServer();
+  stopServer();
+
+  expect(await request('/cancel', { execution: callback.execution }).done).toEqual({
+    status: 200,
+    body: { cancelled: true, state: 'killed' },
+  });
+  mocks.children[0].emit('close', -1);
+  // Nothing reached an event, but a child did spawn: the report is a terminal cancellation
+  // marker, never not_started, so the worker cannot turn it into a fresh paid attempt.
+  expect(await running.done).toEqual({
+    status: 409,
+    body: { error: 'case cancelled', cancelled: true },
+  });
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({
+    execution: callback.execution,
+    outcome: { kind: 'cancelled', spawned: true },
+  });
+  await flushServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+const caseInferenceProxy = {
+  url: 'https://worker.test/case-inference',
+  authorization: 'Bearer capability-token',
+  invocation: Buffer.from(
+    JSON.stringify({
+      engineIdentity: 'engine-1',
+      runId: 'test-run',
+      model: 'test-model',
+      variant: 'high',
+      caseId: 'test-case',
+      repetition: 0,
+      generation: 3,
+      startedAt: Date.now(),
+    })
+  )
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, ''),
+  invocationHeader: 'x-kilo-benchmark-case',
+  catalog: { url: 'https://catalog.test', authorization: 'Bearer bot-token' },
+};
+
+it('sends inference to the worker case route with the capability and never the CLI token', async () => {
+  const fetch = vi.fn(async () => new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+  const env = mocks.spawn.mock.calls[0][2].env;
+  expect(env.KILO_API_URL).toBe('http://127.0.0.1:41000');
+  expect(JSON.parse(env.KILO_AUTH_CONTENT).kilo.key).toBe('benchmark-proxy');
+  expect(env.KILO_AUTH_CONTENT).not.toContain(runBody.kiloToken);
+
+  const inference = proxyRequest(
+    'POST',
+    '/api/gateway/v1/chat/completions',
+    '{"model":"test-model"}'
+  );
+  await flushServer();
+  const [target, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit];
+  expect(String(target)).toBe('https://worker.test/case-inference/chat/completions');
+  expect(init.headers).toMatchObject({
+    authorization: 'Bearer capability-token',
+    'x-kilo-benchmark-case': caseInferenceProxy.invocation,
+  });
+  const modelRequestId = (init.headers as Record<string, string>)[
+    'x-kilo-benchmark-model-request-id'
+  ];
+  expect(modelRequestId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+  );
+  expect(init.redirect).toBe('manual');
+  expect(JSON.stringify(init.headers)).not.toContain('test-benchmark-token');
+
+  expect(await inference).toEqual({ status: 200, body: '{}' });
+  mocks.children[0].emit('close', 0);
+  await running.done;
+});
+
+it('strips a CLI-supplied model request id and mints one per outbound call', async () => {
+  const ids: string[] = [];
+  const fetch = vi.fn(async (_url: URL, init: RequestInit) => {
+    ids.push((init.headers as Record<string, string>)['x-kilo-benchmark-model-request-id']);
+    return new Response('{}', { status: 200 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  const cliSupplied = Object.assign(Readable.from([Buffer.from('{}')]), {
+    method: 'POST',
+    url: '/api/gateway/v1/responses',
+    headers: { 'x-kilo-benchmark-model-request-id': '11111111-1111-4111-8111-111111111111' },
+  });
+  const first = Promise.withResolvers<{ status: number; body: string }>();
+  // The proxy's own responder cannot set request headers, so drive its handler directly.
+  mocks.proxyHandler?.(cliSupplied, {
+    headersSent: false,
+    writeHead: () => {},
+    write: () => true,
+    end: () => first.resolve({ status: 200, body: '' }),
+    destroy: () => {},
+    once: () => {},
+    emit: () => {},
+  });
+  await first.promise;
+  await flushServer();
+
+  expect(ids[0]).not.toBe('11111111-1111-4111-8111-111111111111');
+  expect(ids[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+  mocks.children[0].emit('close', 0);
+  await running.done;
+});
+
+it('revokes only that case generation after an ambiguous transport failure', async () => {
+  const fetch = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('network lost'))
+    .mockResolvedValue(new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const first = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toEqual({
+    status: 502,
+    body: JSON.stringify({ error: 'benchmark upstream unreachable' }),
+  });
+  // The CLI retries the request itself; the next attempt must not open a second paid
+  // attempt for the same case, so the proxy refuses it locally.
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toEqual({
+    status: 503,
+    body: JSON.stringify({ error: 'benchmark case grant revoked' }),
+  });
+  expect(fetch).toHaveBeenCalledOnce();
+
+  mocks.children[0].emit('close', 0);
+  await first.done;
+
+  // A later case on the same slot installs its own envelope and is served normally.
+  const second = request('/run', {
+    ...runBody,
+    inferenceProxy: { ...caseInferenceProxy, authorization: 'Bearer next-capability' },
+  });
+  await flushServer();
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toEqual({
+    status: 200,
+    body: '{}',
+  });
+  expect(fetch).toHaveBeenCalledTimes(2);
+  mocks.children[1].emit('close', 0);
+  await second.done;
+});
+
+it('forwards only the exact catalog read route and never inference with the bot token', async () => {
+  const fetch = vi.fn(async () => new Response('{"data":[]}', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  const catalog = proxyRequest('GET', '/api/openrouter/models');
+  await flushServer();
+  const [target, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit];
+  expect(String(target)).toBe('https://catalog.test/api/openrouter/models');
+  expect(init.headers).toMatchObject({ authorization: 'Bearer bot-token' });
+  expect(await catalog).toEqual({ status: 200, body: '{"data":[]}' });
+
+  mocks.children[0].emit('close', 0);
+  await running.done;
+});
+
+it('reports a Worker stop after a valid billed call as a trusted stop, not from text', async () => {
+  const fetch = vi
+    .fn()
+    // A normal admitted call the CLI billed and used.
+    .mockResolvedValueOnce(
+      new Response('data: {"type":"response.completed"}\n\n', {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'x-kilo-benchmark-admission': 'admitted' },
+      })
+    )
+    // Then the Worker refuses the next call because the payer paused: the marker is the only
+    // trusted signal, and the provider text in the body is irrelevant.
+    .mockResolvedValueOnce(
+      new Response('{"error":"paused earlier","stop":"no_payer","error":{"reason":"paused"}}', {
+        status: 409,
+        headers: {
+          'content-type': 'application/json',
+          'x-kilo-benchmark-admission': 'refused',
+          'x-kilo-benchmark-stop': 'paused',
+        },
+      })
+    );
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toEqual({
+    status: 200,
+    body: 'data: {"type":"response.completed"}\n\n',
+  });
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toEqual({
+    status: 409,
+    body: '{"error":"paused earlier","stop":"no_payer","error":{"reason":"paused"}}',
+  });
+
+  mocks.children[0].emit('close', 0);
+  const result = await running.done;
+  expect(result.body).toMatchObject({ stop: { reason: 'paused', status: 409 } });
+  expect(result.body).not.toHaveProperty('cancelled');
+});
+
+it('never trusts a stop marker carried by an admitted upstream reply', async () => {
+  const fetch = vi.fn(
+    async () =>
+      new Response('{"error":{"reason":"paused"}}', {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'x-kilo-benchmark-admission': 'admitted',
+          'x-kilo-benchmark-stop': 'no_payer',
+        },
+      })
+  );
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  await proxyRequest('POST', '/api/gateway/v1/responses', '{}');
+  mocks.children[0].emit('close', 0);
+
+  const result = await running.done;
+  expect(result.body).not.toHaveProperty('stop');
+  expect(result.body).toMatchObject({ exitCode: 0 });
+});
+
+it.each([
+  ['infra_unavailable', 503],
+  ['model_permanently_failed', 402],
+] as const)('carries the agreed %s stop without inventing usage', async (reason, status) => {
+  const fetch = vi
+    .fn()
+    // This attempt billed: the CLI emitted a step_finish with a real cost before the Worker
+    // refused the next call, so the result's cost must stay truthful for the caller.
+    .mockResolvedValueOnce(
+      new Response('data: {"type":"response.completed"}\n\n', {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'x-kilo-benchmark-admission': 'admitted' },
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(`{"error":{"code":"${reason}"}}`, {
+        status,
+        headers: {
+          'content-type': 'application/json',
+          'x-kilo-benchmark-admission': 'refused',
+          'x-kilo-benchmark-stop': reason,
+        },
+      })
+    );
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  await proxyRequest('POST', '/api/gateway/v1/responses', '{}');
+  expect(await proxyRequest('POST', '/api/gateway/v1/responses', '{}')).toMatchObject({ status });
+  mocks.children[0].emit('close', 0);
+
+  const result = await running.done;
+  expect(result.body).toMatchObject({ stop: { reason, status } });
+  // The stop is metadata, not a cost rewrite: the CLI's own usage fields are untouched.
+  expect(result.body).not.toHaveProperty('cancelled');
+});
+
+it.each([
+  ['an alternate inference spelling', 'POST', '/api/gateway/v1/chat/completions/'],
+  ['an unknown setup path', 'POST', '/api/setup/keys'],
+  [
+    'a catalog path with a foreign query',
+    'GET',
+    '/api/openrouter/models?redirect=https://evil.test',
+  ],
+  ['a catalog path with a write method', 'POST', '/api/openrouter/models'],
+])('refuses %s locally, so no credential can reach it', async (_kind, method, url) => {
+  const fetch = vi.fn(async () => new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const running = request('/run', { ...runBody, inferenceProxy: caseInferenceProxy });
+  await flushServer();
+
+  expect(await proxyRequest(method, url, '{}')).toEqual({
+    status: 404,
+    body: JSON.stringify({ error: 'benchmark proxy route not allowed' }),
+  });
+  expect(fetch).not.toHaveBeenCalled();
+
+  mocks.children[0].emit('close', 0);
+  await running.done;
 });

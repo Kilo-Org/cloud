@@ -51,6 +51,15 @@ function isRefreshRefusalBody(body: unknown): boolean {
 }
 
 /**
+ * The one refresh refusal body that explains the session instead of merely
+ * ending it: the route answers `401 { error: 'USER_BLOCKED' }` when the account
+ * behind the stored pair is blocked. The refresh rotation parses it so the
+ * sign-out it triggers can say why; the classifier and the frozen wire contract
+ * stay as they are, because a 401 is terminal whether or not it names a block.
+ */
+export const UserBlockRefusalBodySchema = z.object({ error: z.literal('USER_BLOCKED') });
+
+/**
  * Every route whose terminal refusal {@link reportAuthTerminalFailure} reports:
  * the native auth POSTs (`postAuth`) and the refresh rotation. The
  * network-error fetch wrapper reads this list so it does not file a second
@@ -126,9 +135,8 @@ export function classifyAuthResponse(args: {
   status: number;
   retryAfterHeader?: string | null;
   /**
-   * The parsed response body, when the caller read it. Only the refresh route
-   * consults it: an intermediary's 403 is told apart from the route's own
-   * refusal by the body the route writes.
+   * The parsed response body, when the caller read it; consulted only for the
+   * refresh route's 403.
    */
   body?: unknown;
   now?: number;
@@ -212,13 +220,6 @@ export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: numb
   if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
-  // Both expected cases are a 401, and every route reported here is either the
-  // stored credential route or an attempt route: the stored credential's own
-  // expiry ends a session the person renews by signing in, and an attempt
-  // route's 401 refuses the credential the attempt presented (the server's
-  // INVALID_CODE, INVALID_TOKEN, INVALID_TICKET or a PasskeyVerificationError
-  // code), which a mistyped code, a reused ticket or a cancelled ceremony
-  // produces. Any other terminal status names a defect and stays at error.
   const expectedRefusal = status === 401;
   captureTelemetry({
     level: expectedRefusal ? 'warning' : 'error',

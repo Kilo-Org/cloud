@@ -32,7 +32,13 @@ import {
   readFailureKindVariant,
 } from '@/lib/query/read-failure-variant';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
-import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
+import {
+  APPEAL_KEYS,
+  REASON_KEYS,
+  statusLabel,
+  TARGET_KEYS,
+  TRIAGE_KEYS,
+} from '@/lib/report-receipt-status';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -178,7 +184,7 @@ export function ReportReceiptScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Section>
-          <Text variant="caption">{t('profile.reportReceipt.description')}</Text>
+          <Text variant="muted">{t('profile.reportReceipt.description')}</Text>
           <RowGroup>
             <KvRow
               label={t('profile.reportReceipt.receiptLabel')}
@@ -196,6 +202,18 @@ export function ReportReceiptScreen() {
                   <Copy size={16} color={colors.mutedForeground} />
                 </Pressable>
               }
+            />
+            <KvRow
+              label={t('profile.reportReceipt.targetLabel')}
+              value={statusLabel(TARGET_KEYS, receipt.data.targetKind)}
+              valueFace="text"
+              valueEllipsizeMode="tail"
+            />
+            <KvRow
+              label={t('profile.reportReceipt.reasonLabel')}
+              value={statusLabel(REASON_KEYS, receipt.data.reason)}
+              valueFace="text"
+              valueEllipsizeMode="tail"
             />
             <KvRow
               label={t('common.status')}

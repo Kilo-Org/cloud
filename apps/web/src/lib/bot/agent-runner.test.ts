@@ -17,6 +17,11 @@ import {
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabProjectAccessLevel } from '@/lib/integrations/platforms/gitlab/adapter';
+import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -102,6 +107,13 @@ jest.mock('@/lib/slack-bot/gitlab-repository-context', () => ({
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
+  getAllIntegrationsForOwner: jest.fn(),
+}));
+jest.mock('@/lib/integrations/core/health', () => ({
+  isPlatformIntegrationHealthy: jest.fn(),
+}));
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabTokenForOrganization: jest.fn(),
@@ -111,6 +123,15 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   buildGitLabCloneUrl: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  fetchGitLabProjectAccessLevel: jest.fn(),
+  GITLAB_ACCESS_LEVELS: { GUEST: 10, REPORTER: 20, DEVELOPER: 30, MAINTAINER: 40, OWNER: 50 },
+  // The credential refusal classification checks this class, so the mock keeps
+  // the real one instead of an undefined binding.
+  GitLabAuthenticationError: jest.requireActual<{
+    GitLabAuthenticationError: unknown;
+  }>('@/lib/integrations/platforms/gitlab/adapter').GitLabAuthenticationError,
 }));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: jest.fn(async () => 'bot-user-1'),
@@ -253,6 +274,17 @@ beforeEach(() => {
   });
   jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
+  jest.mocked(fetchGitLabProjectAccessLevel).mockResolvedValue(30);
+  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
+    {
+      ...runParams().platformIntegration,
+      id: 'gitlab-association-1',
+      platform: PLATFORM.GITLAB,
+      metadata: { gitlab_instance_url: 'https://gitlab.com' },
+    },
+  ]);
+  jest.mocked(isPlatformIntegrationHealthy).mockReturnValue(true);
+  jest.mocked(getValidGitLabToken).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
@@ -475,6 +507,11 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           'org-1',
           'bot-user-1',
           gitlabProject
+        );
+        expect(fetchGitLabProjectAccessLevel).toHaveBeenCalledWith(
+          'gitlab-token',
+          gitlabProject,
+          'https://gitlab.com'
         );
         expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(

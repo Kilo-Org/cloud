@@ -23,6 +23,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => routerMock }));
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerMock.replace }),
+}));
 
 vi.mock('@/components/empty-state', () => ({
   StateAction: (props: { label: string; onPress?: () => void }) =>

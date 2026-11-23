@@ -89,14 +89,24 @@ export function ChatTitle({ title, initialValue, canRename, onRename }: Readonly
             absolute, transparent copy draws nothing and takes no space, so the
             name keeps the whole slot until the measurement decides the notice.
             It is always mounted, so the measurement cannot lag behind a notice
-            that has already been shown. */}
-        <View
-          className="absolute opacity-0"
-          pointerEvents="none"
-          aria-hidden
-          onLayout={measure(setNoticeWidth)}
-        >
-          <BetaPill />
+            that has already been shown.
+
+            The copy fills the row it measures in rather than sitting on the
+            row's start edge. A reader that reports boxes without the style that
+            keeps the copy out of flow takes it for a laid-out sibling of the
+            name, and then a box at the start edge overlaps the name by exactly
+            the notice's width (measured by the accessibility capture source:
+            `model chat` over a 45.33 dp box, 45.3 x 24.8 dp in English and
+            32.76 dp wide in Arabic). Filling the row makes the copy the box the
+            name sits inside, so the pair is containment in every capture
+            source, and the notice's own width is unchanged: it is the copy's
+            child, which lays out at its own size. */}
+        <View className="absolute inset-0 items-start opacity-0" pointerEvents="none" aria-hidden>
+          {/* The measured box is the pill's own, inside the copy that fills the
+              row: a handler on the filled box would report the row's width. */}
+          <View onLayout={measure(setNoticeWidth)}>
+            <BetaPill />
+          </View>
         </View>
       </Pressable>
       {renaming ? (

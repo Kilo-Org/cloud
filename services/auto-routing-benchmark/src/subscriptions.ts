@@ -12,6 +12,8 @@ import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import { platformRegistryEntries, type BenchmarkModelCatalogSchema } from './platform-models';
 import { getBenchmarkConfig } from './config';
 import { listReadyCurrentProfilesForEntries } from './db';
+import { platformCoverageStatements } from './paid-case-store';
+import { variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 
 const PairSchema = z.object({ model: z.string().min(1), variant: z.string().nullable() });
@@ -228,6 +230,19 @@ export async function syncSubscriptionSnapshot(
   }
   throw new Error('Benchmark subscriptions changed concurrently; retry the request.');
 }
+/**
+ * Record one snapshot revision's pairs in the registry and latch platform coverage on any
+ * live case run of a pair that just joined the platform pool — all in one D1 batch.
+ *
+ * A pair is enrolled for automatic measurement only by the platform flag. An owner pool's
+ * pairs get a registry row with both demand flags off: the row is serving bookkeeping (a
+ * ready row is what a pool's routing table and alias pins read) and can be claimed by an
+ * explicit paid request, but it never queues measurement by itself. That is the whole
+ * cutover: no subscription, pool edit or alias move starts a run.
+ *
+ * Under just-in-time billing the membership flip and the coverage latch must commit
+ * together: a case request between two batches could be charged to the wrong payer.
+ */
 async function admitSubscriptionPairs(
   db: D1Database,
   config: BenchmarkConfig,
@@ -236,31 +251,65 @@ async function admitSubscriptionPairs(
   revision: string
 ): Promise<void> {
   const now = new Date().toISOString();
-  const flag = owner.ownerType === 'platform' ? 'platform_requested' : 'user_requested';
   if (!pairs.length) return;
-  await db.batch(
-    pairs.map(pair =>
-      db
-        .prepare(
-          `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status, requested_at, updated_at, platform_requested, user_requested) SELECT ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM benchmark_subscriptions WHERE router = ? AND owner_type = ? AND owner_id = ? AND revision = ?) ON CONFLICT (router, model, variant, engine_identity, repetitions) DO UPDATE SET ${flag} = 1 WHERE ${flag} = 0`
-        )
-        .bind(
-          config.router,
-          pair.model,
-          pair.variant ?? '',
-          computeEngineIdentity('decider', config.router),
-          resolveEffectivePolicy(config).deciderRepetitions,
-          now,
-          now,
-          owner.ownerType === 'platform' ? 1 : 0,
-          owner.ownerType === 'platform' ? 0 : 1,
-          config.router,
-          owner.ownerType,
-          owner.ownerId,
-          revision
-        )
-    )
+  const isPlatform = owner.ownerType === 'platform';
+  const engineIdentity = computeEngineIdentity('decider', config.router);
+  const repetitions = resolveEffectivePolicy(config).deciderRepetitions;
+  const claims = pairs.map(pair =>
+    isPlatform
+      ? db
+          .prepare(
+            `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status, requested_at, updated_at, platform_requested, user_requested) SELECT ?, ?, ?, ?, ?, 'pending', ?, ?, 1, 0 WHERE EXISTS (SELECT 1 FROM benchmark_subscriptions WHERE router = ? AND owner_type = ? AND owner_id = ? AND revision = ?) ON CONFLICT (router, model, variant, engine_identity, repetitions) DO UPDATE SET platform_requested = 1, requested_at = CASE WHEN platform_requested = 0 THEN excluded.requested_at ELSE requested_at END WHERE platform_requested = 0`
+          )
+          .bind(
+            config.router,
+            pair.model,
+            pair.variant ?? '',
+            engineIdentity,
+            repetitions,
+            now,
+            now,
+            config.router,
+            owner.ownerType,
+            owner.ownerId,
+            revision
+          )
+      : db
+          .prepare(
+            `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status, requested_at, updated_at, platform_requested, user_requested) SELECT ?, ?, ?, ?, ?, 'pending', ?, ?, 0, 0 WHERE EXISTS (SELECT 1 FROM benchmark_subscriptions WHERE router = ? AND owner_type = ? AND owner_id = ? AND revision = ?) ON CONFLICT (router, model, variant, engine_identity, repetitions) DO NOTHING`
+          )
+          .bind(
+            config.router,
+            pair.model,
+            pair.variant ?? '',
+            engineIdentity,
+            repetitions,
+            now,
+            now,
+            config.router,
+            owner.ownerType,
+            owner.ownerId,
+            revision
+          )
   );
+  // Same guarded latch: only a pair the registry still marks as a platform member may
+  // newly cover its live case runs, and only in the same statement. A replaced snapshot
+  // therefore cannot latch a pair the platform has since removed, while a generation that is
+  // already covered keeps its sticky latch.
+  const coverage = isPlatform
+    ? pairs.flatMap(pair =>
+        platformCoverageStatements(db, {
+          membership: {
+            router: config.router,
+            engineIdentity,
+            model: pair.model,
+            variant: variantToStorage(pair.variant),
+            repetitions,
+          },
+        })
+      )
+    : [];
+  await db.batch([...claims, ...coverage]);
 }
 const DailyAliasSyncRowSchema = z.object({
   day: z.string(),

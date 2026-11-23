@@ -133,7 +133,6 @@ describe('ImageViewer mounted', () => {
       (image.props.onError as () => void)();
     });
 
-    // The zoomable image is replaced by the fallback.
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(findByType(renderer.root, 'StateSurface')).toHaveLength(1);
     expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
@@ -146,7 +145,21 @@ describe('ImageViewer mounted', () => {
     expect(unavailable).toHaveLength(1);
     expect(unavailable[0]?.props.className).toContain('text-white');
 
-    // The Share header pressable stays enabled when onShare exists.
+    // The row announces through AccessibleStatus: one polite live region on
+    // Android carrying the same white text, not the destructive error tone.
+    const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
+    expect(statuses).toHaveLength(1);
+    const fallbackStatus = statuses[0];
+    if (!fallbackStatus) {
+      throw new Error('fallback AccessibleStatus not found');
+    }
+    expect(fallbackStatus.props.message).toBe('Image unavailable');
+    const announced = findByType(fallbackStatus, 'Text');
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.props.accessibilityLiveRegion).toBe('polite');
+    expect(announced[0]?.props.className).toContain('text-white');
+    expect(announced[0]?.props.className).not.toContain('text-destructive');
+
     const share = findByType(renderer.root, 'Pressable').find(
       node =>
         typeof node.props.accessibilityLabel === 'string' &&
@@ -171,15 +184,11 @@ describe('ImageViewer mounted', () => {
       (image.props.onError as () => void)();
     });
 
-    // The error replaces the image with the unavailable row at once, and the
-    // row persists while the URL is unchanged.
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(
       findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
     ).toHaveLength(1);
 
-    // A renewed uri clears the recorded error in the same commit, so the
-    // refreshed image shows with no "Image unavailable" flash.
     await act(async () => {
       await Promise.resolve();
       renderer.update(

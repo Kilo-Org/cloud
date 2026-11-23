@@ -7,7 +7,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Workflow } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -16,16 +16,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
+import { useTRPC } from '@/lib/trpc/utils';
 import { CustomRouterDialog } from './CustomRouterDialog';
+import { PoolBenchmarkButton } from './PoolBenchmarkButton';
+import { PoolBenchmarkWarnings } from './PoolBenchmarkWarnings';
 import {
   BASE_ROUTER_OPTIONS,
   CUSTOM_ROUTERS_POLL_INTERVAL_MS,
   MODE_OPTIONS,
+  customRoutersQueryKey,
   deleteCustomRouter,
-  entryDisplayStatus,
   entryLabel,
+  entryRoutingStatus,
   fetchCustomRouters,
-  hasPendingEntries,
+  hasUnsettledEntries,
+  pausedRequestInfo,
+  type PausedRequestInfo,
 } from './custom-router-display';
 
 type Props = {
@@ -34,10 +41,6 @@ type Props = {
 };
 
 type EditorState = { router: CustomRouterSummary | undefined } | null;
-
-export function customRoutersQueryKey(organizationId: string | undefined) {
-  return ['auto-routing-custom-routers', organizationId ?? 'personal'] as const;
-}
 
 export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   const queryClient = useQueryClient();
@@ -50,7 +53,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
     queryFn: () => fetchCustomRouters(organizationId),
     refetchInterval: current =>
       current.state.data &&
-      hasPendingEntries(current.state.data.routers.filter(router => router.scope === scope))
+      hasUnsettledEntries(current.state.data.routers.filter(router => router.scope === scope))
         ? CUSTOM_ROUTERS_POLL_INTERVAL_MS
         : false,
   });
@@ -148,6 +151,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
               <CustomRouterItem
                 key={router.id}
                 router={router}
+                organizationId={organizationId}
                 canEdit={!readonly && router.canEdit}
                 deleting={deleteMutation.isPending && deleteMutation.variables?.id === router.id}
                 onEdit={() => setEditor({ router })}
@@ -176,12 +180,14 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
 
 function CustomRouterItem({
   router,
+  organizationId,
   canEdit,
   deleting,
   onEdit,
   onDelete,
 }: {
   router: CustomRouterSummary;
+  organizationId: string | undefined;
   canEdit: boolean;
   deleting: boolean;
   onEdit: () => void;
@@ -191,6 +197,40 @@ function CustomRouterItem({
   const modeLabel = MODE_OPTIONS.find(option => option.value === router.mode)?.label;
   const defaultEntry = router.entries.find(entry => entry.key === router.defaultEntryKey);
   const needsEval = router.entries.some(entry => entry.needsClientEval);
+
+  // A row that is not serving can be paused by the pool's latest request. This
+  // read-only progress fetch never quotes, starts, or charges anything.
+  const trpc = useTRPC();
+  const needsProgress = router.entries.some(entry => {
+    const kind = entryRoutingStatus(entry).kind;
+    return kind === 'not-benchmarked' || kind === 'benchmarking' || kind === 'unknown';
+  });
+  const progressQuery = useQuery({
+    ...trpc.customRouterBenchmarks.progress.queryOptions({
+      slug: router.slug,
+      organizationId,
+    }),
+    enabled: needsProgress,
+    refetchInterval: needsProgress ? CUSTOM_ROUTERS_POLL_INTERVAL_MS : false,
+  });
+  const pausedRequest = useMemo<PausedRequestInfo | null>(
+    () => (progressQuery.data === undefined ? null : pausedRequestInfo(progressQuery.data)),
+    [progressQuery.data]
+  );
+
+  // The catalog's live alias target is what distinguishes "still serving the
+  // benchmarked target" from "must re-benchmark"; concrete pools never load it.
+  const hasAliasEntry = router.entries.some(
+    entry => entry.entry.kind === 'gateway' && entry.entry.model.startsWith('~')
+  );
+  const modelsQuery = useModelSelectorList(organizationId, hasAliasEntry);
+  const aliasTargets = useMemo(() => {
+    const targets = new Map<string, string>();
+    for (const model of modelsQuery.data?.data ?? []) {
+      if (model.alias_target !== undefined) targets.set(model.id, model.alias_target);
+    }
+    return targets;
+  }, [modelsQuery.data]);
 
   return (
     <li className="bg-card space-y-3 rounded-md border p-4">
@@ -204,7 +244,8 @@ function CustomRouterItem({
           </p>
         </div>
         {canEdit ? (
-          <div className="flex shrink-0 items-start gap-2">
+          <div className="flex shrink-0 flex-wrap items-start gap-2">
+            <PoolBenchmarkButton router={router} organizationId={organizationId} />
             <Button type="button" variant="ghost" size="sm" disabled={deleting} onClick={onEdit}>
               <Pencil className="size-4" aria-hidden />
               Edit
@@ -219,28 +260,36 @@ function CustomRouterItem({
         ) : null}
       </div>
 
+      <PoolBenchmarkWarnings router={router} />
+
       <ul className="space-y-1.5">
         {router.entries.map(entry => {
-          const status = entryDisplayStatus(entry);
+          const status = entryRoutingStatus(entry, { paused: pausedRequest, aliasTargets });
+          const label = entryLabel(entry.entry);
+          const servingModels = [
+            ...new Set(
+              entry.variants
+                .map(variant => variant.servingModel ?? null)
+                .filter((model): model is string => model !== null && model !== label)
+            ),
+          ];
           return (
             <li
               key={entry.key}
               className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="truncate font-mono">{entryLabel(entry.entry)}</span>
+                <span className="truncate font-mono">{label}</span>
+                {servingModels.length > 0 ? (
+                  <span className="text-muted-foreground font-mono text-xs break-all">
+                    Serving {servingModels.join(', ')}
+                  </span>
+                ) : null}
                 {entry.entry.kind === 'client' ? <Badge variant="secondary">Client</Badge> : null}
                 {entry.entry.measuredAs ? (
                   <Badge variant="outline" className="max-w-full whitespace-normal break-all">
                     Linked to {entry.entry.measuredAs}
                   </Badge>
-                ) : null}
-                {entry.entry.measuredAs &&
-                status.kind !== 'stale' &&
-                entry.variants.some(variant => variant.linked && variant.status === 'stale') ? (
-                  <span className="text-muted-foreground text-xs">
-                    Linked platform measurements are stale. Routing still uses them.
-                  </span>
                 ) : null}
               </div>
               <div className="flex flex-col sm:items-end">
@@ -248,9 +297,9 @@ function CustomRouterItem({
                   data-status={status.kind}
                   className={cn(
                     'font-medium',
-                    status.kind === 'failed' && 'text-destructive',
-                    (status.kind === 'unknown' || status.kind === 'missing') &&
-                      'text-muted-foreground'
+                    status.tone === 'destructive' && 'text-destructive',
+                    status.tone === 'warning' && 'text-amber-500',
+                    status.tone === 'muted' && 'text-muted-foreground'
                   )}
                 >
                   {status.label}

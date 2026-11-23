@@ -91,6 +91,7 @@
     "draft": "ഡ്രാഫ്റ്റ്",
     "enabled": "പ്രവർത്തനക്ഷമം",
     "github": "GitHub",
+    "image": "ചിത്രം",
     "imageUnavailable": "ചിത്രം ലഭ്യമല്ല.",
     "loading": "ലോഡ് ചെയ്യുന്നു…",
     "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
@@ -122,10 +123,10 @@
     "connectProvider": "ഒരു സേവനദാതാവിനെ കണക്റ്റ് ചെയ്യുക",
     "contentTruncated": "ഉള്ളടക്കത്തിന്റെ ഒരു ഭാഗം മാത്രം കാണിക്കുന്നു",
     "copyLink": "ലിങ്ക് പകർത്തുക",
+    "couldNotLoad": "ലോഡ് ചെയ്യാനായില്ല.",
+    "couldNotLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
     "couldNotLoadOrganizations": "സ്ഥാപനങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
     "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
-    "couldnTLoad": "ലോഡ് ചെയ്യാനായില്ല.",
-    "couldnTLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
     "deviceSessions": "ഉപകരണ സെഷനുകൾ",
     "disabled": "പ്രവർത്തനരഹിതം",
     "email": "ഇമെയിൽ",
@@ -522,6 +523,7 @@
       "receiptLabel": "രസീത്",
       "copyReceiptId": "രസീത് ഐഡി പകർത്തുക",
       "appealLabel": "അപ്പീൽ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ലഭിച്ചു",
       "triageOpen": "അവലോകനത്തിൽ",
       "triageActioned": "ശരിവച്ചു",
@@ -539,13 +541,23 @@
       "nextStepInReview": "ഫലം ഈ സ്ക്രീനിൽ ദൃശ്യമാകും, തീരുമാനത്തിന് ശേഷം അപ്പീൽ നൽകാം.",
       "nextStepAppeal": "അപ്പീലിന്റെ ഫലം ഈ സ്ക്രീനിൽ ദൃശ്യമാകും.",
       "nextStepFinal": "അപ്പീലിന്റെ തീരുമാനം അന്തിമമാണ്. ഇനി അപ്പീൽ സമർപ്പിക്കാനാകില്ല.",
-      "viewReceipt": "രസീത് കാണുക"
+      "viewReceipt": "രസീത് കാണുക",
+      "targetLabel": "റിപ്പോർട്ട് ചെയ്തത്",
+      "reasonLabel": "റിപ്പോർട്ടിന്റെ കാരണം",
+      "targetMessage": "എഐ മറുപടി",
+      "targetComment": "പുൾ റിക്വസ്റ്റ് അഭിപ്രായം",
+      "targetUser": "വ്യക്തി",
+      "reasonHarmful": "ഹാനികരമായ ഉള്ളടക്കം",
+      "reasonIllegal": "നിയമവിരുദ്ധ ഉള്ളടക്കം",
+      "reasonHarassment": "പീഡനം",
+      "reasonSpam": "അനാവശ്യ പരസ്യം",
+      "reasonOther": "മറ്റൊരു കാരണം"
     },
     "reportReceipts": {
       "title": "റിപ്പോർട്ടുകൾ",
       "rowSubtitle": "നിങ്ങൾ സമർപ്പിച്ച റിപ്പോർട്ടുകളും അവയുടെ ഫലങ്ങളും",
       "emptyTitle": "ഇതുവരെ റിപ്പോർട്ടുകളില്ല",
-      "emptyDescription": "ഒരു കമന്റിൽ നിന്നോ AI പ്രതികരണത്തിൽ നിന്നോ നിങ്ങൾ സമർപ്പിക്കുന്ന റിപ്പോർട്ടുകൾ ഇവിടെ ദൃശ്യമാകും.",
+      "emptyDescription": "ഒരു പുൾ റിക്വസ്റ്റ് ചർച്ചയിലെ കമന്റിൽ നിന്നോ ഏജന്റ് സെഷനിലെ എഐ മറുപടിയിൽ നിന്നോ നിങ്ങൾ സമർപ്പിക്കുന്ന റിപ്പോർട്ടുകൾ അവയുടെ ഫലത്തോടൊപ്പം ഇവിടെ ദൃശ്യമാകും.",
       "couldNotLoad": "നിങ്ങളുടെ റിപ്പോർട്ടുകൾ ലോഡ് ചെയ്യാനായില്ല",
       "capped": "നിങ്ങളുടെ ഏറ്റവും പുതിയ റിപ്പോർട്ടുകൾ കാണിക്കുന്നു."
     },
@@ -1000,8 +1012,9 @@
       "checkActiveConnection": "കണക്ഷൻ സജീവമാണ്, എന്നാൽ ഈ ഇനം ഇപ്പോഴും ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
       "bitbucketOrgOnlyDescription": "അതിന്റെ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ മുകളിലുള്ള അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷനിലേക്ക് മാറ്റുക.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ഈ അക്കൗണ്ടിൽ ഇതുവരെ ഓർഗനൈസേഷനുകളൊന്നുമില്ല. നിങ്ങൾ ഒരു ഓർഗനൈസേഷൻ സൃഷ്ടിക്കുകയോ ചേരുകയോ ചെയ്താൽ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ കഴിയും.",
-      "gitlabReconnectAdminOnlyDescription": "ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് വീണ്ടും കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
+      "reconnectAdminOnlyDescription": "ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് വീണ്ടും കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
       "bitbucketNotConnectedTitle": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല",
+      "bitbucketAdminOnlyDescription": "ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
       "adminOnlyConnectDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
       "contextLine": "{{organization}}-ന്",
       "contextLinePersonal": "വ്യക്തിപരത്തിന്"
@@ -1226,6 +1239,7 @@
     "needsInputAction": {
       "approved": "അഭ്യർഥന അംഗീകരിച്ചു",
       "replied": "മറുപടി അയച്ചു",
+      "empty": "ഒരു മറുപടി എഴുതി എന്നിട്ട് അയയ്ക്കുക.",
       "failed": "മറുപടി നൽകാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ വീണ്ടും ടാപ്പ് ചെയ്യുക.",
       "unavailable": "ഈ അഭ്യർഥന ഇനി കാത്തിരിക്കുന്നില്ല."
     }
@@ -1490,7 +1504,9 @@
       "githubError": "GitHub സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "gitlabAccount": "GitLab അക്കൗണ്ട്",
       "gitlabError": "GitLab സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "description": "പുൾ റിക്വസ്റ്റുകൾ സ്വയമേവ അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റ് ചെയ്യുക."
+      "description": "പുൾ റിക്വസ്റ്റുകൾ സ്വയമേവ അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റ് ചെയ്യുക.",
+      "notConnectedTitle": "{{platform}} കണക്റ്റുചെയ്തിട്ടില്ല",
+      "githubAdminOnlyDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ."
     },
     "overview": {
       "allAreas": "എല്ലാ മേഖലകളും",
@@ -2164,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} സെഷനുകൾ",
       "sectionAccessibility": "{{title}}: {{displayCount}} സെഷനുകൾ",
       "live": "തത്സമയം",
-      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു"
+      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു",
+      "retentionLimit": "നിങ്ങളുടെ ഏറ്റവും പുതിയ സെഷനുകൾ കാണിക്കുന്നു."
     },
     "sessionRow": {
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",
@@ -2234,11 +2251,11 @@
       "scrollToBottom": "ഏറ്റവും താഴേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
       "emptyReadOnlyTitle": "ഈ സെഷനിൽ സന്ദേശങ്ങളില്ല",
-      "renameAccessibility": "{{title}} എന്ന സെഷന്റെ പേര് മാറ്റുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "historyTooLarge": "ഈ സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ വളരെ വലുതാണ്.",
       "historyUnavailable": "ഈ സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് വായിക്കാനാവില്ല.",
+      "historyTemporarilyUnavailable": "ഈ സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് താൽക്കാലികമായി ലഭ്യമല്ല.",
       "cloneFailedRetry": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "notEnoughCredits": "ഈ അഭ്യർത്ഥനയ്ക്ക് ക്രെഡിറ്റുകൾ മതിയാകുന്നില്ല. ക്രെഡിറ്റുകൾ ചേർത്ത് വീണ്ടും ശ്രമിക്കുക.",
       "previousTaskFinishing": "മുമ്പത്തെ ജോലി ഇനിയും പൂർത്തിയായിട്ടില്ല. ഒരു നിമിഷം കാത്തിരിക്കുക.",
@@ -2601,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "വിശദാംശങ്ങൾ ലഭ്യമല്ല.",
+      "detailsUnavailableDescription": "ഈ ഇനം ഇപ്പോൾ സെഷനിൽ ഇല്ല.",
       "textDisplay": "ടെക്സ്റ്റ് പ്രദർശനം",
       "thinking": "ചിന്തിക്കുന്നു",
       "thought": "ചിന്ത",
@@ -2644,6 +2662,7 @@
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",
       "imageUnavailableRetry": "ചിത്രം ലഭ്യമല്ല. ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
+      "imageUnavailableRetryWithAlt": "ചിത്രം ലഭ്യമല്ല. {{alt}}. ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "imagePreviewUnavailableInSession": "ഈ സെഷനിൽ ചിത്രത്തിന്റെ പ്രിവ്യൂ ലഭ്യമല്ല.",
       "viewImage": "ചിത്രം കാണുക",
       "viewImageWithAlt": "{{alt}} എന്ന ചിത്രം കാണുക",
@@ -2775,7 +2794,9 @@
       "skip": "ഒഴിവാക്കുക",
       "retrySkip": "ഒഴിവാക്കാൻ വീണ്ടും ശ്രമിക്കുക",
       "submitting": "സമർപ്പിക്കുന്നു…",
-      "sendAnswers": "ഉത്തരങ്ങൾ അയയ്ക്കുക"
+      "sendAnswers": "ഉത്തരങ്ങൾ അയയ്ക്കുക",
+      "unreadableTitle": "ഈ ചോദ്യം പ്രദർശിപ്പിക്കാനായില്ല",
+      "unreadableBody": "ഈ ആപ്പിന് കാണിക്കാനാകാത്ത ഒരു ചോദ്യത്തിനായി ഏജന്റ് കാത്തിരിക്കുകയാണ്. തുടരാൻ CLI-യിൽ അതിന് മറുപടി നൽകുക."
     },
     "blockingCard": {
       "questionUnavailable": "ഈ ചോദ്യം ഇനി ലഭ്യമല്ല.",
@@ -2793,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ഉപസെഷനുകൾക്കുള്ളിലെ ഉപസെഷനുകളുടെ എണ്ണം അനുവദനീയമായ പരിധിയിലെത്തി.",
+      "maxNestingDepth": "നെസ്റ്റഡ് സെഷനുകളുടെ പരമാവധി ആഴത്തിൽ എത്തി.",
       "modelAccessibility": "മോഡൽ: {{modelLabel}}",
       "openHint": "സബ്ഏജന്റ് സെഷൻ തുറക്കുക",
       "subagent": "സബ്ഏജന്റ്",
@@ -2802,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "സബ്ഏജന്റ് സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+      "historyTooLarge": "ഈ സബ്എജന്റിന്റെ ചരിത്രം ലോഡ് ചെയ്യാൻ വളരെ വലുതാണ്.",
+      "historyUnavailable": "ഈ സബ്എജന്റിന്റെ ചരിത്രം ലഭ്യമല്ല.",
+      "historyTemporarilyUnavailable": "ഈ സബ്എജന്റിന്റെ ചരിത്രം താൽക്കാലികമായി ലഭ്യമല്ല.",
       "failed": "സബ്ഏജന്റ് സെഷൻ പരാജയപ്പെട്ടു.",
       "noMessages": "സബ്ഏജന്റ് സന്ദേശങ്ങളൊന്നുമില്ല",
       "noMessagesDescription": "ഈ സബ്ഏജന്റ് സെഷൻ സംഭാഷണരേഖയൊന്നുമില്ലാതെ പൂർത്തിയായി.",
@@ -2971,7 +2995,7 @@
       "windowUnavailable": "സന്ദർഭ പരിധി ലഭ്യമല്ല",
       "tapToViewDetails": " സന്ദർഭ വിശദാംശങ്ങൾ കാണാൻ ടാപ്പ് ചെയ്യുക.",
       "costClause": ", ചെലവ് {{cost}}",
-      "loadingCostSpoken": "ചെലവ് {{cost}}.",
+      "loadingCostSpoken": "ഇതുവരെയുള്ള ചെലവ് {{cost}}.",
       "tokensWindowUnavailable": "സന്ദർഭത്തിൽ {{used}} ടോക്കണുകൾ, സന്ദർഭ പരിധി ലഭ്യമല്ല{{costClause}}.",
       "tokensUsage": "സന്ദർഭത്തിലെ {{window}} ടോക്കണുകളിൽ {{used}} ഉപയോഗിച്ചു, {{percentage}} ഉപയോഗം{{costClause}}.",
       "title": "സന്ദർഭ ഉപയോഗം",
@@ -3083,6 +3107,12 @@
     "retryLoadingAccount": "അക്കൗണ്ട് ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
     "retryLoadingPrivacy": "സ്വകാര്യതാ മുൻഗണനകൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക"
   },
+  "accountBlocked": {
+    "title": "അക്കൗണ്ട് ബ്ലോക്ക് ചെയ്തു",
+    "description": "Kilo ഈ അക്കൗണ്ട് ബ്ലോക്ക് ചെയ്തു, വീണ്ടും സൈൻ ഇൻ ചെയ്യുന്നത് അത് ഒഴിവാക്കില്ല. അഭ്യർത്ഥിച്ചാൽ സഹായ ടീമിന് ബ്ലോക്ക് പരിശോധിക്കാം.",
+    "domainDescription": "Kilo ഈ ഇമെയിൽ ഡൊമെയ്ൻ ഉള്ള അക്കൗണ്ടുകൾ അനുവദിക്കുന്നില്ല, വീണ്ടും സൈൻ ഇൻ ചെയ്യുന്നത് അത് മാറ്റില്ല. അഭ്യർത്ഥിച്ചാൽ സഹായ ടീമിന് ഡൊമെയ്ൻ പരിശോധിക്കാം.",
+    "contactSupport": "സഹായത്തിനായി ബന്ധപ്പെടുക"
+  },
   "addCredits": {
     "cta": "ക്രെഡിറ്റുകൾ ചേർക്കുക",
     "billingPage": "ബില്ലിംഗ് പേജ്"
@@ -3155,8 +3185,7 @@
     "timeoutDescription": "പൂർത്തിയാകുന്നതിന് മുമ്പ് തന്നെ അഭ്യർത്ഥന കാലഹരണപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക."
   },
   "screenHeader": {
-    "openMenu": "മെനു തുറക്കുക",
-    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക"
+    "openMenu": "മെനു തുറക്കുക"
   },
   "picker": {
     "optionsExpired": "ഓപ്ഷനുകൾ കാലഹരണപ്പെട്ടു",
@@ -3375,6 +3404,8 @@
     "voiceTranscriptionWho": "നിങ്ങളുടെ ഉപകരണം, നിങ്ങൾ തിരഞ്ഞെടുത്ത ട്രാൻസ്ക്രിപ്ഷൻ മോഡലിനൊപ്പം Kilo Gateway, അല്ലെങ്കിൽ ഓൺലൈൻ തിരിച്ചറിയലിനായി Apple അല്ലെങ്കിൽ Google.",
     "installAttributionPromptTitle": "ഇൻസ്റ്റാളിന്റെ ഉറവിടം കണ്ടെത്താൻ അനുവദിക്കണോ?",
     "installAttributionPromptMessage": "നിങ്ങൾ ഏത് വഴിയിലൂടെയാണ് എത്തിയതെന്ന് അറിയാൻ മാത്രമാണ് Kilo Apple-ന്റെ ട്രാക്കിംഗ് അനുമതി ഉപയോഗിക്കുന്നത്. നിങ്ങളുടെ പ്രോംപ്റ്റുകളോ സംഭാഷണങ്ങളോ ഇതിനായി ഒരിക്കലും ഉപയോഗിക്കില്ല.",
+    "installAttributionRequestFailedTitle": "ട്രാക്കിംഗ് അഭ്യർത്ഥന കാണിക്കാനായില്ല",
+    "installAttributionRequestFailedMessage": "Kilo സിസ്റ്റം അഭ്യർത്ഥന കാണിക്കാനായില്ല, അതിനാൽ ഇൻസ്റ്റാളിന്റെ ഉറവിടം കണ്ടെത്തൽ ഓഫായി തുടരും.",
     "what": "എന്ത്",
     "why": "എന്തിനാണ്",
     "who": "ആർക്ക്"
@@ -3390,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "ഓഡിറ്റ് ലോഗ്",
-      "permissionDenied": "എന്റർപ്രൈസ് പ്ലാനിലുള്ള ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ ഓഡിറ്റ് ലോഗ് കാണാനാകൂ.",
+      "permissionDenied": "എന്റർപ്രൈസ് പ്ലാനിലുള്ള ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ ഓഡിറ്റ് ലോഗ് കാണാനാകൂ. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ഓഡിറ്റ് ഇവന്റുകളൊന്നുമില്ല",
       "emptyDescription": "ഈ ഓർഗനൈസേഷനിൽ നടക്കുന്ന പ്രവർത്തനങ്ങൾ ഇവിടെ കാണിക്കും.",
       "truncated": "ഏറ്റവും പുതിയ ഇവന്റുകൾ കാണിക്കുന്നു.",
@@ -3440,11 +3471,147 @@
         "guardrailUpdate": "ഗാർഡ്‌റെയിൽ അപ്ഡേറ്റ് ചെയ്തു",
         "guardrailRemove": "ഗാർഡ്‌റെയിൽ നീക്കി",
         "unknown": "ഓഡിറ്റ് ഇവന്റ്"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "മോഡ് \"{{name}}\" (ഐഡന്റിഫയർ: {{slug}})",
+        "modeUpdate": "മോഡ് \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "സ്വയമേവ റൂട്ടിംഗ്",
+          "defaultModel": "ഡിഫോൾട്ട് മോഡൽ"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} എന്നയാളെ {{role}} ആയി ചേർത്തു",
+        "memberRemoved": "{{email}} എന്നയാളെ നീക്കം ചെയ്തു",
+        "memberParentAdded": "പേരന്റ് ഓർഗനൈസേഷൻ {{parent}}-ൽ നിന്ന് {{email}} എന്നയാളെ ചേർത്തു",
+        "memberParentRemoved": "പേരന്റ് ഓർഗനൈസേഷൻ {{parent}}-ൽ നിന്ന് {{email}} എന്നയാളെ നീക്കം ചെയ്തു",
+        "inviteSent": "{{email}} {{role}} ആയി",
+        "inviteRevoked": "{{email}} എന്നയാൾക്കുള്ള ക്ഷണം റദ്ദാക്കി",
+        "inviteAccepted": "{{email}} എന്നയാളുടെ ക്ഷണം സ്വീകരിച്ചു",
+        "groupIdentity": "ഗ്രൂപ്പ് \"{{name}}\"",
+        "groupMembers": "ഗ്രൂപ്പ് \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ഗ്രൂപ്പുകൾ",
+        "groupMemberGroups_one": "{{displayCount}} ഗ്രൂപ്പ്",
+        "groupMemberGroups_other": "{{displayCount}} ഗ്രൂപ്പുകൾ",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ഗ്രൂപ്പുകൾ",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ഗ്രൂപ്പ്",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ഗ്രൂപ്പുകൾ",
+        "groupPolicySet": "ഗ്രൂപ്പ് \"{{name}}\": {{policy}} പോളിസി സെറ്റ് ചെയ്തു",
+        "groupPolicyRemoved": "ഗ്രൂപ്പ് \"{{name}}\": {{policy}} പോളിസി നീക്കി",
+        "groupDefaultPolicySet": "ഡിഫോൾട്ട് {{policy}} പോളിസി സെറ്റ് ചെയ്തു",
+        "groupDefaultPolicyRemoved": "ഡിഫോൾട്ട് {{policy}} പോളിസി നീക്കി",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "കൃത്രിമ ബുദ്ധി ഗാർഡ്റെയിലുകൾ {{state}}",
+        "guardrailConfigGroup": "ഗ്രൂപ്പ് \"{{group}}\"-ന് {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO ഡൊമെയ്ൻ {{domain}}",
+        "ssoDomainChanged": "{{domain}} (മുമ്പ് {{previous}})",
+        "ssoDomainRemoved": "SSO ഡൊമെയ്ൻ {{domain}} നീക്കം ചെയ്തു",
+        "fundsPurchased": "{{method}} വഴി {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} ചൈൽഡ് ഓർഗനൈസേഷനുകൾക്ക് {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} ചൈൽഡ് ഓർഗനൈസേഷന് {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} ചൈൽഡ് ഓർഗനൈസേഷനുകൾക്ക് {{amount}}",
+        "fundsReceived": "{{parent}}-ൽ നിന്ന് {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} കോൺഫിഗറേഷൻ",
+        "reviewAgentConfigStyle": "{{platform}}: ശൈലി {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} അപ്ഡേറ്റ് ചെയ്തു",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} അപ്ഡേറ്റ് ചെയ്തു",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} അപ്ഡേറ്റ് ചെയ്തു",
+        "reviewAgentSecretsFailed": "{{displayCount}} പിശകുകൾ",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} പിശക്",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} പിശകുകൾ",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "ഇൻഫറൻസ് പ്രദേശം: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "മോഡ് \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ആഗോള ഡിഫോൾട്ട്",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "അനുവദിച്ചിരിക്കുന്നു",
+          "denied": "നിഷേധിച്ചിരിക്കുന്നു",
+          "followSetting": "എക്സ്റ്റെൻഷൻ ക്രമീകരണം പിന്തുടരുന്നു"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "പ്രോജക്റ്റ് UI {{state}}",
+        "settingMinimumBalanceOn": "{{emails}} എന്നിവർക്ക് {{threshold}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "ശുപാർശ ഡൈജസ്റ്റ് {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: അനുവദിച്ച ഒറിജിനുകളൊന്നുമില്ല",
+        "settingName": "{{previous}}-ൽ നിന്ന് {{next}} എന്നാക്കി പേരുമാറ്റി",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "ഉപയോഗത്തിന് മുമ്പ് സ്കാൻ ഓൺ",
+        "scanBeforeUseOff": "ഉപയോഗത്തിന് മുമ്പ് സ്കാൻ ഓഫ്",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "നീക്കം ചെയ്തു: {{models}}",
+        "browserPolicyOff": "ബ്രൗസർ ഉപയോഗം തടസ്സപ്പെട്ടിരിക്കുന്നു",
+        "browserPolicyAllow": "അനുവദിച്ച ഒറിജിനുകൾ മാത്രം",
+        "browserPolicyPlaywrightOnly": "ബ്രൗസർ ഉപയോഗം മാത്രം",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "മോഡലുകൾ മാറ്റി: {{values}}",
+        "integrationConnected": "{{integration}} ബന്ധിപ്പിച്ചു",
+        "integrationDisconnected": "{{integration}} വിച്ഛേദിച്ചു",
+        "integrationRefreshed": "{{integration}} പുതുക്കി",
+        "integrationCancelled": "{{integration}} റദ്ദാക്കി",
+        "integrationModelUpdated": "{{integration}}: മോഡൽ {{model}}",
+        "integrationKeyAdded": "{{provider}}-നുള്ള കീ ചേർത്തു",
+        "integrationKeyUpdated": "{{provider}}-നുള്ള കീ അപ്ഡേറ്റ് ചെയ്തു",
+        "integrationKeyDeleted": "{{provider}}-നുള്ള കീ നീക്കം ചെയ്തു",
+        "integrationKeyToggled": "{{provider}}-നുള്ള കീ: {{state}}",
+        "namedPolicyCreated": "{{kind}} പോളിസി {{id}} സൃഷ്ടിച്ചു",
+        "namedPolicyUpdated": "{{kind}} പോളിസി {{id}} അപ്ഡേറ്റ് ചെയ്തു",
+        "namedPolicyDeleted": "{{kind}} പോളിസി {{id}} നീക്കി",
+        "namedPolicyLinked": "{{kind}} പോളിസി {{next}} ലിങ്ക് ചെയ്തു",
+        "webhookTriggerUpdated": "ട്രിഗർ {{trigger}}",
+        "organizationRenamed": "ഓർഗനൈസേഷന്റെ പേര് {{previous}}-ൽ നിന്ന് {{next}}-ലേക്ക് മാറ്റി",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "സ്വന്തം API കീ"
+        }
       }
     },
     "billing": {
       "title": "ബില്ലിംഗ്",
-      "permissionDenied": "ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ അതിന്റെ ബില്ലിംഗ് കാണാൻ കഴിയൂ.",
+      "permissionDenied": "ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ അതിന്റെ ബില്ലിംഗ് കാണാൻ കഴിയൂ. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "സബ്സ്ക്രിപ്ഷൻ",
       "state": "നില",
       "stateNone": "സബ്സ്ക്രിപ്ഷൻ ഇല്ല",
@@ -3526,7 +3693,7 @@
       "noSeatsAvailable": "എല്ലാ സീറ്റുകളും ഉപയോഗത്തിലാണ്. കൂടുതൽ അംഗങ്ങളെ ക്ഷണിക്കുന്നതിന് മുമ്പ് സീറ്റുകൾ ചേർക്കാൻ ഒരു സ്ഥാപന ഉടമയോട് ആവശ്യപ്പെടുക."
     },
     "invoices": {
-      "downloadA11y": "ഇൻവോയ്സ് {{number}} ഡൗൺലോഡ് ചെയ്യുക",
+      "downloadA11y": "ഇൻവോയ്സ് {{number}}, {{amount}}, {{date}}, {{status}} ഡൗൺലോഡ് ചെയ്യുക",
       "emptyDescription": "ഓരോ ബില്ലിംഗ് കാലയളവിലും ഇൻവോയ്സുകൾ സ്വയമേവ സൃഷ്ടിക്കും. നിങ്ങളുടെ ഓർഗനൈസേഷന് ബിൽ നൽകിയ ശേഷം അവ ഇവിടെ കാണാം.",
       "emptyTitle": "ഇൻവോയ്സുകളൊന്നുമില്ല",
       "invoiceFallback": "ഇൻവോയ്സ്",
@@ -3606,7 +3773,6 @@
       "usageDetails": "ഉപയോഗ വിശദാംശങ്ങൾ",
       "providersAndModels": "പ്രൊവൈഡർമാരും മോഡലുകളും",
       "groups": "ഗ്രൂപ്പുകൾ",
-      "guardrails": "ഗാർഡ്‌റെയിലുകൾ",
       "byok": "സ്വന്തം കീ ഉപയോഗിക്കുക",
       "ssoAndDomain": "SSO-യും ഡൊമെയ്‌നും",
       "dataCollection": "ഡാറ്റ ശേഖരണം",
@@ -3621,7 +3787,7 @@
       "emptyDescription": "മുമ്പത്തെ അഭ്യർത്ഥനകൾ കാണാൻ “മുമ്പത്തെ മണിക്കൂർ” ഉപയോഗിക്കുക.",
       "emptyBoundDescription": "അഭ്യർത്ഥനാ രേഖകൾ ഇതിലും പിന്നിലേക്ക് ലഭ്യമല്ല.",
       "loadError": "അഭ്യർത്ഥന ലോഗുകൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "permissionDenied": "ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ അതിന്റെ അഭ്യർത്ഥന ലോഗുകൾ കാണാനാകൂ.",
+      "permissionDenied": "ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ അതിന്റെ അഭ്യർത്ഥന ലോഗുകൾ കാണാനാകൂ. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ഇൻപുട്ട് {{input}} · ഔട്ട്പുട്ട് {{output}}",
       "byok": "BYOK"
     },
@@ -3726,7 +3892,7 @@
     "signupStepUpApple": "നിങ്ങളുടെ അക്കൗണ്ട് സൃഷ്ടിക്കൽ പൂർത്തിയാക്കാൻ '$t(login.signInWithApple)' ഉപയോഗിക്കുക.",
     "signupStepUpGoogle": "നിങ്ങളുടെ അക്കൗണ്ട് സൃഷ്ടിക്കൽ പൂർത്തിയാക്കാൻ '$t(login.signInWithGoogle)' ഉപയോഗിക്കുക.",
     "signupStepUpBack": "നിങ്ങളുടെ അക്കൗണ്ട് സൃഷ്ടിക്കൽ പൂർത്തിയാക്കാൻ തിരികെ പോയി '$t(login.moreSignInOptions)' ഉപയോഗിക്കുക.",
-    "invalidCode": "ഈ കോഡ് തെറ്റാണ് അല്ലെങ്കിൽ കാലഹരണപ്പെട്ടതാണ്. വീണ്ടും ശ്രമിക്കുക അല്ലെങ്കിൽ '$t(login.resendCode)' ഉപയോഗിക്കുക.",
+    "invalidCode": "ഈ കോഡ് തെറ്റാണ് അല്ലെങ്കിൽ കാലഹരണപ്പെട്ടതാണ്. അതിനാൽ '$t(login.resendCode)' ഉപയോഗിക്കുക അല്ലെങ്കിൽ '$t(login.moreSignInOptions)' ഉപയോഗിക്കുക.",
     "codeInProgress": "നിങ്ങളുടെ കോഡ് പരിശോധിക്കുന്നു. അൽപ്പം കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക.",
     "tooManyAttempts": "വളരെയധികം തവണ ശ്രമിച്ചു. പുതിയ കോഡ് അഭ്യർത്ഥിക്കുക.",
     "invalidToken": "സൈൻ ഇൻ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.",
@@ -3891,7 +4057,10 @@
     "list": {
       "loadFailed": "ചാറ്റ് ചരിത്രം ലോഡ് ചെയ്യാനായില്ല.",
       "new": "പുതിയ ചാറ്റ്",
-      "deleteTitle": "ഈ ചാറ്റ് ഇല്ലാതാക്കണോ?"
+      "deleteTitle": "ഈ ചാറ്റ് ഇല്ലാതാക്കണോ?",
+      "resetNoticeTitle": "ഉപകരണത്തിലെ ചാറ്റുകളും ഡ്രാഫ്റ്റുകളും മായ്ച്ചു",
+      "resetNoticeBody": "Kilo-യ്ക്ക് ഈ ഉപകരണത്തിൽ ശേഖരിച്ച ചാറ്റുകൾ തുറക്കാനായില്ല. നിങ്ങളുടെ ക്ലൗഡ് സെഷനുകൾ ബാധിക്കപ്പെട്ടിട്ടില്ല.",
+      "resetNoticeDismiss": "അറിയിപ്പ് ഒഴിവാക്കുക"
     },
     "rename": {
       "title": "ചാറ്റിന്റെ പേര് മാറ്റുക",
@@ -3941,6 +4110,9 @@
       "fieldName": "പ്രദർശിപ്പിക്കുന്ന പേര്",
       "fieldUrl": "സെർവർ URL",
       "fieldUrlInvalid": "സാധുവായ സെർവർ URL നൽകുക.",
+      "fieldUrlCredentials": "URL-ൽ നിന്ന് ഉപയോക്തൃനാമവും പാസ്വേഡും നീക്കം ചെയ്യുക.",
+      "fieldUrlFragment": "URL-ലെ # ഭാഗം നീക്കം ചെയ്യുക.",
+      "fieldUrlInsecure": "https URL നൽകുക; localhost-ന് മാത്രം http അനുവദനീയമാണ്.",
       "duplicateUrl": "ആ സെർവർ URL ഇതിനകം സംരക്ഷിച്ചിട്ടുണ്ട്.",
       "serverNotFound": "ഈ സെർവർ ഇനി സംരക്ഷിച്ചിട്ടില്ല.",
       "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക: {{name}}",
@@ -3966,6 +4138,7 @@
       "app": {
         "label": "ടൂൾ ഇന്റർഫേസ്",
         "failed": "ഈ ടൂളിന്റെ ഇന്റർഫേസ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+        "tooLarge": "ഈ ടൂളിന്റെ ഇന്റർഫേസ് {{size}} പരിധിയേക്കാൾ വലുതാണ്.",
         "empty": "ഈ ടൂളിന്റെ ഇന്റർഫേസിൽ കാണിക്കാൻ ഒന്നുമില്ല."
       }
     },
@@ -4033,6 +4206,8 @@
       "discoveryNoModels": "എൻഡ്‍പോയിന്റ് മോഡലുകളൊന്നും ലിസ്റ്റ് ചെയ്തിട്ടില്ല. മോഡലുകൾ നേരിട്ട് നൽകുക.",
       "connectionIncomplete": "മോഡൽ മറുപടി നൽകി, പക്ഷേ പൂർത്തിയാക്കിയില്ല. വീണ്ടും ശ്രമിക്കുക, അല്ലെങ്കിൽ മോഡൽ ID-യും പ്രോട്ടോക്കോളും പരിശോധിക്കുക.",
       "invalidInput": "ബാക്കെൻഡിന്റെ പേര്, സാധുവായ ഹെഡറുകൾ, വ്യത്യസ്തമായ IDയും പേരുമുള്ള കുറഞ്ഞത് ഒരു മോഡൽ എന്നിവ നൽകുക. ടോക്കൺ പരിധികൾ പൂജ്യത്തേക്കാൾ വലിയ പൂർണ്ണസംഖ്യകളായിരിക്കണം.",
+      "invalidApiKey": "API കീയിൽ അയയ്ക്കാൻ കഴിയാത്ത ഒരു പ്രതീകം അടങ്ങിയിരിക്കുന്നു. അക്ഷരങ്ങളും അക്കങ്ങളും സാധാരണ ചിഹ്നങ്ങളും മാത്രം ഉപയോഗിക്കുക, വരിവിരാമങ്ങൾ ഉണ്ടാകരുത്.",
+      "invalidHeaders": "ഇഷ്ടാനുസൃത ഹെഡർ അയയ്ക്കാൻ കഴിയില്ല. അതിന്റെ പേര് പരിശോധിച്ച് അക്ഷരങ്ങളും അക്കങ്ങളും സാധാരണ ചിഹ്നങ്ങളും മാത്രം ഉപയോഗിക്കുക, വരിവിരാമങ്ങൾ ഉണ്ടാകരുത്.",
       "invalidUrl": "പ്രാമാണീകരണ വിവരങ്ങളോ ക്വറിയോ ഫ്രാഗ്മെന്റോ ഇല്ലാത്ത HTTP അല്ലെങ്കിൽ HTTPS API അടിസ്ഥാന URL നൽകുക.",
       "publicHttp": "പൊതുവായ HTTP എൻഡ്‌പോയിന്റുകൾ അനുവദനീയമല്ല. HTTPS അല്ലെങ്കിൽ സ്വകാര്യ പ്രാദേശിക എൻഡ്‌പോയിന്റ് ഉപയോഗിക്കുക.",
       "httpApprovalRequired": "സൂക്ഷിക്കുന്നതിനോ ബന്ധിപ്പിക്കുന്നതിനോ മുമ്പ് ഈ പ്രാദേശിക HTTP എൻഡ്‌പോയിന്റിന് അനുമതി നൽകുക.",
@@ -4081,6 +4256,7 @@
         "network": "ഡൗൺലോഡ് പൂർത്തിയായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
         "invalidFile": "ഡൗൺലോഡ് ചെയ്ത ഫയൽ ഈ ആപ്പിന് പ്രവർത്തിപ്പിക്കാവുന്ന ഒരു മോഡലല്ല, അതിനാൽ അത് നീക്കം ചെയ്തു.",
         "checksum": "ഡൗൺലോഡ് ചെയ്ത ഫയൽ അതിന്റെ പ്രസിദ്ധീകരിച്ച ചെക്ക്സവുമായി പൊരുത്തപ്പെടുന്നില്ല, അതിനാൽ അത് നീക്കം ചെയ്തു. വീണ്ടും ഡൗൺലോഡ് ചെയ്യാൻ ശ്രമിക്കുക.",
+        "unreadable": "ഈ ഉപകരണത്തിന് ഡൗൺലോഡ് ചെയ്ത ഫയൽ പരിശോധിക്കാനായില്ല, അതിനാൽ അത് നീക്കം ചെയ്തു. വീണ്ടും ഡൗൺലോഡ് ചെയ്യാൻ ശ്രമിക്കുക.",
         "writeFailed": "ഈ ഉപകരണത്തിന് മോഡൽ സേവ് ചെയ്യാനായില്ല. വീണ്ടും ഡൗൺലോഡ് ചെയ്യാൻ ശ്രമിക്കുക."
       }
     },
@@ -4166,7 +4342,15 @@
       "download": "ഉപകരണത്തിലെ മോഡൽ ഡൗൺലോഡ് ചെയ്യുക",
       "downloading": "ഡൗൺലോഡ് ചെയ്യുന്നു…",
       "downloadProgress": "ഡൗൺലോഡ് ചെയ്യുന്നു… {{percent}}%",
-      "downloadFailed": "ഡൗൺലോഡ് പൂർത്തിയായില്ല. കണക്ഷനും ലഭ്യമായ സ്റ്റോറേജും പരിശോധിച്ച ശേഷം വീണ്ടും ശ്രമിക്കുക."
+      "downloadFailed": "ഡൗൺലോഡ് പൂർത്തിയായില്ല. കണക്ഷനും ലഭ്യമായ സ്റ്റോറേജും പരിശോധിച്ച ശേഷം വീണ്ടും ശ്രമിക്കുക.",
+      "cannotUse": "പ്രവർത്തിപ്പിക്കാനാകില്ല: {{items}}.",
+      "cannotUseOptions": "പൂരിപ്പിക്കാനാകില്ല: ചില ടൂൾ ഓപ്ഷനുകൾ.",
+      "limitations": "പരിധികൾ",
+      "tools": {
+        "time": "സമയം",
+        "settingsList": "ക്രമീകരണങ്ങൾ കാണിക്കുക",
+        "settingsSet": "ക്രമീകരണങ്ങൾ മാറ്റുക"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ഈ മോഡൽ ചിന്തയുടെ തോത് പിന്തുണയ്ക്കുന്നു"
@@ -4345,6 +4529,7 @@
     "instructionSaveFailed": "നിർദ്ദേശം സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "instructionDeleteFailed": "നിർദ്ദേശം ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല",
     "instructionToggleFailed": "നിർദ്ദേശം അപ്ഡേറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "instructionViewTitle": "നിർദ്ദേശ ഫയൽ",
     "instructionLimitReached": "ഒരു പ്രൊഫൈലിൽ {{max}} നിർദ്ദേശങ്ങൾ വരെ ഉണ്ടാകാം. കൂടുതൽ ചേർക്കാൻ ഒന്ന് ഇല്ലാതാക്കുക.",
     "mcp": {
       "title": "MCP സെർവറുകൾ",
@@ -4515,10 +4700,20 @@
     "history": {
       "activityUnavailable": "ക്രെഡിറ്റ് പ്രവർത്തനം ലോഡ് ചെയ്യാനായില്ല.",
       "appStoreReceipt": "App Store-ൽ നിന്നുള്ള രസീത്",
+      "deduction": {
+        "adminCancel": "അഡ്മിൻ അടച്ച ബാലൻസ്",
+        "adminDebit": "അഡ്മിൻ നീക്കം ചെയ്ത ക്രെഡിറ്റുകൾ",
+        "codingPlan": "കോഡിംഗ് പ്ലാൻ: {{plan}}",
+        "correction": "ബാലൻസ് തിരുത്തൽ",
+        "dispute": "പേയ്മെന്റ് തർക്കം",
+        "refundAppStore": "App Store-ൽ നിന്നുള്ള ക്രെഡിറ്റ് പാക്ക് റീഫണ്ട്",
+        "refundGooglePlay": "Google Play-ൽ നിന്നുള്ള ക്രെഡിറ്റ് പാക്ക് റീഫണ്ട്"
+      },
       "deductionFallback": "ക്രെഡിറ്റ് കിഴിവ്",
       "emptyDescription": "ക്രെഡിറ്റ് വാങ്ങലുകൾ, രസീതുകൾ, ഉപയോഗം എന്നിവ ഇവിടെ ദൃശ്യമാകും.",
       "emptyTitle": "ക്രെഡിറ്റ് ചരിത്രമില്ല",
       "expiredGrant": "കാലഹരണപ്പെട്ടു: {{description}}",
+      "expiredStatus": "കാലഹരണപ്പെട്ടു",
       "googlePlayReceipt": "Google Play-ൽ നിന്നുള്ള രസീത്",
       "kind": {
         "adjustment": "ക്രമീകരണം",
@@ -4545,7 +4740,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} എന്നതിന്റെ രസീത് തുറക്കുക",
       "receiptUnavailable": "ഈ വാങ്ങലിന് രസീത് ലഭ്യമല്ല.",
       "retentionLimit": "ഏറ്റവും പുതിയ ക്രെഡിറ്റ് ചരിത്രം കാണിക്കുന്നു.",
-      "voidedGrant": "റദ്ദാക്കി: {{description}}"
+      "voidedGrant": "റദ്ദാക്കി: {{description}}",
+      "voidedStatus": "റദ്ദാക്കി"
     },
     "title": "ക്രെഡിറ്റുകൾ വാങ്ങുക",
     "description": "ക്രെഡിറ്റുകൾ എന്നത് Kilo App-ൽ AI കോഡിംഗ് സെഷനുകൾ പ്രവർത്തിപ്പിക്കാൻ നിങ്ങളുടെ Kilo ബാലൻസിലേക്ക് ചേർക്കുന്ന ഒറ്റത്തവണ വാങ്ങൽ ആണ്. സ്റ്റോർ നിങ്ങളുടെ അക്കൗണ്ടിൽ നിന്ന് ഈടാക്കുകയും സ്റ്റോർ പേയ്മെന്റ് സ്ഥിരീകരിച്ചതിന് ശേഷം ക്രെഡിറ്റുകൾ ചേർക്കുകയും ചെയ്യുന്നു.",
@@ -4689,6 +4885,7 @@
     "contextAll": "എല്ലാ സന്ദർഭങ്ങളും",
     "dismiss": "ബ്രീഫിംഗ് ഒഴിവാക്കുക",
     "dismissFailed": "ഈ ബ്രീഫിംഗ് ഒഴിവാക്കാൻ ഇതുവരെ കഴിഞ്ഞില്ല. പശ്ചാത്തലത്തിൽ വീണ്ടും ശ്രമിക്കുന്നു.",
+    "readMarkFailed": "ഈ ബ്രീഫിംഗ് വായിച്ചതായി അടയാളപ്പെടുത്താൻ കഴിഞ്ഞില്ല. ബ്രീഫിംഗ് വീണ്ടും ലോഡ് ചെയ്യുമ്പോൾ വീണ്ടും ശ്രമിക്കും.",
     "offline": "ഓഫ്‌ലൈൻ · സംരക്ഷിച്ച ബ്രീഫിംഗ്",
     "cached": "സംരക്ഷിച്ച ബ്രീഫിംഗ് · പുതുക്കാനാവില്ല",
     "summary": "AI സംഗ്രഹം",
@@ -4708,16 +4905,21 @@
     "morningEnd": "ബ്രീഫിംഗ് ലഭ്യമായിരിക്കുന്നത് വരെ",
     "timeHint": "ബ്രീഫിംഗ് കാലയളവ് അവസാനിക്കുമ്പോൾ, ഓഫ്‌ലൈനിലും, ഹോം കാർഡ് തത്സമയ നില വീണ്ടും കാണിക്കും.",
     "invalidSchedule": "സാധുവായ സമയ മേഖലയും, ശൂന്യമല്ലാത്ത ഒരു ബ്രീഫിംഗ് കാലയളവും തിരഞ്ഞെടുക്കുക.",
+    "scheduleEmptyNight": "ബ്രീഫിംഗ് കാലയളവ് ശൂന്യമാണ്. കാലയളവിന്റെ ആരംഭത്തിന് ശേഷമുള്ള ഒരു തയ്യാറാകുന്ന സമയം തിരഞ്ഞെടുക്കുക.",
+    "scheduleEmptyMorning": "തയ്യാറാകുന്ന സമയവും ലഭ്യമായിരിക്കുന്നത് വരെയുള്ള സമയവും ഒരേപോലെയാണ്. ബ്രീഫിംഗ് എത്ര സമയം ലഭ്യമായിരിക്കണം എന്ന് തിരഞ്ഞെടുക്കുക.",
+    "scheduleFullDay": "രണ്ട് കാലയളവുകളും ഒരു മുഴുവൻ ദിവസത്തെ ഉൾക്കൊള്ളുന്നു. ദിവസത്തിന്റെ ഒരു ഭാഗം ബ്രീഫിംഗിന് പുറത്തായി വിടുക.",
     "notificationsHint": "ഓരോ ഷെഡ്യൂൾ ചെയ്ത ബ്രീഫിംഗിനും ഒരു പൊതു അറിയിപ്പ്. പണമടച്ചുള്ള AI സംഗ്രഹങ്ങളെ ആശ്രയിക്കുന്നില്ല.",
     "notificationPermission": "നിങ്ങളുടെ ബ്രീഫിംഗ് ലഭിക്കാൻ പുഷ് അറിയിപ്പുകൾ ഓണാക്കുക.",
     "defaultModel": "Kilo-യുടെ ഡിഫോൾട്ട് മോഡൽ ഉപയോഗിക്കുക",
     "duration": "സമയ പരിധി (മിനിറ്റ്)",
     "spendLimit": "ചെലവ് പരിധി (USD)",
-    "invalidSafeguards": "പോസിറ്റീവും പരിമിതവുമായ സമയ, ചെലവ് പരിധികൾ നൽകുക.",
+    "invalidSafeguards": "അനുവദനീയമായ പരിധിക്കുള്ളിൽ ഒരു പോസിറ്റീവ് സംഖ്യ നൽകുക.",
     "estimate": "ഏകദേശ ചെലവ് {{estimate}} · പരമാവധി {{maximum}}",
     "estimateUnavailable": "ഈ ക്രമീകരണങ്ങൾക്ക് പണമടച്ചുള്ള സാരാംശം ലഭ്യമല്ല. മോഡലോ പരിധികളോ മാറ്റുക, അല്ലെങ്കിൽ അല്പം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
     "confirmPaid": "{{context}}-ന് പണമടച്ചുള്ള സംഗ്രഹങ്ങൾ പ്രവർത്തനക്ഷമമാക്കണോ?",
+    "paidDisclosure_one": "ഏകദേശം {{estimate}}, പരമാവധി {{maximum}}, {{minutes}} മിനിറ്റ് പരിധി. സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടാലും നിരക്ക് ഈടാക്കും.",
     "paidDisclosure": "ഏകദേശം {{estimate}}, പരമാവധി {{maximum}}, {{minutes}} മിനിറ്റ് പരിധി. സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടാലും നിരക്ക് ഈടാക്കും.",
+    "paidDisclosure_other": "ഏകദേശം {{estimate}}, പരമാവധി {{maximum}}, {{minutes}} മിനിറ്റ് പരിധി. സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടാലും നിരക്ക് ഈടാക്കും.",
     "enable": "പണമടച്ചുള്ള സംഗ്രഹങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക",
     "allContexts": "വ്യക്തിഗത, ഓർഗനൈസേഷൻ ബ്രീഫിംഗുകൾ വേറിട്ടുനിൽക്കും.",
     "emptyHistory": "സംരക്ഷിച്ച ബ്രീഫിംഗുകളില്ല",
@@ -4728,8 +4930,8 @@
     "estimateSpendLimitTooLow": "ഈ സാരാംശം അനുവദിക്കാൻ ചെലവ് പരിധി ഉയർത്തുക.",
     "saved": "ബ്രീഫിംഗ് ക്രമീകരണങ്ങൾ സംരക്ഷിച്ചു",
     "selectedSessions": "തിരഞ്ഞെടുത്ത സെഷനുകൾ",
-    "snapshotPullRequests": "തിരഞ്ഞെടുത്ത സെഷനുകളിലെ PRs",
-    "snapshotBlockers": "തിരഞ്ഞെടുത്ത സെഷനുകളിലെ തടസ്സങ്ങൾ",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "തടസ്സങ്ങൾ",
     "capturedAt": "{{time}} പകർത്തി",
     "snapshotHint": "ഷെഡ്യൂൾ ചെയ്ത പ്രഭാത സമയത്ത് ലഭ്യമായ ഏറ്റവും പുതിയ സെഷൻ നില കഴിയുന്നത്ര പകർത്തിയ സ്നാപ്ഷോട്ട്. എണ്ണങ്ങൾ തിരഞ്ഞെടുത്ത സെഷനുകളുടേതാണ്, രാത്രിയിലെ മുഴുവൻ പ്രവർത്തനങ്ങളുടേതല്ല.",
     "snapshotTruncated": "ഈ സ്നാപ്ഷോട്ടിന്റെ വലുപ്പം പരിമിതപ്പെടുത്താൻ ചില സെഷനുകളോ തെളിവുകളോ ഒഴിവാക്കി.",
@@ -4760,7 +4962,7 @@
     "sourceActivity": "തലക്കെട്ടില്ലാത്ത പ്രവർത്തനം",
     "metadataFailureProvider": "പ്രൊവൈഡർ പിശക്",
     "metadataFailureTool": "ടൂൾ പിശക്",
-    "metadataFailureCancelled": "റദ്ദാക്കി",
+    "metadataStopped": "കഴിഞ്ഞ ടേൺ നിർത്തി",
     "metadataFailureOther": "വ്യക്തമാക്കാത്ത പിശക്"
   },
   "systemSearch": {
@@ -4768,6 +4970,7 @@
   },
   "usage": {
     "title": "ഉപയോഗം",
+    "personalTitle": "വ്യക്തിഗത ഉപയോഗം",
     "orgTitle": "ഓർഗനൈസേഷൻ ഉപയോഗം",
     "entrySubtitle": "ചെലവ്, അഭ്യർത്ഥനകൾ, ടോക്കണുകൾ",
     "rangePicker": "സമയപരിധി",
@@ -4781,7 +4984,8 @@
     "unavailableTitle": "ഉപയോഗം ലഭ്യമല്ല",
     "unavailableDescription": "ഈ വർക്ക്സ്പേസിനായി ഉപയോഗം സജ്ജീകരിച്ചിട്ടില്ല. ഇവിടെ ഉപയോഗം കാണുമെന്ന് പ്രതീക്ഷിക്കുന്നുവെങ്കിൽ പിന്തുണയുമായി ബന്ധപ്പെടുക.",
     "orgSelfNotice": "ഈ ഓർഗനൈസേഷനിലെ നിങ്ങളുടെ സ്വന്തം ഉപയോഗമാണ് നിങ്ങൾ കാണുന്നത്.",
-    "viewDetails": "ഉപയോഗ വിശദാംശങ്ങൾ കാണുക"
+    "viewDetails": "ഉപയോഗ വിശദാംശങ്ങൾ കാണുക",
+    "orgSelfEntryTitle": "നിങ്ങളുടെ ഉപയോഗം"
   },
   "integrations": {
     "title": "ഇന്റഗ്രേഷനുകൾ",
@@ -4877,10 +5081,15 @@
       "autoCommit": "റൺ പൂർത്തിയാകുമ്പോൾ മാറ്റങ്ങൾ കമ്മിറ്റ് ചെയ്യുക",
       "condenseOnComplete": "റൺ പൂർത്തിയാകുമ്പോൾ കോൺടെക്സ്റ്റ് ചുരുക്കുക",
       "activeTitle": "ട്രിഗർ സജീവം",
+      "activeSwitchA11y": "ട്രിഗർ സജീവം: {{name}}",
+      "copyLinkA11y": "{{name}} എന്നതിനുള്ള ലിങ്ക് പകർത്തുക",
       "activeDescription": "നിർത്തിവെച്ച വെബ്ഹുക്കുകൾ 404 നൽകും.",
       "runAsCreator": "എന്റെ പേരിൽ പ്രവർത്തിപ്പിക്കുക",
       "runAsCreatorDescription": "ഓരോ റണ്ണും നിങ്ങളുടെ അക്കൗണ്ട് ഉപയോഗിക്കുന്നതിനാൽ രഹസ്യ ഹെഡർ നിർബന്ധമാണ്.",
       "saveFailedTitle": "ട്രിഗർ സേവ് ചെയ്യാനായില്ല",
+      "nameTaken": "“{{name}}” എന്ന പേരിലുള്ള ട്രിഗർ ഇതിനകം നിലവിലുണ്ട്.",
+      "saveFailedRetry": "സെർവറിലേക്ക് എത്താനായില്ല. കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "saveFailedCheck": "ഫോമിലെ മൂല്യങ്ങൾ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "deleteTitle": "ഈ ട്രിഗർ ഇല്ലാതാക്കണോ?",
       "deleteMessage": "{{name}} ലേക്കുള്ള കോളുകൾ പരാജയപ്പെടും. ഇത് പഴയപടിയാക്കാനാകില്ല.",
       "deleteMessageScheduled": "{{name}} എന്ന ട്രിഗറിന്റെ ഷെഡ്യൂൾ ചെയ്ത പ്രവർത്തനങ്ങൾ നിലയ്ക്കും. ഇത് പഴയപടിയാക്കാനാകില്ല.",

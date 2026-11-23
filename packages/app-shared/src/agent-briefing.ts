@@ -9,6 +9,9 @@ import { z } from 'zod';
 export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
+// The schema's character cap for a title. `z.string().max(...)` counts UTF-16 code
+// units, so this bound is a code-unit count rather than a byte one. The byte cut is
+// the constant below.
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
 // The title's UTF-8 byte budget for screening. It derives from the schema's character
 // bound: a screened title is later validated against that bound, so the byte cut must

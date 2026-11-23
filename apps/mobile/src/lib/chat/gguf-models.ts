@@ -131,11 +131,12 @@ const BACKGROUND_LISTENER = Symbol.for('kilo.gguf.backgroundListener');
 /**
  * The saved list is read on first use rather than at import, so startup does no file work.
  *
- * The latch is set only after `load()` succeeded and the background listener is
- * installed: a read that failed must be retryable, and a listener that was never
- * installed would let a loaded llama context survive into the background. A failed
- * read is not retried from the snapshot getter — that runs while rendering — so the
- * picker's retry calls `retryLoad`.
+ * The latch goes down before `load()` publishes, and comes back up only when the read
+ * failed: a read that failed must be retryable, and a read that succeeded must not be
+ * repeated by the views it wakes. A failed read is not retried from the snapshot
+ * getter — that runs while rendering — so the picker's retry calls `retryLoad`.
+ * The background listener is installed on the same success, or a loaded llama context
+ * would survive into the background.
  */
 function ensureGgufStore(options: { retry?: boolean } = {}): void {
   if (loaded) {
@@ -144,14 +145,23 @@ function ensureGgufStore(options: { retry?: boolean } = {}): void {
   if (downloads.snapshot().loadFailed && options.retry !== true) {
     return;
   }
+  // The latch goes down before the read publishes. A successful read notifies the
+  // subscribers, and a view that renders on that notification reads the store again:
+  // without the latch it would re-enter this function, read the list a second time
+  // while the first read is still publishing, and the second answer could fail over
+  // a list that just arrived — leaving the picker's card up beside the models it found.
+  loaded = true;
   if (!downloads.load()) {
+    loaded = false;
     return;
   }
-  // A failed attempt installs neither the listener nor the latch, so the previous
-  // instance's listener (fast refresh) stays until a successful attempt replaces it.
+  // This runs only after a successful read replaced the listener the previous
+  // instance installed, so a fast refresh leaves exactly one subscription behind.
   const subscription = AppState.addEventListener('change', state => {
     if (state === 'background') {
-      void model.release();
+      // The system, not the model, ended an answer here: the label says so instead
+      // of reading as a failure of the model the person came back to.
+      void model.release(undefined, 'background');
     }
   });
   const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
@@ -160,7 +170,6 @@ function ensureGgufStore(options: { retry?: boolean } = {}): void {
   previous?.remove();
   (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
     subscription;
-  loaded = true;
 }
 
 function ggufStore() {
@@ -173,9 +182,18 @@ const NO_LIMITS = { modelId: '', contextWindow: 0, maxOutputTokens: 0, systemIns
 /** The provider's own answer about whether anything is downloaded; limits are per model. */
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function ggufAvailability(): Promise<NativeAvailability> {
-  const records = ggufStore().snapshot().models;
+  const snapshot = ggufStore().snapshot();
+  if (snapshot.loadFailed) {
+    // The saved list could not be read, so an empty `models` is not an empty
+    // library: the copy has to name the failed check, not a model that is gone.
+    return Promise.resolve({
+      ...NO_LIMITS,
+      status: 'unavailable',
+      reason: 'models_unreadable',
+    });
+  }
   return Promise.resolve(
-    records.length > 0
+    snapshot.models.length > 0
       ? { ...NO_LIMITS, status: 'available' }
       : { ...NO_LIMITS, status: 'unavailable', reason: 'model_unavailable' }
   );
@@ -197,7 +215,6 @@ export const ggufModelProvider: LocalModelProvider = {
         };
   },
   supportsTools: fileId => ggufStore().model(fileId)?.tools ?? false,
-  // True only for a model whose projector llama.cpp reported as reading images.
   supportsImages: fileId => ggufStore().model(fileId)?.vision ?? false,
 };
 

@@ -63,6 +63,20 @@ const mockQueryFixtures: Record<string, unknown> = {
 };
 
 jest.mock('@tanstack/react-query', () => ({
+  // The requests section reads the whole list through one infinite query; this section's
+  // test only needs it to render its empty state.
+  useInfiniteQuery: () => {
+    return {
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: () => undefined,
+    };
+  },
   useQuery: (options: { queryKey?: unknown[] }) => {
     const key = Array.isArray(options.queryKey) ? String(options.queryKey[1] ?? '') : '';
     const data = mockQueryFixtures[key];
@@ -78,6 +92,10 @@ jest.mock('@/lib/hooks/use-openrouter-models', () => ({
     const data = mockQueryFixtures['models'];
     return { data, isLoading: data === undefined, error: null };
   },
+}));
+
+jest.mock('@/components/ui/confirm', () => ({
+  useConfirm: () => async () => true,
 }));
 
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));

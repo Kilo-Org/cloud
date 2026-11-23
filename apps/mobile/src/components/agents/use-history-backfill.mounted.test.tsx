@@ -17,12 +17,10 @@ describe('createOperationCoordinator', () => {
     const first = vi.fn().mockReturnValue(firstResult);
     const second = vi.fn().mockResolvedValue(undefined);
 
-    // First operation starts immediately (queue empty).
     const firstRun = coordinator(first);
     expect(first).toHaveBeenCalledTimes(1);
     expect(resolveFirst.current).toBeDefined();
 
-    // Second operation enqueued behind it must not start while it is in flight.
     const secondRun = coordinator(second);
     await flushMicrotasks();
     expect(second).not.toHaveBeenCalled();

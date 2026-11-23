@@ -376,66 +376,18 @@ export async function upsertPlatformIntegration(data: {
         platform_integrations.platform_installation_id,
       ],
       set: {
+        ...reactivatedIntegrationSetSql(),
         platform_account_id: sql`EXCLUDED.platform_account_id`,
         platform_account_login: sql`EXCLUDED.platform_account_login`,
         permissions: sql`EXCLUDED.permissions`,
         scopes: sql`EXCLUDED.scopes`,
         repository_access: sql`EXCLUDED.repository_access`,
-        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN EXCLUDED.integration_status ELSE ${platform_integrations.integration_status} END`,
         repositories: sql`EXCLUDED.repositories`,
         auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
         auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
         updated_at: sql`now()`,
       },
     });
-}
-
-/**
- * Updates repository list for an integration by installation ID.
- * GitHub rows are unique per `(platform, github_app_type, installation_id)`;
- * pass `githubAppType` when the caller knows it so the update targets only the
- * matching standard or lite row.
- */
-export async function updateIntegrationRepositories(
-  platform: string,
-  installationId: string,
-  repositories: PlatformRepository[],
-  githubAppType?: GitHubAppType
-) {
-  const conditions = [
-    eq(platform_integrations.platform, platform),
-    eq(platform_integrations.platform_installation_id, installationId),
-  ];
-  if (githubAppType) conditions.push(effectiveAppTypeCondition(githubAppType));
-  if (platform === PLATFORM.GITHUB)
-    conditions.push(isNull(platform_integrations.github_disconnected_at));
-
-  await db
-    .update(platform_integrations)
-    .set({
-      repositories,
-      repositories_synced_at: new Date().toISOString(),
-      auth_invalid_at: null,
-      auth_invalid_reason: null,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
-  if (platform === PLATFORM.GITHUB && githubAppType) {
-    await db
-      .update(github_app_installations)
-      .set({
-        repositories,
-        repositories_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(github_app_installations.github_app_type, githubAppType),
-          eq(github_app_installations.installation_id, installationId),
-          ne(github_app_installations.lifecycle_state, 'deleted')
-        )
-      );
-  }
 }
 
 /**
@@ -1083,6 +1035,8 @@ export async function autoCompleteInstallation(
         platform_account_login: installationData.account_login,
         repository_access: installationData.repository_selection,
         integration_status: INTEGRATION_STATUS.ACTIVE,
+        suspended_at: null,
+        suspended_by: null,
         permissions: installationData.permissions as IntegrationPermissions,
         scopes: installationData.events,
         installed_at: new Date(installationData.created_at).toISOString(),
@@ -1290,6 +1244,40 @@ export async function unsuspendIntegrationForOwner(
     .where(and(...conditions));
 }
 
+/**
+ * The status and suspension columns a writer stores on an existing association
+ * when it records a fresh authorization for it.
+ *
+ * An association is either active with no suspension recorded, or it is
+ * suspended; `isPlatformIntegrationSuspended` reads the status or `suspended_at`
+ * and the health predicates require both to agree. This expression writes the
+ * three columns as one state, so a row always answers the same question the same
+ * way.
+ *
+ * A writer that records a fresh authorization records the association as active
+ * with no suspension: `integration_status`, `suspended_at` and `suspended_by`
+ * move together, so a row that answers active never carries a suspension record.
+ * Slack, Linear and GitLab already record the same state on re-authorization,
+ * and one writer operation keeps every platform's answer identical.
+ *
+ * A locally disconnected association keeps its status and its suspension: that
+ * record is what marks the disconnect, and the connect path clears
+ * `github_disconnected_at` in the same write as it reactivates the association.
+ * For GitHub, the provider's own lifecycle is not carried here: it is recorded
+ * on the canonical installation row by `observeGitHubInstallationLifecycle`,
+ * runtime authorization reads it there as well, and
+ * `connectVerifiedGitHubInstallation` refuses to write while that installation is
+ * suspended.
+ */
+export function reactivatedIntegrationSetSql() {
+  const reactivated = sql`${platform_integrations.github_disconnected_at} IS NULL`;
+  return {
+    integration_status: sql`CASE WHEN ${reactivated} THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
+    suspended_at: sql`CASE WHEN ${reactivated} THEN NULL ELSE ${platform_integrations.suspended_at} END`,
+    suspended_by: sql`CASE WHEN ${reactivated} THEN NULL ELSE ${platform_integrations.suspended_by} END`,
+  };
+}
+
 export type UpsertPlatformIntegrationResult =
   | { ok: true }
   | {
@@ -1447,13 +1435,13 @@ export async function upsertPlatformIntegrationForOwner(
       await tx
         .update(platform_integrations)
         .set({
+          ...reactivatedIntegrationSetSql(),
           platform_account_id: values.platform_account_id,
           github_connection_role: existing.github_connection_role ?? 'workflow',
           platform_account_login: values.platform_account_login,
           permissions: values.permissions,
           scopes: values.scopes,
           repository_access: values.repository_access,
-          integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
           repositories_synced_at: values.repositories_synced_at,
           github_app_type: appType,
@@ -1487,12 +1475,12 @@ export async function upsertPlatformIntegrationForOwner(
     await db
       .update(platform_integrations)
       .set({
+        ...reactivatedIntegrationSetSql(),
         platform_account_id: values.platform_account_id,
         platform_account_login: values.platform_account_login,
         permissions: values.permissions,
         scopes: values.scopes,
         repository_access: values.repository_access,
-        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
         repositories_synced_at: values.repositories_synced_at,
         github_app_type: appType,

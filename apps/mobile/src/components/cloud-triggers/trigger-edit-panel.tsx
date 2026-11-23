@@ -15,6 +15,7 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Play, Trash2 } from '@/components/ui/icons';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
@@ -27,15 +28,18 @@ import {
 } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
+import {
+  type TriggerFormFailure,
+  triggerSaveFailure,
+} from '@/lib/cloud-triggers/trigger-save-failure';
 import { useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 import { TriggerDeliveries } from './trigger-deliveries';
-import { TriggerForm, type TriggerFormFailure } from './trigger-form';
+import { TriggerForm } from './trigger-form';
 import { TriggerUrlCard } from './trigger-url-card';
 
 export function TriggerEditPanel({
@@ -100,8 +104,7 @@ export function TriggerEditPanel({
       announcingToast.success(t('cloudAgent.triggers.saved'));
       return true;
     } catch (error) {
-      const message = readTrpcErrorField(error, 'message') ?? t('common.somethingWentWrong');
-      attempt.fail({ kind: isRetryableTrpcError(error) ? 'retryable' : 'rejected', message });
+      attempt.fail(triggerSaveFailure(error, { mode: 'edit', name: detail.triggerId }));
       return false;
     }
   };
@@ -181,12 +184,9 @@ export function TriggerEditPanel({
           </View>
         }
       />
-      <View className="gap-2">
-        <Text className="text-sm font-medium text-foreground">
-          {t('cloudAgent.triggers.deliveries')}
-        </Text>
+      <Section label={t('cloudAgent.triggers.deliveries')}>
         <TriggerDeliveries triggerId={detail.triggerId} organizationId={organizationId} />
-      </View>
+      </Section>
       {dialog}
     </View>
   );

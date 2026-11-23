@@ -83,6 +83,8 @@ import {
   setSignOutActive,
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
+import { setBlockedAccountExplanation } from '@/lib/auth/blocked-account-state';
+import { raiseBlockedAccountExplanationFromRefresh } from '@/lib/auth/blocked-account-raise';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
 import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
@@ -199,11 +201,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // Reactive snapshot of the module auth epoch, advanced synchronously at the
   // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
   const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
-  // Reactive view of the one sign-out flag the cache write fence also reads.
-  // `setSignOutActive` flips it synchronously at the start of sign-out (same
-  // render as the epoch bump) so the read-cache mount cannot resubscribe while
-  // the old user id is still cached; it is cleared only after a sign-in's
-  // credential publication succeeds.
   const isSigningOut = useSyncExternalStore(subscribeSignOutActive, isSignOutActive);
   const isSignedOutReference = useRef(false);
 
@@ -327,6 +324,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // sign-in in flight owns the index instead and fires its own clear,
           // so the epoch and sign-out fences hold here as for every other
           // publish in this bootstrap.
+          // The clear of the launcher surfaces also drops the Quick Action URL
+          // a cold start parks natively, and the sign-in path is that URL's
+          // only staging reader. Take the destination that names no account
+          // first and stage it for the sign-in that follows, so a tap on the
+          // New agent action while signed out still lands where it points; the
+          // same take drops an account-bound URL the clear would have dropped.
+          const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+          const parkedLaunchHref =
+            parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+          if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
+            setPendingDeepLink(parkedLaunchHref, 'universal-link');
+          }
           clearSystemSearchIndexOnSignedOutLaunch();
           // The account is now known to be none: a system-search destination
           // captured before this point is not this process's to open, so the
@@ -437,15 +446,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         }
         // Clear the guard so a later refused refresh can sign out again.
         isSignedOutReference.current = false;
-        // Credentials published on the winning epoch: the teardown window
-        // ends, so refresh may rotate the new session and request-token cold
-        // reads may warm the owner again.
-        setSignOutTeardownActive(false);
         setSessionEnded(false);
-        // Credentials published on the winning epoch: the sign-out fence opens
-        // so the read-cache mount can subscribe for the new session, and the
-        // reactive `isSigningOut` follows the same flag.
-        setSignOutActive(false);
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         // A direct account switch must not keep the prior account's query
@@ -457,6 +458,23 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
+        // The teardown window and the sign-out fence close only here, after
+        // the new credentials are published: a request from the previous
+        // session that settles between the await above and this block carries
+        // its own refusal, and must not raise the blocked-account explanation
+        // (or any other previous-session state) over the account just signed
+        // in. React batches the same synchronous block into one render, so the
+        // read-cache mount subscribes on the first new-session commit exactly
+        // as before.
+        setSignOutTeardownActive(false);
+        // A successful sign-in is the one event that proves the block no
+        // longer applies, so it clears the blocked-account explanation the
+        // signed-out surface would otherwise keep showing.
+        setBlockedAccountExplanation(null);
+        // The sign-out fence opens so the read-cache mount can subscribe for
+        // the new session, and the reactive `isSigningOut` follows the same
+        // flag.
+        setSignOutActive(false);
         // A Quick Action tapped while the app was signed out parks its launch
         // URL natively, and the signed-in launcher mount is its only reader.
         // Take the account-independent destination before the teardown below
@@ -723,6 +741,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
+        if (outcome.userBlocked === true) {
+          // The refusal explains the session it ends, so the explanation is
+          // raised before the teardown and deliberately outlives it: sign-out
+          // clears the credential, not the reason, and the signed-out surface
+          // must still say why once the token is gone. Only a successful
+          // sign-in clears it. The refresh route's frozen body names only a
+          // block, so the raise falls back to the account explanation and never
+          // replaces a reason an answered procedure already published (that
+          // path has no session left, so it already offers no retry).
+          raiseBlockedAccountExplanationFromRefresh();
+        }
         await signOut(true, 'session_ended');
       }
     };
@@ -781,6 +810,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {
+            if (outcome.userBlocked === true) {
+              // Same refusal the unauthorized handler explains: the
+              // explanation is raised before the teardown and outlives it, so
+              // the signed-out surface says why instead of a bare session end.
+              // The frozen refresh body names only a block, so the raise falls
+              // back to the account explanation without replacing a more
+              // specific reason already published, and this path already has no
+              // session left to retry over.
+              raiseBlockedAccountExplanationFromRefresh();
+            }
             await signOut(true, 'session_ended');
           }
           // A set that cannot rotate is a session that cannot outlive this

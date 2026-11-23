@@ -4,6 +4,7 @@ import {
   RefreshBenchmarkProfilesResponseSchema,
   type AutoRouter,
   type BenchmarkPair,
+  type BenchmarkProfileFailure,
   type BenchmarkRegistryFailedEntry,
   type RefreshBenchmarkProfilesResponse,
 } from '@kilocode/auto-routing-contracts';
@@ -43,9 +44,56 @@ function nextRetryText(failure: BenchmarkRegistryFailedEntry['failure'], now: Da
 }
 
 /**
+ * Why the worker made a pair permanent. The cause is part of the diagnosis, so the
+ * console states it verbatim and explains what it means for the operator.
+ */
+export function failureCauseText(failure: BenchmarkProfileFailure): string | null {
+  if (failure.kind !== 'permanent') return null;
+  if (failure.cause === 'infrastructure_budget_exhausted') {
+    return 'infrastructure_budget_exhausted — repeated proven failures with no new valid result since the last progress';
+  }
+  if (failure.cause === 'model_budget_exhausted') {
+    return 'model_budget_exhausted — repeated failures attributed to the model itself';
+  }
+  return 'terminal_class — the failure class cannot succeed on retry';
+}
+
+function FailureReason({ failure }: { failure: BenchmarkProfileFailure }) {
+  const reason = failure.reason ?? 'No reason recorded';
+  const cause = failureCauseText(failure);
+  return (
+    <div className="min-w-48 max-w-96 text-xs">
+      <p className="break-words whitespace-pre-wrap" title={reason}>
+        {reason}
+      </p>
+      {cause ? <p className="text-muted-foreground mt-1 break-words">{cause}</p> : null}
+    </div>
+  );
+}
+
+function FailureTimes({ failure, now }: { failure: BenchmarkProfileFailure; now: Date }) {
+  return (
+    <div className="text-xs">
+      <div>
+        <span className="text-muted-foreground">First </span>
+        <AdminTimeLabel iso={failure.firstFailedAt} now={now.getTime()} />
+      </div>
+      <div className="mt-1">
+        <span className="text-muted-foreground">Last </span>
+        <AdminTimeLabel iso={failure.lastFailedAt} now={now.getTime()} />
+        <span className="text-muted-foreground">
+          {' '}
+          · {failure.attempts} {failure.attempts === 1 ? 'attempt' : 'attempts'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Failed registry pairs of the live identity across both queues. Retryable ones go back
  * with "Requeue retryable" once their retry window passes; permanent ones only through
- * their own Re-admit.
+ * their own Re-admit, which also clears the attempt history behind the diagnosis.
  */
 export function FailedModelsTable({
   entries,
@@ -62,81 +110,134 @@ export function FailedModelsTable({
     return <p className="text-muted-foreground text-sm">No failed models</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Model</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead>Failed</TableHead>
-            <TableHead>Next retry</TableHead>
-            <TableHead>
-              <span className="sr-only">Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.map(entry => {
-            const key = failedEntryKey(entry);
-            const { failure } = entry;
-            const reason = failure.reason ?? 'No reason recorded';
-            return (
-              <TableRow key={key}>
-                <TableCell className="max-w-64">
-                  <div className="font-mono text-xs break-all">{entry.model}</div>
-                  <div className="text-muted-foreground text-xs">
-                    <span className="font-mono">{entry.variant ?? 'default'}</span> ·{' '}
-                    {entry.queues.map(queue => QUEUE_LABELS[queue]).join(', ')}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={failure.kind === 'permanent' ? 'destructive' : 'secondary'}>
-                    {failure.kind === 'permanent' ? 'Permanent' : 'Retryable'}
-                  </Badge>
-                  <div className="text-muted-foreground mt-1 font-mono text-xs">
-                    {failure.failureClass}
-                  </div>
-                </TableCell>
-                <TableCell className="min-w-48 max-w-96 text-xs">
-                  <p className="break-words whitespace-pre-wrap" title={reason}>
-                    {reason}
-                  </p>
-                </TableCell>
-                <TableCell className="text-xs">
-                  <div>
-                    <span className="text-muted-foreground">First </span>
-                    <AdminTimeLabel iso={failure.firstFailedAt} now={now.getTime()} />
-                  </div>
-                  <div className="mt-1">
-                    <span className="text-muted-foreground">Last </span>
-                    <AdminTimeLabel iso={failure.lastFailedAt} now={now.getTime()} />
-                    <span className="text-muted-foreground">
-                      {' '}
-                      · {failure.attempts} {failure.attempts === 1 ? 'attempt' : 'attempts'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs">{nextRetryText(failure, now)}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={readmittingKey !== null}
-                    aria-label={`Re-admit ${entry.model} ${entry.variant ?? 'default'}`}
-                    onClick={() => onReadmit({ model: entry.model, variant: entry.variant })}
-                  >
-                    <RotateCcw className="size-4" />
-                    {readmittingKey === key ? 'Re-admitting' : 'Re-admit'}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+    <>
+      {/* Wide layouts keep the operator's table; narrow ones stack the same fields. */}
+      <div className="hidden overflow-x-auto rounded-md border md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Model</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Failed</TableHead>
+              <TableHead>Next retry</TableHead>
+              <TableHead>
+                <span className="sr-only">Action</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {entries.map(entry => {
+              const key = failedEntryKey(entry);
+              const { failure } = entry;
+              return (
+                <TableRow key={key}>
+                  <TableCell className="max-w-64">
+                    <div className="font-mono text-xs break-all">{entry.model}</div>
+                    <div className="text-muted-foreground text-xs">
+                      <span className="font-mono">{entry.variant ?? 'default'}</span> ·{' '}
+                      {entry.queues.map(queue => QUEUE_LABELS[queue]).join(', ')}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={failure.kind === 'permanent' ? 'destructive' : 'secondary'}>
+                      {failure.kind === 'permanent' ? 'Permanent' : 'Retryable'}
+                    </Badge>
+                    <div className="text-muted-foreground mt-1 font-mono text-xs">
+                      {failure.failureClass}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <FailureReason failure={failure} />
+                  </TableCell>
+                  <TableCell>
+                    <FailureTimes failure={failure} now={now} />
+                  </TableCell>
+                  <TableCell className="text-xs">{nextRetryText(failure, now)}</TableCell>
+                  <TableCell className="text-right">
+                    <ReadmitButton
+                      entry={entry}
+                      readmitting={readmittingKey === key}
+                      disabled={readmittingKey !== null}
+                      onReadmit={onReadmit}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+      <ul className="flex flex-col gap-2 md:hidden">
+        {entries.map(entry => {
+          const key = failedEntryKey(entry);
+          const { failure } = entry;
+          return (
+            <li key={key} className="rounded-md border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs break-all">{entry.model}</span>
+                <Badge variant={failure.kind === 'permanent' ? 'destructive' : 'secondary'}>
+                  {failure.kind === 'permanent' ? 'Permanent' : 'Retryable'}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                <span className="font-mono">{entry.variant ?? 'default'}</span> ·{' '}
+                {entry.queues.map(queue => QUEUE_LABELS[queue]).join(', ')} ·{' '}
+                <span className="font-mono">{failure.failureClass}</span>
+              </p>
+              <div className="mt-2">
+                <FailureReason failure={failure} />
+              </div>
+              <div className="mt-2">
+                <FailureTimes failure={failure} now={now} />
+              </div>
+              <p className="mt-2 text-xs">
+                <span className="text-muted-foreground">Next retry </span>
+                {nextRetryText(failure, now)}
+              </p>
+              <div className="mt-2">
+                <ReadmitButton
+                  entry={entry}
+                  readmitting={readmittingKey === key}
+                  disabled={readmittingKey !== null}
+                  onReadmit={onReadmit}
+                  className="min-h-11"
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function ReadmitButton({
+  entry,
+  readmitting,
+  disabled,
+  onReadmit,
+  className,
+}: {
+  entry: BenchmarkRegistryFailedEntry;
+  readmitting: boolean;
+  disabled: boolean;
+  onReadmit: (entry: BenchmarkPair) => void;
+  className?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={className}
+      disabled={disabled}
+      aria-label={`Re-admit ${entry.model} ${entry.variant ?? 'default'}`}
+      onClick={() => onReadmit({ model: entry.model, variant: entry.variant })}
+    >
+      <RotateCcw className="size-4" />
+      {readmitting ? 'Re-admitting' : 'Re-admit'}
+    </Button>
   );
 }
 

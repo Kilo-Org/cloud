@@ -6,6 +6,7 @@ import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { Building2, CreditCard, Plus, RotateCcw } from '@/components/ui/icons';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import { billingHrefFor, useCanManageBilling } from '@/lib/trial-refusal';
 
@@ -88,6 +89,7 @@ export function CouncilRefusalScreen({
 }>) {
   const { t } = useTranslation();
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const personal = isPersonal(scope);
   // The billing role comes from the shared membership list, the one read every
   // converted refusal uses; it reads as a member until that list settles, so a
@@ -153,7 +155,9 @@ export function CouncilRefusalScreen({
                 // The reviewer scope list is the account switcher: every
                 // membership on one screen, and a pick there opens the picked
                 // account's platform list — where the switch reads.
-                router.replace('/(app)/code-reviewer' as Href);
+                // Swapping the refusal for the scope list in one commit crashes
+                // Android Fabric, so it pushes then retires.
+                stackSafeRouter.replace('/(app)/code-reviewer' as Href);
                 return;
               }
               router.push(CREATE_ORGANIZATION_HREF);

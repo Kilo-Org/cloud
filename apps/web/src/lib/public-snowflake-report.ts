@@ -22,7 +22,7 @@ const IN_MEMORY_CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 type PublicSnowflakeReportOptions<Usage> = {
   cacheKey: RedisKey;
   errorMessage: string;
-  parseRows: (rows: string[][]) => Usage;
+  parseRows: (rows: string[][]) => Usage | Promise<Usage>;
   query: string;
   schema: ZodType<Usage>;
   source: string;
@@ -67,7 +67,7 @@ async function fetchReport<Usage>(
       statement: options.query,
       timeoutSeconds: 30,
     });
-    const usage = options.schema.parse(options.parseRows(rows));
+    const usage = options.schema.parse(await options.parseRows(rows));
 
     try {
       await redisClient.set(options.cacheKey, JSON.stringify(usage), {

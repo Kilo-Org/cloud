@@ -23,7 +23,13 @@ const config = vi.hoisted(() => ({
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
 const router = vi.hoisted(() => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }));
-const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
+const navigation = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  goBack: vi.fn(),
+  // `useSettledReplace` hears the navigator's transition events; every config
+  // here is enabled, so the bounce never dispatches.
+  addListener: () => () => undefined,
+}));
 const preventRemove = vi.hoisted(() => ({
   enabled: false,
   handler: undefined as

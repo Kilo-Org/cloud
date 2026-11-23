@@ -91,6 +91,7 @@
     "draft": "ረቂቅ",
     "enabled": "ነቅቷል",
     "github": "GitHub",
+    "image": "ምስል",
     "imageUnavailable": "ምስሉ አይገኝም።",
     "loading": "በመጫን ላይ…",
     "loadMore": "ተጨማሪ ጫን",
@@ -122,10 +123,10 @@
     "connectProvider": "አቅራቢን ያገናኙ",
     "contentTruncated": "ይዘቱ ተቆርጧል",
     "copyLink": "አገናኙን ቅዳ",
+    "couldNotLoad": "መጫን አልተቻለም።",
+    "couldNotLoadMore": "ተጨማሪ መጫን አልተቻለም።",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
-    "couldnTLoad": "መጫን አልተቻለም።",
-    "couldnTLoadMore": "ተጨማሪ መጫን አልተቻለም።",
     "deviceSessions": "የመሣሪያ ክፍለ ጊዜዎች",
     "disabled": "ተሰናክሏል",
     "email": "ኢሜይል",
@@ -522,13 +523,14 @@
       "receiptLabel": "ደረሰኝ",
       "copyReceiptId": "የደረሰኙን መለያ ቁጥር ይቅዱ",
       "appealLabel": "ይግባኝ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ደርሷል",
       "triageOpen": "በግምገማ ላይ",
       "triageActioned": "ተቀባይነት አግኝቷል",
       "triageRejected": "ተቀባይነት አላገኘም",
       "appealNone": "ምንም አልቀረበም",
-      "appealSubmitted": "በግምገማ ላይ",
-      "appealAccepted": "ተቀባይነት አግኝቷል",
+      "appealSubmitted": "ይግባኝ በግምገማ ላይ",
+      "appealAccepted": "ይግባኝ ተቀባይነት አግኝቷል",
       "appealRejected": "ውድቅ ተደርጓል",
       "appeal": "በዚህ ውሳኔ ላይ ይግባኝ ይበሉ",
       "appealTitle": "በዚህ ውሳኔ ላይ ይግባኝ ማለት ይፈልጋሉ?",
@@ -539,13 +541,23 @@
       "nextStepInReview": "ውጤቱ በዚህ ማያ ላይ ይታያል፣ ከውሳኔ በኋላም ይግባኝ ማለት ይችላሉ።",
       "nextStepAppeal": "የይግባኝዎ ውጤት በዚህ ማያ ላይ ይታያል።",
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
-      "viewReceipt": "ደረሰኙን ይመልከቱ"
+      "viewReceipt": "ደረሰኙን ይመልከቱ",
+      "targetLabel": "ሪፖርት የተደረገበት ንጥል",
+      "reasonLabel": "የሪፖርት ምክንያት",
+      "targetMessage": "የAI ምላሽ",
+      "targetComment": "የማዋሃድ ጥያቄ አስተያየት",
+      "targetUser": "ተጠቃሚ",
+      "reasonHarmful": "ጎጂ ይዘት",
+      "reasonIllegal": "ሕገ-ወጥ ይዘት",
+      "reasonHarassment": "ትንኮሳ",
+      "reasonSpam": "አይፈለጌ ማስታወቂያ",
+      "reasonOther": "ሌላ ምክንያት"
     },
     "reportReceipts": {
       "title": "ሪፖርቶች",
       "rowSubtitle": "ያቀረቧቸው ሪፖርቶች እና ውጤቶቻቸው",
       "emptyTitle": "እስካሁን ምንም ሪፖርት የለም",
-      "emptyDescription": "ከአስተያየት ወይም ከ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች እዚህ ይታያሉ።",
+      "emptyDescription": "ከPR ውይይት ውስጥ ካለው አስተያየት ወይም በኤጀንት ክፍለ ጊዜ ውስጥ ካለው የ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች ከውጤታቸው ጋር እዚህ ይታያሉ።",
       "couldNotLoad": "ሪፖርቶችዎን መጫን አልተቻለም",
       "capped": "የቅርብ ጊዜ ሪፖርቶችዎን ያሳያል።"
     },
@@ -1000,8 +1012,9 @@
       "checkActiveConnection": "ግንኙነቱ ገባሪ ነው፣ ነገር ግን ይህ ንጥል አሁንም ሊጫን አይችልም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
-      "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "reconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
+      "bitbucketAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "adminOnlyConnectDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
@@ -1226,6 +1239,7 @@
     "needsInputAction": {
       "approved": "ጥያቄው ጸድቋል",
       "replied": "መልስ ተልኳል",
+      "empty": "መልስ ይጻፉ፣ ከዚያ ይላኩ።",
       "failed": "መልስ መስጠት አልተቻለም። እንደገና ለመሞከር እንደገና ይንኩ።",
       "unavailable": "ይህ ጥያቄ ከእንግዲህ አይጠብቅም።"
     }
@@ -1490,7 +1504,9 @@
       "githubError": "የGitHub ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "gitlabAccount": "የGitLab መለያ",
       "gitlabError": "የGitLab ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።"
+      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።",
+      "notConnectedTitle": "{{platform}} አልተገናኘም",
+      "githubAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "overview": {
       "allAreas": "ሁሉም ዘርፎች",
@@ -2159,12 +2175,13 @@
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
-      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
+      "pastSessions": "ያለፉ ክፍለ ጊዜዎች",
       "sectionAccessibility_one": "{{title}}: {{displayCount}} ክፍለ ጊዜ",
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "sectionAccessibility": "{{title}}: {{displayCount}} ክፍለ ጊዜዎች",
       "live": "ቀጥታ",
-      "updating": "በማዘመን ላይ"
+      "updating": "በማዘመን ላይ",
+      "retentionLimit": "የቅርብ ጊዜ ክፍለ ጊዜዎችዎን በማሳየት ላይ።"
     },
     "sessionRow": {
       "deleteTitle": "ክፍለ ጊዜው ይሰረዝ?",
@@ -2234,11 +2251,11 @@
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "emptyReadOnlyTitle": "በዚህ ክፍለ ጊዜ ውስጥ ምንም መልእክቶች የሉም",
-      "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
       "cloningSession": "የክፍለ ጊዜውን ቅጂ በመፍጠር ላይ",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
       "historyTooLarge": "የዚህ ክፍለ ጊዜ ጽሑፍ ለመጫን በጣም ትልቅ ነው።",
       "historyUnavailable": "የዚህ ክፍለ ጊዜ ጽሑፍ ሊነበብ አይችልም።",
+      "historyTemporarilyUnavailable": "የዚህ ክፍለ ጊዜ ጽሑፍ ለጊዜው አይገኝም።",
       "cloneFailedRetry": "የዚህን ክፍለ ጊዜ ቅጂ መፍጠር አልተቻለም። እንደገና ይሞክሩ።",
       "notEnoughCredits": "ለዚህ ጥያቄ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "ያለፈው ተግባር ገና አልተጠናቀቀም። እባክዎ ትንሽ ይጠብቁ።",
@@ -2601,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ዝርዝሮች አይገኙም።",
+      "detailsUnavailableDescription": "ይህ ንጥል ከአሁን በኋላ በክፍለ ጊዜው ውስጥ የለም።",
       "textDisplay": "የጽሑፍ ማሳያ",
       "thinking": "በማሰብ ላይ",
       "thought": "ሐሳብ",
@@ -2644,6 +2662,7 @@
     "filePart": {
       "loadingImage": "ምስሉን በመጫን ላይ",
       "imageUnavailableRetry": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ",
+      "imageUnavailableRetryWithAlt": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ {{alt}}",
       "imagePreviewUnavailableInSession": "በዚህ ክፍለ ጊዜ ውስጥ የምስል ቅድመ እይታ አይገኝም።",
       "viewImage": "ምስሉን ይመልከቱ",
       "viewImageWithAlt": "{{alt}} የሚለውን ምስል ይመልከቱ",
@@ -2775,7 +2794,9 @@
       "skip": "ይዝለሉ",
       "retrySkip": "ለመዝለል እንደገና ይሞክሩ",
       "submitting": "በማስገባት ላይ…",
-      "sendAnswers": "መልሶችን ይላኩ"
+      "sendAnswers": "መልሶችን ይላኩ",
+      "unreadableTitle": "ይህ ጥያቄ ማሳየት አልተቻለም",
+      "unreadableBody": "ወኪሉ ይህ መተግበሪያ ማሳየት የማይችለውን ጥያቄ በመጠበቅ ላይ ነው። ለመቀጠል ጥያቄውን በ CLI ውስጥ ይመልሱ።"
     },
     "blockingCard": {
       "questionUnavailable": "ይህ ጥያቄ ከእንግዲህ አይገኝም።",
@@ -2793,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}፣ {{taskName}}{{modelLabel}}፣ {{latestActivityLabel}}፣ {{status}}",
-      "maxNestingDepth": "ክፍለ ጊዜዎችን በሌሎች ክፍለ ጊዜዎች ውስጥ ለመፍጠር የሚፈቀደው ከፍተኛ ጥልቀት ተደርሷል።",
+      "maxNestingDepth": "የጎጆ ከፍተኛ ጥልቀት ተደርሷል።",
       "modelAccessibility": "ሞዴል፦ {{modelLabel}}",
       "openHint": "የንዑስ ወኪሉን ክፍለ ጊዜ ይክፈቱ",
       "subagent": "ንዑስ ወኪል",
@@ -2802,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "የንዑስ ወኪሉን ክፍለ ጊዜ መጫን አልተቻለም።",
+      "historyTooLarge": "የዚህ ንዑስ ወኪል ታሪክ ለመጫን በጣም ትልቅ ነው።",
+      "historyUnavailable": "የዚህ ንዑስ ወኪል ታሪክ አይገኝም።",
+      "historyTemporarilyUnavailable": "የዚህ ንዑስ ወኪል ታሪክ ለጊዜው አይገኝም።",
       "failed": "የንዑስ ወኪሉ ክፍለ ጊዜ አልተሳካም።",
       "noMessages": "የንዑስ ወኪል መልእክቶች የሉም",
       "noMessagesDescription": "ይህ የንዑስ ወኪል ክፍለ ጊዜ የውይይት ግልባጭ ሳያወጣ ተጠናቋል።",
@@ -2971,7 +2995,7 @@
       "windowUnavailable": "የዐውድ መስኮቱ መጠን አይገኝም",
       "tapToViewDetails": " የዐውድ ዝርዝሮችን ለማየት ይንኩ።",
       "costClause": "፣ ወጪ {{cost}}",
-      "loadingCostSpoken": "ወጪ {{cost}}።",
+      "loadingCostSpoken": "እስካሁን ወጪ {{cost}}።",
       "tokensWindowUnavailable": "ዐውድ፦ {{used}} ቶከኖች፣ የመስኮቱ መጠን አይገኝም{{costClause}}።",
       "tokensUsage": "ዐውድ፦ ከ{{window}} ቶከኖች {{used}}፣ {{percentage}} ጥቅም ላይ ውሏል{{costClause}}።",
       "title": "የዐውድ አጠቃቀም",
@@ -3083,6 +3107,12 @@
     "retryLoadingAccount": "መለያውን ለመጫን እንደገና ሞክር",
     "retryLoadingPrivacy": "የግላዊነት ምርጫዎችን ለመጫን እንደገና ሞክር"
   },
+  "accountBlocked": {
+    "title": "መለያ ታግዷል",
+    "description": "Kilo ይህን መለያ ታግዷል፤ እንደገና መግባት ግን አያነሳውም። የድጋፍ ቡድኑ በጥያቄ መሰረት እገዳውን መገምገም ይችላል።",
+    "domainDescription": "Kilo በዚህ የኢሜይል ጎራ ላይ መለያዎችን አይፈቅድም፤ እንደገና መግባት ግን አይለውጠውም። የድጋፍ ቡድኑ በጥያቄ መሰረት ጎራውን መገምገም ይችላል።",
+    "contactSupport": "የድጋፍ ቡድኑን አግኝ"
+  },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
     "billingPage": "የክፍያ ገጽ"
@@ -3155,8 +3185,7 @@
     "timeoutDescription": "ጥያቄው ከመጠናቀቁ በፊት ጊዜው አልቋል። እባክዎ እንደገና ይሞክሩ።"
   },
   "screenHeader": {
-    "openMenu": "ምናሌ ይክፈቱ",
-    "openMenuFor": "ለ{{title}} ምናሌ ይክፈቱ"
+    "openMenu": "ምናሌ ይክፈቱ"
   },
   "picker": {
     "optionsExpired": "የአማራጮቹ ጊዜ አልፏል",
@@ -3375,6 +3404,8 @@
     "voiceTranscriptionWho": "የእርስዎ መሣሪያ፣ Kilo Gateway ከመረጡት የጽሑፍ ቅየራ ሞዴል ጋር፣ ወይም Apple ወይም Google ለመስመር ላይ መለያ።",
     "installAttributionPromptTitle": "የመተግበሪያውን ምንጭ ለመለየት ይፈቅዳሉ?",
     "installAttributionPromptMessage": "Kilo የApple መከታተያ ፈቃድን የሚጠቀመው እዚህ በምን መንገድ እንደደረሱ ለማወቅ ብቻ ነው። ጥያቄዎችዎና ውይይቶችዎ በፍጹም ጥቅም ላይ አይውሉም።",
+    "installAttributionRequestFailedTitle": "የመከታተያ ጥያቄውን ማሳየት አልተቻለም",
+    "installAttributionRequestFailedMessage": "Kilo የስርዓቱን ጥያቄ ማሳየት አልቻለም፣ ስለዚህ የመተግበሪያውን ምንጭ መለየት ተዘግቷል።",
     "what": "ምን",
     "why": "ለምን",
     "who": "ማን"
@@ -3390,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "የኦዲት መዝገብ",
-      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ምንም የኦዲት ክስተቶች የሉም",
       "emptyDescription": "በዚህ ድርጅት ውስጥ የተወሰዱ እርምጃዎች እዚህ ይታያሉ።",
       "truncated": "የቅርብ ጊዜዎቹ ክስተቶች እየታዩ ነው።",
@@ -3440,11 +3471,147 @@
         "guardrailUpdate": "የጥበቃ ገደብ ተዘምኗል",
         "guardrailRemove": "የጥበቃ ገደብ ተወግዷል",
         "unknown": "የኦዲት ክስተት"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "ሁነታ \"{{name}}\" (መለያ: {{slug}})",
+        "modeUpdate": "ሁነታ \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "ራስ-ሰር ማስተላለፍ",
+          "defaultModel": "ነባሪ ሞዴል"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} እንደ {{role}} ተጨምሯል",
+        "memberRemoved": "{{email}} ተወግዷል",
+        "memberParentAdded": "{{email}} ከዋና ድርጅት {{parent}} ተጨምሯል",
+        "memberParentRemoved": "{{email}} ከዋና ድርጅት {{parent}} ተወግዷል",
+        "inviteSent": "{{email}} እንደ {{role}}",
+        "inviteRevoked": "የ{{email}} ግብዣ ተሰርዟል",
+        "inviteAccepted": "{{email}} ተቀብሏል",
+        "groupIdentity": "ቡድን \"{{name}}\"",
+        "groupMembers": "ቡድን \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ቡድኖች",
+        "groupMemberGroups_one": "{{displayCount}} ቡድን",
+        "groupMemberGroups_other": "{{displayCount}} ቡድኖች",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ቡድኖች",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ቡድን",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ቡድኖች",
+        "groupPolicySet": "ቡድን \"{{name}}\": የ{{policy}} ፖሊሲ ተቀናብሯል",
+        "groupPolicyRemoved": "ቡድን \"{{name}}\": የ{{policy}} ፖሊሲ ተወግዷል",
+        "groupDefaultPolicySet": "ነባሪ የ{{policy}} ፖሊሲ ተቀናብሯል",
+        "groupDefaultPolicyRemoved": "ነባሪ የ{{policy}} ፖሊሲ ተወግዷል",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "የAI ጥበቃ ገደቦች {{state}}",
+        "guardrailConfigGroup": "ለቡድን \"{{group}}\" {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "የSSO ጎራ {{domain}}",
+        "ssoDomainChanged": "{{domain}} ({{previous}} ነበር)",
+        "ssoDomainRemoved": "የSSO ጎራ {{domain}} ተሰርዟል",
+        "fundsPurchased": "{{amount}} በ{{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} ለ{{displayCount}} ልጅ ድርጅቶች",
+        "fundsDistributed_one": "{{amount}} ለ{{displayCount}} ልጅ ድርጅት",
+        "fundsDistributed_other": "{{amount}} ለ{{displayCount}} ልጅ ድርጅቶች",
+        "fundsReceived": "{{amount}} ከ{{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "የ{{platform}} ውቅር",
+        "reviewAgentConfigStyle": "{{platform}}: ዘይቤ {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} ተዘምነዋል",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} ተዘምኗል",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} ተዘምነዋል",
+        "reviewAgentSecretsFailed": "{{displayCount}} ስህተቶች",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} ስህተት",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} ስህተቶች",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "የኢንፈረንስ ክልል: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "ሁነታ \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ዓለምአቀፍ ነባሪ",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "የተፈቀደ",
+          "denied": "የተከለከለ",
+          "followSetting": "የቅጥያውን ቅንብር ይከተላል"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ለ{{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "የምክሮች መጠቃለያ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: የተፈቀደ መነሻ የለም",
+        "settingName": "ከ{{previous}} ወደ {{next}} ተቀይሯል",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "ከመጠቀም በፊት ቅኝት ነቅቷል",
+        "scanBeforeUseOff": "ከመጠቀም በፊት ቅኝት ተሰናክሏል",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "ተወግዷል: {{models}}",
+        "browserPolicyOff": "የአሳሽ አጠቃቀም ተከልክሏል",
+        "browserPolicyAllow": "የተፈቀዱ መነሻዎች ብቻ",
+        "browserPolicyPlaywrightOnly": "የአሳሽ አጠቃቀም ብቻ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "ሞዴሎች ተቀይረዋል: {{values}}",
+        "integrationConnected": "{{integration}} ተገናኝቷል",
+        "integrationDisconnected": "{{integration}} ተቋርጧል",
+        "integrationRefreshed": "{{integration}} ታድሷል",
+        "integrationCancelled": "{{integration}} ተሰርዟል",
+        "integrationModelUpdated": "{{integration}}: ሞዴል {{model}}",
+        "integrationKeyAdded": "ቁልፍ ለ{{provider}} ተጨምሯል",
+        "integrationKeyUpdated": "ቁልፍ ለ{{provider}} ተዘምኗል",
+        "integrationKeyDeleted": "ቁልፍ ለ{{provider}} ተወግዷል",
+        "integrationKeyToggled": "የ{{provider}} ቁልፍ: {{state}}",
+        "namedPolicyCreated": "{{kind}} ፖሊሲ {{id}} ተፈጥሯል",
+        "namedPolicyUpdated": "{{kind}} ፖሊሲ {{id}} ተዘምኗል",
+        "namedPolicyDeleted": "{{kind}} ፖሊሲ {{id}} ተወግዷል",
+        "namedPolicyLinked": "{{kind}} ፖሊሲ {{next}} ተገናኝቷል",
+        "webhookTriggerUpdated": "ማስነሻ {{trigger}}",
+        "organizationRenamed": "ድርጅት ከ{{previous}} ወደ {{next}} ተቀይሯል",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "የራስዎ API ቁልፍ"
+        }
       }
     },
     "billing": {
       "title": "ክፍያ",
-      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ ኃላፊ ብቻ ናቸው።",
+      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "subscription": "የደንበኝነት ምዝገባ",
       "state": "ሁኔታ",
       "stateNone": "የደንበኝነት ምዝገባ የለም",
@@ -3522,11 +3689,11 @@
       "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
       "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።",
       "seatsFull": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።",
-      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የሂሳብ አከፋፈል አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
+      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የክፍያ አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
       "noSeatsAvailable": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።"
     },
     "invoices": {
-      "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
+      "downloadA11y": "ደረሰኝ {{number}}ን፣ {{amount}}፣ {{date}}፣ {{status}} ያውርዱ",
       "emptyDescription": "ደረሰኞች በእያንዳንዱ የክፍያ ዑደት በራስ ሰር ይዘጋጃሉ። ድርጅትዎ ክፍያ እንዲፈጽም ሲጠየቅ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም ደረሰኞች የሉም",
       "invoiceFallback": "ደረሰኝ",
@@ -3606,7 +3773,6 @@
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
-      "guardrails": "የጥበቃ ገደቦች",
       "byok": "የራስዎን ቁልፍ ይጠቀሙ",
       "ssoAndDomain": "SSO እና ጎራ",
       "dataCollection": "የውሂብ አሰባሰብ",
@@ -3621,7 +3787,7 @@
       "emptyDescription": "ያለፉ ጥያቄዎችን ለማየት ቀዳሚ ሰዓት የሚለውን ይጠቀሙ።",
       "emptyBoundDescription": "የጥያቄ መዝገቦች ወደኋላ የሚደርሱት እስከዚህ ድረስ ብቻ ነው።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
-      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
       "byok": "BYOK"
     },
@@ -3726,7 +3892,7 @@
     "signupStepUpApple": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithApple)'ን ተጠቀም።",
     "signupStepUpGoogle": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithGoogle)'ን ተጠቀም።",
     "signupStepUpBack": "መለያህን መፍጠር ለመጨረስ ወደ ኋላ ተመለስና '$t(login.moreSignInOptions)'ን ተጠቀም።",
-    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። እንደገና ሞክር ወይም '$t(login.resendCode)'ን ተጠቀም።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። '$t(login.resendCode)'ን ወይም '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "codeInProgress": "ኮድህ እየተሠራበት ነው። ትንሽ ጠብቅና እንደገና ሞክር።",
     "tooManyAttempts": "በጣም ብዙ ሙከራዎች ተደርገዋል። አዲስ ኮድ ጠይቅ።",
     "invalidToken": "መግባት አልተሳካም። እባክህ እንደገና ሞክር።",
@@ -3891,7 +4057,10 @@
     "list": {
       "loadFailed": "የውይይት ታሪክ መጫን አልተቻለም።",
       "new": "አዲስ ውይይት",
-      "deleteTitle": "ይህ ውይይት ይሰረዝ?"
+      "deleteTitle": "ይህ ውይይት ይሰረዝ?",
+      "resetNoticeTitle": "በመሣሪያው ላይ ያሉ ውይይቶችና ረቂቆች ተሰርዘዋል",
+      "resetNoticeBody": "Kilo በዚህ መሣሪያ ላይ የተቀመጡትን ውይይቶች መክፈት አልቻለ። በደመና ውስጥ ያሉ ክፍለ ጊዜዎችዎ አልተነኩም።",
+      "resetNoticeDismiss": "ማሳወቂያውን አስወግድ"
     },
     "rename": {
       "title": "የውይይቱን ስም ቀይር",
@@ -3941,6 +4110,9 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የአገልጋይ URL",
       "fieldUrlInvalid": "ትክክለኛ የአገልጋይ URL ያስገቡ።",
+      "fieldUrlCredentials": "ከአድራሻው የተጠቃሚ ስምና የይለፍ ቃል ያስወግዱ።",
+      "fieldUrlFragment": "ከአድራሻው የ # ክፍሉን ያስወግዱ።",
+      "fieldUrlInsecure": "የ https አድራሻ ያስገቡ፣ ወይም http ለ localhost ብቻ።",
       "duplicateUrl": "ይህ URL አስቀድሞ ተቀምጧል።",
       "serverNotFound": "ይህ አገልጋይ ከእንግዲህ አልተቀመጠም።",
       "enableServer": "ይህን አገልጋይ አንቃ: {{name}}",
@@ -3966,6 +4138,7 @@
       "app": {
         "label": "የመሣሪያ በይነገጽ",
         "failed": "የዚህ መሣሪያ በይነገጽ መጫን አልተቻለም።",
+        "tooLarge": "የዚህ መሣሪያ በይነገጽ ከ {{size}} ገደብ ይበልጣል።",
         "empty": "የዚህ መሣሪያ በይነገጽ የሚያሳየ ነገር የለውም።"
       }
     },
@@ -4033,6 +4206,8 @@
       "discoveryNoModels": "የግንኙነት ነጥቡ ምንም ሞዴል አልዘረዘረም። ሞዴሎችን በእጅ ያስገቡ።",
       "connectionIncomplete": "ሞዴሉ ምላሽ ሰጠ ነገር ግን አልጨረሰም። እንደገና ይሞክሩ፣ ወይም የሞዴሉን መለያ እና ፕሮቶኮሉን ያረጋግጡ።",
       "invalidInput": "የጀርባ አገልግሎት ስም፣ ትክክለኛ ራስጌዎች እና ቢያንስ አንድ ልዩ መለያ እና ስም ያለው ሞዴል ያስገቡ። የቶከን ገደቦች ከዜሮ በላይ የሆኑ ሙሉ ቁጥሮች መሆን አለባቸው።",
+      "invalidApiKey": "የAPI ቁልፉ ሊላክ የማይችል ቁምፊ ይዟል። ፊደላትን፣ አሃዞችን እና መደበኛ ምልክቶችን ብቻ ይጠቀሙ፣ የመስመር መስበር የለም።",
+      "invalidHeaders": "ብጁ ራስጌ ሊላክ አይችልም። ስሙን ያረጋግጡ እና ፊደላትን፣ አሃዞችን እና መደበኛ ምልክቶችን ብቻ ይጠቀሙ፣ የመስመር መስበር የለም።",
       "invalidUrl": "የመግቢያ መረጃ፣ የመጠይቅ ክፍል ወይም የቁራጭ ክፍል የሌለው የHTTP ወይም የHTTPS የAPI ሥር አድራሻ ያስገቡ።",
       "publicHttp": "ይፋዊ የHTTP የግንኙነት ነጥቦች አይፈቀዱም። HTTPS ወይም የግል አካባቢያዊ የግንኙነት ነጥብ ይጠቀሙ።",
       "httpApprovalRequired": "ከማስቀመጥዎ ወይም ከመገናኘትዎ በፊት ይህን አካባቢያዊ የHTTP የግንኙነት ነጥብ ይፍቀዱ።",
@@ -4081,6 +4256,7 @@
         "network": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
         "invalidFile": "የወረደው ፋይል ይህ መተግበሪያ ሊያሂደው የሚችለው ሞዴል አይደለም፤ ስለዚህ ተሰርዟል።",
         "checksum": "የወረደው ፋይል ከታተመው ቼክሰም ጋር አይዛመድም፤ ስለዚህ ተሰርዟል። እባክዎ እንደገና ለማውረድ ይሞክሩ።",
+        "unreadable": "ይህ መሣሪያ የወረደውን ፋይል ማረጋገጥ አልቻለም፤ ስለዚህ ተሰርዟል። እባክዎ እንደገና ለማውረድ ይሞክሩ።",
         "writeFailed": "ይህ መሣሪያ ሞዴሉን ማስቀመጥ አልቻለም። እባክዎ እንደገና ለማውረድ ይሞክሩ።"
       }
     },
@@ -4166,7 +4342,15 @@
       "download": "በመሣሪያ ላይ የሚሠራውን ሞዴል ያውርዱ",
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
-      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
+      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "cannotUse": "ማስኬድ አይችልም፦ {{items}}።",
+      "cannotUseOptions": "መሙላት አይችልም፦ አንዳንድ የመሣሪያ አማራጮች።",
+      "limitations": "ገደቦች",
+      "tools": {
+        "time": "ጊዜ",
+        "settingsList": "ቅንብሮችን አሳይ",
+        "settingsSet": "ቅንብሮችን ቀይር"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
@@ -4345,6 +4529,7 @@
     "instructionSaveFailed": "መመሪያውን ማስቀመጥ አልተቻለም",
     "instructionDeleteFailed": "መመሪያውን መሰረዝ አልተቻለም",
     "instructionToggleFailed": "መመሪያውን ማዘመን አልተቻለም",
+    "instructionViewTitle": "የመመሪያ ፋይል",
     "instructionLimitReached": "አንድ መገለጫ እስከ {{max}} መመሪያዎች ሊይዝ ይችላል። ሌላ ለማከል አንዱን ይሰርዙ።",
     "mcp": {
       "title": "MCP አገልጋዮች",
@@ -4515,10 +4700,20 @@
     "history": {
       "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
       "appStoreReceipt": "ደረሰኝ ከApp Store",
+      "deduction": {
+        "adminCancel": "ቀሪ ሂሳቡ በአስተዳዳሪ ተዘግቷል",
+        "adminDebit": "ክሬዲቶች በአስተዳዳሪ ተወግደዋል",
+        "codingPlan": "የኮድ እቅድ፦ {{plan}}",
+        "correction": "የቀሪ ሂሳብ ማስተካከያ",
+        "dispute": "የክፍያ ክርክር",
+        "refundAppStore": "የክሬዲት ጥቅል ተመላሽ ከApp Store",
+        "refundGooglePlay": "የክሬዲት ጥቅል ተመላሽ ከGoogle Play"
+      },
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
       "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
+      "expiredStatus": "ጊዜው አልፏል",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
         "adjustment": "ማስተካከያ",
@@ -4545,7 +4740,8 @@
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
       "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።",
-      "voidedGrant": "ተሰርዟል፦ {{description}}"
+      "voidedGrant": "ተሰርዟል፦ {{description}}",
+      "voidedStatus": "ተሰርዟል"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
@@ -4689,6 +4885,7 @@
     "contextAll": "ሁሉም አውዶች",
     "dismiss": "ሪፖርቱን አስወግድ",
     "dismissFailed": "ይህን ሪፖርት ገና ማስወገድ አልተቻለም። በጀርባ እንደገና መሞከሩን ይቀጥላል።",
+    "readMarkFailed": "ይህን ሪፖርት እንደተነበበ ምልክት ማድረግ አልተቻለም። ሪፖርቱ እንደገና ሲጫን ዳግም ይሞክራል።",
     "offline": "ከመስመር ውጭ · የተቀመጠ ሪፖርት",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
     "summary": "AI ማጠቃለያ",
@@ -4708,15 +4905,20 @@
     "morningEnd": "ሪፖርቱ የሚገኝበት የመጨረሻ ሰዓት",
     "timeHint": "የሪፖርት ጊዜ ሲያበቃ የመነሻ ካርዱ ከመስመር ውጭም ቢሆን የቀጥታ ሁኔታን ይመልሳል።",
     "invalidSchedule": "ትክክለኛ የሰዓት ሰቅ እና ባዶ ያልሆነ የሪፖርት ጊዜ ይምረጡ።",
+    "scheduleEmptyNight": "የሪፖርት ጊዜው ባዶ ነው። ከጊዜው መጀመሪያ በኋላ ያለ ዝግጁ ሰዓት ይምረጡ።",
+    "scheduleEmptyMorning": "ዝግጁ ሰዓቱ እና እስከሚገኝበት ሰዓቱ አንድ ናቸው። ሪፖርቱ ምን ያህል ጊዜ እንዲገኝ ይምረጡ።",
+    "scheduleFullDay": "ሁለቱ የሪፖርት ጊዜዎች ሙሉ ቀንን ይሸፍናሉ። የቀኑን አንድ ክፍል ከሪፖርቱ ውጭ ይተዉ።",
     "notificationsHint": "ለእያንዳንዱ የመርሃ ግብር ሪፖርት አንድ አጠቃላይ ማሳወቂያ። ከሚከፈልባቸው AI ማጠቃለያዎች ነጻ ነው።",
     "notificationPermission": "ሪፖርትዎን ለመቀበል የፑሽ ማሳወቂያዎችን ያንቁ።",
     "defaultModel": "የKiloን ነባሪ ሞዴል ተጠቀም",
     "duration": "የጊዜ ጥበቃ (ደቂቃዎች)",
     "spendLimit": "የወጪ ጥበቃ (USD)",
-    "invalidSafeguards": "አዎንታዊ እና የተወሰኑ የጊዜ እና የወጪ ገደቦችን ያስገቡ።",
+    "invalidSafeguards": "በተፈቀደው ክልል ውስጥ ያለ አዎንታዊ ቁጥር ያስገቡ።",
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
     "estimateUnavailable": "ለእነዚህ ቅንብሮች የክፍያ ማጠቃለያ አይገኝም። ሞዴሉን ወይም ወሰኖችን ይቀይሩ፣ ወይም በኋላ ላይ እንደገና ይሞክሩ።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",
+    "paidDisclosure_one": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
+    "paidDisclosure_other": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "paidDisclosure": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "enable": "የሚከፈልባቸው ማጠቃለያዎችን አንቃ",
     "allContexts": "የግል እና የድርጅት ሪፖርቶች ተለይተው ይቀመጣሉ።",
@@ -4728,8 +4930,8 @@
     "estimateSpendLimitTooLow": "ይህን ማጠቃለያ ለመፍቀድ የወጪ ጥበቃውን ጨምር።",
     "saved": "የሪፖርት ቅንብሮች ተቀምጠዋል።",
     "selectedSessions": "የተመረጡ ክፍለ ጊዜዎች",
-    "snapshotPullRequests": "በተመረጡ ክፍለ ጊዜዎች ያሉ PRs",
-    "snapshotBlockers": "በተመረጡ ክፍለ ጊዜዎች ያሉ እንቅፋቶች",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "እንቅፋቶች",
     "capturedAt": "በ{{time}} ተቀምጧል",
     "snapshotHint": "በተያዘው የጠዋት ሰዓት፣ በተቻለ መጠን ከሚገኘው የቅርብ ጊዜ የክፍለ ጊዜ ሁኔታ የተቀመጠ ቅጂ ነው። ቆጠራዎቹ የተመረጡ ክፍለ ጊዜዎችን እንጂ የሌሊቱን ሙሉ እንቅስቃሴ አይገልጹም።",
     "snapshotTruncated": "የዚህን የሁኔታ ቅጂ መጠን ለመገደብ አንዳንድ ክፍለ ጊዜዎች ወይም ማስረጃዎች ተትተዋል።",
@@ -4760,7 +4962,7 @@
     "sourceActivity": "ርዕስ የሌለው እንቅስቃሴ",
     "metadataFailureProvider": "የአቅራቢ ስህተት",
     "metadataFailureTool": "የመሣሪያ ስህተት",
-    "metadataFailureCancelled": "ተሰርዟል",
+    "metadataStopped": "የመጨረሻው ዙር ተቆመ",
     "metadataFailureOther": "ያልተገለጸ ስህተት"
   },
   "systemSearch": {
@@ -4768,6 +4970,7 @@
   },
   "usage": {
     "title": "አጠቃቀም",
+    "personalTitle": "የግል አጠቃቀም",
     "orgTitle": "የድርጅት አጠቃቀም",
     "entrySubtitle": "ወጪ፣ ጥያቄዎች እና ቶከኖች",
     "rangePicker": "የጊዜ ክልል",
@@ -4781,7 +4984,8 @@
     "unavailableTitle": "አጠቃቀም አይገኝም",
     "unavailableDescription": "ለዚህ የሥራ አካባቢ አጠቃቀም አልተዋቀረም። እዚህ አጠቃቀም ለማየት የሚጠብቁ ከሆነ ድጋፍን ያግኙ።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
-    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
+    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ",
+    "orgSelfEntryTitle": "የእርስዎ አጠቃቀም"
   },
   "integrations": {
     "title": "ውህደቶች",
@@ -4877,10 +5081,15 @@
       "autoCommit": "ሩጫው ሲጠናቀቅ ለውጦችን ያስመዝግቡ",
       "condenseOnComplete": "ሩጫው ሲጠናቀቅ ዐውዱን ያሳጥሩ",
       "activeTitle": "ቀስቅሴ ንቁ",
+      "activeSwitchA11y": "ቀስቅሴ ንቁ: {{name}}",
+      "copyLinkA11y": "የ{{name}} አገናኝ ቅዳ",
       "activeDescription": "የቆሙ ዌብሁኮች በ404 ምላሽ ይሰጣሉ።",
       "runAsCreator": "በእኔ ስም ያስኪዱ",
       "runAsCreatorDescription": "እያንዳንዱ ሩጫ የእርስዎን መለያ ይጠቀማል፣ ስለዚህ ምስጢራዊው ራስጌ ያስፈልጋል።",
       "saveFailedTitle": "ቀስቅሴውን ማስቀመጥ አልተቻለም",
+      "nameTaken": "«{{name}}» የሚባል ቀስቅሴ አስቀድሞ አለ።",
+      "saveFailedRetry": "ወደ ሰርቨሩ መድረስ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+      "saveFailedCheck": "በቅጹ ውስጥ ያሉትን እሴቶች ያረጋግጡ እና እንደገና ይሞክሩ።",
       "deleteTitle": "ይህን ቀስቅሴ ይሰርዙ፧",
       "deleteMessage": "ወደ {{name}} የሚደረጉ ጥሪዎች ይከሽፋሉ። ይህ ሊቀለበስ አይችልም።",
       "deleteMessageScheduled": "የ{{name}} የተያዙ ሩጫዎች ይቆማሉ። ይህ ሊቀለበስ አይችልም።",

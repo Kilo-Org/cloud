@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module's suite: the catalog derivation, the provider rows, the deny list, the toggles, the save refusals and the form-draft guard share one draft fixture */
 import { describe, expect, it } from 'vitest';
 import { type TFunction } from 'i18next';
 
@@ -166,9 +167,9 @@ describe('initialDraft', () => {
 });
 
 describe('toggles', () => {
-  it('adds and removes a provider while keeping the list sorted', () => {
+  it('adds and removes a provider, canonicalizing a restored legacy slug', () => {
     const allowed = toggleProvider(
-      { providerAllowList: ['openai'], modelDenyList: [] },
+      { providerAllowList: ['OpenAI'], modelDenyList: [] },
       'anthropic',
       true
     );
@@ -189,7 +190,7 @@ describe('toggles', () => {
 
   it('applies one decision to every listed entry, as the bulk actions do', () => {
     const providers = setProvidersAllowed(
-      { providerAllowList: ['openai'], modelDenyList: [] },
+      { providerAllowList: ['OpenAI'], modelDenyList: [] },
       ['openai', 'anthropic'],
       false
     );
@@ -255,6 +256,16 @@ describe('modelAccessSave', () => {
         draft: { providerAllowList: [], modelDenyList: ['openai/gpt'] },
       })
     ).toEqual({ kind: 'ready', providerAllowList: [], modelDenyList: ['openai/gpt'] });
+  });
+
+  it('refuses to empty a provider list that still had providers', () => {
+    expect(
+      save({
+        savedAllowList: ['anthropic'],
+        baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
+        draft: { providerAllowList: [], modelDenyList: [] },
+      })
+    ).toEqual({ kind: 'empty-provider-list' });
   });
 
   it('refuses a deny list that would leave no model any member could use', () => {

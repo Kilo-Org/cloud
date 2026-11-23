@@ -4,7 +4,11 @@ import {
   readReplicaInventory,
 } from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
-import { computeDatabaseUrl, getDatabaseClientConfig } from '@kilocode/db';
+import {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+} from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
 import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
@@ -49,6 +53,16 @@ if (IS_SCRIPT) {
 }
 
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
+
+/**
+ * The host the pools below connect to: the `POSTGRES_SCRIPT_URL` host when `IS_SCRIPT` is set,
+ * the app's host otherwise. This is the same parse the pool uses, so the host is lowercase, and a
+ * caller that names the target without handling the URL or its credentials cannot disagree with
+ * the connection that is actually used.
+ */
+export function primaryDatabaseHost(): string {
+  return postgresConnectionTarget(postgresUrl).host;
+}
 
 /**
  * Whether a region is on the US side. The root AGENTS.md section "Vercel Function Regions" is
@@ -216,6 +230,16 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
   idleTimeoutMillis,
 };
 
+type PoolKind = 'primary' | 'replica' | 'tagged-writer';
+
+// A total table over every pool kind, so adding a fourth kind fails to compile
+// until someone decides whether its death should end the instance.
+const EXIT_ON_POOL_ERROR: Record<PoolKind, boolean> = {
+  primary: true,
+  replica: false,
+  'tagged-writer': false,
+};
+
 // Primary pool - writes go here; script runs (IS_SCRIPT) connect to POSTGRES_SCRIPT_URL
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
@@ -237,6 +261,9 @@ export const taggedWriterPool = taggedWriter.pool;
 export const taggedWriterDb = taggedWriter.db;
 taggedWriterPool.on('error', (error: Error) => {
   console.error('Unexpected error on idle client (tagged writer)', { error_name: error.name });
+  if (shouldExitOnPoolError('tagged-writer')) {
+    process.exit(-1);
+  }
 });
 
 // Replica pools - US replica in US regions; in EU regions one pool per configured
@@ -284,16 +311,20 @@ if (process.env.NODE_ENV !== 'test') {
  * healthy the entire time and taking writes and primary reads down with them.
  * Reads aimed at a broken replica now fail per-request instead.
  *
- * In test mode neither exits: `pool.end()` during cleanup emits idle-client
+ * A dead *tagged-writer* pool does not either. That auxiliary pool carries the
+ * queued Enkrypt and Exa usage recording, a bounded two-connection write path
+ * separate from the LLM pool. A dead tagged pool fails those recordings per
+ * request while the instance keeps serving everything else, so terminating the
+ * whole instance would repeat the replica escalation described above: a
+ * write-only blip becomes a whole-instance outage.
+ *
+ * In test mode nothing exits: `pool.end()` during cleanup emits idle-client
  * errors, and a listener must stay attached so Node does not treat the emit as
  * an unhandled throw.
  */
-export function shouldExitOnPoolError(
-  poolKind: 'primary' | 'replica',
-  nodeEnv = process.env.NODE_ENV
-): boolean {
+export function shouldExitOnPoolError(poolKind: PoolKind, nodeEnv = process.env.NODE_ENV): boolean {
   if (nodeEnv === 'test') return false;
-  return poolKind === 'primary';
+  return EXIT_ON_POOL_ERROR[poolKind];
 }
 
 pool.on('error', (err: Error) => {
@@ -366,11 +397,7 @@ export function createReadDb(dbs: DrizzleDatabase[]): DrizzleDatabase {
 }
 
 /**
- * Default database instance - connects to the primary database.
- * Use this for writes and for reads that need strong consistency.
- *
- * For read-heavy operations that can tolerate replication lag,
- * consider using `readDb` instead for better performance in US regions.
+ * Alias of `primaryDb`; use `readDb` for lag-tolerant read-heavy queries.
  */
 export const db = primaryDb;
 

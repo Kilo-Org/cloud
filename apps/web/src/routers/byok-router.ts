@@ -521,6 +521,7 @@ export const byokRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: { id: 'setting.byokPriorities' },
             message: 'Updated BYOK key priorities',
             organization_id: organizationId,
             tx,
@@ -655,6 +656,7 @@ export const byokRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'integration.keyAdded', integration: 'byok', provider: provider_id },
           message: `Added BYOK key for provider: ${provider_id}`,
           organization_id: organizationId,
         });
@@ -755,6 +757,11 @@ export const byokRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.keyUpdated',
+            integration: 'byok',
+            provider: existingKey.provider_id,
+          },
           message: `Updated BYOK key for provider: ${existingKey.provider_id}`,
           organization_id: existingKey.organization_id,
         });
@@ -822,6 +829,12 @@ export const byokRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.keyToggled',
+            integration: 'byok',
+            provider: existingKey.provider_id,
+            enabled: is_enabled,
+          },
           message: `${is_enabled ? 'Enabled' : 'Disabled'} BYOK key for provider: ${existingKey.provider_id}`,
           organization_id: existingKey.organization_id,
         });
@@ -880,6 +893,13 @@ export const byokRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.keyToggled',
+            integration: 'byok',
+            provider: existingKey.provider_id,
+            enabled: updatedKey.is_enabled,
+            catalogModels: serve_catalog_models,
+          },
           message: `${serve_catalog_models ? 'Enabled' : 'Disabled'} Kilo catalog model IDs for BYOK key for provider: ${existingKey.provider_id}`,
           organization_id: existingKey.organization_id,
         });
@@ -1111,6 +1131,11 @@ export const byokRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.keyDeleted',
+            integration: 'byok',
+            provider: existingKey.provider_id,
+          },
           message: `Deleted BYOK key for provider: ${existingKey.provider_id}`,
           organization_id: existingKey.organization_id,
         });

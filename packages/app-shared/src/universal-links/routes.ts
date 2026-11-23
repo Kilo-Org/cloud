@@ -199,7 +199,6 @@ export function parseKiloWebPath(raw: string): string | null {
   const scheme = trimmed.slice(0, schemeEnd).toLowerCase();
   const afterScheme = trimmed.slice(schemeEnd + 3);
 
-  // Drop query and fragment before path work.
   const withoutQuery = stripQueryAndFragment(afterScheme);
 
   if (scheme === 'https' || scheme === 'http') {
@@ -278,12 +277,10 @@ function parseKiloappPath(authorityAndPath: string): string | null {
     return normalisePathname(pathPart.length === 0 ? '/' : pathPart);
   }
 
-  // Host is app.kilo.ai (case-insensitive) → path alone is the pathname.
   if (hostPart.toLowerCase() === KILO_WEB_HOST) {
     return normalisePathname(pathPart.length === 0 ? '/' : pathPart);
   }
 
-  // Non-empty host that is not app.kilo.ai: treat host + path as the path.
   const combined = `/${hostPart}${pathPart}`;
   return normalisePathname(combined);
 }
@@ -308,7 +305,6 @@ export function webPathToAppPath(webPath: string): string | null {
     }
 
     if (route.exclusions && route.exclusions.length > 0) {
-      // Exclusion applies to the final-segment wildcard (rightmost capture).
       const finalCapture = captures[captures.length - 1];
       if (finalCapture !== undefined && route.exclusions.includes(finalCapture)) {
         return null;
@@ -347,7 +343,6 @@ function matchPattern(pattern: string, path: string): string[] | null {
     }
 
     if (pSeg === '*') {
-      // Single non-empty segment; empty segments never appear after split.
       if (pathSeg.length === 0) {
         return null;
       }
@@ -361,8 +356,6 @@ function matchPattern(pattern: string, path: string): string[] | null {
   }
 
   if (hasTail) {
-    // One-or-more tail segments, joined into a single capture. splitSegments
-    // never yields empty ones, so the join is unambiguous.
     captures.push(pathSegments.slice(fixed.length).join('/'));
   }
 
@@ -436,11 +429,6 @@ export type AasaComponent = {
 /**
  * Compile the table to Apple AASA `components` entries.
  * Exclusion components are emitted immediately BEFORE their row.
- * Apple AASA `*` is a glob that crosses `/`; that superset is deliberate —
- * the table's `*` is kept verbatim in AASA output. A row that must not leak
- * to web-only subpages sets `excludeDeeperAasaPaths`, which emits
- * `<webPath>/*` as an exclusion right before the row (AASA is first match
- * wins, so rows earlier in the table keep their deeper paths associated).
  */
 export function aasaComponents(): AasaComponent[] {
   const components: AasaComponent[] = [];

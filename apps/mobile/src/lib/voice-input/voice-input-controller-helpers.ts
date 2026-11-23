@@ -106,8 +106,6 @@ export function waitForTerminalOutcome(
   return waitForSilence({
     terminal,
     target: current,
-    // The later of the session's last advance and the moment waiting began, so
-    // the first window is never empty.
     baseline: Math.max(current.progressAt, Date.now()),
     timeoutMs,
   });

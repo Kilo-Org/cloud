@@ -92,6 +92,7 @@
     "draft": "Ciornă",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imagine",
     "imageUnavailable": "Imaginea nu este disponibilă.",
     "loading": "Se încarcă…",
     "loadMore": "Încarcă mai multe",
@@ -123,10 +124,10 @@
     "connectProvider": "Conectează un furnizor",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
+    "couldNotLoad": "Nu s-a putut încărca.",
+    "couldNotLoadMore": "Nu s-au putut încărca mai multe elemente.",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
-    "couldnTLoad": "Nu s-a putut încărca.",
-    "couldnTLoadMore": "Nu s-au putut încărca mai multe elemente.",
     "deviceSessions": "Sesiuni pe dispozitive",
     "disabled": "Dezactivat",
     "email": "E-mail",
@@ -523,12 +524,13 @@
       "receiptLabel": "Confirmare",
       "copyReceiptId": "Copiază ID-ul confirmării",
       "appealLabel": "Contestație",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Primit",
       "triageOpen": "În analiză",
       "triageActioned": "Admis",
       "triageRejected": "Respins",
       "appealNone": "Niciuna trimisă",
-      "appealSubmitted": "În analiză",
+      "appealSubmitted": "Contestație în analiză",
       "appealAccepted": "Admisă",
       "appealRejected": "Respinsă",
       "appeal": "Contestă această decizie",
@@ -540,13 +542,23 @@
       "nextStepInReview": "Rezultatul va apărea pe acest ecran, iar după decizie poți trimite o contestație.",
       "nextStepAppeal": "Rezultatul contestației va apărea pe acest ecran.",
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
-      "viewReceipt": "Vezi confirmarea"
+      "viewReceipt": "Vezi confirmarea",
+      "targetLabel": "Element raportat",
+      "reasonLabel": "Motivul raportării",
+      "targetMessage": "Răspuns AI",
+      "targetComment": "Comentariu PR",
+      "targetUser": "Utilizator",
+      "reasonHarmful": "Conținut dăunător",
+      "reasonIllegal": "Conținut ilegal",
+      "reasonHarassment": "Hărțuire",
+      "reasonSpam": "Mesaje nesolicitate",
+      "reasonOther": "Alt motiv"
     },
     "reportReceipts": {
       "title": "Raportări",
       "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
       "emptyTitle": "Nicio raportare încă",
-      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu într-o discuție despre un pull request sau dintr-un răspuns AI într-o sesiune de agent apar aici împreună cu rezultatul lor.",
       "couldNotLoad": "Nu am putut încărca raportările tale",
       "capped": "Sunt afișate cele mai recente raportări ale tale."
     },
@@ -1019,8 +1031,9 @@
       "checkActiveConnection": "Conexiunea este activă, dar acest element tot nu poate fi încărcat.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
-      "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
+      "reconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
+      "bitbucketAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze.",
       "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
@@ -1254,6 +1267,7 @@
     "needsInputAction": {
       "approved": "Cerere aprobată",
       "replied": "Răspuns trimis",
+      "empty": "Scrieți un răspuns, apoi trimiteți-l.",
       "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
       "unavailable": "Această cerere nu mai așteaptă."
     }
@@ -1518,7 +1532,9 @@
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
       "gitlabAccount": "contul GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
-      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile."
+      "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile.",
+      "notConnectedTitle": "{{platform}} nu este conectat",
+      "githubAdminOnlyDescription": "Doar proprietarii și administratorii organizației îl pot conecta."
     },
     "overview": {
       "allAreas": "Toate domeniile",
@@ -2211,7 +2227,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesiuni",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesiuni",
       "live": "ÎN TIMP REAL",
-      "updating": "Se actualizează"
+      "updating": "Se actualizează",
+      "retentionLimit": "Se afișează cele mai recente sesiuni."
     },
     "sessionRow": {
       "deleteTitle": "Ștergi sesiunea?",
@@ -2283,11 +2300,11 @@
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "emptyReadOnlyTitle": "Niciun mesaj în această sesiune",
-      "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
       "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
+      "historyTemporarilyUnavailable": "Transcrierea acestei sesiuni este temporar indisponibilă.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
@@ -2654,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detaliile nu sunt disponibile.",
+      "detailsUnavailableDescription": "Acest element nu mai face parte din sesiune.",
       "textDisplay": "Afișarea textului",
       "thinking": "Se gândește",
       "thought": "Raționament",
@@ -2697,6 +2715,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -2828,7 +2847,9 @@
       "skip": "Sari peste",
       "retrySkip": "Încearcă din nou să omiți",
       "submitting": "Se trimite…",
-      "sendAnswers": "Trimite răspunsurile"
+      "sendAnswers": "Trimite răspunsurile",
+      "unreadableTitle": "Această întrebare nu a putut fi afișată",
+      "unreadableBody": "Agentul așteaptă o întrebare pe care această aplicație nu o poate afișa. Răspunde la întrebare în CLI pentru a continua."
     },
     "blockingCard": {
       "questionUnavailable": "Această întrebare nu mai este disponibilă.",
@@ -2855,6 +2876,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nu s-a putut încărca sesiunea agentului secundar.",
+      "historyTooLarge": "Istoricul acestui agent secundar este prea mare pentru a fi încărcat.",
+      "historyUnavailable": "Istoricul acestui agent secundar nu este disponibil.",
+      "historyTemporarilyUnavailable": "Istoricul acestui agent secundar este temporar indisponibil.",
       "failed": "Sesiunea agentului secundar a eșuat.",
       "noMessages": "Niciun mesaj de la agentul secundar",
       "noMessagesDescription": "Această sesiune a agentului secundar s-a încheiat fără a genera o transcriere.",
@@ -3028,7 +3052,7 @@
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
       "tapToViewDetails": " Atinge pentru a vedea detaliile contextului.",
       "costClause": ", costul {{cost}}",
-      "loadingCostSpoken": "cost de {{cost}}.",
+      "loadingCostSpoken": "cost până acum {{cost}}.",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă{{costClause}}.",
       "tokensUsage": "Context: {{used}} din {{window}} tokenuri, {{percentage}} utilizat{{costClause}}.",
       "title": "Utilizarea contextului",
@@ -3144,6 +3168,12 @@
     "retryLoadingAccount": "Reîncearcă încărcarea contului",
     "retryLoadingPrivacy": "Reîncearcă încărcarea opțiunilor de confidențialitate"
   },
+  "accountBlocked": {
+    "title": "Cont blocat",
+    "description": "Kilo a blocat acest cont și o nouă autentificare nu va ridica blocarea. Asistența poate analiza blocarea la cerere.",
+    "domainDescription": "Kilo nu permite conturi pe acest domeniu de e-mail, iar o nouă autentificare nu va schimba acest lucru. Asistența poate analiza domeniul la cerere.",
+    "contactSupport": "Contactează asistența"
+  },
   "addCredits": {
     "cta": "Adaugă credite",
     "billingPage": "pagina de facturare"
@@ -3216,8 +3246,7 @@
     "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },
   "screenHeader": {
-    "openMenu": "Deschide meniul",
-    "openMenuFor": "Deschide meniul pentru {{title}}"
+    "openMenu": "Deschide meniul"
   },
   "picker": {
     "optionsExpired": "Opțiunile au expirat",
@@ -3438,6 +3467,8 @@
     "voiceTranscriptionWho": "Dispozitivul tău, Kilo Gateway cu modelul de transcriere ales, sau Apple ori Google pentru recunoaștere online.",
     "installAttributionPromptTitle": "Permiți identificarea sursei instalării?",
     "installAttributionPromptMessage": "Kilo folosește permisiunea de urmărire de la Apple doar pentru a afla prin ce canal ai ajuns aici. Instrucțiunile și conversațiile tale nu sunt niciodată folosite în acest scop.",
+    "installAttributionRequestFailedTitle": "Nu s-a putut afișa promptul de urmărire",
+    "installAttributionRequestFailedMessage": "Kilo nu a putut afișa promptul de sistem, așa că identificarea sursei instalării rămâne dezactivată.",
     "what": "Ce",
     "why": "De ce",
     "who": "Cine"
@@ -3453,7 +3484,7 @@
   "organization": {
     "auditLog": {
       "title": "Jurnal de audit",
-      "permissionDenied": "Jurnalul de audit poate fi citit doar de proprietarul, un administrator sau un manager de facturare al organizației, pe planul Enterprise.",
+      "permissionDenied": "Jurnalul de audit poate fi citit doar de proprietarul, un administrator sau un manager de facturare al organizației, pe planul Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Niciun eveniment de audit",
       "emptyDescription": "Acțiunile efectuate în această organizație apar aici.",
       "truncated": "Se afișează cele mai recente evenimente.",
@@ -3503,11 +3534,152 @@
         "guardrailUpdate": "Măsură de protecție actualizată",
         "guardrailRemove": "Măsură de protecție eliminată",
         "unknown": "Eveniment de audit"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modul „{{name}}” (identificator: {{slug}})",
+        "modeUpdate": "Modul „{{name}}”: {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Rutare automată",
+          "defaultModel": "Model AI implicit"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Adăugat {{email}} ca {{role}}",
+        "memberRemoved": "Eliminat {{email}}",
+        "memberParentAdded": "Adăugat {{email}} din organizația părinte {{parent}}",
+        "memberParentRemoved": "Eliminat {{email}} din organizația părinte {{parent}}",
+        "inviteSent": "{{email}} ca {{role}}",
+        "inviteRevoked": "Invitație revocată pentru {{email}}",
+        "inviteAccepted": "Acceptată de {{email}}",
+        "groupIdentity": "Grupul „{{name}}”",
+        "groupMembers": "Grupul „{{name}}”: {{members}}",
+        "groupMemberGroups": "{{displayCount}} grupuri",
+        "groupMemberGroups_few": "{{displayCount}} grupuri",
+        "groupMemberGroups_one": "{{displayCount}} grup",
+        "groupMemberGroups_other": "{{displayCount}} grupuri",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grupuri",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} grupuri",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grup",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grupuri",
+        "groupPolicySet": "Grupul „{{name}}”: setată politica {{policy}}",
+        "groupPolicyRemoved": "Grupul „{{name}}”: eliminată politica {{policy}}",
+        "groupDefaultPolicySet": "Setată politica implicită {{policy}}",
+        "groupDefaultPolicyRemoved": "Eliminată politica implicită {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Bariere de protecție AI {{state}}",
+        "guardrailConfigGroup": "{{state}} pentru grupul „{{group}}”",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Domeniu SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (era {{previous}})",
+        "ssoDomainRemoved": "Domeniu SSO {{domain}} eliminat",
+        "fundsPurchased": "{{amount}} prin {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} către {{displayCount}} organizații copil",
+        "fundsDistributed_few": "{{amount}} către {{displayCount}} organizații copil",
+        "fundsDistributed_one": "{{amount}} către {{displayCount}} organizație copil",
+        "fundsDistributed_other": "{{amount}} către {{displayCount}} organizații copil",
+        "fundsReceived": "{{amount}} de la {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Configurare {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: stil {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} actualizate",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} actualizate",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} actualizat",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} actualizate",
+        "reviewAgentSecretsFailed": "{{displayCount}} erori",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} erori",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} eroare",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} erori",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Regiune de inferență: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modul „{{mode}}”: {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Implicit global",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Permisă",
+          "denied": "Interzisă",
+          "followSetting": "Urmează setarea extensiei"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Proiect UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} către {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Rezumat de recomandări {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: nicio origine permisă",
+        "settingName": "Redenumită din {{previous}} în {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Scanare înainte de utilizare activată",
+        "scanBeforeUseOff": "Scanare înainte de utilizare dezactivată",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Eliminate: {{models}}",
+        "browserPolicyOff": "Utilizarea browserului blocată",
+        "browserPolicyAllow": "Doar origini permise",
+        "browserPolicyPlaywrightOnly": "Doar utilizarea browserului",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modele AI modificate: {{values}}",
+        "integrationConnected": "{{integration}} conectat",
+        "integrationDisconnected": "{{integration}} deconectat",
+        "integrationRefreshed": "{{integration}} reîmprospătat",
+        "integrationCancelled": "{{integration}} anulat",
+        "integrationModelUpdated": "{{integration}}: model AI {{model}}",
+        "integrationKeyAdded": "Cheie adăugată pentru {{provider}}",
+        "integrationKeyUpdated": "Cheie actualizată pentru {{provider}}",
+        "integrationKeyDeleted": "Cheie eliminată pentru {{provider}}",
+        "integrationKeyToggled": "Cheie pentru {{provider}}: {{state}}",
+        "namedPolicyCreated": "Politică {{kind}} creată {{id}}",
+        "namedPolicyUpdated": "Politică {{kind}} actualizată {{id}}",
+        "namedPolicyDeleted": "Politică {{kind}} eliminată {{id}}",
+        "namedPolicyLinked": "Politică {{kind}} asociată {{next}}",
+        "webhookTriggerUpdated": "Declanșator {{trigger}}",
+        "organizationRenamed": "Organizație redenumită din {{previous}} în {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Propria cheie API"
+        }
       }
     },
     "billing": {
       "title": "Facturare",
-      "permissionDenied": "Doar proprietarii, administratorii sau managerii de facturare ai organizației pot vedea facturarea acesteia.",
+      "permissionDenied": "Doar proprietarii, administratorii sau managerii de facturare ai organizației pot vedea facturarea acesteia. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonament",
       "state": "Stare",
       "stateNone": "Fără abonament",
@@ -3585,11 +3757,11 @@
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
       "seatsFull": "Toate locurile sunt ocupate ({{used}}/{{total}}). Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri.",
-      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare administratori de facturare, care nu ocupă un loc.",
+      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare manageri de facturare, care nu ocupă un loc.",
       "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
-      "downloadA11y": "Descarcă factura {{number}}",
+      "downloadA11y": "Descarcă factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Facturile se generează automat la fiecare ciclu de facturare și vor apărea aici după emiterea lor pentru organizația ta.",
       "emptyTitle": "Nicio factură",
       "invoiceFallback": "Factură",
@@ -3669,7 +3841,6 @@
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
-      "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
       "ssoAndDomain": "SSO și domeniu",
       "dataCollection": "Colectarea datelor",
@@ -3684,7 +3855,7 @@
       "emptyDescription": "Apăsați „Ora anterioară” pentru a vedea cererile anterioare.",
       "emptyBoundDescription": "Jurnalele de cereri nu sunt disponibile mai în urmă de atât.",
       "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
-      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} intrare · {{output}} ieșire",
       "byok": "BYOK"
     },
@@ -3791,7 +3962,7 @@
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Pentru a finaliza crearea contului, revino la ecranul anterior și folosește „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Codul este incorect sau a expirat. Încearcă din nou sau folosește „$t(login.resendCode)”.",
+    "invalidCode": "Codul este incorect sau a expirat. Folosește „$t(login.resendCode)” sau „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Codul tău este procesat. Așteaptă puțin și încearcă din nou.",
     "tooManyAttempts": "Prea multe încercări. Solicită un cod nou.",
     "invalidToken": "Autentificarea a eșuat. Încearcă din nou.",
@@ -3964,7 +4135,10 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "deleteTitle": "Ștergi acest chat?"
+      "deleteTitle": "Ștergi acest chat?",
+      "resetNoticeTitle": "Chat-urile și ciornele locale au fost șterse",
+      "resetNoticeBody": "Kilo nu a putut deschide chat-urile salvate pe acest dispozitiv. Sesiunile din cloud nu sunt afectate.",
+      "resetNoticeDismiss": "Ignoră notificarea"
     },
     "rename": {
       "title": "Redenumește chatul",
@@ -4014,6 +4188,9 @@
       "fieldName": "Nume afișat",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
+      "fieldUrlCredentials": "Elimină numele de utilizator și parola din URL.",
+      "fieldUrlFragment": "Elimină partea cu # din URL.",
+      "fieldUrlInsecure": "Introdu un URL https sau http numai pentru localhost.",
       "duplicateUrl": "Acest URL este deja salvat.",
       "serverNotFound": "Acest server nu mai este salvat.",
       "enableServer": "Activează acest server: {{name}}",
@@ -4040,6 +4217,7 @@
       "app": {
         "label": "Interfața instrumentului",
         "failed": "Interfața acestui instrument nu a putut fi încărcată.",
+        "tooLarge": "Interfața acestui instrument este mai mare decât limita de {{size}}.",
         "empty": "Interfața acestui instrument nu are nimic de afișat."
       }
     },
@@ -4107,6 +4285,8 @@
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
+      "invalidApiKey": "Cheia API conține un caracter care nu poate fi trimis. Folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
+      "invalidHeaders": "Un antet personalizat nu poate fi trimis. Verifică-i numele și folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
       "httpApprovalRequired": "Aprobă acest endpoint HTTP local înainte de a salva sau de a te conecta.",
@@ -4155,6 +4335,7 @@
         "network": "Descărcarea nu s-a finalizat. Verifică conexiunea și încearcă din nou.",
         "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat.",
         "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea.",
+        "unreadable": "Acest dispozitiv nu a putut verifica fișierul descărcat, așa că a fost eliminat. Încercați din nou descărcarea.",
         "writeFailed": "Acest dispozitiv nu a putut salva modelul. Încercați din nou descărcarea."
       }
     },
@@ -4240,7 +4421,15 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Nu se poate rula: {{items}}.",
+      "cannotUseOptions": "Nu se pot completa: unele opțiuni ale instrumentului.",
+      "limitations": "Limitări",
+      "tools": {
+        "time": "Timp",
+        "settingsList": "Arată setările",
+        "settingsSet": "Modifică setările"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
@@ -4424,6 +4613,7 @@
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",
     "instructionToggleFailed": "Instrucțiunea nu a putut fi actualizată",
+    "instructionViewTitle": "Fișier de instrucțiuni",
     "instructionLimitReached": "Un profil poate avea până la {{max}} instrucțiuni. Șterge una pentru a adăuga alta.",
     "mcp": {
       "title": "servere MCP",
@@ -4595,10 +4785,20 @@
     "history": {
       "activityUnavailable": "Nu am putut încărca activitatea de credite.",
       "appStoreReceipt": "Chitanță din App Store",
+      "deduction": {
+        "adminCancel": "Sold închis de un administrator",
+        "adminDebit": "Credite eliminate de un administrator",
+        "codingPlan": "Plan de coding: {{plan}}",
+        "correction": "Ajustare de sold",
+        "dispute": "Litigiu privind plata",
+        "refundAppStore": "Rambursare pentru pachetul de credite din App Store",
+        "refundGooglePlay": "Rambursare pentru pachetul de credite din Google Play"
+      },
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
       "expiredGrant": "Expirat: {{description}}",
+      "expiredStatus": "Expirat",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
@@ -4625,7 +4825,8 @@
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
       "retentionLimit": "Se afișează cel mai recent istoric de credite.",
-      "voidedGrant": "Anulat: {{description}}"
+      "voidedGrant": "Anulat: {{description}}",
+      "voidedStatus": "Anulat"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
@@ -4773,6 +4974,7 @@
     "contextAll": "Toate contextele",
     "dismiss": "Ignoră raportul",
     "dismissFailed": "Raportul nu a putut fi ignorat încă. Se reîncearcă în fundal.",
+    "readMarkFailed": "Raportul nu a putut fi marcat ca citit. Se va reîncerca la reîncărcarea raportului.",
     "offline": "Offline · raport salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "summary": "Rezumat AI",
@@ -4792,16 +4994,22 @@
     "morningEnd": "Raport disponibil până la",
     "timeHint": "Cardul de pe ecranul principal revine la starea live când se încheie intervalul de raport, chiar și offline.",
     "invalidSchedule": "Alege un fus orar valid și un interval de raport nevid.",
+    "scheduleEmptyNight": "Intervalul de raport este nevid. Alege o oră la care raportul să fie gata, mai târziu decât începutul intervalului.",
+    "scheduleEmptyMorning": "Ora la care raportul e gata și ora până la care raportul e disponibil coincid. Alege cât timp rămâne raportul disponibil.",
+    "scheduleFullDay": "Cele două intervale acoperă o zi întreagă. Lasă o parte a zilei în afara raportului.",
     "notificationsHint": "O notificare generică pentru fiecare raport programat. Independent de rezumatele AI plătite.",
     "notificationPermission": "Activează notificările push pentru a-ți primi raportul.",
     "defaultModel": "Folosește modelul implicit Kilo",
     "duration": "Limită de timp (minute)",
     "spendLimit": "Limită de cheltuieli (USD)",
-    "invalidSafeguards": "Introdu limite de timp și de cheltuieli pozitive și finite.",
+    "invalidSafeguards": "Introdu un număr pozitiv în intervalul permis.",
     "estimate": "Estimare {{estimate}} · maxim {{maximum}}",
     "estimateUnavailable": "Nu este disponibil un rezumat plătit pentru aceste setări. Schimbă modelul sau limitele, ori încearcă din nou mai târziu.",
     "confirmPaid": "Activezi rezumatele plătite pentru {{context}}?",
-    "paidDisclosure": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} min. Taxele se aplică și dacă generarea eșuează.",
+    "paidDisclosure_one": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} minut. Taxele se aplică și dacă generarea eșuează.",
+    "paidDisclosure_few": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} minute. Taxele se aplică și dacă generarea eșuează.",
+    "paidDisclosure": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} de minute. Taxele se aplică și dacă generarea eșuează.",
+    "paidDisclosure_other": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} de minute. Taxele se aplică și dacă generarea eșuează.",
     "enable": "Activează rezumatele plătite",
     "allContexts": "Rapoartele personale și cele ale organizației rămân separate.",
     "emptyHistory": "Niciun raport salvat",
@@ -4812,8 +5020,8 @@
     "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat.",
     "saved": "Setări raport salvate",
     "selectedSessions": "Sesiuni selectate",
-    "snapshotPullRequests": "PR-uri în sesiunile selectate",
-    "snapshotBlockers": "Blocaje în sesiunile selectate",
+    "snapshotPullRequests": "PR-uri",
+    "snapshotBlockers": "Blocaje",
     "capturedAt": "Captură realizată la {{time}}",
     "snapshotHint": "Captură posibil incompletă a celei mai recente stări disponibile a sesiunilor, realizată la ora programată de dimineață. Valorile se referă la sesiunile selectate, nu la întreaga activitate de peste noapte.",
     "snapshotTruncated": "Unele sesiuni sau date justificative au fost omise pentru a limita dimensiunea acestei capturi.",
@@ -4848,7 +5056,7 @@
     "sourceActivity": "Activitate fără titlu",
     "metadataFailureProvider": "eroare de furnizor",
     "metadataFailureTool": "eroare de instrument",
-    "metadataFailureCancelled": "Anulare",
+    "metadataStopped": "Ultima rundă a fost oprită",
     "metadataFailureOther": "eroare nespecificată"
   },
   "systemSearch": {
@@ -4856,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilizare",
+    "personalTitle": "Utilizarea contului personal",
     "orgTitle": "Utilizarea organizației",
     "entrySubtitle": "Cheltuieli, cereri și tokenuri",
     "rangePicker": "Interval de timp",
@@ -4869,7 +5078,8 @@
     "unavailableTitle": "Utilizarea nu este disponibilă",
     "unavailableDescription": "Utilizarea nu este configurată pentru acest spațiu de lucru. Contactați asistența dacă vă așteptați să vedeți utilizarea aici.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
-    "viewDetails": "Vezi detaliile utilizării"
+    "viewDetails": "Vezi detaliile utilizării",
+    "orgSelfEntryTitle": "Utilizarea ta"
   },
   "integrations": {
     "title": "Integrări",
@@ -4965,10 +5175,15 @@
       "autoCommit": "Comite modificările când rularea se încheie",
       "condenseOnComplete": "Condensează contextul când rularea se încheie",
       "activeTitle": "Declanșator activ",
+      "activeSwitchA11y": "Declanșator activ: {{name}}",
+      "copyLinkA11y": "Copiază linkul pentru {{name}}",
       "activeDescription": "Webhook-urile în pauză răspund cu 404.",
       "runAsCreator": "Rulează ca mine",
       "runAsCreatorDescription": "Fiecare rulare folosește contul tău, deci antetul secret este obligatoriu.",
       "saveFailedTitle": "Nu s-a putut salva declanșatorul",
+      "nameTaken": "Există deja un declanșator numit „{{name}}”.",
+      "saveFailedRetry": "Nu s-a putut contacta serverul. Verifică conexiunea și încearcă din nou.",
+      "saveFailedCheck": "Verifică valorile din formular și încearcă din nou.",
       "deleteTitle": "Ștergi acest declanșator?",
       "deleteMessage": "Apelurile către {{name}} vor eșua. Această acțiune nu poate fi anulată.",
       "deleteMessageScheduled": "Execuțiile programate ale {{name}} se opresc. Această acțiune nu poate fi anulată.",

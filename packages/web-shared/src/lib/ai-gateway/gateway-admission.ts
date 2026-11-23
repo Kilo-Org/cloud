@@ -7,8 +7,9 @@ import {
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
+import { gatewayBalanceRead } from '@kilocode/web-shared/lib/ai-gateway/benchmark-balance-policy';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
@@ -55,6 +56,11 @@ import {
   type FreeModelRateLimitSubject,
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkGatewayAssignment } from '@kilocode/auto-routing-contracts';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
+import { benchmarkRefusalResponse } from '@kilocode/web-shared/lib/ai-gateway/benchmark-case-admission';
 import {
   getGatewaySettingsRefusal,
   getOrganizationGatewaySettings,
@@ -208,14 +214,73 @@ export function resolveGatewayCaller(
 export function readGatewayBalance(
   user: User,
   organizationId: string | undefined,
-  model: string
+  model: string,
+  /**
+   * `noAutoTopUp`: a benchmark case never initiates a purchase for its payer.
+   * `fresh`: read the primary. A benchmark payer was just debited by another case request in
+   * the same run, and a replica lag would admit the next request on a stale balance.
+   */
+  options: { noAutoTopUp?: boolean; fresh?: boolean } = {}
 ): Promise<BalanceAndOrgSettings> {
+  const read = gatewayBalanceRead({
+    isFreeModel: isFreeModel(model),
+    benchmark: Boolean(options.fresh || options.noAutoTopUp),
+  });
   return getBalanceAndOrgSettings(
     organizationId,
     user,
-    readDb,
-    isFreeModel(model) ? undefined : 'usage'
+    read.fresh ? db : readDb,
+    read.fundUsage ? 'usage' : undefined
   );
+}
+
+/**
+ * The account a benchmark case request runs as. The Worker signed the payer and the actor;
+ * this loads the actor row and, for an organization payer, the actor's membership is what
+ * `readGatewayBalance` needs. A payer that does not resolve fails closed: a case request is
+ * never served unbilled.
+ *
+ * This is not a user credential. It cannot be produced by a caller of the public proxy,
+ * because the assignment HMAC is verified before this runs.
+ */
+export async function resolveBenchmarkCaller(
+  assignment: BenchmarkGatewayAssignment
+): Promise<GatewayCaller> {
+  const subjectId =
+    assignment.payer?.type === 'user' ? assignment.payer.id : assignment.actorUserId;
+  const user = await findUserById(subjectId);
+  // An unresolvable payer is an identity refusal, never a payment one: the Worker keeps the
+  // account and pauses rather than rotating to someone the run never signed.
+  if (!user)
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  // Ordinary user/server auth refuses a blocked account and an audit-flagged blacklisted domain
+  // before serving a request; a balance read does not, so a personal payer would otherwise
+  // spend while blocked. Fail closed for both.
+  if (isBlockedAccount(user)) {
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  if (await isUserBlacklistedByDomain(user, readDb)) {
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  // A platform-covered call bills the signed benchmark organization; a paid call bills its
+  // signed payer (the organization, or nobody for a personal payer).
+  const organizationId =
+    assignment.payer?.type === 'organization'
+      ? assignment.payer.id
+      : assignment.payer === null
+        ? (assignment.platformOrganizationId ?? undefined)
+        : undefined;
+  if (assignment.payer === null && !organizationId) {
+    // The schema already refuses this; failing closed here keeps a future caller safe.
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  return {
+    kind: 'signed-in',
+    user,
+    organizationId,
+    botId: undefined,
+    cloudAgentRuntimeProxied: false,
+  };
 }
 
 /**

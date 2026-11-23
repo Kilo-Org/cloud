@@ -92,8 +92,6 @@ describe('useActiveSessions poll ownership', () => {
     const optionArgs = state.queryOptions.mock.calls.map(call => call[1]);
     expect(optionArgs.every(options => options.refetchInterval === false)).toBe(true);
 
-    // The report's A/B 2 condition: with the interval gone, a 60s window holds
-    // no further fetch (the floor poll owns polling on live surfaces).
     await advanceBy(60_000);
     expect(state.request).toHaveBeenCalledTimes(1);
     rendered.unmount();

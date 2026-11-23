@@ -37,10 +37,11 @@ import {
 } from '../../src/sandbox-control/session-credentials.js';
 import type { VercelProviderLocator } from '../../src/sandbox-control/vercel-provider.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
-import type {
-  ProviderAdapter,
-  ProviderCreateIntent,
-  StopResult,
+import {
+  SandboxNetworkPolicyError,
+  type ProviderAdapter,
+  type ProviderCreateIntent,
+  type StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/credential-containment.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
@@ -422,6 +423,56 @@ async function setupVercel(
     });
   });
   return stub;
+}
+
+/** A legacy isolated key: an egress allowlist needs an isolated sandbox. */
+const RESTRICTED_SANDBOX_ID = 'ses-0123456789abcdef';
+
+/** A Vercel sandbox whose pin holds an egress allowlist; the fake adapter stands in for the policy. */
+async function setupRestrictedVercel(
+  provider: FakeProvider,
+  broker: FakeCredentialBroker
+): Promise<DurableObjectStub<SandboxControlV2>> {
+  const stub = await setup(
+    provider,
+    broker,
+    {
+      WORKER_URL: VERCEL_TARGET,
+      KILOCODE_BACKEND_BASE_URL: VERCEL_TARGET,
+      KILO_OPENROUTER_BASE: VERCEL_TARGET,
+      KILO_SESSION_INGEST_URL: VERCEL_TARGET,
+    },
+    RESTRICTED_SANDBOX_ID
+  );
+  await runInDurableObject(stub, async instance => {
+    await instance.ensureAllocation({
+      provider: 'vercel',
+      byoc: { userId: 'user_123', credentialId: '22222222-2222-4222-8222-222222222222' },
+      allocationName: RESTRICTED_SANDBOX_ID,
+      containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com'],
+    });
+  });
+  return stub;
+}
+
+/** The stop reasons of the allocation transitions that `action` causes. */
+async function captureStopReasons(action: () => Promise<unknown>): Promise<unknown[]> {
+  const reasons: unknown[] = [];
+  const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+    const bounded = fields as unknown as Record<string, unknown>;
+    if (bounded.diagnosticEvent === 'allocation_transition' && bounded.event === 'stop-requested') {
+      reasons.push(bounded.stopReason);
+    }
+    return logger;
+  });
+  try {
+    await action();
+  } finally {
+    spy.mockRestore();
+  }
+  return reasons;
 }
 
 async function reconstructPreB(
@@ -2604,13 +2655,63 @@ describe('SandboxControlV2 credentials (B3)', () => {
     );
 
     provider.failPolicy = true;
-    await stub.release({ sessionId: SESSION });
+    const reasons = await captureStopReasons(() => stub.release({ sessionId: SESSION }));
 
     // The alias could not be removed, so the sandbox must stop (fail closed as
     // `sandbox_lost`, a platform failure).
     const state = await stub.getAllocationState();
     expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(reasons).toEqual(['sandbox_lost']);
+  });
+
+  it('stops a restricted Vercel sandbox as network_policy_failed when a release cannot apply the policy', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupRestrictedVercel(provider, createFakeCredentialBroker());
+    await stub.prepare(prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION)));
+    await waitFor(async () => expect((await stub.getAllocationState()).providerRef).not.toBeNull());
+
+    provider.failPolicy = true;
+    const reasons = await captureStopReasons(() => stub.release({ sessionId: SESSION }));
+
+    const state = await stub.getAllocationState();
+    expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
+    expect(reasons).toEqual(['network_policy_failed']);
+  });
+
+  it('stops a restricted Vercel sandbox as network_policy_failed when a workspace Stop cannot apply the policy', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupRestrictedVercel(provider, createFakeCredentialBroker());
+    await stub.prepare(prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION)));
+    await waitFor(async () => expect((await stub.getAllocationState()).providerRef).not.toBeNull());
+
+    provider.failPolicy = true;
+    const reasons = await captureStopReasons(() =>
+      stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() })
+    );
+
+    const state = await stub.getAllocationState();
+    expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
+    expect(reasons).toEqual(['network_policy_failed']);
+  });
+
+  it('fails the route as network_policy_failed when a restricted policy cannot be built at create', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      throw new SandboxNetworkPolicyError();
+    };
+    const stub = await setupRestrictedVercel(provider, createFakeCredentialBroker());
+
+    await stub.prepare(prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION)));
+
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
+        state: 'failed',
+        reason: 'network_policy_failed',
+      })
+    );
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect((await stub.getAllocationState()).providerRef).toBeNull();
   });
 
   it('releases a session without a route and keeps the shared policy', async () => {

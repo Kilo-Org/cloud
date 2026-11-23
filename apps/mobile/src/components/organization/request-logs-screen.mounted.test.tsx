@@ -258,9 +258,9 @@ describe('OrganizationRequestLogsScreen', () => {
     const { renderer, unmount } = await mount();
 
     const [denied] = renderer.root.findAllByType('PermissionDenied');
-    expect(denied?.props.description).toBe(
-      'Only an organization owner, admin or billing manager can read its request logs.'
-    );
+    // The refusal's copy lives in the catalog; this pins that the state reads
+    // this screen's own key, so a member sees the roles and the next step.
+    expect(denied?.props.description).toBe(i18n.t('organization.requestLogs.permissionDenied'));
     // The gate is also what the query reads: a member never asks the server.
     expect(logsQuery.enabled.at(-1)).toBe(false);
     expect(renderer.root.findAllByType('FlashList')).toHaveLength(0);

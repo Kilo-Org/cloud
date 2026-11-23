@@ -12,11 +12,6 @@ import {
   viewHeightOf,
 } from './remote-mcp-app';
 
-/**
- * The document a view is drawn from, and the page that draws it: the policy a
- * server-declared resource gets, and the sandbox it cannot leave.
- */
-
 /** The policy the CSP metadata a resource declared produces. */
 function policyOf(csp: Readonly<Record<string, unknown>>): string {
   return contentSecurityPolicy({ ui: { csp } });

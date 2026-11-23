@@ -37,12 +37,6 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
   },
   {
     provider: 'vercel',
-    feature: 'egressProxy',
-    class: 'gap',
-    reason: 'The Vercel network policy does not forward egress to the Worker proxy yet.',
-  },
-  {
-    provider: 'vercel',
     feature: 'egressProxySeesAll',
     class: 'intentional',
     reason: 'Vercel forwards listed hosts only; other names fail in DNS.',

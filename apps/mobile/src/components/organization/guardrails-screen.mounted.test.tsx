@@ -27,12 +27,12 @@ const boundary = vi.hoisted(() => {
   const state: {
     organizationId: string | null;
     role: string;
-    org: { organizationId: string } | null;
+    org: { organizationId: string; organizationName: string } | null;
     isResolving: boolean;
   } = {
     organizationId: 'org-1',
     role: 'owner',
-    org: { organizationId: 'org-1' },
+    org: { organizationId: 'org-1', organizationName: 'Aarav Labs' },
     isResolving: false,
   };
   return state;
@@ -114,7 +114,8 @@ vi.mock('@/components/organization/guardrails-output-section', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string }) => createElement('ScreenHeaderMock', null, props.title),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', null, props.title, props.subtitle),
 }));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { onPress?: () => void; children?: ReactNode }) =>
@@ -154,7 +155,7 @@ function collectText(node: unknown): string[] {
 beforeEach(() => {
   boundary.organizationId = 'org-1';
   boundary.role = 'owner';
-  boundary.org = { organizationId: 'org-1' };
+  boundary.org = { organizationId: 'org-1', organizationName: 'Aarav Labs' };
   boundary.isResolving = false;
   membership.data = null;
   membership.isError = false;
@@ -174,6 +175,8 @@ describe('OrganizationGuardrailsScreen not-enabled state', () => {
     expect(headers).toBe(1);
     expect(texts).toContain('AI Guardrails');
     expect(texts).toContain(EXPECTED_TITLE);
+    // The header names the organization the state's request refers to.
+    expect(texts).toContain('Aarav Labs');
 
     act(() => {
       renderer.unmount();

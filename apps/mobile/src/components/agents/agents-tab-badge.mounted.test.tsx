@@ -98,7 +98,7 @@ async function updateSessions(result: Mount, rows: ActiveSession[]) {
 }
 
 describe('Agents needs-input badge and live rows', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     organization.organizationId = null;
     organization.isLoaded = true;
@@ -106,6 +106,11 @@ describe('Agents needs-input badge and live rows', () => {
     fetchSessions.mockReturnValue(new Promise(() => undefined));
     attentionKv.getItem.mockReset().mockResolvedValue(null);
     __resetSessionAttentionForTests();
+    // The reset returns the store to `loading`, and the module-init hydrate
+    // does not re-arm. Every row holds its badge until the phase settles, so
+    // settle it here; the cases that need the loading window open the read
+    // themselves and hydrate by hand.
+    await __hydrateSessionAttentionForTests();
   });
 
   afterEach(async () => {
@@ -203,10 +208,15 @@ describe('Agents needs-input badge and live rows', () => {
     async ({ status, raiseId, suppresses }) => {
       const pending = Promise.withResolvers<string | null>();
       attentionKv.getItem.mockReturnValueOnce(pending.promise);
+      // Back to `loading` and hydrate by hand: the gated read below is what
+      // keeps the phase open while the mount paints.
+      __resetSessionAttentionForTests();
       const hydration = __hydrateSessionAttentionForTests();
       const result = await mount();
       await updateSessions(result, sessions([status, 'permission']));
-      expectCounts(result.renderer, status === 'question' ? 2 : 1, 2);
+      // The store has not hydrated, so every row holds: a badge drawn here
+      // would count a raise the stored blob may already answer.
+      expectCounts(result.renderer, undefined, 2);
       await act(async () => {
         pending.resolve(
           JSON.stringify([
@@ -247,6 +257,28 @@ describe('Agents needs-input badge and live rows', () => {
     // A permission raised later reads as its own raise, not the answered one.
     await updateSessions(result, datedRaise('2026-09-18T21:30:00.000Z'));
     expectCounts(result.renderer, 1, 2);
+  });
+
+  it('holds the badge while the ack store loads and counts after it settles', async () => {
+    // The stored read is open, so the store stays in `loading` across the
+    // mount: an unhydrated store answers "not acked" for every raise, so the
+    // badge has to wait rather than count a raise the blob may answer.
+    const pending = Promise.withResolvers<string | null>();
+    attentionKv.getItem.mockReturnValueOnce(pending.promise);
+    // Back to `loading`, then hydrate by hand against the gated read.
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+    const result = await mount();
+    await updateSessions(result, sessions(['question', 'permission', 'busy']));
+    expectCounts(result.renderer, undefined, 3);
+
+    // Released with no stored blob: the store settles empty and every raise
+    // counts.
+    await act(async () => {
+      pending.resolve(null);
+      await hydration;
+    });
+    expectCounts(result.renderer, 2, 3);
   });
 
   it('hides counts while the initial live query loads', async () => {

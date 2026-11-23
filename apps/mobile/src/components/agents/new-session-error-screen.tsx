@@ -7,6 +7,7 @@ import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { clearSharePayload } from '@/lib/share-payload';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ const BACK_GAP = 16;
  */
 export function NewSessionErrorScreen({ onRetry }: Props) {
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ shareId?: string | string[] }>();
@@ -55,7 +57,9 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
               router.back();
               return;
             }
-            router.replace(AGENTS_SESSIONS_INDEX_HREF);
+            // Swapping the failed composer for the list in one commit crashes
+            // Android Fabric, so it pushes then retires.
+            stackSafeRouter.replace(AGENTS_SESSIONS_INDEX_HREF);
           }}
         >
           <Text className="text-sm font-semibold text-foreground">{t('common.back')}</Text>

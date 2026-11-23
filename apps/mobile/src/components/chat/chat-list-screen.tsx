@@ -26,11 +26,13 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useOrganization } from '@/lib/organization-context';
+import { useLocalResetNotice } from '@/lib/persist/use-local-reset-notice';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
 import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
+import { LocalResetNoticeCard } from './local-reset-notice';
 
 /**
  * The chats a person has, newest first.
@@ -59,6 +61,7 @@ function ScopedChatListScreen() {
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
   const connectivity = useCommittedConnectivityStatus();
+  const { notice: localResetNotice, dismiss: dismissLocalResetNotice } = useLocalResetNotice();
 
   const {
     models,
@@ -308,6 +311,11 @@ function ScopedChatListScreen() {
           allowInlineActionsStacking={false}
           inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
         />
+        {/* Above every body kind: an emptied list must never read as an
+            ordinary empty state, so the explanation outranks what remains. */}
+        {localResetNotice.kind === 'present' ? (
+          <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
+        ) : null}
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Fab

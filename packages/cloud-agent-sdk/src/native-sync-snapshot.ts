@@ -6,12 +6,15 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 import {
-  hasUndisplayableKilo2Assets,
+  hasUnresolvedKilo2Assets,
+  hasIncompleteKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   readKilo2Messages,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NATIVE_SYNC_REQUEST_DEADLINE_MS } from './limits';
+import type { NativeSnapshotBlob, NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import type { SessionSnapshot } from './types';
 
 // The intersection merges validated contract fields with the full JSON tree,
@@ -148,6 +151,12 @@ export type NativeSnapshot = {
   entities: NativeEntity[];
   /** Resolved authorized bytes, keyed by kilo2AssetKey(display ID, native URI, MIME). */
   assetURLs?: Record<string, string>;
+  /**
+   * Keys no authorization can bind, in kilo2AssetKey form. The producer stores a message
+   * and its asset mappings together, so these attachments never resolve; readers report
+   * them instead of failing the transcript or waiting for a later snapshot.
+   */
+  unavailableAssetKeys?: string[];
 };
 
 export type NativeSnapshotProjection = {
@@ -167,20 +176,36 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
     });
   }
   const session = withDisplayLocation(snapshot.session);
+  const unavailable = new Set(snapshot.unavailableAssetKeys ?? []);
   const messages: Kilo2Message[] = [];
   const incompleteMessageIDs: string[] = [];
   for (const item of snapshot.messages) {
-    if (item.incomplete) incompleteMessageIDs.push(item.message.id);
-    // A message with no possible display is dropped, not reported as missing data.
-    else if (!hasUndisplayableKilo2Assets(item.message, snapshot.assetURLs)) {
-      messages.push(item.message);
+    if (item.incomplete) {
+      incompleteMessageIDs.push(item.message.id);
+      continue;
     }
+    // A reference a later snapshot can still authorize withholds the message: this reader
+    // has no retry, so it reports the message instead of showing it half-authorized.
+    if (hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs, unavailable)) {
+      incompleteMessageIDs.push(item.message.id);
+      continue;
+    }
+    // A message whose attachment content storage was expected to provide still displays its
+    // text, reasoning and tool output; its withheld attachment is reported, never hidden.
+    // An absolute `http(s)` reference is never fetched on purpose, so it is not reported
+    // unless the snapshot declared its key unavailable.
+    if (hasIncompleteKilo2Assets(item.message, snapshot.assetURLs, unavailable))
+      incompleteMessageIDs.push(item.message.id);
+    messages.push(item.message);
   }
   return {
     session,
     position: snapshot.position,
     revision: snapshot.revision,
-    messages: readKilo2Messages(session, messages, { assetURLs: snapshot.assetURLs }),
+    messages: readKilo2Messages(session, messages, {
+      assetURLs: snapshot.assetURLs,
+      unavailable,
+    }),
     incompleteMessageIDs,
   };
 }
@@ -256,13 +281,36 @@ function snapshotChanged(): Error & { code: string } {
   });
 }
 
+/**
+ * Where one snapshot read finds and retains settled attachment bodies. A read-level store
+ * either wraps the client cache or keeps a per-call map when no cache is supplied.
+ */
+type SnapshotBlobStore = {
+  read(hash: string, bytes: number): NativeSnapshotBlob | undefined;
+  write(hash: string, blob: NativeSnapshotBlob): void;
+};
+
+/** Attachment bodies retained for one call only, reused across its retry attempts. */
+function localBlobStore(): SnapshotBlobStore {
+  const retained = new Map<string, NativeSnapshotBlob>();
+  return {
+    read: (hash, bytes) => {
+      const cached = retained.get(hash);
+      return cached?.bytes === bytes ? cached : undefined;
+    },
+    write: (hash, blob) => {
+      retained.set(hash, blob);
+    },
+  };
+}
+
 async function resolveSnapshotAssets(
   snapshot: NativeSnapshot,
   resolved: ResolvedEntity[],
   path: string,
-  readAsset?: NativeAssetReader,
-  resolvedBlobs: Map<string, { bytes: number; base64: string }> = new Map()
-): Promise<Record<string, string>> {
+  blobs: SnapshotBlobStore,
+  readAsset?: NativeAssetReader
+): Promise<{ assetURLs: Record<string, string>; unavailable: Set<string> }> {
   const mappings = new Map<string, z.infer<typeof assetMappingSchema>>();
   for (const item of resolved) {
     if (item.entity.kind !== 'asset') continue;
@@ -275,6 +323,10 @@ async function resolveSnapshotAssets(
   }
   const wants: { file: Kilo2FileReference; hash: string; bytes: number }[] = [];
   const assetURLs: Record<string, string> = {};
+  // Keys no authorization can bind. The producer writes a message and its asset mappings in
+  // one batch, so an absent or mismatched mapping never arrives later: this attachment stays
+  // unavailable while the rest of the transcript is still readable.
+  const unavailable = new Set<string>();
   const missing: { hash: string; bytes: number }[] = [];
   const queuedHashes = new Set<string>();
   const claimedBytes = new Map<string, number>();
@@ -301,12 +353,8 @@ async function resolveSnapshotAssets(
         mapping.mime !== file.mime ||
         (file.uri.startsWith('media:') && file.uri !== `media:${mapping.blob.hash}`)
       ) {
-        throw Object.assign(
-          new Error(`Native attachment ${file.id} has no matching authorized asset`),
-          {
-            code: 'native_asset_not_found',
-          }
-        );
+        unavailable.add(kilo2AssetKey(file.id, file.uri, file.mime));
+        continue;
       }
       if (!readAsset) {
         throw Object.assign(
@@ -317,7 +365,7 @@ async function resolveSnapshotAssets(
         );
       }
       const advertised = mapping.blob.bytes;
-      const cached = resolvedBlobs.get(mapping.blob.hash);
+      const cached = blobs.read(mapping.blob.hash, advertised);
       const claimed = claimedBytes.get(mapping.blob.hash) ?? cached?.bytes;
       if (claimed !== undefined && claimed !== advertised) {
         throw new Error('Native asset mappings disagree about blob size');
@@ -330,7 +378,7 @@ async function resolveSnapshotAssets(
       wants.push({ file, hash: mapping.blob.hash, bytes: advertised });
     }
   }
-  if (!readAsset) return assetURLs;
+  if (!readAsset) return { assetURLs, unavailable };
   await readWithBoundedConcurrency(
     SNAPSHOT_ASSET_READ_CONCURRENCY,
     missing.map(({ hash, bytes }) => async () => {
@@ -343,16 +391,16 @@ async function resolveSnapshotAssets(
           }
         );
       }
-      viewBytesAsBase64(buffer, base64 => resolvedBlobs.set(hash, { bytes, base64 }));
+      viewBytesAsBase64(buffer, base64 => blobs.write(hash, { bytes, base64 }));
     })
   );
   for (const want of wants) {
-    const cached = resolvedBlobs.get(want.hash);
+    const cached = blobs.read(want.hash, want.bytes);
     if (!cached) throw new Error('Native asset read was skipped');
     assetURLs[kilo2AssetKey(want.file.id, want.file.uri, want.file.mime)] =
       `data:${want.file.mime};base64,${cached.base64}`;
   }
-  return assetURLs;
+  return { assetURLs, unavailable };
 }
 
 function reconstructMessages(
@@ -435,7 +483,7 @@ async function readSnapshot(
   sessionID: string,
   readAsset?: NativeAssetReader,
   resolvedEntities: Map<string, unknown> = new Map(),
-  resolvedAssetBlobs: Map<string, { bytes: number; base64: string }> = new Map()
+  blobs: SnapshotBlobStore = localBlobStore()
 ): Promise<NativeSnapshot> {
   const path = `/v1/sessions/${encodeURIComponent(sessionID)}`;
   const state = stateSchema.parse(await request<unknown>(path));
@@ -524,14 +572,9 @@ async function readSnapshot(
     messages: reconstructMessages(resolved, state.position),
     entities,
   };
-  const assetURLs = await resolveSnapshotAssets(
-    snapshot,
-    resolved,
-    path,
-    readAsset,
-    resolvedAssetBlobs
-  );
-  if (Object.keys(assetURLs).length > 0) snapshot.assetURLs = assetURLs;
+  const assetURLs = await resolveSnapshotAssets(snapshot, resolved, path, blobs, readAsset);
+  if (Object.keys(assetURLs.assetURLs).length > 0) snapshot.assetURLs = assetURLs.assetURLs;
+  if (assetURLs.unavailable.size > 0) snapshot.unavailableAssetKeys = [...assetURLs.unavailable];
   return snapshot;
 }
 
@@ -540,20 +583,22 @@ async function readSnapshot(
  * page to the inspected state. Requests JSON-decode entity blobs and surface
  * service errors with a `code` property. Revision races and reclaimed blobs
  * restart from state, at most three complete attempts; content-addressed blob
- * and attachment reads settled by an earlier attempt are reused, and the rest
- * resolve with a small bounded pool rather than one request at a time. Reads
- * have a two-minute total deadline, a 15-second request deadline, and
- * non-cooperative cancellation. The optional binary reader must use the same
- * session/tenant authorization as JSON reads and bound streamed bytes to the
- * advertised blob size. Stored media requires it; authorized bytes become
- * content-bound data URLs without modifying canonical messages or exposing
- * credentials.
+ * reads settled by an earlier attempt are reused, and the rest resolve with a
+ * small bounded pool rather than one request at a time. Settled attachment
+ * reads are reused across retry attempts of this call, and across reads of the
+ * same session when a `blobs` cache is supplied. Reads have a two-minute total
+ * deadline, a 15-second request deadline, and non-cooperative cancellation. The
+ * optional binary reader must use the same session/tenant authorization as JSON
+ * reads and bound streamed bytes to the advertised blob size. Stored media
+ * requires it; authorized bytes become content-bound data URLs without
+ * modifying canonical messages or exposing credentials.
  */
 export async function fetchNativeSnapshot(
   request: Request,
   sessionID: string,
   signal?: AbortSignal,
-  readAsset?: NativeAssetReader
+  readAsset?: NativeAssetReader,
+  blobs?: NativeSnapshotBlobCache
 ): Promise<NativeSnapshot> {
   sessionIDSchema.parse(sessionID);
   const controller = new AbortController();
@@ -574,7 +619,7 @@ export async function fetchNativeSnapshot(
       const requestTimeout = setTimeout(() => {
         failure = new Error('Native snapshot request timed out');
         controller.abort();
-      }, 15_000);
+      }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
       const abort = () => {
         clearTimeout(requestTimeout);
         reject(failure);
@@ -601,9 +646,31 @@ export async function fetchNativeSnapshot(
         runRequest(() => readAsset(path, advertisedBytes, { signal: controller.signal }))
     : undefined;
   // Content-addressed reads already settled stay cached across retry
-  // attempts; an unchanged body cannot return different bytes.
+  // attempts; an unchanged body cannot return different bytes. A supplied
+  // client cache extends that reuse to later reads of the same session, but
+  // this call's own bodies stay in a call-local map: one snapshot can want
+  // more attachment bytes than the whole cache budget, and evicting a body
+  // this call just downloaded would fail the read it is assembling.
   const resolvedEntities = new Map<string, unknown>();
-  const resolvedBlobs = new Map<string, { bytes: number; base64: string }>();
+  const settled = localBlobStore();
+  const blobStore: SnapshotBlobStore = blobs
+    ? {
+        read: (hash, bytes) => {
+          const local = settled.read(hash, bytes);
+          if (local) return local;
+          const shared = blobs.read(sessionID, hash, bytes);
+          // Pin a shared-cache hit for the rest of this call. A later write in the same call
+          // can evict it from the shared cache, and this call still has to publish every body
+          // it used; the string is shared by reference, so this pins no extra bytes.
+          if (shared) settled.write(hash, shared);
+          return shared;
+        },
+        write: (hash, blob) => {
+          settled.write(hash, blob);
+          blobs.write(sessionID, hash, blob);
+        },
+      }
+    : settled;
   try {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -612,7 +679,7 @@ export async function fetchNativeSnapshot(
           sessionID,
           cancellableAsset,
           resolvedEntities,
-          resolvedBlobs
+          blobStore
         );
       } catch (error) {
         if (

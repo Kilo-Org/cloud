@@ -18,6 +18,7 @@ type Export = {
 
 type ScreenState = {
   access: { enabled: boolean };
+  accessPending: boolean;
   accessError: boolean;
   exports: Export[];
   listError: boolean;
@@ -29,6 +30,7 @@ type ScreenState = {
 
 const state = vi.hoisted((): ScreenState => ({
   access: { enabled: true },
+  accessPending: false,
   accessError: false,
   exports: [],
   listError: false,
@@ -63,7 +65,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       if (options.kind === 'access') {
         return {
           data: state.access,
-          isPending: false,
+          isPending: state.accessPending,
           isError: state.accessError,
           isFetching: false,
           refetch: vi.fn(),
@@ -129,6 +131,8 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-band', () => ({ useShortCenteredBand: () => false }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
@@ -174,6 +178,7 @@ function readyExport(): Export[] {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.access = { enabled: true };
+  state.accessPending = false;
   state.accessError = false;
   state.exports = [];
   state.listError = false;
@@ -272,13 +277,29 @@ describe('DataExportScreen', () => {
     expect(texts(root)).toContain('The artifact could not be produced');
   });
 
+  it("reserves the release check's centered band before the answer", async () => {
+    state.accessPending = true;
+    const root = await mount();
+
+    const centered = root.findAll(node => Object.is(node.type, 'CenteredState'));
+    expect(centered).toHaveLength(1);
+    expect(
+      centered[0]?.findAll(node => node.props.testID === 'data-export-release-check')
+    ).toHaveLength(1);
+    expect(root.findAll(node => Object.is(node.type, 'EmptyState'))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThanOrEqual(3);
+  });
+
   it('explains when the feature is not released to this account', async () => {
     state.access = { enabled: false };
     const root = await mount();
 
-    expect(
-      root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
-    ).toEqual([i18n.t('profile.dataExport.unavailableTitle')]);
+    const notice = root.findAll(node => Object.is(node.type, 'EmptyState'));
+    expect(notice.map(node => node.props.title)).toEqual([
+      i18n.t('profile.dataExport.unavailableTitle'),
+    ]);
+    expect(notice[0]?.props.placement).toBe('center');
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 

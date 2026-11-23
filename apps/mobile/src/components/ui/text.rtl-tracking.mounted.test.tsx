@@ -141,10 +141,6 @@ describe('Text tracked labels', () => {
   });
 
   it('applies the same reset to the shared Eyebrow label, whose own display class is dropped for right-to-left script copy', () => {
-    // The eyebrow's tracking class is script-bound (text.tsx
-    // EYEBROW_LATIN_DISPLAY through `keepsLatinDisplay`): right-to-left script
-    // copy in an RTL interface drops it and relies on the RTL letter-spacing
-    // reset.
     i18nManager.isRTL = true;
     const root = mountTextTree(createElement(Eyebrow, null, 'استكشف'));
 

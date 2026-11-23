@@ -429,7 +429,7 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     ]);
 
     const body = chipBody(renderer.root);
-    expect(body.props.accessibilityLabel).toBe('photo.png, 1 kB');
+    expect(body.props.accessibilityLabel).toBe('photo.png, 1.02 kB');
     expect(body.props.accessibilityRole).toBe('button');
     expect(body.props.accessibilityState).toBeUndefined();
     expect(body.props.accessibilityValue).toBeUndefined();

@@ -41,7 +41,7 @@ import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
-import { BLOCKED_BASH_COMMAND, EMOJI_ANSWER, PENDING_BASH_ASK } from './agent-chat-fixture-states';
+import * as fixtureStates from './agent-chat-fixture-states';
 
 /**
  * The agent chat screen — transcript and composer — against one fixed
@@ -192,25 +192,15 @@ function fixed<T>(value: T) {
 
 /* eslint-disable require-await -- the fixture's methods settle without work, one per manager member */
 
-/**
- * The still states the fixture can hold, one per design-gate target. The plain
- * agent chat screen is `idle`; `pending-permission` holds the same screen behind
- * a bash ask, so the row that reports the agent's activity can be compared
- * while the agent waits for the answer; `running` holds the same blocked
- * transcript with the ask answered, which is the row the wait returns to.
- * `permission-failed` holds the pending-permission screen too, but the first
- * answer to the bash ask fails like a transient transport error, so the card
- * shows its retryable failure branch, and a later answer — the Retry tap —
- * succeeds.
- */
-export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'permission-failed' | 'running';
+/** The still states this fixture can hold; see `agent-chat-fixture-states`. */
+export type { AgentChatFixtureState } from './agent-chat-fixture-states';
 
 /**
  * The session manager the real screen mounts against, typed as the product's own
  * interface so a member the screen starts reading is caught here, not on device.
  */
 export function createAgentChatFixtureManager(
-  state: AgentChatFixtureState = 'idle'
+  state: fixtureStates.AgentChatFixtureState = 'idle'
 ): SessionManager {
   const waitingForPermission = state === 'pending-permission' || state === 'permission-failed';
   // The first answer to the ask must fail like a transient transport error, and
@@ -218,10 +208,11 @@ export function createAgentChatFixtureManager(
   // manager and every other fixture state shares the idle no-op below.
   let failedAnswerAttempts = 0;
   const failOnceThenAllow = state === 'permission-failed';
-  const streaming = state !== 'idle';
+  const streaming = state !== 'idle' && state !== 'pending-unreadable-question';
+  const base = [opening, answer, fixtureStates.EMOJI_ANSWER];
   const messages: StoredMessage[] = streaming
-    ? [opening, answer, EMOJI_ANSWER, BLOCKED_BASH_COMMAND]
-    : [opening, answer, EMOJI_ANSWER, refused];
+    ? [...base, fixtureStates.BLOCKED_BASH_COMMAND]
+    : [...base, refused];
   const pending = streaming
     ? new Map<string, MessageDeliveryState>()
     : new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
@@ -306,14 +297,15 @@ export function createAgentChatFixtureManager(
       activeQuestion: fixed<StandaloneQuestion | null>(null),
       permission: fixed<PermissionState | null>(null),
       activePermission: fixed<StandalonePermission | null>(
-        waitingForPermission ? PENDING_BASH_ASK : null
+        waitingForPermission ? fixtureStates.PENDING_BASH_ASK : null
       ),
       pendingQuestions: fixed<readonly StandaloneQuestion[]>([]),
       backgroundActivity: fixed<BackgroundActivityState>({ status: 'inactive' }),
       agentBoard: fixed<AgentBoardState>({ status: 'inactive' }),
       pendingPermissions: fixed<readonly StandalonePermission[]>(
-        waitingForPermission ? [PENDING_BASH_ASK] : []
+        waitingForPermission ? [fixtureStates.PENDING_BASH_ASK] : []
       ),
+      unreadableQuestions: fixed(fixtureStates.fixtureUnreadableQuestions(state)),
       unreadablePermissions: fixed<readonly UnreadablePermissionState[]>([]),
       suggestion: fixed<SuggestionState | null>(null),
       activeSuggestion: fixed<StandaloneSuggestion | null>(null),

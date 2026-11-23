@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the field's error, validation, alignment, gap and resting-preview suites share one react-native harness, so what is faked here reads as one answer. */
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +16,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   TextInput: 'TextInput',
+  Pressable: 'Pressable',
   I18nManager: {
     get isRTL() {
       return rtl.isRTL;
@@ -317,5 +319,202 @@ describe('FormField label-to-input gap', () => {
     const { root, wrapper } = mountField('gap-y-[16px]');
     expect(String(wrapper.props.className)).toBe('gap-y-[16px]');
     expect(String(root.props.className)).toBe('gap-1.5');
+  });
+});
+
+describe('FormField resting value preview', () => {
+  const label = i18n.t('login.emailAddress');
+  // A value longer than the box: the case Android draws from its tail with the
+  // first glyph cut while the field rests.
+  const longValue = 'person.with.a.long.address@example.com';
+
+  function mountField(props: Partial<React.ComponentProps<typeof FormField>> = {}) {
+    act(() => {
+      renderer = TestRenderer.create(createElement(FormField, { label, ...props }));
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  function previewText(mounted: TestRenderer.ReactTestRenderer) {
+    // The preview is the only text inside the pressable box; the field's own
+    // label and message sit outside it.
+    return mounted.root
+      .findByType('Pressable')
+      .findAllByType('Text')
+      .map(node => node.props.children);
+  }
+
+  /** The preview box, typed so a test can read its press and its state. */
+  function preview(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('Pressable').props as {
+      onPress: () => void;
+      disabled?: boolean;
+      className?: string;
+      accessibilityState: { disabled?: boolean };
+    };
+  }
+
+  /** The preview's assistive-action handler, typed so a test can activate it. */
+  function activationHandler(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    };
+  }
+
+  /** The real input's handlers, typed so a test can type and blur. */
+  function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('TextInput').props as {
+      onChangeText: (value: string) => void;
+      onBlur: (event: unknown) => void;
+    };
+  }
+
+  it('shows a resting single-line value from its start without the input', () => {
+    const mounted = mountField({ defaultValue: longValue });
+
+    // Android keeps a resting one-line EditText scrolled to its caret, so the
+    // real input would paint this value's tail; the preview paints its start.
+    expect(previewText(mounted)).toEqual([longValue]);
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(0);
+  });
+
+  it('swaps the real input in when the preview is pressed', () => {
+    const mounted = mountField({ defaultValue: longValue });
+
+    act(() => {
+      preview(mounted).onPress();
+    });
+
+    expect(mounted.root.findAllByType('Pressable')).toHaveLength(0);
+    const input = mounted.root.findByType('TextInput');
+    // The swap keeps the value and asks for focus, so the keyboard opens with it.
+    expect(input.props.defaultValue).toBe(longValue);
+    expect(input.props.autoFocus).toBe(true);
+  });
+
+  it('shows the typed value in the preview again after a blur', () => {
+    const mounted = mountField({ defaultValue: longValue });
+    const typed = 'person@example.com';
+
+    act(() => {
+      preview(mounted).onPress();
+    });
+    act(() => {
+      inputHandlers(mounted).onChangeText(typed);
+    });
+    act(() => {
+      inputHandlers(mounted).onBlur({});
+    });
+
+    expect(previewText(mounted)).toEqual([typed]);
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(0);
+  });
+
+  it('keeps the real input for a multiline field', () => {
+    const mounted = mountField({ defaultValue: longValue, multiline: true });
+
+    expect(mounted.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(mounted.root.findByType('TextInput').props.multiline).toBe(true);
+  });
+
+  it('keeps the real input for a masked field', () => {
+    const mounted = mountField({ defaultValue: longValue, secureTextEntry: true });
+
+    // A masked value's dots are all the box can show; a preview would print the
+    // plaintext it exists to hide.
+    expect(mounted.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(mounted.root.findByType('TextInput').props.secureTextEntry).toBe(true);
+  });
+
+  it('keeps the real input for an empty field so its placeholder shows', () => {
+    const mounted = mountField({ defaultValue: '', placeholder: i18n.t('login.emailAddress') });
+
+    expect(mounted.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(mounted.root.findByType('TextInput').props.placeholder).toBe(
+      i18n.t('login.emailAddress')
+    );
+  });
+
+  it('marks a disabled field’s preview disabled and refuses the swap', () => {
+    const mounted = mountField({ defaultValue: longValue, disabled: true });
+    const box = preview(mounted);
+
+    expect(box.accessibilityState.disabled).toBe(true);
+    // The press is inert, so a disabled field cannot open an editor.
+    expect(box.disabled).toBe(true);
+  });
+
+  it('treats a caller’s read-only field as one that cannot be entered', () => {
+    // `editable={false}` is how a caller stops accepting text while it saves;
+    // a resting value must not offer an editor the field would refuse, and must
+    // dim like any other read-only field.
+    const mounted = mountField({ defaultValue: longValue, editable: false });
+    const box = preview(mounted);
+
+    expect(box.disabled).toBe(true);
+    expect(box.accessibilityState.disabled).toBe(true);
+    // A read-only field looks read-only in the state a person sees.
+    expect(String(box.className)).toContain('opacity-50');
+    // A press and an assistive activation both leave the field resting.
+    act(() => {
+      preview(mounted).onPress();
+    });
+    act(() => {
+      activationHandler(mounted).onAccessibilityAction({
+        nativeEvent: { actionName: 'activate' },
+      });
+    });
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(0);
+  });
+
+  it('carries no role of its own and ends a long value in a tail ellipsis', () => {
+    const mounted = mountField({ defaultValue: longValue });
+    const box = mounted.root.findByType('Pressable');
+    const text = box.findByType('Text');
+
+    // The field is a text field, not a button, and the app localizes every
+    // string it shows, so the resting box adds no role or hint of its own.
+    expect(box.props.accessibilityRole).toBeUndefined();
+    expect(box.props.accessibilityHint).toBeUndefined();
+    // One line that ends in a tail ellipsis, so a value wider than the box does
+    // not stop short of the border with nothing saying more of it exists.
+    expect(text.props.numberOfLines).toBe(1);
+    expect(text.props.ellipsizeMode).toBe('tail');
+    // Android drops that ellipsis on a selectable text node (measured on the
+    // emulator), so the preview stays a plain node and selecting or copying is
+    // one press away, in the real input that press swaps in.
+    expect(text.props.selectable).toBeUndefined();
+    // The line height lands on the painted line, not on the `View` around it.
+    expect(box.props.className).not.toContain('leading-[normal]');
+    expect(String(text.props.className)).toContain('leading-[normal]');
+  });
+
+  it('enters the field on an assistive activation', () => {
+    const enabled = mountField({ defaultValue: longValue });
+    const handler = enabled.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    };
+    act(() => {
+      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+    });
+    expect(enabled.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(enabled.root.findByType('TextInput')).toBeDefined();
+  });
+
+  it('ignores an assistive activation while the field is disabled', () => {
+    // A disabled field has nothing to enter, so the action changes nothing: the
+    // resting box stays and no editor opens.
+    const disabled = mountField({ defaultValue: longValue, disabled: true });
+    const handler = disabled.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    };
+    act(() => {
+      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+    });
+    expect(disabled.root.findAllByType('Pressable')).toHaveLength(1);
+    expect(disabled.root.findAllByType('TextInput')).toHaveLength(0);
   });
 });

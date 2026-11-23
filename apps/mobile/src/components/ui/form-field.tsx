@@ -1,13 +1,27 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { type LayoutChangeEvent, type TextInput, type TextInputProps, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  type TextInput,
+  type TextInputProps,
+  View,
+} from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
+import { INPUT_BOX_LINE_HEIGHT_CLASS, INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input-box';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
+
+/**
+ * The one assistive action a resting field offers: activating it enters the
+ * field, exactly as a press does. Declared once so a screen reader announces
+ * no action list of its own.
+ */
+const ACTIVATION_ACTIONS = [{ name: 'activate', label: undefined }] as const;
 
 type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
@@ -80,7 +94,13 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  * Never pass a controlled `value` — use `defaultValue` + `onChangeText`
  * writing to a ref (see CLAUDE.md). All other `TextInputProps` pass through
  * to the native input, including `autoComplete`/`textContentType` — set
- * them at call sites to expose system autofill metadata.
+ * them at call sites to expose system autofill metadata. While a single-line
+ * field with a value rests, no native input is mounted, so the forwarded
+ * `TextInput` ref and the mount value write are inert until the person enters
+ * the field. A resting value also honours a caller's `editable={false}`: it
+ * offers no press, no assistive activation, dims, and reports itself disabled.
+ * `disabled` remains the switch that stops the field accepting text in both
+ * states, so use it for a field that stays read-only.
  */
 function FormField({
   label,
@@ -107,12 +127,58 @@ function FormField({
   // Latched at the first focus and never cleared: a slot that unmounts on blur
   // moves everything below the field on every focus/blur cycle.
   const [hasFocused, setHasFocused] = useState(false);
+  // Whether the person pressed the resting preview: the real input takes over
+  // until that input blurs.
+  const [editing, setEditing] = useState(false);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
   // `validate` owns what this field's own rule reports; `error` carries an
   // error known from elsewhere (a rejected submit). Either one marks the field
   // invalid; the field's own rule wins while it has something to say.
   const displayedError = (validate ? validationError : null) ?? error;
+  // `Input` reads the same prop for its box, so the two agree on the shape on
+  // screen.
+  const isMultiline = props.multiline === true;
+  // The field whose real input is on screen: always for a multiline, masked or
+  // empty field (its placeholder must show), when the caller opens it focused,
+  // and once the person pressed the preview. Everything else is at rest.
+  const isEditing =
+    isMultiline || props.secureTextEntry === true || props.autoFocus === true || editing;
+  // The field accepts no text: its own `disabled`, or a caller's `editable`
+  // turned off for a busy state. A resting value honours both — no press, no
+  // assistive activation, and the disabled, dimmed box a read-only field has —
+  // because a preview that offers to open an editor the field would refuse
+  // misleads. A mounted input keeps the field's own switch: an `editable={false}`
+  // written under a focused Android input drops the IME mid-edit, so a caller
+  // that must stop accepting text for good passes `disabled`.
+  const readOnly = disabled === true || props.editable === false;
+  // Android keeps a resting one-line EditText scrolled to its caret, so a value
+  // longer than the box paints its tail with its first glyph cut; a
+  // programmatic selection does not scroll it back (measured on the emulator).
+  // While the field rests, a one-line `Text` preview paints that value from its
+  // start and clips the end instead, and a press swaps the real input in — the
+  // same shape `list-settings-name-field` uses for the same defect.
+  const showsRestingPreview = !isEditing && valueRef.current.length > 0;
+  // The field's own chrome, shared by the preview and the real input so the
+  // swap changes nothing on screen but the text's scroll position.
+  const controlClassName = cn(
+    // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
+    // `@/components/ui/input`, so every single-line field shares it and the
+    // class cannot be copied back wrong. No vertical padding: iOS insets the
+    // already-centered text rect by it, drawing the value and the placeholder
+    // below the middle (apps/mobile/AGENTS.md).
+    'rounded-md border border-input bg-background text-sm text-foreground',
+    // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
+    // white) over the canvas. `bg-background` is the canvas itself, so in
+    // dark the field had no surface of its own and only the border color
+    // separated it from the page. Light keeps the canvas fill, where the
+    // 45 % ink `--input` border already carries the field.
+    'dark:bg-[#FFFFFF0A]',
+    'focus:border-ring',
+    displayedError && 'border-destructive',
+    disabled && 'opacity-50',
+    className
+  );
 
   // Write the default only on attach; later prop changes must not move the caret
   // while the person edits an uncontrolled field.
@@ -136,64 +202,129 @@ function FormField({
         ) : (
           <FormFieldLabel label={label} />
         )}
-        <Input
-          ref={instance => {
-            nativeInput.current = instance;
-            if (ref == null) {
-              return;
-            }
-            if ('current' in ref) {
-              ref.current = instance;
-            } else {
-              ref(instance);
-            }
-          }}
-          {...props}
-          defaultValue={defaultValue}
-          editable={!disabled}
-          // A field's content follows the interface direction, not the script of
-          // its own value, so an email address stays on the same side as its
-          // label in an RTL catalog. `Input` applies the alignment; the caller's
-          // own style passes through untouched.
-          style={style}
-          accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
-          accessibilityState={{ disabled }}
-          onChangeText={value => {
-            valueRef.current = value;
-            onChangeText?.(value);
-            if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
-              setValidationError(validate(value));
-            }
-          }}
-          onFocus={event => {
-            onFocus?.(event);
-            setHasFocused(true);
-          }}
-          onBlur={event => {
-            onBlur?.(event);
-            if (validate) {
-              setValidationError(validate(valueRef.current));
-            }
-          }}
-          className={cn(
-            // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
-            // `@/components/ui/input`, so every single-line field shares it and
-            // the class cannot be copied back wrong. No vertical padding: iOS
-            // insets the already-centered text rect by it, drawing the value and
-            // the placeholder below the middle (apps/mobile/AGENTS.md).
-            'rounded-md border border-input bg-background text-sm text-foreground',
-            // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
-            // white) over the canvas. `bg-background` is the canvas itself, so in
-            // dark the field had no surface of its own and only the border color
-            // separated it from the page. Light keeps the canvas fill, where the
-            // 45 % ink `--input` border already carries the field.
-            'dark:bg-[#FFFFFF0A]',
-            'focus:border-ring',
-            displayedError && 'border-destructive',
-            disabled && 'opacity-50',
-            className
-          )}
-        />
+        {showsRestingPreview ? (
+          <Pressable
+            accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
+            accessibilityValue={{ text: valueRef.current }}
+            accessibilityState={{ disabled: readOnly }}
+            // The box keeps the field's own name and value and carries no role
+            // or hint of its own: the app localizes all of its copy, so the
+            // control introduces no English sentence. An assistive activation
+            // opens the editor, the same as a press.
+            accessibilityActions={ACTIVATION_ACTIONS}
+            onAccessibilityAction={event => {
+              if (!readOnly && event.nativeEvent.actionName === 'activate') {
+                setEditing(true);
+              }
+            }}
+            // The caller's test handle names the field's control, and while the
+            // field rests that control is this preview: a harness that looks the
+            // field up by its handle must find it in both states.
+            testID={props.testID}
+            // A field that accepts no text has nothing to enter: the press must
+            // not open an editor the field itself would not accept text into.
+            disabled={readOnly}
+            onPress={() => {
+              if (!readOnly) {
+                setEditing(true);
+              }
+            }}
+            className={cn(
+              INPUT_BOX_SHAPE_CLASS,
+              // The box's height is the native input's `min-h-[44px]`, so the
+              // one painted line sits on the same middle the value would.
+              'justify-center',
+              // A caller's `editable={false}` dims the resting box the same way
+              // the field's own `disabled` does, so a read-only field looks
+              // read-only in the state a person actually sees.
+              props.editable === false && 'opacity-50',
+              controlClassName
+            )}
+          >
+            <Text
+              // One line, ending in a tail ellipsis: the value is longer than the
+              // box often enough that the broken-off end must say so instead of
+              // stopping at the last whole word.
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              className={cn('text-sm font-normal text-foreground', INPUT_BOX_LINE_HEIGHT_CLASS)}
+              // The line height belongs on the painted line: this control is a
+              // `View`, which ignores it, and the native input draws its value at
+              // the same height, so the resting line keeps the box it stands in.
+              //
+              // No `selectable`: Android drops the tail ellipsis on a selectable
+              // text node and stops the line short of its own edge with nothing
+              // telling the reader that more of the value exists (measured on the
+              // emulator: 27 dp short, no ellipsis, against 1.5 dp and a tail
+              // ellipsis without it). Selecting and copying stay one press away —
+              // the press enters the field, whose real input is selectable and
+              // scrolled to the whole value on both platforms.
+              // A `Text` resolves the interface direction itself (the shared
+              // `Text` sets the paragraph's base direction), so the preview only
+              // carries the caller's own style and an explicit `textAlign`, the
+              // way the native box folds that prop after the style.
+              style={props.textAlign ? [style, { textAlign: props.textAlign }] : style}
+            >
+              {valueRef.current}
+            </Text>
+          </Pressable>
+        ) : (
+          <Input
+            ref={instance => {
+              nativeInput.current = instance;
+              if (ref == null) {
+                return;
+              }
+              if ('current' in ref) {
+                ref.current = instance;
+              } else {
+                ref(instance);
+              }
+            }}
+            {...props}
+            // A field that swaps the real input in keeps what the person typed:
+            // the box mounts with the live value, not the value the screen
+            // opened with.
+            defaultValue={editing ? valueRef.current : defaultValue}
+            editable={!disabled}
+            // A field's content follows the interface direction, not the script of
+            // its own value, so an email address stays on the same side as its
+            // label in an RTL catalog. `Input` applies the alignment; the caller's
+            // own style passes through untouched.
+            style={style}
+            accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
+            accessibilityState={{ disabled }}
+            // A press on the preview swaps this input in unfocused, so it asks
+            // for focus itself and the keyboard opens with the swap.
+            autoFocus={props.autoFocus === true || editing}
+            onChangeText={value => {
+              valueRef.current = value;
+              // A value arriving through this input means the person is in it:
+              // the preview must never swap in under a live edit.
+              setEditing(true);
+              onChangeText?.(value);
+              if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
+                setValidationError(validate(value));
+              }
+            }}
+            onFocus={event => {
+              onFocus?.(event);
+              setHasFocused(true);
+              // Focus can arrive without a press (autofill, an assistive
+              // action, the return key of the field above), and a focused field
+              // must keep its real input.
+              setEditing(true);
+            }}
+            onBlur={event => {
+              onBlur?.(event);
+              if (validate) {
+                setValidationError(validate(valueRef.current));
+              }
+              setEditing(false);
+            }}
+            className={controlClassName}
+          />
+        )}
       </View>
       {reserveErrorMessages?.length && (alwaysReserve || hasFocused || displayedError) ? (
         <View>

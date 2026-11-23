@@ -17,6 +17,9 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   TextInput: 'TextInput',
+  // A single-line field with a value rests under a `Pressable` preview, so the
+  // host has to exist before any suite can focus the field into its input.
+  Pressable: 'Pressable',
   I18nManager: {
     get isRTL() {
       return rtl.isRTL;

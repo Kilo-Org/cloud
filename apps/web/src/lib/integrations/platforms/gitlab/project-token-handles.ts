@@ -635,15 +635,15 @@ async function markUnreachedProjectCredentialsUnusable(input: {
       failures.push({ projectId, error: parsed.error });
       continue;
     }
-    if (parsed.data.unusableReason !== undefined) {
-      outcomes.push({ projectId, outcome: 'already-unusable' });
-      continue;
-    }
     if (
       parsed.data.authorizedAccountId === input.currentAccountId &&
       readLegacyProjectTokenId(input.integration.metadata, projectId) === null
     ) {
       outcomes.push({ projectId, outcome: 'ignored' });
+      continue;
+    }
+    if (parsed.data.unusableReason !== undefined) {
+      outcomes.push({ projectId, outcome: 'already-unusable' });
       continue;
     }
     pending.push({

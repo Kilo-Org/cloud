@@ -2862,6 +2862,63 @@ describe('GitLab encrypted credential persistence', () => {
     });
   });
 
+  it('leaves an own-account row that already carries the marker out of the counts', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db.insert(platform_access_token_credentials).values([
+      {
+        platform_integration_id: integration.id,
+        token_encrypted: 'encrypted-project-42-token',
+        provider_credential_type: 'project_access_token',
+        provider_resource_id: '42',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '101',
+        },
+      },
+      {
+        platform_integration_id: integration.id,
+        token_encrypted: 'encrypted-project-43-token',
+        provider_credential_type: 'project_access_token',
+        provider_resource_id: '43',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: {
+          authorizedAccountId: '202',
+          expiresOn: '2027-07-13',
+          providerCredentialId: '888',
+          unusableReason: 'account-changed',
+        },
+      },
+    ]);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      retireProjectCredentialsForReplacedAccount({
+        integration: {
+          id: integration.id,
+          metadata: { gitlab_instance_url: 'https://gitlab.com' },
+        },
+        userToken: 'glpat-primary-token',
+        currentAccountId: '202',
+        signal: controller.signal,
+      })
+    ).resolves.toEqual({ retired: 0, retained: 1, skipped: 1 });
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+  });
+
   it('leaves a project credential the provider already refused alone on a later account change', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

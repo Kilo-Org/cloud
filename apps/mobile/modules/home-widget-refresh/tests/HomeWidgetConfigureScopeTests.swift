@@ -50,8 +50,8 @@
     precondition(organization.config["endpoint"] as? String == "https://app.kilo.example/api/mobile/widgets")
     precondition(organization.config["organizationId"] as? String == "org-1")
 
-    // A stored scope predating the credential field still retires with the
-    // separately captured widget token, and adds no credential of its own.
+    // The scope keys decide a replacement; the captured configuration is
+    // reported unchanged, so this case carries the widget token only.
     var credentialless = previous
     credentialless.removeValue(forKey: "token")
     guard case .replace(let legacyCredential) = homeWidgetConfigureScope(

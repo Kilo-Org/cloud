@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "دستورالعمل ذخیره نشد",
     "instructionDeleteFailed": "دستورالعمل حذف نشد",
     "instructionToggleFailed": "دستورالعمل به‌روزرسانی نشد",
+    "instructionViewTitle": "فایل دستورالعمل",
     "instructionLimitReached": "هر پروفایل حداکثر {{max}} دستورالعمل می‌تواند داشته باشد. برای افزودن یکی دیگر، یکی را حذف کنید.",
     "mcp": {
       "title": "سرورهای MCP",

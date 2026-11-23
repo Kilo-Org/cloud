@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "அறிவுறுத்தலைச் சேமிக்க முடியவில்லை",
     "instructionDeleteFailed": "அறிவுறுத்தலை நீக்க முடியவில்லை",
     "instructionToggleFailed": "அறிவுறுத்தலைப் புதுப்பிக்க முடியவில்லை",
+    "instructionViewTitle": "அறிவுறுத்தல் கோப்பு",
     "instructionLimitReached": "ஒரு சுயவிவரத்தில் {{max}} அறிவுறுத்தல்கள் வரை இருக்கலாம். மற்றொன்றைச் சேர்க்க ஒன்றை நீக்கவும்.",
     "mcp": {
       "title": "MCP சேவையகங்கள்",

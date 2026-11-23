@@ -4861,6 +4861,7 @@
     "instructionSaveFailed": "Methu cadw'r cyfarwyddyd",
     "instructionDeleteFailed": "Methu dileu'r cyfarwyddyd",
     "instructionToggleFailed": "Methu diweddaru'r cyfarwyddyd",
+    "instructionViewTitle": "Ffeil cyfarwyddyd",
     "instructionLimitReached": "Gall proffil gynnwys hyd at {{max}} cyfarwyddyd. Dilëwch un i ychwanegu un arall.",
     "mcp": {
       "title": "gweinyddwyr MCP",

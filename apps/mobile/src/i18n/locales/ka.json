@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "ინსტრუქციის შენახვა ვერ მოხერხდა",
     "instructionDeleteFailed": "ინსტრუქციის წაშლა ვერ მოხერხდა",
     "instructionToggleFailed": "ინსტრუქციის განახლება ვერ მოხერხდა",
+    "instructionViewTitle": "ინსტრუქციის ფაილი",
     "instructionLimitReached": "პროფილს შეიძლება ჰქონდეს მაქსიმუმ {{max}} ინსტრუქცია. წაშალეთ ერთი, რომ დაამატოთ სხვა.",
     "mcp": {
       "title": "MCP სერვერები",

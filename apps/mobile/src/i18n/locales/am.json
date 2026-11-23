@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "መመሪያውን ማስቀመጥ አልተቻለም",
     "instructionDeleteFailed": "መመሪያውን መሰረዝ አልተቻለም",
     "instructionToggleFailed": "መመሪያውን ማዘመን አልተቻለም",
+    "instructionViewTitle": "የመመሪያ ፋይል",
     "instructionLimitReached": "አንድ መገለጫ እስከ {{max}} መመሪያዎች ሊይዝ ይችላል። ሌላ ለማከል አንዱን ይሰርዙ።",
     "mcp": {
       "title": "MCP አገልጋዮች",

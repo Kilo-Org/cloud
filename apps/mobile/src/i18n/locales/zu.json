@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Ayikwazekanga ukugcina umyalo",
     "instructionDeleteFailed": "Ayikwazekanga ukususa umyalo",
     "instructionToggleFailed": "Ayikwazekanga ukubuyekeza umyalo",
+    "instructionViewTitle": "Ifayela lomyalo",
     "instructionLimitReached": "Iphrofayela ingagcina imiyalelo efinyelela ku-{{max}}. Susa owodwa ukuze wengeze omunye.",
     "mcp": {
       "title": "Amaseva e-MCP",

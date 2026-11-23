@@ -4623,6 +4623,7 @@
     "instructionSaveFailed": "Couldn't save the instruction",
     "instructionDeleteFailed": "Couldn't delete the instruction",
     "instructionToggleFailed": "Couldn't update the instruction",
+    "instructionViewTitle": "Instruction file",
     "instructionLimitReached": "A profile can hold up to {{max}} instructions. Delete one to add another.",
     "mcp": {
       "title": "MCP servers",

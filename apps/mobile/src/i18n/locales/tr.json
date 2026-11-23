@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Talimat kaydedilemedi",
     "instructionDeleteFailed": "Talimat silinemedi",
     "instructionToggleFailed": "Talimat güncellenemedi",
+    "instructionViewTitle": "Talimat dosyası",
     "instructionLimitReached": "Bir profilde en fazla {{max}} talimat olabilir. Eklemek için birini silin.",
     "mcp": {
       "title": "MCP sunucuları",

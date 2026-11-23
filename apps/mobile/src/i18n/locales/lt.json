@@ -4693,6 +4693,7 @@
     "instructionSaveFailed": "Nepavyko išsaugoti instrukcijos",
     "instructionDeleteFailed": "Nepavyko ištrinti instrukcijos",
     "instructionToggleFailed": "Nepavyko atnaujinti instrukcijos",
+    "instructionViewTitle": "Instrukcijos failas",
     "instructionLimitReached": "Profilis gali turėti iki {{max}} instrukcijų. Ištrinkite vieną, kad galėtumėte pridėti kitą.",
     "mcp": {
       "title": "MCP serveriai",

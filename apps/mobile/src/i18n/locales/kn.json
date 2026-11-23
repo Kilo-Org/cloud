@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "ಸೂಚನೆ ಉಳಿಸಲಾಗಲಿಲ್ಲ",
     "instructionDeleteFailed": "ಸೂಚನೆ ಅಳಿಸಲಾಗಲಿಲ್ಲ",
     "instructionToggleFailed": "ಸೂಚನೆ ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ",
+    "instructionViewTitle": "ಸೂಚನೆ ಫೈಲ್",
     "instructionLimitReached": "ಒಂದು ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಗರಿಷ್ಠ {{max}} ಸೂಚನೆಗಳು ಇರಬಹುದು. ಇನ್ನೊಂದು ಸೇರಿಸಲು ಒಂದನ್ನು ಅಳಿಸಿ.",
     "mcp": {
       "title": "MCP ಸರ್ವರ್‌ಗಳು",

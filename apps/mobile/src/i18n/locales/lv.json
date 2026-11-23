@@ -4609,6 +4609,7 @@
     "instructionSaveFailed": "Instrukciju neizdevās saglabāt",
     "instructionDeleteFailed": "Instrukciju neizdevās dzēst",
     "instructionToggleFailed": "Instrukciju neizdevās atjaunināt",
+    "instructionViewTitle": "Instrukcijas fails",
     "instructionLimitReached": "Profils var ietvert līdz {{max}} instrukcijām. Dzēsiet vienu, lai pievienotu citu.",
     "mcp": {
       "title": "MCP serveri",

@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Ohjeen tallennus epäonnistui",
     "instructionDeleteFailed": "Ohjeen poisto epäonnistui",
     "instructionToggleFailed": "Ohjetta ei voitu päivittää",
+    "instructionViewTitle": "Ohjetiedosto",
     "instructionLimitReached": "Profiiliin mahtuu enintään {{max}} ohjetta. Poista yksi lisätäksesi toisen.",
     "mcp": {
       "title": "MCP-palvelimet",

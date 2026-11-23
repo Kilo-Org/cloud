@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳແນະນຳໄດ້",
     "instructionDeleteFailed": "ບໍ່ສາມາດລຶບຄຳແນະນຳໄດ້",
     "instructionToggleFailed": "ບໍ່ສາມາດອັບເດດຄຳແນະນຳໄດ້",
+    "instructionViewTitle": "ໄຟລ໌ຄຳແນະນຳ",
     "instructionLimitReached": "ໜຶ່ງໂປຣໄຟລ໌ເກັບໄດ້ສູງສຸດ {{max}} ຄຳແນະນຳ. ລຶບອັນໜຶ່ງເພື່ອເພີ່ມອັນໃໝ່.",
     "mcp": {
       "title": "ເຊີບເວີ MCP",

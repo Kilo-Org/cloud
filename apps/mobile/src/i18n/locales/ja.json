@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "指示を保存できませんでした",
     "instructionDeleteFailed": "指示を削除できませんでした",
     "instructionToggleFailed": "指示を更新できませんでした",
+    "instructionViewTitle": "指示ファイル",
     "instructionLimitReached": "プロファイルには最大{{max}}件の指示を保存できます。追加するには1件削除してください。",
     "mcp": {
       "title": "MCPサーバー",

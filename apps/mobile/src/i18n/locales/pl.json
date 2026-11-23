@@ -4693,6 +4693,7 @@
     "instructionSaveFailed": "Nie udało się zapisać instrukcji",
     "instructionDeleteFailed": "Nie udało się usunąć instrukcji",
     "instructionToggleFailed": "Nie udało się zaktualizować instrukcji",
+    "instructionViewTitle": "Plik instrukcji",
     "instructionLimitReached": "Profil może mieć maksymalnie {{max}} instrukcji. Usuń jedną, aby dodać kolejną.",
     "mcp": {
       "title": "Serwery MCP",

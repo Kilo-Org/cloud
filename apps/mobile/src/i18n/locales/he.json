@@ -4609,6 +4609,7 @@
     "instructionSaveFailed": "לא ניתן היה לשמור את ההוראה",
     "instructionDeleteFailed": "לא ניתן היה למחוק את ההוראה",
     "instructionToggleFailed": "לא ניתן היה לעדכן את ההוראה",
+    "instructionViewTitle": "קובץ הוראה",
     "instructionLimitReached": "פרופיל יכול להכיל עד {{max}} הוראות. מחקו אחת כדי להוסיף אחרת.",
     "mcp": {
       "title": "שרתי MCP",

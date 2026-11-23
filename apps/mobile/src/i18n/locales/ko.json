@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "지침을 저장하지 못했습니다",
     "instructionDeleteFailed": "지침을 삭제하지 못했습니다",
     "instructionToggleFailed": "지침을 업데이트하지 못했습니다",
+    "instructionViewTitle": "지침 파일",
     "instructionLimitReached": "프로필당 지침은 최대 {{max}}개까지 가능합니다. 하나를 삭제하고 추가하세요.",
     "mcp": {
       "title": "MCP 서버",

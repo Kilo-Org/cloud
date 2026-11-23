@@ -4609,6 +4609,7 @@
     "instructionSaveFailed": "Impossibile salvare l'istruzione",
     "instructionDeleteFailed": "Impossibile eliminare l'istruzione",
     "instructionToggleFailed": "Impossibile aggiornare l'istruzione",
+    "instructionViewTitle": "File dell'istruzione",
     "instructionLimitReached": "Un profilo può contenere fino a {{max}} istruzioni. Eliminane una per aggiungerne un'altra.",
     "mcp": {
       "title": "server MCP",

@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "无法保存指令",
     "instructionDeleteFailed": "无法删除指令",
     "instructionToggleFailed": "无法更新指令",
+    "instructionViewTitle": "指令文件",
     "instructionLimitReached": "一个配置最多可包含 {{max}} 条指令。请删除一条以添加新的。",
     "mcp": {
       "title": "MCP 服务器",

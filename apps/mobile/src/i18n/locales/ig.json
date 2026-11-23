@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Enweghị ike ichekwa ntụziaka",
     "instructionDeleteFailed": "Enweghị ike ihichapụ ntụziaka",
     "instructionToggleFailed": "Enweghị ike imelite ntụziaka",
+    "instructionViewTitle": "Faịlụ ntụziaka",
     "instructionLimitReached": "Profaịlụ nwere ike ịnwe ihe ruru ntụziaka {{max}}. Hichapụ otu ka ịtinye ọzọ.",
     "mcp": {
       "title": "Ihe nkesa MCP",

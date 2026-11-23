@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Anweisung konnte nicht gespeichert werden",
     "instructionDeleteFailed": "Anweisung konnte nicht gelöscht werden",
     "instructionToggleFailed": "Anweisung konnte nicht aktualisiert werden",
+    "instructionViewTitle": "Anweisungsdatei",
     "instructionLimitReached": "Ein Profil kann bis zu {{max}} Anweisungen enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "mcp": {
       "title": "MCP-Server",

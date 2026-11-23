@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Зааврыг хадгалж чадсангүй",
     "instructionDeleteFailed": "Зааврыг устгаж чадсангүй",
     "instructionToggleFailed": "Зааврыг шинэчилж чадсангүй",
+    "instructionViewTitle": "Зааврын файл",
     "instructionLimitReached": "Профайлд хамгийн ихдээ {{max}} заавар байж болно. Өөр нэмэхийн тулд нэгийг устгана уу.",
     "mcp": {
       "title": "MCP серверүүд",

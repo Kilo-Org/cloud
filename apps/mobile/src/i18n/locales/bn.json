@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "নির্দেশনা সংরক্ষণ করা যায়নি",
     "instructionDeleteFailed": "নির্দেশনা মোছা যায়নি",
     "instructionToggleFailed": "নির্দেশনা আপডেট করা যায়নি",
+    "instructionViewTitle": "নির্দেশনার ফাইল",
     "instructionLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি নির্দেশনা থাকতে পারে। আরেকটি যোগ করতে একটি মুছুন।",
     "mcp": {
       "title": "MCP সার্ভার",

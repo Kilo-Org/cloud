@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "無法儲存指示",
     "instructionDeleteFailed": "無法刪除指示",
     "instructionToggleFailed": "無法更新指示",
+    "instructionViewTitle": "指示檔案",
     "instructionLimitReached": "每個設定檔最多可有 {{max}} 個指示。請刪除一個以新增其他指示。",
     "mcp": {
       "title": "MCP伺服器",

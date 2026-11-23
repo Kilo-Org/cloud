@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "સૂચના સેવ કરી શકાઈ નહીં",
     "instructionDeleteFailed": "સૂચના કાઢી શકાઈ નહીં",
     "instructionToggleFailed": "સૂચના અપડેટ કરી શકાઈ નહીં",
+    "instructionViewTitle": "સૂચના ફાઇલ",
     "instructionLimitReached": "એક પ્રોફાઇલમાં વધુમાં વધુ {{max}} સૂચનાઓ રાખી શકાય. બીજી ઉમેરવા એક કાઢી નાખો.",
     "mcp": {
       "title": "MCP સર્વર્સ",

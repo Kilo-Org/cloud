@@ -4777,6 +4777,7 @@
     "instructionSaveFailed": "Ma setgħetx tiġi salvata l-istruzzjoni",
     "instructionDeleteFailed": "Ma setgħetx tiġi mħassra l-istruzzjoni",
     "instructionToggleFailed": "Ma setgħetx tiġi aġġornata l-istruzzjoni",
+    "instructionViewTitle": "Fajl tal-istruzzjoni",
     "instructionLimitReached": "Profil jista' jżomm sa {{max}} struzzjonijiet. Ħassar waħda biex iżżid oħra.",
     "mcp": {
       "title": "servers MCP",

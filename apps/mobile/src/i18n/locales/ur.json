@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "ہدایت محفوظ نہیں ہو سکی",
     "instructionDeleteFailed": "ہدایت حذف نہیں ہو سکی",
     "instructionToggleFailed": "ہدایت اپ ڈیٹ نہیں ہو سکی",
+    "instructionViewTitle": "ہدایت کی فائل",
     "instructionLimitReached": "ایک پروفائل میں زیادہ سے زیادہ {{max}} ہدایات ہو سکتی ہیں۔ مزید شامل کرنے کے لیے ایک حذف کریں۔",
     "mcp": {
       "title": "MCP سرورز",

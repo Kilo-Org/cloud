@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Imeshindwa kuhifadhi elekezo",
     "instructionDeleteFailed": "Imeshindwa kufuta elekezo",
     "instructionToggleFailed": "Imeshindwa kusasisha elekezo",
+    "instructionViewTitle": "Faili ya elekezo",
     "instructionLimitReached": "Wasifu unaweza kubeba elekezo {{max}} kwa juu. Futa moja ili kuongeza nyingine.",
     "mcp": {
       "title": "seva za MCP",

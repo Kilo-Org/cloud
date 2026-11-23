@@ -4609,6 +4609,7 @@
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",
     "instructionToggleFailed": "Instrucțiunea nu a putut fi actualizată",
+    "instructionViewTitle": "Fișier de instrucțiuni",
     "instructionLimitReached": "Un profil poate avea până la {{max}} instrucțiuni. Șterge una pentru a adăuga alta.",
     "mcp": {
       "title": "servere MCP",

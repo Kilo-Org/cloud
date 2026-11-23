@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "निर्देशन सुरक्षित गर्न सकिएन",
     "instructionDeleteFailed": "निर्देशन मेट्न सकिएन",
     "instructionToggleFailed": "निर्देशन अद्यावधिक गर्न सकिएन",
+    "instructionViewTitle": "निर्देशन फाइल",
     "instructionLimitReached": "एउटा प्रोफाइलमा बढीमा {{max}} निर्देशन राख्न सकिन्छ। अर्को थप्न एउटा मेट्नुहोस्।",
     "mcp": {
       "title": "MCP सर्भरहरू",

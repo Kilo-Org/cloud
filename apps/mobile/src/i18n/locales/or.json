@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "ନିର୍ଦ୍ଦେଶ ସେଭ ହୋଇପାରିଲା ନାହିଁ",
     "instructionDeleteFailed": "ନିର୍ଦ୍ଦେଶ ଡିଲିଟ ହୋଇପାରିଲା ନାହିଁ",
     "instructionToggleFailed": "ନିର୍ଦ୍ଦେଶ ଅପଡେଟ ହୋଇପାରିଲା ନାହିଁ",
+    "instructionViewTitle": "ନିର୍ଦ୍ଦେଶ ଫାଇଲ",
     "instructionLimitReached": "ଏକ ପ୍ରୋଫାଇଲରେ ସର୍ବାଧିକ {{max}} ନିର୍ଦ୍ଦେଶ ରଖାଯାଇପାରେ। ଆଉଟି ଯୋଡ଼ିବା ପାଇଁ ଗୋଟିଏ ଡିଲିଟ କରନ୍ତୁ।",
     "mcp": {
       "title": "MCP ସର୍ଭରଗୁଡ଼ିକ।",

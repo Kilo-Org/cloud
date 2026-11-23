@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Kò lè fi ìlànà náà pamọ́",
     "instructionDeleteFailed": "Kò lè pa ìlànà náà rẹ́",
     "instructionToggleFailed": "Kò lè ṣàtúnṣe ìlànà náà",
+    "instructionViewTitle": "Fáìlì ìlànà",
     "instructionLimitReached": "Profáìlì kan lè gba ìlànà tó pọ̀ jù {{max}}. Pa ọ̀kan rẹ́ kí o lè fi òmíràn kún.",
     "mcp": {
       "title": "Awọn olupin MCP",

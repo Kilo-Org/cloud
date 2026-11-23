@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Gat ekki vistað leiðbeininguna",
     "instructionDeleteFailed": "Gat ekki eytt leiðbeiningunni",
     "instructionToggleFailed": "Gat ekki uppfært leiðbeininguna",
+    "instructionViewTitle": "Leiðbeiningarskrá",
     "instructionLimitReached": "Snið getur haft allt að {{max}} leiðbeiningar. Eyða einni til að bæta við annarri.",
     "mcp": {
       "title": "MCP netþjóna",

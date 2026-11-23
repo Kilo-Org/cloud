@@ -4609,6 +4609,7 @@
     "instructionSaveFailed": "No s'ha pogut desar la instrucció",
     "instructionDeleteFailed": "No s'ha pogut eliminar la instrucció",
     "instructionToggleFailed": "No s'ha pogut actualitzar la instrucció",
+    "instructionViewTitle": "Fitxer d'instrucció",
     "instructionLimitReached": "Un perfil pot tenir fins a {{max}} instruccions. Elimina'n una per afegir-ne una altra.",
     "mcp": {
       "title": "Servidors MCP",

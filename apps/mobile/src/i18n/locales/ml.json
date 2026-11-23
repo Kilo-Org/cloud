@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "നിർദ്ദേശം സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "instructionDeleteFailed": "നിർദ്ദേശം ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല",
     "instructionToggleFailed": "നിർദ്ദേശം അപ്ഡേറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "instructionViewTitle": "നിർദ്ദേശ ഫയൽ",
     "instructionLimitReached": "ഒരു പ്രൊഫൈലിൽ {{max}} നിർദ്ദേശങ്ങൾ വരെ ഉണ്ടാകാം. കൂടുതൽ ചേർക്കാൻ ഒന്ന് ഇല്ലാതാക്കുക.",
     "mcp": {
       "title": "MCP സെർവറുകൾ",

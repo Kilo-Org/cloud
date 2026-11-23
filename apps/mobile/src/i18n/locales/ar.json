@@ -4861,6 +4861,7 @@
     "instructionSaveFailed": "تعذّر حفظ التعليمات",
     "instructionDeleteFailed": "تعذّر حذف التعليمات",
     "instructionToggleFailed": "تعذّر تحديث التعليمات",
+    "instructionViewTitle": "ملف التعليمات",
     "instructionLimitReached": "يمكن أن يحتوي الملف الشخصي على {{max}} تعليمات كحد أقصى. احذف واحدة لإضافة أخرى.",
     "mcp": {
       "title": "خوادم MCP",

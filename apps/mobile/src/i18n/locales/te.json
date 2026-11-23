@@ -4527,6 +4527,7 @@
     "instructionSaveFailed": "సూచనను సేవ్ చేయలేకపోయాం",
     "instructionDeleteFailed": "సూచనను తొలగించలేకపోయాం",
     "instructionToggleFailed": "సూచనను అప్‌డేట్ చేయలేకపోయాం",
+    "instructionViewTitle": "సూచన ఫైల్",
     "instructionLimitReached": "ఒక ప్రొఫైల్‌లో గరిష్ఠంగా {{max}} సూచనలు ఉండగలవు. మరొకటి జోడించడానికి ఒకటి తొలగించండి.",
     "mcp": {
       "title": "MCP సర్వర్లు",

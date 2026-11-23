@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "Ko'rsatmani saqlab bo'lmadi",
     "instructionDeleteFailed": "Ko'rsatmani o'chirib bo'lmadi",
     "instructionToggleFailed": "Ko'rsatmani yangilab bo'lmadi",
+    "instructionViewTitle": "Ko'rsatma fayli",
     "instructionLimitReached": "Profilga {{max}} tagacha ko'rsatma sig'adi. Boshqasini qo'shish uchun bittasini o'chiring.",
     "mcp": {
       "title": "MCP serverlari",

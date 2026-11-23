@@ -4525,6 +4525,7 @@
     "instructionSaveFailed": "An kasa adana umarnin",
     "instructionDeleteFailed": "An kasa share umarnin",
     "instructionToggleFailed": "An kasa sabunta umarnin",
+    "instructionViewTitle": "Fayil ɗin umarni",
     "instructionLimitReached": "Bayanin na iya ɗaukar umarni har {{max}}. Share ɗaya don ƙara wani.",
     "mcp": {
       "title": "Sabar MCP",

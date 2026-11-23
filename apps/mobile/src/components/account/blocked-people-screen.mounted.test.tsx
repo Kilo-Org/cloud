@@ -132,13 +132,15 @@ describe('BlockedPeopleScreen', () => {
   });
 
   it('describes a terminal refresh failure as the earlier snapshot, not a failed load', async () => {
-    // The rows are still on screen, so the copy must not claim nothing loaded.
+    // The rows are still on screen, so neither the title nor the description
+    // may claim the content failed to load.
     state.error = true;
     state.errorCode = 'BAD_REQUEST';
     const root = await mount();
 
     const notice = root.find(node => Object.is(node.type, 'QueryError'));
     expect(notice.props.variant).toBe('terminal');
+    expect(notice.props.title).toBe('Something went wrong');
     expect(notice.props.message).toBe('Showing what was loaded earlier. It cannot be refreshed.');
     expect(notice.props.onRetry).toBeUndefined();
   });

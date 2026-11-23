@@ -20,6 +20,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
+import { CREDIT_EVENT_CLIENT_FIELDS } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   claimBouncerCreditEventByEventId,
@@ -53,13 +54,6 @@ function isOrganizationCreditEvent(row: BouncerCreditEventOutboxRow): boolean {
   const orgId = row.payload?.orgId;
   return typeof orgId === 'string' && orgId.length > 0;
 }
-
-/**
- * The wire fields that describe the attributed account's client (its address, its TLS/HTTP
- * fingerprint, and the card it used), rather than the organization the event is reported against.
- * An organization row publishes them only while its attributed account is active.
- */
-const CLIENT_DERIVED_FIELDS = ['ip', 'ipCountry', 'ja4', 'cardFingerprint', 'cardCountry'] as const;
 
 export type BouncerCreditEventOutboxDispatchSummary = {
   reclaimed: number;
@@ -192,7 +186,7 @@ async function dispatchCreditEvent(
     return failed ? 'failed' : 'retried';
   }
   if (organizationEvent && ownerGone) {
-    for (const field of CLIENT_DERIVED_FIELDS) delete body[field];
+    for (const field of CREDIT_EVENT_CLIENT_FIELDS) delete body[field];
   }
 
   const result = await deliverCreditEventWireBody(body);

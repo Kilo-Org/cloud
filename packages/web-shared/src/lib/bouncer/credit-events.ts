@@ -52,6 +52,19 @@ export async function organizationBouncerAccountId(
 }
 
 /**
+ * The credit-event wire fields that describe the attributed account's client: its address, its
+ * TLS/HTTP fingerprint, and the card it used. An organization row publishes them only while its
+ * attributed account is active.
+ */
+export const CREDIT_EVENT_CLIENT_FIELDS = [
+  'ip',
+  'ipCountry',
+  'ja4',
+  'cardFingerprint',
+  'cardCountry',
+] as const;
+
+/**
  * Enqueues one credit event into the durable outbox. For a personal event, the soft-delete check
  * locks the user row `FOR UPDATE`, so it must run inside a transaction (the callers pass
  * `db.transaction` or an open transaction) for the lock to hold; the
@@ -80,7 +93,9 @@ export async function enqueueCreditEvent(
   // The gone/deleting skip is for the event's subject. A personal event's subject is the account
   // in `userId`, so the `FOR UPDATE` lock serializes the insert against a concurrent soft delete.
   // An organization event's subject is the organization, which `withOrganizationPayer` resolves
-  // to the family payer; its `userId` is attribution only.
+  // to the family payer; its `userId` is attribution only, so the row is always enqueued and the
+  // attributed client's fields are withheld while that account is gone or deleting.
+  let attributedAccountGone = false;
   if (!event.orgId) {
     const [owner] = await database
       .select({ blockedReason: kilocode_users.blocked_reason })
@@ -95,15 +110,28 @@ export async function enqueueCreditEvent(
       });
       return { enqueued: false };
     }
+  } else {
+    const [attributedAccount] = await database
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, event.userId))
+      .limit(1);
+    attributedAccountGone = Boolean(
+      attributedAccount && isGoneOrDeletingBlockedReason(attributedAccount.blockedReason)
+    );
   }
   const payerEvent = await withOrganizationPayer(database, event);
+  const payload = creditEventWireBody(payerEvent);
+  if (attributedAccountGone) {
+    for (const field of CREDIT_EVENT_CLIENT_FIELDS) delete payload[field];
+  }
   return enqueueBouncerCreditEvent(database, {
     // The dedupe key is the wire identity (exact when <=128 chars, else SHA-256), the same value
     // bouncer receives, so two source ids never collapse to one identity.
     eventId: bouncerWireEventId(event.eventId),
     eventType: event.type,
     userId: event.userId,
-    payload: creditEventWireBody(payerEvent),
+    payload,
   });
 }
 

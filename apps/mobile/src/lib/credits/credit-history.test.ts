@@ -220,22 +220,24 @@ describe('buildCreditHistoryItems', () => {
     expect(items[0]).toMatchObject({ kind: 'purchase', status: { id: 'expiry' } });
   });
 
-  it('keeps the first status row and lists the second close of one grant', () => {
+  it('keeps the newest close as the status and lists the older one', () => {
+    // The ledger hands its rows over newest first, so the newer voidance is the
+    // row the block paints; the older expiry stays a row of its own.
     const items = buildCreditHistoryItems(
       [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
       [
-        deduction({
-          id: 'expiry',
-          date: '2026-04-01T00:00:00.000Z',
-          kind: 'adjustment',
-          expiry: 'expired',
-          purchase: listedGrant(),
-        }),
         deduction({
           id: 'voided',
           date: '2026-05-01T00:00:00.000Z',
           kind: 'adjustment',
           expiry: 'voided',
+          purchase: listedGrant(),
+        }),
+        deduction({
+          id: 'expiry',
+          date: '2026-04-01T00:00:00.000Z',
+          kind: 'adjustment',
+          expiry: 'expired',
           purchase: listedGrant(),
         }),
       ],
@@ -244,9 +246,9 @@ describe('buildCreditHistoryItems', () => {
 
     // One block can paint one status line, so the second row of the same grant
     // stays a row of its own below the purchase rather than disappearing.
-    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:voided']);
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:expiry']);
     expect(items.find(item => item.kind === 'purchase')).toMatchObject({
-      status: { id: 'expiry' },
+      status: { id: 'voided' },
     });
   });
 

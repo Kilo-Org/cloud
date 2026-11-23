@@ -543,6 +543,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_category: 'credits_expired',
       original_transaction_id: creditIds[12],
       credit_source: 'stripe',
+      // `computeExpiration` copies the grant's policy onto the row it writes.
+      paid_credit_policy: 'one_year',
       created_at: expiredPurchaseExpiryAt,
     },
   ]);

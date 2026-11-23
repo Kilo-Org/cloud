@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { z } from 'zod';
 import { startDownloadFixture, USER_PAGE_PATH } from './download-fixture';
+import type { DownloadFixture } from './download-fixture';
 import { seedExtensionAuth } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { activateTab } from './local-agents-fixture';
 import { launchRealDownloadBrowser } from './real-download-launch';
+import type { RealDownloadBrowser } from './real-download-launch';
 
 /*
  * The unpacked build as Chrome itself lists it: the manager page with developer
@@ -101,22 +103,25 @@ test('the unpacked build is listed with developer mode on', async ({}, testInfo)
 // eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
 test('the panel shows its own gateway error in the real browser', async ({}, testInfo) => {
   test.setTimeout(120_000);
-  const fixture = await startDownloadFixture();
-  const launch = await launchRealDownloadBrowser();
-  const { context, extensionId } = launch;
-  await mockKiloApi(context, {});
-
-  /*
-   * Registered after `mockKiloApi`, so this handler runs first: Playwright tries
-   * the most recently added route for a matching request. The gateway answers a
-   * 500, which the turn runner retries transparently twice before the panel
-   * reports it, so the alert appears only after the retry delays.
-   */
-  await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', route =>
-    route.fulfill({ json: { error: { message: 'stub failure' } }, status: 500 })
-  );
+  let fixture: DownloadFixture | null = null;
+  let launch: RealDownloadBrowser | null = null;
 
   try {
+    fixture = await startDownloadFixture();
+    launch = await launchRealDownloadBrowser();
+    const { context, extensionId } = launch;
+    await mockKiloApi(context, {});
+
+    /*
+     * Registered after `mockKiloApi`, so this handler runs first: Playwright tries
+     * the most recently added route for a matching request. The gateway answers a
+     * 500, which the turn runner retries transparently twice before the panel
+     * reports it, so the alert appears only after the retry delays.
+     */
+    await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', route =>
+      route.fulfill({ json: { error: { message: 'stub failure' } }, status: 500 })
+    );
+
     const targetPage = await context.newPage();
     await targetPage.goto(`${fixture.url}${USER_PAGE_PATH}`);
 
@@ -150,7 +155,7 @@ test('the panel shows its own gateway error in the real browser', async ({}, tes
       path: testInfo.outputPath('side-panel-gateway-error.png'),
     });
   } finally {
-    await launch.close();
-    await fixture.close();
+    await launch?.close();
+    await fixture?.close();
   }
 });

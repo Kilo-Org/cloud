@@ -16,10 +16,14 @@ export function openPaidDatabase(): { db: D1Database; sqlite: DatabaseSync } {
 /**
  * Insert the router config the planner reads. Column set mirrors the current migration, so a
  * schema change fails here loudly instead of silently passing against a hand-written table.
+ *
+ * `benchmarkUserId` must be an internal bot user or the deployment-wide default; the resolver
+ * refuses anything else, so a caller that needs the drain and alias sync to work passes one.
  */
 export function seedBenchmarkConfig(
   sqlite: DatabaseSync,
-  router: 'efficient' | 'frontier' = 'efficient'
+  router: 'efficient' | 'frontier' = 'efficient',
+  benchmarkUserId = 'bench-user'
 ): void {
   const at = '2026-01-01T00:00:00.000Z';
   sqlite
@@ -27,9 +31,9 @@ export function seedBenchmarkConfig(
       `INSERT INTO benchmark_config
         (router, min_accuracy, switch_cost_factor, max_concurrency, benchmark_user_id,
           benchmark_org_id, updated_at)
-      VALUES (?, 0.7, 1, 80, 'bench-user', 'bench-org', ?)`
+      VALUES (?, 0.7, 1, 80, ?, 'bench-org', ?)`
     )
-    .run(router, at);
+    .run(router, benchmarkUserId, at);
   sqlite
     .prepare('INSERT INTO config_classifier_models (router, model) VALUES (?, ?)')
     .run(router, 'vendor/classifier');

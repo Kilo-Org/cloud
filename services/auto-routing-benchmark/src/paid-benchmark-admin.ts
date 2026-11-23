@@ -31,7 +31,7 @@ const ADMIN_REQUEST_COLUMNS = `id, owner_type, owner_id, organization_id, router
 
 type AdminRequestRow = Omit<
   PaidBenchmarkRequestRow,
-  'quote_id' | 'pool_version' | 'engine_identity' | 'context' | 'updated_at'
+  'quote_id' | 'pool_version' | 'engine_identity' | 'context' | 'updated_at' | 'last_staged_at'
 >;
 
 type AdminCaseCounts = PaidBenchmarkAdminRequest['counts'];

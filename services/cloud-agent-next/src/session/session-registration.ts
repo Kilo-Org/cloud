@@ -1625,6 +1625,7 @@ function buildSessionRegistrationCommand(
           requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
         }
       : {}),
+    environmentSetup: input.environmentSetup,
     hostedGitHubRepositories: input.hostedGitHubRepositories,
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,

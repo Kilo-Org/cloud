@@ -23,8 +23,11 @@ const findingTitleLines: readonly PushCatalogKey[] = [
 void [genericTitle, findingBody, findingTitleLines];
 
 // The type is closed: a misspelt leaf, a section used as a leaf, and any plain
-// string are all rejected, so removing a `satisfies PushCatalogKey` above is not
-// a silent miss.
+// `string` are rejected, and a constant whose value drifts away from the catalog
+// still fails the positive assertions above if its own `satisfies` clause is
+// dropped. A key renamed in `en.json` alone is caught by those `satisfies`
+// clauses in `push-i18n-keys.ts`, under this same typecheck; this file cannot
+// see the module-private `SESSION_TITLE_KEY` and `SECURITY_LIFECYCLE_BODY_KEY`.
 // @ts-expect-error 'generic.titl' is not a key the English catalog defines
 const misspelt: PushCatalogKey = 'generic.titl';
 // @ts-expect-error 'internal.securityFindingNew' names a section, not a leaf

@@ -1,7 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -128,7 +128,7 @@ export function DiscordMembershipRow({
   const router = useRouter();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { feedback, failure, begin } = useSurfaceFeedback<DiscordVerifyFailure>();
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<DiscordVerifyFailure>();
   /** A verify attempt settled on this mount, so the action offers a re-check. */
   const [attempted, setAttempted] = useState(false);
 
@@ -153,7 +153,24 @@ export function DiscordMembershipRow({
   );
 
   const view = discordMembershipView(hasDiscordLinked, status.data, status.isError);
-  const failureMessage = failure === null ? null : verifyFailureMessage(failure);
+  /**
+   * A verify failure answers the attempt the person just made, so it paints only
+   * while the row still reports the membership that attempt read. A read that
+   * has answered since (a retry, a refetch, a fresh mount of the query) is a
+   * newer sentence about the same fact, and the row shows that instead: the
+   * load-failure copy with its Retry, the date, or the not-a-member line.
+   */
+  const readAnsweredAt = status.dataUpdatedAt;
+  const lastAnsweredAt = useRef(readAnsweredAt);
+  useEffect(() => {
+    if (lastAnsweredAt.current === readAnsweredAt) {
+      return;
+    }
+    lastAnsweredAt.current = readAnsweredAt;
+    clearWhere(() => true);
+  }, [readAnsweredAt, clearWhere]);
+  const failureMessage =
+    view.kind === 'notMember' && failure !== null ? verifyFailureMessage(failure) : null;
   const verifying = feedback.status === 'pending';
 
   const onVerify = () => {
@@ -238,7 +255,7 @@ export function DiscordMembershipRow({
         <ConfigureRow
           icon={Shield}
           title={t('profile.discord.title')}
-          subtitle={failureMessage ?? t('profile.discord.loadFailed')}
+          subtitle={t('profile.discord.loadFailed')}
           subtitleNumberOfLines={2}
           hue="moss"
           testID={ROW_TEST_ID}

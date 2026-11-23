@@ -118,7 +118,8 @@ function mountRow(
     isAuthenticated: boolean;
     afterIdle: boolean;
     hasDiscordLinked: boolean;
-  }> = {}
+  }> = {},
+  queryClient = createTestQueryClient()
 ) {
   return renderWithProviders(
     createElement(DiscordMembershipRow, {
@@ -127,7 +128,7 @@ function mountRow(
       hasDiscordLinked: true,
       ...props,
     }),
-    { queryClient: createTestQueryClient() }
+    { queryClient }
   );
 }
 
@@ -264,6 +265,32 @@ describe('DiscordMembershipRow', () => {
     await pressTrailing(renderer.root);
 
     await waitFor(() => guildStatusQueryFn.mock.calls.length === 2);
+
+    unmount();
+  });
+
+  it('lets the read answer replace a failed verify sentence', async () => {
+    guildStatusQueryFn.mockResolvedValue(guildStatus(null));
+    verifyMutationFn.mockRejectedValue(new Error('verify failed'));
+
+    const queryClient = createTestQueryClient();
+    const { renderer, unmount } = await mountRow({}, queryClient);
+
+    await waitFor(() => rowTitle(renderer.root) === i18n.t('profile.discord.notMemberTitle'));
+    await pressTrailing(renderer.root);
+    await waitFor(() => rowSubtitle(renderer.root) === i18n.t('profile.discord.verifyFailed'));
+
+    // The read speaks again and fails with no answer behind it: the row's
+    // sentence belongs to the state it shows, so the load failure replaces the
+    // earlier attempt's copy and owns the Retry.
+    guildStatusQueryFn.mockRejectedValue(new Error('membership read failed'));
+    await act(async () => {
+      await queryClient.resetQueries({ queryKey: keys.guildStatus });
+    });
+
+    await waitFor(() => rowSubtitle(renderer.root) === i18n.t('profile.discord.loadFailed'));
+    expect(rowNode(renderer.root).props.title).toBe(i18n.t('profile.discord.title'));
+    expect(trailingAction(renderer.root).props.label).toBe(i18n.t('common.retry'));
 
     unmount();
   });

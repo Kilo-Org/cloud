@@ -7,6 +7,7 @@ import {
   isLinkAccountContextConsumed,
   linkKiloUser,
   loadLinkAccountContext,
+  resolveKiloUserId,
   type LinkAccountContext,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
@@ -17,6 +18,13 @@ import { bot } from '@/lib/bot';
 
 export type CompleteLinkAccountOutcome =
   | { status: 'linked'; context: LinkAccountContext }
+  /**
+   * The identity mapping is this Kilo account's, but another submission of the
+   * same pending link holds the single-use claim and owns replaying the stored
+   * message. This outcome carries no context: the claim winner is the only
+   * caller that may replay it.
+   */
+  | { status: 'linked_elsewhere' }
   | { status: 'used' }
   | { status: 'conflict' }
   | { status: 'context_missing' };
@@ -34,6 +42,12 @@ export type CompleteLinkAccountOutcome =
  *     unspent, and so a transient state-store failure leaves the link usable;
  *  4. consume the pending link, so it completes at most once even under
  *     concurrent submissions.
+ *
+ * The mapping write is committed before step 4, and it is idempotent per Kilo
+ * account, so the link belongs to this account from that point on. Whoever
+ * takes the single-use claim in step 4 — this submission or a concurrent one —
+ * owns replaying the stored message; the others report `linked_elsewhere`
+ * without a context, so exactly one caller hands the message back.
  *
  * A `conflict` therefore leaves the pending link unspent until its TTL. That is
  * safe: the link is bound to the submitting Kilo account and to the chat
@@ -67,11 +81,24 @@ export async function completeLinkAccount({
     return { status: 'conflict' };
   }
 
-  if (!(await consumeLinkAccountContext(state, contextKey))) {
-    return { status: 'used' };
+  let claimed = false;
+  try {
+    claimed = await consumeLinkAccountContext(state, contextKey);
+  } catch (error) {
+    // The mapping is committed; report the link as this account's instead of a
+    // failure, and leave the pending link unspent so a retry can take the claim.
+    captureException(error, { tags: { component: 'kilo-bot', op: 'link-account-claim' } });
   }
 
-  return { status: 'linked', context };
+  if (claimed) {
+    return { status: 'linked', context };
+  }
+
+  // A concurrent submission, or the claim above failing, leaves the message
+  // replay to whichever submission holds the claim.
+  return (await resolveKiloUserId(state, identity)) === user.id
+    ? { status: 'linked_elsewhere' }
+    : { status: 'used' };
 }
 
 /**

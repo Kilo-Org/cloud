@@ -199,7 +199,12 @@ async function handleSlackBotLinkCallback({
     );
   }
 
-  after(() => reprocessLinkedContext(provenIdentity, outcome.context, user));
+  // `linked_elsewhere` means the mapping is this account's but another
+  // submission of the same link holds the single-use claim and owns the replay,
+  // so only a `linked` outcome replays the stored message.
+  if (outcome.status === 'linked') {
+    after(() => reprocessLinkedContext(provenIdentity, outcome.context, user));
+  }
 
   return page(
     'Account linked',

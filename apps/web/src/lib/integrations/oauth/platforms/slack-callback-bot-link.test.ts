@@ -310,6 +310,24 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     await expect(mappedKiloUser()).resolves.toBeNull();
   });
 
+  it('reports the account as linked when a concurrent submission holds the claim', async () => {
+    const contextKey = await seedPendingLink();
+    await state.set(`identity:slack:${SLACK_TEAM_ID}:${SLACK_USER_ID}`, KILO_USER_ID);
+
+    const setIfNotExists = state.setIfNotExists;
+    state.setIfNotExists = async (key, value, ttl) => {
+      if (key.endsWith(':consumed')) return false;
+      return await setIfNotExists(key, value, ttl);
+    };
+
+    const response = await callCallback({ state: botLinkState(contextKey) });
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('Account linked');
+    expect(mockAfter).not.toHaveBeenCalled();
+    await expect(mappedKiloUser()).resolves.toBe(KILO_USER_ID);
+  });
+
   it('reports an expired link when the pending context is gone', async () => {
     const response = await callCallback({
       state: botLinkState('link-account-context:deleted'),

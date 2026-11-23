@@ -267,10 +267,11 @@ export type StoreUnavailableCopyKeys = {
  * The three bodies keep the three outcomes apart: a store that priced no pack
  * is a catalog answer, a store that failed to answer is a failure, and a store
  * that never answered inside the deadline is a timeout. A timeout must not
- * read as a catalog claim. The purchase screen keeps its own shorter pair
- * (`credits.storeUnreachable*` and `creditStoreTimeoutKey`) because its inline
- * tile is one line beside the pack rows, so this card's bodies are the only
- * place this longer wording reaches.
+ * read as a catalog claim. These bodies serve this card and the screen's
+ * products connection banner, so the longer wording reaches both. Only the
+ * purchase screen's inline error tile keeps a shorter pair
+ * (`credits.storeUnreachable*` and `creditStoreTimeoutKey`), because that
+ * tile is one line beside the pack rows.
  */
 export function getStoreUnavailableCopyKeys(
   storefront: 'app_store' | 'play'

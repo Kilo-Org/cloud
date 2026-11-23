@@ -136,6 +136,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Multiple users matched ${email}; use an email that names one account.`);
   }
 
+  // The account signs in by email, and the server infers that method only from
+  // an account with no provider rows (`inferRowlessAuthProviders`). Writing the
+  // Discord row would otherwise take the email method away, and the app would
+  // answer `DIFFERENT-OAUTH` instead of sending a code. A real account that
+  // linked Discord from the app keeps both rows, so the fixture writes both.
+  await db
+    .insert(user_auth_provider)
+    .values({
+      kilo_user_id: user.id,
+      provider: 'email',
+      provider_account_id: user.email,
+      email: user.email,
+      avatar_url: user.avatar,
+      display_name: user.name,
+    })
+    .onConflictDoNothing();
+
   // Reset only this user's own two facts: the Discord link row and the stamp.
   await db
     .delete(user_auth_provider)

@@ -14,7 +14,9 @@ export type CloudAgentAttachments = {
  * workspace and `/workspace/<userId>/worktrees/<worktreeId>` for a
  * worktree-backed session, either optionally under an organization id
  * (`services/cloud-agent-next/src/workspace.ts:200-224`). The isolated
- * container layout clones at `/workspace/app`.
+ * container layout clones at `/workspace/app`. The absolute form must lead the
+ * path, so a repository-relative path that merely contains a
+ * `/workspace/<name>/sessions/<id>` shape keeps its own directories.
  *
  * A reader wants the repo-relative path, not the account, session and worktree
  * ids that lead to it. Patch parts and tool inputs can also carry the relative
@@ -34,7 +36,7 @@ const WORKSPACE_ID_PREFIX = String.raw`(?:ses_|sess_|agent_|workspace_|worktree_
 /** Every root pattern ends at a path separator or the end of the string. */
 const ROOT_BOUNDARY = String.raw`(?=\/|$)`;
 const ABSOLUTE_CLOUD_AGENT_ROOT = new RegExp(
-  String.raw`^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:` +
+  String.raw`^\/workspace\/(?:[^/]+\/)?[^/]+\/(?:` +
     WORKSPACE_KIND +
     String.raw`)\/` +
     WORKSPACE_ID_PREFIX +

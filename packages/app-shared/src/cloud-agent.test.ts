@@ -100,4 +100,16 @@ describe('cloudAgentFileLabel', () => {
   it('leaves a path outside a cloud workspace untouched', () => {
     expect(cloudAgentFileLabel('/Users/me/project/src/a.ts')).toBe('/Users/me/project/src/a.ts');
   });
+
+  it('keeps leading directories that only resemble a workspace root', () => {
+    expect(cloudAgentFileLabel('docs/workspace/standup/sessions/ses_1/notes.md')).toBe(
+      'docs/workspace/standup/sessions/ses_1/notes.md'
+    );
+    expect(cloudAgentFileLabel('packages/workspace/x/worktrees/worktree_2/src/a.ts')).toBe(
+      'packages/workspace/x/worktrees/worktree_2/src/a.ts'
+    );
+    expect(cloudAgentFileLabel('/private/workspace/user-1/worktrees/worktree_abc/src/a.ts')).toBe(
+      '/private/workspace/user-1/worktrees/worktree_abc/src/a.ts'
+    );
+  });
 });

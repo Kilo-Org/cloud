@@ -3,8 +3,6 @@ import { storage } from '#imports';
 import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
-import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
-import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
 import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
 import type { DownloadHold } from '@/src/shared/browser-download-hold';
 import type { DownloadHoldPermissionsApi } from '@/src/shared/browser-download-hold-listener';
@@ -57,11 +55,10 @@ import type {
   BrowserScriptingApi,
   BrowserTabsApi,
   ChromeDebuggerApi,
-  EvalTabResult,
   TabDebuggerRequest,
   TabDebuggerResponse,
-  WebMcpDiscoveryResult,
 } from '@/src/shared/tab-debugger';
+import { webMcpDispatchHooks } from '@/src/shared/web-mcp-tools';
 
 interface ChromeRuntimeApi {
   readonly id?: string;
@@ -234,57 +231,6 @@ export const getBrowserRuntime = ({
 
   return runtime;
 };
-
-const webMcpDiscoveryValueSchema = z.object({
-  documentId: z.string(),
-  tools: z.array(
-    z.object({
-      description: z.string(),
-      inputSchema: z.unknown(),
-      name: z.string(),
-      origin: z.string(),
-      title: z.string(),
-    })
-  ),
-});
-
-/**
- * The WebMCP runtime hooks the page-family handlers need for
- * `browser_webmcp_list`/`browser_webmcp_call`, wired to the same injected
- * discovery/execution helpers the standalone WebMCP messages use. The
- * execution hook is signature-checked by the page handler before anything
- * runs in the page.
- */
-const webMcpDispatchOptions = (
-  scriptingApi: BrowserScriptingApi | undefined
-): Pick<BrowserToolDispatchOptions, 'webMcpDiscover' | 'webMcpExecute'> => ({
-  webMcpDiscover:
-    scriptingApi === undefined
-      ? undefined
-      : async (tabId: number): Promise<WebMcpDiscoveryResult | undefined> => {
-          const discovery = await discoverWebMcpToolsInTab({ scriptingApi, tabId });
-
-          if (!discovery.ok) {
-            return undefined;
-          }
-
-          const parsed = webMcpDiscoveryValueSchema.safeParse(discovery.value);
-
-          return parsed.success ? parsed.data : undefined;
-        },
-  webMcpExecute:
-    scriptingApi === undefined
-      ? undefined
-      : (event: WebMcpToolCallEvent): Promise<EvalTabResult> =>
-          executeWebMcpToolInTab({
-            arguments: JSON.stringify(event.arguments),
-            definitionSignature: event.definitionSignature,
-            documentId: event.documentId,
-            scriptingApi,
-            tabId: event.tabId,
-            toolName: event.name,
-          }),
-});
 
 export const handleTabDebuggerRequest = async ({
   debuggerApi,
@@ -472,7 +418,7 @@ export const handleTabDebuggerRequest = async ({
         ...(request.agent === undefined ? {} : { agent: request.agent }),
         arguments: request.arguments,
         caller: request.caller,
-        options: webMcpDispatchOptions(scriptingApi),
+        options: webMcpDispatchHooks(scriptingApi),
         ...(request.safeMode === undefined ? {} : { safeMode: request.safeMode }),
         tabId: request.tabId,
         ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),

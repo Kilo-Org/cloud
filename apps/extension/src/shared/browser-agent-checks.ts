@@ -16,6 +16,39 @@ export const dropPathsSchema = z.array(z.string().min(1));
 export const dropTargetSchema = z.string().min(1);
 
 /**
+ * The arguments `browser_webmcp_call` takes: a tool name and its params. Strict,
+ * because a key this tool has no room for — the vendored contract's `frame` — is
+ * refused here rather than dropped by a handler that reads the keys it knows.
+ */
+export const webMcpCallArgumentsSchema = z.strictObject({
+  name: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * The tool error for arguments `browser_webmcp_call` does not take. A caller
+ * that sends a key the tool has no room for is told which key: an argument
+ * dropped in silence is a call that does something other than what was asked.
+ */
+export const webMcpCallArgumentError = (error: z.ZodError): string => {
+  const unrecognizedKeys = error.issues.flatMap(issue =>
+    issue.code === 'unrecognized_keys' ? issue.keys : []
+  );
+
+  if (unrecognizedKeys.length > 0) {
+    const keys = unrecognizedKeys.map(key => `"${key}"`).join(', ');
+
+    return `browser_webmcp_call does not take ${keys}; it takes a tool name and its params.`;
+  }
+
+  if (error.issues.some(issue => issue.path[0] === 'name')) {
+    return 'browser_webmcp_call needs a tool name.';
+  }
+
+  return 'browser_webmcp_call arguments were invalid.';
+};
+
+/**
  * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
  * does `browser_drop` when its `paths` lists at least one local file. A drop that carries
  * only `data`, or an empty or malformed `paths`, names no file and is not an upload.

@@ -2825,12 +2825,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       // The block's fate is decided from the row's own counter inside the statement, so a
       // platform block whose last automatic attempt just happened fails here instead of
       // being deferred again, and the manual CTA is what admits it after that.
-      const outcome = await deferChunk(
-        env.BENCH_DB,
-        id,
-        token,
-        Date.now() + delaySeconds * 1000
-      );
+      const outcome = await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
       if (error instanceof BenchmarkThrottleError) {
         await cooldownModel(env.BENCH_DB, claim.model, Date.now() + delaySeconds * 1000);
       }

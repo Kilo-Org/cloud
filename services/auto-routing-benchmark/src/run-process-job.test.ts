@@ -2923,12 +2923,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1 unavailable'));
     vi.mocked(deferChunk).mockReset().mockResolvedValue('failed');
     await processJob(env, deciderMessage());
-    expect(deferChunk).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      'chunk-1',
-      'token-1',
-      expect.any(Number)
-    );
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
     // The lane records the failure the block actually hit: a grading retry it could not spend
     // an attempt on.
     expect(recordLaneFailure).toHaveBeenCalledWith(

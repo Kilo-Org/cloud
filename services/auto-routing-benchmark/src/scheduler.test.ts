@@ -1861,7 +1861,13 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     });
     const config = schedulerConfig('{"slots":1}');
     for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
-      const [claim] = await claimMany(db, config, 1, `${runId}-${caseId}-${attempt}`, NOW + attempt);
+      const [claim] = await claimMany(
+        db,
+        config,
+        1,
+        `${runId}-${caseId}-${attempt}`,
+        NOW + attempt
+      );
       if (!claim) throw new Error(`Expected claim ${attempt} for ${caseId}`);
       expect(claim.case_ids).toBe(JSON.stringify([caseId]));
       await deferChunk(db, claim.id, claim.token, NOW + attempt);
@@ -1891,9 +1897,9 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
     });
     expect(storedChunks(sqlite)).toHaveLength(1);
-    expect(await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'replay-after', NOW + 10)).toEqual(
-      []
-    );
+    expect(
+      await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'replay-after', NOW + 10)
+    ).toEqual([]);
   });
 
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {
@@ -1912,8 +1918,9 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       status: 'failed',
       attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
     });
-    expect(await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'resize-after', NOW + 10))
-      .toEqual([]);
+    expect(
+      await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'resize-after', NOW + 10)
+    ).toEqual([]);
   });
 
   it('assigns every block the same chunk id and counter on every replay', async () => {

@@ -253,6 +253,45 @@ describe('useIntegrationConnect', () => {
     expect(mocks.handoffUrl).not.toHaveBeenCalled();
   });
 
+  // The launched flow awaits the browser for as long as the reader is there, so
+  // a tap on another connect card can land while the first launch is open. The
+  // hub disables only the tapped row, and the state it reads is not yet updated
+  // in that frame, so the hook itself has to refuse the second flow.
+  it('ignores a second connect while the first launch is still open', async () => {
+    const launch = Promise.withResolvers<unknown>();
+    mocks.launch.mockReturnValueOnce(launch.promise);
+    const onReturned = vi.fn(() => Promise.resolve());
+    const resultRef = mountHook('org_1', onReturned);
+
+    let first = Promise.resolve();
+    act(() => {
+      first = requireHook(resultRef).connect('github');
+    });
+
+    await connect(resultRef, 'slack');
+
+    expect(mocks.handoffUrl).toHaveBeenCalledExactlyOnceWith({
+      page: 'github-app',
+      organizationId: 'org_1',
+    });
+    expect(mocks.launch).toHaveBeenCalledExactlyOnceWith(HANDOFF_URL);
+    // The first flow still owns the hub's pending state: its spinner stays up
+    // and the second tap changed nothing.
+    expect(requireHook(resultRef).pendingProvider).toBe('github');
+    expect(onReturned).not.toHaveBeenCalled();
+
+    await act(async () => {
+      launch.resolve({
+        reported: Promise.resolve({ type: 'dismiss' }),
+        settledByLaunch: true,
+      });
+      await first;
+    });
+
+    expect(onReturned).toHaveBeenCalledOnce();
+    expect(requireHook(resultRef).pendingProvider).toBeNull();
+  });
+
   // The organization subscription gate can refuse the hand-off itself. A role
   // that can change the plan gets the copy that offers the step and the step;
   // everyone else keeps the owner-naming sentence and no step.

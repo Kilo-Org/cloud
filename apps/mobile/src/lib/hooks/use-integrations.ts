@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -222,10 +222,18 @@ export function useIntegrationConnect(params: {
   onReturned: () => Promise<void>;
 }): IntegrationConnect {
   const [pendingProvider, setPendingProvider] = useState<WebConnectProvider | null>(null);
+  // Mirrors the state so a second tap in the same frame — before the spinner
+  // reaches the tapped row — still cannot mint a second hand-off. Only the flow
+  // that claimed the ref releases it, so a late launch cannot clear a newer one.
+  const pendingProviderRef = useRef<WebConnectProvider | null>(null);
   const canManageBilling = useCanManageBilling(params.organizationId);
   const billingAction = useBillingAction(params.organizationId);
 
   async function connect(provider: WebConnectProvider) {
+    if (pendingProviderRef.current !== null) {
+      return;
+    }
+    pendingProviderRef.current = provider;
     setPendingProvider(provider);
     try {
       const url = await connectUrl(provider, params.organizationId);
@@ -243,6 +251,7 @@ export function useIntegrationConnect(params: {
         isTrialExpiredRefusal(error)
       );
     } finally {
+      pendingProviderRef.current = null;
       setPendingProvider(null);
     }
   }

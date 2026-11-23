@@ -107,20 +107,52 @@ describe('Sheet Android back before the sheet window owns it', () => {
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 
-  it('stops listening once the sheet is closed', async () => {
+  it('keeps Back for the navigator once the sheet is closed', async () => {
+    const onClose = vi.fn<() => void>();
     const { renderer } = await mount(() => undefined);
     expect(platform.backListeners).toHaveLength(1);
 
     await act(async () => {
       renderer.update(
-        <Sheet visible={false} onClose={() => undefined}>
+        <Sheet visible={false} onClose={onClose}>
           {createElement('View', { testID: 'sheet-content' })}
         </Sheet>
       );
       await Promise.resolve();
     });
 
-    expect(platform.backListeners).toHaveLength(0);
+    // The listener outlives the presentation so it can answer a press that
+    // arrives while the sheet is still being mounted, but a closed sheet never
+    // owns Back: the press is left to the navigator.
+    expect(platform.backListeners).toHaveLength(1);
+    expect(await pressBack()).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps one listener across the sheet opening and closing', async () => {
+    const onClose = vi.fn<() => void>();
+    const { renderer } = await mount(onClose);
+
+    const update = async (visible: boolean) => {
+      await act(async () => {
+        renderer.update(
+          <Sheet visible={visible} onClose={onClose}>
+            {createElement('View', { testID: 'sheet-content' })}
+          </Sheet>
+        );
+        await Promise.resolve();
+      });
+    };
+
+    // One listener for the component's life: a press never waits for a
+    // presentation to register its own, and closing never leaves the screen
+    // without one.
+    await update(false);
+    expect(platform.backListeners).toHaveLength(1);
+    await update(true);
+    expect(platform.backListeners).toHaveLength(1);
+    await update(false);
+    expect(platform.backListeners).toHaveLength(1);
   });
 
   it('leaves Back to the native sheet on iOS', async () => {

@@ -63,15 +63,26 @@ async function relaxedNoncePathAllowed(): Promise<boolean> {
   }
 }
 
-/** Returns true when the error carries an HTTP response from Google's servers,
- *  as opposed to a network or infrastructure failure. */
-function hasResponse(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    (error as { response: unknown }).response !== undefined
-  );
+/** True for a non-null, non-array object — the only shape an error, a response
+ *  or a parsed OAuth body may take. */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Returns true when the Google token endpoint refused the presented
+ * authorization code itself: HTTP 400 whose body is the OAuth `invalid_grant`
+ * error. Every other failure — a 429 or 5xx that arrives with a response after
+ * the client library's own retries, a 400 naming any other OAuth error, or an
+ * error carrying no (or an unparsed) response body — is a provider or
+ * transport fault, not a bad credential.
+ */
+function isRefusedAuthorizationCode(error: unknown): boolean {
+  if (!isObject(error)) return false;
+  const response = error.response;
+  if (!isObject(response) || response.status !== 400) return false;
+  const body = response.data;
+  return isObject(body) && typeof body.error === 'string' && body.error === 'invalid_grant';
 }
 
 export type VerifiedAppleIdToken = { sub: string; email: string };
@@ -347,10 +358,14 @@ export async function exchangeNativeGoogleAuthCode(
   try {
     tokenResponse = await client.getToken(serverAuthCode);
   } catch (error) {
-    // A replayed or expired authorization code surfaces as an OAuth error from
-    // Google with a response body.  Network or infrastructure failures have no
-    // response — propagate those as server errors so the route returns 5xx.
-    if (hasResponse(error)) {
+    // Google answers a spent, expired, replayed or misdirected authorization
+    // code with HTTP 400 and OAuth error `invalid_grant`, and that is the only
+    // answer that means the credential is bad. A 429 or 5xx from the endpoint
+    // (already retried by the client library), a 400 naming any other OAuth
+    // error, and an error carrying no response are provider or transport
+    // faults: they must reach the route as a retryable 500 instead of telling
+    // the user the credential is invalid.
+    if (isRefusedAuthorizationCode(error)) {
       throw new NativeIdTokenError('Google authorization code exchange failed', { cause: error });
     }
     throw error;

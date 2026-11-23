@@ -868,7 +868,7 @@ describe('exchangeNativeGoogleAuthCode', () => {
 
   it('throws NativeIdTokenError when getToken fails with a server response (replayed code)', async () => {
     const oauthError = Object.assign(new Error('invalid_grant'), {
-      response: { data: { error: 'invalid_grant' } },
+      response: { status: 400, data: { error: 'invalid_grant' } },
     });
     mockGetToken.mockRejectedValue(oauthError);
 
@@ -876,6 +876,50 @@ describe('exchangeNativeGoogleAuthCode', () => {
     await expect(exchangeNativeGoogleAuthCode('replayed-code')).rejects.toThrow(
       'Google authorization code exchange failed'
     );
+  });
+
+  it('propagates a rate limited token endpoint without wrapping (retryable 5xx path)', async () => {
+    // A 429 survives the client library's retries as a response-carrying
+    // error, which is still a provider fault rather than a bad credential.
+    const rateLimited = Object.assign(new Error('rate limited'), {
+      response: {
+        status: 429,
+        data: { error: { code: 429, message: 'rate limited', status: 'RESOURCE_EXHAUSTED' } },
+      },
+    });
+    mockGetToken.mockRejectedValue(rateLimited);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(rateLimited);
+  });
+
+  it('propagates an unavailable token endpoint without wrapping (retryable 5xx path)', async () => {
+    const unavailable = Object.assign(new Error('unavailable'), {
+      response: {
+        status: 503,
+        data: { error: { code: 503, message: 'unavailable', status: 'UNAVAILABLE' } },
+      },
+    });
+    mockGetToken.mockRejectedValue(unavailable);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(unavailable);
+  });
+
+  it('propagates a 400 naming another OAuth error without wrapping', async () => {
+    const clientError = Object.assign(new Error('invalid_client'), {
+      response: { status: 400, data: { error: 'invalid_client' } },
+    });
+    mockGetToken.mockRejectedValue(clientError);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(clientError);
+  });
+
+  it('propagates a 400 whose body cannot be parsed without wrapping', async () => {
+    const unparsed = Object.assign(new Error('bad request'), {
+      response: { status: 400, data: '<html>bad request</html>' },
+    });
+    mockGetToken.mockRejectedValue(unparsed);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(unparsed);
   });
 
   it('propagates network errors from getToken without wrapping (5xx path)', async () => {

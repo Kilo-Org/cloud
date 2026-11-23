@@ -194,6 +194,8 @@ describe('listActiveSessions cloud candidates', () => {
     ['question', true, 'question', '2026-09-22T09:15:00.000Z'],
     ['permission', true, 'permission', '2026-09-22T09:15:00.000Z'],
     ['idle', false, 'idle', '2026-09-22T09:15:00.000Z'],
+    [null, false, 'busy', undefined],
+    ['', false, 'busy', undefined],
   ])(
     'dates stored %s with run_open=%s only when the resolved %s status matches',
     async (storedStatus, runOpen, resolvedStatus, statusUpdatedAt) => {
@@ -209,7 +211,7 @@ describe('listActiveSessions cloud candidates', () => {
           git_url: null,
           git_branch: null,
           last_activity_at: null,
-          status_updated_at: '2026-09-22 09:15:00+00',
+          status_updated_at: storedStatus ? '2026-09-22 09:15:00+00' : null,
           total_cost_microdollars: null,
           cloud_agent_session_id: 'cas-1',
           run_open: runOpen,

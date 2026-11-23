@@ -237,7 +237,10 @@ export function resolveActiveSessionStatus(
  * while the run is open. Attention statuses pass through unchanged (a run
  * open while the agent waits on the user must still show needs-input), and a
  * row without an open run keeps its stored status, so the finished state
- * (terminal run + fresh idle) still reads idle in the warm-idle window.
+ * (terminal run + fresh idle) still reads idle in the warm-idle window. A
+ * missing status with no open run reports `busy` instead: only the
+ * `last_activity_at` recency branch admits that combination, and it proves
+ * the agent recorded work in the window.
  */
 export function resolveCloudCandidateStatus(
   storedStatus: string | null | undefined,
@@ -249,7 +252,7 @@ export function resolveCloudCandidateStatus(
   if (runOpen) {
     return 'busy';
   }
-  return storedStatus ?? '';
+  return storedStatus || 'busy';
 }
 
 function mapEnrichedHeartbeatSession(

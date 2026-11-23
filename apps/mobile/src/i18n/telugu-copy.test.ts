@@ -105,8 +105,20 @@ describe('Telugu updated-file count', () => {
 
   it('selects the other value for several files', () => {
     expect(i18n.t('agentChat.partRenderer.updatedFileCount', { count: 3, displayCount: '3' })).toBe(
-      '3 ఫైళ్లను నవీకరించారు.'
+      '3 ఫైళ్లను నవీకరించారు'
     );
+  });
+
+  it('names the setup command by its place in the total', () => {
+    expect(
+      i18n.t('agentChat.preparation.setupCommandOf', { index: '1', count: 1, displayCount: '1' })
+    ).toBe('మొత్తం 1లో 1వ సెటప్ ఆదేశం');
+  });
+
+  it('keeps the same form when the total is several commands', () => {
+    expect(
+      i18n.t('agentChat.preparation.setupCommandOf', { index: '2', count: 4, displayCount: '4' })
+    ).toBe('మొత్తం 4లో 2వ సెటప్ ఆదేశం');
   });
 });
 
@@ -148,7 +160,7 @@ describe('Telugu restart and session history copy', () => {
   });
 
   it('names a transcript that could not be read', () => {
-    expect(i18n.t('agentChat.session.historyUnavailable')).toBe('ఈ సెషన్ ట్రాన్స్క్రిప్ట్‌ను చదవలేకపోయింది.');
+    expect(i18n.t('agentChat.session.historyUnavailable')).toBe('ఈ సెషన్ ట్రాన్స్క్రిప్ట్‌ను చదవడం సాధ్యపడదు.');
   });
 });
 

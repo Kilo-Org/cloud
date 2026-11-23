@@ -919,12 +919,9 @@ async function removeSlackWorkspaceState(
  *
  * A token Slack does not confirm as revoked, a workspace a row records, and a
  * removal past its budget are reported with the team id rather than thrown: the
- * new connection stands. The function does not read its owner argument, because
- * the check asks whether any row records the workspace rather than which owner
- * does.
+ * new connection stands.
  */
 export async function retirePreviousSlackWorkspace(
-  _owner: Owner,
   previous: PreviousSlackWorkspace,
   options: SlackUninstallOptions = {}
 ): Promise<void> {

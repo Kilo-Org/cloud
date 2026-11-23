@@ -298,7 +298,6 @@ describe('handleSlackOAuthCallback replaced workspace settlement', () => {
 
     expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledTimes(1);
     expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledWith(
-      { type: 'user', id: USER_ID },
       previousWorkspace,
       expect.objectContaining({
         deleteChatSdkInstallation: expect.any(Function),

@@ -273,7 +273,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     );
 
     if (install.previousWorkspace) {
-      await retirePreviousSlackWorkspace(owner, install.previousWorkspace, {
+      await retirePreviousSlackWorkspace(install.previousWorkspace, {
         deleteChatSdkInstallation: deleteChatSdkSlackInstallation,
         deleteChatSdkIdentityCache: deleteChatSdkSlackIdentityCache,
       });

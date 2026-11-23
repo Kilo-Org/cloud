@@ -1965,7 +1965,7 @@ describe('Organizations', () => {
       }
     });
 
-    test('retires a child organization invitation when the parent organization changes', async () => {
+    test('retires a child organization invitation when its SSO source changes', async () => {
       const owner = await insertTestUser();
       const invitee = await insertTestUser({ google_user_email: 'source-move@example.com' });
       const formerParent = await createOrganization('Former SSO Parent', owner.id);
@@ -1975,10 +1975,6 @@ describe('Organizations', () => {
         .update(organizations)
         .set({ sso_domain: 'example.com' })
         .where(eq(organizations.id, formerParent.id));
-      await db
-        .update(organizations)
-        .set({ sso_domain: 'moved.example.com' })
-        .where(eq(organizations.id, nextParent.id));
       await addUserToOrganization(formerParent.id, invitee.id, 'member');
       await db
         .update(organizations)
@@ -1993,6 +1989,17 @@ describe('Organizations', () => {
       expect(invitation.authentication_requirement).toBe('workos');
       expect(invitation.sso_source_organization_id).toBe(formerParent.id);
 
+      // Move the child to a parent that claims the same domain, so only the SSO
+      // source differs from the invitation and the domain and the invitee's
+      // address still agree with the policy in force.
+      await db
+        .update(organizations)
+        .set({ sso_domain: null })
+        .where(eq(organizations.id, formerParent.id));
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, nextParent.id));
       await db
         .update(organizations)
         .set({ parent_organization_id: nextParent.id })

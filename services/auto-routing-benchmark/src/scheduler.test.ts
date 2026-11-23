@@ -1147,6 +1147,65 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
   });
 
+  it('moves both starts to the retry start when the fence accepts it', async () => {
+    // The accepting path of the shared guard: a wrong bind order or a predicate that never
+    // matches would silently refuse every retry in production, which assertions about
+    // refusals alone cannot see. Everything the guard names is valid here.
+    insertRun(sqlite, 'accepted');
+    await scheduleRunChunks(db, {
+      runId: 'accepted',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'accepted-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'accepted',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('accepted', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(1);
+    const retriedAt = NOW + 1;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'accepted', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    const retried = retryStarts();
+    const ledgerStart = retried.ledger as { started_at: number };
+    const canonicalStart = retried.canonical as { started_at: string };
+    expect(ledgerStart).toEqual({ started_at: retriedAt });
+    expect(canonicalStart).toEqual({ started_at: new Date(retriedAt).toISOString() });
+    // Both starts name the same instant, which is what RunnerCancel's live check compares.
+    expect(new Date(ledgerStart.started_at).toISOString()).toBe(canonicalStart.started_at);
+    // The claim spent one attempt, and the retry spent exactly one more.
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
+  });
+
   it('moves neither start when the run ends between the consume and the restart', async () => {
     // The two restart statements carry the SAME guard, so a fence refusal cannot move only the
     // canonical row: here the consume succeeds, then the run is paused, and the batch's guard

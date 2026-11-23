@@ -1277,11 +1277,19 @@ export async function readOwnedCaseGeneration(
  * claim token make. The launch fence compares `started_at` to ISO(attemptStartedAt), so a
  * retry that moved only the run's ledger row would be refused as `not_live`.
  *
- * It carries the ledger restart's whole guard, not just its own row predicate: the retry
- * batch must apply both starts or neither, or `benchmark_case_runs.started_at` and
- * `scheduler_executions.started_at` disagree exactly where RunnerCancel compares them. The
- * bind order matches {@link restartPaidCaseStatement}: ledger key, then `now` twice for the
- * chunk lease and the run check.
+ * It shares the ledger restart's guard so the retry's batch applies both starts or neither:
+ * the ledger row exists under this token, the chunk still holds an active unexpired lease,
+ * the run is still `running`, and the lane has no recorded failure. Those four predicates are
+ * what keep `benchmark_case_runs.started_at` and `scheduler_executions.started_at` from
+ * disagreeing where RunnerCancel's live check compares them.
+ *
+ * Not shared: the ledger statement's `? IS NULL OR started_at = ?` predicate. On this path
+ * `attemptStartedAt` is always the start the retry is leaving, so the retry can never
+ * accidentally match an unrelated ledger start, and requiring the old value here would only
+ * duplicate a check that statement already makes in the same transaction.
+ *
+ * Bind order: this statement's own two timestamps (`startedAt` twice), the case key's five
+ * columns, the executor run id and token, then `startedAt` again for the lease clock.
  */
 export function restartPaidCaseRunStatement(
   db: D1Database,

@@ -208,6 +208,8 @@ describe('Hindi instruction file-name rule', () => {
       'छोटे ASCII अक्षर या अंक से शुरू करें और केवल छोटे ASCII अक्षर, अंक और डैश रखें'
     );
   });
+});
+
 describe('Hindi Code Reviewer detail, analytics and review memory copy', () => {
   // findings: label rows keep the canonical colon label and no terminal mark,
   // the ended label names the review with feminine agreement, the uncounted

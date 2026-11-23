@@ -106,6 +106,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   })();
 
   const dark = activityEnvironment.colorScheme === 'dark';
+  // The idle dot is the only mark a connected but quiet agent draws, so it
+  // takes the palette's muted ink: that ink clears 3:1 on the card and the page.
   const palette = dark
     ? {
         bg: '#17171A',
@@ -114,7 +116,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#F2B05F',
         good: '#5FCB8E',
         info: '#60A5FA',
-        idle: '#56544F',
+        idle: '#8A8680',
         primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
@@ -127,7 +129,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#956011',
         good: '#24784A',
         info: '#2260EB',
-        idle: '#A9A39A',
+        idle: '#6F6A61',
         primary: '#4F5A10',
         primaryFg: '#FFFFFF',
         secondary: '#F0EEE6',
@@ -188,7 +190,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     needsInput: '#F2B05F',
     running: '#5FCB8E',
     scheduled: '#60A5FA',
-    idle: '#56544F',
+    idle: '#8A8680',
     failed: '#F2B05F',
   };
   const ISLAND_DOT = {

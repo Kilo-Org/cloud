@@ -428,6 +428,7 @@ export function NewSessionConfigureForm({
           onManualVarsChange={onManualVarsChange}
           onManualCommandsChange={onManualCommandsChange}
           disabled={isStarting}
+          planRefusal={planRefusal}
           onRepoDefaults={onOpenRepoDefaults}
           onRequestReveal={revealAdvancedConfig}
         />

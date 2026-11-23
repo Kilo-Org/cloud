@@ -77,6 +77,20 @@ function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSh
   };
 }
 
+/** A save that settles refused; a null refusal is the outcome with no server answer. */
+function refusedSave(refusal: string | null) {
+  return vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: false, refusal });
+}
+
+/** Records the discard confirms the sheet raises, so a case can assert whether one happened. */
+function captureConfirm() {
+  const confirm = vi.fn();
+  confirmMock.current = request => {
+    confirm(request);
+  };
+  return confirm;
+}
+
 function mount(props: Partial<SaveProfileSheetProps> = {}) {
   const ref: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
@@ -222,9 +236,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('shows the refused save inside the sheet and keeps Save live', async () => {
-    const onSave = vi
-      .fn<() => Promise<SaveProfileOutcome>>()
-      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
+    const onSave = refusedSave('A profile with this name already exists');
     const renderer = mount({ onSave });
 
     act(() => {
@@ -240,10 +252,21 @@ describe('SaveProfileSheet', () => {
     expect(header(renderer).props.doneDisabled).toBe(false);
   });
 
+  it('states the translated plan refusal when the server refuses a lapsed trial', async () => {
+    const onSave = refusedSave('Organization trial has expired.');
+    const renderer = mount({ onSave });
+
+    typeInto(renderer, 'Profile name', 'Retry me');
+    await submit(renderer);
+
+    // The server's sentences are English, so this recognized refusal reads in
+    // the app's own language, the same line every other profile surface shows.
+    expect(liveMessage(renderer)).toBe(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
+    expect(texts(renderer)).not.toContain('Organization trial has expired.');
+  });
+
   it('states the neutral connection line when the save had no answer', async () => {
-    const onSave = vi
-      .fn<() => Promise<SaveProfileOutcome>>()
-      .mockResolvedValue({ saved: false, refusal: null });
+    const onSave = refusedSave(null);
     const renderer = mount({ onSave });
 
     typeInto(renderer, 'Profile name', 'Retry me');
@@ -256,9 +279,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('states the refusal after the form, so the intro holds no empty line and a refused save moves no field', async () => {
-    const onSave = vi
-      .fn<() => Promise<SaveProfileOutcome>>()
-      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
+    const onSave = refusedSave('A profile with this name already exists');
     const renderer = mount({ onSave });
     const body = renderer.root.findByType('ScrollView' as never);
     const lastBlock = () => {
@@ -284,10 +305,7 @@ describe('SaveProfileSheet', () => {
     const held = Promise.withResolvers<SaveProfileOutcome>();
     const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockReturnValue(held.promise);
     const onClose = vi.fn<() => void>();
-    const confirm = vi.fn();
-    confirmMock.current = request => {
-      confirm(request);
-    };
+    const confirm = captureConfirm();
     const renderer = mount({ onSave, onClose });
 
     act(() => {
@@ -309,9 +327,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('keeps the entered values and the sheet open when the save fails', async () => {
-    const onSave = vi
-      .fn<() => Promise<SaveProfileOutcome>>()
-      .mockResolvedValue({ saved: false, refusal: null });
+    const onSave = refusedSave(null);
     const onClose = vi.fn<() => void>();
     const renderer = mount({ onSave, onClose });
 
@@ -329,10 +345,7 @@ describe('SaveProfileSheet', () => {
 
   it('closes an untouched sheet without asking', () => {
     const onClose = vi.fn<() => void>();
-    const confirm = vi.fn();
-    confirmMock.current = request => {
-      confirm(request);
-    };
+    const confirm = captureConfirm();
     const renderer = mount({ onClose });
 
     const onCancel = voidHandler(header(renderer).props.onCancel);
@@ -346,10 +359,7 @@ describe('SaveProfileSheet', () => {
 
   it('asks before Cancel drops a half-typed profile', () => {
     const onClose = vi.fn<() => void>();
-    const confirm = vi.fn();
-    confirmMock.current = request => {
-      confirm(request);
-    };
+    const confirm = captureConfirm();
     const renderer = mount({ onClose });
 
     act(() => {

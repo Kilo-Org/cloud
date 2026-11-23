@@ -17,6 +17,7 @@ import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -63,11 +64,15 @@ type SaveProfileFailure =
   | { readonly kind: 'refused'; readonly message: string }
   | { readonly kind: 'unknown' };
 
-/** The sheet's one line for a failure: the server's sentence, or the neutral retry line. */
+/**
+ * The sheet's one line for a failure: a recognized refusal, translated by the
+ * shared helper, every other server sentence unchanged, or the neutral retry
+ * line when no answer arrived.
+ */
 function saveFailureMessage(t: (key: string) => string, failure: SaveProfileFailure): string {
   switch (failure.kind) {
     case 'refused': {
-      return failure.message;
+      return agentProfileMutationErrorMessage(failure.message);
     }
     case 'unknown': {
       return t('profiles.saveFailed');

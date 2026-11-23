@@ -25,6 +25,7 @@ import {
   SaveProfileSheet,
   type SaveProfileSubmission,
 } from '@/components/agents/save-profile-sheet';
+import { AdvancedConfigSaveEntry } from '@/components/agents/advanced-config-save-entry';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,13 @@ type AdvancedConfigPanelProps = Readonly<{
   onManualVarsChange: (next: VariableEdit[]) => void;
   onManualCommandsChange: (next: string[]) => void;
   disabled?: boolean;
+  /**
+   * The organization plan gate's refusal for the selected account, already
+   * translated, or null when the account may save. Every organization profile
+   * write is refused in that state, so it replaces `Save as profile` instead of
+   * sitting beside an entry that could only fail.
+   */
+  planRefusal?: string | null;
   /** Opens the repo default-profile bindings when that surface is available. */
   onRepoDefaults?: () => void;
   /**
@@ -89,6 +97,7 @@ export function AdvancedConfigPanel({
   onManualVarsChange,
   onManualCommandsChange,
   disabled = false,
+  planRefusal = null,
   onRepoDefaults,
   onRequestReveal,
 }: Readonly<AdvancedConfigPanelProps>) {
@@ -369,13 +378,11 @@ export function AdvancedConfigPanel({
           />
 
           {hasManualConfig ? (
-            <Button
-              onPress={openSaveSheet}
+            <AdvancedConfigSaveEntry
               disabled={disabled}
-              accessibilityLabel={t('agentChat.newSession.saveAsProfile')}
-            >
-              <Text>{t('agentChat.newSession.saveAsProfile')}</Text>
-            </Button>
+              planRefusal={planRefusal}
+              onSave={openSaveSheet}
+            />
           ) : null}
           {onRepoDefaults ? (
             <Button

@@ -130,6 +130,7 @@ function ControlledPanel({
   initialSelectedProfileId,
   initialCommands = [],
   disabled = false,
+  planRefusal = null,
   onSelectProfile,
   onRequestReveal,
 }: {
@@ -137,6 +138,7 @@ function ControlledPanel({
   initialSelectedProfileId?: string | null;
   initialCommands?: string[];
   disabled?: boolean;
+  planRefusal?: string | null;
   onSelectProfile?: (id: string | null) => void;
   onRequestReveal?: (contentOffset: number) => void;
 }) {
@@ -150,6 +152,7 @@ function ControlledPanel({
   return createElement(AdvancedConfigPanel, {
     organizationId,
     disabled,
+    planRefusal,
     selectedProfileId,
     onSelectProfile: id => {
       onSelectProfile?.(id);
@@ -171,6 +174,7 @@ function mount(
     selectedProfileId?: string | null;
     initialCommands?: string[];
     disabled?: boolean;
+    planRefusal?: string | null;
     onSelectProfile?: (id: string | null) => void;
     onRequestReveal?: (contentOffset: number) => void;
   } = {}
@@ -183,6 +187,7 @@ function mount(
       createElement(ControlledPanel, {
         organizationId: options.organizationId,
         disabled: options.disabled,
+        planRefusal: options.planRefusal,
         initialCommands: options.initialCommands,
         initialSelectedProfileId: options.selectedProfileId,
         onSelectProfile: options.onSelectProfile,
@@ -505,6 +510,18 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('1 var');
   });
 
+  it('replaces Save as profile with the plan refusal when the plan gate refuses', () => {
+    const planRefusal = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
+    const renderer = mount({ planRefusal, organizationId: 'org-1' });
+    fillManualConfig(renderer);
+
+    // Every profile write in this organization is refused while the trial has
+    // ended, so the entry is the state itself: a button here would only open a
+    // sheet whose save the server rejects.
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
+    expect(texts(renderer)).toContain(planRefusal);
+  });
+
   it('accepts an empty value in the session draft, matching prepare-session', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
@@ -645,6 +662,8 @@ describe('AdvancedConfigPanel', () => {
     const onSelectProfile = vi.fn<(id: string | null) => void>();
     const renderer = mount({ mocks, onSelectProfile });
     fillManualConfig(renderer);
+    // No plan refusal for this account, so the save entry is still the button.
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     press(buttonByText(renderer, 'Save as profile'));
     typeInto(renderer, 'Profile name', 'My Setup');
     act(() => {

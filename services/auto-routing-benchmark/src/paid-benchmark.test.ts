@@ -2652,6 +2652,19 @@ describe('paid request staging liveness', () => {
     expect(['preparing', 'active']).toContain(requestState(skipped).status);
   }, 120_000);
 
+  /** Slots in the widest plan: 68 pairs × every measured case × every repetition. */
+  const WIDE_SLOTS = 68 * SLOTS;
+
+  /** The widest quotable plan (68 pairs × every case × every repetition), as a value. */
+  function singleWidePlan(): PaidBenchmarkPlan {
+    const plan = singlePairPlan();
+    const pairs = Array.from({ length: 68 }, (_, index) => ({
+      ...plan.pairs[0]!,
+      model: `vendor/wide-${index}`,
+    }));
+    return { ...plan, pairs, counts: { ...plan.counts, exclusive: WIDE_SLOTS } };
+  }
+
   /**
    * A request with every slot really staged and its status still `preparing`: the state a
    * failed activation write leaves behind (rows written, activation not committed).
@@ -2723,18 +2736,18 @@ describe('paid request staging liveness', () => {
     );
     const healthy = ids[50]!;
 
+    const before = ids.map(id => requestState(id).staged_cases);
     const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    // Staged slots per request in this tick: the only observable of the grant each one got.
+    const summaryGranted = ids.map((id, index) => requestState(id).staged_cases - before[index]!);
     // Every stalled request is closed…
     expect(summary.closed).toHaveLength(50);
     expect(summary.closed).not.toContain(healthy);
     expect(requestState(healthy).status).toBe('preparing');
     expect(requestState(healthy).staged_cases).toBe(0);
-    // The invariant behind the order: the grants never exceed the budget and every staging
-    // request is granted exactly its share. (Under either order the grants are identical —
-    // `offered` is computed over exactly the rows that can reach the call — so this asserts the
-    // property, not a difference the reorder creates.)
-    const staging = 51;
-    expect(Math.floor(4_400 / staging) * staging).toBeLessThanOrEqual(4_400);
+    // Closing them spent nothing: every served request's staged delta in this tick is zero, so
+    // no share was consumed by a request that did no work.
+    expect(summaryGranted.every(grant => grant === 0)).toBe(true);
 
     // …and the closing did not consume the budget: the healthy request is served next (the
     // scan bound is 50, so it enters the scan once the stalled rows are gone) and stages with
@@ -2744,6 +2757,37 @@ describe('paid request staging liveness', () => {
     });
     expect(next.closed).toEqual([]);
     expect(requestState(healthy).staged_cases).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('grants each staging request exactly its share of the tick budget', async () => {
+    // Two wide plans (68 pairs each) staging together: the split is visible in how many slots
+    // each one actually staged in this tick.
+    const ids = seedPreparingRequests(2, () => ({
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      lastStagedAt: null,
+    }));
+    // Give both requests the widest plan, so neither is capped by its own remaining slots.
+    const wide = JSON.stringify(singleWidePlan());
+    for (const id of ids) {
+      const quoteId = (
+        sqlite.prepare('SELECT quote_id FROM paid_benchmark_requests WHERE id = ?').get(id) as {
+          quote_id: string;
+        }
+      ).quote_id;
+      sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?').run(wide, quoteId);
+      sqlite
+        .prepare('UPDATE paid_benchmark_requests SET plan_cases = ? WHERE id = ?')
+        .run(WIDE_SLOTS, id);
+    }
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(summary.closed).toEqual([]);
+    const share = Math.floor(4_400 / 2);
+    const deltas = ids.map(id => requestState(id).staged_cases);
+    // Each got exactly its half — the divisor is measured on real grants, not asserted on
+    // literals — and the two together are the whole budget.
+    expect(deltas).toEqual([share, share]);
+    expect(deltas.reduce((sum, grant) => sum + grant, 0)).toBe(4_400);
   }, 120_000);
 
   it("does not let a fully staged request dilute a staging request's share", async () => {
@@ -2770,6 +2814,73 @@ describe('paid request staging liveness', () => {
     // …and the wide plan staged its whole plan in this one tick: the share was the full budget,
     // not a tenth of it (which is what a divisor counting the nine would have given).
     expect(requestState(wide!).staged_cases).toBeGreaterThan(SLOTS * 0.9);
+  }, 120_000);
+
+  it('leaves requests untouched on a plan read fault and still drains the outbox', async () => {
+    // A D1 wrapper that fails the plan-body read once, after the sizes read succeeded.
+    const ids = seedPreparingRequests(2);
+    const faults = { planRead: 0 };
+    const faulty: D1Database = {
+      prepare(sql: string) {
+        if (!sql.includes('SELECT id, plan FROM paid_benchmark_quotes')) return db.prepare(sql);
+        return {
+          bind: (...values: never[]) => {
+            const bound = db.prepare(sql).bind(...values);
+            return {
+              run: () => bound.run(),
+              all: async () => {
+                faults.planRead += 1;
+                throw new Error('D1_ERROR: internal error');
+              },
+              first: () => bound.first(),
+              raw: () => bound.raw(),
+            } as unknown as D1PreparedStatement;
+          },
+        } as unknown as D1PreparedStatement;
+      },
+      batch: (statements: D1PreparedStatement[]) => db.batch(statements),
+      exec: (sql: string) => db.exec(sql),
+    } as D1Database;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_billing_outbox (id, kind, request_id, owner_type, owner_id,
+          amount_microdollars, attempts, available_at, created_at, updated_at, status)
+        VALUES (?, 'pins', ?, 'user', 'user-0', 0, 0, ?, ?, ?, 'pending')`
+      )
+      .run(
+        crypto.randomUUID(),
+        ids[0]!,
+        Date.now(),
+        new Date().toISOString(),
+        new Date().toISOString()
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests({
+      BENCH_DB: faulty,
+      KILO_WEB_API_BASE_URL: 'https://web.test',
+      INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
+    } as never);
+    // The fault is infrastructure: neither request is closed, failed or charged…
+    expect(faults.planRead).toBeGreaterThan(0);
+    expect(summary.closed).toEqual([]);
+    expect(summary.failed).toEqual([]);
+    for (const id of ids) {
+      expect(requestState(id).status).toBe('preparing');
+      expect(requestState(id).staged_cases).toBe(0);
+    }
+    // …and the pass still reached the drain.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, attempts, last_error FROM paid_benchmark_billing_outbox
+          WHERE request_id = ?`
+        )
+        .get(ids[0]!)
+    ).toEqual({ status: 'pending', attempts: 1, last_error: 'request_not_completed' });
+
+    // The next tick, without the fault, stages both.
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    for (const id of ids) expect(requestState(id).staged_cases).toBeGreaterThan(0);
   }, 120_000);
 
   it('closes one unreadable plan, frees its live slot and still drains the outbox', async () => {
@@ -2865,12 +2976,17 @@ describe('paid request staging liveness', () => {
         .run(freshId, brokenLive.router_id, ENGINE, freshQuote, SLOTS, freshAt, freshAt)
     ).not.toThrow();
     expect(requestState(freshId).status).toBe('preparing');
-    // The pass reached its end: the pending intent is still pending, i.e. the drain ran.
+    // The pass reached its end: the drain really processed the intent. A pins intent on a
+    // still-preparing request cannot be published, so the drain records the attempt and the
+    // reason — a change the guard can only see if the drain ran.
     expect(
-      countRows(
-        "SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox WHERE status = 'pending'"
-      )
-    ).toBe(1);
+      sqlite
+        .prepare(
+          `SELECT status, attempts, last_error FROM paid_benchmark_billing_outbox
+          WHERE request_id = ?`
+        )
+        .get(ids[0]!)
+    ).toEqual({ status: 'pending', attempts: 1, last_error: 'request_not_completed' });
     expect(billing).toHaveLength(0);
   }, 120_000);
 

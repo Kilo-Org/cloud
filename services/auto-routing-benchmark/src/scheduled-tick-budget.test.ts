@@ -377,6 +377,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
   let send: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    planReads.length = 0;
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     send = vi.fn(async () => undefined);
@@ -401,6 +402,9 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     vi.useRealTimers();
   });
 
+  /** SQL texts of the plan-body reads this tick issued (the chunked `SELECT id, plan` reads). */
+  const planReads: string[] = [];
+
   function newTickDb(): DatabaseSync {
     const directory = mkdtempSync(join(tmpdir(), 'benchmark-tick-budget-'));
     const sqlite = new DatabaseSync(join(directory, 'tick.sqlite'));
@@ -416,11 +420,19 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     return sqlite;
   }
 
-  /** One real one-minute tick over `sqlite`, returning what it cost D1. */
-  async function runTick(sqlite: DatabaseSync): Promise<QueryCounts> {
+  /** One real one-minute tick over `sqlite`, returning what it cost D1 and the plan reads it made. */
+  async function runTick(sqlite: DatabaseSync): Promise<QueryCounts & { planReads: number }> {
     const counts = { queries: 0, statements: 0 };
+    const counting = countingDb(sqlite, counts);
     const env = {
-      BENCH_DB: countingDb(sqlite, counts),
+      BENCH_DB: {
+        prepare(sql: string) {
+          if (sql.includes('SELECT id, plan FROM paid_benchmark_quotes')) planReads.push(sql);
+          return counting.prepare(sql);
+        },
+        batch: counting.batch,
+        exec: counting.exec,
+      } as D1Database,
       BENCH_QUEUE: { send },
       KILO_WEB_API_BASE_URL: 'https://web.test',
       KILO_CLI_API_URL: 'https://cli.test',
@@ -430,7 +442,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
       BOT_TOKEN_MINT_SECRET: { get: async () => 'bot-secret' },
     } as unknown as Env;
     await worker.scheduled({ cron: '* * * * *' } as ScheduledController, env);
-    return { ...counts };
+    return { ...counts, planReads: planReads.length };
   }
 
   it('keeps a worst-case one-minute tick inside the 1,000-query limit, with the split', async () => {
@@ -460,14 +472,14 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     seedPaidRequests(coveredSqlite, true);
     const covered = await runTick(coveredSqlite);
 
-    // Four wide plans preparing at once: ~250 KB of plan JSON each, so a single unbounded
-    // plan read would return ~1 MB here and tens of MB at the full 100 rows. The chunked read
-    // keeps it bounded while the tick stays inside its query ceiling.
+    // Twelve wide plans preparing at once: ~250 KB of plan JSON each, so the served set is
+    // ~3 MB — past the 2 MB chunk budget, which means the read must split into more than one
+    // query. (Four would sit under it and never exercise the split.)
     const wideSqlite = newTickDb();
     seedRunningRuns(wideSqlite);
     seedPendingOutputs(wideSqlite);
     seedAliasSync(wideSqlite);
-    seedWidePreparingRequests(wideSqlite, 4);
+    seedWidePreparingRequests(wideSqlite, 12);
     const wide = await runTick(wideSqlite);
 
     // Fifty preparing requests, each staging one 88-slot slice: the per-request fixed reads
@@ -487,6 +499,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
       coveredWorst: covered.queries,
       manyWorst: many.queries,
       widePlans: wide.queries,
+      widePlanReads: wide.planReads,
     };
     console.error(JSON.stringify(components));
 
@@ -529,10 +542,12 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     // Several wide plans in one tick: their staging still fits, and every one of them advanced
     // (the byte-bounded read does not drop a request).
     expect(components.widePlans).toBeLessThanOrEqual(700);
+    // The split is real: the twelve wide plans are read in more than one query.
+    expect(wide.planReads).toBeGreaterThan(1);
     const wideStaged = wideSqlite
       .prepare(`SELECT COUNT(*) AS moved FROM paid_benchmark_requests WHERE staged_cases > 0`)
       .get() as { moved: number } | undefined;
-    expect(Number(wideStaged?.moved ?? 0)).toBe(4);
+    expect(Number(wideStaged?.moved ?? 0)).toBe(12);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);

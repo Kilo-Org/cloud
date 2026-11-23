@@ -1329,14 +1329,45 @@ export async function reconcilePaidBenchmarkRequests(
   // plan is hundreds of KB of JSON, and 100 of them in one query would be tens of MB against
   // D1's result limit and the Worker's memory. A chunk is decoded and processed one request at
   // a time, then dropped.
-  for (const chunk of planReadChunks(
-    [...preparingRows.results, ...activeRows.results],
-    await readPlanSizes(
-      db,
-      [...preparingRows.results, ...activeRows.results].map(request => request.quote_id)
-    )
-  )) {
-    const plans = await readPlans(db, chunk);
+  //
+  // A read fault here is infrastructure, not evidence about any request: it must neither close
+  // a request nor abort the pass. The sizes read is best-effort (on failure staging waits a
+  // tick), and a failed chunk read leaves that chunk's requests untouched for the next tick
+  // while the remaining chunks, the billing drain and the receipts still run.
+  const served = [...preparingRows.results, ...activeRows.results];
+  let chunks: PaidBenchmarkRequestRow[][];
+  try {
+    chunks = planReadChunks(
+      served,
+      await readPlanSizes(
+        db,
+        served.map(request => request.quote_id)
+      )
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'benchmark_paid_plan_sizes_failed',
+        requests: served.length,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    chunks = [];
+  }
+  for (const chunk of chunks) {
+    let plans: Map<string, string>;
+    try {
+      plans = await readPlans(db, chunk);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'benchmark_paid_plan_read_failed',
+          requests: chunk.map(request => request.id),
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      continue;
+    }
     for (const request of chunk) {
       // One request's failure must never abort the tick for the others: a read fault, an
       // unexpected throw or an unreadable plan is that request's problem, logged and left for

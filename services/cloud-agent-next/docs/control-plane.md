@@ -2934,7 +2934,7 @@ enforcement, use the compatibility release as the Cloud Agent rollback target.
 
 New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
 Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
-A legacy grant fails with `credential_upgrade_required`. A failed handle mint sends no prepare frame and fails workspace preparation.
+A legacy grant fails with `credential_upgrade_required`. A failed handle mint fails a per-session prepare and sends no prepare frame. An adopted worktree scope keeps serving its usable canonical handle.
 
 An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
 only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.

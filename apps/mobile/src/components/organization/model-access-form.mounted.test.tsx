@@ -1334,7 +1334,9 @@ describe('ModelAccessForm keyboard lift', () => {
     const regionIndex = siblings.findIndex(
       child => child.findAllByType('SegmentedControl' as never).length === 1
     );
-    const footerIndex = siblings.findIndex(child => child.type === 'ScreenFooter');
+    const footerIndex = siblings.findIndex(
+      child => child.findAllByType('ScreenFooter' as never).length === 1
+    );
 
     expect(regionIndex).toBe(0);
     expect(footerIndex).toBe(regionIndex + 1);

@@ -25,9 +25,13 @@ afterEach(() => {
 });
 
 /** The parts of the fixture the cases mutate; the rest passes through untouched. */
+type AppExtension = { targetName: string; entitlements: Record<string, unknown> };
 type MutableFixture = {
   ios: { entitlements: Record<string, unknown> };
-  extra: Record<string, unknown>;
+  extra: {
+    [key: string]: unknown;
+    eas: { build: { experimental: { ios: { appExtensions: AppExtension[] } } } };
+  };
   /** Replaced with a value no check can read, to prove the exit-2 classification. */
   plugins: unknown;
 };
@@ -55,9 +59,24 @@ function run(argv: string[], env: Record<string, string | undefined> = {}, cwd =
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
+/** The fixture's sole File Provider extension; the cases mutate it in place. */
+function fileProviderExtension(config: MutableFixture): AppExtension {
+  const [extension] = config.extra.eas.build.experimental.ios.appExtensions;
+  if (extension === undefined) {
+    throw new Error('the fixture must carry the ArtifactsFileProvider extension');
+  }
+  return extension;
+}
+
 const withTestingMode = () =>
   writeVariant(config => {
     config.ios.entitlements['com.apple.developer.fileprovider.testing-mode'] = true;
+  });
+
+const withExtensionTestingMode = () =>
+  writeVariant(config => {
+    fileProviderExtension(config).entitlements['com.apple.developer.fileprovider.testing-mode'] =
+      true;
   });
 
 describe('assert-expo-config', () => {
@@ -82,6 +101,32 @@ describe('assert-expo-config', () => {
   it('allows the File Provider testing-mode entitlement under development', () => {
     const { status } = run(['--config', withTestingMode(), '--profile', 'development']);
     expect(status).toBe(0);
+  });
+
+  it('fails the File Provider testing-mode extension entitlement under production', () => {
+    const { status, output } = run([
+      '--config',
+      withExtensionTestingMode(),
+      '--profile',
+      'production',
+    ]);
+    expect(status).toBe(1);
+    expect(output).toContain('extension entitlement');
+  });
+
+  it('allows the File Provider testing-mode extension entitlement under development', () => {
+    const { status } = run(['--config', withExtensionTestingMode(), '--profile', 'development']);
+    expect(status).toBe(0);
+  });
+
+  it('fails a renamed File Provider extension target under production', () => {
+    const path = writeVariant(config => {
+      config.extra.eas.build.experimental.ios.appExtensions[0].targetName =
+        'ArtifactsFileProviderRenamed';
+    });
+    const { status, output } = run(['--config', path, '--profile', 'production']);
+    expect(status).toBe(1);
+    expect(output).toContain('must carry the ArtifactsFileProvider target');
   });
 
   it('fails a missing playIntegrityProjectNumber under production', () => {

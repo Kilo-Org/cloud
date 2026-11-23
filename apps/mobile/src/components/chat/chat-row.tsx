@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { RenameModal } from '@/components/rename-modal';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Cloud, Smartphone, Terminal } from '@/components/ui/icons';
@@ -125,7 +127,12 @@ export function ChatRow({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={title}
+        // The row is one accessible element, so its label carries the title and
+        // the origin the badge draws; a label on the badge alone is swallowed
+        // by this pressable and a screen reader could never learn the origin.
+        accessibilityLabel={
+          originLabel === '' ? title : formatList([title, originLabel], i18n.language)
+        }
         accessibilityHint={t('modelChat.rename.openHint')}
         className="active:opacity-70"
         onPress={() => {
@@ -143,7 +150,8 @@ export function ChatRow({
           metaWhileLive
           platformIcon={
             OriginIcon === null ? undefined : (
-              <View accessibilityLabel={originLabel}>
+              // Drawn only: the row's own label above announces the origin.
+              <View accessible={false} importantForAccessibility="no">
                 <OriginIcon size={14} color={colors.mutedForeground} />
               </View>
             )

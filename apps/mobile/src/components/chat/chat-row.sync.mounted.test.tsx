@@ -115,12 +115,12 @@ describe('ChatRow under sync', () => {
     const { tree } = await mount({ origin: 'cli', liveRemote: true });
     const row = tree.root.findAllByProps({ agentLabel: 'Kilo' }).at(0);
     expect(row?.props.live).toBe(true);
-    const icon: unknown = row?.props.platformIcon;
-    const label =
-      typeof icon === 'object' && icon !== null && 'props' in icon
-        ? (icon as { props: { accessibilityLabel?: string } }).props.accessibilityLabel
-        : undefined;
-    expect(label).toBe(i18n.t('agentChat.sessionFilter.platformCli'));
+    // The row is one accessible element: its own label names the title and
+    // the origin, which the badge's label alone could not reach.
+    const pressable = tree.root.findAll(node => node.props.accessibilityRole === 'button').at(0);
+    const spoken: unknown = pressable?.props.accessibilityLabel;
+    expect(spoken).toContain('Deploy notes');
+    expect(spoken).toContain(i18n.t('agentChat.sessionFilter.platformCli'));
   });
 
   it('keeps a local-only chat out of the badge state', async () => {

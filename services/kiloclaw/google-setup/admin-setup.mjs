@@ -14,10 +14,6 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { ask, runCommand, runCommandOutput, GCP_APIS } from './shared.mjs';
 
-// ---------------------------------------------------------------------------
-// Step 1: Sign into gcloud
-// ---------------------------------------------------------------------------
-
 console.log('KiloClaw Google Setup — Admin Mode\n');
 console.log('This will set up the GCP project and credentials for your organization.');
 console.log('Members will run a separate, simpler command afterwards.\n');
@@ -36,10 +32,6 @@ await runCommand('gcloud', ['auth', 'login', '--brief']);
 
 const gcloudAccount = runCommandOutput('gcloud', ['config', 'get-value', 'account']);
 console.log(`\nSigned in as: ${gcloudAccount}\n`);
-
-// ---------------------------------------------------------------------------
-// Step 2: Create or select GCP project
-// ---------------------------------------------------------------------------
 
 console.log('Google Cloud project setup:');
 console.log('  1. Create a new project (recommended)');
@@ -129,17 +121,9 @@ if (projectChoice === '2') {
 await runCommand('gcloud', ['config', 'set', 'project', projectId]);
 console.log(`\nUsing project: ${projectId}`);
 
-// ---------------------------------------------------------------------------
-// Step 3: Enable APIs
-// ---------------------------------------------------------------------------
-
 console.log('\nEnabling Google APIs (this may take a minute)...');
 await runCommand('gcloud', ['services', 'enable', ...GCP_APIS, `--project=${projectId}`]);
 console.log('APIs enabled.\n');
-
-// ---------------------------------------------------------------------------
-// Step 4: OAuth consent screen + client
-// ---------------------------------------------------------------------------
 
 const consentUrl = `https://console.cloud.google.com/auth/overview?project=${projectId}`;
 const credentialsUrl = `https://console.cloud.google.com/apis/credentials?project=${projectId}`;
@@ -176,15 +160,10 @@ if (!clientId || !clientSecret) {
   process.exit(1);
 }
 
-// ---------------------------------------------------------------------------
-// Step 5: Push notification infra (Pub/Sub topic, SA, IAM)
-// ---------------------------------------------------------------------------
-
 console.log('\nSetting up Gmail push notification infrastructure...');
 
 let pushSetupOk = true;
 
-// Create Pub/Sub topic
 console.log('Creating Pub/Sub topic gog-gmail-watch...');
 try {
   execFileSync('gcloud', ['pubsub', 'topics', 'create', 'gog-gmail-watch', '--quiet'], {
@@ -202,7 +181,6 @@ try {
   }
 }
 
-// Grant Gmail API push publisher role
 if (pushSetupOk) {
   console.log('Granting Gmail push publisher role...');
   try {
@@ -266,7 +244,6 @@ if (pushSetupOk) {
   }
 }
 
-// Create push auth service account
 const pushSaName = 'gmail-push';
 const pushSaEmail = `${pushSaName}@${projectId}.iam.gserviceaccount.com`;
 
@@ -298,7 +275,6 @@ if (pushSetupOk) {
   }
 }
 
-// Grant Pub/Sub token creator role on the SA
 if (pushSetupOk) {
   console.log('Granting Pub/Sub token creator role...');
   try {
@@ -328,10 +304,6 @@ if (pushSetupOk) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Step 6: Add org members
-// ---------------------------------------------------------------------------
-
 console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('  Add organization members');
 console.log('');
@@ -349,7 +321,6 @@ while (true) {
 }
 
 if (memberEmails.length > 0) {
-  // Grant IAM roles for push subscription creation
   if (pushSetupOk) {
     console.log('\nGranting member permissions for push notifications...');
     for (const email of memberEmails) {
@@ -392,7 +363,6 @@ if (memberEmails.length > 0) {
     }
   }
 
-  // Instruct admin to add test users on consent screen
   const allEmails = [gcloudAccount, ...memberEmails];
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  Add test users to the OAuth consent screen');
@@ -407,7 +377,6 @@ if (memberEmails.length > 0) {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   await ask('Press Enter when done...');
 } else {
-  // No members — just add admin as test user
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  Add yourself as a test user');
   console.log('');
@@ -418,10 +387,6 @@ if (memberEmails.length > 0) {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   await ask('Press Enter when done...');
 }
-
-// ---------------------------------------------------------------------------
-// Done — print member command
-// ---------------------------------------------------------------------------
 
 console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('  Admin setup complete!');

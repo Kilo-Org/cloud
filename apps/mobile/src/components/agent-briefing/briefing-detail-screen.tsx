@@ -5,7 +5,6 @@ import { type TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { BriefingScorecard } from './briefing-card';
 import { BriefingMetadataRows } from './briefing-metadata-rows';
@@ -14,6 +13,7 @@ import { BriefingSessionList } from './briefing-session-list';
 import { BriefingSummary } from './briefing-summary';
 import { BriefingPeriodLabel } from './briefing-period-label';
 import { formatBriefingTimestamp } from './briefing-window';
+import { useBriefingLocale } from './briefing-locale';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   BRIEFING_PATH,
   type BriefingReport,
@@ -78,7 +79,8 @@ export function BriefingDetailScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
@@ -114,21 +116,34 @@ export function BriefingDetailScreen() {
     access.canRead(query.data.context.organizationId)
       ? query.data
       : undefined;
+  const announcedFailureFor = useRef<string | null>(null);
   const read = useMutation(
     trpc.agentBriefing.read.mutationOptions({
-      onError: () => {
-        toast.error(t('common.somethingWentWrong'));
+      onError: (_error, variables) => {
+        // The mark retries on a later payload, so a brief whose summary is still
+        // generating polls and can fail more than once; the person hears the
+        // failure once per report in this visit.
+        if (announcedFailureFor.current === variables.reportId) {
+          return;
+        }
+        announcedFailureFor.current = variables.reportId;
+        announcingToast.error(t('agentBriefing.readMarkFailed'));
       },
     })
   );
-  const marked = useRef<string | null>(null);
+  // One attempt per fetched payload. A keyed-by-report-id attempt made a failure
+  // sticky for the rest of the visit; keying by the payload generation tries the
+  // mark again on the next fetch or the next visit, without a retry timer or a
+  // counter that could loop. The failure itself is announced once per report, so
+  // a poll while the summary is still generating does not repeat it.
+  const attemptedAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!report || offline || report.readAt || marked.current === report.id) {
+    if (!report || offline || report.readAt || attemptedAt.current === query.dataUpdatedAt) {
       return;
     }
-    marked.current = report.id;
+    attemptedAt.current = query.dataUpdatedAt;
     read.mutate({ reportId: report.id });
-  }, [offline, read, report]);
+  }, [offline, query.dataUpdatedAt, read, report]);
   const phase = selectBriefingDetailPhase({
     hasReport: report !== undefined,
     offline,
@@ -229,13 +244,9 @@ export function BriefingDetailScreen() {
                     >
                       <Card>
                         <Text>{label}</Text>
-                        <BriefingSourceDetail source={source} t={t} language={i18n.language} />
+                        <BriefingSourceDetail source={source} t={t} language={locale} />
                         <Text variant="caption">
-                          {formatBriefingTimestamp(
-                            source.occurredAt,
-                            i18n.language,
-                            report.timezone
-                          )}
+                          {formatBriefingTimestamp(source.occurredAt, locale, report.timezone).text}
                         </Text>
                       </Card>
                     </Pressable>

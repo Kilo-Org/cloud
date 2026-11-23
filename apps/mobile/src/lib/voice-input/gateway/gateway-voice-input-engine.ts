@@ -80,8 +80,6 @@ type GatewayCredentials = {
 };
 
 type GatewaySession = {
-  /** Monotonic id; every async continuation checks it still owns the session. */
-  id: number;
   /** BCP-47 hint carried from `start()` into every segment upload. */
   languageTag: string;
   /** The recorder we currently own, or null once it has been detached. */
@@ -223,7 +221,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
   const segmentDurationMs = deps.segmentDurationMs ?? GATEWAY_SEGMENT_DURATION_MS;
   const listeners = new Map<keyof VoiceInputNativeEvent, Set<AnyListener>>();
   let session: GatewaySession | null = null;
-  let sessionSeq = 0;
 
   const emit = <K extends keyof VoiceInputNativeEvent>(
     event: K,
@@ -444,17 +441,13 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       // 'gateway-invalid-response' — the codes voice-input-state classifies.
       fail(current, `gateway-${classification}`);
     } finally {
-      // The upload no longer needs the file; delete it on every path.
       await deleteRecordingFile(deleteRecording, uri);
     }
   };
 
   /**
-   * Queue one segment upload behind the previous ones so their results land
-   * in recording order even when a later request finishes first. The queued
-   * link never rejects: a rejected link would stop every later segment and
-   * `finalizeStop`'s drain, so the session would emit no terminal `end`.
-   * Each upload reports its own failure through `fail`.
+   * Queue one segment upload behind the previous ones. Each upload reports its
+   * own failure through `fail`.
    */
   const enqueueSegmentUpload = (current: GatewaySession, uri: string): void => {
     const previous = current.uploadChain;
@@ -721,12 +714,10 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       }
       // Any previous session's upload (if still in flight) owns its own abort
       // controller and cannot emit into this one.
-      sessionSeq += 1;
       const current: GatewaySession = {
         credentials: null,
         finalizing: false,
         handle: null,
-        id: sessionSeq,
         languageTag: options.lang,
         producedText: false,
         recordingStarted: false,
@@ -734,7 +725,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         rotationTimer: null,
         stopped: false,
         stopRequested: false,
-        // eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
         uploadChain: Promise.resolve(),
         uploadController: null,
       };
@@ -777,9 +767,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       const handle = current.handle;
       current.handle = null;
       if (handle) {
-        // Discard the recording: end capture, free the native object, delete
-        // the file. Late segment uploads check `stale`, delete their file,
-        // and emit nothing.
         void discardRecording(handle, deleteRecording);
       }
       emit('end', null);

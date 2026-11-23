@@ -37,14 +37,24 @@ function report() {
 }
 function paint() {
   if (running || wanted === null) return;
-  const { source, dark, background } = wanted;
+  const { source, dark, background, themeVariables } = wanted;
   wanted = null;
   running = true;
   document.documentElement.style.background = background;
   document.body.style.background = background;
+  // The theme alone picks mermaid's own colors; a theme that needs its own
+  // measured values (the dark theme's pie fills) sends them alongside, and
+  // mermaid re-applies them over the ones the theme derives.
+  const overrides =
+    themeVariables !== null && typeof themeVariables === 'object' ? themeVariables : null;
   let rendered;
   try {
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default' });
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: dark ? 'dark' : 'default',
+      ...(overrides === null ? {} : { themeVariables: overrides }),
+    });
     rendered = mermaid.render('g', source);
   } catch (e) {
     painted = null;

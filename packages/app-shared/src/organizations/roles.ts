@@ -85,8 +85,7 @@ export function canManageOrganizationOwners(role: OrganizationRole | undefined):
 }
 
 /**
- * True for roles that may manage organization billing (owner, admin or
- * billing_manager). Ported from web's `canManageBilling`
+ * Ported from web's `canManageBilling`
  * (components/organizations/subscription/utils.ts) and mobile's
  * `isMoneyRole` (lib/hooks/use-organization-queries.ts) — both had the
  * identical `role === 'owner' || role === 'billing_manager'` check; `admin`

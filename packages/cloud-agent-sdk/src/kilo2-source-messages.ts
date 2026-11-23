@@ -29,6 +29,12 @@ export function kilo2ContentLayoutKey(kind: string, ordinal: number): string {
 export type Kilo2ProjectionOptions = {
   /** Authorized bytes, keyed by kilo2AssetKey; never credential-bearing URLs. */
   assetURLs?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Keys, in kilo2AssetKey form, that no authorization can ever bind: the authoritative
+   * snapshot found no mapping for them. Their file part is withheld while the rest of the
+   * message still displays.
+   */
+  unavailable?: ReadonlySet<string> | undefined;
 };
 
 /** Stable identity for a file returned inside one native tool content part. */
@@ -144,39 +150,61 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
 }
 
 /**
+ * A reference no authorization can ever bind: an absolute `http(s)` reference, which
+ * never receives a mapping, or a key the authoritative snapshot reported as unmapped.
+ */
+export function isPermanentKilo2Asset(
+  file: Kilo2FileReference,
+  unavailable?: ReadonlySet<string>
+): boolean {
+  return (
+    /^https?:\/\//.test(file.uri) ||
+    unavailable?.has(kilo2AssetKey(file.id, file.uri, file.mime)) === true
+  );
+}
+
+/**
  * The recovery queue: references a later snapshot can still authorize, so recovery
  * keeps waiting on them. Only `media:` and workspace-relative references qualify —
- * inline bytes already display, and an absolute remote reference never receives a
- * mapping, so recovery must never chase either.
+ * inline bytes already display, and a permanent reference (see
+ * `isPermanentKilo2Asset`) never receives a mapping, so recovery must not chase it.
  */
 export function hasUnresolvedKilo2Assets(
   message: Kilo2Message,
-  assetURLs?: Readonly<Record<string, string>>
+  assetURLs?: Readonly<Record<string, string>>,
+  unavailable?: ReadonlySet<string>
 ): boolean {
   return readKilo2FileReferences(message).some(
     file =>
       assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
       !isInlineDataUri(file.uri) &&
-      !/^https?:\/\//.test(file.uri)
+      !isPermanentKilo2Asset(file, unavailable)
   );
 }
 
 /**
- * The rendering gate for the current context: this reference has no authorized entry
- * and no inline bytes, so it has no display with the authorization available now. It
- * is not a claim of permanence — a later snapshot still authorizes an unmapped
- * `media:` reference. Contrast `hasUnresolvedKilo2Assets`, the recovery queue: every
- * reference in that queue is also undisplayable, while this set additionally holds
- * references no authorization can ever bind (absolute `http(s)` references).
+ * The incomplete-reporting gate: this message holds a reference with no authorized entry,
+ * no inline bytes, and one the content store was expected to provide — a `media:` or
+ * workspace-relative reference — plus any key the snapshot declared unavailable, even
+ * when its URI is an absolute `http(s)` one. Contrast `hasUnresolvedKilo2Assets`, the
+ * recovery queue: every reference in that queue is also reported, while this set
+ * additionally holds references no authorization can ever bind.
+ *
+ * A bare absolute `http(s)` reference is never fetched on purpose, so it is withheld from
+ * the display but never reported as missing content unless the snapshot declared that key
+ * unavailable.
  */
-export function hasUndisplayableKilo2Assets(
+export function hasIncompleteKilo2Assets(
   message: Kilo2Message,
-  assetURLs?: Readonly<Record<string, string>>
+  assetURLs?: Readonly<Record<string, string>>,
+  unavailable?: ReadonlySet<string>
 ): boolean {
   return readKilo2FileReferences(message).some(
     file =>
       assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
-      !isInlineDataUri(file.uri)
+      !isInlineDataUri(file.uri) &&
+      (!/^https?:\/\//.test(file.uri) ||
+        unavailable?.has(kilo2AssetKey(file.id, file.uri, file.mime)) === true)
   );
 }
 
@@ -203,13 +231,18 @@ export function readKilo2Messages(
   options: Kilo2ProjectionOptions = {}
 ): ProjectedKilo2Message[] {
   const result: ProjectedKilo2Message[] = [];
-  const fileURL = (id: string, uri: string, mime: string): string => {
-    const resolved = options.assetURLs?.[kilo2AssetKey(id, uri, mime)];
+  // A permanent reference has no display in any context, so its file part is withheld and
+  // the rest of the message still renders. A recoverable one keeps the throwing contract:
+  // every call site gates the message before it reaches here.
+  const fileURL = (file: Kilo2FileReference): string | undefined => {
+    const resolved = options.assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)];
     if (resolved !== undefined) return resolved;
-    if (isInlineDataUri(uri)) return uri;
-    throw Object.assign(new Error(`Native attachment ${id} requires authorized asset resolution`), {
-      code: 'native_asset_unresolved',
-    });
+    if (isInlineDataUri(file.uri)) return file.uri;
+    if (isPermanentKilo2Asset(file, options.unavailable)) return undefined;
+    throw Object.assign(
+      new Error(`Native attachment ${file.id} requires authorized asset resolution`),
+      { code: 'native_asset_unresolved' }
+    );
   };
   let parentID = '';
   for (const nativeMessage of messages) {
@@ -254,15 +287,16 @@ export function readKilo2Messages(
                     ? file.uri
                     : undefined;
             if (uri === undefined) return [];
-            // A reference without authorization keeps the projector's throwing contract;
-            // empty bytes are the one absent case, and they emit no part rather than a
-            // zero-byte one. Every call site gates the message before it reaches here.
+            // Empty bytes are absent bytes: a `data:` url of nothing would be a zero-byte
+            // file, so such a file renders only from an inline source uri or its authorized
+            // mapping, and otherwise emits no part. A file with real bytes falls through to
+            // the reference rules below.
             const url =
               file.data === ''
                 ? isInlineDataUri(uri)
                   ? uri
-                  : (options.assetURLs?.[kilo2AssetKey(id, uri, file.mime)] ?? undefined)
-                : fileURL(id, uri, file.mime);
+                  : options.assetURLs?.[kilo2AssetKey(id, uri, file.mime)]
+                : fileURL({ id, uri, mime: file.mime, fileIndex: index });
             if (url === undefined) return [];
             return [
               {
@@ -379,17 +413,28 @@ export function readKilo2Messages(
           callID: item.id,
           tool: item.name === 'shell' ? 'bash' : item.name === 'subagent' ? 'task' : item.name,
         };
-        const attachments = kilo2ToolContentFiles(item).map(({ fileIndex, file }) => {
+        const attachments = kilo2ToolContentFiles(item).flatMap(({ fileIndex, file }) => {
           const id = kilo2ToolFileId(message.id, index + offset, fileIndex);
-          return {
-            ...base,
+          const url = fileURL({
             id,
-            messageID: message.id,
-            type: 'file' as const,
+            uri: file.uri,
             mime: file.mime,
-            url: fileURL(id, file.uri, file.mime),
-            ...(file.name === undefined ? {} : { filename: file.name }),
-          };
+            fileIndex,
+            contentIndex: index,
+          });
+          // The tool card keeps its state and output; only the unusable file is withheld.
+          if (url === undefined) return [];
+          return [
+            {
+              ...base,
+              id,
+              messageID: message.id,
+              type: 'file' as const,
+              mime: file.mime,
+              url,
+              ...(file.name === undefined ? {} : { filename: file.name }),
+            },
+          ];
         });
         if (state.status === 'streaming')
           parts.push({
@@ -442,20 +487,21 @@ export function readKilo2Messages(
 
 /**
  * Project one native message for display, with the guard both the live reader and the
- * history page need: a message that can never display returns nothing, and a projection
- * failure degrades this message instead of failing the surrounding batch or page.
+ * history page need: a message whose authorization is still missing returns nothing, and
+ * a projection failure degrades this message instead of failing the surrounding batch or
+ * page. A reference no authorization can ever bind is withheld from the message, which
+ * still displays its text, reasoning and tool output.
  */
 export function projectKilo2Message(
   session: Kilo2Session,
   message: Kilo2Message,
-  parentID?: string
+  parentID?: string,
+  options: Kilo2ProjectionOptions = {}
 ): ProjectedKilo2Message | undefined {
-  // No authorized URL exists for an attachment that can never have one, so this
-  // message can never be displayed.
-  if (hasUndisplayableKilo2Assets(message)) return undefined;
+  if (hasUnresolvedKilo2Assets(message, options.assetURLs, options.unavailable)) return undefined;
   let display: ProjectedKilo2Message | undefined;
   try {
-    display = readKilo2Messages(session, [message])[0];
+    display = readKilo2Messages(session, [message], options)[0];
   } catch (error) {
     console.error(`[ConversationSource] Native message ${message.id} projection failed:`, error);
   }

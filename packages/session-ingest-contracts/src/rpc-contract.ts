@@ -11,6 +11,7 @@ import {
   storedSessionIdSchema,
 } from './kilo-session-id';
 import { storedMessageIdSchema } from './message-id';
+import { MAX_GIT_BRANCH_LENGTH } from './git-branch';
 import { needsPartTextRepair } from './part-text';
 import { sessionLiveSummarySchema } from './session-live-summary';
 import { tokenUsageSchema } from './token-usage';
@@ -295,7 +296,7 @@ export const createSessionForCloudAgentSchema = z.object({
    * The branch the new working branch starts from. Omitted means the default
    * branch, or the stacked parent's branch when `parentWorktreeId` is set.
    */
-  baseBranch: z.string().min(1).max(256).optional(),
+  baseBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   /** The exact commit the working branch starts from, resolved by the web router. */
   baseSha: z
     .string()
@@ -308,7 +309,7 @@ export const createSessionForCloudAgentSchema = z.object({
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
   /** The workspace working branch, selected before the first registration. */
-  gitBranch: z.string().min(1).max(256).optional(),
+  gitBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   // The profile the session was prepared with, as resolved by the caller
   // (explicit pick, effective default, or repository binding). Optional and
   // nullable so a caller that predates profile recording still creates the
@@ -943,7 +944,8 @@ export const kiloSdkAssistantMessageSchema = z.object({
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
-  parentID: messageIdSchema,
+  // The v2 display projection uses an empty parent for unparented system messages.
+  parentID: z.union([messageIdSchema, z.literal('')]),
   modelID: z.string(),
   providerID: z.string(),
   mode: z.string(),
@@ -965,13 +967,27 @@ export const kiloSdkMessageSchema = z.discriminatedUnion('role', [
 export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
-  id: partIdSchema,
+  // Native v2 display parts retain the identity shared by history and live replay.
+  id: z.union([
+    partIdSchema,
+    storedMessageIdSchema.startsWith('msg_').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
+  ]),
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
+
+function sdkPartIdMatchesMessage(part: KiloSdkPartBase): boolean {
+  if (part.id.startsWith('prt')) return true;
+  const prefix = `${part.messageID}_`;
+  return (
+    part.messageID.startsWith('msg_') &&
+    part.id.startsWith(prefix) &&
+    /^[0-9]{6}(?:_summary|_file_[0-9]+)?$/.test(part.id.slice(prefix.length))
+  );
+}
 
 /**
  * The identity a part is PERSISTED under: `id` + `messageID`, with no
@@ -985,11 +1001,11 @@ export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
  * understand.
  */
 const persistedSdkPartIdentitySchema = z.object({
-  id: sdkPartBaseShape.id,
+  id: partIdSchema,
   messageID: sdkPartBaseShape.messageID,
 });
 
-export const sdkFilePartSchema = z.object({
+const sdkFilePartObjectSchema = z.object({
   ...sdkPartBaseShape,
   type: z.literal('file'),
   mime: z.string(),
@@ -1022,6 +1038,10 @@ export const sdkFilePartSchema = z.object({
     ])
     .optional(),
 });
+export const sdkFilePartSchema = sdkFilePartObjectSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkFilePart = z.infer<typeof sdkFilePartSchema>;
 
 export const sdkToolStateSchema = z.discriminatedUnion('status', [
@@ -1052,7 +1072,7 @@ export const sdkToolStateSchema = z.discriminatedUnion('status', [
 ]);
 export type KiloSdkToolState = z.infer<typeof sdkToolStateSchema>;
 
-export const kiloSdkPartSchema = z.discriminatedUnion('type', [
+const sdkPartVariantsSchema = z.discriminatedUnion('type', [
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('text'),
@@ -1087,7 +1107,11 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     state: sdkToolStateSchema,
     metadata: sdkMetadataSchema.optional(),
   }),
-  z.object({ ...sdkPartBaseShape, type: z.literal('step-start'), snapshot: z.string().optional() }),
+  z.object({
+    ...sdkPartBaseShape,
+    type: z.literal('step-start'),
+    snapshot: z.string().optional(),
+  }),
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('step-finish'),
@@ -1125,6 +1149,10 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     tail_start_id: messageIdSchema.optional(),
   }),
 ]);
+export const kiloSdkPartSchema = sdkPartVariantsSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkPart = z.infer<typeof kiloSdkPartSchema>;
 
 export const kiloSdkStoredMessageSchema = z.object({
@@ -1462,8 +1490,6 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
- * value never reaches the decoder.
  *
  * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
  * store still addresses sessions created before the canonical id shape was
@@ -1492,11 +1518,9 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
  * worker RPC). Sharing the schema keeps tRPC-level validation identical to
  * the worker's own bounded reader.
  *
- * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
- * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
- * always bounded before it reaches the session store. `cursor` is the opaque
- * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
- * receives one from a previous page and passes it back to walk older history.
+ * `cursor` is the opaque continuation cursor validated by
+ * `validateKiloSdkMessagesCursor`; a caller receives one from a previous page
+ * and passes it back to walk older history.
  *
  * `session_id` takes `storedSessionIdSchema`, the same rule the worker reader
  * applies. The boundary accepts exactly the ids the reader addresses: bounded,

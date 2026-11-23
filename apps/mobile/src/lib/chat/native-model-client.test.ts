@@ -72,7 +72,6 @@ describe('native on-device model client', () => {
       { ...AVAILABLE, status: 'unavailable', reason: 'apple_intelligence_disabled' },
       'modelChat.localModels.reasons.appleIntelligenceDisabled',
     ],
-    // Android's normal restricted answers carry no reason; the status picks the class.
     [
       'downloadable',
       { ...AVAILABLE, status: 'downloadable' },
@@ -143,6 +142,7 @@ describe('native on-device model client', () => {
     ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
     ['battery_quota_exceeded', 'modelChat.localModels.reasons.batteryQuota'],
     ['check_failed', 'modelChat.localModels.reasons.checkFailed'],
+    ['models_unreadable', 'modelChat.localModels.reasons.checkFailed'],
     ['background_use_blocked', 'modelChat.localModels.background'],
     ['busy', 'modelChat.localModels.busy'],
     ['context_exceeded', 'modelChat.localModels.failed'],

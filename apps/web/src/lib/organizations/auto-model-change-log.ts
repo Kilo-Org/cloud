@@ -4,6 +4,10 @@ import type { Organization } from '@kilocode/db/schema';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import {
   getEligibleProviderRoutes,
@@ -36,7 +40,7 @@ function precompute(restrictions: ModelRestrictions): PrecomputedRestrictions {
   return {
     modelDenySet: new Set(restrictions.modelDenyList.map(normalizeModelId)),
     providerAllowSet: restrictions.providerAllowList
-      ? new Set(restrictions.providerAllowList)
+      ? new Set(normalizeInferenceProviderIds(restrictions.providerAllowList))
       : undefined,
   };
 }
@@ -59,12 +63,18 @@ function checkAvailability(
     return { allowed: false, reasonProvider: null };
   }
 
+  // The snapshot keeps each provider's own slug, which may differ in case from the
+  // catalog form, so both sides of the route rule are compared canonically and the
+  // admitted route is reported under the snapshot's slug.
+  const canonicalProviders = new Set(
+    [...providerSlugsForModel].map(slug => normalizeInferenceProviderId(slug))
+  );
   const routes = precomputed.providerAllowSet
-    ? getEligibleProviderRoutes(providerSlugsForModel, precomputed.providerAllowSet)
-    : providerSlugsForModel;
+    ? getEligibleProviderRoutes(canonicalProviders, precomputed.providerAllowSet)
+    : canonicalProviders;
 
   const admittingProvider = [...providerSlugsForModel]
-    .filter(slug => routes.has(slug))
+    .filter(slug => routes.has(normalizeInferenceProviderId(slug)))
     .sort((a, b) => a.localeCompare(b))[0];
 
   return admittingProvider
@@ -252,6 +262,14 @@ export async function logAutoModelChangesForAllOrgs(
         actor_id: null,
         actor_email: null,
         actor_name: null,
+        details: {
+          id: 'autoRouting.models',
+          added: [...changes.addedByReasonProvider].map(([provider, models]) => ({
+            provider,
+            models,
+          })),
+          removed: [...changes.removedFromCatalog, ...changes.removedFromAllowedProviders],
+        },
         message,
         organization_id: organization.id,
       });

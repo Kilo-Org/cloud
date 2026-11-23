@@ -157,8 +157,6 @@ describe('createGlanceablePublisher', () => {
     }
   });
 
-  // A record is adopted only for the scope it names, on the same fence a remote
-  // snapshot passes.
   it.each([
     ['another account', { userId: 'u2', organizationId: null }],
     ['another organization of the same account', { userId: 'u1', organizationId: 'org-9' }],
@@ -182,8 +180,6 @@ describe('createGlanceablePublisher', () => {
       publisher.handleFetchError(context);
       expect(snapshots).toEqual([]);
 
-      // The first frame of the new scope still outranks the one the surfaces
-      // already hold, so no sink drops it.
       publisher.handleFetchStarted(context);
       expect(snapshots).toEqual([
         expect.objectContaining({

@@ -488,11 +488,79 @@ test('folds a Devanagari danda as sentence-final punctuation', () => {
   // so the shared-wording rule must read them as one wording.
   const found = run({
     language: 'hi',
-    english: { label: 'Choose a model', error: 'Choose a model.' },
-    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
-    source: "t('label'); t('error');",
+    english: {
+      common: { sentenceJoiner: '. ' },
+      label: 'Choose a model',
+      error: 'Choose a model.',
+    },
+    translated: {
+      common: { sentenceJoiner: '। ' },
+      label: 'मॉडल चुनें',
+      error: 'मॉडल चुनें।',
+    },
+    source: "t('common.sentenceJoiner'); t('label'); t('error');",
   });
   assert.deepEqual(found, []);
+});
+
+test('accepts the Devanagari danda in a catalog that joins sentences with it', () => {
+  const found = run({
+    language: 'hi',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '। ' }, first: 'मॉडल चुनें।', second: 'फिर से प्रयास करें।' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes another mark', () => {
+  const found = run({
+    language: 'kn',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '.' }, first: 'ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ।', second: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/kn/);
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /"first"/);
+});
+
+test('rejects a borrowed Devanagari danda in Marathi, which closes sentences with the full stop', () => {
+  const found = run({
+    language: 'mr',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: {
+      common: { sentenceJoiner: '.' },
+      first: 'मॉडेल निवडा।',
+      second: 'पुन्हा प्रयत्न करा.',
+    },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/mr/);
+  assert.match(found[0], /«।»/);
+});
+
+test('rejects a borrowed Devanagari danda in a catalog that writes no sentence mark', () => {
+  // The push catalog carries no `common.sentenceJoiner`, so it states no
+  // sentence mark at all and a danda there belongs to no script of its own.
+  const found = run({
+    language: 'hi',
+    pushEnglish: {
+      generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+    },
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { chatMessage: 'आपके पास एक नया संदेश है।' } },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+    ].join('\n'),
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /«।»/);
+  assert.match(found[0], /no sentence mark/);
 });
 
 for (const [language, title, badge] of [
@@ -1684,6 +1752,179 @@ test('leaves another locale’s ASCII sentence terminator alone', () => {
       },
     },
     source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+const URDU_TERMINATORS_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  work: {
+    empty: 'Nothing to do.',
+    waiting: 'Waiting...',
+    retry: 'Try again',
+    host: 'Open kilo.ai',
+    note: 'Contact support',
+    file: 'Read this file',
+  },
+};
+const URDU_TERMINATORS_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');\nt('work.file');";
+const URDU_TERMINATOR_WORK = {
+  empty: 'کوئی کام نہیں۔',
+  waiting: 'انتظار...',
+  retry: 'دوبارہ کوشش کریں',
+  host: 'kilo.ai کھولیں۔',
+  note: 'رپورٹنگ Sentry.',
+  file: 'فائل.png کھولیں۔',
+};
+
+/** The Urdu catalog fixture: it declares the Urdu full stop as its joiner. */
+function urduTerminators(work = URDU_TERMINATOR_WORK) {
+  return { common: { sentenceJoiner: '۔ ', listJoiner: '، ' }, work };
+}
+
+test('accepts Urdu copy that closes its sentences with «۔»', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators(),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects Urdu copy with a terminal ASCII period', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({ ...URDU_TERMINATOR_WORK, empty: 'کوئی کام نہیں.' }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('rejects Urdu copy with a period that joins two sentences', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      empty: 'پہلے یہ کریں. پھر دوبارہ کوشش کریں',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+const URDU_JOIN_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  goal: {
+    sectionAccessibility: '{{status}}. Goal: {{text}}',
+    note: 'Kilo (kilo.ai).',
+    closing: 'Reporting',
+  },
+};
+const URDU_JOIN_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('goal.sectionAccessibility');\nt('goal.note');\nt('goal.closing');";
+
+/** The Urdu pair for the joining-period cases: a placeholder and a bracket. */
+function urduJoins(goal) {
+  return {
+    common: { sentenceJoiner: '۔ ', listJoiner: '، ' },
+    goal: {
+      sectionAccessibility: '{{status}}۔ ہدف: {{text}}',
+      note: 'دیکھیں Kilo (kilo.ai).',
+      closing: 'رپورٹنگ',
+      ...goal,
+    },
+  };
+}
+
+test('rejects Urdu copy whose period joins a sentence after a placeholder', () => {
+  // The dot follows `{{status}}` rather than an Urdu letter, but a word after
+  // it still means a second sentence starts there.
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ sectionAccessibility: '{{status}}. ہدف: {{text}}' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "goal\.sectionAccessibility" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('accepts the same sentence joined by «۔» after a placeholder', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins(),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('leaves a value-final period after a closing bracket alone, and a host keeps its dots', () => {
+  // `Kilo (kilo.ai).` ends on a bracket rather than on an Urdu word, so its
+  // period closes no Urdu sentence and `kilo.ai` carries its own dots, while a
+  // value-final period after an Urdu word is still the same defect.
+  const clean = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ note: 'دیکھیں Kilo (kilo.ai).' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(clean, []);
+  const reported = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ closing: 'رپورٹنگ.' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(reported.length, 1, reported.join('\n'));
+  assert.match(
+    reported.join('\n'),
+    /mobile\/ur: "goal\.closing" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('leaves an Urdu URL, product name and ellipsis alone', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      // A host and a file name continue after their dot, and a product name
+      // ends on a Latin letter rather than on an Urdu word.
+      host: 'یہ لنک کھولیں: kilo.ai',
+      note: 'رپورٹنگ Sentry.',
+      file: 'فائل.png',
+      waiting: 'انتظار...',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('holds only the catalog that declares «۔» as its sentence joiner', () => {
+  const found = run({
+    language: 'ar',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: {
+      common: { sentenceJoiner: '.', listJoiner: '، ' },
+      work: { ...URDU_TERMINATOR_WORK, empty: 'لا يوجد شيء للقيام به.' },
+    },
+    source: URDU_TERMINATORS_SOURCE,
   });
   assert.deepEqual(found, []);
 });
@@ -3197,14 +3438,15 @@ const CHANGELOG_AREAS_SOURCE = [
 test('accepts a changelog area label that joins its nouns without the list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल व संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);
 });
@@ -3212,14 +3454,15 @@ test('accepts a changelog area label that joins its nouns without the list conju
 test('rejects a changelog area label that carries the catalog list conjunction', () => {
   const found = run({
     language: 'hi',
-    english: CHANGELOG_AREAS,
+    english: { common: { sentenceJoiner: '. ' }, ...CHANGELOG_AREAS },
     translated: {
+      common: { sentenceJoiner: '। ' },
       profile: {
         changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
         changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल और संगठन' },
       },
     },
-    source: CHANGELOG_AREAS_SOURCE,
+    source: `${CHANGELOG_AREAS_SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(

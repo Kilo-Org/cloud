@@ -72,6 +72,8 @@ type AgentSessionListContentProps = {
    * list never reads as the end of the history.
    */
   isFetchNextPageError: boolean;
+  /** The retention bound ended the list while the server still had older rows. */
+  isRetentionLimited: boolean;
   onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
@@ -90,6 +92,10 @@ type AgentSessionListContentProps = {
   isSearching: boolean;
   /** True while the driving query fetches — the error body's retry in flight. */
   isRetrying: boolean;
+  /** The driving read is paused (offline) with nothing of its own to show. */
+  isPaused: boolean;
+  /** Re-issues the paused read; it resolves only after reconnect, so it is not awaited. */
+  onRetryPaused: () => void;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
   /** Retires exactly the narrowing input the pressed clear control names. */
@@ -108,6 +114,7 @@ export function AgentSessionListContent({
   hasFreshHistory,
   isFetchingNextPage,
   isFetchNextPageError,
+  isRetentionLimited,
   onRetryNextPage,
   refetch,
   onRetry,
@@ -118,6 +125,8 @@ export function AgentSessionListContent({
   hasActiveFilters,
   isSearching,
   isRetrying,
+  isPaused,
+  onRetryPaused,
   searchQuery,
   onClearAction,
   onCreateSession,
@@ -203,6 +212,7 @@ export function AgentSessionListContent({
 
   const surface = selectSessionListContentSurface({
     isLoading,
+    isPaused,
     isError: isError || errorPullFailed,
     isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
@@ -343,9 +353,11 @@ export function AgentSessionListContent({
 
   // A failed next page keeps every loaded row and says so at the end of the
   // list: the spinner alone ended the list silently, so the last loaded row
-  // read as the end of the history. The retry calls `fetchNextPage`, and the
-  // end-reach gate stops re-firing while this line stands (see
-  // `shouldLoadMoreSessions`).
+  // read as the end of the history. The retention bound is a third ending, and
+  // a list that stopped at it says so instead of ending silently like a
+  // complete history. The retry calls `fetchNextPage`, and the end-reach gate
+  // stops re-firing while this line stands (see `shouldLoadMoreSessions`); a
+  // failed or in-flight next page owns the footer ahead of the bound.
   let listFooter: ReactNode = null;
   if (isFetchNextPageError) {
     listFooter = (
@@ -369,6 +381,14 @@ export function AgentSessionListContent({
     listFooter = (
       <View className="py-4">
         <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  } else if (isRetentionLimited) {
+    listFooter = (
+      <View className="items-center gap-3 px-4 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('agents.sessionList.retentionLimit')}
+        </Text>
       </View>
     );
   }
@@ -449,6 +469,18 @@ export function AgentSessionListContent({
           isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
+      </View>
+    );
+  }
+
+  // A paused read (offline) never settles: the offline card takes the surface
+  // with its own Retry instead of skeletons that never land or a list that
+  // hides the search. It takes no pull — a refresh there could not settle.
+  if (surface.kind === 'offline') {
+    return (
+      <View className="flex-1">
+        {updatingStatus}
+        <QueryError variant="offline" onRetry={onRetryPaused} />
       </View>
     );
   }

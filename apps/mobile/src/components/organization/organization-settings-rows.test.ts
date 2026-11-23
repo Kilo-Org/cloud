@@ -7,6 +7,7 @@ import {
   visibleInAppSettingsRows,
   visibleOrgSettingsRows,
 } from '@/components/organization/organization-settings-rows';
+import { i18n } from '@/i18n';
 
 // The row table carries icon components; the pure node project cannot load the
 // native icon package, and the icons are not what this suite asserts.
@@ -164,6 +165,30 @@ describe('visibleInAppSettingsRows', () => {
       pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
       params: { org: 'org_1' },
     });
+  });
+
+  it('names the usage row for the organization a billing role reads', () => {
+    for (const role of ['owner', 'admin', 'billing_manager'] as const) {
+      const row = visibleInAppSettingsRows(
+        { role, plan: 'enterprise', guardrailsEnabled: true },
+        'org_1'
+      ).find(entry => entry.area === 'usageDetails');
+      expect(row?.title).toBe(i18n.t('organization.settingsOnWeb.usageDetails'));
+      expect(row).not.toHaveProperty('subtitle');
+      expect(row?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
+    }
+  });
+
+  it('names the usage row for the self scope when the screen answers self-scoped', () => {
+    for (const role of ['member', undefined] as const) {
+      const row = visibleInAppSettingsRows(
+        { role, plan: 'enterprise', guardrailsEnabled: true },
+        'org_1'
+      ).find(entry => entry.area === 'usageDetails');
+      expect(row?.title).toBe(i18n.t('usage.orgSelfEntryTitle'));
+      expect(row).not.toHaveProperty('subtitle');
+      expect(row?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
+    }
   });
 });
 

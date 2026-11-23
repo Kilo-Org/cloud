@@ -1,7 +1,9 @@
 import { fetchNativeSnapshot, projectNativeSnapshot } from './native-sync-snapshot';
+import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
   readKilo2Messages,
   hasUnresolvedKilo2Assets,
+  kilo2MessageFileId,
   kilo2ToolFileId,
   kilo2AssetKey,
 } from './kilo2-source-messages';
@@ -1080,22 +1082,22 @@ describe('canonical native snapshot projection', () => {
     expect(snapshot.entities).toContainEqual(sessionBlob);
 
     const projection = projectNativeSnapshot(snapshot);
-    // The absolute remote reference has no possible display, so only that message is
-    // dropped, and it is not reported as an incomplete or recoverable message.
-    const displayable = messages.filter(message => message.id !== 'msg_remote_result');
+    // An absolute remote reference is never fetched on purpose, so only its file part is
+    // withheld: the message still projects, and the transcript is NOT reported incomplete
+    // for it because that reference was never expected from content storage.
     expect(projection).toEqual({
       session: projectedSession,
       position: 20,
       revision: 4,
-      messages: readKilo2Messages(projectedSession, displayable, {
+      messages: readKilo2Messages(projectedSession, messages, {
         assetURLs: snapshot.assetURLs,
       }),
       incompleteMessageIDs: [],
     });
-    // A shell record has no display part of its own, so it is absent for the same
-    // reason it always was; only the remote-reference message is newly dropped.
+    // A shell record has no display part of its own, so it is absent from the
+    // projection for the same reason it always was.
     expect(projection.messages.map(message => message.info.id)).toEqual(
-      displayable.filter(message => message.type !== 'shell').map(message => message.id)
+      messages.filter(message => message.type !== 'shell').map(message => message.id)
     );
     expect(JSON.stringify(projection.messages)).not.toContain('https://fixture.invalid/image.png');
     // Empty bytes are absent bytes: the header-only file has no part at all, and the
@@ -1140,7 +1142,9 @@ describe('canonical native snapshot projection', () => {
     expect(projection.messages[2]?.parts[0]).toMatchObject({ type: 'compaction' });
     expect(projection.messages[4]?.info).toMatchObject({ id: 'msg_pending' });
     expect(projection.messages[5]?.info).toMatchObject({ error: { name: 'MessageAbortedError' } });
-    expect(projection.messages.at(-1)?.parts[1]).toEqual(
+    expect(
+      projection.messages.find(message => message.info.id === 'msg_media_user')?.parts[1]
+    ).toEqual(
       expect.objectContaining({
         id: kilo2PartId('msg_media_user', 1),
         type: 'file',
@@ -1148,6 +1152,12 @@ describe('canonical native snapshot projection', () => {
         url: 'data:image/png;base64,AQID',
       })
     );
+    // The remote-reference message now displays; only its unusable file part is missing.
+    expect(
+      projection.messages
+        .find(message => message.info.id === 'msg_remote_result')
+        ?.parts.filter(part => part.type === 'file')
+    ).toEqual([]);
   });
 
   it('retains incomplete native metadata but does not project it as an empty complete answer', async () => {
@@ -1260,6 +1270,18 @@ describe('native user file display fallbacks', () => {
     expect(hasUnresolvedKilo2Assets(message)).toBe(true);
     expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
       { id: kilo2PartId(message.id, 0), type: 'text' },
+    ]);
+    // Once that reference is authorized, its bytes are the display: the empty `data:` never
+    // becomes a zero-byte file, and the authorized mapping still renders a part.
+    const id = kilo2MessageFileId(message.id, 0);
+    const url = 'data:image/png;base64,AQID';
+    expect(
+      readKilo2Messages(session, [message], {
+        assetURLs: { [kilo2AssetKey(id, `media:${'a'.repeat(64)}`, 'image/png')]: url },
+      })[0]?.parts
+    ).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text' },
+      { id, type: 'file', url },
     ]);
   });
 });
@@ -1501,6 +1523,35 @@ describe('authorized native snapshot attachments', () => {
     ]);
   });
 
+  // The broken attachment has its own message so each case only ever mismatches its
+  // own mapping; the seeded valid message keeps a resolvable sibling in the same read.
+  const brokenHash = 'e'.repeat(64);
+  const brokenUser = {
+    id: 'msg_media_broken',
+    type: 'user',
+    time: { created: 2 },
+    text: 'broken',
+    files: [
+      {
+        mime: 'image/png',
+        name: 'broken.png',
+        uri: `media:${brokenHash}`,
+        source: { type: 'inline' },
+      },
+    ],
+  };
+  const brokenEntity = entity('message', brokenUser.id, { seq: 1, message: brokenUser });
+  const siblingKey = kilo2AssetKey(
+    kilo2PartId(storedUser.id, 1),
+    `media:${mediaHash}`,
+    'image/png'
+  );
+  const brokenKey = kilo2AssetKey(
+    kilo2PartId(brokenUser.id, 1),
+    `media:${brokenHash}`,
+    'image/png'
+  );
+
   it.each<[string, unknown[]]>([
     ['missing mapping', []],
     [
@@ -1509,10 +1560,10 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/1',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1526,8 +1577,8 @@ describe('authorized native snapshot attachments', () => {
           'message',
           'msg_other',
           '/message/files/0',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1539,10 +1590,10 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
           '/somewhere',
-          mediaHash,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1554,13 +1605,26 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'application/pdf'
         ),
+      ],
+    ],
+    // The resolver requires the mapping MIME to match the file's own type, so a mapping
+    // that states none cannot be bound to this attachment.
+    [
+      'absent MIME',
+      [
+        entity('asset', 'bad', {
+          entity: { kind: 'message', id: brokenUser.id },
+          pointer: '/message/files/0',
+          reference: `media:${brokenHash}`,
+          blob: { hash: brokenHash, bytes: 3 },
+        }),
       ],
     ],
     [
@@ -1569,24 +1633,49 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
-          `media:${mediaHash}`,
+          `media:${brokenHash}`,
           pdfHash,
           3,
           'image/png'
         ),
       ],
     ],
-  ])('rejects %s before downloading private bytes', async (_name, mappings) => {
-    const { request } = snapshotFetch([userEntity, ...mappings]);
-    const readAsset = jest.fn(async () => new Uint8Array([1, 2, 3]).buffer);
-    await expect(
-      fetchNativeSnapshot(request, sessionID, undefined, readAsset)
-    ).rejects.toMatchObject({
-      code: 'native_asset_not_found',
+  ])('withholds %s while the rest of the transcript stays readable', async (_name, mappings) => {
+    const { request } = snapshotFetch([
+      entity('session', sessionID, nativeSession),
+      userEntity,
+      userMapping,
+      brokenEntity,
+      ...mappings,
+    ]);
+    const readAsset = jest.fn(async (path: string) =>
+      path === `${sessionPath}/blobs/${mediaHash}`
+        ? new Uint8Array([1, 2, 3]).buffer
+        : Promise.reject(new Error(`Unexpected binary route ${path}`))
+    );
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    // Both messages stay in the snapshot: an unbound reference withholds only its bytes.
+    expect(snapshot.messages.map(item => item.message.id)).toEqual([storedUser.id, brokenUser.id]);
+    // The valid sibling resolves from its own authorized mapping ...
+    expect(snapshot.assetURLs?.[siblingKey]).toBe('data:image/png;base64,AQID');
+    expect(projectNativeSnapshot(snapshot).messages[0]?.parts[1]).toMatchObject({
+      id: kilo2PartId(storedUser.id, 1),
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AQID',
     });
-    expect(readAsset).not.toHaveBeenCalled();
+    // ... while the broken reference gets no URL and is reported as unavailable.
+    expect(snapshot.assetURLs?.[brokenKey]).toBeUndefined();
+    expect(snapshot.unavailableAssetKeys).toEqual([brokenKey]);
+    // The broken message still displays its text, with only the unusable file withheld.
+    expect(projectNativeSnapshot(snapshot).messages[1]?.parts).toMatchObject([
+      { id: kilo2PartId(brokenUser.id, 0), type: 'text', text: 'broken' },
+    ]);
+    expect(readAsset.mock.calls.map(([path]) => path)).toEqual([
+      `${sessionPath}/blobs/${mediaHash}`,
+    ]);
   });
 
   it('rejects asset mappings that disagree about a blob size before any read', async () => {
@@ -1713,6 +1802,155 @@ describe('authorized native snapshot attachments', () => {
         })
       ).success
     ).toBe(false);
+  });
+});
+
+describe('retained native attachment bodies', () => {
+  const messageID = 'msg_media_cache';
+  /** One user message with a stored attachment for each index, all at `bytes` advertised bytes. */
+  function mediaSnapshot(indexes: number[], bytes = 3): unknown[] {
+    const files = indexes.map(index => ({
+      mime: 'image/png',
+      name: `image-${index}.png`,
+      uri: `media:${hashOf(index)}`,
+      source: { type: 'inline' },
+    }));
+    return [
+      entity('message', messageID, {
+        seq: 0,
+        message: { id: messageID, type: 'user', time: { created: 1 }, text: 'inspect', files },
+      }),
+      ...indexes.map((index, position) =>
+        entity('asset', `asset-${index}`, {
+          entity: { kind: 'message', id: messageID },
+          pointer: `/message/files/${position}`,
+          reference: `media:${hashOf(index)}`,
+          mime: 'image/png',
+          blob: { hash: hashOf(index), bytes },
+        })
+      ),
+    ];
+  }
+  /** The `data:` URL each attachment of `indexes` resolves to, keyed by its asset identity. */
+  function expectedURLs(indexes: number[], bytes = 3): Record<string, string> {
+    const bytesValue = new Uint8Array(bytes).fill(1);
+    const url = `data:image/png;base64,${Buffer.from(bytesValue).toString('base64')}`;
+    return Object.fromEntries(
+      indexes.map((index, position) => [
+        kilo2AssetKey(kilo2PartId(messageID, position + 1), `media:${hashOf(index)}`, 'image/png'),
+        url,
+      ])
+    );
+  }
+  /** A binary reader that answers the authorized byte count with a fixed body. */
+  function reader(): jest.Mock<Promise<ArrayBuffer>, [string, number]> {
+    return jest.fn(async (_path: string, bytes: number) => new Uint8Array(bytes).fill(1).buffer);
+  }
+  /** Read `indexes` once, asserting every attachment resolved to its expected `data:` URL. */
+  async function readAssets(
+    indexes: number[],
+    bytes: number,
+    readAsset: jest.Mock<Promise<ArrayBuffer>, [string, number]>,
+    cache?: NativeSnapshotBlobCache
+  ): Promise<void> {
+    const snapshot = await fetchNativeSnapshot(
+      snapshotFetch(mediaSnapshot(indexes, bytes)).request,
+      sessionID,
+      undefined,
+      readAsset,
+      cache
+    );
+    expect(snapshot.assetURLs).toEqual(expectedURLs(indexes, bytes));
+  }
+
+  it('answers a later read of the same session from the cache without downloading again', async () => {
+    const cache = new NativeSnapshotBlobCache(1024);
+    const readAsset = reader();
+    await readAssets([0, 1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+    await readAssets([0, 1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+  });
+
+  it('downloads again on a later read of the same session without a cache', async () => {
+    const readAsset = reader();
+    await readAssets([0, 1], 3, readAsset);
+    await readAssets([0, 1], 3, readAsset);
+    expect(readAsset).toHaveBeenCalledTimes(4);
+  });
+
+  it('resolves a snapshot larger than the cache budget and reuses its own bodies across a retry', async () => {
+    // Each entry costs 4 * 2 + (10 + 64) * 2 = 156 bytes, its body text plus its keys. Against
+    // a 320-byte budget the cache holds two of the three, so only this call's own settled bodies
+    // keep the final asset loop answerable.
+    const cache = new NativeSnapshotBlobCache(320);
+    const entities = mediaSnapshot([0, 1, 2]);
+    const readAsset = reader();
+    await readAssets([0, 1, 2], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(3);
+    // The budget held two bodies, so a second call re-downloads only the evicted oldest one.
+    await readAssets([0, 1, 2], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(4);
+
+    // Within one call, a retry reuses every body the earlier attempt settled. A budget that
+    // holds a single 156-byte entry keeps this independent of the shared cache: attempt two must
+    // serve two bodies from the call's own store and read only the one that failed.
+    let failed = false;
+    const retrying = jest.fn(async (path: string, bytes: number) => {
+      if (!failed && path.endsWith(hashOf(2))) {
+        failed = true;
+        throw Object.assign(new Error('Reclaimed'), { code: 'blob_not_found' });
+      }
+      return new Uint8Array(bytes).fill(1).buffer;
+    });
+    const resolved = await fetchNativeSnapshot(
+      fakeFetch([
+        { path: sessionPath, body: state() },
+        { path: pagePath(), body: page(entities) },
+        { path: sessionPath, body: state() },
+        { path: pagePath(), body: page(entities) },
+      ]).request,
+      sessionID,
+      undefined,
+      retrying,
+      new NativeSnapshotBlobCache(156)
+    );
+    expect(resolved.assetURLs).toEqual(expectedURLs([0, 1, 2]));
+    // Two bodies settled before the failure; only the reclaimed one is read a second time.
+    const asked = (index: number) =>
+      retrying.mock.calls.filter(([path]) => path.endsWith(hashOf(index))).length;
+    expect([asked(0), asked(1), asked(2)]).toEqual([1, 1, 2]);
+
+    // A budget below one retained entry (156 bytes here) keeps nothing, so each call reads all
+    // three again.
+    const tiny = new NativeSnapshotBlobCache(155);
+    const again = reader();
+    await readAssets([0, 1, 2], 3, again, tiny);
+    await readAssets([0, 1, 2], 3, again, tiny);
+    expect(again).toHaveBeenCalledTimes(6);
+  });
+
+  it('evicts the oldest retained body so re-reading it downloads again', async () => {
+    // A 156-byte budget holds exactly one retained entry, keys included.
+    const cache = new NativeSnapshotBlobCache(156);
+    const readAsset = reader();
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    // A second body evicts the first.
+    await readAssets([1], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
+    // The evicted body is downloaded again.
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not serve a retained body whose advertised size changed', async () => {
+    const cache = new NativeSnapshotBlobCache(1024);
+    const readAsset = reader();
+    await readAssets([0], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    await readAssets([0], 4, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(2);
   });
 });
 

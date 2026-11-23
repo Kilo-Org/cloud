@@ -62,6 +62,29 @@ export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | unde
   );
 }
 
+/**
+ * A denial's description as one paragraph per reason. A lone paragraph stays
+ * the bare string, so a sentence that already names the organization reads as
+ * one sentence; two or more become separate muted paragraphs in the same body
+ * token, one paragraph gap apart, so the reader sees two reasons rather than
+ * one cramped paragraph at a different size.
+ */
+function denialParagraphs(paragraphs: readonly string[]): ReactNode {
+  const [only] = paragraphs;
+  if (paragraphs.length === 1 && only !== undefined) {
+    return only;
+  }
+  return (
+    <View className="items-center gap-2">
+      {paragraphs.map((paragraph, index) => (
+        <Text key={index} variant="muted" className="text-center">
+          {paragraph}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -103,12 +126,20 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !status.isPending &&
     !(readiness.isError && readiness.data == null) &&
     !(status.isError && status.data == null);
-  let title = t('agentChat.repoPicker.platformBitbucket');
+  // A title that names a connect or reconnect action is offered only to a role
+  // that can finish it. A refused member reads the connection state when the
+  // workspace has no integration, and the platform name when one exists,
+  // because the body refuses that reconnect.
+  const platformTitle = t('agentChat.repoPicker.platformBitbucket');
+  let title = platformTitle;
   if (readsSettled && !managesExisting) {
-    title =
-      integrationId === null
+    if (integrationId === null) {
+      title = canManage
         ? t('common.connectBitbucket')
-        : t('prReview.connect.reconnectTitleBitbucket');
+        : t('prReview.connect.bitbucketNotConnectedTitle');
+    } else if (canManage) {
+      title = t('prReview.connect.reconnectTitleBitbucket');
+    }
   }
 
   // One body per state, so the guard's confirmation renders beside all of them:
@@ -146,9 +177,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('codeReviewer.bitbucketConnect.deniedConnectRole', {
-            organization: org.organizationName,
-          })}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -164,9 +196,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('codeReviewer.bitbucketConnect.deniedConnectRole', {
-            organization: org.organizationName,
-          })}
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
           showBack={false}
         />
       ) : (
@@ -180,24 +213,24 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
-      // `org` is narrowed here, so the sentences name the organization whose
-      // role rule refused: a person in several of them cannot tell whose rule
-      // this is from the role alone.
-      const { organizationName } = org;
       // The repair this sheet would offer decides which trio can make it: an
-      // OAuth connection is an owner's to change, a first connect needs
-      // anyone who may connect, and a stored token needs anyone who may
-      // reconnect it.
-      const deniedDescription = managesExisting
-        ? t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
-            organization: organizationName,
-          })
-        : t(
-            integrationId === null
-              ? 'codeReviewer.bitbucketConnect.deniedConnectRole'
-              : 'codeReviewer.bitbucketConnect.deniedReconnectRole',
-            { organization: organizationName }
-          );
+      // OAuth connection is an owner's to change, a stored token needs anyone
+      // who may reconnect it, and a first connect asks for whoever holds the
+      // permission. The reconnect and owner sentences name the organization
+      // whose rule refused, so a person in several of them reads which one this
+      // is. The first connect sentence is the shared ask the composer's
+      // Bitbucket card states beside the same restriction, and it leaves the
+      // organization implicit, so it is stated under the organization line.
+      let deniedDescription = t('prReview.connect.bitbucketAdminOnlyDescription');
+      if (managesExisting) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
+          organization: org.organizationName,
+        });
+      } else if (integrationId !== null) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedReconnectRole', {
+          organization: org.organizationName,
+        });
+      }
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the plan line
       // under the role names the owner and the billing step that unblocks it.
@@ -222,26 +255,22 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
             }}
           />
         );
-      // The denial sentence stays the state's description. The plan line is a
-      // second paragraph in the same muted body token, one paragraph gap under
-      // it, so the reader sees two reasons rather than one cramped paragraph at
-      // a different size.
+      // The organization line leads the shared ask sentence, because that
+      // sentence leaves the organization implicit and the header names only the
+      // platform; the owner and reconnect sentences already name it, so they
+      // stay the one paragraph. The plan line closes the first-connect list when
+      // the plan blocks too.
+      const deniedParagraphs =
+        managesExisting || integrationId !== null
+          ? [deniedDescription]
+          : [
+              t('prReview.connect.contextLine', { organization: org.organizationName }),
+              deniedDescription,
+              ...(deniedPlanLine === undefined ? [] : [deniedPlanLine]),
+            ];
       return (
         <PermissionDenied
-          description={
-            deniedPlanLine === undefined ? (
-              deniedDescription
-            ) : (
-              <View className="items-center gap-2">
-                <Text variant="muted" className="text-center">
-                  {deniedDescription}
-                </Text>
-                <Text variant="muted" className="text-center">
-                  {deniedPlanLine}
-                </Text>
-              </View>
-            )
-          }
+          description={denialParagraphs(deniedParagraphs)}
           showBack={false}
           action={deniedAction}
         />

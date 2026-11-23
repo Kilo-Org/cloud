@@ -41,6 +41,8 @@ type ChatToolbarProps = {
   modelLocked?: boolean;
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
+  /** Refetches the model catalog; the model chip offers it when the catalog is empty. */
+  onRetryModels?: () => void;
   className?: string;
   /**
    * Accepted for the new-session and clone callers that used to allow a second
@@ -79,6 +81,7 @@ export function ChatToolbar({
   pasteDisabled = false,
   modelLocked = false,
   modelLockLabel,
+  onRetryModels,
   className,
   onLayout,
 }: Readonly<ChatToolbarProps>) {
@@ -95,6 +98,7 @@ export function ChatToolbar({
       disabled={disabled || modelLocked}
       isLoading={isLoadingModels}
       lockLabel={modelLocked ? modelLockLabel : undefined}
+      onRetryModels={onRetryModels}
     />
   );
   // The paste button shares the model chip's line. The wrapper grows to fill the

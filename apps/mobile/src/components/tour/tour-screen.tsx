@@ -154,8 +154,8 @@ export function TourScreen() {
   // GO_BACK banner instead of dismissing.
   const dismiss = useCallback(() => {
     recordCompleted();
-    dismissTour(router);
-  }, [recordCompleted, router]);
+    dismissTour(router, stackSafeRouter.replace);
+  }, [recordCompleted, router, stackSafeRouter]);
 
   // The hand-off ends the tour: record the decision, then open the
   // new-session page over the tour. The tour route and `/agent-chat/new` are

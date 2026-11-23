@@ -7,7 +7,6 @@ import { LANGUAGE_PREFERENCE_KEY } from '@/lib/storage-keys';
 
 export type LanguagePreference = 'device' | SupportedLanguage;
 
-/** Maps any raw stored value to a valid preference; unknown values become `device`. */
 export function parseLanguagePreference(raw: string | null): LanguagePreference {
   if (raw === 'device') {
     return 'device';

@@ -19,10 +19,6 @@ export function getDeliveredEmailAddress(email: string): string {
 
 /**
  * Normalizes an email address for duplicate detection.
- * - Lowercases the entire address
- * - Strips `+` aliases (e.g. `user+tag@example.com` → `user@example.com`)
- * - For Gmail/Googlemail: removes dots from the local part
- * - Normalizes `googlemail.com` → `gmail.com` (same mailbox)
  */
 export function normalizeEmail(email: string): string {
   const trimmed = email.trim().toLowerCase();

@@ -6,12 +6,15 @@ type ModelSelectorLabelInput = {
   /** The session's stored model reference or id. */
   value: string;
   /**
-   * True when the options carry CLI-catalog refs. The chip then cannot know a
-   * human name for an unmatched value and falls back to the generic label.
+   * True when the options carry CLI-catalog refs. The chip then cannot rewrite
+   * an unmatched value as a reference and reads it as unknown.
    */
   providerAware: boolean;
-  /** `t('common.model')`: the label for a stored value nothing can name. */
-  fallbackLabel: string;
+  /**
+   * `t('common.unknown')`: the value for a non-empty stored model the catalogue
+   * cannot name.
+   */
+  unknownLabel: string;
   /** `t('common.notSelected')`: the label while no model is chosen at all. */
   notSelectedLabel: string;
 };
@@ -27,7 +30,9 @@ type ModelSelectorLabelInput = {
  * model picker shows. Mirrors the web chat toolbar, which never renders the raw
  * model reference: a `vendor/model` reference the catalog does not carry falls
  * back to `modelReferenceLabel`, the one readable rule the catalogue-backed rows
- * (`modelLabelFromCatalogue`) also use.
+ * (`modelLabelFromCatalogue`) also use. A stored model nothing can name reads
+ * as unknown rather than repeating the field's own label, which would read as a
+ * choice the catalogue never offered.
  */
 export function resolveModelSelectorLabel(input: ModelSelectorLabelInput): string {
   if (input.selectedName !== undefined) {
@@ -43,11 +48,12 @@ export function resolveModelSelectorLabel(input: ModelSelectorLabelInput): strin
     const referenceLabel = modelReferenceLabel(input.value);
     if (referenceLabel !== '') {
       // A `vendor/model` reference is an id, not copy: `modelReferenceLabel`
-      // shows its readable last segment, the same rule every other row uses.
-      // The chip read `deepseek/deepseek-v4.1-flash-1017` on a session whose
-      // picker named the same model `DeepSeek V4.1 Flash 1017`.
+      // shows its readable parts, the same rule every other row uses. The chip
+      // read `deepseek/deepseek-v4.1-flash-1017` on a session whose picker
+      // named the same model `DeepSeek V4.1 Flash 1017`. A value the helper
+      // leaves unchanged is a name already, better copy than `unknown`.
       return referenceLabel;
     }
   }
-  return input.fallbackLabel;
+  return input.unknownLabel;
 }

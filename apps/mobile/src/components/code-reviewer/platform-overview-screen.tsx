@@ -8,7 +8,6 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { ActionRequiredBanner } from '@/components/code-reviewer/action-required-banner';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
-import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
   resolveRowOnPress,
@@ -165,9 +164,7 @@ export function PlatformOverviewScreen({
         <ProviderConnectState
           scope={scope}
           platform={platform}
-          notice={
-            canConnect ? undefined : t(connectNoticeKey(platform), { platform: capabilities.label })
-          }
+          refused={!canConnect}
           onConnected={handleConnected}
         />
       </View>
@@ -327,6 +324,8 @@ export function PlatformOverviewScreen({
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
+                    // Focus areas is a comma list; short values like "Set" stay on one line.
+                    subtitleNumberOfLines={2}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}

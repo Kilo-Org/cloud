@@ -197,12 +197,7 @@ type OptimisticContext = Readonly<{
   previousWasLegacy: boolean;
 }>;
 
-/**
- * Apply the optimistic flip for a single category. Returns the previous
- * snapshot for rollback and a flag indicating whether the cache held the
- * legacy `agentPushEnabled`-only shape (so the rollback can restore it
- * verbatim instead of leaving the new per-category shape behind).
- */
+/** Apply the optimistic flip for a single category. */
 export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<OptimisticContext> {
   await args.queryClient.cancelQueries({ queryKey: args.queryKey });
   // Stamp after the last await, in the same synchronous block as the cache

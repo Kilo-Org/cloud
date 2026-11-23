@@ -78,7 +78,6 @@ function parseIPv6CIDR(cidr: string): ParsedIPv6Range | null {
 
 // --- Parsed ranges (computed once at module evaluation) ---
 
-// Source: https://api.cloudflare.com/client/v4/ips
 const IPV4_RANGES = [
   '173.245.48.0/20',
   '103.21.244.0/22',

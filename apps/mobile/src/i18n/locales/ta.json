@@ -91,6 +91,7 @@
     "draft": "வரைவு",
     "enabled": "இயக்கப்பட்டது",
     "github": "GitHub",
+    "image": "படம்",
     "imageUnavailable": "படம் கிடைக்கவில்லை.",
     "loading": "ஏற்றுகிறது…",
     "loadMore": "மேலும் ஏற்றவும்",
@@ -399,7 +400,7 @@
       "title": "வழங்குநர் விசைகள்",
       "rowSubtitle": "உங்கள் சொந்த வழங்குநர் பில்லிங்கைப் பயன்படுத்தவும்",
       "orgDescription": "இந்த விசைகள் நிறுவனத்தில் உள்ள அனைவருடனும் பகிரப்படுகின்றன, அவற்றுக்கான கட்டணம் நிறுவனத்தின் வழங்குநர் கணக்குகளில் வசூலிக்கப்படும்.",
-      "viewOnly": "நிறுவன உரிமையாளர், நிர்வாகி அல்லது பில்லிங் மேலாளர் மட்டுமே நிறுவனத்தின் விசைகளை மாற்ற முடியும்.",
+      "viewOnly": "நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளர் மட்டுமே நிறுவனத்தின் விசைகளை மாற்ற முடியும்.",
       "description": "இந்த விசைகள் மூலம் அனுப்பப்படும் கோரிக்கைகளுக்கான கட்டணம் உங்கள் Kilo இருப்பிற்குப் பதிலாக உங்கள் வழங்குநர் கணக்கில் வசூலிக்கப்படும்.",
       "managedByPlan": "உங்கள் கோடிங் திட்டத்தால் நிர்வகிக்கப்படுகிறது",
       "enableKey": "{{provider}} விசையை இயக்கவும்",
@@ -522,6 +523,7 @@
       "receiptLabel": "ரசீது",
       "copyReceiptId": "ரசீது ID-ஐ நகலெடுக்கவும்",
       "appealLabel": "மேல்முறையீடு",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "பெறப்பட்டது",
       "triageOpen": "மதிப்பாய்வில் உள்ளது",
       "triageActioned": "உறுதிசெய்யப்பட்டது",
@@ -555,7 +557,7 @@
       "title": "புகார்கள்",
       "rowSubtitle": "நீங்கள் சமர்ப்பித்த புகார்களும் அவற்றின் முடிவுகளும்",
       "emptyTitle": "இன்னும் புகார்கள் இல்லை",
-      "emptyDescription": "ஒரு கருத்து அல்லது AI பதிலில் இருந்து நீங்கள் சமர்ப்பிக்கும் புகார்கள் இங்கே தோன்றும்.",
+      "emptyDescription": "pull request விவாதத்தில் உள்ள ஒரு கருத்தில் இருந்தோ அல்லது முகவர் அமர்வில் வரும் AI பதிலில் இருந்தோ நீங்கள் சமர்ப்பிக்கும் புகார்கள் அவற்றின் முடிவுடன் இங்கே தோன்றும்.",
       "couldNotLoad": "உங்கள் புகார்களை ஏற்ற முடியவில்லை",
       "capped": "உங்கள் சமீபத்திய புகார்கள் காட்டப்படுகின்றன."
     },
@@ -1010,8 +1012,9 @@
       "checkActiveConnection": "இணைப்பு செயலில் உள்ளது, ஆனால் இந்த உருப்படியை இன்னும் ஏற்ற முடியவில்லை.",
       "bitbucketOrgOnlyDescription": "அதன் Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய மேலே உள்ள கணக்கை ஒரு நிறுவனத்திற்கு மாற்றவும்.",
       "bitbucketOrgOnlyNoOrganizationDescription": "இந்தக் கணக்கில் இன்னும் எந்த நிறுவனமும் இல்லை. ஒரு நிறுவனத்தை உருவாக்கியதும் அல்லது அதில் இணைந்ததும், Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யலாம்.",
-      "gitlabReconnectAdminOnlyDescription": "அதை மீண்டும் இணைக்க ஒரு நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளரிடம் கேட்கவும்.",
+      "reconnectAdminOnlyDescription": "அதை மீண்டும் இணைக்க ஒரு நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளரிடம் கேட்கவும்.",
       "bitbucketNotConnectedTitle": "Bitbucket இணைக்கப்படவில்லை",
+      "bitbucketAdminOnlyDescription": "அதை இணைக்க ஒரு நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளரிடம் கேட்கவும்.",
       "adminOnlyConnectDescription": "நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்.",
       "contextLine": "{{organization}}-க்கு",
       "contextLinePersonal": "உங்கள் தனிப்பட்ட கணக்கிற்கு"
@@ -1236,6 +1239,7 @@
     "needsInputAction": {
       "approved": "கோரிக்கை அங்கீகரிக்கப்பட்டது",
       "replied": "பதில் அனுப்பப்பட்டது",
+      "empty": "பதிலை எழுதி, பின்னர் அனுப்பவும்.",
       "failed": "பதிலளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க மீண்டும் தட்டவும்.",
       "unavailable": "இந்தக் கோரிக்கை இனி காத்திருக்கவில்லை."
     }
@@ -1500,7 +1504,9 @@
       "githubError": "GitHub அமைப்புச் செயல்முறையைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "gitlabAccount": "GitLab கணக்கு",
       "gitlabError": "GitLab அமைப்புச் செயல்முறையைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "description": "இணைப்புக் கோரிக்கைகளைத் தானாக மதிப்பாய்வு செய்ய Kilo {{label}}-ஐ இணைக்கவும்."
+      "description": "இணைப்புக் கோரிக்கைகளைத் தானாக மதிப்பாய்வு செய்ய Kilo {{label}}-ஐ இணைக்கவும்.",
+      "notConnectedTitle": "{{platform}} இணைக்கப்படவில்லை",
+      "githubAdminOnlyDescription": "நிறுவன உரிமையாளர்களும் நிர்வாகிகளும் மட்டுமே அதை இணைக்க முடியும்."
     },
     "overview": {
       "allAreas": "அனைத்துப் பகுதிகளும்",
@@ -1586,7 +1592,7 @@
       "empty": "இன்னும் பகுப்பாய்வுடன் மதிப்பாய்வுகள் இல்லை",
       "emptyDescription": "நிறுவனத்திற்கு பகுப்பாய்வு இயக்கப்பட்டிருக்கும்போது முடிந்த மதிப்பாய்வுகளை அது பதிவு செய்கிறது.",
       "offTitle": "{{platform}} பகுப்பாய்வு முடக்கப்பட்டுள்ளது",
-      "offDescription": "நிறுவனத்தின் பில்லிங் பங்குகளான உரிமையாளர்கள், நிர்வாகிகள் மற்றும் பில்லிங் மேலாளர்களால், முடிந்த மதிப்பாய்வுகளைப் பதிவு செய்வதற்காக இணையதளத்தில் உள்ள நிறுவன அமைப்புகளில் பகுப்பாய்வை இயக்கலாம்.",
+      "offDescription": "நிறுவனத்தின் பில்லிங் பங்குகளான உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்களால், முடிந்த மதிப்பாய்வுகளைப் பதிவு செய்வதற்காக இணையதளத்தில் உள்ள நிறுவன அமைப்புகளில் பகுப்பாய்வை இயக்கலாம்.",
       "couldNotLoad": "பகுப்பாய்வை ஏற்ற முடியவில்லை",
       "trackedReviewsCaption": "இந்தக் காலகட்டத்தில் பகுப்பாய்வு இயக்கப்பட்டிருந்தபோது முடிந்த மதிப்பாய்வுகள். நடந்து கொண்டிருக்கும் மற்றும் தோல்வியடைந்த மதிப்பாய்வுகள் ஒருபோதும் கணக்கில் எடுத்துக் கொள்ளப்படாது.",
       "trackedReviewsUncounted": "கணக்கில் எடுத்துக் கொள்ளப்படவில்லை: {{displayCount}} / {{displayTotal}} நிறுவனத்திற்கு உள்ள மொத்த முடிந்த மதிப்பாய்வுகளில் அவற்றின் முடிவு பதிவு செய்யப்படவில்லை.",
@@ -2174,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} அமர்வுகள்",
       "sectionAccessibility": "{{title}}: {{displayCount}} அமர்வுகள்",
       "live": "நேரலை",
-      "updating": "புதுப்பிக்கப்படுகிறது"
+      "updating": "புதுப்பிக்கப்படுகிறது",
+      "retentionLimit": "உங்கள் மிகச் சமீபத்திய அமர்வுகள் காட்டப்படுகின்றன."
     },
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",
@@ -2244,11 +2251,11 @@
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "emptyReadOnlyTitle": "இந்த அமர்வில் செய்திகள் இல்லை",
-      "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",
       "cloningSession": "அமர்வு நகலாக்கப்படுகிறது",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை.",
       "historyTooLarge": "இந்த அமர்வின் பதிவேடு ஏற்ற முடியாற்படி மிகப் பெரிது.",
       "historyUnavailable": "இந்த அமர்வின் பதிவேட்டைப் படிக்க முடியாது.",
+      "historyTemporarilyUnavailable": "இந்த அமர்வின் பதிவேடு தற்காலிகமாகக் கிடைக்கவில்லை.",
       "cloneFailedRetry": "இந்த அமர்வை நகலாக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "notEnoughCredits": "இந்தக் கோரிக்கைக்குப் போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
       "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடையவில்லை. சிறிது நேரம் காத்திருக்கவும்.",
@@ -2654,6 +2661,7 @@
     "filePart": {
       "loadingImage": "படம் ஏற்றப்படுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை. மீண்டும் ஏற்ற முயற்சிக்கவும்",
+      "imageUnavailableRetryWithAlt": "படம் கிடைக்கவில்லை. {{alt}}. மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்க்கவும்",
       "viewImageWithAlt": "{{alt}} படத்தைப் பார்க்கவும்",
@@ -2785,7 +2793,9 @@
       "skip": "தவிர்க்கவும்",
       "retrySkip": "மீண்டும் தவிர்க்க முயற்சிக்கவும்",
       "submitting": "சமர்ப்பிக்கப்படுகிறது…",
-      "sendAnswers": "பதில்களை அனுப்பவும்"
+      "sendAnswers": "பதில்களை அனுப்பவும்",
+      "unreadableTitle": "இந்தக் கேள்வியைக் காட்ட முடியவில்லை",
+      "unreadableBody": "இந்தச் செயலி காட்ட முடியாத கேள்விக்காக முகவர் காத்திருக்கிறது. தொடர CLI-இல் கேள்விக்கு பதிலளிக்கவும்."
     },
     "blockingCard": {
       "questionUnavailable": "இந்தக் கேள்வி இனி கிடைக்கவில்லை.",
@@ -2812,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "துணை ஏஜென்ட்டின் அமர்வை ஏற்ற முடியவில்லை.",
+      "historyTooLarge": "இந்த துணை ஏஜென்ட்டின் வரலாறு ஏற்ற முடியாதபடி மிகப் பெரிது.",
+      "historyUnavailable": "இந்த துணை ஏஜென்ட்டின் வரலாறு கிடைக்கவில்லை.",
+      "historyTemporarilyUnavailable": "இந்த துணை ஏஜென்ட்டின் வரலாறு தற்காலிகமாகக் கிடைக்கவில்லை.",
       "failed": "துணை ஏஜென்ட்டின் அமர்வு தோல்வியடைந்தது.",
       "noMessages": "துணை ஏஜென்ட்டின் செய்திகள் இல்லை",
       "noMessagesDescription": "இந்தத் துணை ஏஜென்ட்டின் அமர்வு உரையாடல் பதிவு எதுவும் இல்லாமல் முடிந்தது.",
@@ -3093,6 +3106,12 @@
     "retryLoadingAccount": "கணக்கை ஏற்ற மீண்டும் முயற்சிக்கவும்",
     "retryLoadingPrivacy": "தனியுரிமை விருப்பங்களை ஏற்ற மீண்டும் முயற்சிக்கவும்"
   },
+  "accountBlocked": {
+    "title": "கணக்கு தடைசெய்யப்பட்டது",
+    "description": "Kilo இந்தக் கணக்கைத் தடைசெய்துள்ளது, மீண்டும் உள்நுழைவதால் அது நீங்காது. கோரிக்கையின் பேரில் உதவிக் குழு தடையை மதிப்பாய்வு செய்யலாம்.",
+    "domainDescription": "Kilo இந்த மின்னஞ்சல் டொமைனில் கணக்குகளைத் தடைசெய்கிறது, மீண்டும் உள்நுழைவதால் அது மாறாது. கோரிக்கையின் பேரில் உதவிக் குழு டொமைனை மதிப்பாய்வு செய்யலாம்.",
+    "contactSupport": "உதவிக் குழுவைத் தொடர்புகொள்ளவும்"
+  },
   "addCredits": {
     "cta": "கிரெடிட்களைச் சேர்க்கவும்",
     "billingPage": "கட்டணப் பக்கம்"
@@ -3165,8 +3184,7 @@
     "timeoutDescription": "கோரிக்கை நிறைவடையும் முன் நேரம் காலாவதியானது. மீண்டும் முயற்சிக்கவும்."
   },
   "screenHeader": {
-    "openMenu": "மெனுவைத் திறக்கவும்",
-    "openMenuFor": "{{title}}-க்கான மெனுவைத் திறக்கவும்"
+    "openMenu": "மெனுவைத் திறக்கவும்"
   },
   "picker": {
     "optionsExpired": "விருப்பங்கள் காலாவதியாகின",
@@ -3385,6 +3403,8 @@
     "voiceTranscriptionWho": "உங்கள் சாதனம், நீங்கள் தேர்ந்தெடுத்த படியெடுப்பு மாதிரியுடன் Kilo Gateway, அல்லது ஆன்லைன் அங்கீகாரத்திற்கு Apple அல்லது Google.",
     "installAttributionPromptTitle": "நிறுவல் மூலத்தைக் கண்டறிய அனுமதிக்கவா?",
     "installAttributionPromptMessage": "நீங்கள் எந்த வழியாக Kilo-விற்கு வந்தீர்கள் என்பதை அறிய மட்டுமே Apple-இன் கண்காணிப்பு அனுமதியை Kilo பயன்படுத்துகிறது. உங்கள் வினவல்களும் உரையாடல்களும் இதற்காக ஒருபோதும் பயன்படுத்தப்படாது.",
+    "installAttributionRequestFailedTitle": "கண்காணிப்புக் கோரிக்கையைக் காட்ட முடியவில்லை",
+    "installAttributionRequestFailedMessage": "Kilo-வால் கண்காணிப்பு அமைப்புக் கோரிக்கையைக் காட்ட முடியவில்லை, எனவே நிறுவல் மூலக் கண்டறிதல் அணைக்கப்பட்டே உள்ளது.",
     "what": "என்ன",
     "why": "ஏன்",
     "who": "யார்"
@@ -3400,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "தணிக்கைப் பதிவு",
-      "permissionDenied": "Enterprise திட்டத்தில் உள்ள நிறுவனத்தின் உரிமையாளர், நிர்வாகி அல்லது பில்லிங் மேலாளர் மட்டுமே அதன் தணிக்கைப் பதிவைப் படிக்க முடியும்.",
+      "permissionDenied": "Enterprise திட்டத்தில் உள்ள நிறுவனத்தின் உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளர் மட்டுமே அதன் தணிக்கைப் பதிவைப் படிக்க முடியும். $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "தணிக்கை நிகழ்வுகள் இல்லை",
       "emptyDescription": "இந்த நிறுவனத்தில் மேற்கொள்ளப்படும் செயல்கள் இங்கே தோன்றும்.",
       "truncated": "மிகச் சமீபத்திய நிகழ்வுகள் காட்டப்படுகின்றன.",
@@ -3450,11 +3470,147 @@
         "guardrailUpdate": "பாதுகாப்பு வரம்பு புதுப்பிக்கப்பட்டது",
         "guardrailRemove": "பாதுகாப்பு வரம்பு நீக்கப்பட்டது",
         "unknown": "தணிக்கை நிகழ்வு"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "முறை \"{{name}}\" (அடையாளங்காட்டி: {{slug}})",
+        "modeUpdate": "முறை \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "தானியங்கி வழிமாற்றம்",
+          "defaultModel": "இயல்புநிலை மாதிரி"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} {{role}} ஆகச் சேர்க்கப்பட்டார்",
+        "memberRemoved": "{{email}} அகற்றப்பட்டார்",
+        "memberParentAdded": "தாய் நிறுவனம் {{parent}} இலிருந்து {{email}} சேர்க்கப்பட்டார்",
+        "memberParentRemoved": "தாய் நிறுவனம் {{parent}} இலிருந்து {{email}} அகற்றப்பட்டார்",
+        "inviteSent": "{{email}} {{role}} ஆக",
+        "inviteRevoked": "{{email}} க்கான அழைப்பு ரத்து செய்யப்பட்டது",
+        "inviteAccepted": "{{email}} ஏற்கப்பட்டது",
+        "groupIdentity": "குழு \"{{name}}\"",
+        "groupMembers": "குழு \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} குழுக்கள்",
+        "groupMemberGroups_one": "{{displayCount}} குழு",
+        "groupMemberGroups_other": "{{displayCount}} குழுக்கள்",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} குழுக்கள்",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} குழு",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} குழுக்கள்",
+        "groupPolicySet": "குழு \"{{name}}\": {{policy}} கொள்கை அமைக்கப்பட்டது",
+        "groupPolicyRemoved": "குழு \"{{name}}\": {{policy}} கொள்கை நீக்கப்பட்டது",
+        "groupDefaultPolicySet": "இயல்புநிலை {{policy}} கொள்கை அமைக்கப்பட்டது",
+        "groupDefaultPolicyRemoved": "இயல்புநிலை {{policy}} கொள்கை நீக்கப்பட்டது",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "செயற்கை நுண்ணறிவு பாதுகாப்பு வேலிகள் {{state}}",
+        "guardrailConfigGroup": "குழு \"{{group}}\" க்கு {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO டொமைன் {{domain}}",
+        "ssoDomainChanged": "{{domain}} (முன்பு {{previous}})",
+        "ssoDomainRemoved": "SSO டொமைன் {{domain}} அகற்றப்பட்டது",
+        "fundsPurchased": "{{method}} மூலம் {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} துணை நிறுவனங்களுக்கு {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} துணை நிறுவனத்திற்கு {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} துணை நிறுவனங்களுக்கு {{amount}}",
+        "fundsReceived": "{{parent}} இலிருந்து {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} உள்ளமைவு",
+        "reviewAgentConfigStyle": "{{platform}}: {{style}} நடை",
+        "reviewAgentSecretsUpdated": "{{displayCount}} புதுப்பிக்கப்பட்டன",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} புதுப்பிக்கப்பட்டது",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} புதுப்பிக்கப்பட்டன",
+        "reviewAgentSecretsFailed": "{{displayCount}} பிழைகள்",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} பிழை",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} பிழைகள்",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "அனுமானப் பிராந்தியம்: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "முறை \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "உலகளாவிய இயல்புநிலை",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "அனுமதிக்கப்பட்டது",
+          "denied": "மறுக்கப்பட்டது",
+          "followSetting": "நீட்டிப்பு அமைப்பைப் பின்பற்றுகிறது"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "திட்டம் UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}} க்கு",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "பரிந்துரைச் சுருக்கம் {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: அனுமதிக்கப்பட்ட மூலங்கள் இல்லை",
+        "settingName": "{{previous}} இலிருந்து {{next}} என மறுபெயரிடப்பட்டது",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "பயன்படுத்தும் முன் ஸ்கேன் இயக்கப்பட்டது",
+        "scanBeforeUseOff": "பயன்படுத்தும் முன் ஸ்கேன் முடக்கப்பட்டது",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "நீக்கப்பட்டது: {{models}}",
+        "browserPolicyOff": "உலாவி பயன்பாடு தடுக்கப்பட்டது",
+        "browserPolicyAllow": "அனுமதிக்கப்பட்ட மூலங்கள் மட்டும்",
+        "browserPolicyPlaywrightOnly": "உலாவி பயன்பாடு மட்டும்",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "மாதிரிகள் மாற்றப்பட்டன: {{values}}",
+        "integrationConnected": "{{integration}} இணைக்கப்பட்டது",
+        "integrationDisconnected": "{{integration}} துண்டிக்கப்பட்டது",
+        "integrationRefreshed": "{{integration}} புதுப்பிக்கப்பட்டது",
+        "integrationCancelled": "{{integration}} ரத்து செய்யப்பட்டது",
+        "integrationModelUpdated": "{{integration}}: மாதிரி {{model}}",
+        "integrationKeyAdded": "{{provider}} க்கான விசை சேர்க்கப்பட்டது",
+        "integrationKeyUpdated": "{{provider}} க்கான விசை புதுப்பிக்கப்பட்டது",
+        "integrationKeyDeleted": "{{provider}} க்கான விசை அகற்றப்பட்டது",
+        "integrationKeyToggled": "{{provider}} க்கான விசை: {{state}}",
+        "namedPolicyCreated": "{{kind}} கொள்கை {{id}} உருவாக்கப்பட்டது",
+        "namedPolicyUpdated": "{{kind}} கொள்கை {{id}} புதுப்பிக்கப்பட்டது",
+        "namedPolicyDeleted": "{{kind}} கொள்கை {{id}} அகற்றப்பட்டது",
+        "namedPolicyLinked": "{{kind}} கொள்கை {{next}} உடன் இணைக்கப்பட்டது",
+        "webhookTriggerUpdated": "தூண்டுதல் {{trigger}}",
+        "organizationRenamed": "நிறுவனம் {{previous}} இலிருந்து {{next}} ஆக மறுபெயரிடப்பட்டது",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "உங்கள் சொந்த API விசை"
+        }
       }
     },
     "billing": {
       "title": "பில்லிங்",
-      "permissionDenied": "நிறுவன உரிமையாளர், நிர்வாகி அல்லது பில்லிங் மேலாளர் மட்டுமே அதன் பில்லிங்கைப் பார்க்க முடியும்.",
+      "permissionDenied": "நிறுவன உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளர் மட்டுமே அதன் பில்லிங்கைப் பார்க்க முடியும். $t(organization.boundary.accessDeniedDescription)",
       "subscription": "சந்தா",
       "state": "நிலை",
       "stateNone": "சந்தா இல்லை",
@@ -3532,7 +3688,7 @@
       "pendingInvitation": "இந்த மின்னஞ்சலுக்கு ஏற்கனவே நிலுவையில் உள்ள அழைப்பு உள்ளது.",
       "alreadyMember": "இந்த நபர் ஏற்கனவே இந்த நிறுவனத்தின் உறுப்பினராக உள்ளார்.",
       "seatsFull": "அனைத்து இருக்கைகளும் பயன்பாட்டில் உள்ளன ({{used}}/{{total}}). மேலும் உறுப்பினர்களை அழைப்பதற்கு முன், இருக்கைகளைச் சேர்க்குமாறு நிறுவன உரிமையாளரிடம் கேட்கவும்.",
-      "seatsFullCanInviteBilling": "அனைத்து இருக்கைகளும் பயன்பாட்டில் உள்ளன ({{used}}/{{total}}). இருக்கையைப் பயன்படுத்தாத பில்லிங் மேலாளர்களை நீங்கள் இன்னும் அழைக்கலாம்.",
+      "seatsFullCanInviteBilling": "அனைத்து இருக்கைகளும் பயன்பாட்டில் உள்ளன ({{used}}/{{total}}). இருக்கையைப் பயன்படுத்தாத கட்டண மேலாளர்களை நீங்கள் இன்னும் அழைக்கலாம்.",
       "noSeatsAvailable": "அனைத்து இருக்கைகளும் பயன்பாட்டில் உள்ளன. மேலும் உறுப்பினர்களை அழைப்பதற்கு முன், இருக்கைகளைச் சேர்க்குமாறு நிறுவன உரிமையாளரிடம் கேட்கவும்."
     },
     "invoices": {
@@ -3631,7 +3787,7 @@
       "emptyDescription": "முந்தைய கோரிக்கைகளைப் பார்க்க 'முந்தைய மணிநேரம்' பொத்தானைப் பயன்படுத்தவும்.",
       "emptyBoundDescription": "கோரிக்கைப் பதிவுகள் இதற்கு முந்தைய காலத்திற்குக் கிடைக்காது.",
       "loadError": "கோரிக்கைப் பதிவுகளை ஏற்ற முடியவில்லை.",
-      "permissionDenied": "நிறுவனத்தின் உரிமையாளர், நிர்வாகி அல்லது பில்லிங் மேலாளர் மட்டுமே அதன் கோரிக்கைப் பதிவுகளைப் படிக்க முடியும்.",
+      "permissionDenied": "நிறுவனத்தின் உரிமையாளர், நிர்வாகி அல்லது கட்டண மேலாளர் மட்டுமே அதன் கோரிக்கைப் பதிவுகளைப் படிக்க முடியும். $t(organization.boundary.accessDeniedDescription)",
       "tokens": "உள்ளீடு {{input}} · வெளியீடு {{output}}",
       "byok": "BYOK"
     },
@@ -3736,7 +3892,7 @@
     "signupStepUpApple": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க '$t(login.signInWithApple)' என்பதைப் பயன்படுத்தவும்.",
     "signupStepUpGoogle": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க '$t(login.signInWithGoogle)' என்பதைப் பயன்படுத்தவும்.",
     "signupStepUpBack": "உங்கள் கணக்கை உருவாக்குவதை முடிக்க பின்னால் சென்று '$t(login.moreSignInOptions)' என்பதைப் பயன்படுத்தவும்.",
-    "invalidCode": "அந்தக் குறியீடு தவறானது அல்லது காலாவதியானது. மீண்டும் முயற்சிக்கவும் அல்லது '$t(login.resendCode)' என்பதைப் பயன்படுத்தவும்.",
+    "invalidCode": "அந்தக் குறியீடு தவறானது அல்லது காலாவதியானது. இதற்கு '$t(login.resendCode)' என்பதையோ அல்லது '$t(login.moreSignInOptions)' என்பதையோ பயன்படுத்தவும்.",
     "codeInProgress": "உங்கள் குறியீடு செயலாக்கப்படுகிறது. சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்.",
     "tooManyAttempts": "முயற்சிகளின் வரம்பை மீறிவிட்டீர்கள். புதிய குறியீட்டைக் கோரவும்.",
     "invalidToken": "உள்நுழைவு தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.",
@@ -3901,7 +4057,10 @@
     "list": {
       "loadFailed": "அரட்டை வரலாற்றை ஏற்ற முடியவில்லை.",
       "new": "புதிய அரட்டை",
-      "deleteTitle": "இந்த அரட்டையை நீக்கவா?"
+      "deleteTitle": "இந்த அரட்டையை நீக்கவா?",
+      "resetNoticeTitle": "உள்ளூர் அரட்டைகளும் வரைவுகளும் நீக்கப்பட்டன",
+      "resetNoticeBody": "Kilo இந்தச் சாதனத்தில் சேமிக்கப்பட்ட அரட்டை வரலாற்றை ஏற்ற முடியவில்லை. உங்கள் மேகத்தில் உள்ள அமர்வுகள் பாதிக்கப்படவில்லை.",
+      "resetNoticeDismiss": "அறிவிப்பைப் புறக்கணிக்கவும்"
     },
     "rename": {
       "title": "அரட்டையின் பெயரை மாற்றவும்",
@@ -3951,6 +4110,9 @@
       "fieldName": "காட்டப்படும் பெயர்",
       "fieldUrl": "சேவையக URL",
       "fieldUrlInvalid": "செல்லுபடியாகும் சேவையக URL உள்ளிடவும்.",
+      "fieldUrlCredentials": "முகவரியில் இருந்து பயனர் பெயரையும் கடவுச்சொல்லையும் நீக்கவும்.",
+      "fieldUrlFragment": "முகவரியின் # பகுதியை நீக்கவும்.",
+      "fieldUrlInsecure": "https முகவரியை உள்ளிடவும்; http என்பது localhost க்கு மட்டும் அனுமதிக்கப்படும்.",
       "duplicateUrl": "அந்த URL ஏற்கனவே சேமிக்கப்பட்டுள்ளது.",
       "serverNotFound": "இந்த சேவையகம் இனிச் சேமிக்கப்படவில்லை.",
       "enableServer": "இந்தச் சேவையகத்தை இயக்கு: {{name}}",
@@ -3976,6 +4138,7 @@
       "app": {
         "label": "கருவி இடைமுகம்",
         "failed": "இந்த கருவியின் இடைமுகத்தை ஏற்ற முடியவில்லை.",
+        "tooLarge": "இந்த கருவியின் இடைமுகம் {{size}} வரம்பை விட பெரியது.",
         "empty": "இந்த கருவியின் இடைமுகத்தில் காட்ட எதுவும் இல்லை."
       }
     },
@@ -4043,6 +4206,8 @@
       "discoveryNoModels": "சேவை முனையம் எந்த மாதிரியையும் பட்டியலிடவில்லை. மாதிரிகளைக் கைமுறையாக உள்ளிடவும்.",
       "connectionIncomplete": "மாதிரி பதிலளித்தது ஆனால் முடிக்கவில்லை. மீண்டும் முயற்சிக்கவும், அல்லது மாதிரி ID மற்றும் நெறிமுறையைச் சரிபார்க்கவும்.",
       "invalidInput": "பின்தளப் பெயர், செல்லுபடியாகும் தலைப்புகள் மற்றும் தனித்துவமான ID மற்றும் பெயரைக் கொண்ட குறைந்தது ஒரு மாதிரியை உள்ளிடவும். டோக்கன் வரம்புகள் பூஜ்ஜியத்தைவிடப் பெரிய முழு எண்களாக இருக்க வேண்டும்.",
+      "invalidApiKey": "API விசையில் அனுப்ப முடியாத எழுத்து ஒன்று உள்ளது. எழுத்துகள், இலக்கங்கள் மற்றும் நிலையான சின்னங்களை மட்டும் வரி முறிவுகள் இல்லாமல் பயன்படுத்தவும்.",
+      "invalidHeaders": "தனிப்பயன் தலைப்பை அனுப்ப முடியாது. அதன் பெயரைச் சரிபார்த்து, எழுத்துகள், இலக்கங்கள் மற்றும் நிலையான சின்னங்களை மட்டும் வரி முறிவுகள் இல்லாமல் பயன்படுத்தவும்.",
       "invalidUrl": "அணுகல் சான்றுகள், வினவல் அல்லது துண்டுப் பகுதி இல்லாத HTTP அல்லது HTTPS API மூல முகவரியை உள்ளிடவும்.",
       "publicHttp": "பொது HTTP சேவை முனையங்கள் அனுமதிக்கப்படாது. HTTPS அல்லது தனிப்பட்ட உள்ளூர் சேவை முனையத்தைப் பயன்படுத்தவும்.",
       "httpApprovalRequired": "சேமிப்பதற்கு அல்லது இணைப்பதற்கு முன் இந்த உள்ளூர் HTTP சேவை முனையத்திற்கு ஒப்புதல் அளிக்கவும்.",
@@ -4091,6 +4256,7 @@
         "network": "பதிவிறக்கம் முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
         "invalidFile": "பதிவிறக்கிய கோப்பு இந்த ஆப் இயக்கக்கூடிய மாதிரி அல்ல, எனவே அது நீக்கப்பட்டது.",
         "checksum": "பதிவிறக்கிய கோப்பு அதன் வெளியிடப்பட்ட செக்சம் மதிப்புடன் பொருந்தவில்லை, எனவே அது நீக்கப்பட்டது. மீண்டும் பதிவிறக்க முயலவும்.",
+        "unreadable": "இந்தச் சாதனத்தால் பதிவிறக்கிய கோப்பைச் சரிபார்க்க முடியவில்லை, எனவே அது நீக்கப்பட்டது. மீண்டும் பதிவிறக்க முயலவும்.",
         "writeFailed": "இந்தச் சாதனத்தால் மாதிரியைச் சேமிக்க முடியவில்லை. மீண்டும் பதிவிறக்க முயலவும்."
       }
     },
@@ -4176,7 +4342,15 @@
       "download": "சாதனத்திலுள்ள மாதிரியைப் பதிவிறக்கு",
       "downloading": "பதிவிறங்குகிறது…",
       "downloadProgress": "பதிவிறங்குகிறது… {{percent}}%",
-      "downloadFailed": "பதிவிறக்கம் முடியவில்லை. உங்கள் இணைப்பையும் காலியிடத்தையும் சரிபார்த்து, மீண்டும் முயலவும்."
+      "downloadFailed": "பதிவிறக்கம் முடியவில்லை. உங்கள் இணைப்பையும் காலியிடத்தையும் சரிபார்த்து, மீண்டும் முயலவும்.",
+      "cannotUse": "இயக்க முடியாது: {{items}}.",
+      "cannotUseOptions": "நிரப்ப முடியாது: சில கருவி விருப்பங்கள்.",
+      "limitations": "வரம்புகள்",
+      "tools": {
+        "time": "நேரம்",
+        "settingsList": "அமைப்புகளைக் காட்டு",
+        "settingsSet": "அமைப்புகளை மாற்று"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "இந்த மாதிரி சிந்தனை அளவை ஆதரிக்கிறது"
@@ -4355,6 +4529,7 @@
     "instructionSaveFailed": "அறிவுறுத்தலைச் சேமிக்க முடியவில்லை",
     "instructionDeleteFailed": "அறிவுறுத்தலை நீக்க முடியவில்லை",
     "instructionToggleFailed": "அறிவுறுத்தலைப் புதுப்பிக்க முடியவில்லை",
+    "instructionViewTitle": "அறிவுறுத்தல் கோப்பு",
     "instructionLimitReached": "ஒரு சுயவிவரத்தில் {{max}} அறிவுறுத்தல்கள் வரை இருக்கலாம். மற்றொன்றைச் சேர்க்க ஒன்றை நீக்கவும்.",
     "mcp": {
       "title": "MCP சேவையகங்கள்",
@@ -4529,6 +4704,7 @@
       "emptyDescription": "கிரெடிட் வாங்குதல்கள், ரசீதுகள் மற்றும் பயன்பாடு இங்கே தோன்றும்.",
       "emptyTitle": "கிரெடிட் வரலாறு இல்லை",
       "expiredGrant": "காலாவதியானது: {{description}}",
+      "expiredStatus": "காலாவதியானது",
       "googlePlayReceipt": "Google Play-இலிருந்து ரசீது",
       "kind": {
         "adjustment": "சரிசெய்தல்",
@@ -4555,7 +4731,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}}-க்கான ரசீதைத் திற",
       "receiptUnavailable": "இந்த வாங்குதலுக்கு ரசீது கிடைக்கவில்லை.",
       "retentionLimit": "மிகச் சமீபத்திய கிரெடிட் வரலாறு காட்டப்படுகிறது.",
-      "voidedGrant": "ரத்து செய்யப்பட்டது: {{description}}"
+      "voidedGrant": "ரத்து செய்யப்பட்டது: {{description}}",
+      "voidedStatus": "ரத்து செய்யப்பட்டது"
     },
     "title": "கிரெடிட்களை வாங்கவும்",
     "description": "கிரெடிட்கள் என்பது Kilo App இல் AI குறியீட்டு அமர்வுகளை இயக்க உங்கள் Kilo இருப்புக்கு சேர்க்கப்படும் ஒரு முறை வாங்குதல் ஆகும். ஸ்டோர் உங்கள் கணக்கிலிருந்து கட்டணம் வசூலிக்கும், ஸ்டோர் பணம் செலுத்தியதை உறுதிப்படுத்திய பிறகு கிரெடிட்கள் சேர்க்கப்படும்.",
@@ -4699,6 +4876,7 @@
     "contextAll": "அனைத்துச் சூழல்களும்",
     "dismiss": "அறிக்கையைப் புறக்கணிக்கவும்",
     "dismissFailed": "இந்த அறிக்கையை இன்னும் புறக்கணிக்க இயலவில்லை. பின்புலத்தில் தானாகவே மீண்டும் முயற்சிக்கப்படும்.",
+    "readMarkFailed": "இந்த அறிக்கையைப் படித்ததாகக் குறிக்க இயலவில்லை. அறிக்கை மீண்டும் ஏற்றப்படும்போது தானாகவே மீண்டும் முயற்சிக்கப்படும்.",
     "offline": "ஆஃப்லைன் · சேமித்த அறிக்கை",
     "cached": "சேமித்த அறிக்கை · புதுப்பிக்க இயலாது",
     "summary": "AI சுருக்கம்",
@@ -4718,16 +4896,21 @@
     "morningEnd": "அறிக்கை கிடைக்கும் வரை",
     "timeHint": "அறிக்கைக் காலம் முடிந்ததும், ஆஃப்லைனிலும், முகப்பு அட்டை நேரடி நிலையை மீட்டமைக்கும்.",
     "invalidSchedule": "சரியான நேர மண்டலத்தையும், காலியில்லாத அறிக்கைக் காலத்தையும் தேர்வுசெய்யவும்.",
+    "scheduleEmptyNight": "அறிக்கைக் காலம் காலியாக உள்ளது. காலத் தொடக்கத்திற்குப் பிறகான தயாராகும் நேரத்தைத் தேர்வுசெய்யவும்.",
+    "scheduleEmptyMorning": "தயாராகும் நேரமும் கிடைக்கும் வரை நேரமும் ஒத்துள்ளன. அறிக்கை எவ்வளவு காலம் கிடைக்கும் என்பதைத் தேர்வுசெய்யவும்.",
+    "scheduleFullDay": "இரண்டு காலங்களும் ஒரு முழு நாளை உள்ளடக்குகின்றன. நாளின் ஒரு பகுதியை அறிக்கைக்கு வெளியே விடவும்.",
     "notificationsHint": "திட்டமிடப்பட்ட அறிக்கைக்கு ஒரு பொது அறிவிப்பு. கட்டண AI சுருக்கங்களைச் சாராதது.",
     "notificationPermission": "உங்கள் அறிக்கையைப் பெற புஷ் அறிவிப்புகளை இயக்கவும்.",
     "defaultModel": "Kilo இன் இயல்பு மாடலைப் பயன்படுத்து",
     "duration": "நேர வரம்பு (நிமிடங்கள்)",
     "spendLimit": "செலவு வரம்பு (USD)",
-    "invalidSafeguards": "நேர்மறையான, வரம்புள்ள நேர மற்றும் செலவு வரம்புகளை உள்ளிடவும்.",
+    "invalidSafeguards": "அனுமதிக்கப்பட்ட வரம்பிற்குள் நேர்மறை எண்ணை உள்ளிடவும்.",
     "estimate": "மதிப்பீடு {{estimate}} · அதிகபட்சம் {{maximum}}",
     "estimateUnavailable": "இந்த அமைப்புகளுக்கு கட்டண சுருக்கம் கிடைக்கவில்லை. மாடலையோ வரம்புகளையோ மாற்றவும், அல்லது பின்னர் மீண்டும் முயற்சிக்கவும்.",
     "confirmPaid": "{{context}} க்குக் கட்டணச் சுருக்கங்களை இயக்கவா?",
-    "paidDisclosure": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure_one": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடம் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடங்கள் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
+    "paidDisclosure_other": "மதிப்பீடு {{estimate}}, அதிகபட்சம் {{maximum}}, {{minutes}} நிமிடங்கள் கொண்ட வரம்புடன். உருவாக்கம் தோல்வியடைந்தாலும் கட்டணம் உண்டு.",
     "enable": "கட்டணச் சுருக்கங்களை இயக்கு",
     "allContexts": "தனிப்பட்ட மற்றும் நிறுவன அறிக்கைகள் தனித்தனியாக இருக்கும்.",
     "emptyHistory": "சேமித்த அறிக்கைகள் இல்லை",
@@ -4770,7 +4953,7 @@
     "sourceActivity": "தலைப்பில்லா செயல்பாடு",
     "metadataFailureProvider": "வழங்குநர் பிழை",
     "metadataFailureTool": "கருவி பிழை",
-    "metadataFailureCancelled": "ரத்து செய்யப்பட்டது",
+    "metadataStopped": "கடைசி சுற்று நிறுத்தப்பட்டது",
     "metadataFailureOther": "குறிப்பிடப்படாத பிழை"
   },
   "systemSearch": {
@@ -4791,7 +4974,8 @@
     "unavailableTitle": "பயன்பாடு கிடைக்கவில்லை",
     "unavailableDescription": "இந்தப் பணியிடத்திற்குப் பயன்பாடு அமைக்கப்படவில்லை. இங்கே பயன்பாட்டைக் காண வேண்டும் என எதிர்பார்த்தால், ஆதரவுக் குழுவைத் தொடர்புகொள்ளவும்.",
     "orgSelfNotice": "இந்த நிறுவனத்தில் உங்கள் சொந்தப் பயன்பாட்டைப் பார்க்கிறீர்கள்.",
-    "viewDetails": "பயன்பாட்டு விவரங்களைக் காண்க"
+    "viewDetails": "பயன்பாட்டு விவரங்களைக் காண்க",
+    "orgSelfEntryTitle": "உங்கள் பயன்பாடு"
   },
   "integrations": {
     "title": "ஒருங்கிணைப்புகள்",
@@ -4887,10 +5071,15 @@
       "autoCommit": "இயக்கம் முடிந்ததும் மாற்றங்களைப் பதிவு செய்",
       "condenseOnComplete": "இயக்கம் முடிந்ததும் சூழலைச் சுருக்கு",
       "activeTitle": "தூண்டி செயலில்",
+      "activeSwitchA11y": "தூண்டி செயலில்: {{name}}",
+      "copyLinkA11y": "இணைப்பை நகலெடுக்கவும்: {{name}}",
       "activeDescription": "இடைநிறுத்தப்பட்ட வெப்ஹூக்குகள் 404 உடன் பதிலளிக்கும்.",
       "runAsCreator": "எனது கணக்காக இயக்கு",
       "runAsCreatorDescription": "ஒவ்வொரு இயக்கமும் உங்கள் கணக்கைப் பயன்படுத்தும், எனவே ரகசியத் தலைப்பு தேவை.",
       "saveFailedTitle": "தூண்டியைச் சேமிக்க முடியவில்லை",
+      "nameTaken": "“{{name}}” எனும் பெயரில் ஒரு தூண்டி ஏற்கனவே உள்ளது.",
+      "saveFailedRetry": "சேவையகத்தை அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்.",
+      "saveFailedCheck": "படிவத்தில் உள்ள மதிப்புகளைச் சரிபார்த்து மீண்டும் முயலவும்.",
       "deleteTitle": "இந்தத் தூண்டியை நீக்கவா?",
       "deleteMessage": "{{name}}-க்கான அழைப்புகள் தோல்வியடையும். இதை மீளச் செய்ய முடியாது.",
       "deleteMessageScheduled": "{{name}} தூண்டியின் திட்டமிடப்பட்ட இயக்கங்கள் நிற்கும். இதை மீளச் செய்ய முடியாது.",

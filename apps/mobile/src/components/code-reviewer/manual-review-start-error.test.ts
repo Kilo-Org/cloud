@@ -125,7 +125,7 @@ describe('manualReviewStartFailure recognized server sentences', () => {
 });
 
 describe('manualReviewStartFailure retryability', () => {
-  it.each(['BAD_GATEWAY', 'TOO_MANY_REQUESTS', 'PRECONDITION_FAILED', 'CONFLICT'])(
+  it.each(['BAD_GATEWAY', 'TOO_MANY_REQUESTS', 'PRECONDITION_FAILED'])(
     'offers the retry for %s',
     code => {
       expect(manualReviewStartFailure(trpcError(code, 'server copy'), 'github').retryable).toBe(
@@ -134,14 +134,18 @@ describe('manualReviewStartFailure retryability', () => {
     }
   );
 
-  it.each(['FORBIDDEN', 'UNAUTHORIZED', 'NOT_FOUND', 'BAD_REQUEST', 'UNPROCESSABLE_CONTENT'])(
-    'drops the retry for the terminal code %s',
-    code => {
-      expect(manualReviewStartFailure(trpcError(code, 'server copy'), 'github').retryable).toBe(
-        false
-      );
-    }
-  );
+  it.each([
+    'CONFLICT',
+    'FORBIDDEN',
+    'UNAUTHORIZED',
+    'NOT_FOUND',
+    'BAD_REQUEST',
+    'UNPROCESSABLE_CONTENT',
+  ])('drops the retry for the terminal code %s', code => {
+    expect(manualReviewStartFailure(trpcError(code, 'server copy'), 'github').retryable).toBe(
+      false
+    );
+  });
 
   it('offers the retry for a transport failure with no code', () => {
     expect(manualReviewStartFailure(new Error('Network request failed'), 'github').retryable).toBe(

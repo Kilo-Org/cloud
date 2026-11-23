@@ -46,11 +46,6 @@ describe('getSessionDetailRenameState', () => {
   });
 
   it('returns a real caller fallback unchanged and normalizes a placeholder one', () => {
-    // The screen pre-sanitizes the cached list title before it becomes
-    // `fallbackTitle` (session-detail-content.tsx), so a real name passes
-    // through untouched. The helper normalizes a placeholder or blank fallback
-    // to the generic label as well, so a machine timestamp can never reach the
-    // header even if one is handed in.
     for (const fallback of ['Session', 'Fix login bug']) {
       const state = getSessionDetailRenameState({
         fallbackTitle: fallback,
@@ -191,9 +186,6 @@ describe('getSessionDetailRenameState', () => {
   });
 
   it('falls back to the untitled copy for a loaded session whose server title normalized away', () => {
-    // A `New session - <ISO>` placeholder is normalized to undefined by
-    // displaySessionTitle at the data boundary; the header then shows the
-    // short fallback in full instead of an ellipsized timestamp.
     expect(
       getSessionDetailRenameState({
         fallbackTitle,
@@ -225,8 +217,6 @@ describe('getSessionDetailRenameState', () => {
   });
 
   it('keeps an optimistic rename even when the typed title looks like a placeholder', () => {
-    // Only server-derived titles are filtered; whatever the user typed is
-    // their title.
     const state = getSessionDetailRenameState({
       fallbackTitle,
       isLoaded: true,

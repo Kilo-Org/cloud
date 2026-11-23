@@ -11,6 +11,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { toast } from 'sonner-native';
 
 import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { type SessionAttentionHydration } from '@/lib/session-attention';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
 
@@ -48,11 +49,13 @@ import {
  * request, so its cancel answer reports nothing here.
  */
 export function usePendingAppAction({
+  attentionHydration,
   isError,
   isLoading,
   needsInputRows,
   orgLoaded,
 }: {
+  attentionHydration: SessionAttentionHydration;
   isError: boolean;
   isLoading: boolean;
   needsInputRows: readonly NeedsInputSession[];
@@ -73,8 +76,12 @@ export function usePendingAppAction({
     }
     // Wait for the live list to settle before answering "the one waiting
     // session, or the list" — and treat a failed query as settled, because the
-    // list screen owns that error and its retry.
-    if (pendingAppAction.action === 'OpenNeedsInput' && !(orgLoaded && (!isLoading || isError))) {
+    // list screen owns that error and its retry. The ack store is the second
+    // input: an unhydrated store answers "not acked" for a raise the person
+    // already answered, so hold until its phase settles too.
+    const needsInputSettled =
+      orgLoaded && (!isLoading || isError) && attentionHydration !== 'loading';
+    if (pendingAppAction.action === 'OpenNeedsInput' && !needsInputSettled) {
       return;
     }
     // Act on what this run consumed, not on the snapshot it rendered with: an
@@ -122,6 +129,7 @@ export function usePendingAppAction({
     orgLoaded,
     isLoading,
     isError,
+    attentionHydration,
     needsInputRows,
     router,
     billingAction,

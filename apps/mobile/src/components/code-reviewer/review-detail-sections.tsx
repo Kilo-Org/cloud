@@ -12,6 +12,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
+import { specialistCopy } from '@/lib/code-reviewer-council';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn } from '@/lib/utils';
 
@@ -67,17 +68,23 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
           value={councilDecisionLabel(councilResult.decision)}
           valueFace="text"
         />
-        {councilResult.specialists.map(specialist => (
-          <KvRow
-            key={specialist.id}
-            label={specialist.name}
-            value={councilVoteLabel(specialist.vote)}
-            valueFace="text"
-            // The name is configured and can be long: it truncates so the vote
-            // the row exists to show stays in view.
-            labelShrink
-          />
-        ))}
+        {councilResult.specialists.map(specialist => {
+          const copy = specialistCopy(specialist.id);
+          return (
+            <KvRow
+              key={specialist.id}
+              // A preset's stored name is the shared roster's English copy, so
+              // the row names the concern from the catalog instead. Only a
+              // custom specialist has a name of its own to show.
+              label={copy.kind === 'preset' ? t(copy.nameKey) : specialist.name}
+              value={councilVoteLabel(specialist.vote)}
+              valueFace="text"
+              // A custom name is arbitrary and can be long: it truncates so the
+              // vote the row exists to show stays in view.
+              labelShrink
+            />
+          );
+        })}
       </RowGroup>
     </Section>
   );

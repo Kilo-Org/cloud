@@ -320,9 +320,17 @@ describe('ToolCardFileAttachments mounted', () => {
     const root = renderer.root;
 
     expect(shareButtons(root)).toHaveLength(0);
+    // The row keeps its file identity: the filename is the title line and the
+    // unavailable copy stands in for the mime subtitle, at the row's normal
+    // icon size, so a missing cache entry does not look like a broken card.
+    expect(texts(root).filter(text => text === 'report.pdf')).toHaveLength(1);
     expect(texts(root).filter(text => text === 'File unavailable in this session.')).toHaveLength(
       1
     );
+    expect(texts(root)).not.toContain('application/pdf');
+    const [icon] = root.findAll(node => (node.type as string) === 'FileIcon');
+    expect(icon?.props.size).toBe(16);
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(0);
 
     await unmount(renderer);
   });

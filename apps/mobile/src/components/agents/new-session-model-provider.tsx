@@ -22,6 +22,12 @@ export type NewSessionModelState = {
   setModel: Dispatch<SetStateAction<string>>;
   variant: string;
   setVariant: Dispatch<SetStateAction<string>>;
+  /**
+   * The organization-default read's failure while nothing is selected yet. It
+   * is the only remaining input that could have chosen the model, so the form
+   * states it and offers the read again instead of committing a fallback row.
+   */
+  modelSelectionFailure: { onRetry: () => void; isRetrying: boolean } | null;
 };
 
 type NewSessionModelProviderProps = {
@@ -50,15 +56,31 @@ export function NewSessionModelProvider({
   const { models } = useAvailableModels(organizationId);
   const autoSelected = useAutoSelectModel(models, organizationId);
   const hasAppliedAutoSelection = useRef(false);
-  const initialSelection = resolvePrefillModel(models, prefill) ?? autoSelected;
-  if (!hasAppliedAutoSelection.current && initialSelection.model && !model) {
+  const initialSelection =
+    resolvePrefillModel(models, prefill) ??
+    (autoSelected.kind === 'selected'
+      ? { model: autoSelected.model, variant: autoSelected.variant }
+      : null);
+  if (!hasAppliedAutoSelection.current && initialSelection?.model && !model) {
     hasAppliedAutoSelection.current = true;
     setModel(initialSelection.model);
     setVariant(initialSelection.variant);
   }
+  // The hook's retry is the query's own stable callback, so the failure object
+  // keeps one identity across renders and the context value does not churn; it
+  // clears the moment a model is committed.
+  const orgDefaultRetry = autoSelected.kind === 'org-default-failed' ? autoSelected.onRetry : null;
+  const orgDefaultRetrying =
+    autoSelected.kind === 'org-default-failed' ? autoSelected.isRetrying : false;
+  const modelSelectionFailure = useMemo(() => {
+    if (model !== '' || orgDefaultRetry === null) {
+      return null;
+    }
+    return { onRetry: orgDefaultRetry, isRetrying: orgDefaultRetrying };
+  }, [model, orgDefaultRetry, orgDefaultRetrying]);
   const state = useMemo(
-    () => ({ mode, setMode, model, setModel, variant, setVariant }),
-    [mode, model, variant]
+    () => ({ mode, setMode, model, setModel, variant, setVariant, modelSelectionFailure }),
+    [mode, model, variant, modelSelectionFailure]
   );
 
   return (

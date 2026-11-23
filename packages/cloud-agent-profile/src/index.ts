@@ -170,6 +170,7 @@ export {
   updateAgent,
   deleteAgent,
   getAgentsForSession,
+  type SessionAgents,
   type AgentCreateInput,
   type AgentUpdateInput,
   type AgentForSession,

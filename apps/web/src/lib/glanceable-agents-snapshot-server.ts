@@ -194,11 +194,8 @@ export type GlanceableDelivery = {
 const LIVE_PR_STATES = new Set(['open', 'draft', 'unknown']);
 
 /**
- * True when the session's pull request is worth telling the user about: a
- * link GitHub verified for this session (the session list's own rule for
- * `associatedPr`), whose pull request is still open or a draft, or not yet
- * synced. A merged or closed pull request, and a stored link nobody verified,
- * do not count.
+ * True when the session's pull request is worth telling the user about. A
+ * stored link nobody verified never counts.
  */
 export function isSessionCardPrOpened(pr: { verified: boolean; state: string | null }): boolean {
   return pr.verified && LIVE_PR_STATES.has(pr.state ?? 'unknown');

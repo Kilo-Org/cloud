@@ -124,5 +124,19 @@ describe('organization groups tRPC router', () => {
       });
       expect(result.name).toBe('Design renamed');
     });
+
+    // A name of zero-width spaces draws nothing, so the procedure refuses it as
+    // a bad request rather than storing a group the list cannot name.
+    it('refuses a create whose name draws nothing', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.groups.create({
+          organizationId: organization.id,
+          name: '\u200B\u200B',
+          policies: [],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
   });
 });

@@ -275,15 +275,12 @@ function reportRetirementFailure(error: unknown): void {
  * usually gone before anyone could see it.
  */
 export async function retireLoginAttempt(): Promise<void> {
-  /* Memory retirement never waits on the keychain: whatever the write does, the
-     signed-out screen must not see the attempt this sign-in ended. */
   phase = { kind: 'retired' };
   try {
     /* The decision is made inside the key's chain, after any queued persist has
-       landed. Only a record the keychain says is absent costs no write: a read
-       that failed, or a value this build cannot parse, is not evidence that
-       nothing is stored, and skipping the tombstone would leave the held copy
-       for the next cold start. */
+       landed. Only a record the keychain says is absent costs no write, since
+       skipping the tombstone would leave the held copy for the next cold
+       start. */
     await chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
       const record = await readRecord();
       if (!retirementPending && (record.kind === 'absent' || record.kind === 'retired')) {

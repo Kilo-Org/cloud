@@ -6,7 +6,10 @@ import {
   SecurityAuditLogActorType,
   SecuritySeverity,
 } from '@kilocode/db/schema-types';
-import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  isDisallowedAuditJsonKey,
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+} from '@kilocode/worker-utils/security-finding-audit';
 import {
   and,
   asc,
@@ -1227,9 +1230,6 @@ function safeUrl(value: string | null): string | null {
   }
 }
 
-const REDACTED_JSON_KEY_PATTERN =
-  /(^|_)(email|recipient|prompt|rawmarkdown|raw_markdown|transcript|assistant|provider_response|authorization|auth_header|cookie|token|secret|password|credential|headers|raw_error)(_|$)/i;
-
 function selectReportEvidence(
   value: Record<string, unknown> | null,
   allowedFields: readonly string[]
@@ -1254,7 +1254,7 @@ function sanitizeJson(value: unknown): unknown {
   if (value && typeof value === 'object') {
     const sanitized: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (REDACTED_JSON_KEY_PATTERN.test(key)) continue;
+      if (isDisallowedAuditJsonKey(key)) continue;
       sanitized[key] = sanitizeJson(child);
     }
     return sanitized;

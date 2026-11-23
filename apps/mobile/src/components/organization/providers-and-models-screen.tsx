@@ -14,6 +14,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import {
   useOrgAvailableModels,
   useOrgGatewaySettings,
@@ -34,18 +35,23 @@ const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
  * own spacing, so the swap to the form moves nothing.
  */
 function ModelAccessSkeleton() {
+  // The form's own frame sits inside the window's side insets; the placeholder
+  // that stands in for it takes the same ones, so the swap moves nothing.
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="gap-3 px-4 pt-3">
-      <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'w-full rounded-lg bg-muted-soft')} />
-      <View className="flex-row items-center justify-end gap-2">
-        <Skeleton className="h-9 w-20 rounded-md bg-muted-soft" />
-        <Skeleton className="h-9 w-16 rounded-md bg-muted-soft" />
+    <View style={sideInsetStyle}>
+      <View className="gap-3 px-4 pt-3">
+        <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'w-full rounded-lg bg-muted-soft')} />
+        <View className="flex-row items-center justify-end gap-2">
+          <Skeleton className="h-9 w-20 rounded-md bg-muted-soft" />
+          <Skeleton className="h-9 w-16 rounded-md bg-muted-soft" />
+        </View>
+        <RowGroup>
+          {[0, 1, 2, 3, 4].map(index => (
+            <RowSkeleton key={index} subtitle trailing="switch" />
+          ))}
+        </RowGroup>
       </View>
-      <RowGroup>
-        {[0, 1, 2, 3, 4].map(index => (
-          <RowSkeleton key={index} subtitle trailing="switch" />
-        ))}
-      </RowGroup>
     </View>
   );
 }

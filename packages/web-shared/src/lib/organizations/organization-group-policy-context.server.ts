@@ -112,8 +112,6 @@ export async function getOrganizationGroupPolicyContext(params: {
   );
 
   let groups: OrganizationGroupPolicyEntry[] = [];
-  // A non-member caller belongs to no group, so only organization-level policy
-  // applies to them.
   if (params.subject.type === 'member' && isDirectMember) {
     const rows = await client
       .select({ id: organization_groups.id, policies: organization_groups.policies })

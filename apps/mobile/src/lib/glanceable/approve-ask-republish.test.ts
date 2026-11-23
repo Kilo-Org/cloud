@@ -1,6 +1,18 @@
 /* eslint-disable require-await -- the fake tray fetch settles without await */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  __hydrateSessionAttentionForTests,
+  __resetSessionAttentionForTests,
+  getHydrationSnapshot,
+} from '@/lib/session-attention';
+import {
+  gateSessionAttentionKvRead,
+  nextEventLoopTurn,
+  resetSessionAttentionKvFake,
+  seedSessionAttentionKvFake,
+} from '@/test/session-attention-fake';
+
 /**
  * The republish that follows an answered ask runs on the *tray*, and the tray's
  * row for the answered session can still read permission/question until the
@@ -14,6 +26,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * `approve-ask.test.ts`, whose fakes cover the answer path itself.
  */
 vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+// The ack store's hydration read, so a case can hold the store in `loading`.
+vi.mock('@/lib/persist/encrypted-kv', async () => {
+  const { sessionAttentionKvFake } = await import('@/test/session-attention-fake');
+  return sessionAttentionKvFake;
+});
 vi.mock('@/lib/cloud-agent-stream-ticket', () => ({ fetchCloudAgentStreamTicket: vi.fn() }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ createConnection: vi.fn() }));
 vi.mock('@/lib/config', () => ({
@@ -66,16 +83,30 @@ const RETRYABLE_ASK = {
 /** One tick only: the poll's own cadence and budget are covered in approve-ask.test.ts. */
 const oneTick = { sleep: vi.fn(), deadlineMs: 0 };
 
-beforeEach(() => {
+/** A raise an earlier launch answered, still waiting in the tray until status sync. */
+const EARLIER_RAISE = '2026-01-01T00:00:01.000Z';
+const ACK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LATER_ROW = { id: 'ses_2', status: 'permission', statusUpdatedAt: EARLIER_RAISE };
+
+beforeEach(async () => {
   _resetWaitingAskForTests();
   _resetGlanceablePersistForTests();
   // The republish selects the ask and reads its request binding; the read is a
   // control-plane call, so the case supplies it.
   _setAskBindingForTests({ read: async () => 'perm_1' });
+  // Start every case from a settled, empty store: the module-level hydration
+  // races the first test, and a store left `loading` would make each later
+  // derive pay the settle deadline.
+  resetSessionAttentionKvFake();
+  __resetSessionAttentionForTests();
+  await __hydrateSessionAttentionForTests();
 });
 
 afterEach(() => {
   _resetAskBindingForTests();
+  // Open a read a case gated, so its hydration cannot resolve into the next
+  // case's assertions.
+  resetSessionAttentionKvFake();
 });
 
 describe('the republish after an answered ask', () => {
@@ -161,5 +192,70 @@ describe('the republish after an answered ask', () => {
       userId: 'u1',
       organizationId: null,
     });
+  });
+});
+
+describe('the derive waits for the ack store', () => {
+  it('holds the derive until hydration lands, so an earlier launch answer is not republished as waiting', async () => {
+    // The row still reads permission until the control plane's status sync, and
+    // the ack naming it lives in the persisted blob: a derive that ran before
+    // the store hydrated would record this raise as a fresh waiting ask.
+    seedSessionAttentionKvFake([
+      {
+        sessionId: 'ses_2',
+        raiseId: EARLIER_RAISE,
+        status: 'permission',
+        ackedAt: Date.now(),
+        expiresAt: Date.now() + ACK_TTL_MS,
+      },
+    ]);
+    const releaseRead = gateSessionAttentionKvRead();
+    __resetSessionAttentionForTests();
+    void __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    const fetchRows = vi.fn(async () => [LATER_ROW]);
+    let settled = false;
+    const refresh = (async () => {
+      await refreshGlanceableSnapshot(
+        { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+        { fetchRows, ...oneTick }
+      );
+      settled = true;
+    })();
+
+    // One event-loop turn settles every promise-only step of the run: the
+    // fetch, the publisher and the ask binding. Only the held hydration read
+    // can keep the derive back.
+    await nextEventLoopTurn();
+    expect(fetchRows).toHaveBeenCalled();
+    expect(settled).toBe(false);
+    expect(getWaitingAsk()).toBeNull();
+
+    releaseRead();
+    await refresh;
+    // The restored ack resolved the row to idle, so the earlier answer was not
+    // republished as waiting.
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  it('derives after the bounded deadline when the ack store never settles', async () => {
+    // Back to `loading` with no read in flight: only the settle deadline can
+    // release the derive, and it must, instead of hanging the headless call.
+    __resetSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    const fetchRows = vi.fn(async () => [LATER_ROW]);
+    const refresh = refreshGlanceableSnapshot(
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+      { fetchRows, ...oneTick }
+    );
+
+    // Real clock on purpose: this case pins the production deadline itself.
+    await refresh;
+    expect(fetchRows).toHaveBeenCalled();
+    // The unhydrated store left the raise unanswered, so it still counts as
+    // waiting — the derive ran regardless, which is the fail-open contract.
+    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_2' });
   });
 });

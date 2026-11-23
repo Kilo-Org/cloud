@@ -54,9 +54,6 @@ describe('toPersonalPlatform', () => {
   });
 
   it('throws on bitbucket instead of rewriting it to github', () => {
-    // A personal-scope config must never alias Bitbucket to GitHub; the
-    // narrowing helper throws so the bad argument cannot silently target
-    // another platform's config.
     expect(() => toPersonalPlatform('bitbucket')).toThrow();
   });
 });

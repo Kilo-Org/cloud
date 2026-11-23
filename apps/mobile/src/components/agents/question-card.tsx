@@ -82,6 +82,12 @@ type QuestionCardProps = {
    * The card title receives a position hint when more than one request waits.
    */
   pendingCount?: number;
+  /**
+   * An answer the person already typed somewhere else (a notification reply),
+   * offered as the first question's custom answer. Applied once, and only onto
+   * an empty field, so it never replaces text typed here.
+   */
+  initialAnswer?: string | null;
 };
 
 export function QuestionCard({
@@ -92,6 +98,7 @@ export function QuestionCard({
   requestId,
   submissionError = null,
   pendingCount = 1,
+  initialAnswer = null,
 }: Readonly<QuestionCardProps>) {
   const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
@@ -105,6 +112,10 @@ export function QuestionCard({
   // Bumped when a transition drops the custom answer, so the uncontrolled field
   // remounts empty. Typing never bumps it, so focus survives an edit.
   const [customReset, setCustomReset] = useState<Record<number, number>>({});
+  // The text an applied `initialAnswer` painted into the field. The box is
+  // uncontrolled, so the value only paints at mount; the seed rides the key
+  // above to remount it with this default.
+  const [customSeed, setCustomSeed] = useState<Record<number, string>>({});
 
   // Accessibility presentation is derived from the shared FSM so the
   // selection logic and CTA flags stay covered by pure-logic tests.
@@ -130,6 +141,40 @@ export function QuestionCard({
     [requestId]
   );
 
+  // A remembered answer from a notification reply arrives before the person
+  // has typed here. Apply it exactly as typing does, once, and only onto an
+  // empty field: text typed on this card belongs to the person.
+  const appliedInitialAnswer = useRef<string | null>(null);
+  useEffect(() => {
+    const text = initialAnswer ?? '';
+    if (text.trim().length === 0) {
+      appliedInitialAnswer.current = null;
+      return;
+    }
+    if (appliedInitialAnswer.current === text) {
+      return;
+    }
+    if ((customInputs.current[0] ?? '').length > 0) {
+      return;
+    }
+    const first = questions[0];
+    // A question that takes no custom answer has no field to seed, and its
+    // preset answer is the only thing it would submit.
+    if (first === undefined || first.custom === false) {
+      return;
+    }
+    appliedInitialAnswer.current = text;
+    customInputs.current[0] = text;
+    setCustomHasText(prev => ({ ...prev, 0: true }));
+    setCustomSeed(prev => ({ ...prev, 0: text }));
+    setCustomReset(prev => ({ ...prev, 0: (prev[0] ?? 0) + 1 }));
+    if (first.multiple) {
+      setMultiAnswers(prev => ({ ...prev, 0: typeMultiCustom(prev[0] ?? MULTI_NONE, true) }));
+      return;
+    }
+    setSingleAnswers(prev => ({ ...prev, 0: typeSingleCustom(prev[0] ?? SINGLE_NONE, true) }));
+  }, [initialAnswer, questions]);
+
   function answerOf(question: QuestionInfo, index: number): SingleAnswer | MultiAnswer {
     return question.multiple
       ? (multiAnswers[index] ?? MULTI_NONE)
@@ -139,6 +184,7 @@ export function QuestionCard({
   function clearCustomAnswer(index: number) {
     customInputs.current[index] = '';
     setCustomHasText(prev => ({ ...prev, [index]: false }));
+    setCustomSeed(prev => ({ ...prev, [index]: '' }));
     setCustomReset(prev => ({ ...prev, [index]: (prev[index] ?? 0) + 1 }));
   }
 
@@ -340,7 +386,7 @@ export function QuestionCard({
                     // the way the preset options do, in its accessible name.
                     <Input
                       key={`custom-${qIndex}-${customReset[qIndex] ?? 0}`}
-                      defaultValue=""
+                      defaultValue={customSeed[qIndex] ?? ''}
                       onChangeText={text => {
                         handleCustomTextChange(qIndex, text);
                       }}

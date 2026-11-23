@@ -38,10 +38,8 @@ const wipeFailure = (error: unknown): string =>
  * that is being deleted. Then the rows go, the account's own and no others —
  * unless the sign-out could not name the account, which takes the lot.
  *
- * The MCP state goes with them: the cached tools and the identity they were
- * discovered under belong to the account that is leaving, the stored remote
- * servers hold its bearer tokens, and the settings of the chats being deleted
- * belong to chats that no longer exist.
+ * The MCP state goes with them through `forgetMcpState`, and the per-chat
+ * settings of the deleted chats go with the rows.
  *
  * A wipe the store refuses is reported and then passed on. The wipe is one
  * transaction, so a refusal leaves the account whole and the next sign-out

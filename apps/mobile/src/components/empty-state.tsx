@@ -112,10 +112,6 @@ function EmptyStateBody({
   compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
-  // The light disc is the card surface and the muted glyph reads on it. The
-  // dark disc is the filled neutral instead, where the muted glyph sits dimmer
-  // than its light counterpart, so dark takes the secondary ink and the mark
-  // stays as visible as it is in light. An explicit `iconColor` still wins.
   const stateIconInk = useColorScheme() === 'dark' ? colors.ink2 : colors.mutedForeground;
   // A centered state is handed the band between the page header and the fixed
   // bottom tab bar, and in a short landscape window that band is shorter than
@@ -152,7 +148,11 @@ function EmptyStateBody({
             <Icon size={iconSize} color={iconColor ?? stateIconInk} strokeWidth={iconStrokeWidth} />
           </View>
         )}
-        <View className="items-center gap-1">
+        {/* The reading measure is the full form's alone. In the compact form
+            the band is already short, so the cap would add a line exactly where
+            vertical room is what the compact form buys; a landscape window's
+            content box is wider than the cap anyway. */}
+        <View className={cn('items-center gap-1', !compact && 'max-w-sm')}>
           <Text
             variant="large"
             className={cn('text-center', compact ? compactTitleClassName : undefined)}
@@ -168,7 +168,14 @@ function EmptyStateBody({
           {
             // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
             typeof description === 'string' ? (
-              <Text variant="muted" className="text-center">
+              <Text
+                variant="muted"
+                className="text-center"
+                // The full form's block is capped at `max-w-sm`, so a long
+                // sentence wraps there; greedy wrap would leave one word alone
+                // on the second line. Android-only; iOS ignores the prop.
+                textBreakStrategy="balanced"
+              >
                 {description}
               </Text>
             ) : (

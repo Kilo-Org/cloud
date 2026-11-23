@@ -189,6 +189,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -4500,6 +4501,14 @@ export const organization_audit_logs = pgTable(
     actor_name: text(),
     organization_id: uuid().notNull(),
     message: text().notNull(),
+    /**
+     * The structured shape of the event, for readers that render it in their
+     * own language. `message` stays the English sentence the web client shows;
+     * this nullable column carries the same event as values, validated by
+     * `AuditDetailSchema` in `@kilocode/app-shared/organizations`. A row
+     * written before this column existed has none.
+     */
+    details: jsonb().$type<AuditDetail>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -12821,6 +12830,11 @@ export const auto_routing_custom_routers = pgTable(
       .where(isNotNull(table.owned_by_user_id)),
     index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
     index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    // `jsonb_path_ops` serves the `@>` lookup an alias promotion uses to find every pool that
+    // holds a moved alias, which is the only use.
+    index('IDX_auto_routing_custom_routers_entries')
+      .using('gin', table.entries.op('jsonb_path_ops'))
+      .concurrently(),
     check(
       'auto_routing_custom_routers_owner_check',
       sql`(

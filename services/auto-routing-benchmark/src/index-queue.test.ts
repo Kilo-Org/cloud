@@ -1,5 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
+import type * as PaidBenchmarkModule from './paid-benchmark';
+
+// The scheduled handler's paid tick needs a real D1 handle; these tests exercise router
+// draining, so it runs over an empty in-memory database exactly as a quiet tick would.
+vi.mock('./paid-benchmark', async importOriginal => {
+  const actual = await importOriginal<typeof PaidBenchmarkModule>();
+  return {
+    ...actual,
+    reconcilePaidBenchmarkRequests: vi.fn(async () => ({
+      staged: 0,
+      completed: [],
+      failed: [],
+      closed: [],
+    })),
+    reconcilePaidUsageReceipts: vi.fn(async () => ({ recorded: 0, pending: 0, mismatched: 0 })),
+  };
+});
 
 vi.mock('./system-optimal', () => ({
   fetchProductionAutoMetrics: vi.fn(),

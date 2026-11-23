@@ -138,14 +138,8 @@ export function VoiceTranscriptionControl() {
     );
   }
 
-  // The mode gate owns the on-device claim: the review never prints "On
-  // device" from the service-level support alone — the mic refines that check
-  // with the offline model of the resolved language, and a device without the
-  // model raises the online disclosure on every start. `languageInstalled`
-  // stays `null` while that per-language gate is pending; the row shows the
-  // loading placeholder instead of a state it has not read (same rule as the
-  // account read). Devices without service support skip the gate entirely and
-  // fall through to the online consent row.
+  // Devices without service support skip the mode gate entirely and fall
+  // through to the online consent row.
   const reviewMode = resolveVoiceTranscriptionReviewMode({
     gatewayTranscriptionEnabled,
     serviceSupportsOnDevice: supportsOnDevice,

@@ -1284,6 +1284,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         actor_name: ctx.user.google_user_name,
+        details: { id: 'webhookTrigger.updated', trigger: input.triggerId },
         message: `Updated organization webhook trigger "${input.triggerId}", which runs as another member`,
         organization_id: input.organizationId,
       });

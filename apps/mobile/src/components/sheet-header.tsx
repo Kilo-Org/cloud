@@ -32,10 +32,10 @@ import { useSideInsetStyle } from '@/lib/screen-insets';
  * `SheetHeader` applies the `header` pair through `underHandle`: its divider
  * ends the gap below the title. A sheet that draws its own title row with no
  * divider uses the `row` pair, because there the first content's own top
- * padding adds to the gap below the title. On iOS the row pair `pt-3 pb-2.5`
- * measured 33.3 pt above the title against 26.7 pt below, so it moves 4 pt
- * back below the title. Android measured balanced with one pair for both
- * (41 / 43 dp).
+ * padding adds to the gap below the title. On iOS the row pair is `pb-3.5 pt-2`:
+ * the earlier `pt-3 pb-2.5` measured 33.3 pt above the title against 26.7 pt
+ * below, so the pair moves 4 pt back below the title. Android measured
+ * balanced with one pair for both (41 / 43 dp).
  *
  * Resolved at render, not at import: the split depends on the platform the row
  * paints on, and a module-level read freezes whatever platform the first import
@@ -78,8 +78,7 @@ export function SheetHeader({
   /**
    * The title Text itself, for a caller that has to drive TalkBack's reading
    * order from it (an imperative `Sheet` that moves focus to the heading on
-   * open). It is the same node the title paints in; a `titleContent` replacement
-   * has its own ref.
+   * open). It is the same node the title paints in.
    */
   titleRef?: Ref<TextInstance>;
   /**
@@ -245,12 +244,11 @@ export function SheetHeader({
         // the title, so a larger `pt-4` over it is a band the reader measures
         // against that divider. The pair resolved above says which case
         // applies: a native handle already leaves room over the content, and a
-        // card with no handle above it takes the body's own inset. The handle's
-        // own gap differs by platform (Material3 ~22dp, iOS 16pt), so each
-        // platform gets its own split: measured 33.9dp above and 35.9dp below
-        // on the Android emulator, and 26.3pt above and 33.7pt below on iOS
-        // with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and 29.7pt, so the
-        // gap over the title is no larger than the gap below it.
+        // card with no handle above it takes the body's own inset. Measured
+        // 33.9dp above and 35.9dp below on the Android emulator, and 26.3pt
+        // above and 33.7pt below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5`
+        // predicts 28.3pt and 29.7pt, so the gap over the title is no larger
+        // than the gap below it.
         verticalPadding,
         surfaceClassName
       )}

@@ -1,9 +1,6 @@
 /* oxlint-disable max-lines */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The helper's vi.hoisted object merges into file scope at the same import
-// position the local hoisted block used, so the vi.mock factories below reach
-// it the same way they reached the local doubles.
 import {
   posthogMockConstructor,
   postHogPersistedProperty,
@@ -446,7 +443,6 @@ describe('discardPostHog', () => {
     // bare-mock early discard branch.  Restore after the test so other tests
     // still see the full mock.
     const originalSPP = (hoisted.client as Record<string, unknown>).setPersistedProperty;
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- temporary removal to trigger bare-mock path
     delete (hoisted.client as Record<string, unknown>).setPersistedProperty;
 
     try {
@@ -699,8 +695,6 @@ describe('discard serialization', () => {
     vi.useFakeTimers();
   });
 
-  // Restore the clock on the failing path too: a leftover fake clock makes the
-  // later suites' real timer waits hang instead of reporting their own failure.
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
@@ -975,8 +969,7 @@ describe('flag listener persistence through off-on', () => {
     const discardPromise = discardPostHog();
 
     // Let the synchronous part of discardPostHog run (seal, clear queues,
-    // client = null), then it awaits optOut. After our fix, flagListeners
-    // is NOT cleared here.
+    // client = null), then it awaits optOut.
     await new Promise<void>(resolve => {
       void setTimeout(resolve, 0);
     });

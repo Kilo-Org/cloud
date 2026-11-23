@@ -169,7 +169,6 @@ function hasCatalogData(provider: DirectByokProvider): boolean {
   return provider.models_dev_id !== undefined;
 }
 
-/** Catalog mode needs models.dev data to map upstream models to catalog ids. */
 export function supportsCatalogMode(providerId: string): boolean {
   const provider = findDirectByokProvider(providerId);
   return provider !== undefined && hasCatalogData(provider);
@@ -269,7 +268,7 @@ export async function findDirectByokCatalogModels(
   return candidates.flat();
 }
 
-/** Serving providers per catalog id; a latest alias is served by the providers of its target. */
+/** Serving providers per catalog id. */
 type CatalogModeProviders = Map<string, DirectByokProvider[]>;
 
 async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders): Promise<void> {
@@ -398,10 +397,7 @@ export async function getDirectByokModelsForUser(userId: string) {
   return getDirectByokModelsForOwner({ type: 'user', id: userId });
 }
 
-/**
- * The URL string of a fetch input: a string as it arrives, a `URL` by its `href`, and a `Request`
- * by its `url`. Interpolating the input would turn a `Request` into `[object Request]`.
- */
+/** Interpolating the input would turn a `Request` into `[object Request]`. */
 function fetchInputUrlString(input: RequestInfo | URL): string {
   if (typeof input === 'string') return input;
   return input instanceof URL ? input.href : input.url;

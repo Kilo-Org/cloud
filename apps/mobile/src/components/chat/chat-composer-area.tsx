@@ -52,6 +52,10 @@ type ChatComposerAreaProps = {
   variant: string;
   onModelSelect: (modelId: string, variant: string) => void;
   modelOptions: (ModelOption | SessionModelOption)[];
+  /** Whether the model catalog behind `modelOptions` is still loading. */
+  isLoadingModels?: boolean;
+  /** Refetches the model catalog; the model chip offers it when the catalog is empty. */
+  onRetryModels?: () => void;
   attachmentsEnabled: boolean;
   organizationId?: string;
   disabled?: boolean;
@@ -75,6 +79,8 @@ export function ChatComposerArea({
   variant,
   onModelSelect,
   modelOptions,
+  isLoadingModels,
+  onRetryModels,
   attachmentsEnabled,
   organizationId,
   disabled = false,
@@ -140,6 +146,8 @@ export function ChatComposerArea({
         model={model}
         variant={variant}
         modelOptions={modelOptions}
+        isLoadingModels={isLoadingModels}
+        onRetryModels={onRetryModels}
         onModelSelect={onModelSelect}
         attachmentsEnabled={attachmentsEnabled}
         attachmentDelivery="local"

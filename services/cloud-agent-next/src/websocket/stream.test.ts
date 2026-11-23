@@ -458,7 +458,19 @@ describe('stream handler handleStreamRequest', () => {
         {
           deriveCloudStatus: async () => ({ type: 'preparing' }),
           readPendingInteractions: () => ({
-            questions: [{ id: 'current-question', sessionID: 'root-1', questions: [] }],
+            questions: [
+              {
+                id: 'current-question',
+                sessionID: 'root-1',
+                questions: [
+                  {
+                    question: 'Continue?',
+                    header: 'Approval',
+                    options: [{ label: 'Yes', description: 'Continue the turn' }],
+                  },
+                ],
+              },
+            ],
             permissions: [],
           }),
           getPreparationSnapshots: async () => [
@@ -1068,7 +1080,19 @@ describe('stream handler handleStreamRequest', () => {
       const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
         reconcileMaterializedEvents: true,
         derivePendingInteractions: async () => ({
-          questions: [{ id: 'question-root', sessionID: 'ses_root', questions: [] }],
+          questions: [
+            {
+              id: 'question-root',
+              sessionID: 'ses_root',
+              questions: [
+                {
+                  question: 'Continue?',
+                  header: 'Approval',
+                  options: [{ label: 'Yes', description: 'Continue the turn' }],
+                },
+              ],
+            },
+          ],
           permissions: [{ id: 'permission-child', sessionID: 'ses_child', permission: 'bash' }],
         }),
       });
@@ -1116,7 +1140,21 @@ describe('stream handler handleStreamRequest', () => {
     await reading.promise;
     expect(status).not.toHaveBeenCalled();
     expect(serverWs.sentMessages).toEqual([]);
-    pending.resolve({ questions: [{ id: 'legacy-question', questions: [] }], permissions: [] });
+    pending.resolve({
+      questions: [
+        {
+          id: 'legacy-question',
+          questions: [
+            {
+              question: 'Continue?',
+              header: 'Approval',
+              options: [{ label: 'Yes', description: 'Continue the turn' }],
+            },
+          ],
+        },
+      ],
+      permissions: [],
+    });
     await connecting;
     expect(status).toHaveBeenCalledOnce();
     expect(parseSentMessages(serverWs).map(frame => frame.streamEventType)).toEqual([

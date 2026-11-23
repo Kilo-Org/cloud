@@ -33,8 +33,6 @@ describe('createRetainedOperationKeys', () => {
       keys.getKey(`merge-${String(index + 2)}`);
     }
 
-    // No eviction: capacity pressure must never drop an intent whose outcome is
-    // still unknown, which would mint a replacement for the same merge.
     expect(heldKey(keys, 'merge-1')).toBe(original);
   });
 
@@ -90,13 +88,9 @@ describe('createRetainedOperationKeys', () => {
       heldKey(keys, `merge-${String(index)}`);
     }
 
-    // At the bound a brand-new intent is refused: nothing unresolved is dropped
-    // to make room, and an admitted intent keeps the key it was given.
     expect(keys.getKey('merge-overflow')).toBeNull();
     expect(heldKey(keys, 'merge-1')).toBe(first);
 
-    // An authoritative retirement is the only way back in, and it reclaims the
-    // one slot that intent held.
     keys.retireKey('merge-2', second);
     expect(keys.getKey('merge-overflow')).not.toBeNull();
   });

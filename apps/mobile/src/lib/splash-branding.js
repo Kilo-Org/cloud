@@ -16,9 +16,7 @@ export const SPLASH_LOGO_IMAGE = './assets/images/logo-mark.png';
 /** The field the native splash and the overlay paint behind the mark. */
 export const SPLASH_BACKGROUND_COLOR = '#FFDD00';
 
-/** The launch splash's own mark, in dp. The branded splash plugin paints it
- *  natively from these numbers and `AnimatedSplashOverlay` paints the same one
- *  while the native splash hides, so the handover never moves or resizes it. */
+/** The launch splash's own mark, in dp. */
 export const SPLASH_LOGO_SIZE = 100;
 
 /** The ring the overlay paints around the mark, on each side of it. */

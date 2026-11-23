@@ -26,11 +26,16 @@ type ConfigureRowProps = {
   titleBadge?: ReactNode;
   subtitle?: string;
   /**
-   * Line cap for the subtitle. A subtitle that is one unbreakable token (an
-   * email address, a host name) cannot wrap on Android and is hard-clipped at
-   * the row edge with no ellipsis; `1` makes it ellipsize cleanly instead.
+   * Line cap for the subtitle, one line by default. The row's subtitle is one
+   * line of `text-xs`, and without the cap a subtitle that is one unbreakable
+   * token (an email address, a host name) cannot wrap on Android and is
+   * hard-clipped at the row edge with no ellipsis, while a long sentence grows
+   * the row past its neighbours. Pass `2` from a caller whose subtitle is a
+   * sentence the reader must finish, or `'all'` from a caller whose copy a
+   * reader must be able to finish and whose length no fixed line count can
+   * bound.
    */
-  subtitleNumberOfLines?: number;
+  subtitleNumberOfLines?: number | 'all';
   /**
    * Node rendered in the subtitle's place while the value that fills it loads.
    * The row's subtitle is one line of `text-xs`, so a placeholder of that
@@ -105,7 +110,7 @@ export function ConfigureRow({
   title,
   titleBadge,
   subtitle,
-  subtitleNumberOfLines,
+  subtitleNumberOfLines = 1,
   subtitlePlaceholder,
   tone,
   hue,
@@ -132,11 +137,9 @@ export function ConfigureRow({
   // Both cases get the stacked presentation, which hands the title the row's
   // full width.
   const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
-  // A semantic tone outranks the curated destination hue, and a row carrying
-  // neither keeps the shared neutral tile. A settings list is not a list of
-  // agents: hashing each title into the agent hue ramp gave one list (Language
-  // / Trusted hosts / Device sessions) three different accents, and a title
-  // never picks a hue here.
+  // A settings list is not a list of agents: hashing each title into the agent
+  // hue ramp gave one list (Language / Trusted hosts / Device sessions) three
+  // different accents, and a title never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
   if (destructive) {
     tint = toneColor('danger');
@@ -186,7 +189,10 @@ export function ConfigureRow({
       subtitle={
         subtitle === undefined
           ? undefined
-          : { text: subtitle, numberOfLines: subtitleNumberOfLines }
+          : {
+              text: subtitle,
+              numberOfLines: subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines,
+            }
       }
       subtitlePlaceholder={subtitlePlaceholder}
       trailing={rowTrailing}

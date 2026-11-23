@@ -93,8 +93,6 @@ function questionSummary(input: Record<string, unknown>): string | undefined {
   ) {
     question = input.question;
   }
-  // Bound the question text: the collapse must not regex-scan an unbounded
-  // question on the per-render row path.
   return question === undefined ? undefined : capSummarySource(question);
 }
 
@@ -113,8 +111,6 @@ function getArgumentSummary(args: Record<string, unknown>): string | undefined {
   if (label !== undefined) parts.push(capSummarySource(label));
   if (scalar !== undefined) {
     const [key, value] = scalar;
-    // Bound a string scalar before interpolating it, so a huge argument value
-    // never reaches the collapse as one string.
     parts.push(`${key}=${typeof value === 'string' ? capSummarySource(value) : String(value)}`);
   }
   const summary = parts.filter(part => part.length > 0).join(' · ');

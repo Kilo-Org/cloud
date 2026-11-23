@@ -52,6 +52,9 @@ const fakeFs = vi.hoisted(() => {
   let protectedIndexUri: string | null = null;
   const directIndexWrites: string[] = [];
   const indexReplacements: IndexReplacement[] = [];
+  // Paths whose delete the filesystem refuses, standing in for an entry that
+  // another process holds open.
+  const refusedDeletes = new Set<string>();
   const appGroup = { id: 'group.com.kilocode.kiloapp', uri: 'file:///app-group' };
 
   // eslint-disable-next-line unicorn/consistent-function-scoping -- vi.hoisted runs before module scope
@@ -142,6 +145,9 @@ const fakeFs = vi.hoisted(() => {
         return node.content;
       },
       delete() {
+        if (refusedDeletes.has(uri)) {
+          throw new Error(`refused: ${uri}`);
+        }
         if (!nodes.has(uri)) {
           throw new Error(`missing: ${uri}`);
         }
@@ -214,6 +220,23 @@ const fakeFs = vi.hoisted(() => {
       }
       writeNode(uri, content);
     },
+    /** Removes a path the way the platform file browser does: outside the mirror's writes. */
+    remove: (uri: string) => {
+      nodes.delete(uri);
+      for (const child of nodes.keys()) {
+        if (child.startsWith(`${uri}/`)) {
+          nodes.delete(child);
+        }
+      }
+    },
+    /** Make every delete of `uri` throw until `restoreDelete` or a reset. */
+    refuseDelete: (uri: string) => {
+      refusedDeletes.add(uri);
+    },
+    /** Let `uri` be deleted again. */
+    restoreDelete: (uri: string) => {
+      refusedDeletes.delete(uri);
+    },
     /** Deep, order-independent snapshot of the whole tree. */
     snapshot: () =>
       [...nodes.entries()]
@@ -224,6 +247,7 @@ const fakeFs = vi.hoisted(() => {
       operations.length = 0;
       directIndexWrites.length = 0;
       indexReplacements.length = 0;
+      refusedDeletes.clear();
       // The guard outlives a reset: a case that resets mid-case keeps the
       // protection, so no apply can write the index in place unnoticed.
     },
@@ -277,7 +301,8 @@ describe('applyArtifactSnapshot', () => {
   it('writes into the platform container and keeps an empty session folder', () => {
     expect(fakeFs.appGroup.id).toBe(ARTIFACT_APP_GROUP_ID);
 
-    applyArtifactSnapshot(snapshotOf([{ id: 's1' }]));
+    // Nothing existed, so the first apply is what built the tree.
+    expect(applyArtifactSnapshot(snapshotOf([{ id: 's1' }]))).toBe(true);
 
     expect(fakeFs.has(`${SESSIONS_DIR}/s1`)).toBe(true);
     expect(fakeFs.has(MANIFEST_URI)).toBe(true);
@@ -285,22 +310,77 @@ describe('applyArtifactSnapshot', () => {
 
     reactNativeMock.Platform.OS = 'android';
     fakeFs.reset();
-    applyArtifactSnapshot(snapshotOf([{ id: 's1' }]));
+    expect(applyArtifactSnapshot(snapshotOf([{ id: 's1' }]))).toBe(true);
 
     expect(fakeFs.has(`${DOCUMENT_URI}/artifacts/sessions/s1`)).toBe(true);
     expect(fakeFs.has(MIRROR_ROOT)).toBe(false);
   });
 
   it('prunes a dropped session folder and a stale file in a live one', () => {
+    const snapshot = snapshotOf([{ id: 's1', files: ['keep'] }]);
+    // The first apply builds the folders, so the second one finds every
+    // directory present and has nothing left to create: its report can only
+    // come from the prune it performs.
+    applyArtifactSnapshot(snapshot);
     fakeFs.seedFile(`${SESSIONS_DIR}/gone/stale.txt`, 'stale');
     fakeFs.seedFile(`${SESSIONS_DIR}/s1/stale.txt`, 'stale');
     fakeFs.seedFile(`${SESSIONS_DIR}/s1/keep`, 'bytes');
 
-    applyArtifactSnapshot(snapshotOf([{ id: 's1', files: ['keep'] }]));
+    expect(applyArtifactSnapshot(snapshot)).toBe(true);
 
     expect(fakeFs.has(`${SESSIONS_DIR}/gone`)).toBe(false);
     expect(fakeFs.has(`${SESSIONS_DIR}/s1/stale.txt`)).toBe(false);
     expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
+  });
+
+  it('keeps an entry the filesystem refuses to delete, then prunes it next run', () => {
+    applyArtifactSnapshot(snapshotOf([{ id: 's1', files: ['keep', 'held'] }]));
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1/keep`, 'bytes');
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1/held`, 'bytes');
+    fakeFs.refuseDelete(`${SESSIONS_DIR}/s1/held`);
+
+    const next = snapshotOf([{ id: 's1', files: ['keep'] }]);
+    // The refused entry is the only stale one, so nothing moved the tree and
+    // the report stays false even though the index advanced.
+    expect(applyArtifactSnapshot(next)).toBe(false);
+
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(next));
+    expect(readArtifactMirror()).toEqual(next);
+    expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(true);
+    expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
+
+    // The next run still sees the entry as stale and removes it.
+    fakeFs.restoreDelete(`${SESSIONS_DIR}/s1/held`);
+    expect(applyArtifactSnapshot(next)).toBe(true);
+
+    expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(false);
+  });
+
+  it('advances the index past a session folder it cannot list', () => {
+    // A file where a session folder belongs: `exists` holds, so the reconcile
+    // creates nothing, and the prune's `list()` throws instead.
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1`, 'not a dir');
+    const snapshot = snapshotOf([{ id: 's1' }]);
+
+    expect(() => applyArtifactSnapshot(snapshot)).not.toThrow();
+
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(snapshot));
+    expect(readArtifactMirror()).toEqual(snapshot);
+  });
+
+  it('reports a repair when it re-creates a session folder the browser deleted', () => {
+    // A session with no files publishes an empty list, so the index it applies
+    // is identical before and after the folder comes back. Only the snapshot
+    // knows the tree moved, and this is the report the sync announces on.
+    const snapshot = snapshotOf([{ id: 's1' }, { id: 's2' }]);
+    applyArtifactSnapshot(snapshot);
+    const index = fakeFs.readFile(MANIFEST_URI);
+    fakeFs.remove(`${SESSIONS_DIR}/s2`);
+
+    expect(applyArtifactSnapshot(snapshot)).toBe(true);
+
+    expect(fakeFs.has(`${SESSIONS_DIR}/s2`)).toBe(true);
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(index);
   });
 
   it('publishes the index atomically, after the session folders it describes', () => {
@@ -331,11 +411,12 @@ describe('applyArtifactSnapshot', () => {
 
   it('is idempotent: a second identical snapshot touches nothing', () => {
     const snapshot = snapshotOf([{ id: 's1', files: ['f1'] }, { id: 's2' }]);
-    applyArtifactSnapshot(snapshot);
+    expect(applyArtifactSnapshot(snapshot)).toBe(true);
     const tree = fakeFs.snapshot();
     const operations = [...fakeFs.operations];
 
-    applyArtifactSnapshot(snapshot);
+    // Nothing to create and nothing to prune, so the tree was left as it was.
+    expect(applyArtifactSnapshot(snapshot)).toBe(false);
 
     expect(fakeFs.snapshot()).toEqual(tree);
     expect(fakeFs.operations).toEqual(operations);
@@ -344,18 +425,21 @@ describe('applyArtifactSnapshot', () => {
   it('is a no-op without an app group container', () => {
     fakeFs.setAppGroup(false);
 
-    applyArtifactSnapshot(snapshotOf([{ id: 's1' }]));
+    expect(applyArtifactSnapshot(snapshotOf([{ id: 's1' }]))).toBe(false);
 
     expect(fakeFs.snapshot()).toEqual([]);
   });
 
-  it('never throws when the mirror root cannot be created', () => {
+  it('never throws when the mirror root cannot be created, and reports a change', () => {
     fakeFs.seedFile(MIRROR_ROOT, 'not a directory');
 
+    let report = false;
     expect(() => {
-      applyArtifactSnapshot(snapshotOf([{ id: 's1' }]));
+      report = applyArtifactSnapshot(snapshotOf([{ id: 's1' }]));
     }).not.toThrow();
 
+    // The snapshot stopped partway, which is still a tree change to announce.
+    expect(report).toBe(true);
     expect(fakeFs.readFile(MANIFEST_URI)).toBeUndefined();
   });
 

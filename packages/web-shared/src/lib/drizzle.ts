@@ -4,7 +4,11 @@ import {
   readReplicaInventory,
 } from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
-import { computeDatabaseUrl, getDatabaseClientConfig } from '@kilocode/db';
+import {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+} from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
 import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
@@ -49,6 +53,16 @@ if (IS_SCRIPT) {
 }
 
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
+
+/**
+ * The host the pools below connect to: the `POSTGRES_SCRIPT_URL` host when `IS_SCRIPT` is set,
+ * the app's host otherwise. This is the same parse the pool uses, so the host is lowercase, and a
+ * caller that names the target without handling the URL or its credentials cannot disagree with
+ * the connection that is actually used.
+ */
+export function primaryDatabaseHost(): string {
+  return postgresConnectionTarget(postgresUrl).host;
+}
 
 /**
  * Whether a region is on the US side. The root AGENTS.md section "Vercel Function Regions" is
@@ -366,11 +380,7 @@ export function createReadDb(dbs: DrizzleDatabase[]): DrizzleDatabase {
 }
 
 /**
- * Default database instance - connects to the primary database.
- * Use this for writes and for reads that need strong consistency.
- *
- * For read-heavy operations that can tolerate replication lag,
- * consider using `readDb` instead for better performance in US regions.
+ * Alias of `primaryDb`; use `readDb` for lag-tolerant read-heavy queries.
  */
 export const db = primaryDb;
 

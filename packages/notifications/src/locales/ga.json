@@ -7,6 +7,7 @@
       "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
+      "agentBriefing": "Tá do thuarascáil ar ghníomhaíocht an ghníomhaire réidh",
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },

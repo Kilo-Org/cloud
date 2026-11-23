@@ -179,7 +179,13 @@ vi.mock('@/lib/hooks/use-todos', () => ({
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: handoff.models }),
-  useOrgDefaultModel: () => ({ defaultModel: undefined, isLoading: false }),
+  useOrgDefaultModel: () => ({
+    defaultModel: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: () => undefined,
+  }),
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({

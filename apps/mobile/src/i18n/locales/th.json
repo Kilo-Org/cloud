@@ -91,6 +91,7 @@
     "draft": "ฉบับร่าง",
     "enabled": "เปิดใช้งานแล้ว",
     "github": "GitHub",
+    "image": "รูปภาพ",
     "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
     "loading": "กำลังโหลด…",
     "loadMore": "โหลดเพิ่ม",
@@ -399,7 +400,7 @@
       "title": "คีย์ผู้ให้บริการ",
       "rowSubtitle": "ใช้การเรียกเก็บเงินจากผู้ให้บริการของคุณเอง",
       "orgDescription": "คีย์เหล่านี้ใช้ร่วมกันกับทุกคนในองค์กรและเรียกเก็บเงินจากบัญชีผู้ให้บริการขององค์กร.",
-      "viewOnly": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรเท่านั้นที่เปลี่ยนคีย์ได้.",
+      "viewOnly": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเท่านั้นที่เปลี่ยนคีย์ได้.",
       "description": "คำขอที่ส่งผ่านคีย์เหล่านี้จะเรียกเก็บเงินจากบัญชีผู้ให้บริการของคุณแทนยอดคงเหลือ Kilo.",
       "managedByPlan": "จัดการโดยแผนการเขียนโค้ดของคุณ",
       "enableKey": "เปิดใช้คีย์ {{provider}}",
@@ -522,6 +523,7 @@
       "receiptLabel": "ใบรับ",
       "copyReceiptId": "คัดลอก ID ใบรับ",
       "appealLabel": "การอุทธรณ์",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ได้รับแล้ว",
       "triageOpen": "กำลังตรวจสอบ",
       "triageActioned": "ยืนยันตามรายงาน",
@@ -555,7 +557,7 @@
       "title": "รายงาน",
       "rowSubtitle": "รายงานที่คุณส่งและผลลัพธ์",
       "emptyTitle": "ยังไม่มีรายงาน",
-      "emptyDescription": "รายงานที่คุณส่งจากความคิดเห็นหรือจากคำตอบของ AI จะแสดงที่นี่.",
+      "emptyDescription": "รายงานที่คุณส่งจากความคิดเห็นในการสนทนาใน pull request หรือจากคำตอบของ AI ในเซสชันเอเจนต์ จะแสดงที่นี่พร้อมผลลัพธ์.",
       "couldNotLoad": "ไม่สามารถโหลดรายงานของคุณได้",
       "capped": "กำลังแสดงรายงานล่าสุดของคุณ."
     },
@@ -1010,8 +1012,9 @@
       "checkActiveConnection": "การเชื่อมต่อใช้งานอยู่ แต่ยังโหลดรายการนี้ไม่ได้",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
       "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
-      "gitlabReconnectAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อใหม่",
+      "reconnectAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อใหม่",
       "bitbucketNotConnectedTitle": "Bitbucket ยังไม่เชื่อมต่อ",
+      "bitbucketAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อ.",
       "adminOnlyConnectDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
@@ -1236,6 +1239,7 @@
     "needsInputAction": {
       "approved": "อนุมัติคำขอแล้ว",
       "replied": "ส่งคำตอบกลับแล้ว",
+      "empty": "พิมพ์คำตอบแล้วจึงส่ง",
       "failed": "ตอบกลับไม่สำเร็จ แตะอีกครั้งเพื่อลองใหม่",
       "unavailable": "คำขอนี้ไม่ได้รออยู่อีกต่อไป"
     }
@@ -1500,7 +1504,9 @@
       "githubError": "ไม่สามารถเปิดหน้าตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง",
       "gitlabAccount": "บัญชี GitLab",
       "gitlabError": "ไม่สามารถเปิดหน้าตั้งค่า GitLab ได้ กรุณาลองอีกครั้ง",
-      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ"
+      "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ",
+      "notConnectedTitle": "{{platform}} ยังไม่เชื่อมต่อ",
+      "githubAdminOnlyDescription": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่สามารถเชื่อมต่อได้"
     },
     "overview": {
       "allAreas": "ทุกด้าน",
@@ -1586,7 +1592,7 @@
       "empty": "ยังไม่มีการตรวจสอบที่มีข้อมูลการวิเคราะห์",
       "emptyDescription": "การวิเคราะห์จะบันทึกการตรวจสอบที่เสร็จสิ้นในขณะที่เปิดใช้สำหรับองค์กร",
       "offTitle": "การวิเคราะห์ปิดอยู่สำหรับ {{platform}}",
-      "offDescription": "บทบาทด้านการเรียกเก็บเงินขององค์กร (เจ้าของ ผู้ดูแลระบบ และผู้จัดการด้านการเรียกเก็บเงิน) สามารถเปิดใช้การวิเคราะห์ได้ในการตั้งค่าองค์กรบนเว็บ เพื่อบันทึกการตรวจสอบที่เสร็จสิ้น",
+      "offDescription": "บทบาทด้านการเรียกเก็บเงินขององค์กร (เจ้าของ ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงิน) สามารถเปิดใช้การวิเคราะห์ได้ในการตั้งค่าองค์กรบนเว็บ เพื่อบันทึกการตรวจสอบที่เสร็จสิ้น",
       "couldNotLoad": "ไม่สามารถโหลดข้อมูลการวิเคราะห์ได้",
       "trackedReviewsCaption": "การตรวจสอบที่เสร็จสิ้นในช่วงเวลานี้ในขณะที่เปิดใช้การวิเคราะห์ โดยการตรวจสอบที่กำลังดำเนินการหรือล้มเหลวจะไม่ถูกนับเลย",
       "trackedReviewsUncounted": "ไม่ถูกนับ: การตรวจสอบที่เสร็จสิ้นทั้งหมด {{displayTotal}} รายการขององค์กร มี {{displayCount}} รายการที่ไม่ได้บันทึกผลลัพธ์",
@@ -1966,7 +1972,7 @@
       "summary": "สรุปรายงาน",
       "title": "รายงานการตรวจสอบ",
       "unavailable": "รายงานการตรวจสอบไม่พร้อมใช้งาน",
-      "unavailableDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กร ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
+      "unavailableDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กร ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
       "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง",
       "eventActions": {
         "findingAnalysisCompleted": "การวิเคราะห์เสร็จสมบูรณ์",
@@ -2174,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} เซสชัน",
       "sectionAccessibility": "{{title}}: {{displayCount}} เซสชัน",
       "live": "สด",
-      "updating": "กำลังอัปเดต"
+      "updating": "กำลังอัปเดต",
+      "retentionLimit": "กำลังแสดงเซสชันล่าสุดของคุณ"
     },
     "sessionRow": {
       "deleteTitle": "ลบเซสชันนี้หรือไม่?",
@@ -2205,12 +2212,12 @@
       "couldNotOpenMessage": "เริ่มตั้งค่า GitHub App ไม่สำเร็จ โปรดลองอีกครั้ง",
       "installedTitle": "ติดตั้ง GitHub App แล้ว",
       "installedMessage": "เชื่อมต่อรีโพซิทอรีของคุณแล้ว",
-      "pendingTitle": "รอการอนุมัติจากผู้ดูแลองค์กร",
-      "pendingMessage": "ผู้ดูแลองค์กรต้องอนุมัติคำขอติดตั้ง",
+      "pendingTitle": "รอการอนุมัติจากผู้ดูแลระบบขององค์กร",
+      "pendingMessage": "ผู้ดูแลระบบขององค์กรต้องอนุมัติคำขอติดตั้ง",
       "accountMismatchTitle": "บัญชีไม่ตรงกัน",
       "accountMismatchMessage": "การเชื่อมต่อนี้เริ่มจาก Kilo App ที่เข้าสู่ระบบด้วยบัญชีอื่น เข้าสู่ระบบบนเว็บด้วยบัญชีนั้น หรือเริ่มใหม่จากแอป",
       "cannotCompleteTitle": "ไม่สามารถติดตั้งให้เสร็จสมบูรณ์ได้",
-      "notAdminMessage": "มีเพียงผู้ดูแลบัญชี GitHub นั้นเท่านั้นที่เชื่อมต่อได้ ขอให้ผู้ดูแลองค์กรติดตั้ง Kilo",
+      "notAdminMessage": "มีเพียงผู้ดูแลบัญชี GitHub นั้นเท่านั้นที่เชื่อมต่อได้ ขอให้ผู้ดูแลระบบขององค์กรติดตั้ง Kilo",
       "alreadyClaimedMessage": "การติดตั้ง GitHub นั้นเชื่อมต่อกับบัญชี Kilo อื่นแล้ว ตัดการเชื่อมต่อที่นั่นก่อน",
       "installationUnavailableMessage": "การติดตั้ง GitHub App นี้ถูกระงับหรือไม่พร้อมใช้งานอีกต่อไป กู้คืนหรือติดตั้งใหม่ใน GitHub จากนั้นเริ่มอีกครั้ง",
       "multipleInstallationsMessage": "องค์กร Kilo นี้สามารถเชื่อมต่อองค์กร GitHub ได้เพียงหนึ่งองค์กรในขณะนี้",
@@ -2244,11 +2251,11 @@
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "emptyReadOnlyTitle": "ไม่มีข้อความในเซสชันนี้",
-      "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
       "historyTooLarge": "บันทึกการสนทนาของเซสชันนี้ใหญ่เกินกว่าจะโหลดได้",
       "historyUnavailable": "ไม่สามารถอ่านบันทึกการสนทนาของเซสชันนี้ได้",
+      "historyTemporarilyUnavailable": "บันทึกการสนทนาของเซสชันนี้ไม่พร้อมใช้งานชั่วคราว",
       "cloneFailedRetry": "ไม่สามารถคัดลอกเซสชันนี้ได้ ลองอีกครั้ง",
       "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับคำขอนี้ เติมเครดิตแล้วลองอีกครั้ง",
       "previousTaskFinishing": "งานก่อนหน้ากำลังจะเสร็จ กรุณารอสักครู่",
@@ -2654,6 +2661,7 @@
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",
       "imageUnavailableRetry": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่",
+      "imageUnavailableRetryWithAlt": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่ {{alt}}",
       "imagePreviewUnavailableInSession": "ไม่สามารถแสดงตัวอย่างรูปภาพในเซสชันนี้ได้",
       "viewImage": "ดูรูปภาพ",
       "viewImageWithAlt": "ดูรูปภาพ {{alt}}",
@@ -2785,7 +2793,9 @@
       "skip": "ข้าม",
       "retrySkip": "ลองข้ามอีกครั้ง",
       "submitting": "กำลังส่ง…",
-      "sendAnswers": "ส่งคำตอบ"
+      "sendAnswers": "ส่งคำตอบ",
+      "unreadableTitle": "ไม่สามารถแสดงคำถามนี้ได้",
+      "unreadableBody": "เอเจนต์กำลังรอคำถามที่แอปนี้ไม่สามารถแสดงได้ โปรดตอบคำถามใน CLI เพื่อดำเนินการต่อ"
     },
     "blockingCard": {
       "questionUnavailable": "คำถามนี้ไม่เปิดให้ตอบแล้ว",
@@ -2812,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "โหลดเซสชันเอเจนต์ย่อยไม่สำเร็จ",
+      "historyTooLarge": "ประวัติของเอเจนต์ย่อยนี้ใหญ่เกินกว่าจะโหลดได้",
+      "historyUnavailable": "ประวัติของเอเจนต์ย่อยนี้ไม่พร้อมใช้งาน",
+      "historyTemporarilyUnavailable": "ประวัติของเอเจนต์ย่อยนี้ไม่พร้อมใช้งานชั่วคราว",
       "failed": "เซสชันเอเจนต์ย่อยทำงานไม่สำเร็จ",
       "noMessages": "ไม่มีข้อความจากเอเจนต์ย่อย",
       "noMessagesDescription": "เซสชันเอเจนต์ย่อยนี้เสร็จสิ้นแล้วโดยไม่มีบันทึกการสนทนา",
@@ -3093,6 +3106,12 @@
     "retryLoadingAccount": "ลองโหลดบัญชีอีกครั้ง",
     "retryLoadingPrivacy": "ลองโหลดตัวเลือกความเป็นส่วนตัวอีกครั้ง"
   },
+  "accountBlocked": {
+    "title": "บัญชีถูกระงับ",
+    "description": "Kilo ระงับบัญชีนี้แล้ว และการเข้าสู่ระบบอีกครั้งจะไม่ยกเลิกการระงับ ฝ่ายสนับสนุนสามารถตรวจสอบการระงับตามคำขอ",
+    "domainDescription": "Kilo ระงับบัญชีที่ใช้อีเมลโดเมนนี้ และการเข้าสู่ระบบอีกครั้งจะไม่เปลี่ยนแปลงการระงับนั้น ฝ่ายสนับสนุนสามารถตรวจสอบโดเมนตามคำขอ",
+    "contactSupport": "ติดต่อฝ่ายสนับสนุน"
+  },
   "addCredits": {
     "cta": "เติมเครดิต",
     "billingPage": "หน้าการเรียกเก็บเงิน"
@@ -3165,8 +3184,7 @@
     "timeoutDescription": "คำขอใช้เวลานานเกินกำหนด กรุณาลองอีกครั้ง"
   },
   "screenHeader": {
-    "openMenu": "เปิดเมนู",
-    "openMenuFor": "เปิดเมนูสำหรับ {{title}}"
+    "openMenu": "เปิดเมนู"
   },
   "picker": {
     "optionsExpired": "ตัวเลือกหมดอายุแล้ว",
@@ -3385,6 +3403,8 @@
     "voiceTranscriptionWho": "อุปกรณ์ของคุณ, Kilo Gateway พร้อมโมเดลถอดเสียงที่คุณเลือก หรือ Apple หรือ Google สำหรับการรู้จำออนไลน์",
     "installAttributionPromptTitle": "อนุญาตการระบุแหล่งที่มาของการติดตั้งหรือไม่?",
     "installAttributionPromptMessage": "Kilo ใช้สิทธิ์การติดตามของ Apple เพื่อทราบว่าคุณมาจากช่องทางใดเท่านั้น เราจะไม่นำพรอมต์และการสนทนาของคุณมาใช้เพื่อการนี้",
+    "installAttributionRequestFailedTitle": "ไม่สามารถแสดงพรอมต์การติดตามได้",
+    "installAttributionRequestFailedMessage": "Kilo ไม่สามารถแสดงพรอมต์ของระบบได้ การระบุแหล่งที่มาของการติดตั้งจึงยังคงปิดอยู่",
     "what": "ข้อมูลที่แชร์",
     "why": "เหตุผลที่แชร์",
     "who": "ผู้รับข้อมูล"
@@ -3400,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "บันทึกการตรวจสอบ",
-      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรที่ใช้แผน Enterprise เท่านั้นที่ดูบันทึกการตรวจสอบได้",
+      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรที่ใช้แผน Enterprise เท่านั้นที่ดูบันทึกการตรวจสอบได้ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ไม่มีเหตุการณ์ที่บันทึกไว้",
       "emptyDescription": "การดำเนินการที่เกิดขึ้นในองค์กรนี้จะแสดงที่นี่",
       "truncated": "กำลังแสดงเหตุการณ์ล่าสุด",
@@ -3450,11 +3470,147 @@
         "guardrailUpdate": "อัปเดต Guardrail แล้ว",
         "guardrailRemove": "ลบ Guardrail แล้ว",
         "unknown": "เหตุการณ์ตรวจสอบ"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "โหมด \"{{name}}\" (ตัวระบุ: {{slug}})",
+        "modeUpdate": "โหมด \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "การกำหนดเส้นทางอัตโนมัติ",
+          "defaultModel": "โมเดลเริ่มต้น"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "เพิ่ม {{email}} เป็น {{role}}",
+        "memberRemoved": "ลบ {{email}}",
+        "memberParentAdded": "เพิ่ม {{email}} จากองค์กรแม่ {{parent}}",
+        "memberParentRemoved": "ลบ {{email}} จากองค์กรแม่ {{parent}}",
+        "inviteSent": "{{email}} เป็น {{role}}",
+        "inviteRevoked": "เพิกถอนคำเชิญสำหรับ {{email}}",
+        "inviteAccepted": "ยอมรับ {{email}}",
+        "groupIdentity": "กลุ่ม \"{{name}}\"",
+        "groupMembers": "กลุ่ม \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} กลุ่ม",
+        "groupMemberGroups_one": "{{displayCount}} กลุ่ม",
+        "groupMemberGroups_other": "{{displayCount}} กลุ่ม",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} กลุ่ม",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} กลุ่ม",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} กลุ่ม",
+        "groupPolicySet": "กลุ่ม \"{{name}}\": กำหนดนโยบาย {{policy}}",
+        "groupPolicyRemoved": "กลุ่ม \"{{name}}\": ลบนโยบาย {{policy}}",
+        "groupDefaultPolicySet": "กำหนดนโยบาย {{policy}} เริ่มต้น",
+        "groupDefaultPolicyRemoved": "ลบนโยบาย {{policy}} เริ่มต้น",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "แนวป้องกัน AI {{state}}",
+        "guardrailConfigGroup": "{{state}} สำหรับกลุ่ม \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "โดเมน SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (เดิม {{previous}})",
+        "ssoDomainRemoved": "ล้างโดเมน SSO {{domain}}",
+        "fundsPurchased": "{{amount}} ด้วย {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
+        "fundsDistributed_one": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
+        "fundsDistributed_other": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
+        "fundsReceived": "{{amount}} จาก {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "การกำหนดค่า {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: รูปแบบ {{style}}",
+        "reviewAgentSecretsUpdated": "อัปเดตแล้ว {{displayCount}}",
+        "reviewAgentSecretsUpdated_one": "อัปเดตแล้ว {{displayCount}}",
+        "reviewAgentSecretsUpdated_other": "อัปเดตแล้ว {{displayCount}}",
+        "reviewAgentSecretsFailed": "ข้อผิดพลาด {{displayCount}}",
+        "reviewAgentSecretsFailed_one": "ข้อผิดพลาด {{displayCount}}",
+        "reviewAgentSecretsFailed_other": "ข้อผิดพลาด {{displayCount}}",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "ภูมิภาคการอนุมาน: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "โหมด \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ค่าเริ่มต้นส่วนกลาง",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "อนุญาต",
+          "denied": "ไม่อนุญาต",
+          "followSetting": "เป็นไปตามการตั้งค่าส่วนขยาย"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "โปรเจกต์ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ถึง {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "สรุปคำแนะนำ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ไม่มีต้นทางที่อนุญาต",
+        "settingName": "เปลี่ยนชื่อจาก {{previous}} เป็น {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "สแกนก่อนใช้งาน เปิด",
+        "scanBeforeUseOff": "สแกนก่อนใช้งาน ปิด",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "นำออก: {{models}}",
+        "browserPolicyOff": "การใช้งานเบราว์เซอร์ถูกบล็อก",
+        "browserPolicyAllow": "เฉพาะต้นทางที่อนุญาต",
+        "browserPolicyPlaywrightOnly": "ใช้งานเบราว์เซอร์เท่านั้น",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "โมเดลที่เปลี่ยนแปลง: {{values}}",
+        "integrationConnected": "{{integration}} เชื่อมต่อแล้ว",
+        "integrationDisconnected": "{{integration}} ตัดการเชื่อมต่อแล้ว",
+        "integrationRefreshed": "{{integration}} รีเฟรชแล้ว",
+        "integrationCancelled": "{{integration}} ยกเลิกแล้ว",
+        "integrationModelUpdated": "{{integration}}: โมเดล {{model}}",
+        "integrationKeyAdded": "เพิ่มคีย์สำหรับ {{provider}}",
+        "integrationKeyUpdated": "อัปเดตคีย์สำหรับ {{provider}}",
+        "integrationKeyDeleted": "ลบคีย์สำหรับ {{provider}}",
+        "integrationKeyToggled": "คีย์สำหรับ {{provider}}: {{state}}",
+        "namedPolicyCreated": "สร้างนโยบาย {{kind}} {{id}}",
+        "namedPolicyUpdated": "อัปเดตนโยบาย {{kind}} {{id}}",
+        "namedPolicyDeleted": "ลบนโยบาย {{kind}} {{id}}",
+        "namedPolicyLinked": "เชื่อมนโยบาย {{kind}} {{next}}",
+        "webhookTriggerUpdated": "ทริกเกอร์ {{trigger}}",
+        "organizationRenamed": "เปลี่ยนชื่อองค์กรจาก {{previous}} เป็น {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "คีย์ API ของคุณเอง"
+        }
       }
     },
     "billing": {
       "title": "การเรียกเก็บเงิน",
-      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูข้อมูลการเรียกเก็บเงินได้",
+      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูข้อมูลการเรียกเก็บเงินได้ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "การสมัครใช้บริการ",
       "state": "สถานะ",
       "stateNone": "ไม่มีการสมัครใช้บริการ",
@@ -3532,7 +3688,7 @@
       "pendingInvitation": "อีเมลนี้มีคำเชิญที่รอดำเนินการอยู่แล้ว",
       "alreadyMember": "บุคคลนี้เป็นสมาชิกขององค์กรนี้อยู่แล้ว",
       "seatsFull": "ที่นั่งทั้งหมดถูกใช้งานแล้ว ({{used}}/{{total}}) โปรดขอให้เจ้าของขององค์กรเพิ่มที่นั่งก่อนเชิญสมาชิกเพิ่มเติม",
-      "seatsFullCanInviteBilling": "ที่นั่งทั้งหมดถูกใช้งานแล้ว ({{used}}/{{total}}) คุณยังคงเชิญผู้จัดการการเรียกเก็บเงินได้ เนื่องจากผู้จัดการการเรียกเก็บเงินไม่ใช้ที่นั่ง",
+      "seatsFullCanInviteBilling": "ที่นั่งทั้งหมดถูกใช้งานแล้ว ({{used}}/{{total}}) คุณยังคงเชิญผู้ดูแลการเรียกเก็บเงินได้ เนื่องจากผู้ดูแลการเรียกเก็บเงินไม่ใช้ที่นั่ง",
       "noSeatsAvailable": "ที่นั่งทั้งหมดถูกใช้งานแล้ว โปรดขอให้เจ้าของขององค์กรเพิ่มที่นั่งก่อนเชิญสมาชิกเพิ่มเติม"
     },
     "invoices": {
@@ -3631,7 +3787,7 @@
       "emptyDescription": "ใช้ปุ่มชั่วโมงก่อนหน้าเพื่อดูคำขอก่อนหน้านี้",
       "emptyBoundDescription": "บันทึกคำขอย้อนหลังได้ถึงช่วงเวลานี้เท่านั้น",
       "loadError": "โหลดบันทึกคำขอไม่สำเร็จ",
-      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูบันทึกคำขอได้",
+      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูบันทึกคำขอได้ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "อินพุต {{input}} · เอาต์พุต {{output}}",
       "byok": "BYOK"
     },
@@ -3736,7 +3892,7 @@
     "signupStepUpApple": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithApple)'",
     "signupStepUpGoogle": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithGoogle)'",
     "signupStepUpBack": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ย้อนกลับไปแล้วใช้ '$t(login.moreSignInOptions)'.",
-    "invalidCode": "รหัสนั้นไม่ถูกต้องหรือหมดอายุแล้ว โปรดลองอีกครั้งหรือใช้ '$t(login.resendCode)'.",
+    "invalidCode": "รหัสนั้นไม่ถูกต้องหรือหมดอายุแล้ว โปรดใช้ '$t(login.resendCode)' หรือ '$t(login.moreSignInOptions)'.",
     "codeInProgress": "กำลังประมวลผลรหัสของคุณ รอสักครู่แล้วลองอีกครั้ง",
     "tooManyAttempts": "ลองหลายครั้งเกินไป โปรดขอรหัสใหม่",
     "invalidToken": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
@@ -3901,7 +4057,10 @@
     "list": {
       "loadFailed": "ไม่สามารถโหลดประวัติแชทได้",
       "new": "แชทใหม่",
-      "deleteTitle": "ลบแชทนี้ไหม"
+      "deleteTitle": "ลบแชทนี้ไหม",
+      "resetNoticeTitle": "แชทและฉบับร่างบนอุปกรณ์นี้ถูกล้างแล้ว",
+      "resetNoticeBody": "Kilo ไม่สามารถเปิดแชทที่บันทึกไว้บนอุปกรณ์นี้ได้ เซสชันบนคลาวด์ของคุณไม่ได้รับผลกระทบ",
+      "resetNoticeDismiss": "ละเว้นการแจ้งเตือน"
     },
     "rename": {
       "title": "เปลี่ยนชื่อแชท",
@@ -3951,6 +4110,9 @@
       "fieldName": "ชื่อที่แสดง",
       "fieldUrl": "URL ของเซิร์ฟเวอร์",
       "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
+      "fieldUrlCredentials": "ลบชื่อผู้ใช้และรหัสผ่านออกจาก URL.",
+      "fieldUrlFragment": "ลบส่วน # ออกจาก URL.",
+      "fieldUrlInsecure": "ป้อน URL ที่เป็น https หรือใช้ http เฉพาะกับ localhost เท่านั้น.",
       "duplicateUrl": "URL นี้ถูกบันทึกไว้แล้ว",
       "serverNotFound": "เซิร์ฟเวอร์นี้ไม่ได้ถูกบันทึกไว้อีกต่อไป",
       "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
@@ -3976,6 +4138,7 @@
       "app": {
         "label": "อินเทอร์เฟซของเครื่องมือ",
         "failed": "ไม่สามารถโหลดอินเทอร์เฟซของเครื่องมือนี้ได้.",
+        "tooLarge": "อินเทอร์เฟซของเครื่องมือนี้มีขนาดใหญ่เกินขีดจำกัด {{size}}.",
         "empty": "อินเทอร์เฟซของเครื่องมือนี้ไม่มีอะไรจะแสดง."
       }
     },
@@ -4043,6 +4206,8 @@
       "discoveryNoModels": "ปลายทางไม่ได้แสดงรายการโมเดลใดเลย ป้อนโมเดลด้วยตนเอง",
       "connectionIncomplete": "โมเดลตอบกลับแต่ไม่ได้ทำจนเสร็จ ลองอีกครั้ง หรือตรวจสอบรหัสโมเดลและโพรโทคอล",
       "invalidInput": "ป้อนชื่อแบ็กเอนด์ ส่วนหัวที่ถูกต้อง และโมเดลอย่างน้อยหนึ่งรายการ โดยแต่ละโมเดลต้องมีรหัสและชื่อที่ไม่ซ้ำกัน ขีดจำกัดโทเค็นต้องเป็นจำนวนเต็มบวก",
+      "invalidApiKey": "คีย์ API มีอักขระที่ไม่สามารถส่งได้ ใช้ตัวอักษร ตัวเลข และสัญลักษณ์มาตรฐานเท่านั้น โดยไม่มีอักขระขึ้นบรรทัดใหม่",
+      "invalidHeaders": "ไม่สามารถส่งส่วนหัวที่กำหนดเองได้ ตรวจสอบชื่อของส่วนหัวและใช้ตัวอักษร ตัวเลข และสัญลักษณ์มาตรฐานเท่านั้น โดยไม่มีอักขระขึ้นบรรทัดใหม่",
       "invalidUrl": "ป้อน URL หลักของ API ที่ใช้ HTTP หรือ HTTPS โดยไม่ใส่ข้อมูลรับรอง พารามิเตอร์การค้นหา หรือส่วนระบุย่อย",
       "publicHttp": "ไม่อนุญาตให้ใช้ปลายทาง HTTP สาธารณะ ให้ใช้ HTTPS หรือปลายทางภายในเครือข่ายส่วนตัว",
       "httpApprovalRequired": "อนุมัติปลายทาง HTTP ภายในเครือข่ายนี้ก่อนบันทึกหรือเชื่อมต่อ",
@@ -4091,6 +4256,7 @@
         "network": "การดาวน์โหลดไม่เสร็จสิ้น ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
         "invalidFile": "ไฟล์ที่ดาวน์โหลดไม่ใช่โมเดลที่แอปนี้รันได้ จึงถูกลบออก",
         "checksum": "ไฟล์ที่ดาวน์โหลดไม่ตรงกับค่าตรวจสอบที่เผยแพร่ไว้ จึงถูกลบออก ลองดาวน์โหลดอีกครั้ง",
+        "unreadable": "อุปกรณ์นี้ไม่สามารถตรวจสอบไฟล์ที่ดาวน์โหลดได้ จึงถูกลบออก ลองดาวน์โหลดอีกครั้ง",
         "writeFailed": "อุปกรณ์นี้ไม่สามารถบันทึกโมเดลได้ ลองดาวน์โหลดอีกครั้ง"
       }
     },
@@ -4176,7 +4342,15 @@
       "download": "ดาวน์โหลดโมเดลบนอุปกรณ์",
       "downloading": "กำลังดาวน์โหลด…",
       "downloadProgress": "กำลังดาวน์โหลด… {{percent}}%",
-      "downloadFailed": "ดาวน์โหลดไม่สำเร็จ ตรวจสอบการเชื่อมต่อและพื้นที่ว่าง แล้วลองอีกครั้ง"
+      "downloadFailed": "ดาวน์โหลดไม่สำเร็จ ตรวจสอบการเชื่อมต่อและพื้นที่ว่าง แล้วลองอีกครั้ง",
+      "cannotUse": "รันไม่ได้: {{items}}",
+      "cannotUseOptions": "กรอกไม่ได้: ตัวเลือกเครื่องมือบางส่วน",
+      "limitations": "ข้อจำกัด",
+      "tools": {
+        "time": "เวลา",
+        "settingsList": "แสดงการตั้งค่า",
+        "settingsSet": "เปลี่ยนการตั้งค่า"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
@@ -4355,6 +4529,7 @@
     "instructionSaveFailed": "ไม่สามารถบันทึกคำแนะนำได้",
     "instructionDeleteFailed": "ไม่สามารถลบคำแนะนำได้",
     "instructionToggleFailed": "ไม่สามารถอัปเดตคำแนะนำได้",
+    "instructionViewTitle": "ไฟล์คำแนะนำ",
     "instructionLimitReached": "โปรไฟล์หนึ่งเก็บคำแนะนำได้สูงสุด {{max}} รายการ ลบหนึ่งรายการเพื่อเพิ่มรายการใหม่",
     "mcp": {
       "title": "เซิร์ฟเวอร์ MCP",
@@ -4529,6 +4704,7 @@
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",
       "expiredGrant": "หมดอายุแล้ว: {{description}}",
+      "expiredStatus": "หมดอายุแล้ว",
       "googlePlayReceipt": "ใบเสร็จจาก Google Play",
       "kind": {
         "adjustment": "การปรับปรุง",
@@ -4555,7 +4731,8 @@
       "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}} จำนวน {{amount}} วันที่ {{date}}",
       "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้",
       "retentionLimit": "กำลังแสดงประวัติเครดิตล่าสุด",
-      "voidedGrant": "ยกเลิกแล้ว: {{description}}"
+      "voidedGrant": "ยกเลิกแล้ว: {{description}}",
+      "voidedStatus": "ยกเลิกแล้ว"
     },
     "title": "ซื้อเครดิต",
     "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
@@ -4699,6 +4876,7 @@
     "contextAll": "บริบททั้งหมด",
     "dismiss": "ละเว้นรายงาน",
     "dismissFailed": "ยังละเว้นรายงานนี้ไม่สำเร็จ ระบบจะลองใหม่ในเบื้องหลัง",
+    "readMarkFailed": "ไม่สามารถทำเครื่องหมายว่ารายงานนี้อ่านแล้วได้ ระบบจะลองอีกครั้งเมื่อรายงานโหลดใหม่",
     "offline": "ออฟไลน์ · รายงานที่บันทึกไว้",
     "cached": "รายงานที่บันทึกไว้ · รีเฟรชไม่ได้",
     "summary": "สรุปโดย AI",
@@ -4718,16 +4896,21 @@
     "morningEnd": "รายงานพร้อมใช้งานจนถึง",
     "timeHint": "การ์ดหน้าหลักจะกลับไปแสดงสถานะสดเมื่อสิ้นสุดช่วงเวลาของรายงาน แม้จะออฟไลน์",
     "invalidSchedule": "เลือกเขตเวลาที่ถูกต้อง และช่วงเวลาของรายงานที่ไม่ว่าง",
+    "scheduleEmptyNight": "ช่วงเวลาของรายงานว่างเปล่า เลือกเวลาที่รายงานพร้อมซึ่งช้ากว่าเวลาเริ่มต้นของช่วงเวลา",
+    "scheduleEmptyMorning": "เวลาที่รายงานพร้อมกับเวลาที่รายงานพร้อมใช้งานจนถึงตรงกัน เลือกว่าจะให้รายงานพร้อมใช้งานนานเท่าใด",
+    "scheduleFullDay": "ทั้งสองช่วงเวลาครอบคลุมทั้งวัน เว้นบางส่วนของวันไว้นอกช่วงเวลาของรายงาน",
     "notificationsHint": "แจ้งเตือนทั่วไปหนึ่งครั้งต่อรายงานตามกำหนดการ ไม่เกี่ยวกับสรุป AI แบบชำระเงิน",
     "notificationPermission": "เปิดการแจ้งเตือนแบบพุชเพื่อรับรายงาน",
     "defaultModel": "ใช้โมเดลเริ่มต้นของ Kilo",
     "duration": "ขีดจำกัดเวลา (นาที)",
     "spendLimit": "ขีดจำกัดค่าใช้จ่าย (USD)",
-    "invalidSafeguards": "ป้อนขีดจำกัดเวลาและค่าใช้จ่ายที่เป็นค่าบวกและมีขอบเขต",
+    "invalidSafeguards": "ป้อนจำนวนบวกภายในช่วงที่อนุญาต",
     "estimate": "ประมาณการ {{estimate}} · สูงสุด {{maximum}}",
     "estimateUnavailable": "ไม่มีสรุปแบบเสียเงินสำหรับการตั้งค่าเหล่านี้ เปลี่ยนโมเดลหรือขีดจำกัด หรือลองใหม่ภายหลัง",
     "confirmPaid": "เปิดใช้สรุปแบบชำระเงินสำหรับ {{context}} ไหม",
+    "paidDisclosure_one": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
     "paidDisclosure": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
+    "paidDisclosure_other": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
     "enable": "เปิดใช้สรุปแบบชำระเงิน",
     "allContexts": "รายงานส่วนตัวและขององค์กรจะแยกจากกัน",
     "emptyHistory": "ไม่มีรายงานที่บันทึกไว้",
@@ -4766,7 +4949,7 @@
     "sourceActivity": "กิจกรรมไม่มีชื่อ",
     "metadataFailureProvider": "ข้อผิดพลาดผู้ให้บริการ",
     "metadataFailureTool": "ข้อผิดพลาดเครื่องมือ",
-    "metadataFailureCancelled": "ยกเลิกแล้ว",
+    "metadataStopped": "รอบล่าสุดถูกหยุด",
     "metadataFailureOther": "ข้อผิดพลาดที่ไม่ระบุ",
     "metadataPlan_one": "แผน: เสร็จแล้ว {{displayDone}} จาก {{displayTotal}} ขั้นตอน",
     "metadataFiles_one": "{{displayCount}} ไฟล์ที่เปลี่ยนแปลง",
@@ -4791,7 +4974,8 @@
     "unavailableTitle": "ข้อมูลการใช้งานไม่พร้อมใช้งาน",
     "unavailableDescription": "ยังไม่ได้ตั้งค่าข้อมูลการใช้งานสำหรับพื้นที่ทำงานนี้ โปรดติดต่อฝ่ายสนับสนุนหากคุณคาดว่าจะเห็นข้อมูลการใช้งานที่นี่",
     "orgSelfNotice": "คุณกำลังดูการใช้งานของคุณเองในองค์กรนี้",
-    "viewDetails": "ดูรายละเอียดการใช้งาน"
+    "viewDetails": "ดูรายละเอียดการใช้งาน",
+    "orgSelfEntryTitle": "การใช้งานของคุณ"
   },
   "integrations": {
     "title": "การเชื่อมต่อ",
@@ -4887,10 +5071,15 @@
       "autoCommit": "คอมมิตการเปลี่ยนแปลงเมื่อการรันเสร็จสิ้น",
       "condenseOnComplete": "ย่อบริบทเมื่อการรันเสร็จสิ้น",
       "activeTitle": "ทริกเกอร์ใช้งานอยู่",
+      "activeSwitchA11y": "ทริกเกอร์ที่ใช้งานอยู่: {{name}}",
+      "copyLinkA11y": "คัดลอกลิงก์สำหรับ {{name}}",
       "activeDescription": "เว็บฮุคที่หยุดชั่วคราวจะตอบกลับด้วย 404",
       "runAsCreator": "รันในนามของฉัน",
       "runAsCreatorDescription": "ทุกการรันจะใช้บัญชีของคุณ จึงจำเป็นต้องมีเฮดเดอร์ความลับ",
       "saveFailedTitle": "บันทึกทริกเกอร์ไม่สำเร็จ",
+      "nameTaken": "มีทริกเกอร์ชื่อ “{{name}}” อยู่แล้ว",
+      "saveFailedRetry": "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+      "saveFailedCheck": "ตรวจสอบค่าต่างๆ ในฟอร์มแล้วลองอีกครั้ง",
       "deleteTitle": "ลบทริกเกอร์นี้หรือไม่",
       "deleteMessage": "การเรียกไปยัง {{name}} จะล้มเหลว ไม่สามารถย้อนกลับได้",
       "deleteMessageScheduled": "การรันที่กำหนดเวลาไว้ของทริกเกอร์ {{name}} จะหยุดลง ไม่สามารถย้อนกลับได้",

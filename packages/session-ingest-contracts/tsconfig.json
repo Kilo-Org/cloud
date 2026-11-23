@@ -11,7 +11,8 @@
     "noEmit": true,
     "isolatedModules": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*"]
 }

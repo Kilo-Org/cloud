@@ -25,7 +25,7 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
-import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
+import { isRedundantAgentSlug, isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import {
   PERMISSION_TOOLS,
@@ -36,16 +36,6 @@ import {
 } from './agent-permissions';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
-const BUILTIN_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
 
 type Props = {
   profileId: string;
@@ -313,7 +303,7 @@ function AgentForm({
       toast.error('Slug must start with a letter and contain only letters, digits, and dashes');
       return;
     }
-    if (BUILTIN_SLUGS.has(trimmedSlug)) {
+    if (isReservedAgentSlug(trimmedSlug)) {
       toast.error(`Slug "${trimmedSlug}" conflicts with a built-in agent; pick a different slug`);
       return;
     }

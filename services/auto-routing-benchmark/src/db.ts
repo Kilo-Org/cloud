@@ -25,6 +25,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNotNull,
   isNull,
@@ -60,7 +61,13 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import { platformCoverageStatements } from './paid-case-store';
 import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
+import {
+  aliasReadinessClearSql,
+  aliasReadinessFenceReadStatement,
+  aliasReadinessSampleClockStatement,
+} from './alias-readiness-lease';
 import {
   parseProfileState,
   profileFailureAssignments,
@@ -293,7 +300,10 @@ const QueueRunOccupancySchema = z.object({
 });
 export type QueueRunOccupancy = z.infer<typeof QueueRunOccupancySchema>;
 
-export type RunAdmission = { admitted: true } | { admitted: false; occupancy: QueueRunOccupancy };
+export type RunAdmission =
+  | { admitted: true }
+  | { admitted: false; occupancy: QueueRunOccupancy }
+  | { admitted: false; operatorHold: true };
 
 /**
  * Running decider runs of one (router ?1, queue ?2), and the oldest of them that
@@ -308,6 +318,22 @@ const QUEUE_RUN_OCCUPANCY_SQL = `
 `;
 
 /**
+ * Admission predicate for a *live operator pause* on the dispatch lock row (id 1,
+ * `operator-pause-*`, `lease_until` in the future). The hold exists to freeze the queues: the
+ * lease stops chunk claims, but nothing before the claim, so without this predicate a start
+ * under the hold still writes a `running` run and claims work no dispatch can start. Only that
+ * token prefix is a hold — an ordinary dispatch pass or the deploy intent on another row keeps
+ * admitting platform work, and an expired operator token blocks nothing.
+ *
+ * Each admitting statement closes the `NOT EXISTS (` with its own admission-instant bind.
+ */
+const OPERATOR_HOLD_CLEAR_PREDICATE_SQL = `
+    SELECT 1 FROM scheduler_dispatch_lock AS held
+    WHERE held.id = 1
+      AND held.token LIKE 'operator-pause-%'
+      AND held.lease_until > `;
+
+/**
  * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
  * and fewer than ?17 active runs, so the check and the insert are one statement.
  * The run records the measurement revision it was started under (?16).
@@ -316,9 +342,10 @@ const ADMIT_DECIDER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
     kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
     max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
-    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision)
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision,
+    admission_marker)
   SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-    ?16
+    ?16, ?18
   WHERE NOT EXISTS (
     SELECT 1 FROM benchmark_runs AS active
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
@@ -329,6 +356,26 @@ const ADMIT_DECIDER_RUN_SQL = `
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
       AND active.status = 'running'
   ) < ?17
+  AND NOT EXISTS (${OPERATOR_HOLD_CLEAR_PREDICATE_SQL}?19)
+`;
+
+/**
+ * Inserts a classifier run only while no operator pause holds the dispatch lock (?17). The
+ * classifier path keeps no occupancy or starting-run predicate: the admin start picks the one
+ * run, and the unique partial index is its backstop. Like the decider insert, it stamps the
+ * post-cutover admission marker (?18) so the row is never mistaken for legacy work: the
+ * kind-agnostic `--legacy-residue` inspection reports any unmarked running row, and
+ * `retireLegacyRuns` retires only deciders, so nothing would ever clear an unmarked classifier.
+ */
+const ADMIT_CLASSIFIER_RUN_SQL = `
+  INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
+    kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
+    max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision,
+    admission_marker)
+  SELECT ?1, ?2, ?3, ?4, 'classifier', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+    ?15, ?16, ?18
+  WHERE NOT EXISTS (${OPERATOR_HOLD_CLEAR_PREDICATE_SQL}?17)
 `;
 
 export async function getQueueRunOccupancy(
@@ -345,7 +392,10 @@ export async function getQueueRunOccupancy(
  * Writes a run with its model rows and carried summaries in one batch. A decider
  * run is admitted by the same statement that inserts it: only while no run of its
  * (router, queue) is still starting and fewer than MAX_RUNNING_RUNS_PER_QUEUE are
- * active, so overlapping drains cannot both start one. A refused run leaves no rows.
+ * active, so overlapping drains cannot both start one. A classifier run is admitted
+ * by its own insert only while no operator pause holds the dispatch lock. A refused
+ * run leaves no rows. Both kinds stamp the post-cutover admission marker, so no run
+ * this function writes can be mistaken for legacy work.
  */
 export async function insertRun(
   db: D1Database,
@@ -391,6 +441,11 @@ export async function insertRun(
     engine_identity: run.engine_identity,
     measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
+    // Post-cutover admission provenance: only a Worker that owns the flow writes it, so a
+    // run admitted by an older image during the deploy overlap stays NULL and is never
+    // claimable, initializable or dispatchable — and is exactly what `--legacy-residue`
+    // reports. A classifier run needs it too: nothing retires an unmarked classifier row.
+    admission_marker: crypto.randomUUID(),
   } satisfies typeof benchmarkRuns.$inferInsert;
 
   const dependents = [];
@@ -427,17 +482,27 @@ export async function insertRun(
     );
   }
 
-  if (row.kind === 'classifier') {
-    await orm.batch([orm.insert(benchmarkRuns).values(row), ...dependents]);
-    return { admitted: true };
-  }
-
+  const dependentStatements = dependents.map(query => {
+    const built = query.toSQL();
+    return db.prepare(built.sql).bind(...built.params);
+  });
   // D1 runs a batch as one transaction: a refused run's model and summary rows are
   // written under its id and deleted again before the batch commits.
-  const [inserted, occupancy] = await db.batch([
-    db
-      .prepare(ADMIT_DECIDER_RUN_SQL)
-      .bind(
+  const refusedRunCleanup =
+    dependents.length > 0
+      ? ['run_models', 'model_summaries'].map(table =>
+          db
+            .prepare(
+              `DELETE FROM ${table} WHERE run_id = ?1
+                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
+            )
+            .bind(row.id)
+        )
+      : [];
+
+  if (row.kind === 'classifier') {
+    const [inserted] = await db.batch([
+      db.prepare(ADMIT_CLASSIFIER_RUN_SQL).bind(
         row.id,
         row.router,
         row.accuracy_noise_band,
@@ -454,23 +519,44 @@ export async function insertRun(
         row.engine_identity,
         row.purpose,
         row.measurement_revision,
-        MAX_RUNNING_RUNS_PER_QUEUE
+        // The admission instant the operator-hold predicate compares the lease against.
+        Date.now(),
+        row.admission_marker
       ),
+      ...dependentStatements,
+      ...refusedRunCleanup,
+    ]);
+    if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
+    return { admitted: false, operatorHold: true };
+  }
+
+  const [inserted, occupancy] = await db.batch([
+    db.prepare(ADMIT_DECIDER_RUN_SQL).bind(
+      row.id,
+      row.router,
+      row.accuracy_noise_band,
+      row.frontier_min_accuracy_delta,
+      row.started_at,
+      row.min_accuracy,
+      row.switch_cost_factor,
+      row.best_accuracy_switch_threshold,
+      row.max_concurrency,
+      row.benchmark_user_id,
+      row.benchmark_org_id,
+      row.repetitions,
+      row.classifier_max_p95_latency_ms,
+      row.engine_identity,
+      row.purpose,
+      row.measurement_revision,
+      MAX_RUNNING_RUNS_PER_QUEUE,
+      // The same post-cutover admission marker the classifier insert stamps.
+      row.admission_marker,
+      // The admission instant the operator-hold predicate compares the lease against.
+      Date.now()
+    ),
     db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
-    ...dependents.map(query => {
-      const built = query.toSQL();
-      return db.prepare(built.sql).bind(...built.params);
-    }),
-    ...(dependents.length > 0
-      ? ['run_models', 'model_summaries'].map(table =>
-          db
-            .prepare(
-              `DELETE FROM ${table} WHERE run_id = ?1
-                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
-            )
-            .bind(row.id)
-        )
-      : []),
+    ...dependentStatements,
+    ...refusedRunCleanup,
   ]);
   if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
   return {
@@ -492,49 +578,91 @@ export async function getRunWithModels(
   return { run, models };
 }
 
-export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Promise<void> {
-  const orm = drizzle(db);
-  const upsert = orm
-    .insert(caseResults)
-    .values(row)
-    .onConflictDoUpdate({
-      target: [
-        caseResults.run_id,
-        caseResults.model,
-        caseResults.variant,
-        caseResults.case_id,
-        caseResults.rep,
-      ],
-      set: {
-        route_key: row.route_key,
-        score: row.score,
-        latency_ms: row.latency_ms,
-        cost_usd: row.cost_usd,
-        input_tokens: row.input_tokens,
-        cached_input_tokens: row.cached_input_tokens,
-        output_tokens: row.output_tokens,
-        reasoning_tokens: row.reasoning_tokens,
-        error: row.error,
-        fallback_reason: row.fallback_reason,
-        route_hit: row.route_hit,
-        retried: row.retried,
-        exit_code: row.exit_code,
-        output_prefix: row.output_prefix,
-        event_count: row.event_count,
-        last_event_types: row.last_event_types,
-        tool_calls: row.tool_calls,
-        tool_names: row.tool_names,
-        step_count: row.step_count,
-        final_finish_reason: row.final_finish_reason,
-        rep: row.rep,
-        timed_out: row.timed_out,
-        prompt_revision: row.prompt_revision,
-      },
-    });
-  await orm.batch([
-    upsert,
-    orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)),
-  ]);
+const CASE_RESULT_COLUMNS = [
+  'run_id',
+  'model',
+  'variant',
+  'case_id',
+  'route_key',
+  'score',
+  'latency_ms',
+  'cost_usd',
+  'input_tokens',
+  'cached_input_tokens',
+  'output_tokens',
+  'reasoning_tokens',
+  'error',
+  'fallback_reason',
+  'route_hit',
+  'retried',
+  'exit_code',
+  'output_prefix',
+  'event_count',
+  'last_event_types',
+  'tool_calls',
+  'tool_names',
+  'step_count',
+  'final_finish_reason',
+  'rep',
+  'timed_out',
+  'prompt_revision',
+] as const satisfies readonly (keyof CaseResultRow)[];
+
+/**
+ * Raw upsert so its statements can join a settlement batch. A paid case settles its
+ * payer split in the same D1 transaction as the graded result
+ * (`settlePaidCaseStatements`, src/paid-case-store.ts); `orm.batch` cannot take those
+ * prepared statements, so the result write is prepared here instead.
+ */
+const CASE_RESULT_UPSERT_SQL = `
+  INSERT INTO case_results (${CASE_RESULT_COLUMNS.join(', ')})
+  VALUES (${CASE_RESULT_COLUMNS.map((_, index) => `?${index + 1}`).join(', ')})
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO UPDATE SET
+    ${CASE_RESULT_COLUMNS.filter(column => column !== 'run_id' && column !== 'rep')
+      .map(column => `${column} = excluded.${column}`)
+      .join(',\n    ')}
+`;
+
+function caseResultParams(row: CaseResultRow): Array<string | number | null> {
+  const bind = (value: unknown): string | number | null => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'boolean') return value ? 1 : 0;
+    if (typeof value === 'number' || typeof value === 'string') return value;
+    throw new Error(`Unsupported case result value type: ${typeof value}`);
+  };
+  return CASE_RESULT_COLUMNS.map(column => bind(row[column]));
+}
+
+/**
+ * The graded result write and the pending-output cleanup, prepared. A settlement
+ * batch appends the payer split (and any late-result restoration) after them.
+ */
+export function caseResultStatements(
+  db: D1Database,
+  row: CaseResultRow
+): [D1PreparedStatement, D1PreparedStatement] {
+  return [
+    db.prepare(CASE_RESULT_UPSERT_SQL).bind(...caseResultParams(row)),
+    db
+      .prepare(
+        `DELETE FROM pending_decider_outputs
+        WHERE run_id = ? AND model = ? AND variant = ? AND case_id = ? AND rep = ?`
+      )
+      .bind(row.run_id, row.model, row.variant, row.case_id, row.rep),
+  ];
+}
+
+/**
+ * Write one graded case, optionally with statements that must commit atomically with
+ * it (a paid case run's settlement). Returns each statement's result so a caller can
+ * tell whether the settlement transition applied to its generation.
+ */
+export async function upsertCaseResult(
+  db: D1Database,
+  row: CaseResultRow,
+  settlement: readonly D1PreparedStatement[] = []
+): Promise<D1Result[]> {
+  return db.batch([...caseResultStatements(db, row), ...settlement]);
 }
 
 /**
@@ -553,7 +681,11 @@ export const PRIOR_CASE_RESULTS_REUSE_SQL = `
     CROSS JOIN case_results AS source
     WHERE run.id = source.run_id
       AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
-      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND run.router = ? AND run.engine_identity = ?
+      -- A prior run of any repetition count contributes only the repetitions it
+      -- measured, and only the repetitions this run measures: repetition r fills
+      -- repetition r, so one stored repetition is never copied to two.
+      AND source.rep < ?
       AND source.model = ? AND source.variant = ?
       AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
       AND NOT EXISTS (
@@ -594,7 +726,9 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
     CROSS JOIN pending_decider_outputs AS source
     WHERE run.id = source.run_id
       AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
-      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND run.router = ? AND run.engine_identity = ?
+      -- Same repetition rule as PRIOR_CASE_RESULTS_REUSE_SQL.
+      AND source.rep < ?
       AND source.model = ? AND source.variant = ?
       AND NOT EXISTS (
         SELECT 1 FROM benchmark_profiles AS profile
@@ -634,6 +768,12 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
  * earlier runs into this run. A result measured below its case's entry in
  * `minimumRevisions` (src/measurement-revision.ts) is never copied, so that case runs again.
+ *
+ * Repetitions are compared per index, not per run: a prior run's repetition `r` is one
+ * valid independent draw for this run's repetition `r` whenever this run takes more than
+ * `r` repetitions, whatever the prior run's repetition count was. A three-repetition run
+ * therefore reuses one-repetition priors for its first repetition and measures the rest,
+ * and a one-repetition run reuses a longer prior's first repetition only.
  */
 export async function reuseDeciderCaseResults(
   db: D1Database,
@@ -686,6 +826,990 @@ export async function reuseDeciderCaseResults(
     }
   }
   return copied;
+}
+
+/**
+ * Adopt the newest compatible measured result for one exact case slot, from any run of
+ * this engine (settled, failed or still running), into `runId`. The last check before a
+ * paid inference: another run may have measured this case after this run materialized its
+ * chunks, and paying again for it would be a duplicate. Same eligibility predicates as
+ * {@link PRIOR_CASE_RESULTS_REUSE_SQL}: successful exit, not timed out, above the case's
+ * minimum revision, and not preceded by the profile's invalidation.
+ */
+const ADOPT_CASE_RESULT_SQL = `
+  INSERT INTO case_results (
+    run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+    input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
+    error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+    event_count, last_event_types, tool_calls, tool_names, step_count,
+    final_finish_reason, rep, timed_out, prompt_revision
+  )
+  SELECT ?1, candidate.model, candidate.variant, candidate.case_id, candidate.route_key,
+    candidate.score, candidate.latency_ms, candidate.cost_usd, candidate.input_tokens,
+    candidate.cached_input_tokens, candidate.output_tokens, candidate.reasoning_tokens,
+    candidate.error, candidate.fallback_reason, candidate.route_hit, candidate.retried,
+    candidate.exit_code, candidate.output_prefix, candidate.event_count,
+    candidate.last_event_types, candidate.tool_calls, candidate.tool_names,
+    candidate.step_count, candidate.final_finish_reason, candidate.rep, candidate.timed_out,
+    candidate.prompt_revision
+  FROM (
+    SELECT source.*
+    FROM benchmark_runs AS run
+    CROSS JOIN case_results AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed', 'running')
+      AND run.router = ?2 AND run.engine_identity = ?3
+      AND source.model = ?4 AND source.variant = ?5 AND source.rep = ?6
+      AND source.case_id = ?7
+      AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+      AND source.prompt_revision >= ?8
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+    ORDER BY run.started_at DESC, run.id DESC
+    LIMIT 1
+  ) AS candidate
+  -- SQLite requires a WHERE between a derived-table alias and ON CONFLICT in
+  -- INSERT…SELECT; without it the whole statement fails to prepare.
+  WHERE true
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+/** Pending-output twin of {@link ADOPT_CASE_RESULT_SQL}, for an ungraded durable output. */
+const ADOPT_PENDING_OUTPUT_SQL = `
+  INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
+    prompt_revision)
+  SELECT ?1, candidate.model, candidate.variant, candidate.case_id, candidate.rep,
+    candidate.payload, candidate.prompt_revision
+  FROM (
+    SELECT source.*
+    FROM benchmark_runs AS run
+    CROSS JOIN pending_decider_outputs AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed', 'running')
+      AND run.router = ?2 AND run.engine_identity = ?3
+      AND source.model = ?4 AND source.variant = ?5 AND source.rep = ?6
+      AND source.case_id = ?7
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+      AND CASE WHEN json_valid(source.payload) THEN
+        json_type(source.payload, '$.result.exitCode') = 'integer'
+        AND json_extract(source.payload, '$.result.exitCode') = 0
+        AND json_type(source.payload, '$.result.timedOut') = 'false'
+        AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
+      ELSE 0 END
+      AND source.prompt_revision >= ?8
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results AS graded
+        WHERE graded.run_id = source.run_id AND graded.model = source.model
+          AND graded.variant = source.variant AND graded.case_id = source.case_id
+          AND graded.rep = source.rep
+      )
+    ORDER BY run.started_at DESC, run.id DESC
+    LIMIT 1
+  ) AS candidate
+  -- SQLite requires a WHERE between a derived-table alias and ON CONFLICT in
+  -- INSERT…SELECT; without it the whole statement fails to prepare.
+  WHERE true
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+export type CaseResultAdoption = 'graded' | 'pending' | 'none';
+
+/**
+ * Copy one case slot's reusable measurement (graded result, else recoverable pending
+ * output) into `runId`. Returns what landed: a graded row, a pending output to grade, or
+ * nothing. Idempotent — a slot this run already holds is left alone.
+ */
+export async function adoptReusableCaseResult(
+  db: D1Database,
+  input: {
+    runId: string;
+    router: AutoRouter;
+    engineIdentity: string;
+    model: string;
+    /** Storage-form variant ('' = default). */
+    variant: string;
+    rep: number;
+    caseId: string;
+    minimumRevision: number;
+  }
+): Promise<CaseResultAdoption> {
+  const bindings = [
+    input.runId,
+    input.router,
+    input.engineIdentity,
+    input.model,
+    input.variant,
+    input.rep,
+    input.caseId,
+    input.minimumRevision,
+  ];
+  const results = await db.batch<{ hits: number }>([
+    db.prepare(ADOPT_CASE_RESULT_SQL).bind(...bindings),
+    db.prepare(ADOPT_PENDING_OUTPUT_SQL).bind(...bindings),
+    db
+      .prepare(
+        `DELETE FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+          AND EXISTS (
+            SELECT 1 FROM case_results AS graded
+            WHERE graded.run_id = ?1 AND graded.model = ?2 AND graded.variant = ?3
+              AND graded.case_id = ?4 AND graded.rep = ?5
+          )`
+      )
+      .bind(input.runId, input.model, input.variant, input.caseId, input.rep),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS hits FROM case_results
+        WHERE run_id = ? AND model = ? AND variant = ? AND case_id = ? AND rep = ?`
+      )
+      .bind(input.runId, input.model, input.variant, input.caseId, input.rep),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS hits FROM pending_decider_outputs
+        WHERE run_id = ? AND model = ? AND variant = ? AND case_id = ? AND rep = ?`
+      )
+      .bind(input.runId, input.model, input.variant, input.caseId, input.rep),
+  ]);
+  if ((results[3]?.results[0]?.hits ?? 0) > 0) return 'graded';
+  if ((results[4]?.results[0]?.hits ?? 0) > 0) return 'pending';
+  return 'none';
+}
+
+/**
+ * Cases each lane is expected to produce, from its materialized chunks. A run whose
+ * chunks hold only the slots that actually need measuring (a paid request after reuse)
+ * is complete at that count; a platform run's chunks cover the full case list, so this
+ * equals the catalog count. Empty when the run has no chunks yet (whole-run legacy work).
+ */
+export async function laneCaseExpectations(
+  db: D1Database,
+  runId: string
+): Promise<Map<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT model, variant, rep, SUM(json_array_length(case_ids)) AS n
+      FROM scheduler_chunks WHERE run_id = ? GROUP BY model, variant, rep`
+    )
+    .bind(runId)
+    .all<{ model: string; variant: string; rep: number; n: number }>();
+  return new Map(
+    rows.results.map(row => [JSON.stringify([row.model, row.variant, row.rep]), Number(row.n)])
+  );
+}
+
+/**
+ * The queued case slots of a paid request that an executor may still claim: its own case
+ * rows still `queued`, whose global case run is queued (claimable) or running (another
+ * scan of the fence will adopt it). Terminal case runs are left out, so a run neither
+ * waits on nor fails over a case nobody can measure any more.
+ */
+export async function listPaidRequestCasePlan(
+  db: D1Database,
+  input: { requestId: string }
+): Promise<
+  Array<{ engine_identity: string; model: string; variant: string; rep: number; case_id: string }>
+> {
+  const rows = await db
+    .prepare(
+      `SELECT request_case.engine_identity, request_case.model, request_case.variant,
+        request_case.rep, request_case.case_id
+      FROM paid_benchmark_request_cases AS request_case
+      JOIN benchmark_case_runs AS case_run
+        ON case_run.engine_identity = request_case.engine_identity
+        AND case_run.model = request_case.model AND case_run.variant = request_case.variant
+        AND case_run.rep = request_case.rep AND case_run.case_id = request_case.case_id
+      WHERE request_case.request_id = ? AND request_case.status = 'queued'
+        AND case_run.status IN ('queued', 'running')
+      ORDER BY request_case.model, request_case.variant, request_case.rep,
+        request_case.case_id`
+    )
+    .bind(input.requestId)
+    .all<{
+      engine_identity: string;
+      model: string;
+      variant: string;
+      rep: number;
+      case_id: string;
+    }>();
+  return rows.results;
+}
+
+/**
+ * Exact (model, variant) pairs a live paid request of this owner still owes work for, in one
+ * scoped read.
+ *
+ * These are the pairs `enrollPaidPairStatements` creates with both demand flags off and
+ * `releaseUncommittedRunClaimsStatement` returns to `pending` after a capped launch, and whose
+ * `ready`→`pending` reopen keeps the original request time. The registry row therefore looks
+ * inert to a queue probe while the explicit request is really waiting on it, so the status
+ * readers consult this scoped evidence instead of loosening the flag rule.
+ *
+ * Rows come from this owner's request for this router and engine identity only, across all
+ * repetitions (a reopen is not repetition-scoped), and only while the request is `preparing` or
+ * `active`. A pair whose request cases are all terminal (`reused`, `done`, `failed`, `paused`)
+ * is not waiting: it falls back to the registry row alone.
+ */
+export async function listPaidRequestedPairs(
+  db: D1Database,
+  input: {
+    ownerType: 'user' | 'org';
+    ownerId: string;
+    router: AutoRouter;
+    engineIdentity: string;
+    models: readonly string[];
+  }
+): Promise<Set<string>> {
+  if (input.models.length === 0) return new Set();
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT rq.model, rq.variant
+      FROM paid_benchmark_requests AS req
+      JOIN paid_benchmark_request_cases AS rq ON rq.request_id = req.id
+      WHERE req.owner_type = ? AND req.owner_id = ? AND req.router = ?
+        AND req.engine_identity = ? AND req.status IN ('preparing', 'active')
+        AND rq.model IN (SELECT value FROM json_each(?))
+        AND rq.status IN ('queued', 'running')`
+    )
+    .bind(
+      input.ownerType === 'org' ? 'organization' : 'user',
+      input.ownerId,
+      input.router,
+      input.engineIdentity,
+      JSON.stringify([...new Set(input.models)])
+    )
+    .all<{ model: string; variant: string }>();
+  return new Set(rows.results.map(row => exactPairKey(row.model, row.variant)));
+}
+
+/** True while the exact pair is a member of the automatic platform pool. */
+export async function isPlatformPoolPair(
+  db: D1Database,
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  model: string,
+  variant: string
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM benchmark_profiles
+      WHERE router = ? AND model = ? AND variant = ? AND engine_identity = ?
+        AND repetitions = ? AND platform_requested = 1
+      LIMIT 1`
+    )
+    .bind(
+      current.router ?? 'efficient',
+      model,
+      variant,
+      current.engineIdentity,
+      current.repetitions
+    )
+    .first();
+  return row !== null;
+}
+
+/**
+ * The cutover instant, read from the single marker row. The first post-cutover pass claims
+ * it (`ensureBenchmarkCutover`), so every worker sees the same timestamp. A missing table
+ * throws: callers fail closed rather than schedule legacy work.
+ */
+export async function readBenchmarkCutover(db: D1Database): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT cutover_at FROM benchmark_cutover WHERE id = 1')
+    .first<{ cutover_at: string }>();
+  return row?.cutover_at ?? null;
+}
+
+/**
+ * The router's readiness epoch: one exact-key read, bumped inside the same transaction as every
+ * readiness or provenance change to a profile row (migration 0039's triggers). A caller compares it
+ * with the epoch its cached table recorded; a mismatch means the served ranking may have moved.
+ *
+ * A missing row or a failed read throws: the serving Worker must fail retryably rather than keep
+ * serving a table it cannot prove current.
+ */
+export async function readBenchmarkReadinessEpoch(
+  db: D1Database,
+  router: AutoRouter
+): Promise<number> {
+  const row = await db
+    .prepare('SELECT epoch FROM benchmark_readiness_epoch WHERE router = ?')
+    .bind(router)
+    .first<{ epoch: number }>();
+  if (!row) throw new Error(`benchmark readiness epoch missing for ${router}`);
+  return row.epoch;
+}
+
+/** Claim the cutover instant if nobody has; returns the durable one. */
+export async function ensureBenchmarkCutover(
+  db: D1Database,
+  nowIso: string = new Date().toISOString()
+): Promise<string> {
+  await db
+    .prepare(
+      'INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?) ON CONFLICT (id) DO NOTHING'
+    )
+    .bind(nowIso)
+    .run();
+  const cutoverAt = await readBenchmarkCutover(db);
+  // A successful insert that cannot be read back leaves this pass with its own instant:
+  // the row is the durable marker for every later pass, and a *failing* read still throws
+  // out of `readBenchmarkCutover` (the caller then fails closed).
+  return cutoverAt ?? nowIso;
+}
+
+/**
+ * `requested_at` of work that is parked: earlier than any cutover, so the drain's
+ * `requested_at >= cutover` filter never picks it up. An explicit admin requeue or a new
+ * membership commit re-stamps it.
+ */
+export const PARKED_REQUESTED_AT = '1970-01-01T00:00:00.000Z';
+
+/**
+ * Park the registry claims of the given runs, without touching measurement rows or
+ * failure counters: rows go back to `pending` with no owner and a parked request time,
+ * and their re-measure claims are dropped. The pair keeps its previous `ready`
+ * measurement (a re-measure claim never changes it) and no drain picks it up again until
+ * someone explicitly re-requests it.
+ */
+export async function quarantineProfileClaimsForRuns(
+  db: D1Database,
+  runIds: readonly string[],
+  nowIso: string = new Date().toISOString()
+): Promise<number> {
+  let moved = 0;
+  for (let offset = 0; offset < runIds.length; offset += RUN_ID_FILTER_BATCH_SIZE) {
+    const ids = runIds.slice(offset, offset + RUN_ID_FILTER_BATCH_SIZE);
+    const placeholders = ids.map(() => '?').join(', ');
+    const [profiles, remeasures] = await db.batch([
+      db
+        .prepare(
+          // Only a live claim is parked. A run can still be pointed at by a `ready` row it
+          // measured (a partially measured legacy run, or an admin-cancelled run whose
+          // completed entries were published): that row keeps its measurement, its
+          // provenance and its place in the routing table. Parking it would strip a valid
+          // result from the pool and re-admit work nobody asked for again.
+          `UPDATE benchmark_profiles
+          SET status = 'pending', run_id = NULL, requested_at = ?, updated_at = ?
+          WHERE run_id IN (${placeholders}) AND status = 'running'`
+        )
+        .bind(PARKED_REQUESTED_AT, nowIso, ...ids),
+      db
+        .prepare(
+          `UPDATE profile_remeasures SET run_id = NULL, claimed_at = NULL
+          WHERE run_id IN (${placeholders})`
+        )
+        .bind(...ids),
+    ]);
+    moved += profiles.meta.changes ?? 0;
+    moved += remeasures.meta.changes ?? 0;
+  }
+  return moved;
+}
+
+/**
+ * Slots a paid lane no longer has to produce because their case run was cancelled (a
+ * payer paused or the platform run was cancelled) and holds no usable result. They are
+ * subtracted from the lane's materialized expectation so the run settles instead of
+ * waiting forever, and the pair is left unpublished rather than ranked on a gap.
+ */
+export async function laneCancelledCaseCounts(
+  db: D1Database,
+  runId: string
+): Promise<Map<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT chunk.model, chunk.variant, chunk.rep, COUNT(*) AS n
+      FROM benchmark_runs AS run
+      CROSS JOIN scheduler_chunks AS chunk
+      CROSS JOIN json_each(chunk.case_ids) AS planned
+      JOIN benchmark_case_runs AS case_run
+        ON case_run.engine_identity = run.engine_identity
+        AND case_run.model = chunk.model AND case_run.variant = chunk.variant
+        AND case_run.rep = chunk.rep AND case_run.case_id = planned.value
+      WHERE chunk.run_id = ? AND run.id = chunk.run_id
+        AND case_run.status IN ('cancelled', 'paused') AND case_run.result_usable = 0
+      GROUP BY chunk.model, chunk.variant, chunk.rep`
+    )
+    .bind(runId)
+    .all<{ model: string; variant: string; rep: number; n: number }>();
+  return new Map(
+    rows.results.map(row => [JSON.stringify([row.model, row.variant, row.rep]), Number(row.n)])
+  );
+}
+
+/**
+ * The generation of a case run this run is executing right now, if any. A result written
+ * by this run settles exactly that generation; an adopted result (executed by another run)
+ * resolves to null and never touches a payer set.
+ */
+export async function readOwnedCaseGeneration(
+  db: D1Database,
+  runId: string,
+  key: { engineIdentity: string; model: string; variant: string; rep: number; caseId: string }
+): Promise<{ runId: string; token: string; generation: number } | null> {
+  const row = await db
+    .prepare(
+      `SELECT executor_token, generation FROM benchmark_case_runs
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND executor_run_id = ? AND executor_token IS NOT NULL AND status = 'running'`
+    )
+    .bind(key.engineIdentity, key.model, key.variant, key.rep, key.caseId, runId)
+    .first<{ executor_token: string; generation: number }>();
+  if (!row) return null;
+  return { runId, token: row.executor_token, generation: row.generation };
+}
+
+/**
+ * Move a running generation's canonical start to a further paid call its own run and
+ * claim token make. The launch fence compares `started_at` to ISO(attemptStartedAt), so a
+ * retry that moved only the run's ledger row would be refused as `not_live`.
+ */
+export function restartPaidCaseRunStatement(
+  db: D1Database,
+  input: {
+    key: { engineIdentity: string; model: string; variant: string; rep: number; caseId: string };
+    executor: { runId: string; token: string };
+    startedAt: number;
+  }
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'`
+    )
+    .bind(
+      new Date(input.startedAt).toISOString(),
+      new Date(input.startedAt).toISOString(),
+      input.key.engineIdentity,
+      input.key.model,
+      input.key.variant,
+      input.key.rep,
+      input.key.caseId,
+      input.executor.runId,
+      input.executor.token
+    );
+}
+
+/**
+ * Settle the canonical case run when a result is saved: the terminal `settled` transition
+ * and `result_usable` commit in the same D1 batch as the graded row, so a settled case run
+ * can never exist without a usable result. Billing is charged just in time per model
+ * request by the gateway, not here — no payer split, no charge row, no outbox.
+ *
+ * Result indexes: [0] running→settled for this exact generation, [1] late-result usable
+ * flag on an already terminal case.
+ */
+export function completePaidCaseStatements(
+  db: D1Database,
+  input: {
+    key: { engineIdentity: string; model: string; variant: string; rep: number; caseId: string };
+    generation: { runId: string; token: string; generation: number };
+    resultUsable: boolean;
+    settlementId: string;
+    now?: number;
+  }
+): D1PreparedStatement[] {
+  const at = new Date(input.now ?? Date.now()).toISOString();
+  const keyPredicate = `engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?`;
+  return [
+    db
+      .prepare(
+        `UPDATE benchmark_case_runs
+        SET status = 'settled', settled_at = ?, updated_at = ?, settlement_id = ?,
+          result_usable = ?, failure_reason = NULL
+        WHERE ${keyPredicate} AND status = 'running'
+          AND executor_run_id = ? AND executor_token = ? AND generation = ?`
+      )
+      .bind(
+        at,
+        at,
+        input.settlementId,
+        input.resultUsable ? 1 : 0,
+        input.key.engineIdentity,
+        input.key.model,
+        input.key.variant,
+        input.key.rep,
+        input.key.caseId,
+        input.generation.runId,
+        input.generation.token,
+        input.generation.generation
+      ),
+    db
+      .prepare(
+        `UPDATE benchmark_case_runs
+        SET result_usable = CASE WHEN ? = 1 THEN 1 ELSE result_usable END, updated_at = ?
+        WHERE ${keyPredicate} AND status IN ('settled', 'cancelled', 'failed')
+          AND executor_run_id = ? AND executor_token = ? AND generation = ?`
+      )
+      .bind(
+        input.resultUsable ? 1 : 0,
+        at,
+        input.key.engineIdentity,
+        input.key.model,
+        input.key.variant,
+        input.key.rep,
+        input.key.caseId,
+        input.generation.runId,
+        input.generation.token,
+        input.generation.generation
+      ),
+  ];
+}
+
+/**
+ * Terminalize the paid case rows of one pair's case runs: the pair is permanently
+ * unavailable, so its queued/running generations become `failed` with the exact reason and
+ * their request rows show `failed`. Without this the request would wait forever on a case
+ * that can never be measured. Settled rows and their results are never touched.
+ */
+/**
+ * The paid-link terminalization statements, prepared so a caller can commit them in the same
+ * D1 batch as the scheduler transition that killed the lane (`failDeadLaneAndPaidLinks`,
+ * src/run.ts). Both commit or neither does: a paid link can never survive the lane failure
+ * that made it unmeasurable, and a lane can never die while its links wait forever.
+ */
+export function failPaidCasesForUnavailablePairStatements(
+  db: D1Database,
+  input: {
+    engineIdentity: string;
+    model: string;
+    variant: string;
+    reason: string;
+    transitionId: string;
+    /**
+     * The exact scheduler claim that owns this lane, when the caller is a scheduler pass.
+     * Both statements then require that claim to still be `active` under its own id and
+     * token, so a stale claim that lost the lane writes nothing at all — not even the paid
+     * links. Omitted for a direct, non-scheduler caller, which is the only case allowed to
+     * terminalize without proving a live claim.
+     */
+    claim?: { id: string; token: string };
+    now?: number;
+  }
+): D1PreparedStatement[] {
+  const at = new Date(input.now ?? Date.now()).toISOString();
+  const pairPredicate = `engine_identity = ? AND model = ? AND variant = ?`;
+  const pairBindings = [input.engineIdentity, input.model, input.variant];
+  const claimPredicate = input.claim
+    ? `EXISTS (
+        SELECT 1 FROM scheduler_chunks AS owner
+        WHERE owner.id = ? AND owner.token = ? AND owner.status = 'active'
+      )`
+    : '1 = 1';
+  const claimBindings: Array<string> = input.claim ? [input.claim.id, input.claim.token] : [];
+  // Two independent fences, both required:
+  // 1. the exact pair (`engine_identity`, `model`, `variant`) — a `rep`/`case_id` pair is
+  //    shared by every model measured on the same cases, so correlating on those alone would
+  //    fail a different model's rows;
+  // 2. the transition id this call just wrote, so only rows whose own case run was failed by
+  //    this batch move. Covered, settled, completed and later generations keep their state.
+  // A scheduler caller additionally fences both writes on its own live claim, so a stale
+  // claim can never terminalize a link another pass is about to measure.
+  return [
+    db
+      .prepare(
+        `UPDATE benchmark_case_runs
+        SET status = 'failed', failure_reason = ?, settled_at = ?, settlement_id = ?,
+          updated_at = ?
+        WHERE ${pairPredicate} AND status IN ('queued', 'running') AND platform_covered = 0
+          AND ${claimPredicate}
+          -- Liveness comes from the owned claim and the live status, not from settlement
+          -- metadata: a reclaimed generation legitimately carries a *stale* settlement_id
+          -- (the store bumps generation without clearing it), and this statement overwrites
+          -- it with this batch's own id below. Idempotency is the status predicate: a repeat
+          -- pass finds the row already terminal and matches nothing.`
+      )
+      .bind(input.reason, at, input.transitionId, at, ...pairBindings, ...claimBindings),
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases
+        SET status = 'failed', reason = ?, updated_at = ?
+        WHERE ${pairPredicate}
+          AND status IN ('queued', 'running')
+          AND ${claimPredicate}
+          AND EXISTS (
+            SELECT 1 FROM benchmark_case_runs AS case_run
+            WHERE case_run.engine_identity = paid_benchmark_request_cases.engine_identity
+              AND case_run.model = paid_benchmark_request_cases.model
+              AND case_run.variant = paid_benchmark_request_cases.variant
+              AND case_run.rep = paid_benchmark_request_cases.rep
+              AND case_run.case_id = paid_benchmark_request_cases.case_id
+              AND case_run.status = 'failed'
+              AND case_run.settlement_id = ?
+          )`
+      )
+      .bind(input.reason, at, ...pairBindings, ...claimBindings, input.transitionId),
+  ];
+}
+
+export async function failPaidCasesForUnavailablePair(
+  db: D1Database,
+  input: {
+    engineIdentity: string;
+    model: string;
+    variant: string;
+    reason: string;
+    transitionId: string;
+    now?: number;
+  }
+): Promise<number> {
+  const [runs] = await db.batch(failPaidCasesForUnavailablePairStatements(db, input));
+  return runs.meta.changes ?? 0;
+}
+
+/**
+ * Enroll a pair the platform has never seen, on an explicit paid confirmation only.
+ *
+ * A pair with no registry row cannot be claimed by a run, so the first-ever paid benchmark
+ * of a custom-only model needs the row created. It is created `pending` with **both demand
+ * flags off**: the platform queue never picks it up, and only the confirmed request's own
+ * claim moves it to `running`. An existing row is left exactly as it is
+ * (`ON CONFLICT DO NOTHING`), so a ready pair is reused rather than re-queued.
+ */
+export function enrollPaidPairStatements(
+  db: D1Database,
+  input: {
+    router: AutoRouter;
+    engineIdentity: string;
+    repetitions: number;
+    entries: readonly BenchmarkPair[];
+    requestedAt: string;
+  }
+): D1PreparedStatement[] {
+  return input.entries.map(entry =>
+    db
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
+          repetitions, status, run_id, failure_reason, requested_at, updated_at,
+          completed_at, platform_requested, user_requested)
+        VALUES (?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?, NULL, 0, 0)
+        ON CONFLICT (router, model, variant, engine_identity, repetitions) DO NOTHING`
+      )
+      .bind(
+        input.router,
+        entry.model,
+        variantToStorage(entry.variant),
+        input.engineIdentity,
+        input.repetitions,
+        input.requestedAt,
+        input.requestedAt
+      )
+  );
+}
+
+/**
+ * Release a proven-unspent generation and clear its scheduler ledger in ONE D1 batch.
+ *
+ * The rule the user asked for is all-or-nothing: a crash must never leave a `queued` case run
+ * next to a stale claimed ledger row (that stalls work everyone agreed was never dispatched),
+ * and a refused release must never clear the ledger (that would reopen work which may have
+ * been admitted). Both statements therefore commit in a single transaction, and the deletes
+ * are conditioned on the post-state the release itself produces:
+ *
+ * - `benchmark_case_runs` for this exact case key is `queued`, has no executor, and its
+ *   `generation` is still the generation we released. A refused release leaves it `running`
+ *   under our token, so the condition is false and the ledger row survives untouched.
+ * - the ledger row is identified by its own token and start, so another attempt's row is
+ *   never deleted.
+ *
+ * `releaseChanges` is the release statement's own `meta.changes`, so the caller can report
+ * whether the batch actually reopened the slot without a second read.
+ */
+export function releaseUnbilledPaidGenerationBatch(
+  db: D1Database,
+  input: {
+    release: readonly D1PreparedStatement[];
+    key: { engineIdentity: string; model: string; variant: string; rep: number; caseId: string };
+    executor: { runId: string; token: string; startedAt: number };
+    generation: number;
+  }
+): D1PreparedStatement[] {
+  const queuedByUs = `EXISTS (
+    SELECT 1 FROM benchmark_case_runs
+    WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+      AND status = 'queued' AND executor_run_id IS NULL AND executor_token IS NULL
+      AND generation = ?
+  )`;
+  const queuedParams: Array<string | number> = [
+    input.key.engineIdentity,
+    input.key.model,
+    input.key.variant,
+    input.key.rep,
+    input.key.caseId,
+    input.generation,
+  ];
+  const ledgerKey = `run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+    AND token = ?`;
+  const ledgerParams: Array<string | number> = [
+    input.executor.runId,
+    input.key.model,
+    input.key.variant,
+    input.key.rep,
+    input.key.caseId,
+    input.executor.token,
+  ];
+  return [
+    ...input.release,
+    // `pending_decider_outputs` keys on the run's slot only (no token column); it is deleted
+    // in the same transaction, so the queued post-state still gates it.
+    db
+      .prepare(
+        `DELETE FROM pending_decider_outputs
+        WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+          AND prompt_revision IS NOT NULL AND ${queuedByUs}`
+      )
+      .bind(
+        input.executor.runId,
+        input.key.model,
+        input.key.variant,
+        input.key.rep,
+        input.key.caseId,
+        ...queuedParams
+      ),
+    db
+      .prepare(`DELETE FROM scheduler_executions WHERE ${ledgerKey} AND ${queuedByUs}`)
+      .bind(...ledgerParams, ...queuedParams),
+  ];
+}
+
+/**
+ * Release claims this exact run id holds, but only while it has no committed run row.
+ *
+ * Two launchers of one paid request share a deterministic run id, so both can claim the same
+ * registry rows: the winner's claims are indistinguishable from the loser's by run id alone.
+ * The loser must therefore never release them after the winner's row committed — that would
+ * strip the run that is about to measure them. This single-statement form makes that check
+ * and the release one write, so a commit racing the release either wins (no release) or
+ * loses (the release happens before it, and the winner's own claim sees a clean slot).
+ */
+export function releaseUncommittedRunClaimsStatement(
+  db: D1Database,
+  runId: string,
+  nowIso: string = new Date().toISOString()
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE benchmark_profiles
+      SET status = 'pending', run_id = NULL, updated_at = ?
+      WHERE run_id = ? AND status = 'running'
+        AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?)`
+    )
+    .bind(nowIso, runId, runId);
+}
+
+export type PaidCaseCancelTarget = {
+  key: {
+    engineIdentity: string;
+    model: string;
+    variant: string;
+    rep: number;
+    caseId: string;
+  };
+  generation: { runId: string; token: string; generation: number };
+};
+
+/**
+ * Durable cancellation intent for one exact running generation. The intent commits with
+ * the cancel that fenced it (the payer set is already removed), so an isolate that dies
+ * before reaching the container leaves a retryable row instead of an orphaned inference.
+ */
+export function queuePaidCancellationIntentStatements(
+  db: D1Database,
+  targets: readonly PaidCaseCancelTarget[],
+  now: number = Date.now()
+): D1PreparedStatement[] {
+  const at = new Date(now).toISOString();
+  return targets.map(target =>
+    db
+      .prepare(
+        `INSERT INTO paid_benchmark_cancellations (
+          engine_identity, model, variant, rep, case_id, generation, executor_run_id,
+          executor_token, status, attempts, available_at, created_at, updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM benchmark_case_runs
+          WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+            AND executor_run_id = ? AND executor_token = ? AND generation = ?
+            AND status IN ('cancelled', 'failed')
+        )
+        ON CONFLICT DO NOTHING`
+      )
+      .bind(
+        target.key.engineIdentity,
+        target.key.model,
+        target.key.variant,
+        target.key.rep,
+        target.key.caseId,
+        target.generation.generation,
+        target.generation.runId,
+        target.generation.token,
+        now,
+        at,
+        at,
+        target.key.engineIdentity,
+        target.key.model,
+        target.key.variant,
+        target.key.rep,
+        target.key.caseId,
+        target.generation.runId,
+        target.generation.token,
+        target.generation.generation
+      )
+  );
+}
+
+export type PaidCancellationIntent = {
+  engine_identity: string;
+  model: string;
+  variant: string;
+  rep: number;
+  case_id: string;
+  generation: number;
+  executor_run_id: string;
+  executor_token: string;
+  attempts: number;
+  /** Scheduler slot the generation runs in, when its chunk still holds one. */
+  slot: number | null;
+  /** Start of the ledgered paid call this generation owns. */
+  attempt_started_at: number | null;
+};
+
+/** Pending cancellation intents whose backoff has elapsed, with what a caller needs to signal. */
+export async function listPendingPaidCancellations(
+  db: D1Database,
+  now: number,
+  limit = 8,
+  /**
+   * Restrict the pass to the intents one mutation just wrote. A pause passes its request id,
+   * an operator's platform-run cancel passes the exact executor run (one bind, so a run with
+   * many cases stays far below D1's bound-variable ceiling).
+   */
+  scope: {
+    /** The request whose case keys this pass may signal (owner plan scoping). */
+    requestId?: string;
+    /** One exact executor run (an operator's platform-run cancel). One bind, any size. */
+    executorRunId?: string;
+    /** Oldest created_at accepted, so a cancel pass cannot pick up other runs' intents. */
+    createdAfter?: number;
+  } = {}
+): Promise<PaidCancellationIntent[]> {
+  const predicates: string[] = [];
+  const scopeBindings: Array<string | number> = [];
+  if (scope.requestId !== undefined) {
+    predicates.push(`EXISTS (
+      SELECT 1 FROM paid_benchmark_request_cases AS request_case
+      WHERE request_case.request_id = ?
+        AND request_case.engine_identity = cancellation.engine_identity
+        AND request_case.model = cancellation.model
+        AND request_case.variant = cancellation.variant
+        AND request_case.rep = cancellation.rep
+        AND request_case.case_id = cancellation.case_id
+    )`);
+    scopeBindings.push(scope.requestId);
+  }
+  if (scope.executorRunId !== undefined) {
+    // One bind regardless of how many cases the run owns: a wide admin cancel must not
+    // approach D1's bound-variable ceiling.
+    predicates.push('cancellation.executor_run_id = ?');
+    scopeBindings.push(scope.executorRunId);
+  }
+  if (scope.createdAfter !== undefined) {
+    // `created_at` is an INTEGER epoch-millisecond column, so the caller's epoch value is
+    // compared as an integer. Comparing it to a text column would compare an epoch number to
+    // an ISO string and silently match nothing.
+    predicates.push('cancellation.created_at >= ?');
+    scopeBindings.push(Math.trunc(scope.createdAfter));
+  }
+  const rows = await db
+    .prepare(
+      `SELECT cancellation.engine_identity, cancellation.model, cancellation.variant,
+        cancellation.rep, cancellation.case_id, cancellation.generation,
+        cancellation.executor_run_id, cancellation.executor_token, cancellation.attempts,
+        chunk.slot, execution.started_at AS attempt_started_at
+      FROM paid_benchmark_cancellations AS cancellation
+      LEFT JOIN scheduler_chunks AS chunk
+        ON chunk.run_id = cancellation.executor_run_id AND chunk.model = cancellation.model
+        AND chunk.variant = cancellation.variant AND chunk.rep = cancellation.rep
+        AND chunk.token = cancellation.executor_token AND chunk.status = 'active'
+      LEFT JOIN scheduler_executions AS execution
+        ON execution.run_id = cancellation.executor_run_id
+        AND execution.model = cancellation.model AND execution.variant = cancellation.variant
+        AND execution.rep = cancellation.rep AND execution.case_id = cancellation.case_id
+        AND execution.token = cancellation.executor_token
+      WHERE cancellation.status = 'pending' AND cancellation.available_at <= ?
+        ${predicates.length > 0 ? `AND ${predicates.join(' AND ')}` : ''}
+      ORDER BY cancellation.created_at LIMIT ?`
+    )
+    .bind(now, ...scopeBindings, Math.min(Math.max(limit, 1), 32))
+    .all<PaidCancellationIntent>();
+  return rows.results;
+}
+
+export async function markPaidCancellationDelivered(
+  db: D1Database,
+  intent: PaidCancellationIntent,
+  error: string | null = null
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE paid_benchmark_cancellations
+      SET status = 'delivered', delivered_at = ?, updated_at = ?, last_error = ?
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND generation = ?`
+    )
+    .bind(
+      Date.now(),
+      new Date().toISOString(),
+      error,
+      intent.engine_identity,
+      intent.model,
+      intent.variant,
+      intent.rep,
+      intent.case_id,
+      intent.generation
+    )
+    .run();
+}
+
+/** Backoff a failed cancellation delivery; the intent stays pending for the next pass. */
+export async function deferPaidCancellation(
+  db: D1Database,
+  intent: PaidCancellationIntent,
+  error: string,
+  now: number = Date.now()
+): Promise<void> {
+  const delayMs = Math.min(300_000, 15_000 * 2 ** Math.min(intent.attempts, 4));
+  await db
+    .prepare(
+      `UPDATE paid_benchmark_cancellations
+      SET attempts = attempts + 1, available_at = ?, updated_at = ?, last_error = ?
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND generation = ? AND status = 'pending'`
+    )
+    .bind(
+      now + delayMs,
+      new Date(now).toISOString(),
+      error.slice(0, 500),
+      intent.engine_identity,
+      intent.model,
+      intent.variant,
+      intent.rep,
+      intent.case_id,
+      intent.generation
+    )
+    .run();
 }
 
 export type LaneCaseCount = { model: string; variant: string; rep: number; n: number };
@@ -770,28 +1894,70 @@ export async function getRoutingCaseResultsForEntries(
 
 export type ProbeCaseCount = { model: string; variant: string; run_id: string; probes: number };
 
+/** One pair whose provenance run may hold probe results. `variant` is the storage form. */
+export type ProbeCasePair = { runId: string; model: string; variant: string };
+
+// Three bound variables per pair plus the case list and the revision. 30 triples bind 92
+// variables, inside the same 100-variable ceiling `PROFILE_ENTRY_FILTER_BATCH_SIZE` respects.
+const PROBE_CASE_PAIR_BATCH_SIZE = 30;
+
+/**
+ * The statement that counts one batch of pairs' probe results.
+ *
+ * Exported so a test can assert the plan it produces: the composite primary key of
+ * `case_results` is `(run_id, model, variant, case_id, rep)`, so the `ON` clause must name
+ * all three leading columns or SQLite seeks each pair's whole run instead of the pair.
+ */
+export function probeCaseCountStatement(pairCount: number): string {
+  return `WITH pair(run_id, model, variant) AS (VALUES ${Array.from(
+    { length: pairCount },
+    () => '(?, ?, ?)'
+  ).join(', ')})
+         SELECT pair.run_id, pair.model, pair.variant, COUNT(DISTINCT measured.case_id) AS probes
+         FROM pair
+         LEFT JOIN case_results AS measured
+           ON measured.run_id = pair.run_id
+          AND measured.model = pair.model
+          AND measured.variant = pair.variant
+          AND measured.case_id IN (SELECT value FROM json_each(?))
+          AND measured.prompt_revision >= ?
+         GROUP BY pair.run_id, pair.model, pair.variant`;
+}
+
 /**
  * Probe results each pair's provenance run holds at `revision` or newer. A pair counts as
  * probe-complete only when `probes` reaches the number of probe cases (src/probe/eligibility.ts);
  * run completion already guarantees every repetition produced a row.
+ *
+ * The pairs are named, not their runs. `case_results` is keyed
+ * `(run_id, model, variant, case_id, rep)`, so a statement that constrains only `run_id`
+ * seeks each pair's whole run — every model, every case, every repetition — and filters
+ * the probe cuts out of it row by row. Naming the pair turns that into one composite-PK
+ * range per pair, which is what makes this affordable on a table of a few million rows.
+ * A pair with no result at all still comes back (`LEFT JOIN`) with `probes = 0`.
  */
 export async function countProbeCaseResults(
   db: D1Database,
-  params: { runIds: readonly string[]; caseIds: readonly string[]; revision: number }
+  params: { pairs: readonly ProbeCasePair[]; caseIds: readonly string[]; revision: number }
 ): Promise<ProbeCaseCount[]> {
-  if (params.runIds.length === 0 || params.caseIds.length === 0) return [];
-  const { results } = await db
-    .prepare(
-      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
-       FROM case_results
-       WHERE run_id IN (SELECT value FROM json_each(?))
-         AND case_id IN (SELECT value FROM json_each(?))
-         AND prompt_revision >= ?
-       GROUP BY run_id, model, variant`
-    )
-    .bind(JSON.stringify(params.runIds), JSON.stringify(params.caseIds), params.revision)
-    .all<ProbeCaseCount>();
-  return results;
+  if (params.pairs.length === 0 || params.caseIds.length === 0) return [];
+  const caseIds = JSON.stringify(params.caseIds);
+  const counts = new Map<string, ProbeCaseCount>();
+  for (let offset = 0; offset < params.pairs.length; offset += PROBE_CASE_PAIR_BATCH_SIZE) {
+    const batch = params.pairs.slice(offset, offset + PROBE_CASE_PAIR_BATCH_SIZE);
+    const { results } = await db
+      .prepare(probeCaseCountStatement(batch.length))
+      .bind(
+        ...batch.flatMap(pair => [pair.runId, pair.model, pair.variant]),
+        caseIds,
+        params.revision
+      )
+      .all<ProbeCaseCount>();
+    for (const row of results) {
+      counts.set(`${row.run_id}\u0000${row.model}\u0000${row.variant}`, row);
+    }
+  }
+  return [...counts.values()];
 }
 
 export async function getExistingCaseResultIds(
@@ -855,6 +2021,9 @@ const PendingDeciderOutputSchema = z.object({
       .default(null),
     timedOut: z.boolean(),
     unavailableModelId: z.string().min(1).optional(),
+    // The Worker-origin stop that ended this case, carried through the durable output so a
+    // late or recovered delivery classifies exactly like the live one. Absent means normal.
+    stop: z.object({ reason: z.string().min(1), status: z.number().int() }).optional(),
   }),
   retried: z.boolean(),
   attemptStartedAt: z.number().int().nonnegative().optional(),
@@ -1545,10 +2714,45 @@ export async function copyRemeasureBaselines(
   return result.meta.changes ?? 0;
 }
 
+/** Outcome of a ready publication: `deferred` wrote nothing, so the run stays open. */
+export type ReadyPublication = 'published' | 'deferred';
+
+/** The fence read every guarded publication batches first: `free` is 1 while it may publish. */
+export function aliasReadinessAllows(fence: unknown): boolean {
+  const row = fence as { free?: unknown } | null | undefined;
+  return Number(row?.free) === 1;
+}
+
+/**
+ * One database-clock sample per publication. The same cutoff guards every statement in the
+ * batch, so a lease that expires mid-batch cannot let one statement skip and a later one
+ * write — the publication is all-or-none.
+ */
+async function sampleAliasReadinessCutoff(db: D1Database): Promise<number> {
+  const row = await aliasReadinessSampleClockStatement(db).first<{ now_ms: number }>();
+  const nowMs = Number(row?.now_ms);
+  if (!Number.isFinite(nowMs)) throw new Error('readiness clock read failed');
+  return nowMs;
+}
+
+/** Whether an unexpired readiness lease currently blocks a ready publication. */
+export async function aliasReadinessLeaseHeld(db: D1Database): Promise<boolean> {
+  return !aliasReadinessAllows(
+    await aliasReadinessFenceReadStatement(db, await sampleAliasReadinessCutoff(db)).first<{
+      free: number;
+    }>()
+  );
+}
+
 /**
  * Settle this run's re-measures: an entry with a dead lane is dropped and keeps its
  * previous measurement; every other claimed profile moves its provenance to this run,
  * which now holds its full result set. Status stays `ready` throughout.
+ *
+ * Every statement carries {@link aliasReadinessClearSql} against one sampled cutoff, and the
+ * batch opens with the same read, so a held lease makes the whole publication a no-op and the
+ * caller keeps the run open for the settled-run sweep. Partial publication is impossible: the
+ * failed-entry deletes and the provenance update share the cutoff.
  */
 export async function settleRemeasuresForRun(
   db: D1Database,
@@ -1556,18 +2760,22 @@ export async function settleRemeasuresForRun(
   /** Storage-form variant keys ('' = default variant). */
   failedEntries: readonly { model: string; variant: string }[],
   nowIso: string = new Date().toISOString()
-): Promise<void> {
+): Promise<ReadyPublication> {
+  const cutoff = await sampleAliasReadinessCutoff(db);
   const orm = drizzle(db);
-  const statements: BatchItem<'sqlite'>[] = failedEntries.map(entry =>
-    orm
-      .delete(profileRemeasures)
-      .where(
-        and(
-          eq(profileRemeasures.run_id, runId),
-          eq(profileRemeasures.model, entry.model),
-          eq(profileRemeasures.variant, entry.variant)
+  const clear = aliasReadinessClearSql(cutoff);
+  const statements: { toSQL: () => { sql: string; params: unknown[] } }[] = failedEntries.map(
+    entry =>
+      orm
+        .delete(profileRemeasures)
+        .where(
+          and(
+            eq(profileRemeasures.run_id, runId),
+            eq(profileRemeasures.model, entry.model),
+            eq(profileRemeasures.variant, entry.variant),
+            clear
+          )
         )
-      )
   );
   statements.push(
     orm
@@ -1576,6 +2784,7 @@ export async function settleRemeasuresForRun(
       .where(
         and(
           eq(benchmarkProfiles.status, 'ready'),
+          clear,
           sql`EXISTS (
             SELECT 1 FROM ${profileRemeasures}
             WHERE ${profileRemeasures.run_id} = ${runId}
@@ -1587,9 +2796,16 @@ export async function settleRemeasuresForRun(
           )`
         )
       ),
-    orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId))
+    orm.delete(profileRemeasures).where(and(eq(profileRemeasures.run_id, runId), clear))
   );
-  await orm.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    ...statements.map(statement => {
+      const built = statement.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
+  ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
 }
 
 /**
@@ -1599,7 +2815,8 @@ export async function settleRemeasuresForRun(
 export function markProfilesReadyForRunStatement(
   orm: ReturnType<typeof drizzle>,
   runId: string,
-  nowIso: string
+  nowIso: string,
+  readinessCutoffMs: number
 ) {
   return orm
     .update(benchmarkProfiles)
@@ -1609,7 +2826,127 @@ export function markProfilesReadyForRunStatement(
       updated_at: nowIso,
       completed_at: nowIso,
     })
-    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+    .where(
+      and(
+        eq(benchmarkProfiles.run_id, runId),
+        eq(benchmarkProfiles.status, 'running'),
+        aliasReadinessClearSql(readinessCutoffMs)
+      )
+    );
+}
+
+/**
+ * Transition only the given entries of this run to ready, with the same no-clobber guard as
+ * {@link markProfilesReadyForRun}. A paid run readies each pair whose slots are complete, so
+ * one dead or paused model never withholds another model's finished measurement.
+ */
+export async function markProfilesReadyForEntries(
+  db: D1Database,
+  runId: string,
+  entries: readonly BenchmarkPair[],
+  nowIso: string = new Date().toISOString()
+): Promise<ReadyPublication> {
+  if (entries.length === 0) return 'published';
+  const cutoff = await sampleAliasReadinessCutoff(db);
+  const orm = drizzle(db);
+  const clear = aliasReadinessClearSql(cutoff);
+  const statements = [
+    orm
+      .update(benchmarkProfiles)
+      .set({
+        ...profileFailureResetAssignments,
+        status: 'ready',
+        updated_at: nowIso,
+        completed_at: nowIso,
+      })
+      .where(
+        and(
+          eq(benchmarkProfiles.run_id, runId),
+          eq(benchmarkProfiles.status, 'running'),
+          clear,
+          or(
+            ...entries.map(entry =>
+              and(
+                eq(benchmarkProfiles.model, entry.model),
+                eq(benchmarkProfiles.variant, variantToStorage(entry.variant))
+              )
+            )
+          )
+        )
+      ),
+    orm
+      .delete(profileRemeasures)
+      .where(
+        and(
+          eq(profileRemeasures.run_id, runId),
+          clear,
+          or(
+            ...entries.map(entry =>
+              and(
+                eq(profileRemeasures.model, entry.model),
+                eq(profileRemeasures.variant, variantToStorage(entry.variant))
+              )
+            )
+          )
+        )
+      ),
+  ];
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    ...statements.map(statement => {
+      const built = statement.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
+  ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
+}
+
+/**
+ * Release only the given entries of this run back to `pending` (paid runs that end with a
+ * paused or cancelled slot), leaving every other pair the run measured claimed so it can be
+ * readied.
+ */
+export async function releaseProfileClaimsForEntries(
+  db: D1Database,
+  runId: string,
+  entries: readonly BenchmarkPair[]
+): Promise<void> {
+  if (entries.length === 0) return;
+  const orm = drizzle(db);
+  await orm.batch([
+    orm
+      .update(benchmarkProfiles)
+      .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(benchmarkProfiles.run_id, runId),
+          eq(benchmarkProfiles.status, 'running'),
+          or(
+            ...entries.map(entry =>
+              and(
+                eq(benchmarkProfiles.model, entry.model),
+                eq(benchmarkProfiles.variant, variantToStorage(entry.variant))
+              )
+            )
+          )
+        )
+      ),
+    orm
+      .delete(profileRemeasures)
+      .where(
+        and(
+          eq(profileRemeasures.run_id, runId),
+          or(
+            ...entries.map(entry =>
+              and(
+                eq(profileRemeasures.model, entry.model),
+                eq(profileRemeasures.variant, variantToStorage(entry.variant))
+              )
+            )
+          )
+        )
+      ),
+  ]);
 }
 
 /**
@@ -1620,8 +2957,15 @@ export async function markProfilesReadyForRun(
   db: D1Database,
   runId: string,
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  await markProfilesReadyForRunStatement(drizzle(db), runId, nowIso);
+): Promise<ReadyPublication> {
+  const cutoff = await sampleAliasReadinessCutoff(db);
+  const orm = drizzle(db);
+  const statement = markProfilesReadyForRunStatement(orm, runId, nowIso, cutoff).toSQL();
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    db.prepare(statement.sql).bind(...statement.params),
+  ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
 }
 
 /**
@@ -1816,10 +3160,20 @@ export async function listLaneFailures(
  * Used by the per-queue drain to claim the next batch. A row wanted by both
  * queues appears in both listings — whichever run claims it first flips it to
  * `running`, so it is still measured exactly once.
+ *
+ * `requestedAfter` admits only work requested at or after the paid cutover: a row
+ * that predates it is legacy measurement the deploy must not schedule again. It stays
+ * `pending` (measured rows and routing artifacts untouched) until an explicit requeue or
+ * a new membership commit re-stamps `requested_at`.
  */
 export async function listPendingCurrentProfiles(
   db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  current: {
+    router?: AutoRouter;
+    engineIdentity: string;
+    repetitions: number;
+    requestedAfter?: string;
+  },
   queue: BenchmarkRunPurpose
 ): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
   return drizzle(db)
@@ -1835,6 +3189,9 @@ export async function listPendingCurrentProfiles(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
+        current.requestedAfter
+          ? gte(benchmarkProfiles.requested_at, current.requestedAfter)
+          : undefined,
         queue === 'platform'
           ? eq(benchmarkProfiles.platform_requested, true)
           : eq(benchmarkProfiles.user_requested, true)
@@ -1850,7 +3207,12 @@ export async function listPendingCurrentProfiles(
 /** Queued, unclaimed re-measures of ready current-engine rows wanted by one queue. */
 export async function listQueuedRemeasures(
   db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  current: {
+    router?: AutoRouter;
+    engineIdentity: string;
+    repetitions: number;
+    requestedAfter?: string;
+  },
   queue: BenchmarkRunPurpose
 ): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
   return drizzle(db)
@@ -1876,6 +3238,9 @@ export async function listQueuedRemeasures(
         eq(profileRemeasures.router, current.router ?? 'efficient'),
         eq(profileRemeasures.engine_identity, current.engineIdentity),
         eq(profileRemeasures.repetitions, current.repetitions),
+        current.requestedAfter
+          ? gte(profileRemeasures.requested_at, current.requestedAfter)
+          : undefined,
         eq(benchmarkProfiles.status, 'ready'),
         queue === 'platform'
           ? eq(benchmarkProfiles.platform_requested, true)
@@ -1889,11 +3254,25 @@ export async function listQueuedRemeasures(
     );
 }
 
+/**
+ * A `pending` row is queue work only when requested at or after the paid cutover; every other
+ * status passes unfiltered. `undefined` leaves the read untouched; `null` fails pending closed.
+ */
+function pendingRespectsCutover(cutoverAt: string | null | undefined) {
+  if (cutoverAt === undefined) return undefined;
+  if (cutoverAt === null) return ne(benchmarkProfiles.status, 'pending');
+  return or(
+    ne(benchmarkProfiles.status, 'pending'),
+    gte(benchmarkProfiles.requested_at, cutoverAt)
+  );
+}
+
 /** Registry row counts per wire status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  queue: BenchmarkRunPurpose
+  queue: BenchmarkRunPurpose,
+  cutoverAt?: string | null
 ): Promise<Array<{ status: BenchmarkProfileStatus; count: number }>> {
   const rows = await drizzle(db)
     .select({ status: benchmarkProfiles.status, n: count() })
@@ -1905,7 +3284,8 @@ export async function countCurrentProfilesByStatus(
         eq(benchmarkProfiles.repetitions, current.repetitions),
         queue === 'platform'
           ? eq(benchmarkProfiles.platform_requested, true)
-          : eq(benchmarkProfiles.user_requested, true)
+          : eq(benchmarkProfiles.user_requested, true),
+        pendingRespectsCutover(cutoverAt)
       )
     )
     .groupBy(benchmarkProfiles.status);
@@ -1920,13 +3300,28 @@ export async function countCurrentProfilesByStatus(
 /** Exact platform-pair coverage for the currently measured engine and repetitions. */
 export async function listCurrentPlatformProfileStatuses(
   db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
-): Promise<Array<{ model: string; variant: string | null; status: BenchmarkProfileStatus }>> {
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  cutoverAt?: string | null
+): Promise<
+  Array<{
+    model: string;
+    variant: string | null;
+    status: BenchmarkProfileStatus;
+    /**
+     * When this row's current failure settled, or null. The failure transition writes it, so a
+     * copied or migrated row keeps the original instant while a retry timer only moves
+     * `retry_after`. Always selected, so a null value is a real "no failure instant" and never
+     * evidence that licenses a rewrite.
+     */
+    completed_at: string | null;
+  }>
+> {
   const rows = await drizzle(db)
     .select({
       model: benchmarkProfiles.model,
       variant: benchmarkProfiles.variant,
       status: benchmarkProfiles.status,
+      completed_at: benchmarkProfiles.completed_at,
     })
     .from(benchmarkProfiles)
     .where(
@@ -1934,7 +3329,8 @@ export async function listCurrentPlatformProfileStatuses(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
-        eq(benchmarkProfiles.platform_requested, true)
+        eq(benchmarkProfiles.platform_requested, true),
+        pendingRespectsCutover(cutoverAt)
       )
     )
     .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
@@ -1942,6 +3338,7 @@ export async function listCurrentPlatformProfileStatuses(
     model: row.model,
     variant: variantFromStorage(row.variant),
     status: row.status === 'unavailable' ? 'failed' : row.status,
+    completed_at: row.completed_at,
   }));
 }
 
@@ -2047,6 +3444,13 @@ export async function listCurrentFailedProfiles(
  * pairs that left the list lose the flag. Existing measurements are never
  * discarded — a `ready` row only gains the flag, so a pair already measured for
  * an owner pool is reused by the platform table instead of re-benchmarked.
+ *
+ * Only pairs that actually left the list are released, so a pair that stays in
+ * the pool keeps its `requested_at`: pre-cutover pending work stays parked, and a
+ * pair that is genuinely (re)added gets a fresh request time the drain admits.
+ * Each desired pair also latches platform coverage on any live case run of that
+ * pair in the same batch, so the platform pays for a case run a user already
+ * started (and keeps paying for it if the pair leaves the pool before it settles).
  */
 export async function syncPlatformRegistryRows(
   db: D1Database,
@@ -2055,20 +3459,55 @@ export async function syncPlatformRegistryRows(
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   const orm = drizzle(db);
+  const desiredKeys = new Set(desired.map(entry => exactPairKey(entry.model, entry.variant)));
+  const flagged = await orm
+    .select({ model: benchmarkProfiles.model, variant: benchmarkProfiles.variant })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.platform_requested, true)
+      )
+    );
+  const released = flagged.filter(
+    row => !desiredKeys.has(exactPairKey(row.model, variantFromStorage(row.variant)))
+  );
 
-  // Clear every flag first, then re-set it per desired pair. Naming the desired
-  // set in one NOT(...) clause instead would bind two variables per model and
-  // blow D1's bound-variable ceiling once the decider list passes ~47 entries.
-  // Both statements run in one batch, so no drain sees a half-cleared queue.
-  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
-    clearPlatformRequestedStatement(orm, current),
-  ];
-
-  for (const entry of desired) {
-    stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso));
+  const stmts: Array<
+    | ReturnType<typeof releasePlatformRequestedStatement>
+    | ReturnType<typeof claimPlatformRequestedStatement>
+  > = [];
+  for (const row of released) {
+    stmts.push(releasePlatformRequestedStatement(orm, row, current));
   }
-
-  await orm.batch(stmts);
+  for (const pair of desired) {
+    stmts.push(claimPlatformRequestedStatement(orm, pair, current, nowIso));
+  }
+  // Coverage latches in the SAME D1 transaction as the membership writes. Under
+  // just-in-time billing a case request between two batches could be charged to a user the
+  // platform had already assigned to itself (or vice versa); one transaction makes the
+  // join-versus-assignment race resolve to a single ordering.
+  const coverage = desired.flatMap(pair =>
+    platformCoverageStatements(db, {
+      membership: {
+        router: current.router ?? 'efficient',
+        engineIdentity: current.engineIdentity,
+        model: pair.model,
+        variant: variantToStorage(pair.variant ?? null),
+        repetitions: current.repetitions,
+      },
+    })
+  );
+  if (stmts.length === 0 && coverage.length === 0) return;
+  // Drizzle and the store's prepared statements cannot share `orm.batch`, so both are
+  // compiled to D1 statements and run as one `db.batch` transaction.
+  const prepared = stmts.map(statement => {
+    const built = statement.toSQL();
+    return db.prepare(built.sql).bind(...built.params);
+  });
+  await db.batch([...prepared, ...coverage]);
 }
 
 /**
@@ -2116,9 +3555,42 @@ export function claimPlatformRequestedStatement(
         // every 15 minutes, so bumping it would hold every platform row
         // permanently below the reaper's age guard and an orphaned claim
         // would leave that pair unmeasured, never reaching the routing table.
-        set: { platform_requested: true },
+        //
+        // `requested_at` moves only when the flag was absent: a pair that just
+        // (re)joined the pool is new work the drain admits, while a pair that
+        // stayed in the pool keeps its request time, so pre-cutover pending work
+        // stays parked and an admin-cancelled run is not re-admitted in a minute.
+        set: {
+          platform_requested: true,
+          requested_at: sql`CASE WHEN ${benchmarkProfiles.platform_requested} = 0
+            THEN excluded.requested_at ELSE ${benchmarkProfiles.requested_at} END`,
+        },
       })
   );
+}
+
+/**
+ * Drop `platform_requested` from one pair that left the saved decider list. Storage-form
+ * variant. Leaves `updated_at` alone for the reason given on the claim above.
+ */
+export function releasePlatformRequestedStatement(
+  orm: ReturnType<typeof drizzle>,
+  pair: { model: string; variant: string },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
+) {
+  return orm
+    .update(benchmarkProfiles)
+    .set({ platform_requested: false })
+    .where(
+      and(
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
+        eq(benchmarkProfiles.model, pair.model),
+        eq(benchmarkProfiles.variant, pair.variant),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.platform_requested, true)
+      )
+    );
 }
 
 /**
@@ -2434,7 +3906,8 @@ type RoutingTableCandidateRow = typeof routingTableCandidates.$inferSelect;
 export function routingTableToRows(
   table: RoutingTable,
   publishedAt: string,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  desiredPairs: readonly string[] | null = null
 ): { tableRow: RoutingTableRow; candidateRows: RoutingTableCandidateRow[] } {
   const tableRow: RoutingTableRow = {
     run_id: table.version,
@@ -2449,6 +3922,7 @@ export function routingTableToRows(
     switch_horizon_turns: table.switchHorizonTurns ?? null,
     low_confidence_threshold: table.lowConfidenceThreshold ?? null,
     effort_by_complexity: table.effortByComplexity ?? null,
+    desired_pairs: desiredPairs === null ? null : [...desiredPairs],
     source: table.source,
   };
 
@@ -2546,10 +4020,11 @@ export async function saveRoutingTable(
   db: D1Database,
   table: RoutingTable,
   publishedAt: string,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  desiredPairs: readonly string[] | null = null
 ): Promise<void> {
   const orm = drizzle(db);
-  const { tableRow, candidateRows } = routingTableToRows(table, publishedAt, router);
+  const { tableRow, candidateRows } = routingTableToRows(table, publishedAt, router, desiredPairs);
 
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm.delete(routingTableCandidates).where(eq(routingTableCandidates.run_id, table.version)),
@@ -2569,6 +4044,7 @@ export async function saveRoutingTable(
           switch_horizon_turns: tableRow.switch_horizon_turns,
           low_confidence_threshold: tableRow.low_confidence_threshold,
           effort_by_complexity: tableRow.effort_by_complexity,
+          desired_pairs: tableRow.desired_pairs,
           source: tableRow.source,
         },
       }),
@@ -2585,10 +4061,39 @@ export async function saveRoutingTable(
   await orm.batch(stmts);
 }
 
+/**
+ * Record the exact desired platform membership on an already-published artifact.
+ *
+ * Used once, at the paid cutover, for a publication written before the column existed: the
+ * configured/resolved set is the durable baseline every later publish is compared against,
+ * so an unchanged pool is never rebuilt (rebuilding under a newer measurement revision can
+ * narrow routes) while a real addition, removal or alias pin still publishes. Only this
+ * column changes; the artifact rows are untouched.
+ */
+export async function recordPublishedDesiredPairs(
+  db: D1Database,
+  version: string,
+  pairs: readonly string[]
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE routing_tables SET desired_pairs = ?
+      WHERE run_id = ? AND desired_pairs IS NULL`
+    )
+    .bind(JSON.stringify([...pairs].sort()), version)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
 export async function getLatestRoutingTable(
   db: D1Database,
   router: AutoRouter = 'efficient'
-): Promise<{ table: RoutingTable; publishedAt: string } | null> {
+): Promise<{
+  table: RoutingTable;
+  publishedAt: string;
+  /** Exact desired platform membership at publication; null on pre-cutover publications. */
+  desiredPairs: string[] | null;
+} | null> {
   const orm = drizzle(db);
   const tableRow = await orm
     .select()
@@ -2619,7 +4124,11 @@ export async function getLatestRoutingTable(
     return null;
   }
 
-  return { table: parsed.data, publishedAt: tableRow.published_at };
+  return {
+    table: parsed.data,
+    publishedAt: tableRow.published_at,
+    desiredPairs: tableRow.desired_pairs ?? null,
+  };
 }
 
 // Only runs measured under the current classifier engine count: a winner from

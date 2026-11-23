@@ -47,7 +47,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, getTableColumns } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -2215,6 +2215,125 @@ describe('logMicrodollarUsage', () => {
       .from(organization_user_usage)
       .where(eq(organization_user_usage.organization_id, organization.id));
     expect(memberUsage?.microdollarUsage).toBe(300);
+  });
+
+  // Concurrent writes for one member and day queue on the member's daily row, so the writer must
+  // reach that row only after its other work, and then write the organization row in the same
+  // statement. Another transaction holds the daily row here to stop the writer at that point.
+  test('takes the organization rows last, in one statement that commits with the usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-org-usage-lock-order-user',
+      microdollars_used: 0,
+      google_user_email: 'org-usage-lock-order@example.com',
+    });
+    const organization = await createTestOrganization('Lock order organization', user.id, 10_000);
+    const { core: seedCore, metadata: seedMetadata } = await defineMicrodollarUsage();
+    await insertUsageRecord(
+      { ...seedCore, kilo_user_id: user.id, organization_id: organization.id, cost: 100 },
+      seedMetadata
+    );
+    const { core, metadata } = await defineMicrodollarUsage();
+    const usage = { ...core, kilo_user_id: user.id, organization_id: organization.id, cost: 400 };
+    const requestId = 'req-org-usage-lock-order';
+
+    let releaseBlocker = () => {};
+    const blockerReleased = new Promise<void>(resolve => {
+      releaseBlocker = resolve;
+    });
+    let reportBlockerPid = (_pid: number) => {};
+    const blockerPid = new Promise<number>(resolve => {
+      reportBlockerPid = resolve;
+    });
+    const blocker = db.transaction(async tx => {
+      const { rows } = await tx.execute<{ pid: number }>(sql`
+        SELECT pg_backend_pid() AS pid
+        FROM organization_user_usage
+        WHERE organization_id = ${organization.id} AND kilo_user_id = ${user.id}
+        FOR UPDATE
+      `);
+      assert.ok(rows[0]);
+      reportBlockerPid(rows[0].pid);
+      await blockerReleased;
+    });
+
+    let write: ReturnType<typeof insertUsageRecord> | undefined;
+    try {
+      const pid = await blockerPid;
+      write = insertUsageRecord(usage, metadata, {
+        request_id: requestId,
+        payload: { requestId, accountId: `user:${user.id}`, costMicrodollars: usage.cost },
+      });
+
+      let waiting: { pid: number; query: string } | undefined;
+      for (let attempt = 0; attempt < 400 && !waiting; attempt++) {
+        const { rows } = await db.execute<{ pid: number; query: string }>(sql`
+          SELECT pid, query FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))
+        `);
+        waiting = rows[0];
+        if (!waiting) await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      assert.ok(waiting, 'the usage write never waited on the held organization_user_usage row');
+
+      // Relation locks last until COMMIT, so they show which writes this transaction already ran.
+      const { rows: held } = await db.execute<{ relation: string }>(sql`
+        SELECT relation::regclass::text AS relation
+        FROM pg_locks
+        WHERE pid = ${waiting.pid} AND locktype = 'relation' AND mode = 'RowExclusiveLock' AND granted
+      `);
+      // No earlier statement writes `organizations`, so its lock comes from the waiting statement.
+      expect(held.map(row => row.relation)).toEqual(
+        expect.arrayContaining([
+          'microdollar_usage_daily_repairs',
+          'bouncer_usage_event_outbox',
+          'organizations',
+        ])
+      );
+      expect(waiting.query).toContain('INSERT INTO "organization_user_usage"');
+      // The organization row stays unlocked until the member row is acquired.
+      await db.transaction(tx =>
+        tx.execute(
+          sql`SELECT id FROM organizations WHERE id = ${organization.id} FOR UPDATE NOWAIT`
+        )
+      );
+    } finally {
+      releaseBlocker();
+      await blocker;
+    }
+
+    await expect(write).resolves.toMatchObject({ usageId: usage.id, wasRedelivery: false });
+    const { rows: versions } = await db.execute<{ source: string; xmin: string }>(sql`
+      SELECT 'usage' AS source, xmin::text FROM microdollar_usage WHERE id = ${usage.id}
+      UNION ALL
+      SELECT 'repair', xmin::text FROM microdollar_usage_daily_repairs WHERE usage_id = ${usage.id}
+      UNION ALL
+      SELECT 'member', xmin::text FROM organization_user_usage
+        WHERE organization_id = ${organization.id} AND kilo_user_id = ${user.id}
+      UNION ALL
+      SELECT 'organization', xmin::text FROM organizations WHERE id = ${organization.id}
+    `);
+    expect(versions.map(row => row.source).sort()).toEqual([
+      'member',
+      'organization',
+      'repair',
+      'usage',
+    ]);
+    expect(new Set(versions.map(row => row.xmin)).size).toBe(1);
+
+    const [organizationRow] = await db
+      .select({ microdollarsUsed: organizations.microdollars_used })
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    expect(organizationRow?.microdollarsUsed).toBe(500);
+    const [memberUsage] = await db
+      .select({ microdollarUsage: organization_user_usage.microdollar_usage })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, organization.id));
+    expect(memberUsage?.microdollarUsage).toBe(500);
+    const outbox = await db
+      .select({ requestId: bouncer_usage_event_outbox.request_id })
+      .from(bouncer_usage_event_outbox)
+      .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+    expect(outbox).toHaveLength(1);
   });
 
   // A redelivery of the same usage id can reach the write while, or after, the

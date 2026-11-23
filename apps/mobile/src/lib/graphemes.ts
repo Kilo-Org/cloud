@@ -105,9 +105,10 @@ function isRegionalIndicatorEndingAt(value: string, end: number): boolean {
  * pair the wrong two.
  *
  * The run-start walk is bounded by the same window, so a cut costs the same
- * whatever the payload. A run of more than 256 flags in a row is longer than
- * that bound; a cut inside one backs off to the window's own start, which is
- * never inside a surrogate pair, and may sit between two indicators.
+ * whatever the payload. A regional indicator is two code units, so a run of
+ * more than 512 flags in a row — `CUT_WINDOW` code units — is longer than that
+ * bound; a cut inside one backs off to the window's own start, which is never
+ * inside a surrogate pair, and may sit between two indicators.
  */
 export function graphemePrefixWithin(value: string, maxCodeUnits: number): string {
   if (value.length <= maxCodeUnits) {

@@ -34,6 +34,7 @@ vi.mock('react', async importOriginal => {
   return {
     default: actual,
     ...actual,
+    useMemo: <T>(fn: () => T): T => fn(),
     // `SelectableText` is invoked directly by the pure walker, outside a React
     // render, so the real `useContext` would throw on the null dispatcher.
     useContext: () => undefined,

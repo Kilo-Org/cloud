@@ -123,10 +123,10 @@
     "connectProvider": "Поврзи платформа",
     "contentTruncated": "Содржината е скратена",
     "copyLink": "Копирај врска",
+    "couldNotLoad": "Не се вчита.",
+    "couldNotLoadMore": "Не се вчитаа дополнителни ставки.",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",
     "couldNotLoadSessions": "Сесиите не се вчитаа.",
-    "couldnTLoad": "Не се вчита.",
-    "couldnTLoadMore": "Не се вчитаа дополнителни ставки.",
     "deviceSessions": "Сесии на уреди",
     "disabled": "Оневозможено",
     "email": "Е-пошта",
@@ -493,7 +493,7 @@
       "download": "Преземи датотека",
       "downloadFailed": "Не успеа преземањето на извозот. Провери ја врската и обиди се повторно.",
       "unavailableTitle": "Извозот на податоци сè уште не е достапен",
-      "unavailableDescription": "Извозот на податоци се воведува постепено. Провери повторно наскоро."
+      "unavailableDescription": "Функцијата се воведува постепено. Провери повторно наскоро."
     },
     "blockedPeople": {
       "title": "Блокирани и занемени луѓе",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Деталите не се достапни.",
+      "detailsUnavailableDescription": "Овој елемент веќе не е во сесијата.",
       "textDisplay": "Приказ на текст",
       "thinking": "Размислување",
       "thought": "Мисла",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Големината на контекстниот прозорец не е достапна",
       "tapToViewDetails": " Допри за да ги видиш деталите за контекстот.",
       "costClause": ", трошок {{cost}}",
-      "loadingCostSpoken": "трошок {{cost}}.",
+      "loadingCostSpoken": "досегашен трошок {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токени, големината на контекстниот прозорец не е достапна{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} од {{window}} токени, искористени {{percentage}}{{costClause}}.",
       "title": "Искористеност на контекстот",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Детали за користењето",
       "providersAndModels": "Провајдери и модели",
       "groups": "Групи",
-      "guardrails": "Заштитни ограничувања",
       "byok": "Сопствен клуч (BYOK)",
       "ssoAndDomain": "SSO и домен",
       "dataCollection": "Собирање податоци",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Не може да се вчитаат активностите со кредити.",
       "appStoreReceipt": "Сметка од App Store",
+      "deduction": {
+        "adminCancel": "Затворена состојба од администратор",
+        "adminDebit": "Отстранети кредити од администратор",
+        "codingPlan": "План за кодирање: {{plan}}",
+        "correction": "Корекција на состојбата",
+        "dispute": "Спор за плаќање",
+        "refundAppStore": "Поврат на пакет кредити од App Store",
+        "refundGooglePlay": "Поврат на пакет кредити од Google Play"
+      },
       "deductionFallback": "Одбивање кредити",
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
       "emptyTitle": "Нема историја на кредити",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Подигнете го лимитот за трошоци за да го овозможите ова резиме.",
     "saved": "Поставките за извештај се зачувани",
     "selectedSessions": "Избрани сесии",
-    "snapshotPullRequests": "PRs во избраните сесии",
-    "snapshotBlockers": "Пречки во избраните сесии",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Пречки",
     "capturedAt": "Зачувано {{time}}",
     "snapshotHint": "Снимка на најновата достапна состојба на сесиите, со можни пропусти, зачувана во закажаното утринско време. Бројките се однесуваат на избраните сесии, а не на целосната активност во текот на ноќта.",
     "snapshotTruncated": "Некои сесии или докази се изоставени за да се ограничи обемот на оваа снимка.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Користење",
+    "personalTitle": "Користење на личната сметка",
     "orgTitle": "Користење на организацијата",
     "entrySubtitle": "Трошоци, барања и токени",
     "rangePicker": "Временски опсег",

@@ -123,10 +123,10 @@
     "connectProvider": "Conecta un provedor",
     "contentTruncated": "Contido truncado",
     "copyLink": "Copiar a ligazón",
+    "couldNotLoad": "Non se puido cargar.",
+    "couldNotLoadMore": "Non se puideron cargar máis resultados.",
     "couldNotLoadOrganizations": "Non se puideron cargar as organizacións.",
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
-    "couldnTLoad": "Non se puido cargar.",
-    "couldnTLoadMore": "Non se puideron cargar máis resultados.",
     "deviceSessions": "Sesións nos dispositivos",
     "disabled": "Desactivado",
     "email": "Correo electrónico",
@@ -493,7 +493,7 @@
       "download": "Descargar ficheiro",
       "downloadFailed": "Non se puido descargar a exportación. Comproba a conexión e téntao de novo.",
       "unavailableTitle": "A exportación de datos aínda non está dispoñible",
-      "unavailableDescription": "A exportación de datos estase activando gradualmente. Volve consultalo pronto."
+      "unavailableDescription": "A función estase activando gradualmente. Volve consultalo pronto."
     },
     "blockedPeople": {
       "title": "Persoas bloqueadas e silenciadas",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Os detalles non están dispoñibles.",
+      "detailsUnavailableDescription": "Este elemento xa non está na sesión.",
       "textDisplay": "Vista de texto",
       "thinking": "Razoando",
       "thought": "Razoamento",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Tamaño da xanela de contexto non dispoñible",
       "tapToViewDetails": " Toca para ver os detalles do contexto.",
       "costClause": ", custo {{cost}}",
-      "loadingCostSpoken": "custo de {{cost}}.",
+      "loadingCostSpoken": "custo ata agora {{cost}}.",
       "tokensWindowUnavailable": "Contexto: {{used}} tokens; tamaño da xanela non dispoñible{{costClause}}.",
       "tokensUsage": "Contexto: {{used}} de {{window}} tokens; {{percentage}} usado{{costClause}}.",
       "title": "Uso do contexto",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Detalles de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
-      "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Recollida de datos",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Non se puido cargar a actividade de crédito.",
       "appStoreReceipt": "Recibo da App Store",
+      "deduction": {
+        "adminCancel": "Saldo pechado por un administrador",
+        "adminDebit": "Créditos eliminados por un administrador",
+        "codingPlan": "Plan de programación: {{plan}}",
+        "correction": "Corrección do saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso dun paquete de créditos da App Store",
+        "refundGooglePlay": "Reembolso dun paquete de créditos de Google Play"
+      },
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo.",
     "saved": "Configuración do informe gardada",
     "selectedSessions": "Sesións seleccionadas",
-    "snapshotPullRequests": "PRs nas sesións seleccionadas",
-    "snapshotBlockers": "Bloqueos nas sesións seleccionadas",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Bloqueos",
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantánea do último estado dispoñible das sesións, capturada á hora programada da mañá coa información que se puido obter. As cantidades refírense ás sesións seleccionadas, non a toda a actividade nocturna.",
     "snapshotTruncated": "Omitíronse algunhas sesións ou evidencias para manter esta instantánea dentro dos límites.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Uso",
+    "personalTitle": "Uso da conta persoal",
     "orgTitle": "Uso da organización",
     "entrySubtitle": "Gasto, solicitudes e tokens",
     "rangePicker": "Intervalo de tempo",

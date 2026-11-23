@@ -123,10 +123,10 @@
     "connectProvider": "සැපයුම්කරුවෙකු සම්බන්ධ කරන්න",
     "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
     "copyLink": "සබැඳිය පිටපත් කරන්න",
+    "couldNotLoad": "පූරණය කළ නොහැකි විය.",
+    "couldNotLoadMore": "තවත් පූරණය කළ නොහැකි විය.",
     "couldNotLoadOrganizations": "සංවිධාන පූරණය කළ නොහැකි විය.",
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldnTLoad": "පූරණය කළ නොහැකි විය.",
-    "couldnTLoadMore": "තවත් පූරණය කළ නොහැකි විය.",
     "deviceSessions": "උපාංග සැසි",
     "disabled": "අක්‍රීයයි",
     "email": "ඊමේල්",
@@ -493,7 +493,7 @@
       "download": "ගොනුව බාගන්න",
       "downloadFailed": "අපනයනය බාගත කළ නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "unavailableTitle": "දත්ත අපනයනය තවම ලබා ගත නොහැක",
-      "unavailableDescription": "දත්ත අපනයනය ක්‍රමයෙන් හඳුන්වා දෙමින් පවතී. ඉක්මනින් නැවත පරීක්ෂා කරන්න."
+      "unavailableDescription": "මෙම විශේෂාංගය ක්‍රමයෙන් හඳුන්වා දෙමින් පවතී. ඉක්මනින් නැවත පරීක්ෂා කරන්න."
     },
     "blockedPeople": {
       "title": "අවහිර කළ සහ නිහඬ කළ පුද්ගලයන්",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබා ගත නොහැක.",
+      "detailsUnavailableDescription": "මෙම අයිතමය තවදුරටත් සැසියේ නොමැත.",
       "textDisplay": "පෙළ සංදර්ශකය",
       "thinking": "සිතමින්",
       "thought": "සිතුවිල්ල",
@@ -2813,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "එකක් තුළ තවත් උපසැසියක් සෑදිය හැකි උපරිම මට්ටමට ළඟා වී ඇත.",
+      "maxNestingDepth": "කැදැලි සැසිවල උපරිම ගැඹුරට ළඟා වී ඇත.",
       "modelAccessibility": "මාදිලිය: {{modelLabel}}",
       "openHint": "උපනියෝජිත සැසිය විවෘත කරන්න",
       "subagent": "උපනියෝජිතයා",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "සන්දර්භ කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක",
       "tapToViewDetails": " සන්දර්භ විස්තර බැලීමට තට්ටු කරන්න.",
       "costClause": ", පිරිවැය {{cost}}",
-      "loadingCostSpoken": "පිරිවැය {{cost}}.",
+      "loadingCostSpoken": "මෙතෙක් පිරිවැය {{cost}}.",
       "tokensWindowUnavailable": "සන්දර්භයේ ටෝකන {{used}}, කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක{{costClause}}.",
       "tokensUsage": "සන්දර්භයේ ටෝකන {{window}} න් {{used}}, {{percentage}} භාවිත කර ඇත{{costClause}}.",
       "title": "සන්දර්භ භාවිතය",
@@ -3772,7 +3773,6 @@
       "usageDetails": "භාවිත විස්තර",
       "providersAndModels": "සපයන්නන් සහ මාදිලි",
       "groups": "කණ්ඩායම්",
-      "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
       "ssoAndDomain": "SSO සහ වසම",
       "dataCollection": "දත්ත එකතු කිරීම",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ක්‍රෙඩිට් ක්‍රියාකාරකම් පූරණය කළ නොහැක.",
       "appStoreReceipt": "App Store වෙතින් ලැබුණු රිසිට්පත",
+      "deduction": {
+        "adminCancel": "ශේෂය පරිපාලක විසින් වසා ඇත",
+        "adminDebit": "ක්‍රෙඩිට් පරිපාලක විසින් ඉවත් කර ඇත",
+        "codingPlan": "කේතීකරණ සැලැස්ම: {{plan}}",
+        "correction": "ශේෂය ගැලපීම",
+        "dispute": "ගෙවීම පිළිබඳ ආරවුල",
+        "refundAppStore": "App Store වෙතින් ක්‍රෙඩිට් පැකේජයක මුදල් ආපසු ගැනීම",
+        "refundGooglePlay": "Google Play වෙතින් ක්‍රෙඩිට් පැකේජයක මුදල් ආපසු ගැනීම"
+      },
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "මෙම සාරාංශයට ඉඩ දීමට වියදම් ආරක්ෂක සීමාව ඉහළ නංවන්න.",
     "saved": "වාර්තා සැකසීම් සුරකින ලදී",
     "selectedSessions": "තෝරාගත් සැසි",
-    "snapshotPullRequests": "තෝරාගත් සැසිවල PRs",
-    "snapshotBlockers": "තෝරාගත් සැසිවල බාධක",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "බාධක",
     "capturedAt": "සටහන් කළේ {{time}}",
     "snapshotHint": "නියමිත උදෑසන වේලාවේ ලබා ගත හැකි නවතම සැසි තත්ත්වය හැකි උපරිමයෙන් සටහන් කළ තත්ත්ව සටහනකි. ගණන් දැක්වෙන්නේ තෝරාගත් සැසි සඳහා මිස රාත්‍රිය පුරා සිදු වූ සියලු ක්‍රියාකාරකම් සඳහා නොවේ.",
     "snapshotTruncated": "මෙම තත්ත්ව සටහනේ ප්‍රමාණය සීමා කිරීමට සමහර සැසි හෝ සාක්ෂි ඇතුළත් කර නැත.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "භාවිතය",
+    "personalTitle": "පුද්ගලික ගිණුම් භාවිතය",
     "orgTitle": "සංවිධාන භාවිතය",
     "entrySubtitle": "වියදම, ඉල්ලීම් සහ ටෝකන",
     "rangePicker": "කාල පරාසය",

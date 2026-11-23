@@ -1118,4 +1118,52 @@ describe('adminCustomLlmRouter', () => {
       expect(row).toBeUndefined();
     });
   });
+
+  describe('setEnabled', () => {
+    it('sets is_enabled in the definition without touching the rest or the credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-toggle';
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-secret' },
+      });
+      const [before] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, publicId));
+
+      const disabled = await caller.admin.customLlm.setEnabled({
+        public_id: publicId,
+        is_enabled: false,
+      });
+      expect(disabled).toEqual({
+        public_id: publicId,
+        definition: { ...validDefinition, is_enabled: false },
+      });
+      const listResult = await caller.admin.customLlm.list();
+      expect(
+        listResult.items.find(item => item.public_id === publicId)?.definition.is_enabled
+      ).toBe(false);
+
+      const enabled = await caller.admin.customLlm.setEnabled({
+        public_id: publicId,
+        is_enabled: true,
+      });
+      expect(enabled.definition).toEqual({ ...validDefinition, is_enabled: true });
+      const [after] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, publicId));
+      expect(after?.encrypted_api_key).toEqual(before?.encrypted_api_key);
+    });
+
+    it('rejects an unknown public_id', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.customLlm.setEnabled({ public_id: 'kilo-internal/missing', is_enabled: false })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+  });
 });

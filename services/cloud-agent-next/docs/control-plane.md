@@ -799,6 +799,36 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
+### Environment setup sessions
+
+- Grouped metadata MAY carry `environmentSetup: { runId, environmentId, role }`
+  with role `setup` or `verification`. Preflight sets it; clients cannot.
+- `setup`: accepted only from a non-authority internal-key `prepareSession`
+  with `environmentSetupRunId`, verified against
+  `cloud_agent_environment_setup_runs` (owner match, open status, draft equals
+  `requestedEnvironment.id`). The session may resolve its draft environment.
+  This role uses full network access with egress auditing for setup discovery,
+  even when the draft is restricted. It requires a Cloudflare Containers allocation.
+- `verification`: accepted only under a Cloud Agent authority whose
+  `environmentSetup` claim matches `verificationOf.runId` and
+  `requestedEnvironment.id`, and whose parent workspace authority recorded the
+  same binding from the setup session. The child resolves the draft and its
+  network policy instead of inheriting the parent workspace's policy.
+- The agent can read the discovery audit through `get_environment_draft` and
+  cite setup or verification audit records when requesting hosts. Pending host
+  requests block verification. Discovery alone cannot satisfy the completion gate.
+- The workspace MCP grant adds `environmentSetup` to `cloudAgentAuthority`
+  only for the workspace created by the setup session.
+- Drafts cannot be built into environment snapshots. Setup and verification
+  sessions run the draft's setup commands during session preparation.
+- When an environment applies and the resolved egress mode is `allowlist`,
+  the environment's required hosts are added to the allowlist.
+- `getSession` exposes the admitted environment revision, the latest
+  preparation outcome, and the workspace egress policy. A command failure
+  fails the verification preparation outcome without preventing the session
+  from starting. A setup authority can use `getEgressAudit` for the setup
+  session or a direct child.
+
 ### Workspace tail snapshots
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
@@ -1781,7 +1811,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
-| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress remains native-only. |
+| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress uses the shared [sandbox egress proxy](#sandbox-egress-proxy). |
 
 **Changed**
 
@@ -1901,6 +1931,105 @@ Cloudflare's public Worker ingress limit depends on the account plan: 100 MB, 20
 Workers HTTP duration has no fixed limit while connected, but Vercel forwarding duration remains
 unverified beyond the tested 8 MiB transfers and Git operations. Before production rollout,
 confirm ingress and duration compatibility and resolve any confirmed reduction. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+### Sandbox egress proxy
+
+An egress allowlist and an egress audit are product logic in one shared core,
+`proxySandboxEgress` (`src/egress/sandbox-egress.ts`). A provider supplies two primitives in the
+capability table (`packages/worker-utils/src/sandbox-provider-capabilities.ts`):
+
+| Feature | Meaning | Containers | Vercel | Cloudflare (retired) |
+|---|---|---|---|---|
+| `egressProxy` | Sandbox egress reaches the Worker proxy with a verified sandbox identity. | yes | yes | no |
+| `egressProxySeesAll` | The proxy sees all HTTP(S) egress, not only the listed hosts. | yes | no | no |
+
+One rule, `egressRequestSupported`, reads them: an allowlist needs `egressProxy`; an audit without
+an allowlist needs `egressProxySeesAll`; a session without an egress request is always supported.
+Registration, the sandbox selection and metadata schemas, the Sandbox DO pin checks, the
+saved-allocation skip and the web guidance use this rule. The pin checks and the schemas also
+require an isolated sandbox. The audit read requires `egressProxy`.
+
+**Core.** For each request: a strict URL check against the allowlist (`https` or `http`, the
+default port, no userinfo, an exact host); then one audit row when the policy has audit; then a 403
+`Egress destination disallowed`, or a fetch with `Host` from the URL and `redirect: 'manual'`.
+A failed audit write gives 502 `Egress audit unavailable` and sends nothing. Containers runs the
+core from its outbound handler. The audit store is one `EgressAuditStore` for each logical sandbox,
+reached only through `egressAuditStore` (`SANDBOX_CONTAINERS` by the logical sandbox id). Its use
+is provider-neutral: for a Vercel sandbox the object starts no container, sets no alarm and writes
+no billing record. Retention is the same on both providers: at most 256 chunks of 64 rows. When
+the store is full, a write deletes the oldest chunk if its last write is at least 60 seconds old;
+otherwise the write fails, and the request gets 502. Rows have no time-based expiry.
+
+**Vercel request path.** A restricted Vercel policy (`restrictVercelEgress`) has the effective
+allowlist as its keys and never `'*'`. The Worker host keeps its credential rules and a Host-pin
+transform; every other listed host keeps its credential rules and ends with a forward to
+`/scm/vercel/<sandboxId>`. An unlisted name does not resolve in the sandbox. A policy that cannot
+be built creates no sandbox and sends no update. The route then:
+
+1. reads the target from the `vercel-forwarded-*` headers;
+2. admits the request: the pin policy, then the live allocation (owner, allocation id, provider
+   ref, not stopping or stopped), then the Vercel OIDC token (issuer, audience, team, project,
+   sandbox name, `exp`). An unavailable allocation gives 403 `allocation_unavailable` before the
+   token check. A bad or expired token, or a token of another sandbox, gives 401;
+3. strips every `vercel-*`, `x-vercel-*` and `x-forwarded-*` header, the token and hop-by-hop
+   headers. It keeps `upgrade` only on a WebSocket upgrade;
+4. runs the core with the pin allowlist minus the Worker host, so the Worker host, another port,
+   userinfo, `http` and an IP literal give 403. The core writes a `denied` row only when the pin
+   has audit;
+5. sends an unmanaged request with `fetch`, and a managed SCM credential through the SCM admission.
+
+A Vercel sandbox without an allowlist keeps the SCM forward path unchanged. The route never
+proxies to a host outside the allowlist or the managed SCM targets.
+
+The runtime proxy facade middleware leaves `/scm/vercel/` paths alone, so a forwarded request with
+a runtime proxy handle in `Authorization` also reaches the route.
+
+**Admission caches.** The Sandbox DO caches a verified identity for each token hash and allocation
+(at most 64 entries, until the token `exp`); the live allocation check runs on every request. Each
+Worker isolate caches an admitted result by sandbox id and token hash: at most 256 entries, for at
+most 30 seconds and never past the token `exp`. A denial is not cached. So an isolate can admit a
+request for up to 30 seconds after the allocation stops or changes. In that window the request
+still passes the URL check against the admitted allowlist, and its audit row is still written.
+
+**Differences on Vercel.**
+
+| # | Case | Containers | Vercel |
+|---|---|---|---|
+| D1 | `http://` to a listed host | allowed | fails (connection reset); use `https://` |
+| D3 | unlisted host | 403, audited `denied` | does not resolve; not audited |
+| D13 | audit | any network mode | allowlist mode only |
+| D15 | Worker host; a request that a credential rule matches | through the proxy, audited | direct, not audited |
+| D16 | upload size | no edge limit | the request body limit of the Cloudflare plan |
+| D17 | HTTP/2-only client, gRPC | not checked | fails on forwarded hosts |
+
+**Failure.** Egress stays restricted in each case: a refused update leaves the old policy in
+force, and that policy has no `'*'`.
+
+| Path | Result of a policy that cannot be built or applied |
+|---|---|
+| Create | No sandbox. The routes fail with `network_policy_failed`. |
+| Release (`applyVercelNetworkPolicyOrStop`), workspace Stop (`cancelWorkspace`) | The sandbox stops: `network_policy_failed` on a restricted sandbox, `sandbox_lost` on an unrestricted one (`refusedPolicyStopReason`). |
+| Route grant at prepare (2 attempts) | That route fails with `workspace_setup_failed`, stage `credential_policy_unavailable`. The sandbox keeps running. |
+| A preparing route when the wrapper connects (`onWrapperConnected`) | That route fails with `workspace_setup_failed`. The sandbox keeps running. |
+| `bindRuntimeCredentialProxyHandle`, `updateNetworkPolicy` | The call fails. The sandbox keeps running. |
+
+**Rollback.**
+
+- No migration and no new Durable Object class.
+- Deploy the Worker before the web app: the web guidance reads the same capability table.
+- Revert of the Vercel `egressProxy = true` commit fails closed. Registration refuses a restricted
+  Vercel request, and a live restricted pin makes `readProviderPin` throw. The stored metadata and
+  registration of a restricted Vercel session fail validation, so the Session DO loads that session
+  as absent until the commit is deployed again. Audit rows stay in the store, but the audit read
+  refuses them. Nothing is deleted.
+- After that revert, a live restricted Vercel sandbox runs until the Vercel sandbox timeout.
+  `readProviderPin` runs in `initializeStorage`, so the Sandbox DO fails to initialize and cannot
+  stop the BYOC sandbox in the customer account. Egress stays closed: the Vercel policy stays in
+  force, and each forward gets 503 `forwarding_unavailable` because the admission cannot load the
+  pin. To prevent this, stop live restricted Vercel sandboxes before the rollback.
+- Revert the two `network_policy_failed` commits together (the reason, and the workspace Stop that
+  uses it), and only when no stored route row holds that reason: the failure reason schema is
+  strict, and a stored row with an unknown reason fails to parse.
 
 ### Compatibility and rollout
 

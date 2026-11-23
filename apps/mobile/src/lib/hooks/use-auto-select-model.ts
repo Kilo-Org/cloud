@@ -1,14 +1,14 @@
 import { useCallback, useRef } from 'react';
 
-import { type AutoSelectedModel, pickAutoSelectedModel } from '@/lib/hooks/auto-select-model';
+import { pickAutoSelectedModel } from '@/lib/hooks/auto-select-model';
 import { type ModelOption, useOrgDefaultModel } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 
 /**
  * The new-session auto-selection phase. One union, because the form commits the
- * model once per mount: a failed organization-default read is a state that says
- * nothing may be committed, not a flag beside a selection.
+ * model once per account scope: a failed organization-default read is a state
+ * that says nothing may be committed, not a flag beside a selection.
  */
 type AutoSelectModelState =
   | { kind: 'waiting' }
@@ -29,11 +29,18 @@ export function useAutoSelectModel(
     void refetchOrgDefault();
   }, [refetchOrgDefault]);
   // The committed pair only: which input chose it stops mattering once the form
-  // owns the selection.
-  const chosenRef = useRef<Pick<AutoSelectedModel, 'model' | 'variant'> | null>(null);
+  // owns the selection. It carries the account scope it was resolved for, so
+  // the pair always belongs to the catalog it was chosen from.
+  const scope = organizationId ?? null;
+  const chosenRef = useRef<{ scope: string | null; model: string; variant: string } | null>(null);
 
-  if (chosenRef.current) {
-    return { kind: 'selected', ...chosenRef.current };
+  const committed = chosenRef.current;
+  // An autoselection belongs to the account scope that resolved it, and that
+  // scope is the account the create reads, so another scope's pair is dropped.
+  if (committed === null || committed.scope !== scope) {
+    chosenRef.current = null;
+  } else {
+    return { kind: 'selected', model: committed.model, variant: committed.variant };
   }
   // Wait for the server preference and the stored preference too, or the shared
   // value loses the race against the local cache on cold start and is never
@@ -66,6 +73,6 @@ export function useAutoSelectModel(
   if (orgDefault.isPending || !picked) {
     return { kind: 'waiting' };
   }
-  chosenRef.current = { model: picked.model, variant: picked.variant };
+  chosenRef.current = { scope, model: picked.model, variant: picked.variant };
   return { kind: 'selected', model: picked.model, variant: picked.variant };
 }

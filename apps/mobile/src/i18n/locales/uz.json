@@ -123,10 +123,10 @@
     "connectProvider": "Provayderni ulash",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
+    "couldNotLoad": "Yuklab bo‘lmadi.",
+    "couldNotLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
     "couldNotLoadSessions": "Seanslarni yuklab bo‘lmadi.",
-    "couldnTLoad": "Yuklab bo‘lmadi.",
-    "couldnTLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "deviceSessions": "Qurilma seanslari",
     "disabled": "O‘chirilgan",
     "email": "Elektron pochta",
@@ -493,7 +493,7 @@
       "download": "Faylni yuklab olish",
       "downloadFailed": "Eksportni yuklab bo'lmadi. Internet aloqasini tekshirib, qayta urinib ko'ring.",
       "unavailableTitle": "Ma'lumotlarni eksport qilish hali tayyor emas",
-      "unavailableDescription": "Ma'lumotlarni eksport qilish bosqichma-bosqich joriy qilinmoqda. Tez orada qayta tekshiring."
+      "unavailableDescription": "Funksiya bosqichma-bosqich joriy qilinmoqda. Tez orada qayta tekshiring."
     },
     "blockedPeople": {
       "title": "Bloklangan va ovozsiz qilingan foydalanuvchilar",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Tafsilotlar mavjud emas.",
+      "detailsUnavailableDescription": "Bu element endi sessiyada yo'q.",
       "textDisplay": "Matn ko'rinishi",
       "thinking": "Fikrlamoqda",
       "thought": "Fikr",
@@ -2813,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Ichma-ich sessiyalar soni ruxsat etilgan chegaraga yetdi.",
+      "maxNestingDepth": "Ichma-ich sessiyalarning maksimal chuqurligiga yetdi.",
       "modelAccessibility": "Model nomi: {{modelLabel}}",
       "openHint": "Yordamchi agent sessiyasini ochish",
       "subagent": "Yordamchi agent",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Kontekst oynasining hajmi noma'lum",
       "tapToViewDetails": " Kontekst tafsilotlarini ko'rish uchun bosing.",
       "costClause": ", xarajat {{cost}}",
-      "loadingCostSpoken": "xarajati {{cost}}.",
+      "loadingCostSpoken": "hozirgacha xarajati {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} ta token, oyna hajmi noma'lum{{costClause}}.",
       "tokensUsage": "Kontekst: {{window}} ta tokendan {{used}} tasi ishlatilgan, {{percentage}}{{costClause}}.",
       "title": "Kontekstdan foydalanish",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
-      "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
       "ssoAndDomain": "SSO va domen",
       "dataCollection": "Ma'lumotlar yig'ish",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
+      "deduction": {
+        "adminCancel": "Balans administrator tomonidan yopilgan",
+        "adminDebit": "Kreditlar administrator tomonidan olib tashlangan",
+        "codingPlan": "Kodlash tarifi: {{plan}}",
+        "correction": "Balansni tuzatish",
+        "dispute": "To‘lov bo‘yicha nizo",
+        "refundAppStore": "App Store’dan kredit paketi qaytarilishi",
+        "refundGooglePlay": "Google Play’dan kredit paketi qaytarilishi"
+      },
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Bu xulosani yaratishga imkon berish uchun xarajat cheklovini oshiring.",
     "saved": "Brifing sozlamalari saqlandi",
     "selectedSessions": "Tanlangan seanslar",
-    "snapshotPullRequests": "Tanlangan seanslardagi PRlar",
-    "snapshotBlockers": "Tanlangan seanslardagi to‘siqlar",
+    "snapshotPullRequests": "PRlar",
+    "snapshotBlockers": "To‘siqlar",
     "capturedAt": "{{time}} da qayd etilgan",
     "snapshotHint": "Rejalashtirilgan tonggi vaqtda mavjud bo‘lgan eng so‘nggi seans holatining imkon qadar to‘liq qayd etilgan nusxasi. Sonlar tun davomidagi barcha faoliyatni emas, tanlangan seanslarni aks ettiradi.",
     "snapshotTruncated": "Bu holat nusxasi hajmini cheklash uchun ayrim seanslar yoki dalillar kiritilmadi.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Foydalanish",
+    "personalTitle": "Shaxsiy hisob foydalanishi",
     "orgTitle": "Tashkilot foydalanishi",
     "entrySubtitle": "Xarajat, so'rovlar va tokenlar",
     "rangePicker": "Vaqt oralig'i",

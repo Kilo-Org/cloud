@@ -123,10 +123,10 @@
     "connectProvider": "Ku xidh bixiye",
     "contentTruncated": "Nuxurka waa la gaabiyay",
     "copyLink": "Nuqul ka samee xiriiriyaha",
+    "couldNotLoad": "Lama soo rari karin.",
+    "couldNotLoadMore": "Kuwo kale lama soo rari karin.",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",
     "couldNotLoadSessions": "Kalfadhiyada lama soo rari karin.",
-    "couldnTLoad": "Lama soo rari karin.",
-    "couldnTLoadMore": "Kuwo kale lama soo rari karin.",
     "deviceSessions": "Kalfadhiyada aaladaha",
     "disabled": "La damiyay",
     "email": "Iimayl",
@@ -493,7 +493,7 @@
       "download": "Soo deji faylka",
       "downloadFailed": "Xogta la dhoofiyay lama soo dejin karin. Hubi xiriirkaaga oo mar kale isku day.",
       "unavailableTitle": "Dhoofinta xogta weli lama heli karo",
-      "unavailableDescription": "Dhoofinta xogta si tartiib-tartiib ah ayaa loo soo bandhigayaa. Dib u soo eeg dhawaan."
+      "unavailableDescription": "Sifada si tartiib-tartiib ah ayaa loo soo bandhigayaa. Dib u soo eeg dhawaan."
     },
     "blockedPeople": {
       "title": "Dadka la xannibay iyo kuwa la aamusiiyay",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Faahfaahinta lama heli karo.",
+      "detailsUnavailableDescription": "Shaygan hadda kama jiro kalfadhiga.",
       "textDisplay": "Muuqaalka qoraalka",
       "thinking": "Wuu fikirayaa",
       "thought": "Fikrad",
@@ -2813,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Waxaa la gaaray xadka kalfadhiyada la isku dhex abuuri karo.",
+      "maxNestingDepth": "Waxaa la gaaray xadka qotada kalfadhiyada gudaha ah.",
       "modelAccessibility": "Moodeelka: {{modelLabel}}",
       "openHint": "Fur kalfadhiga wakiilka hoose",
       "subagent": "Wakiil hoose",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Cabbirka daaqadda macnaha guud lama heli karo",
       "tapToViewDetails": " Taabo si aad u aragto faahfaahinta macnaha guud.",
       "costClause": ", kharash {{cost}}",
-      "loadingCostSpoken": "kharashka {{cost}}.",
+      "loadingCostSpoken": "kharashka ilaa hadda {{cost}}.",
       "tokensWindowUnavailable": "Macnaha guud: {{used}} halbeeg qoraal, cabbirka daaqadda lama heli karo{{costClause}}.",
       "tokensUsage": "Macnaha guud: {{used}} ka mid ah {{window}} halbeeg qoraal, {{percentage}} waa la isticmaalay{{costClause}}.",
       "title": "Isticmaalka macnaha guud",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
-      "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
       "ssoAndDomain": "SSO iyo domain",
       "dataCollection": "Ururinta xogta",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Dhaqdhaqaaqa kireditka lama rari karin.",
       "appStoreReceipt": "Rasiid ka yimid App Store",
+      "deduction": {
+        "adminCancel": "Hadhaaga waxaa xidhay maamule",
+        "adminDebit": "Kiredit waxaa ka saaray maamule",
+        "codingPlan": "Qorshaha codeynta: {{plan}}",
+        "correction": "Hagaajinta haraaga",
+        "dispute": "Muranka lacag-bixinta",
+        "refundAppStore": "Lacag celin xirmo kiredit oo ka timid App Store",
+        "refundGooglePlay": "Lacag celin xirmo kiredit oo ka timid Google Play"
+      },
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Kordhi xadka kharashka si aad u oggolaato soo koobiddan.",
     "saved": "Dejinta warbixinta waa la kaydiyay",
     "selectedSessions": "Fadhiyada la doortay",
-    "snapshotPullRequests": "PRs ku jira fadhiyada la doortay",
-    "snapshotBlockers": "Caqabadaha ku jira fadhiyada la doortay",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Caqabadaha",
     "capturedAt": "La kaydiyay {{time}}",
     "snapshotHint": "Nuqul laga kaydiyay xaaladdii ugu dambaysay ee fadhiyada ee la heli karay subaxdii la jadwalay, intii suurtagal ahayd. Tirooyinku waxay khuseeyaan fadhiyada la doortay, ma aha dhammaan dhaqdhaqaaqii habeenkii.",
     "snapshotTruncated": "Fadhiyo ama caddaymo qaar ayaa laga reebay si cabbirka nuqulkan xaaladdu u ahaado mid xaddidan.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Isticmaalka",
+    "personalTitle": "Isticmaalka akoonka qofka",
     "orgTitle": "Isticmaalka ururka",
     "entrySubtitle": "Kharashka, codsiyada iyo halbeegyada",
     "rangePicker": "Muddada waqtiga",

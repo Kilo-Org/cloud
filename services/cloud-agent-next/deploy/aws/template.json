@@ -1,0 +1,620 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Kilo AWS BYOC internal foundation. M1 only; customer enablement requires the forced proxy in P4.",
+  "Metadata": {
+    "KiloTemplateVersion": 1
+  },
+  "Parameters": {
+    "KiloRoleArn": {
+      "Type": "String",
+      "Description": "The fixed Kilo backend role. Do not enter an IAM user ARN.",
+      "AllowedPattern": "arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "Description": "The owner-bound ExternalId supplied by Kilo.",
+      "AllowedPattern": "[A-Za-z0-9_-]{32,128}",
+      "NoEcho": true
+    },
+    "RuntimeArtifactBucket": {
+      "Type": "String",
+      "Description": "Kilo release artifact bucket.",
+      "AllowedPattern": "[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"
+    },
+    "RuntimeArtifactKey": {
+      "Type": "String",
+      "Description": "Immutable release ZIP containing the runtime image build and hook.",
+      "AllowedPattern": "[A-Za-z0-9_./-]+[.]zip"
+    },
+    "RuntimeRepositoryArn": {
+      "Type": "String",
+      "Description": "The one ECR repository used by the pinned runtime build.",
+      "AllowedPattern": "arn:aws:ecr:[a-z0-9-]+:[0-9]{12}:repository/[a-z0-9_./-]+"
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.84.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {}
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.84.0.0/24",
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PrivateSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.84.1.0/24",
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PublicRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "PublicAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        }
+      }
+    },
+    "InternetRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": "GatewayAttachment"
+    },
+    "NatAddress": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatGateway": {
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "AllocationId": {
+          "Fn::GetAtt": ["NatAddress", "AllocationId"]
+        }
+      },
+      "DependsOn": "InternetRoute"
+    },
+    "PrivateRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "PrivateAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PrivateSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        }
+      }
+    },
+    "NatRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "NatGateway"
+        }
+      }
+    },
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireLaunchDocuments",
+              "Status": "Enabled",
+              "Prefix": "kilo/launch/",
+              "ExpirationInDays": 1,
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ArtifactPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "Artifacts"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["Artifacts", "Arn"]
+                },
+                {
+                  "Fn::Sub": "${Artifacts.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/kilo/byoc/${AWS::StackName}"
+        },
+        "RetentionInDays": 7
+      }
+    },
+    "ConnectorOperatorRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CreateScopedConnectorEni",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateNetworkInterface",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${SandboxSecurityGroup}"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateTags",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "ec2:ManagedResourceOperator": "network-connectors.lambda.amazonaws.com"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SandboxSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Internal M1 only; P4 replaces internet egress with the proxy route",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Connector": {
+      "Type": "AWS::Lambda::NetworkConnector",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-sandboxes"
+        },
+        "OperatorRole": {
+          "Fn::GetAtt": ["ConnectorOperatorRole", "Arn"]
+        },
+        "Configuration": {
+          "VpcEgressConfiguration": {
+            "AssociatedComputeResourceTypes": ["MicroVm"],
+            "NetworkProtocol": "IPv4",
+            "SubnetIds": [
+              {
+                "Ref": "PrivateSubnet"
+              }
+            ],
+            "SecurityGroupIds": [
+              {
+                "Ref": "SandboxSecurityGroup"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "BuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": ["sts:AssumeRole", "sts:TagSession"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "RuntimeBuildInputs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:GetObject",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${RuntimeArtifactBucket}/${RuntimeArtifactKey}"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ecr:GetAuthorizationToken",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage"
+                  ],
+                  "Resource": {
+                    "Ref": "RuntimeRepositoryArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource": {
+                    "Fn::GetAtt": ["Logs", "Arn"]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "RuntimeImage": {
+      "Type": "AWS::Lambda::MicrovmImage",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-runtime"
+        },
+        "BaseImageArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:aws:microvm-image:al2023-1"
+        },
+        "BaseImageVersion": "3",
+        "BuildRoleArn": {
+          "Fn::GetAtt": ["BuildRole", "Arn"]
+        },
+        "Description": "Kilo AWS BYOC runtime protocol 1; AMD64, 8GiB baseline",
+        "CodeArtifact": {
+          "Uri": {
+            "Fn::Sub": "s3://${RuntimeArtifactBucket}/${RuntimeArtifactKey}"
+          }
+        },
+        "CpuConfigurations": [
+          {
+            "Architecture": "X86_64"
+          }
+        ],
+        "Resources": [
+          {
+            "MinimumMemoryInMiB": 8192
+          }
+        ],
+        "AdditionalOsCapabilities": ["ALL"],
+        "EnvironmentVariables": [],
+        "EgressNetworkConnectors": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:aws:network-connector:aws-network-connector:INTERNET_EGRESS"
+          }
+        ],
+        "Logging": {
+          "CloudWatch": {
+            "LogGroup": {
+              "Ref": "Logs"
+            },
+            "LogStream": "runtime-build"
+          }
+        },
+        "Hooks": {
+          "Port": 8080,
+          "MicrovmHooks": {
+            "Run": "ENABLED",
+            "RunTimeoutInSeconds": 60,
+            "Terminate": "ENABLED",
+            "TerminateTimeoutInSeconds": 10
+          },
+          "MicrovmImageHooks": {
+            "Ready": "ENABLED",
+            "ReadyTimeoutInSeconds": 300,
+            "Validate": "ENABLED",
+            "ValidateTimeoutInSeconds": 60
+          }
+        }
+      }
+    },
+    "CustomerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "KiloRoleArn"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "KiloSandboxLifecycle",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:RunMicrovm",
+                    "lambda:GetMicrovm",
+                    "lambda:TerminateMicrovm",
+                    "lambda:GetMicrovmImage",
+                    "lambda:GetMicrovmImageVersion"
+                  ],
+                  "Resource": {
+                    "Ref": "RuntimeImage"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "lambda:GetNetworkConnector",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": ["Connector", "Arn"]
+                    },
+                    {
+                      "Fn::GetAtt": ["Connector", "LatestVersionArn"]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "lambda:PassNetworkConnector",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": ["Connector", "Arn"]
+                    },
+                    {
+                      "Fn::GetAtt": ["Connector", "LatestVersionArn"]
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:aws:network-connector:aws-network-connector:NO_INGRESS"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/launch/*"
+                    },
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/archives/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DescribeStacks",
+                  "Resource": {
+                    "Ref": "AWS::StackId"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "TemplateVersion": {
+      "Value": "1"
+    },
+    "ProxyProtocolVersion": {
+      "Value": "1"
+    },
+    "RoleArn": {
+      "Value": {
+        "Fn::GetAtt": ["CustomerRole", "Arn"]
+      }
+    },
+    "Bucket": {
+      "Value": {
+        "Ref": "Artifacts"
+      }
+    },
+    "ImageArn": {
+      "Value": {
+        "Ref": "RuntimeImage"
+      }
+    },
+    "ImageVersion": {
+      "Value": {
+        "Fn::GetAtt": ["RuntimeImage", "LatestActiveImageVersion"]
+      }
+    },
+    "ConnectorArn": {
+      "Value": {
+        "Fn::GetAtt": ["Connector", "LatestVersionArn"]
+      }
+    },
+    "Vpc": {
+      "Value": {
+        "Ref": "Vpc"
+      }
+    },
+    "PrivateSubnet": {
+      "Value": {
+        "Ref": "PrivateSubnet"
+      }
+    },
+    "SandboxSecurityGroup": {
+      "Value": {
+        "Ref": "SandboxSecurityGroup"
+      }
+    }
+  }
+}

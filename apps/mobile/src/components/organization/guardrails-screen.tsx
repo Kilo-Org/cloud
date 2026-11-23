@@ -40,13 +40,22 @@ export function OrganizationGuardrailsScreen() {
   const query = useOrgGuardrails(organizationId, allowed && guardrailsAvailable);
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t(TITLE_KEY)} />;
+    // Only the transient membership read reserves the subtitle line: the
+    // header that replaces this boundary fills it with the organization's
+    // name, so the swap keeps the header's height. A settled boundary state
+    // (no membership, no selection, access denied, unavailable) never fills
+    // that line, so it keeps its own header height.
+    return <OrganizationBoundary title={t(TITLE_KEY)} reserveSubtitle={isResolving} />;
   }
 
   if (!allowed) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+        <ScreenHeader
+          title={t(TITLE_KEY)}
+          subtitle={org.organizationName}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <PermissionDenied
           description={t('organizationGuardrails.permissionDenied')}
           showBack={false}
@@ -58,7 +67,11 @@ export function OrganizationGuardrailsScreen() {
   if (membership.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+        <ScreenHeader
+          title={t(TITLE_KEY)}
+          subtitle={org.organizationName}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         {membership.isError ? (
           <QueryError
             className="bg-background"
@@ -79,7 +92,11 @@ export function OrganizationGuardrailsScreen() {
   if (!guardrailsAvailable) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+        <ScreenHeader
+          title={t(TITLE_KEY)}
+          subtitle={org.organizationName}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <EmptyState
           className="bg-background"
           icon={Lock}
@@ -104,7 +121,11 @@ export function OrganizationGuardrailsScreen() {
   if (query.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+        <ScreenHeader
+          title={t(TITLE_KEY)}
+          subtitle={org.organizationName}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
           <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
@@ -116,7 +137,11 @@ export function OrganizationGuardrailsScreen() {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+        <ScreenHeader
+          title={t(TITLE_KEY)}
+          subtitle={org.organizationName}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <QueryError
           className="bg-background"
           message={t('organizationGuardrails.loadError')}
@@ -129,7 +154,11 @@ export function OrganizationGuardrailsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
+      <ScreenHeader
+        title={t(TITLE_KEY)}
+        subtitle={org.organizationName}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
       <TabScreenScrollView
         automaticallyAdjustKeyboardInsets
         className="flex-1"

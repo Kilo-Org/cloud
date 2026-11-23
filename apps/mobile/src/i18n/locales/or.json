@@ -123,10 +123,10 @@
     "connectProvider": "ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ",
     "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
     "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
+    "couldNotLoad": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "couldNotLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldNotLoadOrganizations": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "couldnTLoad": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "couldnTLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "deviceSessions": "ଉପକରଣର ସେସନ୍",
     "disabled": "ବନ୍ଦ",
     "email": "ଇମେଲ୍",
@@ -493,7 +493,7 @@
       "download": "ଫାଇଲ୍ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
       "downloadFailed": "ରପ୍ତାନି ଡାଉନଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "unavailableTitle": "ଡାଟା ରପ୍ତାନି ଏପର୍ଯ୍ୟନ୍ତ ଉପଲବ୍ଧ ନାହିଁ",
-      "unavailableDescription": "ଡାଟା ରପ୍ତାନି ଧୀରେ ଧୀରେ ଆରମ୍ଭ କରାଯାଉଛି। ଶୀଘ୍ର ପୁଣି ଦେଖନ୍ତୁ।"
+      "unavailableDescription": "ଏହି ସୁବିଧା ଧୀରେ ଧୀରେ ଆରମ୍ଭ କରାଯାଉଛି। ଶୀଘ୍ର ପୁଣି ଦେଖନ୍ତୁ।"
     },
     "blockedPeople": {
       "title": "ଅବରୋଧିତ ଓ ନିଃଶବ୍ଦ କରାଯାଇଥିବା ଲୋକ",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ବିବରଣୀ ଉପଲବ୍ଧ ନାହିଁ।",
+      "detailsUnavailableDescription": "ଏହି ଆଇଟମ୍ ଆଉ ସେସନରେ ନାହିଁ।",
       "textDisplay": "ପାଠ୍ୟ ପ୍ରଦର୍ଶନ",
       "thinking": "ଭାବୁଛି",
       "thought": "ଚିନ୍ତନ",
@@ -2813,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ଗୋଟିଏ ସେସନ୍ ଭିତରେ ଆଉ ଏକ ସେସନ୍ ଖୋଲିବାର ସର୍ବାଧିକ ସ୍ତରରେ ପହଞ୍ଚିଛି।",
+      "maxNestingDepth": "ନେଷ୍ଟେଡ୍ ସେସନର ସର୍ବାଧିକ ଗଭୀରତାରେ ପହଞ୍ଚିଛି।",
       "modelAccessibility": "ମଡେଲ୍: {{modelLabel}}",
       "openHint": "ଉପଏଜେଣ୍ଟ ସେସନ୍ ଖୋଲନ୍ତୁ",
       "subagent": "ଉପଏଜେଣ୍ଟ",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "ପ୍ରସଙ୍ଗ ୱିଣ୍ଡୋର ଆକାର ଉପଲବ୍ଧ ନାହିଁ",
       "tapToViewDetails": " ପ୍ରସଙ୍ଗ ବିବରଣୀ ଦେଖିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
       "costClause": ", ଖର୍ଚ୍ଚ {{cost}}",
-      "loadingCostSpoken": "ଖର୍ଚ୍ଚ {{cost}}।",
+      "loadingCostSpoken": "ଏପର୍ଯ୍ୟନ୍ତ ଖର୍ଚ୍ଚ {{cost}}।",
       "tokensWindowUnavailable": "ପ୍ରସଙ୍ଗରେ {{used}} ଟୋକନ୍, ୱିଣ୍ଡୋର ଆକାର ଉପଲବ୍ଧ ନାହିଁ{{costClause}}।",
       "tokensUsage": "ପ୍ରସଙ୍ଗରେ {{window}} ଟୋକନ୍ ମଧ୍ୟରୁ {{used}} ବ୍ୟବହୃତ, {{percentage}} ବ୍ୟବହାର ହୋଇଛି{{costClause}}।",
       "title": "ପ୍ରସଙ୍ଗ ବ୍ୟବହାର",
@@ -3772,7 +3773,6 @@
       "usageDetails": "ବ୍ୟବହାର ବିବରଣୀ",
       "providersAndModels": "ପ୍ରୋଭାଇଡର୍ ଏବଂ ମଡେଲ୍",
       "groups": "ଗ୍ରୁପ୍",
-      "guardrails": "ଗାର୍ଡରେଲ୍",
       "byok": "ନିଜର କି ଆଣନ୍ତୁ",
       "ssoAndDomain": "SSO ଏବଂ ଡୋମେନ୍",
       "dataCollection": "ଡାଟା ସଂଗ୍ରହ",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
       "appStoreReceipt": "App Storeରୁ ରସିଦ",
+      "deduction": {
+        "adminCancel": "ପ୍ରଶାସକ ଦ୍ୱାରା ବନ୍ଦ ହୋଇଥିବା ବ୍ୟାଲାନ୍ସ",
+        "adminDebit": "ପ୍ରଶାସକ ଦ୍ୱାରା ହଟାଯାଇଥିବା କ୍ରେଡିଟ୍",
+        "codingPlan": "କୋଡିଂ ପ୍ଲାନ୍: {{plan}}",
+        "correction": "ବ୍ୟାଲାନ୍ସ ସମାୟୋଜନ",
+        "dispute": "ଦେୟ ବିବାଦ",
+        "refundAppStore": "App Storeରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ",
+        "refundGooglePlay": "Google Playରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ"
+      },
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "ଏହି ସାରାଂଶ ପାଇଁ ଖର୍ଚ୍ଚ ସୁରକ୍ଷା ସୀମା ବଢ଼ାନ୍ତୁ।",
     "saved": "ରିପୋର୍ଟ ସେଟିଂସ ସଂରକ୍ଷିତ ହୋଇଛି",
     "selectedSessions": "ଚୟନିତ ସେସନ୍‌ଗୁଡ଼ିକ",
-    "snapshotPullRequests": "ଚୟନିତ ସେସନ୍‌ରେ PRs",
-    "snapshotBlockers": "ଚୟନିତ ସେସନ୍‌ରେ ବାଧା",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "ବାଧା",
     "capturedAt": "{{time}}ରେ ସଂରକ୍ଷିତ",
     "snapshotHint": "ନିର୍ଦ୍ଧାରିତ ସକାଳ ସମୟରେ ଉପଲବ୍ଧ ସେସନ୍‌ର ସର୍ବଶେଷ ସ୍ଥିତିକୁ ଯଥାସମ୍ଭବ ସଂଗ୍ରହ କରି ସଂରକ୍ଷିତ ସ୍ନାପସଟ୍। ସଂଖ୍ୟାଗୁଡ଼ିକ ଚୟନିତ ସେସନ୍‌କୁ ଦର୍ଶାଏ, ରାତିସାରାର ସମ୍ପୂର୍ଣ୍ଣ କାର୍ଯ୍ୟକଳାପକୁ ନୁହେଁ।",
     "snapshotTruncated": "ଏହି ସ୍ନାପସଟ୍‌କୁ ସୀମିତ ରଖିବା ପାଇଁ କିଛି ସେସନ୍ କିମ୍ବା ପ୍ରମାଣ ବାଦ ଦିଆଯାଇଛି।",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "ବ୍ୟବହାର",
+    "personalTitle": "ବ୍ୟକ୍ତିଗତ ବ୍ୟବହାର",
     "orgTitle": "ସଂସ୍ଥାର ବ୍ୟବହାର",
     "entrySubtitle": "ଖର୍ଚ୍ଚ, ଅନୁରୋଧ ଓ ଟୋକନ୍",
     "rangePicker": "ସମୟ ପରିସର",

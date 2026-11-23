@@ -182,6 +182,8 @@ Workflow issuance reads the existing primary user pepper, including explicit `nu
 
 The gateway credential issued for a queued workflow is limited to one hour, and it carries the caller's organization, in both issuance modes. A requested lifetime that is not positive is rejected in both modes. Its compatibility shape omits the audience for receivers that require that shape.
 
+The Cloud Agent workflow credential applies the same one-hour lifetime bound and the same non-positive-lifetime refusal in both issuance modes. Its compatibility shape also omits the audience for receivers that require that shape.
+
 Discord session operations use `generateCloudAgentWorkflowToken` for the installation's
 acting user, with the installation's organization scope and a one-hour lifetime.
 The shared Cloud Agent rollout flags select the credential format. Model calls retain

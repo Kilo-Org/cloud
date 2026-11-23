@@ -123,10 +123,10 @@
     "connectProvider": "Свържи доставчик",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
+    "couldNotLoad": "Не успяхме да заредим.",
+    "couldNotLoadMore": "Не успяхме да заредим още резултати.",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
     "couldNotLoadSessions": "Сесиите не се заредиха.",
-    "couldnTLoad": "Не успяхме да заредим.",
-    "couldnTLoadMore": "Не успяхме да заредим още резултати.",
     "deviceSessions": "Сесии на устройства",
     "disabled": "Изключено",
     "email": "Имейл",
@@ -493,7 +493,7 @@
       "download": "Изтегли файла",
       "downloadFailed": "Не успяхме да изтеглим експорта. Провери връзката си и опитай отново.",
       "unavailableTitle": "Експортирането на данни още не е налично",
-      "unavailableDescription": "Експортирането на данни се въвежда постепенно. Провери отново скоро."
+      "unavailableDescription": "Функцията се въвежда постепенно. Провери отново скоро."
     },
     "blockedPeople": {
       "title": "Блокирани и заглушени хора",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Подробностите са недостъпни.",
+      "detailsUnavailableDescription": "Този елемент вече не е в сесията.",
       "textDisplay": "Преглед на текста",
       "thinking": "Разсъждава",
       "thought": "Разсъждения",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Неизвестен размер на контекстния прозорец",
       "tapToViewDetails": " Докосни, за да видиш подробностите за контекста.",
       "costClause": ", разход {{cost}}",
-      "loadingCostSpoken": "разход {{cost}}.",
+      "loadingCostSpoken": "разход досега {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токена, размерът на прозореца е неизвестен{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}{{costClause}}.",
       "title": "Използване на контекста",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Подробности за използването",
       "providersAndModels": "Доставчици и модели",
       "groups": "Групи",
-      "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
       "ssoAndDomain": "SSO и домейн",
       "dataCollection": "Събиране на данни",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Неуспешно зареждане на кредитната активност.",
       "appStoreReceipt": "Разписка от App Store",
+      "deduction": {
+        "adminCancel": "Балансът е закрит от администратор",
+        "adminDebit": "Кредити, премахнати от администратор",
+        "codingPlan": "План за програмиране: {{plan}}",
+        "correction": "Корекция на баланса",
+        "dispute": "Спор за плащане",
+        "refundAppStore": "Възстановяване на пакет кредити от App Store",
+        "refundGooglePlay": "Възстановяване на пакет кредити от Google Play"
+      },
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
       "emptyTitle": "Няма история на кредитите",
@@ -4921,8 +4930,8 @@
     "estimatePermissionUnavailable": "Нямаш разрешение да използваш баланса на този контекст. Поискай от собственик на организацията да го активира.",
     "saved": "Настройките на брифинга са запазени",
     "selectedSessions": "Избрани сесии",
-    "snapshotPullRequests": "PR-и в избраните сесии",
-    "snapshotBlockers": "Блокери в избраните сесии",
+    "snapshotPullRequests": "PR-и",
+    "snapshotBlockers": "Блокери",
     "capturedAt": "Запазена {{time}}",
     "snapshotHint": "Моментна снимка на последното налично състояние на сесиите, запазена в планирания сутрешен час. Възможни са пропуски. Показаните бройки се отнасят за избраните сесии, а не за цялата активност през нощта.",
     "snapshotTruncated": "Някои сесии или доказателства са пропуснати, за да се ограничи размерът на тази моментна снимка.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Потребление",
+    "personalTitle": "Потребление на личния акаунт",
     "orgTitle": "Потребление на организацията",
     "entrySubtitle": "Разходи, заявки и токени",
     "rangePicker": "Период",

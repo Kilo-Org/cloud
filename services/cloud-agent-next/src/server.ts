@@ -100,7 +100,11 @@ import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { containersBillingIdentity } from './container-usage-context.js';
 import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
-import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import {
+  isVercelEgressPath,
+  loggableRequestPath,
+  registerVercelEgressRoute,
+} from './egress/vercel-egress-route.js';
 import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
@@ -256,7 +260,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
     const url = new URL(c.req.url);
-    logger.setTags({ method: c.req.method, path: url.pathname });
+    logger.setTags({ method: c.req.method, path: loggableRequestPath(url.pathname) });
     await next();
   });
 });
@@ -271,6 +275,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   if (!facadeBase) return next();
   const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
   const requestPath = new URL(c.req.url).pathname;
+  // A forwarded sandbox request belongs to the egress route, whatever its Authorization holds.
+  if (isVercelEgressPath(requestPath)) return next();
   const path = facadePath
     ? requestPath.startsWith(`${facadePath}/`)
       ? requestPath.slice(facadePath.length)
@@ -290,7 +296,7 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
 
-registerVercelScmBrokerRoute(app);
+registerVercelEgressRoute(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({

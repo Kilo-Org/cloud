@@ -62,6 +62,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The vanished body is its own component with its own suite; here it is a
+// sentinel so the sheet's branch is what the assertions read.
+vi.mock('./vanished-part-state', () => ({ VanishedPartState: 'VanishedPartState' }));
 vi.mock('./tool-card-image-cache', () => ({
   isToolCardImagePending: () => false,
   useToolCardImageUri: () => undefined,
@@ -586,17 +589,17 @@ describe('PartDetailSheet mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows no control for reasoning parts or null parts', async () => {
+  it('shows no control for reasoning parts or vanished parts', async () => {
     const reasoning = await mountSheet(makeReasoningPart('r1', 'working through it'));
     expect(radiogroup(reasoning.root)).toBeUndefined();
     await unmount(reasoning);
 
     const nullPart = await mountSheet(null);
     expect(radiogroup(nullPart.root)).toBeUndefined();
-    const unavailable = findByType(nullPart.root, 'Text').filter(
-      node => propOf(node, 'children') === 'Details unavailable'
-    );
-    expect(unavailable).toHaveLength(1);
+    // The state block is the whole body, so it is not nested in a second
+    // CenteredState of the sheet's own.
+    expect(findByType(nullPart.root, 'VanishedPartState')).toHaveLength(1);
+    expect(findByType(nullPart.root, 'CenteredState')).toHaveLength(0);
     await unmount(nullPart);
   });
 

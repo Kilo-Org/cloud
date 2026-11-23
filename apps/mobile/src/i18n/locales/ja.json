@@ -20,7 +20,6 @@
     "commandStatus": "コマンドの配信：{{status}}",
     "delivered": "配信済み",
     "expired": "期限切れ",
-    "recoveryGaps_one": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。",
     "recoveryGaps_other": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。"
   },
   "common": {
@@ -123,10 +122,10 @@
     "connectProvider": "プロバイダーを接続",
     "contentTruncated": "内容の一部を省略しています",
     "copyLink": "リンクをコピー",
+    "couldNotLoad": "読み込めませんでした。",
+    "couldNotLoadMore": "続きを読み込めませんでした。",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
-    "couldnTLoad": "読み込めませんでした。",
-    "couldnTLoadMore": "続きを読み込めませんでした。",
     "deviceSessions": "デバイスのセッション",
     "disabled": "無効",
     "email": "メールアドレス",
@@ -493,7 +492,7 @@
       "download": "ファイルをダウンロード",
       "downloadFailed": "エクスポートをダウンロードできませんでした。接続を確認して、もう一度お試しください。",
       "unavailableTitle": "データのエクスポートはまだ利用できません",
-      "unavailableDescription": "データのエクスポートは段階的に提供中です。しばらくしてから再度ご確認ください。"
+      "unavailableDescription": "段階的に提供中です。しばらくしてから再度ご確認ください。"
     },
     "blockedPeople": {
       "title": "ブロック・ミュートしたユーザー",
@@ -665,7 +664,6 @@
       "emptyTitle": "通知はまだありません",
       "emptyCategoryTitle": "このカテゴリの通知はありません",
       "emptyBody": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
-      "emptyBody_one": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
       "emptyBody_other": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
       "capped": "最新の通知を表示しています。",
       "loadError": "通知履歴を読み込めませんでした。",
@@ -955,7 +953,6 @@
     "overview": {
       "allAreas": "すべての領域",
       "nSelected": "{{displayCount}}件選択中",
-      "nSelected_one": "{{displayCount}}件選択中",
       "nSelected_other": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "set": "設定済み",
@@ -1034,7 +1031,6 @@
       "couldNotLoad": "分析を読み込めませんでした",
       "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
       "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
-      "trackedReviewsUncounted_one": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
       "trackedReviewsUncounted_other": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。"
     },
     "council": {
@@ -1126,7 +1122,6 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
-      "whereFound_one": "検出場所（{{displayCount}}）",
       "whereFound_other": "検出場所（{{displayCount}}）",
       "yes": "はい",
       "action": {
@@ -1155,7 +1150,6 @@
       "eventReason": "理由：{{reason}}",
       "eventSeverityChange": "$t(securityAgent.filter.severity)：{{previous}} → {{next}}",
       "eventStatusChange": "$t(common.status)：{{previous}} → {{next}}",
-      "eventsCount_one": "{{displayCount}}件のイベント",
       "eventsCount_other": "{{displayCount}}件のイベント",
       "generated": "{{generatedAt}}に生成しました。",
       "noActivity": "記録されたアクティビティはありません",
@@ -1164,7 +1158,6 @@
       "repositoryNotRecorded": "リポジトリの記録なし",
       "reasonUnknown": "認識されない理由",
       "severityCount": "{{displayCount}}件{{label}}",
-      "severityCount_one": "{{displayCount}}件{{label}}",
       "severityCount_other": "{{displayCount}}件{{label}}",
       "summary": "レポートの概要",
       "title": "監査レポート",
@@ -1215,14 +1208,14 @@
       "minimumSeverity": "重大度の下限",
       "queued": "既存の検出事項{{displayCount}}件を分析の順番待ちに追加しました。",
       "queued_other": "既存の検出事項{{displayCount}}件を分析の順番待ちに追加しました。",
-      "queued_one": "{{displayCount}}件の既存の検出結果を分析キューに追加しました。",
       "requireApproval": "自動修復の前に承認を必須にする",
       "requireApprovalSubtitle": "自動修復では、承認を得てからPRを作成します。",
       "severityAll": "すべての重大度",
       "severityCriticalOnly": "重大のみ",
       "severityHighAndAbove": "高以上",
       "severityMediumAndAbove": "中以上",
-      "title": "自動化"
+      "title": "自動化",
+      "queued_one": "{{displayCount}}件の既存の検出結果を分析キューに追加しました。"
     },
     "dashboard": {
       "actFirst": "優先対応",
@@ -1250,13 +1243,10 @@
       "refreshFailed": "更新できませんでした。最後に同期したデータを表示しています。",
       "repoSummary": "{{open}}・{{critical}}・{{high}}",
       "repoSummaryOpen": "未解決{{displayCount}}件",
-      "repoSummaryOpen_one": "未解決{{displayCount}}件",
       "repoSummaryOpen_other": "未解決{{displayCount}}件",
       "repoSummaryCritical": "重大{{displayCount}}件",
-      "repoSummaryCritical_one": "重大{{displayCount}}件",
       "repoSummaryCritical_other": "重大{{displayCount}}件",
       "repoSummaryHigh": "高{{displayCount}}件",
-      "repoSummaryHigh_one": "高{{displayCount}}件",
       "repoSummaryHigh_other": "高{{displayCount}}件",
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
@@ -1264,9 +1254,7 @@
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",
-      "daysOverdue_one": "{{displayCount}}日超過",
       "daysOverdue_other": "{{displayCount}}日超過",
-      "findingsCount_one": "検出結果{{displayCount}}件",
       "findingsCount_other": "検出結果{{displayCount}}件"
     },
     "dashboardMetrics": {
@@ -1281,17 +1269,13 @@
       "deadlinePassedDetail": "{{critical}}、{{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}、{{high}}、{{mediumLow}}",
       "breakdownCritical": "重大：{{displayCount}}件",
-      "breakdownCritical_one": "重大：{{displayCount}}件",
       "breakdownCritical_other": "重大：{{displayCount}}件",
       "breakdownHigh": "高：{{displayCount}}件",
-      "breakdownHigh_one": "高：{{displayCount}}件",
       "breakdownHigh_other": "高：{{displayCount}}件",
       "breakdownMediumLow": "中・低：{{displayCount}}件",
-      "breakdownMediumLow_one": "中・低：{{displayCount}}件",
       "breakdownMediumLow_other": "中・低：{{displayCount}}件",
       "dueThisWeek": "今週が期限",
       "dueThisWeekDetail": "このうち{{exploitable}}件が悪用可能と確認済み",
-      "dueThisWeekDetail_one": "このうち{{exploitable}}件が悪用可能と確認済み",
       "dueThisWeekDetail_other": "このうち{{exploitable}}件が悪用可能と確認済み",
       "noDeadline": "期限なし",
       "reviewSlaAssignment": "SLA期限の設定を確認",
@@ -1433,8 +1417,7 @@
       "notificationsCount": "2件中{{displayCount}}件が有効",
       "on": "オン",
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
-      "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
-      "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中"
+      "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中"
     },
     "settingsSave": {
       "saveChanges": "変更を保存",
@@ -1530,9 +1513,7 @@
       "dueTomorrow": "明日が期限",
       "dueInDays_other": "期限まで{{count}}日",
       "overdue": "{{count}}日超過",
-      "overdue_one": "{{count}}日超過",
-      "dueInDays": "期限まで{{count}}日",
-      "dueInDays_one": "期限まで{{count}}日"
+      "dueInDays": "期限まで{{count}}日"
     },
     "remediationStatus": {
       "notStarted": "未開始",
@@ -1614,7 +1595,6 @@
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
       "pastSessions": "過去のセッション",
-      "sectionAccessibility_one": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
@@ -1634,10 +1614,8 @@
       "sessionDeleted": "セッションを削除しました",
       "needsInput": "入力が必要",
       "fromPlatform": "{{platform}}から",
-      "cent_one": "セント",
       "cent": "セント",
       "cent_other": "セント",
-      "dollar_one": "ドル",
       "dollar": "ドル",
       "dollar_other": "ドル",
       "costSpoken": "コスト {{cost}}",
@@ -1927,7 +1905,6 @@
       "snapshotCaptured": "{{when}}にワークスペースのスナップショットを取得"
     },
     "partRenderer": {
-      "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
       "updatedFileCount": "{{displayCount}}件のファイルを更新しました。",
       "updatedFileCount_other": "{{displayCount}}件のファイルを更新しました。"
     },
@@ -1966,11 +1943,8 @@
       "linesBadge": "{{displayCount}}行",
       "filesBadge": "{{displayCount}}ファイル",
       "matchesBadge": "{{displayCount}}件",
-      "filesBadge_one": "{{displayCount}}ファイル",
       "filesBadge_other": "{{displayCount}}ファイル",
-      "linesBadge_one": "{{displayCount}}行",
       "linesBadge_other": "{{displayCount}}行",
-      "matchesBadge_one": "{{displayCount}}件",
       "matchesBadge_other": "{{displayCount}}件",
       "noOutput": "出力はありません。",
       "translationFailed": "翻訳に失敗しました"
@@ -2056,6 +2030,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "詳細を表示できません。",
+      "detailsUnavailableDescription": "この項目はセッションに含まれなくなりました。",
       "textDisplay": "テキスト表示",
       "thinking": "思考中",
       "thought": "思考",
@@ -2286,12 +2261,12 @@
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",
       "retryHint": "このセッションの以前のメッセージの読み込みを再試行します。",
-      "omitted_one": "このセッションの以前の項目の一部を表示できませんでした。",
       "omitted": "このセッションの以前の項目{{displayCount}}件を表示できませんでした。",
       "omitted_other": "このセッションの以前の項目{{displayCount}}件を表示できませんでした。",
       "couldNotLoad": "以前のメッセージを読み込めませんでした。",
       "unavailable": "以前のメッセージは利用できません。",
-      "tooLarge": "以前のメッセージはデータ量が多すぎて読み込めません。"
+      "tooLarge": "以前のメッセージはデータ量が多すぎて読み込めません。",
+      "omitted_one": "このセッションの以前の項目の一部を表示できませんでした。"
     },
     "sessionFilter": {
       "title": "セッションの絞り込み",
@@ -2349,9 +2324,7 @@
       "couldNotOpenPhotoPicker": "写真の選択画面を開けませんでした。Kiloを再起動して、もう一度お試しください。",
       "maxFilesAllowed": "添付できるファイルは最大{{displayCount}}件です。",
       "onlyAddingFiles": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）",
-      "maxFilesAllowed_one": "添付できるファイルは最大{{displayCount}}件です。",
       "maxFilesAllowed_other": "添付できるファイルは最大{{displayCount}}件です。",
-      "onlyAddingFiles_one": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）",
       "onlyAddingFiles_other": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）"
     },
     "composer": {
@@ -2376,7 +2349,6 @@
       "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
       "charactersRemaining": "残り{{count}}文字",
       "insertNewline": "改行を挿入",
-      "charactersRemaining_one": "残り{{count}}文字",
       "charactersRemaining_other": "残り{{count}}文字"
     },
     "chatLink": {
@@ -2432,7 +2404,7 @@
       "windowUnavailable": "コンテキストウィンドウのサイズは不明",
       "tapToViewDetails": "タップするとコンテキストの詳細を表示します。",
       "costClause": "、コスト {{cost}}",
-      "loadingCostSpoken": "コスト {{cost}}。",
+      "loadingCostSpoken": "これまでのコスト {{cost}}。",
       "tokensWindowUnavailable": "コンテキストは{{used}}トークン使用、ウィンドウのサイズは不明{{costClause}}。",
       "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用{{costClause}}。",
       "title": "コンテキスト使用量",
@@ -2452,13 +2424,10 @@
       "ofWindowTokens": "／{{window}}トークン",
       "tokens": "トークン",
       "tokens_other": "トークン",
-      "tokens_one": "トークン",
       "tokensWithPercentage": "トークン（{{percentage}}）",
-      "stepsCount_one": "{{steps}}ステップ",
       "stepsCount": "{{steps}}ステップ",
       "stepsCount_other": "{{steps}}ステップ",
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}",
-      "modelsCount_one": "モデル（{{displayCount}}）",
       "modelsCount_other": "モデル（{{displayCount}}）"
     },
     "sessionChanges": {
@@ -2532,7 +2501,6 @@
     "toolRun": {
       "sheetTitle": "ツール呼び出し",
       "condensedLabel": "{{itemCount}}件の項目; {{last}}",
-      "condensedLabel_one": "{{itemCount}}件の項目; {{last}}",
       "condensedLabel_other": "{{itemCount}}件の項目; {{last}}"
     }
   },
@@ -2671,7 +2639,6 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "最近のセッションを検索",
     "connectedCli": "接続中のCLI",
-    "connectedCliAccessibility_one": "{{title}}：{{displayCount}} 件のインスタンス",
     "connectedCliAccessibility_other": "{{title}}：{{displayCount}} 件のインスタンス",
     "connectedCliAccessibility": "{{title}}：{{displayCount}} 件のインスタンス",
     "newSessionOn": "{{name}}の新しいセッション",
@@ -2687,7 +2654,6 @@
     "cliCantReceiveFilesMessage": "このセッションを実行しているKilo CLIはファイルを受信できません。そのマシンでCLIを更新するか、新しいセッションに共有してください。",
     "contentlessMessage": "共有するテキストやファイルがありません。",
     "couldNotReadContent": "共有コンテンツを読み取れませんでした。",
-    "onlyFirstFilesAttached_one": "最初の{{displayCount}}件のファイルのみが添付されます。",
     "onlyFirstFilesAttached_other": "最初の{{displayCount}}件のファイルのみが添付されます。"
   },
   "kiloPass": {
@@ -2852,23 +2818,19 @@
     "checkConnection": "接続を確認",
     "checks": {
       "checksCount": "{{displayCount}}件のチェック",
-      "checksCount_one": "{{displayCount}}件のチェック",
       "checksCount_other": "{{displayCount}}件のチェック",
       "couldNotLoad": "チェックを読み込めませんでした。",
       "failed": "{{displayCount}}件失敗",
-      "failed_one": "{{displayCount}}件失敗",
       "failed_other": "{{displayCount}}件失敗",
       "noAccess": "このリポジトリのチェックにアクセスできません。",
       "noChecksReported": "チェックは報告されていません",
       "notAvailable": "チェックの情報はまだ表示できません。マージ元ブランチの先頭コミットが未処理か、マージ元リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
       "openDetails": "{{name}}の詳細を開く",
       "passed": "{{displayCount}}件成功",
-      "passed_one": "{{displayCount}}件成功",
       "passed_other": "{{displayCount}}件成功",
       "pending": "{{displayCount}}件待機中",
       "retryChecks": "チェックを再試行",
       "skipped": "{{displayCount}}件スキップ",
-      "skipped_one": "{{displayCount}}件スキップ",
       "skipped_other": "{{displayCount}}件スキップ",
       "title": "チェック",
       "checkDetails": "チェックの詳細"
@@ -2934,7 +2896,6 @@
       "comment_other": "{{displayCount}}件のコメント",
       "conversationTruncated": "最初の{{displayCount}}件のコメントのみを表示しています。",
       "conversationTruncated_other": "最初の{{displayCount}}件のコメントのみを表示しています。",
-      "conversationTruncated_one": "最初の{{displayCount}}件のコメントのみを表示しています。",
       "couldNotLoad": "ディスカッションを読み込めませんでした。",
       "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
       "loadMoreComments": "さらにコメントを読み込む",
@@ -2962,13 +2923,11 @@
       "mutedUser": "{{login}}をミュートしました",
       "noDiscussion": "まだディスカッションはありません",
       "noDiscussionDescription": "このプルリクエストには、レビュースレッドもコメントもまだありません。",
-      "comment_one": "1件のコメント",
       "outdated": "古い内容",
       "quotedDiffSnippet": "引用した差分の一部",
       "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",
       "reaction": "リアクション",
       "reaction_other": "リアクション",
-      "reaction_one": "件",
       "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
       "replyBody": "返信の本文",
       "replyForbidden": "このプルリクエストに返信する権限がありません。",
@@ -3027,7 +2986,6 @@
       },
       "deletedUser": "削除されたユーザー",
       "replyForbiddenTerm": "この{{term}}に返信する権限がありません。",
-      "moreLinesAbove_one": "… この上にさらに{{displayCount}}行あります。",
       "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。",
       "deleteComment": "コメントを削除",
       "deleteCommentTitle": "コメントを削除しますか?",
@@ -3035,7 +2993,9 @@
       "commentEditFailed": "コメントを保存できませんでした。接続を確認して、もう一度お試しください。",
       "commentEditUnavailable": "このコメントは編集できません。削除された可能性があります。",
       "commentDeleteFailed": "コメントを削除できませんでした。接続を確認して、もう一度お試しください。",
-      "commentDeleteUnavailable": "このコメントは削除できません。"
+      "commentDeleteUnavailable": "このコメントは削除できません。",
+      "comment_one": "1件のコメント",
+      "reaction_one": "件"
     },
     "entry": {
       "noRecentPrs": "最近のレビューはありません",
@@ -3079,10 +3039,8 @@
       "retryLoadingMoreFiles": "追加のファイルの読み込みを再試行",
       "title": "ファイル",
       "viewedCount": "{{total}}件中{{viewed}}件を確認済み",
-      "viewedCount_one": "{{total}}件中{{viewed}}件を確認済み",
       "viewedCount_other": "{{total}}件中{{viewed}}件を確認済み",
       "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み",
-      "viewedOfListed_one": "表示中の{{total}}件中{{viewed}}件を確認済み",
       "viewedOfListed_other": "表示中の{{total}}件中{{viewed}}件を確認済み"
     },
     "fileRows": {
@@ -3115,8 +3073,6 @@
       "expandMoreLines": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
       "failedToLoadContext": "前後の行を読み込めませんでした。タップして再試行",
       "failedToLoadMoreFiles": "追加のファイルを読み込めませんでした。タップして再試行",
-      "fileLoadedCount_one": "{{displayCount}}件のファイルを読み込み済み",
-      "fileLoadedOfTotalCount_one": "{{total}}件中{{displayCount}}件のファイルを読み込み済み",
       "fileLoadedCount": "ファイル{{displayCount}}件を読み込み済み",
       "fileLoadedCount_other": "ファイル{{displayCount}}件を読み込み済み",
       "fileLoadedOfTotalCount": "全{{total}}件中{{displayCount}}件のファイルを読み込み済み",
@@ -3135,16 +3091,13 @@
       "loadingMoreFiles": "追加のファイルを読み込み中…",
       "retryLoadingContext": "前後の行の読み込みを再試行",
       "retryLoadingNextPage": "次のページの読み込みを再試行",
-      "expandAllLines_one": "全{{displayCount}}行を展開",
       "expandAllLines_other": "全{{displayCount}}行を展開",
-      "expandLines_one": "{{displayCount}}行を展開（{{start}}–{{end}}）",
       "expandLines_other": "{{displayCount}}行を展開（{{start}}–{{end}}）",
-      "expandLinesOfContext_one": "前後の{{displayCount}}行を展開",
       "expandLinesOfContext_other": "前後の{{displayCount}}行を展開",
-      "expandMoreLines_one": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
       "expandMoreLines_other": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
-      "loadedOfTotalFiles_one": "{{total}}件中{{loaded}}件のファイルを読み込み済み",
-      "loadedOfTotalFiles_other": "{{total}}件中{{loaded}}件のファイルを読み込み済み"
+      "loadedOfTotalFiles_other": "{{total}}件中{{loaded}}件のファイルを読み込み済み",
+      "fileLoadedCount_one": "{{displayCount}}件のファイルを読み込み済み",
+      "fileLoadedOfTotalCount_one": "{{total}}件中{{displayCount}}件のファイルを読み込み済み"
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした。",
@@ -3227,7 +3180,6 @@
       },
       "restrictions": {
         "title": "マージの制限",
-        "approvalsRequired_one": "{{displayCount}}件の承認が必要",
         "approvalsRequired_other": "{{displayCount}}件の承認が必要",
         "pipelineMustSucceed": "マージする前にパイプラインが成功する必要があります。"
       },
@@ -3254,10 +3206,8 @@
     "overview": {
       "commit": "コミット",
       "commit_other": "コミット",
-      "commit_one": "コミット",
       "file": "ファイル",
       "file_other": "ファイル",
-      "file_one": "ファイル",
       "stateMerged": "マージ済み",
       "stateOpen": "オープン",
       "stateOpenApproved": "オープン · 承認済み",
@@ -3320,16 +3270,12 @@
       "loadFailedTitle": "レビューの送信画面を読み込めませんでした。",
       "pendingComment": "未送信のコメント",
       "pendingComment_other": "未送信のコメント",
-      "pendingComment_one": "未送信のコメント",
       "summaryOptional": "総評（任意）",
       "partialPostedFresh": "{{displayFreshCount}}件のコメントを投稿しました。",
-      "partialPostedFresh_one": "{{displayFreshCount}}件のコメントを投稿しました。",
       "partialPostedFresh_other": "{{displayFreshCount}}件のコメントを投稿しました。",
       "partialPostedStale": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
-      "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
-      "submitCountOfTotal_one": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitCountOfTotal_other": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
@@ -3345,9 +3291,9 @@
       "discussion": "ディスカッション",
       "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
       "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
-      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
-      "overview": "概要"
+      "overview": "概要",
+      "discussionAccessibility_one": "{{title}}：1件のコメント"
     },
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
@@ -3357,7 +3303,6 @@
       "lineLabel": "{{status}}、{{line}}行目：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
       "emptyLine": "（空）",
-      "truncationBanner_one": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。",
       "truncationBanner_other": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
@@ -3495,10 +3440,8 @@
         "groupIdentity": "グループ「{{name}}」",
         "groupMembers": "グループ「{{name}}」：{{members}}",
         "groupMemberGroups": "{{displayCount}}個のグループ",
-        "groupMemberGroups_one": "{{displayCount}}個のグループ",
         "groupMemberGroups_other": "{{displayCount}}個のグループ",
         "groupMemberGroupsOf": "{{email}}：{{displayCount}}個のグループ",
-        "groupMemberGroupsOf_one": "{{email}}：{{displayCount}}個のグループ",
         "groupMemberGroupsOf_other": "{{email}}：{{displayCount}}個のグループ",
         "groupPolicySet": "グループ「{{name}}」：{{policy}}ポリシーを設定",
         "groupPolicyRemoved": "グループ「{{name}}」：{{policy}}ポリシーを削除",
@@ -3520,17 +3463,14 @@
         "fundsPurchased": "{{method}}で{{amount}}",
         "fundsGranted": "{{amount}}",
         "fundsDistributed": "{{displayCount}}つの子組織に{{amount}}",
-        "fundsDistributed_one": "{{displayCount}}つの子組織に{{amount}}",
         "fundsDistributed_other": "{{displayCount}}つの子組織に{{amount}}",
         "fundsReceived": "{{parent}}から{{amount}}",
         "reviewAgentPlatform": "{{platform}}",
         "reviewAgentConfig": "{{platform}}設定",
         "reviewAgentConfigStyle": "{{platform}}：スタイル{{style}}",
         "reviewAgentSecretsUpdated": "更新{{displayCount}}件",
-        "reviewAgentSecretsUpdated_one": "更新{{displayCount}}件",
         "reviewAgentSecretsUpdated_other": "更新{{displayCount}}件",
         "reviewAgentSecretsFailed": "エラー{{displayCount}}件",
-        "reviewAgentSecretsFailed_one": "エラー{{displayCount}}件",
         "reviewAgentSecretsFailed_other": "エラー{{displayCount}}件",
         "reviewAgentSecretRotated": "{{values}}",
         "settingAdvancedPolicies": "{{values}}",
@@ -3776,7 +3716,6 @@
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
-      "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
       "ssoAndDomain": "SSOとドメイン",
       "dataCollection": "データ収集",
@@ -3843,7 +3782,6 @@
       "emptyTitle": "グループはまだありません",
       "enterpriseOnly": "グループは Enterprise プランで利用できます。",
       "memberCount": "メンバー{{displayCount}}人",
-      "memberCount_one": "メンバー{{displayCount}}人",
       "memberCount_other": "メンバー{{displayCount}}人",
       "memberViewEmpty": "この組織のどのグループにも所属していません。",
       "memberViewTitle": "自分のグループ",
@@ -3865,7 +3803,6 @@
       "ended": "終了済み",
       "notSubscribed": "未契約",
       "overallocated": "パスの割り当てが有料シート数を超えています",
-      "paidSeat_one": "有料シート{{displayCount}}席",
       "paidSeat": "有料シート{{displayCount}}席",
       "paidSeat_other": "有料シート{{displayCount}}席",
       "paymentNeedsAttention": "支払いへの対応が必要",
@@ -3974,23 +3911,15 @@
     "answerNeeded": "回答が必要",
     "waitingToRetry": "再試行待ち",
     "countNoun": {
-      "needsInput_one": "入力が必要",
       "needsInput_other": "入力が必要",
-      "running_one": "作業中",
       "running_other": "作業中",
-      "scheduled_one": "予定",
       "scheduled_other": "予定",
-      "idle_one": "待機中",
       "idle_other": "待機中"
     },
     "count": {
-      "needsInput_one": "{{displayCount}} 入力が必要",
       "needsInput_other": "{{displayCount}} 入力が必要",
-      "running_one": "{{displayCount}} 作業中",
       "running_other": "{{displayCount}} 作業中",
-      "scheduled_one": "{{displayCount}} 予定",
       "scheduled_other": "{{displayCount}} 予定",
-      "idle_one": "{{displayCount}} 待機中",
       "idle_other": "{{displayCount}} 待機中"
     },
     "footer": {
@@ -4131,7 +4060,6 @@
       "settingsToolsOn": "オン — 設定ツールがモデルに送信されます",
       "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
       "serverChecking": "このサーバーを確認しています…",
-      "serverToolCount_one": "{{count}} 個のツール",
       "serverToolCount_other": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです",
@@ -4417,16 +4345,11 @@
     "emptyDescription": "プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。",
     "loadFailed": "プロフィールを読み込めませんでした",
     "counts": {
-      "vars_one": "変数 {{count}} 件",
       "vars_other": "変数 {{count}} 件",
       "mcp": "MCP {{count}} 件",
-      "skills_one": "スキル {{count}} 件",
       "skills_other": "スキル {{count}} 件",
-      "commands_one": "コマンド {{count}} 件",
       "commands_other": "コマンド {{count}} 件",
-      "setupCommands_one": "セットアップコマンド {{count}} 件",
       "setupCommands_other": "セットアップコマンド {{count}} 件",
-      "agents_one": "エージェント {{count}} 件",
       "agents_other": "エージェント {{count}} 件"
     },
     "nameLabel": "プロフィール名",
@@ -4544,7 +4467,6 @@
       "environment": "環境(JSON)",
       "headers": "ヘッダー (JSON)",
       "timeout": "タイムアウト",
-      "secretCount_one": "シークレット {{count}} 件",
       "secretCount_other": "シークレット {{count}} 件",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
@@ -4700,6 +4622,15 @@
     "history": {
       "activityUnavailable": "クレジットアクティビティを読み込めませんでした。",
       "appStoreReceipt": "領収書は App Store にあります",
+      "deduction": {
+        "adminCancel": "管理者による残高の停止",
+        "adminDebit": "管理者によるクレジットの削除",
+        "codingPlan": "コーディングプラン: {{plan}}",
+        "correction": "残高の修正",
+        "dispute": "支払いに関する異議",
+        "refundAppStore": "App Store からのクレジットパックの返金",
+        "refundGooglePlay": "Google Play からのクレジットパックの返金"
+      },
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
@@ -4776,9 +4707,7 @@
       "couldNotLoad": "リストを読み込めませんでした",
       "noRepository": "リポジトリなし",
       "rowA11y": "{{name}}、{{openCount}}",
-      "openCount_one": "未完了{{count}}件",
       "openCount_other": "未完了{{count}}件",
-      "archived_one": "アーカイブ済み ({{count}})",
       "archived_other": "アーカイブ済み ({{count}})",
       "archive": "アーカイブ",
       "unarchive": "アーカイブを解除",
@@ -4801,7 +4730,6 @@
       "addFailed": "タスクを追加できませんでした。接続を確認して、もう一度お試しください。",
       "empty": "タスクはまだありません",
       "setDefaults": "リポジトリ、モード、モデルを設定",
-      "completed_one": "完了 ({{count}})",
       "completed_other": "完了 ({{count}})"
     },
     "item": {
@@ -4810,7 +4738,6 @@
       "markDonePrompt": "完了にしますか？",
       "deleted": "タスクを削除しました",
       "undo": "元に戻す",
-      "runCount_one": "実行{{count}}回",
       "runCount_other": "実行{{count}}回",
       "startNow": "レビューなしで開始",
       "startNowHint": "長押しでレビューなしで開始",
@@ -4910,7 +4837,6 @@
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",
     "paidDisclosure_other": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "paidDisclosure": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
-    "paidDisclosure_one": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "enable": "有料要約を有効にする",
     "allContexts": "個人と組織のブリーフィングは別々に管理されます。",
     "emptyHistory": "保存済みのブリーフィングはありません",
@@ -4921,8 +4847,8 @@
     "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。",
     "saved": "ブリーフィング設定を保存しました",
     "selectedSessions": "選択されたセッション",
-    "snapshotPullRequests": "選択されたセッションのPRs",
-    "snapshotBlockers": "選択されたセッションのブロッカー",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "ブロッカー",
     "capturedAt": "取得日時：{{time}}",
     "snapshotHint": "予定された朝の時刻に、取得可能な最新のセッション状態を可能な範囲で記録したスナップショットです。件数は選択されたセッションのもので、夜間のアクティビティ全体を表すものではありません。",
     "snapshotTruncated": "スナップショットのサイズを抑えるため、一部のセッションや根拠データを省略しました。",
@@ -4950,17 +4876,14 @@
     "metadataFailureProvider": "プロバイダーエラー",
     "metadataFailureTool": "ツールエラー",
     "metadataStopped": "前回のターンが停止されました",
-    "metadataFailureOther": "不明なエラー",
-    "metadataPlan_one": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
-    "metadataFiles_one": "{{displayCount}}件のファイルを変更",
-    "metadataLinesAdded_one": "{{displayCount}}行を追加",
-    "metadataLinesRemoved_one": "{{displayCount}}行を削除"
+    "metadataFailureOther": "不明なエラー"
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
   },
   "usage": {
     "title": "使用状況",
+    "personalTitle": "個人の使用状況",
     "orgTitle": "組織の使用状況",
     "entrySubtitle": "コスト、リクエスト、トークン",
     "rangePicker": "期間",

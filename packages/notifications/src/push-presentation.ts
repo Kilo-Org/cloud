@@ -231,7 +231,6 @@ function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   }
 }
 
-/** The named kind of a push, or null when it is not an agent notification. */
 export function agentNotificationKindForPushData(data: PushData): AgentNotificationKind | null {
   return isAgentPushData(data) ? agentKindForAgentPush(data) : null;
 }
@@ -247,7 +246,6 @@ const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
   AGENT_NOTIFICATION_KINDS.map(kind => [AGENT_KIND_CHANNEL[kind], kind] as const)
 );
 
-/** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
 ): AndroidNotificationChannelId {

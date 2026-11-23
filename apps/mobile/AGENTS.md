@@ -4,7 +4,7 @@
 
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
-- Start the backend and Metro yourself; never ask the user to start them.
+- Start the backend yourself and let the worktree's dev runner own Metro; never ask the user to start either.
 - Substantial mobile work may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
@@ -293,8 +293,8 @@ One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline i
 against `LAYOUT_RULES` in `tools/nativewind/check-classes.mjs`, which is the only description of the rules:
 read the L1–L13 ids and their bans there instead of restating them here. A violation the migration has not
 reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and
-lower its line, never regenerate the baseline over a new violation, and the rewrite refuses while the theme
-or any walked file could not be read or parsed.
+lower its line, never regenerate the baseline over a new violation, and the rewrite refuses while any walked
+file could not be read or parsed (a theme read failure does not withhold it).
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.

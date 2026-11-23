@@ -124,10 +124,10 @@
     "connectProvider": "Connecter un fournisseur",
     "contentTruncated": "Contenu tronqué",
     "copyLink": "Copier le lien",
+    "couldNotLoad": "Le chargement a échoué",
+    "couldNotLoadMore": "Impossible de charger la suite",
     "couldNotLoadOrganizations": "Impossible de charger les organisations",
     "couldNotLoadSessions": "Impossible de charger les sessions",
-    "couldnTLoad": "Le chargement a échoué",
-    "couldnTLoadMore": "Impossible de charger la suite",
     "deviceSessions": "Sessions sur les appareils",
     "disabled": "Désactivé",
     "email": "E-mail",
@@ -494,7 +494,7 @@
       "download": "Télécharger le fichier",
       "downloadFailed": "Impossible de télécharger l'exportation. Vérifiez votre connexion et réessayez.",
       "unavailableTitle": "L'exportation des données n'est pas encore disponible",
-      "unavailableDescription": "L'exportation des données est déployée progressivement. Revenez bientôt."
+      "unavailableDescription": "La fonctionnalité est déployée progressivement. Revenez bientôt."
     },
     "blockedPeople": {
       "title": "Personnes bloquées et masquées",
@@ -1978,6 +1978,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Les détails ne sont pas disponibles",
+      "detailsUnavailableDescription": "Cet élément ne fait plus partie de la session",
       "textDisplay": "Affichage du texte",
       "thinking": "Réflexion en cours",
       "thought": "Réflexion",
@@ -3844,7 +3845,6 @@
       "usageDetails": "Détails d'utilisation",
       "providersAndModels": "Fournisseurs et modèles",
       "groups": "Groupes",
-      "guardrails": "Garde-fous",
       "byok": "Utiliser votre propre clé",
       "ssoAndDomain": "SSO et domaine",
       "dataCollection": "Collecte de données",
@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Impossible de charger l'activité de crédits.",
       "appStoreReceipt": "Reçu disponible sur l'App Store",
+      "deduction": {
+        "adminCancel": "Solde clôturé par un administrateur",
+        "adminDebit": "Crédits retirés par un administrateur",
+        "codingPlan": "Formule de codage : {{plan}}",
+        "correction": "Correction du solde",
+        "dispute": "Litige de paiement",
+        "refundAppStore": "Remboursement d'un pack de crédits sur l'App Store",
+        "refundGooglePlay": "Remboursement d'un pack de crédits sur Google Play"
+      },
       "deductionFallback": "Déduction de crédits",
       "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
       "emptyTitle": "Aucun historique de crédits",
@@ -5011,8 +5020,8 @@
     "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte. Demandez à un propriétaire d’organisation de l’activer.",
     "saved": "Paramètres du briefing enregistrés",
     "selectedSessions": "Sessions sélectionnées",
-    "snapshotPullRequests": "PRs des sessions sélectionnées",
-    "snapshotBlockers": "Blocages des sessions sélectionnées",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Blocages",
     "capturedAt": "Capturé {{time}}",
     "snapshotHint": "Instantané non exhaustif du dernier état disponible des sessions, figé à l’heure matinale prévue. Les chiffres portent sur les sessions sélectionnées, pas sur toute l’activité de la nuit.",
     "snapshotTruncated": "Certaines sessions ou preuves ont été omises pour limiter la taille de cet instantané.",
@@ -5055,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilisation",
+    "personalTitle": "Utilisation du compte personnel",
     "orgTitle": "Utilisation de l'organisation",
     "entrySubtitle": "Dépenses, requêtes et jetons",
     "rangePicker": "Période",

@@ -124,10 +124,10 @@
     "connectProvider": "Pievieno pakalpojuma sniedzēju",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
+    "couldNotLoad": "Neizdevās ielādēt.",
+    "couldNotLoadMore": "Neizdevās ielādēt vairāk.",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldnTLoad": "Neizdevās ielādēt.",
-    "couldnTLoadMore": "Neizdevās ielādēt vairāk.",
     "deviceSessions": "Ierīču sesijas",
     "disabled": "Atspējots",
     "email": "E-pasts",
@@ -494,7 +494,7 @@
       "download": "Lejupielādēt failu",
       "downloadFailed": "Neizdevās lejupielādēt eksportu. Pārbaudi savienojumu un mēģini vēlreiz.",
       "unavailableTitle": "Datu eksports vēl nav pieejams",
-      "unavailableDescription": "Datu eksports tiek ieviests pakāpeniski. Drīzumā ieskaties vēlreiz."
+      "unavailableDescription": "Funkcija tiek ieviesta pakāpeniski. Drīzumā ieskaties vēlreiz."
     },
     "blockedPeople": {
       "title": "Bloķētie un apklusinātie cilvēki",
@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detalizēta informācija nav pieejama.",
+      "detailsUnavailableDescription": "Šis vienums sesijā vairs nav.",
       "textDisplay": "Teksta attēlojums",
       "thinking": "Domā",
       "thought": "Domas",
@@ -3051,7 +3052,7 @@
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
       "tapToViewDetails": " Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
       "costClause": ", izmaksas {{cost}}",
-      "loadingCostSpoken": "izmaksas {{cost}}.",
+      "loadingCostSpoken": "līdzšinējās izmaksas {{cost}}.",
       "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams{{costClause}}.",
       "tokensUsage": "Konteksts: {{used}} no {{window}} tokeniem, izmantoti {{percentage}}{{costClause}}.",
       "title": "Konteksta izmantojums",
@@ -3840,7 +3841,6 @@
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
-      "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
       "appStoreReceipt": "Kvīts veikalā App Store",
+      "deduction": {
+        "adminCancel": "Administratora slēgta bilance",
+        "adminDebit": "Administratora noņemti kredīti",
+        "codingPlan": "Kodēšanas plāns: {{plan}}",
+        "correction": "Bilances korekcija",
+        "dispute": "Maksājuma strīds",
+        "refundAppStore": "Kredītu paketes atmaksa no App Store",
+        "refundGooglePlay": "Kredītu paketes atmaksa no Google Play"
+      },
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
@@ -5011,8 +5020,8 @@
     "estimateSpendLimitTooLow": "Palieliniet tēriņu ierobežojumu, lai atļautu šo kopsavilkumu.",
     "saved": "Atskaites iestatījumi saglabāti",
     "selectedSessions": "Atlasītās sesijas",
-    "snapshotPullRequests": "PRs atlasītajās sesijās",
-    "snapshotBlockers": "Šķēršļi atlasītajās sesijās",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Šķēršļi",
     "capturedAt": "Fiksēts {{time}}",
     "snapshotHint": "Plānotajā rīta laikā fiksēts jaunākā pieejamā sesiju stāvokļa momentuzņēmums, kas var būt nepilnīgs. Skaitļi attiecas uz atlasītajām sesijām, nevis visu nakts aktivitāti.",
     "snapshotTruncated": "Dažas sesijas vai pierādījumi nav iekļauti, lai ierobežotu šī momentuzņēmuma apjomu.",
@@ -5055,6 +5064,7 @@
   },
   "usage": {
     "title": "Lietojums",
+    "personalTitle": "Personīgā konta lietojums",
     "orgTitle": "Organizācijas lietojums",
     "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
     "rangePicker": "Laika periods",

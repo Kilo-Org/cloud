@@ -123,10 +123,10 @@
     "connectProvider": "Szolgáltató csatlakoztatása",
     "contentTruncated": "Tartalom csonkolva",
     "copyLink": "Hivatkozás másolása",
+    "couldNotLoad": "Nem sikerült betölteni.",
+    "couldNotLoadMore": "Nem sikerült betölteni a további elemeket.",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldnTLoad": "Nem sikerült betölteni.",
-    "couldnTLoadMore": "Nem sikerült betölteni a további elemeket.",
     "deviceSessions": "Eszközök munkamenetei",
     "disabled": "Letiltva",
     "email": "E-mail",
@@ -493,7 +493,7 @@
       "download": "Fájl letöltése",
       "downloadFailed": "Nem sikerült letölteni az exportált adatokat. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "unavailableTitle": "Az adatexportálás még nem érhető el",
-      "unavailableDescription": "Az adatexportálás fokozatosan válik elérhetővé. Nézz vissza hamarosan."
+      "unavailableDescription": "A funkció fokozatosan válik elérhetővé. Nézz vissza hamarosan."
     },
     "blockedPeople": {
       "title": "Letiltott és némított személyek",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "A részletek nem érhetők el.",
+      "detailsUnavailableDescription": "Ez az elem már nem szerepel a munkamenetben.",
       "textDisplay": "Szövegmegjelenítés",
       "thinking": "Gondolkodás",
       "thought": "Gondolat",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "A kontextusablak mérete nem érhető el",
       "tapToViewDetails": " A kontextus részleteihez koppints.",
       "costClause": ", költség: {{cost}}",
-      "loadingCostSpoken": "költség: {{cost}}.",
+      "loadingCostSpoken": "eddigi költség: {{cost}}.",
       "tokensWindowUnavailable": "Kontextus: {{used}} token, a kontextusablak mérete nem érhető el{{costClause}}.",
       "tokensUsage": "Kontextus: {{used}} token az összesen {{window}} tokenből, {{percentage}} felhasználva{{costClause}}.",
       "title": "Kontextushasználat",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
-      "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
       "ssoAndDomain": "SSO és domain",
       "dataCollection": "Adatgyűjtés",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Nem sikerült betölteni a kreditaktivitást.",
       "appStoreReceipt": "A nyugta az App Store-ban érhető el",
+      "deduction": {
+        "adminCancel": "Az egyenleget egy adminisztrátor zárta le",
+        "adminDebit": "Egy adminisztrátor eltávolította a krediteket",
+        "codingPlan": "Kódolási csomag: {{plan}}",
+        "correction": "Egyenlegkorrekció",
+        "dispute": "Fizetési vita",
+        "refundAppStore": "Kreditcsomag visszatérítése az App Store-ból",
+        "refundGooglePlay": "Kreditcsomag visszatérítése a Google Playről"
+      },
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Emeld a költési korlátot az összefoglaló engedélyezéséhez.",
     "saved": "Jelentés beállításai mentve",
     "selectedSessions": "Kiválasztott munkamenetek",
-    "snapshotPullRequests": "PR-ek a kiválasztott munkamenetekben",
-    "snapshotBlockers": "Akadályok a kiválasztott munkamenetekben",
+    "snapshotPullRequests": "PR-ek",
+    "snapshotBlockers": "Akadályok",
     "capturedAt": "Rögzítve: {{time}}",
     "snapshotHint": "A rendelkezésre álló adatokból összeállított pillanatkép a munkamenetek legutóbbi elérhető állapotáról, az ütemezett reggeli időpontban rögzítve. A számok a kiválasztott munkamenetekre vonatkoznak, nem a teljes éjszakai tevékenységre.",
     "snapshotTruncated": "Egyes munkamenetek vagy bizonyítékok kimaradtak a pillanatkép méretkorlátja miatt.",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Használat",
+    "personalTitle": "Személyes használat",
     "orgTitle": "Szervezeti használat",
     "entrySubtitle": "Költség, kérések és tokenek",
     "rangePicker": "Időtartomány",

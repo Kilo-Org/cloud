@@ -123,10 +123,10 @@
     "connectProvider": "Միացնել մատակարար",
     "contentTruncated": "Բովանդակությունը կրճատված է",
     "copyLink": "Պատճենել հղումը",
+    "couldNotLoad": "Չհաջողվեց բեռնել։",
+    "couldNotLoadMore": "Չհաջողվեց բեռնել ավելին։",
     "couldNotLoadOrganizations": "Չհաջողվեց բեռնել կազմակերպությունները։",
     "couldNotLoadSessions": "Չհաջողվեց բեռնել նստաշրջանները։",
-    "couldnTLoad": "Չհաջողվեց բեռնել։",
-    "couldnTLoadMore": "Չհաջողվեց բեռնել ավելին։",
     "deviceSessions": "Սարքերի նստաշրջաններ",
     "disabled": "Անջատված",
     "email": "Էլ. փոստ",
@@ -493,7 +493,7 @@
       "download": "Ներբեռնել ֆայլը",
       "downloadFailed": "Չհաջողվեց ներբեռնել արտահանումը։ Ստուգեք կապը և կրկին փորձեք։",
       "unavailableTitle": "Տվյալների արտահանումը դեռ հասանելի չէ",
-      "unavailableDescription": "Տվյալների արտահանումը գործարկվում է աստիճանաբար։ Շուտով կրկին ստուգեք։"
+      "unavailableDescription": "Գործառույթը գործարկվում է աստիճանաբար։ Շուտով կրկին ստուգեք։"
     },
     "blockedPeople": {
       "title": "Արգելափակված և լռեցված մարդիկ",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Մանրամասներն անհասանելի են։",
+      "detailsUnavailableDescription": "Այս տարրն այլևս նստաշրջանում չէ։",
       "textDisplay": "Տեքստի ցուցադրում",
       "thinking": "Մտածում է",
       "thought": "Միտք",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Համատեքստի պատուհանի չափը հասանելի չէ",
       "tapToViewDetails": " Հպեք՝ համատեքստի մանրամասները տեսնելու համար։",
       "costClause": ", արժեքը {{cost}}",
-      "loadingCostSpoken": "արժեքը՝ {{cost}}։",
+      "loadingCostSpoken": "մինչ այժմ արժեքը՝ {{cost}}։",
       "tokensWindowUnavailable": "Համատեքստ՝ {{used}} տոկեն, պատուհանի չափն անհասանելի է{{costClause}}։",
       "tokensUsage": "Համատեքստ՝ {{used}} տոկեն՝ {{window}}-ից, օգտագործված է {{percentage}}{{costClause}}։",
       "title": "Համատեքստի օգտագործում",
@@ -3772,7 +3773,6 @@
       "usageDetails": "Օգտագործման մանրամասներ",
       "providersAndModels": "Մատակարարներ և մոդելներ",
       "groups": "Խմբեր",
-      "guardrails": "Պաշտպանիչ սահմանափակումներ",
       "byok": "Սեփական բանալի",
       "ssoAndDomain": "SSO և դոմեն",
       "dataCollection": "Տվյալների հավաքում",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Կրեդիտների ակտիվությունը չհաջողվեց բեռնել։",
       "appStoreReceipt": "Անդորրագիր App Store-ից",
+      "deduction": {
+        "adminCancel": "Մնացորդը փակվել է ադմինիստրատորի կողմից",
+        "adminDebit": "Կրեդիտները հեռացվել են ադմինիստրատորի կողմից",
+        "codingPlan": "Կոդավորման պլան՝ {{plan}}",
+        "correction": "Մնացորդի ուղղում",
+        "dispute": "Վճարման վեճ",
+        "refundAppStore": "Կրեդիտային փաթեթի վերադարձ App Store-ից",
+        "refundGooglePlay": "Կրեդիտային փաթեթի վերադարձ Google Play-ից"
+      },
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
       "emptyTitle": "Կրեդիտների պատմություն չկա",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "Բարձրացրեք ծախսերի սահմանաչափը՝ այս ամփոփումը թույլատրելու համար։",
     "saved": "Հաշվետվության կարգավորումները պահպանվել են",
     "selectedSessions": "Ընտրված նստաշրջաններ",
-    "snapshotPullRequests": "PRs՝ ընտրված նստաշրջաններում",
-    "snapshotBlockers": "Խոչընդոտներ՝ ընտրված նստաշրջաններում",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Խոչընդոտներ",
     "capturedAt": "Արձանագրվել է՝ {{time}}",
     "snapshotHint": "Առավոտյան պլանավորված ժամին նստաշրջանների վերջին հասանելի վիճակի՝ հնարավորության սահմաններում կազմված անփոփոխ պատկեր։ Թվերը վերաբերում են ընտրված նստաշրջաններին, ոչ թե գիշերվա ամբողջ ակտիվությանը։",
     "snapshotTruncated": "Որոշ նստաշրջաններ կամ ապացույցներ չեն ներառվել՝ այս պատկերի ծավալը սահմանափակ պահելու համար։",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "Օգտագործում",
+    "personalTitle": "Անձնական հաշվի օգտագործում",
     "orgTitle": "Կազմակերպության օգտագործում",
     "entrySubtitle": "Ծախսեր, հարցումներ և տոկեններ",
     "rangePicker": "Ժամանակահատված",

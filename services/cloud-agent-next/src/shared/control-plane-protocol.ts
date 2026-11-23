@@ -215,6 +215,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'byoc_vercel_capacity',
   'byoc_vercel_snapshot_missing',
   'provider_identity_mismatch',
+  'network_policy_failed',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 

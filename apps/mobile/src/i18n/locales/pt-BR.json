@@ -125,10 +125,10 @@
     "connectProvider": "Conectar um provedor",
     "contentTruncated": "Conteúdo exibido parcialmente",
     "copyLink": "Copiar link",
+    "couldNotLoad": "Não foi possível carregar.",
+    "couldNotLoadMore": "Não foi possível carregar mais itens.",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
-    "couldnTLoad": "Não foi possível carregar.",
-    "couldnTLoadMore": "Não foi possível carregar mais itens.",
     "deviceSessions": "Sessões nos dispositivos",
     "disabled": "Desativado",
     "email": "E-mail",
@@ -495,7 +495,7 @@
       "download": "Baixar arquivo",
       "downloadFailed": "Não foi possível baixar a exportação. Verifique sua conexão e tente novamente.",
       "unavailableTitle": "A exportação de dados ainda não está disponível",
-      "unavailableDescription": "A exportação de dados está sendo liberada aos poucos. Volte em breve."
+      "unavailableDescription": "A funcionalidade está sendo liberada aos poucos. Volte em breve."
     },
     "blockedPeople": {
       "title": "Pessoas bloqueadas e silenciadas",
@@ -2077,6 +2077,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Os detalhes não estão disponíveis.",
+      "detailsUnavailableDescription": "Este item não está mais na sessão.",
       "textDisplay": "Exibição de texto",
       "thinking": "Pensando",
       "thought": "Raciocínio",
@@ -2461,7 +2462,7 @@
       "windowUnavailable": "Tamanho da janela de contexto indisponível",
       "tapToViewDetails": " Toque para ver os detalhes do contexto.",
       "costClause": ", custo {{cost}}",
-      "loadingCostSpoken": "custo de {{cost}}.",
+      "loadingCostSpoken": "custo até agora {{cost}}.",
       "tokensWindowUnavailable": "Contexto: {{used}} tokens, tamanho da janela indisponível{{costClause}}.",
       "tokensUsage": "Contexto: {{used}} de {{window}} tokens, {{percentage}} em uso{{costClause}}.",
       "title": "Uso do contexto",
@@ -3912,7 +3913,6 @@
       "usageDetails": "Detalhes de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
-      "guardrails": "Proteções",
       "byok": "Use sua própria chave",
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Coleta de dados",
@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Não foi possível carregar a atividade de crédito.",
       "appStoreReceipt": "Recibo na App Store",
+      "deduction": {
+        "adminCancel": "Saldo encerrado por um administrador",
+        "adminDebit": "Créditos removidos por um administrador",
+        "codingPlan": "Plano de programação: {{plan}}",
+        "correction": "Ajuste de saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso de pacote de créditos pela App Store",
+        "refundGooglePlay": "Reembolso de pacote de créditos pelo Google Play"
+      },
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
@@ -5101,8 +5110,8 @@
     "estimateSpendLimitTooLow": "Aumente o limite de gastos para permitir este resumo.",
     "saved": "Configurações do relatório salvas",
     "selectedSessions": "Sessões selecionadas",
-    "snapshotPullRequests": "PRs nas sessões selecionadas",
-    "snapshotBlockers": "Bloqueios nas sessões selecionadas",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Bloqueios",
     "capturedAt": "Capturado {{time}}",
     "snapshotHint": "Registro fixo do estado mais recente disponível das sessões, capturado na manhã agendada, sem garantia de cobertura completa. As contagens se referem às sessões selecionadas, não a toda a atividade da noite.",
     "snapshotTruncated": "Algumas sessões ou evidências foram omitidas para limitar o tamanho deste registro.",
@@ -5149,6 +5158,7 @@
   },
   "usage": {
     "title": "Uso",
+    "personalTitle": "Uso da conta pessoal",
     "orgTitle": "Uso da organização",
     "entrySubtitle": "Gastos, solicitações e tokens",
     "rangePicker": "Período",

@@ -564,7 +564,14 @@ describe('explicit sandbox session creation', () => {
           { egressMode: 'allowlist' as const },
           { egressAudit: true },
           { egressMode: 'unrestricted' as const, egressAudit: true },
-        ].map(policy => ({ sandboxAllocation, policy }))
+        ]
+          // A Vercel sandbox enforces an allowlist, but cannot audit without one.
+          .filter(
+            policy =>
+              sandboxAllocation !== 'vercel-small' ||
+              !('egressMode' in policy && policy.egressMode === 'allowlist')
+          )
+          .map(policy => ({ sandboxAllocation, policy }))
     )
   )(
     'rejects egress policy on resolved placement before ownership creation: %j',
@@ -2262,8 +2269,10 @@ describe('explicit sandbox session creation', () => {
       }
     );
 
-    describe('with an egress allowlist', () => {
+    describe('with an egress request', () => {
       const allowlist = { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] };
+      // A Vercel sandbox enforces an allowlist, but cannot audit without one.
+      const auditOnly = { egressAudit: true };
       function vercelContext(doStub: ReturnType<typeof makeDoStub>) {
         const ctx = selectedContext(doStub);
         ctx.env.BYOC_VERCEL_IDS = orgId;
@@ -2283,7 +2292,7 @@ describe('explicit sandbox session creation', () => {
           });
           const doStub = makeDoStub();
           const request = environmentRequest(v2Environment);
-          request.runtime = allowlist;
+          request.runtime = auditOnly;
 
           await expect(
             createSessionWithLedger(request, vercelContext(doStub), {
@@ -2295,8 +2304,7 @@ describe('explicit sandbox session creation', () => {
             sandboxAllocation: 'cloudflare-containers-standard-3',
             sandboxProvider: 'cloudflare-containers',
             sandboxKind: 'isolated',
-            egressMode: 'allowlist',
-            egressAllowlist: ['example.com'],
+            egressAudit: true,
           });
           expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
         }
@@ -2310,7 +2318,7 @@ describe('explicit sandbox session creation', () => {
           });
           const doStub = makeDoStub();
           const request = environmentRequest(v2Environment, undefined, 'vercel-small');
-          request.runtime = allowlist;
+          request.runtime = auditOnly;
 
           await expect(
             createSessionWithLedger(request, vercelContext(doStub), {
@@ -2319,11 +2327,30 @@ describe('explicit sandbox session creation', () => {
             })
           ).rejects.toMatchObject({
             code: 'BAD_REQUEST',
-            message: 'Restricted network access is not available for Vercel sandboxes.',
+            message: 'Egress audit needs an allowlist on Vercel sandboxes.',
           });
           expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
         }
       );
+
+      it('keeps a Vercel owner default for an allowlist', async () => {
+        getSandboxAllocationCandidatesMock.mockResolvedValue({
+          contextAllocation: 'vercel-small',
+        });
+        const doStub = makeDoStub();
+        const request = environmentRequest(v2Environment);
+        request.runtime = allowlist;
+
+        await expect(
+          createSessionWithLedger(request, vercelContext(doStub), CREATE_OPTIONS)
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'vercel-small',
+          sandboxProvider: 'vercel',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com'],
+        });
+      });
     });
 
     it('rejects network secrets for an unpinned V1 environment with a Vercel owner default', async () => {
@@ -8843,11 +8870,25 @@ describe('prepareInputToSessionCreateRequest environment selection', () => {
     expect(request.requireEnvironmentChoice).toBe(true);
   });
 
+  it('carries the environment setup run and the verification target', () => {
+    const environmentSetupRunId = '22222222-2222-4222-8222-222222222222';
+    const verificationOf = { runId: '33333333-3333-4333-8333-333333333333' };
+
+    const request = prepareInputToSessionCreateRequest(
+      parse({ environmentSetupRunId, verificationOf })
+    );
+
+    expect(request.environmentSetupRunId).toBe(environmentSetupRunId);
+    expect(request.verificationOf).toEqual(verificationOf);
+  });
+
   it('adds neither field when the client sent neither', () => {
     const request = prepareInputToSessionCreateRequest(parse({}));
 
     expect(request).not.toHaveProperty('requestedEnvironment');
     expect(request).not.toHaveProperty('requireEnvironmentChoice');
+    expect(request).not.toHaveProperty('environmentSetupRunId');
+    expect(request).not.toHaveProperty('verificationOf');
   });
 
   it.each([

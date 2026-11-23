@@ -123,10 +123,10 @@
     "connectProvider": "ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ",
     "contentTruncated": "ਸਮੱਗਰੀ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
     "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
+    "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "couldNotLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "couldNotLoadOrganizations": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-    "couldnTLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-    "couldnTLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "deviceSessions": "ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "disabled": "ਬੰਦ",
     "email": "ਈਮੇਲ",
@@ -493,7 +493,7 @@
       "download": "ਫ਼ਾਈਲ ਡਾਊਨਲੋਡ ਕਰੋ",
       "downloadFailed": "ਐਕਸਪੋਰਟ ਡਾਊਨਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unavailableTitle": "ਡਾਟਾ ਐਕਸਪੋਰਟ ਹਾਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
-      "unavailableDescription": "ਡਾਟਾ ਐਕਸਪੋਰਟ ਹੌਲੀ-ਹੌਲੀ ਜਾਰੀ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ। ਜਲਦੀ ਦੁਬਾਰਾ ਦੇਖੋ।"
+      "unavailableDescription": "ਸਹੂਲਤ ਹੌਲੀ-ਹੌਲੀ ਜਾਰੀ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜਲਦੀ ਦੁਬਾਰਾ ਦੇਖੋ।"
     },
     "blockedPeople": {
       "title": "ਬਲੌਕ ਅਤੇ ਮਿਊਟ ਕੀਤੇ ਲੋਕ",
@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ਵੇਰਵੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "detailsUnavailableDescription": "ਇਹ ਆਈਟਮ ਹੁਣ ਸੈਸ਼ਨ ਵਿੱਚ ਨਹੀਂ ਹੈ।",
       "textDisplay": "ਟੈਕਸਟ ਵਾਲਾ ਖੇਤਰ",
       "thinking": "ਸੋਚ ਰਿਹਾ ਹੈ",
       "thought": "ਸੋਚ",
@@ -2813,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ਇੱਕ ਦੇ ਅੰਦਰ ਦੂਜਾ ਸੈਸ਼ਨ ਬਣਾਉਣ ਦੀ ਵੱਧ ਤੋਂ ਵੱਧ ਹੱਦ ਪੂਰੀ ਹੋ ਗਈ ਹੈ।",
+      "maxNestingDepth": "ਨੈਸਟਿਡ ਸੈਸ਼ਨਾਂ ਦੀ ਵੱਧ ਤੋਂ ਵੱਧ ਡੂੰਘਾਈ ਪੂਰੀ ਹੋ ਗਈ ਹੈ।",
       "modelAccessibility": "ਮਾਡਲ: {{modelLabel}}",
       "openHint": "ਸਬਏਜੰਟ ਦਾ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ",
       "subagent": "ਸਬਏਜੰਟ",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "ਸੰਦਰਭ ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ",
       "tapToViewDetails": " ਸੰਦਰਭ ਦੇ ਵੇਰਵੇ ਵੇਖਣ ਲਈ ਟੈਪ ਕਰੋ।",
       "costClause": ", ਲਾਗਤ {{cost}}",
-      "loadingCostSpoken": "ਲਾਗਤ {{cost}}।",
+      "loadingCostSpoken": "ਹੁਣ ਤੱਕ ਦੀ ਲਾਗਤ {{cost}}।",
       "tokensWindowUnavailable": "ਸੰਦਰਭ ਵਿੱਚ {{used}} ਟੋਕਨ, ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ{{costClause}}।",
       "tokensUsage": "ਸੰਦਰਭ ਵਿੱਚ {{window}} ਵਿੱਚੋਂ {{used}} ਟੋਕਨ, {{percentage}} ਵਰਤੋਂ{{costClause}}।",
       "title": "ਸੰਦਰਭ ਦੀ ਵਰਤੋਂ",
@@ -3772,7 +3773,6 @@
       "usageDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ",
       "providersAndModels": "ਪ੍ਰੋਵਾਈਡਰ ਅਤੇ ਮਾਡਲ",
       "groups": "ਗਰੁੱਪ",
-      "guardrails": "ਗਾਰਡਰੇਲ",
       "byok": "ਆਪਣੀ ਖੁਦ ਦੀ ਕੁੰਜੀ ਵਰਤੋ",
       "ssoAndDomain": "SSO ਅਤੇ ਡੋਮੇਨ",
       "dataCollection": "ਡਾਟਾ ਇਕੱਠਾ ਕਰਨਾ",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "appStoreReceipt": "App Store ਤੋਂ ਰਸੀਦ",
+      "deduction": {
+        "adminCancel": "ਐਡਮਿਨ ਵੱਲੋਂ ਬੰਦ ਕੀਤਾ ਬੈਲੰਸ",
+        "adminDebit": "ਐਡਮਿਨ ਵੱਲੋਂ ਹਟਾਏ ਕ੍ਰੈਡਿਟ",
+        "codingPlan": "ਕੋਡਿੰਗ ਪਲਾਨ: {{plan}}",
+        "correction": "ਬੈਲੰਸ ਸਮਾਯੋਜਨ",
+        "dispute": "ਭੁਗਤਾਨ ਵਿਵਾਦ",
+        "refundAppStore": "App Store ਤੋਂ ਕ੍ਰੈਡਿਟ ਪੈਕ ਦੀ ਵਾਪਸੀ",
+        "refundGooglePlay": "Google Play ਤੋਂ ਕ੍ਰੈਡਿਟ ਪੈਕ ਦੀ ਵਾਪਸੀ"
+      },
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
@@ -4921,8 +4930,8 @@
     "estimateSpendLimitTooLow": "ਇਹ ਸਾਰ ਬਣਾਉਣ ਲਈ ਖਰਚ ਸੁਰੱਖਿਆ ਸੀਮਾ ਵਧਾਓ।",
     "saved": "ਬ੍ਰੀਫਿੰਗ ਸੈਟਿੰਗਾਂ ਸੰਭਾਲੀਆਂ ਗਈਆਂ",
     "selectedSessions": "ਚੁਣੇ ਹੋਏ ਸੈਸ਼ਨ",
-    "snapshotPullRequests": "ਚੁਣੇ ਹੋਏ ਸੈਸ਼ਨਾਂ ਵਿੱਚ PRs",
-    "snapshotBlockers": "ਚੁਣੇ ਹੋਏ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਰੁਕਾਵਟਾਂ",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "ਰੁਕਾਵਟਾਂ",
     "capturedAt": "{{time}} ਨੂੰ ਲਿਆ ਗਿਆ",
     "snapshotHint": "ਸਵੇਰ ਦੇ ਨਿਰਧਾਰਿਤ ਸਮੇਂ 'ਤੇ ਉਪਲਬਧ ਸੈਸ਼ਨ ਦੀ ਨਵੀਨਤਮ ਸਥਿਤੀ ਦਾ ਯਥਾਸੰਭਵ ਲਿਆ ਗਿਆ ਸਨੈਪਸ਼ਾਟ। ਗਿਣਤੀਆਂ ਚੁਣੇ ਹੋਏ ਸੈਸ਼ਨਾਂ ਨੂੰ ਦਰਸਾਉਂਦੀਆਂ ਹਨ, ਰਾਤ ਭਰ ਦੀ ਪੂਰੀ ਗਤੀਵਿਧੀ ਨੂੰ ਨਹੀਂ।",
     "snapshotTruncated": "ਇਸ ਸਨੈਪਸ਼ਾਟ ਨੂੰ ਸੀਮਤ ਰੱਖਣ ਲਈ ਕੁਝ ਸੈਸ਼ਨ ਜਾਂ ਸਬੂਤ ਛੱਡ ਦਿੱਤੇ ਗਏ ਸਨ।",
@@ -4961,6 +4970,7 @@
   },
   "usage": {
     "title": "ਵਰਤੋਂ",
+    "personalTitle": "ਨਿੱਜੀ ਵਰਤੋਂ",
     "orgTitle": "ਸੰਗਠਨ ਦੀ ਵਰਤੋਂ",
     "entrySubtitle": "ਖਰਚਾ, ਬੇਨਤੀਆਂ ਅਤੇ ਟੋਕਨ",
     "rangePicker": "ਸਮਾਂ ਸੀਮਾ",

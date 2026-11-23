@@ -26,6 +26,7 @@ import {
 import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { resolveConnectionConnector } from '@kilocode/web-shared/lib/ai-gateway/connector';
 import {
+  claudeBillingEffectiveConnection,
   getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
@@ -262,7 +263,8 @@ async function resolveClaudeBillingForModel(params: {
     ? { kind: 'organization', organizationId: params.organizationId }
     : { kind: 'personal', kiloUserId: params.user.id };
 
-  const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
+  const granted = await getGrantedClaudeBillingConnection(owner, params.fromDb);
+  const row = granted ? claudeBillingEffectiveConnection(granted) : null;
   if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
   if (row?.status !== ClaudeBillingConnectionStatus.Connected) return 'none';
   if (owner.kind === 'organization') {

@@ -76,11 +76,8 @@ export function collectLanguageSearchNames(displayTag) {
   return names;
 }
 
-/** The generated module's source for one display language's names. */
-export function generateLanguageSearchNamesSource(
-  displayTag,
-  names = collectLanguageSearchNames(displayTag)
-) {
+/** The generated module's source for one display language's collected names map. */
+export function generateLanguageSearchNamesSource(names) {
   // Two-space key indentation, a named export and no import: the generated
   // file must be byte-identical to what `oxfmt` and the lint config want, so
   // the drift assert, `format:check` and `oxlint` all agree on it. The loader
@@ -107,7 +104,7 @@ runIfMain(
       const names = collectLanguageSearchNames(displayTag);
       entries += names.size;
       const file = join(OUTPUT_DIR, fileName(displayTag));
-      writeFileSync(file, generateLanguageSearchNamesSource(displayTag, names));
+      writeFileSync(file, generateLanguageSearchNamesSource(names));
       written += 1;
     }
     console.log(`Wrote ${written} language-search-name files with ${entries} names`);

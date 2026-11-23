@@ -10,7 +10,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: true,
         hasOlderMessages: true,
         olderMessagesError: null,
-        historyState: { kind: 'pending' },
+        historyState: { kind: 'pending', reason: 'first-page' },
       })
     ).toBe('list');
   });
@@ -22,7 +22,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: true,
         hasOlderMessages: false,
         olderMessagesError: null,
-        historyState: { kind: 'pending' },
+        historyState: { kind: 'pending', reason: 'first-page' },
       })
     ).toBe('status');
   });
@@ -34,7 +34,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: false,
         hasOlderMessages: true,
         olderMessagesError: null,
-        historyState: { kind: 'pending' },
+        historyState: { kind: 'pending', reason: 'first-page' },
       })
     ).toBe('older-loading');
   });
@@ -46,7 +46,7 @@ describe('resolveSessionTranscriptView', () => {
         hasStatusIndicator: false,
         hasOlderMessages: true,
         olderMessagesError: { kind: 'retryable' },
-        historyState: { kind: 'pending' },
+        historyState: { kind: 'pending', reason: 'first-page' },
       })
     ).toBe('older-error');
   });
@@ -78,18 +78,6 @@ describe('resolveSessionTranscriptView', () => {
     ).toBe('empty');
   });
 
-  it('keeps the skeleton while no first page has settled', () => {
-    expect(
-      resolveSessionTranscriptView({
-        transcriptItemCount: 0,
-        hasStatusIndicator: false,
-        hasOlderMessages: false,
-        olderMessagesError: null,
-        historyState: { kind: 'pending' },
-      })
-    ).toBe('history-pending');
-  });
-
   it('gives a first page that settled unreadable its own failure, not the empty state', () => {
     expect(
       resolveSessionTranscriptView({
@@ -102,18 +90,34 @@ describe('resolveSessionTranscriptView', () => {
     ).toBe('history-error');
   });
 
-  it.each([{ kind: 'pending' }, { kind: 'unreadable' }] as const)(
-    'keeps an older-page error above the first-page state ($kind)',
-    historyState => {
+  it.each(['first-page', 'streaming'] as const)(
+    'keeps the skeleton for either reason a first page is pending (%s)',
+    reason => {
       expect(
         resolveSessionTranscriptView({
           transcriptItemCount: 0,
           hasStatusIndicator: false,
-          hasOlderMessages: true,
-          olderMessagesError: { kind: 'retryable' },
-          historyState,
+          hasOlderMessages: false,
+          olderMessagesError: null,
+          historyState: { kind: 'pending', reason },
         })
-      ).toBe('older-error');
+      ).toBe('history-pending');
     }
   );
+
+  it.each([
+    { kind: 'pending', reason: 'first-page' },
+    { kind: 'pending', reason: 'streaming' },
+    { kind: 'unreadable' },
+  ] as const)('keeps an older-page error above the first-page state ($kind)', historyState => {
+    expect(
+      resolveSessionTranscriptView({
+        transcriptItemCount: 0,
+        hasStatusIndicator: false,
+        hasOlderMessages: true,
+        olderMessagesError: { kind: 'retryable' },
+        historyState,
+      })
+    ).toBe('older-error');
+  });
 });

@@ -91,6 +91,8 @@ type QueryErrorProps = {
    *  pin air. The title keeps the error cue through its tint. See `EmptyState`. */
   compact?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** The failure's handle for a native test and the design gate; see `EmptyState`. */
+  testID?: string;
 };
 
 export function QueryError({
@@ -110,6 +112,7 @@ export function QueryError({
   inset,
   compact,
   refreshControl,
+  testID,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -138,6 +141,7 @@ export function QueryError({
       inset={inset}
       compact={compact}
       refreshControl={refreshControl}
+      testID={testID}
       iconContainerClassName="rounded-full bg-muted p-4"
       iconColor={colors.destructive}
       iconSize={32}

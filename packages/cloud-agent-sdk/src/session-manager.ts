@@ -201,15 +201,24 @@ const IDLE_CHILD_SESSION_HYDRATION_STATE = {
 /**
  * Where the active session's first history page stands, as one state:
  *
- * - `pending` — no first page has settled yet, so the transcript surface must
- *   keep its skeleton and must not claim the session is empty.
+ * - `pending` — the transcript surface must keep its skeleton and must not
+ *   claim the session is empty. It carries why, because the surface behaves
+ *   differently: `first-page` is an open whose history has not been read yet,
+ *   so the reader has nothing to write into and the composer is withdrawn;
+ *   `streaming` is a run whose admitted turn is still producing its first
+ *   rows, which is progress, so the composer stays available to queue a
+ *   follow-up.
  * - `settled` — a first page settled with something the reader can judge: rows
- *   were stored, or the session genuinely has no admitted turn to show.
+ *   were stored, the page was cleared on purpose, or the session genuinely
+ *   has no admitted turn to show.
  * - `unreadable` — the page settled with no row to show although the session
  *   had history: rows existed and were dropped (`omittedItemCount > 0`), or
- *   the run admitted an initial turn that the page matched no rows for.
+ *   the run admitted turns that the page matched no rows for.
  */
-type TranscriptHistoryState = { kind: 'pending' } | { kind: 'settled' } | { kind: 'unreadable' };
+type TranscriptHistoryState =
+  | { kind: 'pending'; reason: 'first-page' | 'streaming' }
+  | { kind: 'settled' }
+  | { kind: 'unreadable' };
 
 const EMPTY_REMOTE_MODEL_STATE = {
   ownerConnectionId: null,
@@ -1358,52 +1367,75 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const transcriptClearedAtom = atom(false);
   /**
    * The first applied page's own evidence, kept as facts: whether it stored any
-   * row and how many items the reader omitted. It is a dependency of
-   * `transcriptHistoryAtom`, not a verdict: whether the facts mean `settled` or
-   * `unreadable` also needs the session's admitted turn, which usually resolves
-   * AFTER this page (the eager page read starts before the metadata await), so
-   * the verdict is derived on read.
+   * row, how many items the reader omitted, and how many turns the session
+   * admitted. It is a dependency of `transcriptHistoryAtom`, not a verdict:
+   * whether the facts mean `settled`, `pending` or `unreadable` also needs the
+   * run's live streaming state, so the verdict is derived on read.
+   *
+   * `admittedMessages` is absent on a page read before the field existed, and
+   * the verdict then falls back to the session metadata's `initialMessageId`.
    */
   const firstPageEvidenceAtom = atom<{
     storedRowCount: number;
     omittedItemCount: number;
+    admittedMessages?: number | undefined;
   } | null>(null);
   /**
-   * First-page lifecycle for the active session: `pending` until a first page
-   * settles, then `settled` or `unreadable`. The transcript view reads it so a
-   * session whose history was never read cannot render as an action-less empty
-   * transcript, and a page that settled with nothing readable gets a retryable
-   * failure instead of the empty state.
+   * First-page lifecycle for the active session: `pending` until that page's
+   * verdict can be told, then `settled` or `unreadable`. The transcript view
+   * reads it so a session whose history was never read cannot render as an
+   * action-less empty transcript, and a page that settled with nothing readable
+   * gets a terminal failure instead of the empty state.
    *
-   * Derived from the evidence and the metadata rather than latched at the page
-   * apply, because the metadata's `initialMessageId` is what separates a
-   * genuinely empty session from a page that matched no row of an admitted
-   * turn, and the metadata lands after the page: a derived read flips when it
-   * arrives, with no extra wiring.
+   * The verdict is derived rather than latched at the page apply, because the
+   * live run decides the last step: an admitted turn with no rows yet is
+   * `pending` while the session streams and `unreadable` once it stopped. The
+   * page's own count of admitted turns settles that without waiting for the
+   * metadata, whose `initialMessageId` is only the fallback for a page that
+   * predates it.
    */
   const transcriptHistoryAtom = atom<TranscriptHistoryState>(get => {
     // `/clear` empties the view on purpose: that is an empty session, not a
     // history that could not be read, whatever the stored evidence says.
     if (get(transcriptClearedAtom)) return { kind: 'settled' };
     const evidence = get(firstPageEvidenceAtom);
-    if (evidence === null) return { kind: 'pending' };
+    if (evidence === null) {
+      // Nothing recorded a first page, and no page-aware seam exists to record
+      // one: the legacy full-snapshot replay is this open's whole read. Once
+      // it finished with nothing to show, the transcript really is empty — a
+      // `pending` here would keep the skeleton up forever.
+      if (
+        !config.fetchSnapshotPage &&
+        !config.fetchCloudSnapshotPage &&
+        !get(isLoadingAtom) &&
+        !get(isReplayingLiveHistoryAtom)
+      ) {
+        return { kind: 'settled' };
+      }
+      return { kind: 'pending', reason: 'first-page' };
+    }
     if (evidence.storedRowCount > 0) return { kind: 'settled' };
     if (evidence.omittedItemCount > 0) return { kind: 'unreadable' };
-    const metadata = get(fetchedSessionDataAtom);
-    // No rows and nothing omitted is only judgeable once the session's own
-    // metadata is known: `initialMessageId` separates a session that never
-    // admitted a turn (the normal empty state) from a page that matched no row
-    // of an admitted one. Until then the answer is still pending, and the
-    // metadata usually lands after this page.
-    if (metadata === null) return { kind: 'pending' };
-    if (metadata.initialMessageId == null) return { kind: 'settled' };
-    // An admitted turn whose rows have not landed is also what a run that is
-    // streaming its first turn looks like. That is progress, not an unreadable
-    // history, so the surface keeps the skeleton while the run is live. It does
-    // not test preparation: a run whose sandbox never prepared produces no rows
-    // at all, and that state must state itself instead of loading forever.
-    if (get(isStreamingAtom)) return { kind: 'pending' };
-    return { kind: 'unreadable' };
+    const streaming = (): TranscriptHistoryState => ({ kind: 'pending', reason: 'streaming' });
+    if (evidence.admittedMessages === undefined) {
+      // An older page carries no count, so the session's own metadata decides
+      // whether a turn was ever admitted. Until it lands the answer is still
+      // pending, and it usually lands after this page.
+      const metadata = get(fetchedSessionDataAtom);
+      if (metadata === null) return { kind: 'pending', reason: 'first-page' };
+      if (metadata.initialMessageId == null) return { kind: 'settled' };
+      // An admitted turn whose rows have not landed is also what a run that is
+      // streaming its first turn looks like. That is progress, not an unreadable
+      // history, so the surface keeps the skeleton while the run is live. It does
+      // not test preparation: a run whose sandbox never prepared produces no rows
+      // at all, and that state must state itself instead of loading forever.
+      return get(isStreamingAtom) ? streaming() : { kind: 'unreadable' };
+    }
+    // The page's own count: a run that admitted a turn and has no row yet is
+    // streaming while it is live, and a gap once it stopped. A session that
+    // never admitted a turn is genuinely empty.
+    if (evidence.admittedMessages === 0) return { kind: 'settled' };
+    return get(isStreamingAtom) ? streaming() : { kind: 'unreadable' };
   });
 
   // Bumped whenever the active session or its resolved-delivery record changes,
@@ -2688,12 +2720,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageOmittedItemCount = outcome.omittedItemCount;
       // The first applied page owns the evidence. A later re-apply of the same
       // page (the live read after the cached replay) must not overwrite it, and
-      // the `settled`/`unreadable` verdict is derived from it plus the
-      // metadata, which may still be landing.
-      if (store.get(firstPageEvidenceAtom) === null) {
+      // the `settled`/`pending`/`unreadable` verdict is derived from it plus the
+      // live run. The one fact a re-apply may add is the admitted-turn count a
+      // cached page read before the field existed never carried: it is fresh
+      // when it arrives, and only ever travels from absent to a number.
+      const evidence = store.get(firstPageEvidenceAtom);
+      if (evidence === null) {
         store.set(firstPageEvidenceAtom, {
           storedRowCount: storedMessageIds.length,
           omittedItemCount: outcome.omittedItemCount,
+          admittedMessages: outcome.admittedMessages,
+        });
+      } else if (
+        evidence.admittedMessages === undefined &&
+        outcome.admittedMessages !== undefined
+      ) {
+        store.set(firstPageEvidenceAtom, {
+          ...evidence,
+          admittedMessages: outcome.admittedMessages,
         });
       }
     }

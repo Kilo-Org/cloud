@@ -15,7 +15,7 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { Copy, MessageSquare, RotateCcw } from '@/components/ui/icons';
 import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
@@ -187,6 +187,7 @@ import { PartRenderer } from '@/components/agents/part-renderer';
 import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
 import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
+  buildTerminalErrorCopyText,
   resolveSessionTerminalError,
   type SessionTerminalError,
   statusIndicatorDuplicatesMessageFailure,
@@ -234,6 +235,7 @@ import { useAppActiveAndFocused } from '@/lib/hooks/use-app-active-and-focused';
 import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
 import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
+import { performCopy } from '@/components/agents/use-message-copy';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -1397,6 +1399,15 @@ export function SessionDetailContent({
     olderMessagesError,
     historyState: transcriptHistory,
   });
+  // The first-page skeleton has two causes with different surfaces. A page that
+  // has not landed yet has nowhere to write, so the session chrome keeps its
+  // loading shape; a live run's first turn is progress the reader can queue a
+  // follow-up into, so its composer stays. One derivation, so the body, the
+  // chrome and the slow-load clock cannot disagree.
+  const historyPendingFirstPage =
+    transcriptHistory.kind === 'pending' && transcriptHistory.reason === 'first-page';
+  const historyStreamingFirstTurn =
+    transcriptHistory.kind === 'pending' && transcriptHistory.reason === 'streaming';
 
   // A zero-item transcript with a live older-page cursor is transient: page
   // until renderable content arrives or the cursor ends. The manager dedupes
@@ -2035,8 +2046,10 @@ export function SessionDetailContent({
   const sessionLoadPhase = useSessionSlowLoadPhase({
     // A first page that has not settled is a load in progress as well: without
     // it a stalled open whose `isLoading` the transport already cleared would
-    // sit on the skeleton with no message and no Retry.
-    isLoading: shouldShowLoading || transcriptHistory.kind === 'pending',
+    // sit on the skeleton with no message and no Retry. A streaming first turn
+    // is excluded: a live run clears the status indicator while it works, so
+    // counting it would swap the skeleton for a Retry over progress.
+    isLoading: shouldShowLoading || historyPendingFirstPage,
     hasContent: messages.length > 0,
     hasError: error !== null,
     hasStatusIndicator: statusIndicator !== null,
@@ -2176,24 +2189,27 @@ export function SessionDetailContent({
   // failed preparation rows arrive: they are the run's own failure statement,
   // so the stale page-load failure has nothing left to say.
   //
-  // A first page that settled with nothing readable is the same failure a
-  // terminal load failure states, and reuses that card, its single Retry latch
-  // and its release on a settled reopen. One card, one latch.
+  // A first page that settled with nothing readable is a terminal failure: the
+  // server fix makes hydration complete before the page answers, so a reopen
+  // re-reads the same result. The card offers no Retry (its one way out is
+  // Back, beside the header's own), so it reuses neither the terminal retry
+  // latch below nor a recovery the reopen cannot perform.
   const historyFailure = useMemo<SessionTerminalError>(
     () => ({
       variant: 'server',
       title: t('agentChat.session.couldNotLoadThisSession'),
       message: t('agentChat.session.historyUnavailable'),
-      retryable: true,
+      retryable: false,
       retryWith: 'session',
       detail: '',
     }),
     [t]
   );
+  const historyUnreadable = terminalError === null && transcriptView === 'history-error';
   const shownTerminalError =
     terminalRetryPending && messages.length === 0 && !hasFailedPreparation
       ? (terminalError ?? terminalRetry.error)
-      : (terminalError ?? (transcriptView === 'history-error' ? historyFailure : null));
+      : (terminalError ?? (historyUnreadable ? historyFailure : null));
   const handleTerminalRetry = (failure: SessionTerminalError): void => {
     if (terminalRetryPending) {
       return;
@@ -2357,13 +2373,20 @@ export function SessionDetailContent({
   // pill's value slots and the bottom slot — keeps its loading shape until the
   // body is painted. A failure, an agent status, or a pending ask is the
   // session speaking, and each keeps the chrome it already has.
+  //
+  // A run that is streaming its first turn is the one loading body that keeps
+  // its composer: the turn is progress, and the reader can still queue a
+  // follow-up into it, so only the page that has not landed yet withdraws the
+  // bottom slot.
   const transcriptRowsHidden = transcriptView === 'list' && !transcriptOpenSettled;
+  // The bottom slot's loading shape belongs to a body that cannot answer yet.
+  const chromeHoldsLoading = shouldShowLoading && !historyStreamingFirstTurn;
   const isSessionChromePending =
-    (shouldShowLoading ||
+    (chromeHoldsLoading ||
       transcriptView === 'older-loading' ||
       // The body is still the skeleton because no first page has settled, so
       // the chrome keeps its loading shape with it.
-      transcriptView === 'history-pending' ||
+      historyPendingFirstPage ||
       transcriptRowsHidden) &&
     terminalError === null &&
     activeQuestion === null &&
@@ -2545,7 +2568,9 @@ export function SessionDetailContent({
   // editable beside the error's Retry instead of locking the composer.
   const isComposerDisabled = resolveSessionComposerDisabled({
     isReadOnly,
-    shouldShowLoading,
+    // A live first turn is not a body that cannot answer: the reader can queue
+    // a follow-up into it, so its input stays editable while the rows land.
+    shouldShowLoading: shouldShowLoading && !historyStreamingFirstTurn,
     hasBlockingInteraction,
     requiresModel,
     // A pinned agent model satisfies the model requirement even before the
@@ -3483,6 +3508,11 @@ export function SessionDetailContent({
           title={shownTerminalError.title}
           message={shownTerminalError.message}
           isRetrying={terminalRetryPending}
+          // A first page that settled with nothing readable is its own failure
+          // surface: the design gate and the mount suite find it by this handle,
+          // and it states a history that cannot be read rather than a failed open
+          // (whose card keeps the shared `centered-state` handle).
+          testID={shownTerminalError === historyFailure ? 'session-history-unreadable' : undefined}
           action={
             <View className="flex-row items-center gap-3">
               {shownTerminalError.retryable ? (
@@ -3492,6 +3522,28 @@ export function SessionDetailContent({
                   loading={terminalRetryPending}
                   onPress={() => {
                     handleTerminalRetry(shownTerminalError);
+                  }}
+                />
+              ) : null}
+              {/* A history that cannot be read offers no retry — the reopen it
+                  would run re-reads the same result — so the card carries what
+                  support needs instead: the session id, what the reader saw and
+                  the untranslated original, behind a quiet control so Back keeps
+                  the screen's one primary action. */}
+              {historyUnreadable ? (
+                <StateAction
+                  label={t('common.copy')}
+                  icon={Copy}
+                  emphasis="quiet"
+                  accessibilityLabel={t('agentChat.session.copyErrorDetails')}
+                  onPress={() => {
+                    void performCopy(
+                      buildTerminalErrorCopyText({
+                        sessionId,
+                        title: historyFailure.title,
+                        message: historyFailure.message,
+                      })
+                    );
                   }}
                 />
               ) : null}

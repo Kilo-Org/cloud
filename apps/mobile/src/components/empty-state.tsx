@@ -78,6 +78,10 @@ type EmptyStateProps = {
    *  around it publishes and compacts on its own, so the form cannot disagree
    *  with the reserve the caller set. */
   compact?: boolean;
+  /** The state's handle for a native test and the design gate, on the node that
+   *  owns the state's box. Omitted by every caller that does not name it; a
+   *  centered state hands it to its `CenteredState`. */
+  testID?: string;
 };
 
 export function EmptyState({
@@ -85,11 +89,22 @@ export function EmptyState({
   refreshControl,
   compact,
   title,
+  testID,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
+  const body = (
+    <EmptyStateBody
+      {...props}
+      title={title}
+      placement={placement}
+      compact={compact}
+      testID={testID}
+    />
+  );
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
+    <CenteredState refreshControl={refreshControl} testID={testID}>
+      {body}
+    </CenteredState>
   ) : (
     body
   );
@@ -110,6 +125,7 @@ function EmptyStateBody({
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
   compactTitleClassName,
+  testID,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
   // The light disc is the card surface and the muted glyph reads on it. The
@@ -139,6 +155,7 @@ function EmptyStateBody({
 
   const content = (
     <View
+      testID={placement === 'center' ? undefined : testID}
       className={cn(
         'items-center',
         inset === 'gutter' && STATE_GUTTER_CLASS,

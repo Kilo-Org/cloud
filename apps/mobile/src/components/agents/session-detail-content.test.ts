@@ -339,24 +339,33 @@ vi.mock('@/components/empty-state', () => ({
 vi.mock('@/components/query-error', async () => {
   const react = await import('react');
   const catalogs = await import('@/i18n');
+  // The stub forwards the state's handle on a host node, the way the real card
+  // hands it to its `EmptyState`, so a test can find one failure surface among
+  // the screen's states.
   return {
     QueryError: ({
       action,
       onRetry,
       isRetrying,
+      testID,
     }: {
       action?: ReactNode;
       onRetry?: () => void;
       isRetrying?: boolean;
+      testID?: string;
     }) =>
-      action ??
-      (onRetry
-        ? react.createElement('StateAction', {
-            label: catalogs.i18n.t('common.retry'),
-            loading: isRetrying,
-            onPress: onRetry,
-          })
-        : null),
+      react.createElement(
+        'QueryErrorState',
+        { testID },
+        action ??
+          (onRetry
+            ? react.createElement('StateAction', {
+                label: catalogs.i18n.t('common.retry'),
+                loading: isRetrying,
+                onPress: onRetry,
+              })
+            : null)
+      ),
   };
 });
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -952,7 +961,11 @@ function toolRunMessage(
 function page(
   sessionId: KiloSessionId,
   messages: StoredMessage[],
-  options: { goal?: SessionGoal; nextCursor?: string | null } = {}
+  options: {
+    goal?: SessionGoal;
+    nextCursor?: string | null;
+    admittedMessages?: number;
+  } = {}
 ): SessionSnapshotPageOutcome {
   return {
     kind: 'success',
@@ -960,8 +973,18 @@ function page(
     messages,
     nextCursor: options.nextCursor ?? null,
     omittedItemCount: 0,
+    ...(options.admittedMessages === undefined
+      ? {}
+      : { admittedMessages: options.admittedMessages }),
   };
 }
+
+/**
+ * The admitted-turn count the root page reports, set by a test before
+ * `mountDetails`. `undefined` keeps the page the way a server older than the
+ * field answers it, which is the fixture every other test relies on.
+ */
+let rootPageAdmittedMessages: number | undefined = undefined;
 
 // Set before `mountDetails` by the zero-render guard tests; the root page
 // resolves with this cursor instead of the default `null`.
@@ -1036,6 +1059,7 @@ beforeEach(() => {
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
+  rootPageAdmittedMessages = undefined;
   sessionTitleOverride = null;
   pendingSend = null;
   condensePreference.value = false;
@@ -1053,7 +1077,6 @@ beforeEach(() => {
   vi.mocked(createAndNavigateAgentSession).mockReset();
   vi.mocked(restartAgentSession).mockReset();
 });
-
 type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
@@ -1135,7 +1158,13 @@ async function mountDetails(
         // load a zero-render transcript triggers) stays pending for `respond`.
         rootPages.delete(id);
         response.resolve(
-          page(id, messages, { goal: goalMountOptions.goal, nextCursor: rootPageNextCursor })
+          page(id, messages, {
+            goal: goalMountOptions.goal,
+            nextCursor: rootPageNextCursor,
+            ...(rootPageAdmittedMessages === undefined
+              ? {}
+              : { admittedMessages: rootPageAdmittedMessages }),
+          })
         );
       }
       const outcome = await response.promise;
@@ -3261,6 +3290,82 @@ describe('session detail slow load', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('session detail first-page history state', () => {
+  /** The unreadable-history card's action labels, in the order the slot draws them. */
+  function historyCardActions(view: { renderer: ReactTestRenderer }): string[] {
+    return view.renderer.root
+      .findByProps({ testID: 'session-history-unreadable' })
+      .findAll(node => Object.is(node.type, 'StateAction'))
+      .map(node => String(node.props.label));
+  }
+
+  it('states a first page that settled unreadable as a terminal card with no Retry', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // A page the reader matched no row of, from a session whose run admitted
+    // turns: the page's own count is what tells this apart from an empty one.
+    rootPageAdmittedMessages = 3;
+    const view = await mountDetails([]);
+
+    expect(view.store.get(view.manager.atoms.transcriptHistory)).toEqual({ kind: 'unreadable' });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(view.renderer.root.findByType(QueryError).props).toMatchObject({
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      message: i18n.t('agentChat.session.historyUnavailable'),
+    });
+    // The card carries Copy and the screen's way back, and no Retry: a reopen
+    // re-reads the same result.
+    expect(historyCardActions(view)).toEqual([
+      i18n.t('common.copy'),
+      i18n.t('agentChat.session.backToSessions'),
+    ]);
+    expect(
+      view.renderer.root.findAll(
+        node => Object.is(node.type, 'StateAction') && node.props.label === i18n.t('common.retry')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps the skeleton and withdraws the session chrome while the first page has not landed', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // The page read never answers, so no first page has settled.
+    const view = await mountDetails(null);
+
+    expect(view.store.get(view.manager.atoms.transcriptHistory)).toEqual({
+      kind: 'pending',
+      reason: 'first-page',
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    // The bottom slot is still the composer's reserve: nothing can be written
+    // into a session whose history was never read.
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
+  it('keeps the composer available for a run that is streaming its first turn', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // The page landed with no row while the run admitted a turn: that is
+    // progress, not a history that cannot be read.
+    rootPageAdmittedMessages = 1;
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.isStreaming, true);
+    });
+
+    expect(view.store.get(view.manager.atoms.transcriptHistory)).toEqual({
+      kind: 'pending',
+      reason: 'streaming',
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    // The reader can queue the follow-up into the live turn, so the input is
+    // mounted and unlocked instead of being replaced by its reserve.
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.disabled).toBe(false);
   });
 });
 

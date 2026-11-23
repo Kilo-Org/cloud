@@ -42,10 +42,14 @@ type SessionTranscriptView =
  * The first-page lifecycle outranks the empty state: while no first page has
  * settled the skeleton stays up (`history-pending`), because an empty
  * transcript would claim the session has nothing to show before its history
- * was read. A first page that settled with no readable row (`unreadable`)
- * gets its own retryable failure (`history-error`) rather than that same
- * claim. A `settled` page keeps the original behaviour, including the
- * terminal older-page fallthrough to `empty`.
+ * was read. Both reasons a first page can be pending — the page has not landed
+ * (`first-page`), or the page landed with no row while the run is still
+ * streaming its first turn (`streaming`) — keep that skeleton; the screen
+ * decides the session chrome around it from the reason. A first page that
+ * settled with no readable row (`unreadable`) gets its own terminal failure
+ * (`history-error`) rather than that same claim. A `settled` page keeps the
+ * original behaviour, including the terminal older-page fallthrough to
+ * `empty`.
  */
 export function resolveSessionTranscriptView({
   transcriptItemCount,

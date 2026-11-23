@@ -15,6 +15,7 @@ import {
   ownerChoices,
   type ProfileOwnerChoice,
 } from '@/components/profiles/profile-owner-model';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,10 @@ export function NewProfileScreen({
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
+  // A create whose request is in flight owns the route: Back is dropped instead
+  // of popping the form, because the removal the save dispatches when it lands
+  // would then pop the scene a second time.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: create.isPending });
   const nameField = useProfileNameField();
   const descriptionRef = useRef('');
   // `null` until the user picks: the route's request, or Personal, applies
@@ -146,12 +151,18 @@ export function NewProfileScreen({
       // The caller is collecting a profile to select, so it keeps its form and
       // the user's place in it; only a direct create opens the new profile.
       if (returnToCaller && router.canGoBack()) {
-        router.back();
+        guard.leaveWithoutAsking(() => {
+          router.back();
+        });
         return;
       }
-      stackSafeRouter.replace(
-        getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
-      );
+      // The guard disarms before the removal is dispatched, so the push-then-
+      // retire hand-off is not intercepted as a Back that the form must hold.
+      guard.leaveWithoutAsking(() => {
+        stackSafeRouter.replace(
+          getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
+        );
+      });
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.createFailed'));
@@ -212,6 +223,7 @@ export function NewProfileScreen({
           <Text>{t('profiles.createAction')}</Text>
         </Button>
       </TabScreenScrollView>
+      {guard.dialog}
     </View>
   );
 }

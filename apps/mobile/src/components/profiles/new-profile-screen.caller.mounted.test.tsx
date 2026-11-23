@@ -19,25 +19,58 @@ const boundaryState = vi.hoisted(() => ({
   role: 'owner' as string | undefined,
   isResolving: false,
 }));
+const mutationState = vi.hoisted(() => ({
+  create: { mutateAsync: createMutate, isPending: false },
+}));
+// The guard's own surface: the flag and handler it registers, the confirmation
+// it would raise, and the flag each leave saw when it was dispatched.
+const guard = vi.hoisted(() => ({
+  enabled: false,
+  handler: undefined as
+    | ((options: { data: { action: { type: string } }; repeat: () => void }) => void)
+    | undefined,
+  confirm: vi.fn(),
+  repeat: vi.fn(),
+  repeatSawEnabled: [] as boolean[],
+  backSawEnabled: [] as boolean[],
+  replaceSawEnabled: [] as boolean[],
+}));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the render case below.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfileMutations: () => ({ create: { mutateAsync: createMutate, isPending: false } }),
+  useAgentProfileMutations: () => mutationState,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({
+  usePreventRemove: (
+    enabled: boolean,
+    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
+  ) => {
+    guard.enabled = enabled;
+    guard.handler = handler;
+  },
   useRouter: () => ({
     replace: routerReplace,
     back: routerBack,
     canGoBack: () => routerCanGoBack.value,
   }),
 }));
-
 // The post-create hand-off goes through the push-then-retire hook that keeps
 // Android Fabric alive; its own mechanics have their own suite, so
 // here it stands in for the navigation call and the assertions stay about the
 // destination href.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: routerReplace }),
+}));
+// The screen arms its leave guard for the write window; the confirm branch is
+// unreachable here (no dirty path), so the dialog is a marker the suite asserts
+// the screen renders.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (organizationId?: string) => {
@@ -91,6 +124,23 @@ async function pressCreate(root: ReactTestInstance): Promise<void> {
   });
 }
 
+/** Hand the guard the removal the navigator produces for a Back press. */
+function pressBack(): void {
+  const handler = guard.handler;
+  if (!handler) {
+    throw new Error('the leave guard did not register a removal handler');
+  }
+  act(() => {
+    handler({
+      data: { action: { type: 'GO_BACK' } },
+      repeat: () => {
+        guard.repeatSawEnabled.push(guard.enabled);
+        guard.repeat();
+      },
+    });
+  });
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('NewProfileScreen caller request', () => {
@@ -98,12 +148,37 @@ describe('NewProfileScreen caller request', () => {
     createMutate.mockReset();
     routerReplace.mockReset();
     routerBack.mockReset();
+    guard.confirm.mockReset();
+    guard.repeat.mockReset();
+    guard.repeatSawEnabled = [];
+    guard.backSawEnabled = [];
+    guard.replaceSawEnabled = [];
+    guard.enabled = false;
+    guard.handler = undefined;
+    routerBack.mockImplementation(() => {
+      guard.backSawEnabled.push(guard.enabled);
+    });
+    routerReplace.mockImplementation(() => {
+      guard.replaceSawEnabled.push(guard.enabled);
+    });
     routerCanGoBack.value = true;
     createMutate.mockResolvedValue({ id: 'profile-1' });
+    mutationState.create.isPending = false;
     boundaryState.organizationId = 'org-1';
     boundaryState.role = 'owner';
     boundaryState.org = { organizationName: 'First test organization' };
     boundaryState.isResolving = false;
+  });
+
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await mount({});
+
+    expect(findAll(renderer.root, DISCARD_DIALOG)).toHaveLength(1);
+
+    unmount();
   });
 
   it('starts on the owner its caller asked for and hands the form back on save', async () => {
@@ -122,6 +197,9 @@ describe('NewProfileScreen caller request', () => {
       name: 'Org profile',
       organizationId: 'org-1',
     });
+    // The leave waits one task behind the guard's disarm render, so the pop is
+    // dispatched in a macrotask of its own.
+    await waitFor(() => routerBack.mock.calls.length > 0);
     expect(routerBack).toHaveBeenCalledOnce();
     expect(routerReplace).not.toHaveBeenCalled();
 
@@ -139,6 +217,7 @@ describe('NewProfileScreen caller request', () => {
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);
+    await waitFor(() => routerReplace.mock.calls.length > 0);
     expect(routerBack).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith(
       '/(app)/profile-management/profile-1?organizationId=org-1'
@@ -154,6 +233,7 @@ describe('NewProfileScreen caller request', () => {
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);
+    await waitFor(() => routerReplace.mock.calls.length > 0);
     expect(routerBack).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith(
       '/(app)/profile-management/profile-1?organizationId=org-1'
@@ -189,6 +269,55 @@ describe('NewProfileScreen caller request', () => {
 
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+
+    unmount();
+  });
+
+  it('drops Back while the create is in flight and raises no prompt', async () => {
+    mutationState.create.isPending = true;
+    const { renderer, unmount } = await mount({ returnToCaller: true });
+
+    expect(guard.enabled).toBe(true);
+
+    pressBack();
+
+    expect(guard.repeat).not.toHaveBeenCalled();
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.enabled).toBe(true);
+    // The reader is still on the form the write belongs to.
+    expect(findAll(renderer.root, 'FormField')).not.toHaveLength(0);
+
+    unmount();
+  });
+
+  it('leaves on Back when no create is in flight', async () => {
+    const { unmount } = await mount({ returnToCaller: true });
+
+    expect(guard.enabled).toBe(false);
+
+    pressBack();
+
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.repeat).toHaveBeenCalledTimes(1);
+    expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
+  });
+
+  // The hand-back is a leave the guard speaks for: the caller's form is popped
+  // only after the disarm render, so the navigator sees a plain pop.
+  it('hands the form back through the guard, disarmed before the pop', async () => {
+    mutationState.create.isPending = true;
+    const { renderer, unmount } = await mount({ returnToCaller: true });
+    expect(guard.enabled).toBe(true);
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+    await waitFor(() => routerBack.mock.calls.length === 1);
+
+    expect(guard.backSawEnabled).toEqual([false]);
+    expect(guard.confirm).not.toHaveBeenCalled();
+    await waitFor(() => !guard.enabled);
 
     unmount();
   });

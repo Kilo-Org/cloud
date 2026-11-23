@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { scrollTo as scrollToSpy } from '@/test/scroll-view-mock';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 
@@ -44,6 +44,25 @@ const status = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
 }));
+// The leave guard's own surface: the flag and removal handler it registers, the
+// confirmation it would raise, and the flag the review exit saw when the leave
+// dispatched it.
+const guard = vi.hoisted(() => ({
+  enabled: false,
+  handler: undefined as
+    | ((options: { data: { action: { type: string } }; repeat: () => void }) => void)
+    | undefined,
+  confirm: vi.fn(),
+  repeat: vi.fn(),
+  repeatSawEnabled: [] as boolean[],
+  replaceSawEnabled: [] as boolean[],
+}));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the guard suite's render case.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
+/** The review detail route the settled start opens, dispatched by the guard's leave. */
 // The footer reads its keyboard lift from the root `KeyboardProvider` instead of
 // listening to React Native's keyboard events. The store below is driven per
 // test so the footer clearance can be asserted against a raised keyboard; the
@@ -142,6 +161,13 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('expo-router', () => ({
+  usePreventRemove: (
+    enabled: boolean,
+    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
+  ) => {
+    guard.enabled = enabled;
+    guard.handler = handler;
+  },
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
@@ -150,6 +176,12 @@ vi.mock('expo-router', () => ({
 // destination it is handed.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: status.replace }),
+}));
+// The screen's leave guard renders its discard confirmation through this hook;
+// the confirm branch is unreachable here (no dirty path), so the dialog is a
+// marker the guard suite asserts the screen renders.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 // The connect actions read the reader's organization role for a trial refusal.
 vi.mock('@/lib/organization-context', () => ({
@@ -385,6 +417,15 @@ beforeEach(() => {
   operationKey.getKey.mockClear();
   operationKey.rotateKey.mockClear();
   scrollToSpy.mockClear();
+  guard.confirm.mockReset();
+  guard.repeat.mockReset();
+  guard.repeatSawEnabled = [];
+  guard.replaceSawEnabled = [];
+  guard.enabled = false;
+  guard.handler = undefined;
+  status.replace.mockImplementation(() => {
+    guard.replaceSawEnabled.push(guard.enabled);
+  });
 });
 
 describe.each(['android', 'ios'] as const)(
@@ -891,7 +932,9 @@ describe('ManualReviewScreen start operation key', () => {
     // The fulfilled intent ends, so a later Start of the same draft is a new
     // review rather than a replay of this one.
     expect(operationKey.rotateKey).toHaveBeenCalledTimes(1);
-    // The review replaces this form once it exists.
+    // The review replaces this form once it exists. The guard speaks for the
+    // leave, so the removal is dispatched one task behind its disarm render.
+    await waitFor(() => status.replace.mock.calls.length > 0);
     expect(status.replace).toHaveBeenCalledExactlyOnceWith(
       '/(app)/code-reviewer/personal/reviews/review-1'
     );
@@ -1304,6 +1347,161 @@ describe('ManualReviewScreen platform-shaped URL field', () => {
     expect(renderedTexts(renderer.root)).toContain(
       i18n.t('codeReviewer.manualReview.invalidMergeRequestUrl')
     );
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen leave guard', () => {
+  type StartCallbacks = {
+    onSuccess?: (result: { reviewId: string }) => void;
+    onError?: (error: Error) => void;
+  };
+
+  /** Records each start's callbacks so the case can settle the call. */
+  function captureStarts(): { onSuccess?: StartCallbacks['onSuccess'] }[] {
+    const calls: { onSuccess?: StartCallbacks['onSuccess'] }[] = [];
+    status.mutate.mockImplementation((_vars: unknown, callbacks: StartCallbacks) => {
+      calls.push(callbacks);
+      return undefined;
+    });
+    return calls;
+  }
+
+  function primaryAction(root: TestRenderer.ReactTestInstance) {
+    return only(
+      findAllOfType(root, 'Button').filter(node => propOf(node, 'variant') !== 'outline'),
+      'primary action'
+    );
+  }
+
+  function startDraft(root: TestRenderer.ReactTestInstance) {
+    act(() => {
+      (propOf(urlField(root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    act(() => {
+      (propOf(primaryAction(root), 'onPress') as () => void)();
+    });
+  }
+
+  /** Hand the guard the removal the navigator produces for a Back press. */
+  function pressBack() {
+    const handler = guard.handler;
+    if (!handler) {
+      throw new Error('the leave guard did not register a removal handler');
+    }
+    act(() => {
+      handler({
+        data: { action: { type: 'GO_BACK' } },
+        repeat: () => {
+          guard.repeatSawEnabled.push(guard.enabled);
+          guard.repeat();
+        },
+      });
+    });
+  }
+
+  // The start owns the route for as long as its request runs: a Back pressed
+  // while it is out must hold the reader on the form, because the review route
+  // the success dispatches would otherwise pop the scene a second time. This
+  // case fails on the screen before the guard, where the Back left the form.
+  it('drops Back while the start is in flight and raises no prompt', async () => {
+    status.pending = true;
+    status.mutate.mockImplementation(() => undefined);
+    const { renderer, unmount } = await renderScreen();
+    startDraft(renderer.root);
+
+    expect(guard.enabled).toBe(true);
+
+    pressBack();
+
+    expect(guard.repeat).not.toHaveBeenCalled();
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.enabled).toBe(true);
+
+    unmount();
+  });
+
+  it('leaves on Back when no start is in flight', async () => {
+    const { unmount } = await renderScreen();
+
+    expect(guard.enabled).toBe(false);
+
+    pressBack();
+
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.repeat).toHaveBeenCalledTimes(1);
+    expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
+  });
+
+  // The success's own exit is a leave the guard speaks for: the disarm render
+  // lands before the review route is dispatched, so the native stack sees a
+  // plain push of the review and the retire that follows its transition.
+  it('opens the review through the guard, disarmed before the dispatch', async () => {
+    // The guard is armed for the whole request, including the deadline stall
+    // the watchdog releases the button on: `saving` reads the mutation, not the
+    // watchdog.
+    status.pending = true;
+    const calls = captureStarts();
+    const { renderer, unmount } = await renderScreen();
+    startDraft(renderer.root);
+    expect(guard.enabled).toBe(true);
+
+    act(() => calls[0]?.onSuccess?.({ reviewId: 'review-1' }));
+
+    await waitFor(() => status.replace.mock.calls.length === 1);
+    expect(status.replace).toHaveBeenCalledWith('/(app)/code-reviewer/personal/reviews/review-1');
+    expect(guard.replaceSawEnabled).toEqual([false]);
+    expect(guard.confirm).not.toHaveBeenCalled();
+    await waitFor(() => !guard.enabled);
+
+    unmount();
+  });
+
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await renderScreen();
+
+    expect(renderer.root.findAll(node => Object.is(node.type, DISCARD_DIALOG))).toHaveLength(1);
+
+    unmount();
+  });
+
+  // A withdrawn attempt's late success describes a draft that is no longer on
+  // screen, so it neither ends the current intent's key nor navigates. The
+  // leave is dispatched a task after the guard's disarm render, so the case
+  // yields one macrotask before it asserts the absence of both side effects:
+  // an assertion made in the same turn as the settle would miss the dispatch.
+  it('does not open a review for a withdrawn attempt that succeeds late', async () => {
+    const calls = captureStarts();
+    const { renderer, unmount } = await renderScreen();
+    startDraft(renderer.root);
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        `${GITHUB_PR_URL}/files`
+      );
+    });
+    act(() => {
+      (propOf(primaryAction(renderer.root), 'onPress') as () => void)();
+    });
+
+    act(() => calls[0]?.onSuccess?.({ reviewId: 'review-old-draft' }));
+    // One macrotask, because the leave dispatches a task after the guard's
+    // disarm render.
+    const leaveTask = Promise.withResolvers<undefined>();
+    setTimeout(() => {
+      leaveTask.resolve(undefined);
+    }, 0);
+    await act(async () => {
+      await leaveTask.promise;
+    });
+
+    expect(status.replace).not.toHaveBeenCalled();
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
 
     unmount();
   });

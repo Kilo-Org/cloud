@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen renders four states (organization boundary, permission refusal, provider list pending/error, form) on top of the leave guard's hook, `pending` derivation and dialog. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,6 +10,7 @@ import { ProviderKeyCredentialForm } from '@/components/account/provider-key-cre
 import { ProviderKeySaveFailure } from '@/components/account/provider-key-save-failure';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -43,6 +45,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
@@ -78,6 +81,11 @@ export function ProviderKeyNewScreen() {
   const [fieldErrors, setFieldErrors] =
     useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
   const save = useSurfaceFeedback<KeySaveFailure>();
+  const pending = save.feedback.status === 'pending';
+  // A Back during the save must not remove this route: the save's own
+  // `dismissTo` would then remove the same scene a second time and reboot the
+  // Android stack. The guard drops it, so the reader stays here.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: pending });
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;
@@ -96,13 +104,15 @@ export function ProviderKeyNewScreen() {
     []
   );
 
-  const create = useMutation(trpc.byok.create.mutationOptions({}));
-  const update = useMutation(trpc.byok.update.mutationOptions({}));
+  // A save is an outcome to attempt, not a precondition on connectivity: on the
+  // default `networkMode: 'online'` a save tapped while the device reports
+  // itself offline pauses, so `pending` never clears and the leave guard holds
+  // Back until the connection returns. The attempt settles either way.
+  const create = useMutation(trpc.byok.create.mutationOptions({ ...MUTATE_WHILE_OFFLINE }));
+  const update = useMutation(trpc.byok.update.mutationOptions({ ...MUTATE_WHILE_OFFLINE }));
 
   const backHref = providerKeysHref(scope);
-  const title = keyId
-    ? t('profile.providerKeys.editKeyTitle')
-    : t('profile.providerKeys.newKeyTitle');
+  const title = t(keyId ? 'profile.providerKeys.editKeyTitle' : 'profile.providerKeys.newKeyTitle');
 
   if (scope.kind === 'organization' && (isResolving || org == null)) {
     // Not resolved, a failed organization list, or an id the viewer is not a
@@ -278,7 +288,11 @@ export function ProviderKeyNewScreen() {
       keyId === undefined ? t('profile.providerKeys.added') : t('profile.providerKeys.updated')
     );
     attempt.abandon();
-    router.dismissTo(backHref);
+    // The save owns its exit: the guard is disarmed in this render and the pop
+    // goes out one task later, so the stack sees a plain pop, not a replay.
+    guard.leaveWithoutAsking(() => {
+      router.dismissTo(backHref);
+    });
   };
 
   const saveFailure = (
@@ -288,8 +302,6 @@ export function ProviderKeyNewScreen() {
       retryLabel={t('common.retry')}
     />
   );
-
-  const pending = save.feedback.status === 'pending';
 
   return (
     <View className="flex-1 bg-background">
@@ -353,6 +365,7 @@ export function ProviderKeyNewScreen() {
           <Text>{keyId === undefined ? t('profile.providerKeys.add') : t('common.save')}</Text>
         </Button>
       </TabScreenScrollView>
+      {guard.dialog}
     </View>
   );
 }

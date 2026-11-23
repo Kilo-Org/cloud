@@ -20,6 +20,7 @@ import { GitHubIcon } from '@/components/icons/github-icon';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -159,6 +160,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   // control-plane deadline while the request is still pending, releases the
   // busy button, and a late success still navigates.
   const createReview = useCreateManualReview(scope, { silent: true });
+  // The start owns this route for as long as its request runs, which is longer
+  // than the watchdog's busy button: the deadline releases the action while the
+  // request is still out, so the guard reads the mutation's own pending flag.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: createReview.isPending });
   // One operation key per draft intent: a retry of the draft this stall belongs
   // to replays the review the server already accepted, instead of creating a
   // second one for the same change.
@@ -221,9 +226,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // review, not a replay of this one.
             rotateKey();
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
-            // The hand-off swaps this form for the review in one commit, which
-            // crashes Android Fabric: push, then retire the form.
-            stackSafeRouter.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+            // The review detail replaces this form, so Back must not return to a
+            // Start for a review that now exists: the guard disarms before the
+            // removal is dispatched, which keeps the retire that follows the push
+            // from being intercepted.
+            guard.leaveWithoutAsking(() => {
+              stackSafeRouter.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+            });
           },
           onError: error => {
             // A client-deadline rejection is the stall, not a server reason:
@@ -516,6 +525,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           </Button>
         </ManualReviewActionFooter>
       </KeyboardAvoidingView>
+      {guard.dialog}
     </View>
   );
 }

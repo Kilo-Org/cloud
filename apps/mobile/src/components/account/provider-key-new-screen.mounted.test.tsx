@@ -13,7 +13,7 @@ import {
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { type ModelMapping } from '@/lib/byok/credential-fields';
 
@@ -37,7 +37,11 @@ type ScreenState = {
   role: string | undefined;
   mutateAsync: Mock;
   dismissTo: Mock;
+  /** The guard flag recorded when each dismissal is dispatched. */
+  dismissSawEnabled: boolean[];
 };
+
+type RemovalHandler = (options: { data: { action: { type: string } }; repeat: () => void }) => void;
 
 const ORG_ID = '6f1c2f9a-0d3b-4a55-9c1e-2b8f7c4d5e60';
 const KEY_ID = '2b8f7c4d-5e60-4a55-9c1e-6f1c2f9a0d3b';
@@ -49,12 +53,34 @@ const state = vi.hoisted((): ScreenState => ({
   role: 'owner',
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
+  dismissSawEnabled: [],
+}));
+
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the render case below.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
+
+/**
+ * The leave guard's registration, recorded the way the navigator would read it:
+ * the flag the screen asked for and the handler a removal reaches. `confirm`
+ * stands in for the discard prompt, which the guard must never raise here.
+ */
+const guard = vi.hoisted(() => ({
+  enabled: false,
+  handler: undefined as RemovalHandler | undefined,
+  confirm: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => state.params,
   useRouter: () => ({ dismissTo: state.dismissTo }),
+  usePreventRemove: (enabled: boolean, handler: RemovalHandler) => {
+    guard.enabled = enabled;
+    guard.handler = handler;
+  },
 }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
@@ -97,6 +123,9 @@ vi.mock('@/lib/trpc', () => ({
       update: { mutationOptions: (options: MutationOptions) => ({ ...options, kind: 'update' }) },
     },
   }),
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 vi.mock('@/components/account/provider-key-credential-form', () => ({
   ProviderKeyCredentialForm: 'CredentialForm',
@@ -183,9 +212,62 @@ async function submitKey(root: ReactTestRenderer['root'], key: string) {
   act(() => {
     (apiKeyField(root).props.onChangeText as (value: string) => void)(key);
   });
-  await act(() => {
+  await act(async () => {
     (addButton(root).props.onPress as () => void)();
+    // A save that lands leaves through the guard, which schedules its pop one
+    // task after the disarm render. This tick is queued before that one, so the
+    // second tick is what carries the pop out.
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
   });
+}
+
+/**
+ * Press Add key and leave the request unsettled, so the screen renders its
+ * pending state. The returned `resolve` lands the save the way the server would.
+ */
+async function submitKeyPending(root: ReactTestRenderer['root'], key: string) {
+  const deferred = Promise.withResolvers<undefined>();
+  state.mutateAsync.mockReturnValueOnce(deferred.promise);
+  act(() => {
+    (apiKeyField(root).props.onChangeText as (value: string) => void)(key);
+  });
+  // The press starts an async `submit`; the state write it makes inside the
+  // first await resolves before the promise the request holds.
+  await act(async () => {
+    (addButton(root).props.onPress as () => void)();
+    await Promise.resolve();
+  });
+  return {
+    resolve: async () => {
+      await act(async () => {
+        deferred.resolve(undefined);
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
+/** Hand the guard the removal a Back press produces. */
+function pressBack() {
+  const handler = guard.handler;
+  if (!handler) {
+    throw new Error('the guard did not register a removal handler');
+  }
+  const repeat = vi.fn();
+  act(() => {
+    handler({
+      data: { action: { type: 'GO_BACK' } },
+      repeat: () => {
+        repeat();
+      },
+    });
+  });
+  return repeat;
 }
 
 beforeEach(() => {
@@ -197,6 +279,16 @@ beforeEach(() => {
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
+  state.dismissSawEnabled = [];
+  // The flag at dispatch is the property under test: the guard must already be
+  // disarmed in this render, or the native stack replays the removal after the
+  // pop and takes a second scene with it.
+  state.dismissTo.mockImplementation(() => {
+    state.dismissSawEnabled.push(guard.enabled);
+  });
+  guard.enabled = false;
+  guard.handler = undefined;
+  guard.confirm.mockClear();
 });
 
 afterEach(() => {
@@ -688,5 +780,66 @@ describe('ProviderKeyNewScreen', () => {
 
     expect(root.findAll(node => Object.is(node.type, 'InvalidRouteState'))).toHaveLength(1);
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
+  });
+
+  // The guard returns the discard confirmation as an element the screen must
+  // render: without it a dirty Back stores a request no dialog ever shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, DISCARD_DIALOG))).toHaveLength(1);
+  });
+
+  // The write window is the only thing this guard answers: a Back there must not
+  // remove the route, because the save's own `dismissTo` would then be a second
+  // removal of the same scene and reboot the Android native stack.
+  it('drops a Back while the save is in flight and keeps the form on screen', async () => {
+    const root = await mount();
+    await submitKeyPending(root, 'sk-test-123');
+
+    expect(guard.enabled).toBe(true);
+    const repeat = pressBack();
+
+    // The removal is dropped, not prompted: Discard cannot call the request back.
+    expect(repeat).not.toHaveBeenCalled();
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+    // The screen the removal would have popped is still the pending form.
+    expect(addButton(root).props.loading).toBe(true);
+  });
+
+  it('leaves on Back when no save is in flight', async () => {
+    await mount();
+
+    expect(guard.enabled).toBe(false);
+    const repeat = pressBack();
+
+    expect(repeat).toHaveBeenCalledTimes(1);
+    expect(guard.confirm).not.toHaveBeenCalled();
+  });
+
+  it('exits through the guard when the save lands, so the scene leaves once', async () => {
+    const root = await mount();
+    const save = await submitKeyPending(root, 'sk-test-123');
+
+    // Android Back arrives while the request is still out, as it does in the
+    // report; the guard holds the route.
+    const backRepeat = pressBack();
+    expect(backRepeat).not.toHaveBeenCalled();
+
+    await save.resolve();
+    await waitFor(() => state.dismissTo.mock.calls.length > 0);
+
+    // The form's own exit is the leave, dispatched after the disarm render: one
+    // dismissal of the list href, and no removal replayed from a still-armed
+    // guard. The device run proves the ordering the native stack sees; this
+    // suite proves the screen asks for the disarmed leave and nothing else.
+    expect(state.dismissTo).toHaveBeenCalledTimes(1);
+    expect(state.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-keys');
+    // The dismissal saw a disarmed guard: a submit that called `dismissTo`
+    // directly would leave it armed and be popped again by the stack.
+    expect(state.dismissSawEnabled).toEqual([false]);
+    expect(guard.enabled).toBe(false);
+    expect(backRepeat).not.toHaveBeenCalled();
   });
 });

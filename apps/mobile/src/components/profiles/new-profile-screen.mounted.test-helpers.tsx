@@ -20,6 +20,23 @@ const boundaryState = vi.hoisted(() => ({
 const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
+// The leave guard's own surface: the flag and removal handler it registers, the
+// confirmation it would raise, and the flag each leave saw when it dispatched.
+const guard = vi.hoisted(() => ({
+  enabled: false,
+  handler: undefined as
+    | ((options: { data: { action: { type: string } }; repeat: () => void }) => void)
+    | undefined,
+  confirm: vi.fn(),
+  repeat: vi.fn(),
+  repeatSawEnabled: [] as boolean[],
+  replaceSawEnabled: [] as boolean[],
+}));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the mounted suite's render case.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => mutationState,
@@ -30,7 +47,21 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
+  usePreventRemove: (
+    enabled: boolean,
+    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
+  ) => {
+    guard.enabled = enabled;
+    guard.handler = handler;
+  },
   useRouter: () => ({ canGoBack: () => false, back: () => undefined }),
+}));
+
+// The form arms its leave guard for the write window; the confirm branch is
+// unreachable here (the name is committed once), so the dialog is a marker the
+// mounted suite asserts the screen renders.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 
 // The post-create hand-off goes through the push-then-retire hook that keeps
@@ -64,7 +95,16 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { boundaryState, createMutate, routerReplace, toastError, toastSuccess };
+export {
+  boundaryState,
+  createMutate,
+  DISCARD_DIALOG,
+  guard,
+  mutationState,
+  routerReplace,
+  toastError,
+  toastSuccess,
+};
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
@@ -129,6 +169,17 @@ export function resetNewProfileState(): void {
   toastSuccess.mockReset();
   toastError.mockReset();
   routerReplace.mockReset();
+  guard.confirm.mockReset();
+  guard.repeat.mockReset();
+  guard.repeatSawEnabled = [];
+  guard.replaceSawEnabled = [];
+  guard.enabled = false;
+  guard.handler = undefined;
+  // The overview exit is a leave the guard speaks for; record its flag at
+  // dispatch so a case can prove the disarm render landed first.
+  routerReplace.mockImplementation(() => {
+    guard.replaceSawEnabled.push(guard.enabled);
+  });
   createMutate.mockResolvedValue({ id: 'profile-1' });
   boundaryState.organizationId = 'org-1';
   boundaryState.role = 'owner';

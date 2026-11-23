@@ -13,6 +13,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 function isPersonal(scope: string) {
@@ -481,6 +482,11 @@ export function useCreateManualReview(
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
+    // The screen guards its Back press on this mutation's `isPending`: on the
+    // default `networkMode: 'online'` a create tapped while the device reports
+    // itself offline pauses, so nothing settles and the leave guard would drop
+    // Back until connectivity returned. The attempt settles either way.
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: createManualReviewMutationFn.bind(null, scope),
     onSuccess: () => {
       invalidateReviews();

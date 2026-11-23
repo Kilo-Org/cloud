@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   boundaryState,
   createMutate,
+  DISCARD_DIALOG,
   findAll,
   findField,
   findOwnerControl,
+  guard,
   mount,
+  mutationState,
   pressCreate,
   resetNewProfileState,
   routerReplace,
@@ -16,6 +19,23 @@ import {
 } from '@/components/profiles/new-profile-screen.mounted.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+
+/** Hand the guard the removal the navigator produces for a Back press. */
+function pressBack(): void {
+  const handler = guard.handler;
+  if (!handler) {
+    throw new Error('the leave guard did not register a removal handler');
+  }
+  act(() => {
+    handler({
+      data: { action: { type: 'GO_BACK' } },
+      repeat: () => {
+        guard.repeatSawEnabled.push(guard.enabled);
+        guard.repeat();
+      },
+    });
+  });
+}
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +82,9 @@ describe('NewProfileScreen', () => {
     expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     expect(toastSuccess).toHaveBeenCalledWith('Profile "Backend debugging" created');
+    // The leave waits one task behind the guard's disarm render, so the
+    // overview route is dispatched in a macrotask of its own.
+    await waitFor(() => routerReplace.mock.calls.length > 0);
     expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
     unmount();
@@ -86,6 +109,7 @@ describe('NewProfileScreen', () => {
         name: 'Org profile',
         organizationId: 'org-1',
       });
+      await waitFor(() => routerReplace.mock.calls.length > 0);
       expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
 
       unmount();
@@ -161,6 +185,7 @@ describe('NewProfileScreen', () => {
 
       await waitFor(() => createMutate.mock.calls.length > 0);
       expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      await waitFor(() => routerReplace.mock.calls.length > 0);
       expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
       unmount();
@@ -185,6 +210,7 @@ describe('NewProfileScreen', () => {
 
       await waitFor(() => createMutate.mock.calls.length > 0);
       expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      await waitFor(() => routerReplace.mock.calls.length > 0);
       expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
       unmount();
@@ -209,6 +235,7 @@ describe('NewProfileScreen', () => {
 
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+    await waitFor(() => routerReplace.mock.calls.length > 0);
     expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
 
     unmount();
@@ -262,6 +289,72 @@ describe('NewProfileScreen', () => {
     expect(toastError).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Profile name').props.error).toBeUndefined();
     expect(routerReplace).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(findAll(renderer.root, DISCARD_DIALOG)).toHaveLength(1);
+
+    unmount();
+  });
+
+  // A create in flight owns the route: a Back pressed while the request runs
+  // must not pop the form, because the save's own removal would then pop the
+  // scene a second time and reboot the Android stack. This case fails on the
+  // screen before the guard, where the Back left the form mid-save.
+  it('drops Back while the create is in flight and raises no prompt', async () => {
+    mutationState.create.isPending = true;
+    const { renderer, unmount } = await mount();
+
+    expect(guard.enabled).toBe(true);
+
+    pressBack();
+
+    expect(guard.repeat).not.toHaveBeenCalled();
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.enabled).toBe(true);
+    // The reader is still on the form the write belongs to.
+    expect(findField(renderer.root, 'Profile name')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('leaves on Back when no create is in flight', async () => {
+    const { unmount } = await mount();
+
+    expect(guard.enabled).toBe(false);
+
+    pressBack();
+
+    expect(guard.confirm).not.toHaveBeenCalled();
+    expect(guard.repeat).toHaveBeenCalledTimes(1);
+    expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
+  });
+
+  // The overview exit is a leave the guard speaks for: the disarm render lands
+  // before the removal is dispatched, so the native stack sees a plain push of
+  // the overview and the retire that follows the push transition.
+  it('leaves for the overview through the guard, disarmed before the dispatch', async () => {
+    mutationState.create.isPending = true;
+    const { renderer, unmount } = await mount();
+    expect(guard.enabled).toBe(true);
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+    await waitFor(() => routerReplace.mock.calls.length === 1);
+
+    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+    expect(guard.replaceSawEnabled).toEqual([false]);
+    expect(guard.confirm).not.toHaveBeenCalled();
+    await waitFor(() => !guard.enabled);
 
     unmount();
   });

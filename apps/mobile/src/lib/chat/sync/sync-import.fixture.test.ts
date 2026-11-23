@@ -1,15 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-import type { PulledSnapshot } from '@kilocode/cloud-agent-sdk';
-import { SessionStore, type Turn } from '@kilocode/harness-sdk';
+import { type PulledSnapshot } from '@kilocode/cloud-agent-sdk';
+import { SessionStore } from '@kilocode/harness-sdk';
 import { layerNodeStore } from '@kilocode/harness-sdk/plugins/store/node';
 import { Effect, Option } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { rememberChat } from '../store';
-import { pulledToTurns } from './sync-mapping';
 import { pullChat } from './sync-pull';
 import { stampServerSessionId, syncRecordOf } from './sync-store';
 import { type SyncDeps } from './sync-protocol';
@@ -25,7 +24,7 @@ const fixtureSchema = z.object({
   snapshot: z.custom<PulledSnapshot>(),
 });
 const snapshot = fixtureSchema.parse(
-  JSON.parse(readFileSync(new URL('./fixtures/cli-session-snapshot.json', import.meta.url), 'utf8'))
+  JSON.parse(readFileSync(new URL('fixtures/cli-session-snapshot.json', import.meta.url), 'utf8'))
 ).snapshot;
 
 const CHATS = [
@@ -64,9 +63,14 @@ describe('importing the captured CLI session', () => {
       isInTransactionSync: () => database.isTransaction,
     };
     rememberChat(db, { sessionId: SESSION_ID, scope: 'user:personal', at: 1000 });
-    stampServerSessionId({ db, sessionId: SESSION_ID, serverSessionId: SESSION_ID, sourceId: 'src' });
+    stampServerSessionId({
+      db,
+      sessionId: SESSION_ID,
+      serverSessionId: SESSION_ID,
+      sourceId: 'src',
+    });
 
-    const run = async <A>(work: Effect.Effect<A, unknown, SessionStore>): Promise<A> =>
+    const run = <A>(work: Effect.Effect<A, unknown, SessionStore>): Promise<A> =>
       Effect.runPromise(
         Effect.provide(work, layerNodeStore(database)) as unknown as Effect.Effect<A>
       );

@@ -205,7 +205,7 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 describe('fetchNativeSnapshot', () => {
-    it('asks every entity page for the writer source tag', async () => {
+  it('asks every entity page for the writer source tag', async () => {
     const { fetch, request } = snapshotFetch([envelope()]);
     await fetchNativeSnapshot(request, sessionID);
     const entityPages = (fetch as jest.Mock).mock.calls
@@ -217,7 +217,7 @@ describe('fetchNativeSnapshot', () => {
     }
   });
 
-it('pins every page to state and reconstructs numeric, sparse ordinals across lexical pages', async () => {
+  it('pins every page to state and reconstructs numeric, sparse ordinals across lexical pages', async () => {
     const first = part(2, 10, { type: 'reasoning', text: 'first', native: { nil: null } });
     const last = part(10, 19, { type: 'text', text: 'last' });
     const user = entity('message', 'msg_user', {

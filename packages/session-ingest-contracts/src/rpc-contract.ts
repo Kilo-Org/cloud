@@ -269,10 +269,17 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
 /** The boundary name for the stored message-id rule; see `storedMessageIdSchema`. */
 export const messageIdSchema = storedMessageIdSchema;
 
+/**
+ * The stem every SDK part id starts with, declared once so the schema, the
+ * message-membership rule and the Durable Object's part-row reader cannot drift
+ * apart.
+ */
+export const PART_ID_PREFIX = 'prt';
+
 // Part ids become storage and item identities, so they refuse `/` and U+0000.
 export const partIdSchema = z
   .string()
-  .startsWith('prt')
+  .startsWith(PART_ID_PREFIX)
   .refine(id => !id.includes('/') && !id.includes('\u0000'), {
     message: 'part IDs must not contain / or U+0000',
   });
@@ -966,12 +973,32 @@ export const kiloSdkMessageSchema = z.discriminatedUnion('role', [
 ]);
 export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
+/**
+ * The native display part-id suffix grammar, declared once so every reader of a
+ * native part id — the full-tail check, the sliced-suffix check and the schema —
+ * cannot drift apart. A native part id is a stored message id, `_`, then this
+ * suffix: six digits, then an optional `_summary` or `_file_<n>` marker.
+ */
+const NATIVE_PART_ID_SUFFIX = '[0-9]{6}(?:_summary|_file_[0-9]+)?';
+
+/** The whole-part-id form: the message id, `_`, then the suffix. */
+const NATIVE_PART_ID_TAIL_PATTERN = new RegExp(`_${NATIVE_PART_ID_SUFFIX}$`);
+/** The suffix alone, as it appears once the message id and its `_` are sliced off. */
+const NATIVE_PART_ID_SUFFIX_PATTERN = new RegExp(`^${NATIVE_PART_ID_SUFFIX}$`);
+
+/** A native v2 display part id: a stored message id plus the display suffix. */
+export const nativePartIdSchema = storedMessageIdSchema
+  .startsWith('msg_')
+  .regex(NATIVE_PART_ID_TAIL_PATTERN);
+
+/**
+ * The two id families a stored part can carry: the SDK's own `prt` id, and the
+ * native display id that the v2 projection retains from history and live replay.
+ */
+export const sdkPartIdSchema = z.union([partIdSchema, nativePartIdSchema]);
+
 const sdkPartBaseShape = {
-  // Native v2 display parts retain the identity shared by history and live replay.
-  id: z.union([
-    partIdSchema,
-    storedMessageIdSchema.startsWith('msg_').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
-  ]),
+  id: sdkPartIdSchema,
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
@@ -979,13 +1006,13 @@ const sdkPartBaseShape = {
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
 
-function sdkPartIdMatchesMessage(part: KiloSdkPartBase): boolean {
-  if (part.id.startsWith('prt')) return true;
+export function sdkPartIdMatchesMessage(part: Pick<KiloSdkPartBase, 'id' | 'messageID'>): boolean {
+  if (part.id.startsWith(PART_ID_PREFIX)) return true;
   const prefix = `${part.messageID}_`;
   return (
     part.messageID.startsWith('msg_') &&
     part.id.startsWith(prefix) &&
-    /^[0-9]{6}(?:_summary|_file_[0-9]+)?$/.test(part.id.slice(prefix.length))
+    NATIVE_PART_ID_SUFFIX_PATTERN.test(part.id.slice(prefix.length))
   );
 }
 
@@ -1000,10 +1027,15 @@ function sdkPartIdMatchesMessage(part: KiloSdkPartBase): boolean {
  * well-formed persisted data whose body this contract's union may still not
  * understand.
  */
-const persistedSdkPartIdentitySchema = z.object({
-  id: partIdSchema,
-  messageID: sdkPartBaseShape.messageID,
-});
+const persistedSdkPartIdentitySchema = z
+  .object({
+    id: sdkPartIdSchema,
+    messageID: sdkPartBaseShape.messageID,
+  })
+  .refine(sdkPartIdMatchesMessage, {
+    message: 'Native display part ID must belong to its message',
+    path: ['id'],
+  });
 
 const sdkFilePartObjectSchema = z.object({
   ...sdkPartBaseShape,

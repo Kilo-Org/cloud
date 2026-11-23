@@ -126,7 +126,7 @@ export async function unlinkAndRemoveClaudeBillingGrant(
   if (!operatorConfigured()) {
     return { unlink: NO_UNLINK, unreferencedPayer: await removeClaudeBillingGrant(owner) };
   }
-  return await withClaudeBillingPayerLock(owner, async (tx, granted, heldPayers) => {
+  return await withClaudeBillingPayerLock(owner, async (tx, granted, heldLockKeys) => {
     const retiring = await findRetiringClaudeBillingPayer(owner, tx);
     const unlink = retiring
       ? await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs)
@@ -140,7 +140,7 @@ export async function unlinkAndRemoveClaudeBillingGrant(
     // The unlink is idempotent, and the restart is bounded by the retry bound.
     return {
       unlink,
-      unreferencedPayer: await removeClaudeBillingGrantWithin(tx, owner, granted, heldPayers),
+      unreferencedPayer: await removeClaudeBillingGrantWithin(tx, owner, granted, heldLockKeys),
     };
   });
 }

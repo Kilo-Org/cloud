@@ -23,17 +23,15 @@ import {
 import { claudeBillingOwnerMatches } from './owner';
 
 /**
- * Holds one payer key in its own transaction and reports the backend pid that
+ * Holds one lock key in its own transaction and reports the backend pid that
  * holds it, so a concurrent operation can be observed queueing behind the key.
  * The caller releases `release` and then awaits the returned promise.
  */
-async function holdPayerKey(payerConnectionId: string) {
+async function holdLockKey(lockKey: string) {
   const lockHeld = Promise.withResolvers<number>();
   const release = Promise.withResolvers<void>();
   const holder = db.transaction(async tx => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_grant:${payerConnectionId}`}))`
-    );
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
     const backend = await tx.execute<{ pid: number }>(sql`select pg_backend_pid()::int as pid`);
     const pid = backend.rows[0]?.pid;
     if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
@@ -41,6 +39,11 @@ async function holdPayerKey(payerConnectionId: string) {
     await release.promise;
   });
   return { holderPid: await lockHeld.promise, release: () => release.resolve(), holder };
+}
+
+/** Holds the payer key of one row, which is the key the module takes for that row. */
+async function holdPayerKey(payerConnectionId: string) {
+  return await holdLockKey(`claude_billing_grant:${payerConnectionId}`);
 }
 
 /** Whether any backend in this database waits for a lock the holder holds. Bounded, no timers. */
@@ -728,5 +731,43 @@ describe('Claude billing grants', () => {
         .where(eq(claude_billing_connections.id, occupantPayer.id))
     ).resolves.toEqual([expect.objectContaining({ status: 'removed', connection_id: null })]);
     await expect(activeGrants(occupantPayer.id)).resolves.toEqual([]);
+  }, 20000);
+
+  it('holds a claim key on the target scope while it shares, so two first shares into one scope cannot both report success', async () => {
+    const user = await insertTestUser();
+    // The organization has no payer row and no grant, so a share into it writes
+    // the first grant on a scope that holds nothing yet.
+    const organization = await createTestOrganization('Claude first share claim', user.id, 0);
+    const payer = await connectedPayer(user.id);
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    const held = await holdLockKey(`claude_billing_claim:org:${organization.id}`);
+    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id);
+    let blocked = false;
+    try {
+      blocked = await waitsForLockOf(held.holderPid);
+    } finally {
+      held.release();
+      await held.holder;
+    }
+
+    expect(blocked).toBe(true);
+    await expect(share).resolves.toMatchObject({ id: payer.id });
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connection_grants)
+        .where(
+          and(
+            eq(claude_billing_connection_grants.organization_id, organization.id),
+            isNull(claude_billing_connection_grants.kilo_user_id),
+            isNull(claude_billing_connection_grants.removed_at)
+          )
+        )
+    ).resolves.toEqual([expect.objectContaining({ payer_connection_id: payer.id })]);
   }, 20000);
 });

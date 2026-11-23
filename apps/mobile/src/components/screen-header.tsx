@@ -734,7 +734,11 @@ export function ScreenHeader({
   // font scale raises the floor to two lines (see `titleNumberOfLines`).
   const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
   const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
-  const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
+  // The cap is part of the layout: a title capped at one line is never read for
+  // a line count (see `onTitleTextLayout`), so a count taken under a deeper cap
+  // must not decide it. Keeping both in the key gives every measurement one
+  // meaning, the rule the widths already follow.
+  const titleFitKey = JSON.stringify([title, windowWidth, fontScale, titleLines]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
   const [titleWrap, setTitleWrap] = useState<TitleWrap>(UNMEASURED_TITLE_WRAP);
   const titleNaturalRef = useRef<TextInstance>(null);

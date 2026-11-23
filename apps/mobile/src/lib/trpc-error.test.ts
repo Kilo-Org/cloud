@@ -167,8 +167,6 @@ describe('readTrpcServerMessage', () => {
   });
 
   it('yields no sentence for a context auth failure, whatever the envelope carries', () => {
-    // The session failure carries the server's diagnostic text and is handled
-    // by the sign-out path, so it is not a sentence for this sheet.
     const signedOut = Object.assign(
       new Error('User not authenticated - no user to set on context'),
       {
@@ -196,8 +194,6 @@ describe('readTrpcServerMessage', () => {
   });
 
   it('yields no sentence for a procedure-level auth denial', () => {
-    // Every procedure-level denial carries an org-access diagnostic, so the
-    // caller states its own line instead of showing that text.
     const denied = Object.assign(
       new Error('You do not have the required organizational role to access this feature'),
       {
@@ -236,8 +232,6 @@ describe('readTrpcServerMessage', () => {
   });
 
   it('yields no sentence for a framework code, whatever human-looking text it carries', () => {
-    // The allowlist decides, not the presence of text: a framework code is not
-    // a refusal the application wrote for a person.
     for (const code of [
       'PARSE_ERROR',
       'METHOD_NOT_SUPPORTED',

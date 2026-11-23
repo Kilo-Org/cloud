@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { type BriefingReport } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
-import { briefingSummaryStatusKey } from '@/lib/agent-briefing-state';
+import { briefingSummaryBodyKey } from '@/lib/agent-briefing-state';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { resolveCatalogModelName } from '@/lib/model-display-name';
 import { useBriefingLocale } from './briefing-locale';
@@ -19,7 +19,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
       <Text variant="heading">{t('agentBriefing.summary')}</Text>
       {report.summary.status !== 'ready' ? (
         <Text variant="muted">
-          {t(briefingSummaryStatusKey(report.summary.status, report.summary.error))}
+          {t(briefingSummaryBodyKey(report.summary.status, report.summary.error))}
         </Text>
       ) : null}
       {report.summary.text ? <Text selectable>{report.summary.text}</Text> : null}

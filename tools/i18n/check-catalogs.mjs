@@ -223,8 +223,8 @@ const WORDED_COUNTS = new Set([
   'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
   'prReview.tabs.discussionAccessibility:two:ar',
-  'prReview.hunkRows.fileLoadedCount:two:ar',
-  'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
+  'prReview.fileNavigator.fileLoadedCount:two:ar',
+  'prReview.fileNavigator.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
   'organization.kiloPass.paidSeat:two:ar',
 ]);
@@ -1012,7 +1012,12 @@ function checkVisibilitySeparators(values, label) {
   return problems;
 }
 
-/** The agent editor's catalog rules, applied to English and to every locale. */
+/**
+ * The agent editor's catalog rules. The separator rule judges any catalog,
+ * English included. The verbatim rule reads a translated catalog against the
+ * English reference, so it does not run on the English pass, where the two maps
+ * would be the same.
+ */
 function checkAgentEditorCopy(values, english, label) {
   return [
     ...checkVisibilitySeparators(values, label),
@@ -2243,8 +2248,10 @@ function isSerializedJson(value) {
  * config placeholder shows the shape the stored value takes, so its braces and
  * quoted key are the content, not a storage slip. It is registered in
  * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
- * Every other key, verbatim or not, still fails a serialized value — including
- * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
+ * Every other key, verbatim or not, still fails a serialized value. The
+ * verbatim rule reads a locale against the English reference, so it cannot see
+ * a deviation in the English catalog itself, and the storage-slip rule is the
+ * only guard there.
  */
 const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
@@ -2290,7 +2297,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
   const label = `${catalogName}/en`;
   return [
     ...checkEnglishValues({ catalogName, english, englishValues }),
-    ...checkAgentEditorCopy(english, english, label),
+    ...checkVisibilitySeparators(english, label),
     ...checkPullRequestTerm(english, label),
     ...checkChangelogAreaLabels('en', english, label),
   ];
@@ -2301,12 +2308,11 @@ function checkKeyParity({
   label,
   tag,
   selectableCategories,
-  english,
+  englishFacts,
   translated,
-  englishFamilies,
-  englishCountedBases,
   localeFamilies,
 }) {
+  const { english, families: englishFamilies, countedBases: englishCountedBases } = englishFacts;
   const problems = [];
   const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
@@ -2364,7 +2370,8 @@ function checkKeyParity({
  * declares under a flat counted English key is not asked for that form; a
  * family English declares is still covered by the key-parity rule.
  */
-function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
+function checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories }) {
+  const { english } = englishFacts;
   const problems = [];
   const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
   const selectable = selectableCategories(tag);
@@ -2409,17 +2416,8 @@ function checkUnselectablePluralCategories({ label, tag, translated, selectableC
 }
 
 /** The value rules every translated key passes, in emission order. */
-function checkTranslatedValues({
-  label,
-  tag,
-  english,
-  translated,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
-}) {
+function checkTranslatedValues({ label, tag, englishFacts, translated }) {
+  const { english, destructiveChecks } = englishFacts;
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
@@ -2432,12 +2430,9 @@ function checkTranslatedValues({
         ...checkAddedPluralForm({
           label,
           tag,
-          english,
+          englishFacts,
           key,
           value,
-          englishFamilies,
-          englishCountedBases,
-          englishValues,
           ownValues,
         })
       );
@@ -2448,15 +2443,13 @@ function checkTranslatedValues({
       ...checkTranslatedValue({
         label,
         tag,
-        english,
+        englishFacts,
         key,
         value,
         englishValue,
-        englishValues,
         ownValues,
         cancelValue: translated.get('common.cancel'),
         rejectContainingCancel: destructiveChecks.get(key),
-        mustTranslateKeys,
       })
     );
   }
@@ -2469,17 +2462,13 @@ function checkTranslatedValues({
  * reference for that category. A key that is not an admitted family member is
  * the extra-key rule's finding and passes nothing here.
  */
-function checkAddedPluralForm({
-  label,
-  tag,
-  english,
-  key,
-  value,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  ownValues,
-}) {
+function checkAddedPluralForm({ label, tag, englishFacts, key, value, ownValues }) {
+  const {
+    english,
+    families: englishFamilies,
+    countedBases: englishCountedBases,
+    values: englishValues,
+  } = englishFacts;
   const problems = [];
   const parts = pluralParts(key);
   if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
@@ -2516,16 +2505,15 @@ function checkAddedPluralForm({
 function checkTranslatedValue({
   label,
   tag,
-  english,
+  englishFacts,
   key,
   value,
   englishValue,
-  englishValues,
   ownValues,
   cancelValue,
   rejectContainingCancel,
-  mustTranslateKeys,
 }) {
+  const { english, values: englishValues, mustTranslateKeys } = englishFacts;
   const problems = [];
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
@@ -2809,15 +2797,11 @@ function checkCatalogLocales({
   selectableCategories,
   present,
   supported,
-  english,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
+  englishFacts,
   sharedWordings,
   wordingExceptions,
 }) {
+  const { english } = englishFacts;
   const problems = [];
   const catalogName = catalog.name;
   const localeValues = new Map();
@@ -2862,16 +2846,14 @@ function checkCatalogLocales({
       ...checkKeyParity({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
         localeFamilies,
         selectableCategories,
       })
     );
     problems.push(
-      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+      ...checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories })
     );
     problems.push(
       ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
@@ -2880,13 +2862,8 @@ function checkCatalogLocales({
       ...checkTranslatedValues({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
-        englishValues,
-        mustTranslateKeys,
-        destructiveChecks,
       })
     );
     problems.push(...checkLoginSeparators({ label, tag, translated }));
@@ -3227,6 +3204,17 @@ export function checkCatalogs(root = ROOT) {
     }
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
     const destructiveChecks = destructiveConfirmKeys(source, english);
+    // The English reference one catalog's rules read, built once and never
+    // mutated, so a new rule-specific fact is one field here rather than a
+    // parameter on every rule layer.
+    const englishFacts = Object.freeze({
+      english,
+      families: englishFamilies,
+      countedBases: englishCountedBases,
+      values: englishValues,
+      mustTranslateKeys,
+      destructiveChecks,
+    });
 
     problems.push(...checkEnglishCatalog({ catalogName, english, englishValues }));
 
@@ -3235,12 +3223,7 @@ export function checkCatalogs(root = ROOT) {
       selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
-      english,
-      englishFamilies,
-      englishCountedBases,
-      englishValues,
-      mustTranslateKeys,
-      destructiveChecks,
+      englishFacts,
       sharedWordings,
       wordingExceptions,
     });

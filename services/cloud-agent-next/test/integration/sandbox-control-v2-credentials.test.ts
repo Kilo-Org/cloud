@@ -2206,7 +2206,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
   });
 
-  it('does not ask for an MCP credential before prompts of a non-interactive workspace', async () => {
+  it('checks for an MCP credential before prompts of a non-interactive workspace', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);
     const issueMcpGrant = vi.fn(async () => undefined);
@@ -2219,7 +2219,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       'sent'
     );
     expect((await wrapper.next())?.type).toBe('session.prompt');
-    expect(issueMcpGrant).toHaveBeenCalledTimes(atPrepare);
+    expect(issueMcpGrant).toHaveBeenCalledTimes(atPrepare + 1);
   });
 
   it('offers a renewed workspace MCP credential before a prompt without re-issuing the route grant', async () => {

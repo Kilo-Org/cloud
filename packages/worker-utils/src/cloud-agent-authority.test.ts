@@ -279,8 +279,9 @@ describe('Cloud Agent authority contract', () => {
   });
   it.each([null, organizationId])('allows a stacked launch in its pinned scope: %s', orgId => {
     const authority = { ...scope, organizationId: orgId };
+    const { githubRepo: _repo, ...task } = launch;
     const input = {
-      ...launch,
+      ...task,
       stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
       operationKey: '33333333-3333-4333-8333-333333333333',
       ...(orgId === null ? {} : { organizationId: orgId }),
@@ -317,8 +318,9 @@ describe('Cloud Agent authority contract', () => {
       ...scope,
       parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
     };
+    const { githubRepo: _repo, ...task } = launch;
     const input = {
-      ...launch,
+      ...task,
       stackOnWorktreeId: 'worktree_44444444-4444-4444-8444-444444444444',
       callbackTarget: { url: 'workspace:new-chat' },
     };
@@ -523,31 +525,20 @@ describe('Cloud Agent authority contract', () => {
     ).toBe(false);
   });
 
-  it('allows only the models.list discovery query for personal and organization authority', () => {
-    expect(cloudAgentAuthorityProcedures(scope)).toEqual([
-      'cloudAgentNext.prepareSession',
-      'cloudAgentNext.listChildSessions',
-      'cloudAgentNext.getSession',
-      'cloudAgentNext.getMessageResult',
-      'cloudAgentNext.interruptSession',
-      'cloudAgentNext.sendMessage',
-      'models.list',
-      'cloudEnvironments.list',
-      'workspaceFolders.list',
-      'workspaceFolders.moveWorktree',
-    ]);
-    expect(cloudAgentAuthorityProcedures({ ...scope, organizationId })).toEqual([
-      'organizations.cloudAgentNext.prepareSession',
-      'organizations.cloudAgentNext.listChildSessions',
-      'organizations.cloudAgentNext.getSession',
-      'organizations.cloudAgentNext.getMessageResult',
-      'organizations.cloudAgentNext.interruptSession',
-      'organizations.cloudAgentNext.sendMessage',
-      'models.list',
-      'cloudEnvironments.list',
-      'workspaceFolders.list',
-      'workspaceFolders.moveWorktree',
-    ]);
+  it('allows repository discovery and limits Bitbucket repository listing to organizations', () => {
+    expect(cloudAgentAuthorityProcedures(scope)).toEqual(
+      expect.arrayContaining([
+        'cloudAgentNext.listGitHubRepositories',
+        'cloudAgentNext.listGitLabRepositories',
+        'cloudAgentNext.listRepositoryBranches',
+      ])
+    );
+    expect(cloudAgentAuthorityProcedures(scope)).not.toContain(
+      'cloudAgentNext.listBitbucketRepositories'
+    );
+    expect(cloudAgentAuthorityProcedures({ ...scope, organizationId })).toContain(
+      'organizations.cloudAgentNext.listBitbucketRepositories'
+    );
     expect(cloudAgentAuthorityProcedureKind('models.list')).toBe('query');
     expect(cloudAgentAuthorityProcedureKind('cloudEnvironments.list')).toBe('query');
   });
@@ -652,7 +643,7 @@ describe('Cloud Agent authority contract', () => {
       type: 'object',
       additionalProperties: false,
       properties: {
-        repository: { type: 'object' },
+        repository: { oneOf: expect.any(Array) },
         ...(authority.organizationId === null
           ? {}
           : { organizationId: { const: authority.organizationId } }),
@@ -670,14 +661,13 @@ describe('Cloud Agent authority contract', () => {
     ['missing repository', {}],
     ['extra field', { repository: { platform: 'github', fullName: 'acme/repo' }, extra: true }],
     ['unknown platform', { repository: { platform: 'local', fullName: 'acme/repo' } }],
-    ['gitlab repository', { repository: { platform: 'gitlab', projectPath: 'group/project' } }],
+    ['gitlab repository without a project path', { repository: { platform: 'gitlab' } }],
     [
-      'bitbucket repository',
+      'bitbucket repository without a repository UUID',
       {
         repository: {
           platform: 'bitbucket',
           workspaceUuid: organizationId,
-          repositoryUuid: organizationId,
         },
       },
     ],

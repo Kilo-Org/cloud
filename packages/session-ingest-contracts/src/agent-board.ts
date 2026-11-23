@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { storedSessionIdSchema } from './kilo-session-id';
+
 const identity = z.string().min(1).max(128);
 export const AGENT_BOARD_PAGE_LIMIT = 50;
 export const agentBoardMessageSchema = z.object({
@@ -14,7 +16,10 @@ export const agentBoardMessageSchema = z.object({
   reply_to: identity.optional(),
 });
 export const agentBoardSchema = z.object({
-  ownerSessionID: identity,
+  // A stored Kilo session id at every producer, so it follows the same rule as
+  // the other session-id fields in this package; `identity` stays for message
+  // ids and participant addresses.
+  ownerSessionID: storedSessionIdSchema,
   revision: z.number().int().nonnegative(),
   messages: z.array(agentBoardMessageSchema).max(AGENT_BOARD_PAGE_LIMIT),
   cursor: z.string().optional(),

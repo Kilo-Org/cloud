@@ -510,6 +510,104 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   });
 
+  it('retries transient provider admission on the same allocation and credential', async () => {
+    const provider = createFakeProvider();
+    let validations = 0;
+    provider.adapter.validateWrapperAdmission = async () => {
+      if (++validations === 1) throw new Error('temporary provider read failure');
+    };
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    const identity = launchIdentity(provider);
+    const first = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: identity.credential,
+    });
+    expect(
+      await first.hello({ wrapperId: 'wr_first', allocationId: identity.allocationId })
+    ).toBeNull();
+    expect(provider.stopCalls).toHaveLength(0);
+    expect(await readState(stub)).toMatchObject({
+      kind: 'starting',
+      allocationId: before.allocationId,
+      providerRef: before.providerRef,
+      firstConnectDeadlineAt: before.firstConnectDeadlineAt,
+    });
+    const { wrapper } = await connectAndHello(provider, stub, 'wr_reconnected');
+    expect(validations).toBe(2);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toHaveLength(0);
+    wrapper.close();
+  });
+
+  it.each([
+    { code: 'invalid_configuration', reason: 'invalid_configuration' },
+    { code: 'cleanup_required', reason: 'provider_cleanup_required' },
+  ] as const)(
+    'stops a permanent provider $code before welcoming its wrapper',
+    async ({ code, reason }) => {
+      const provider = createFakeProvider();
+      provider.adapter.validateWrapperAdmission = async () => {
+        throw new ProviderCreationError(code);
+      };
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await awaitStarting(provider, stub);
+      const identity = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({
+        sandboxId: SANDBOX_ID,
+        credential: identity.credential,
+      });
+      expect(
+        await wrapper.hello({ wrapperId: 'wr_mismatch', allocationId: identity.allocationId })
+      ).toBeNull();
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason,
+      });
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it('fails a resumed launch that requires repair without confirming its stop', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await awaitStarting(provider, stub);
+    provider.adapter.reconcileLaunch = async () => {
+      throw new ProviderCreationError('cleanup_required');
+    };
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'provider_cleanup_required',
+    });
+    expect(await readState(stub)).toMatchObject({
+      kind: 'stopping',
+      providerRef: provider.refs[0],
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('arms an absolute provider lifetime and reports its specific failure before cleanup', async () => {
+    const provider = createFakeProvider();
+    let deadline = Date.now() + 5_000;
+    provider.adapter.lifetimeDeadlineAt = async () => deadline;
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await awaitStarting(provider, stub);
+    const { wrapper } = await connectAndHello(provider, stub);
+    expect(await readAlarm(stub)).toBe(deadline);
+    deadline = Date.now() - 1;
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'provider_lifetime_exhausted',
+    });
+    wrapper.close();
+  });
+
   it.each([
     { stage: 'create', failure: { failFirstCreate: true } },
     { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
@@ -2582,13 +2680,10 @@ describe('SandboxControlV2 allocation egress policy', () => {
   const baseline = [
     'api.bitbucket.org',
     'api.github.com',
-    'backend.example.com',
     'bitbucket.org',
     'codeload.github.com',
-    'gateway.example.com',
     'github.com',
     'gitlab.com',
-    'ingest.example.com',
     'media.githubusercontent.com',
     'objects.githubusercontent.com',
     'raw.githubusercontent.com',
@@ -2668,6 +2763,61 @@ describe('SandboxControlV2 allocation egress policy', () => {
     };
   }
 
+  it.each([
+    {},
+    {
+      KILOCODE_BACKEND_BASE_URL: 'http://localhost:3900',
+      KILO_OPENROUTER_BASE: 'http://localhost:3910/api',
+      KILO_SESSION_INGEST_URL: 'http://localhost:9700',
+    },
+  ])('prepares a Containers allowlist route only with facade credentials (%j)', async extraEnv => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider, sandboxId, extraEnv);
+    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_allowlist', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('Expected session.prepare');
+    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
+    expect(frame.credentials.proxy?.handle).not.toBe(frame.credentials.kilo.token);
+    const targets = frame.credentials.proxy?.targets;
+    if (!targets) throw new Error('Missing runtime facade');
+    const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as { egressAllowlist: string[] };
+    for (const url of Object.values(targets)) {
+      expect(new URL(url).hostname).toBe('worker.example.com');
+      expect(pin.egressAllowlist).toContain(new URL(url).hostname);
+    }
+    for (const host of [
+      'backend.example.com',
+      'gateway.example.com',
+      'ingest.example.com',
+      'localhost',
+    ])
+      expect(pin.egressAllowlist).not.toContain(host);
+  });
+
+  it('fails a Containers allowlist route before preparation when proxy minting fails', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = () => null;
+    });
+    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_allowlist_no_proxy', allocationId });
+    await waitFor(async () => {
+      expect((await stub.status({ sessionId: firstSessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'workspace_setup_failed',
+      });
+    });
+    expect(await wrapper.next(100)).toBeNull();
+  });
+
   it.each(
     [
       { egressMode: undefined, policy: undefined, expected: undefined },
@@ -2701,7 +2851,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }
   );
 
-  it('pins the configured provider origin during prepare', async () => {
+  it('keeps the Worker provider origin behind the runtime facade during prepare', async () => {
     const provider = createFakeProvider();
     const { stub } = await configureEgressSandbox(provider, sandboxId, {
       KILO_OPENROUTER_BASE: 'https://token-provider.example.com/api',
@@ -2709,13 +2859,9 @@ describe('SandboxControlV2 allocation egress policy', () => {
     const input = prepareInput(firstSessionId, { egressMode: 'allowlist' });
     expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
     await awaitStarting(provider, stub);
-    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(
-      [
-        ...baseline.filter(domain => domain !== 'gateway.example.com'),
-        'git.example.com',
-        'token-provider.example.com',
-      ].sort()
-    );
+    const list = JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist;
+    expect(list).toEqual([...baseline, 'git.example.com'].sort());
+    expect(list).not.toContain('token-provider.example.com');
   });
 
   it('compiles mode-only deny policy for a placed isolated container', async () => {
@@ -2974,6 +3120,95 @@ describe('SandboxControlV2 allocation egress policy', () => {
       wrapper.close();
     }
   );
+
+  async function installPreviousBaseline(stub: DurableObjectStub<SandboxControlV2>) {
+    const raw = await readProviderPin(stub);
+    if (!raw) throw new Error('Missing provider pin');
+    const pin = JSON.parse(raw) as StoredProviderPin;
+    pin.egressAllowlist = [
+      ...(pin.egressAllowlist ?? []),
+      'backend.example.com',
+      'gateway.example.com',
+      'ingest.example.com',
+    ].sort();
+    const encoded = JSON.stringify(pin);
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.update(allocationTable)
+        .set({ provider_pin: encoded })
+        .where(eq(allocationTable.id, 'current'))
+        .run();
+      Object.assign(instance, { providerPin: pin });
+    });
+    return encoded;
+  }
+
+  it('preserves an active deployed egress pin and allocation across eviction', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const request = {
+      egressMode: 'allowlist' as const,
+      egressAllowlist: ['packages.example.com'],
+      egressAudit: true,
+    };
+    await stub.prepare(prepareInput(firstSessionId, request));
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    const stored = await installPreviousBaseline(stub);
+    await evictDurableObject(stub);
+    await configureEgressSandbox(provider);
+    expect(await stub.prepare(prepareInput(nextSessionId, request))).toMatchObject({
+      state: 'preparing',
+    });
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(stored);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['packages.example.com', 'other.example.com'] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+    { egressAudit: false },
+  ])('rejects a changed request against a deployed old-baseline pin: %j', async change => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const request = {
+      egressMode: 'allowlist' as const,
+      egressAllowlist: ['packages.example.com'],
+      egressAudit: true,
+    };
+    await stub.prepare(prepareInput(firstSessionId, request));
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    const stored = await installPreviousBaseline(stub);
+    expect(
+      await stub.prepare(prepareInput(nextSessionId, { ...request, ...change }))
+    ).toMatchObject({ state: 'failed', reason: 'invalid_configuration' });
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(stored);
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('uses the corrected baseline after the old allocation stops', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const request = { egressMode: 'allowlist' as const, egressAllowlist: ['packages.example.com'] };
+    await stub.prepare(prepareInput(firstSessionId, request));
+    await awaitStarting(provider, stub);
+    await installPreviousBaseline(stub);
+    await stub.release({ sessionId: firstSessionId });
+    await stub.reportProviderGone();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(await stub.prepare(prepareInput(nextSessionId, request))).toMatchObject({
+      state: 'preparing',
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(
+      [...baseline, 'git.example.com', 'packages.example.com'].sort()
+    );
+  });
 
   it('accepts an identical normalized active prepare policy without replacing the allocation', async () => {
     const provider = createFakeProvider();

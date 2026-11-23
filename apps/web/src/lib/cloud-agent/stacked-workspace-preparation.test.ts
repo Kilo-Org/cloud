@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { cloud_agent_worktrees } from '@kilocode/db/schema';
+import { CLOUD_AGENT_STACK_TARGET_DENIED } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   resolveStackedWorkspacePreparation,
   resolveStackedWorkspaceSource,
@@ -125,6 +126,18 @@ describe('resolveStackedWorkspaceSource', () => {
     await expect(resolveStackedWorkspaceSource(sourceParams({ db }))).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
+  });
+
+  it.each([
+    [CLOUD_AGENT_STACK_TARGET_DENIED, 'FORBIDDEN'],
+    [`${CLOUD_AGENT_STACK_TARGET_DENIED}: read failed`, 'PRECONDITION_FAILED'],
+  ])('classifies stack-source error %s as %s', async (message, code) => {
+    const reader = client();
+    reader.getSession.mockRejectedValue(new Error(message));
+    await expect(
+      resolveStackedWorkspaceSource(sourceParams({ client: reader }))
+    ).rejects.toMatchObject({ code });
+    expect(mockGetProviderBranchHead).not.toHaveBeenCalled();
   });
 
   it('refuses a deleting parent', async () => {

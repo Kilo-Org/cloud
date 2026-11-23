@@ -1136,6 +1136,7 @@ export const WorktreeFileInput = worktreeFileQuerySchema.extend({
 export const SyncWorktreeBranchInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema,
+    organizationId: z.string().optional(),
     baseBranch: branchNameSchema.optional(),
     upstreamSha: commitShaSchema.optional(),
   })
@@ -1144,6 +1145,7 @@ export const SyncWorktreeBranchInput = z
 export const RestackWorktreeBranchInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema,
+    organizationId: z.string().optional(),
     baseBranch: branchNameSchema.optional(),
     upstreamSha: commitShaSchema.optional(),
   })

@@ -83,7 +83,7 @@ describe('Hindi permission card', () => {
       'एक ही टूल कॉल का दोहराव की अनुमति दें?'
     );
     expect(question(i18n.t('agentChat.permissionCard.subjectAgentManager'))).toBe(
-      'सबएजेंट प्रबंधन की अनुमति दें?'
+      'एजेंट प्रबंधन की अनुमति दें?'
     );
   });
 });
@@ -243,5 +243,107 @@ describe('Hindi Code Reviewer detail, analytics and review memory copy', () => {
     const line = i18n.t('codeReviewer.reviewMemory.noProposalsDescription');
     expect(line).toContain('Kilo मेंटेनरों के जवाबों का विश्लेषण करता है');
     expect(line).not.toContain('Kilo के मेंटेनर');
+  });
+});
+
+describe('Hindi agent-chat wording corrections', () => {
+  it('gives the wait status the progressive form of its siblings', () => {
+    expect(i18n.t('agentChat.computeStatus.waitingForPermission')).toBe('अनुमति का इंतज़ार कर रहा है');
+  });
+
+  it('describes the used count against the whole window in that order', () => {
+    expect(i18n.t('agentChat.contextUsage.ofWindowTokens', { window: '200,000' })).toBe(
+      '200,000 टोकन में'
+    );
+  });
+
+  it('names the lost changes as the uncommitted ones from that workspace', () => {
+    for (const key of [
+      'agentChat.environment.startFreshMessage',
+      'agentChat.environment.startFreshMessageUnknown',
+    ] as const) {
+      expect(i18n.t(key, { when: 'today' })).toContain(
+        'उस वर्कस्पेस के जो बदलाव कमिट नहीं किए गए हैं, वे खो जाएँगे।'
+      );
+    }
+  });
+
+  it('labels the run target without a dangling demonstrative', () => {
+    expect(i18n.t('agentChat.instancePicker.runOn')).toBe('कहाँ चलाएँ');
+  });
+
+  it('labels the cache-write token row with a metric name', () => {
+    expect(i18n.t('agentChat.messageDetails.cacheWrite')).toBe('कैश राइट');
+  });
+
+  it('states what the default profile resolves to', () => {
+    expect(i18n.t('agentChat.newSession.defaultProfileResolvesTo', { name: 'Fast' })).toBe(
+      'Fast लागू होता है'
+    );
+  });
+
+  it('keeps the pick-them-below instruction free of an added qualifier', () => {
+    expect(i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable')).toBe(
+      'मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे रिपॉज़िटरी और मॉडल चुनें।'
+    );
+  });
+
+  it('writes the reusable-profile prefix with the visarga', () => {
+    expect(i18n.t('agentChat.newSession.saveProfileDescription')).toContain('पुनः प्रयोज्य');
+  });
+
+  it('names the omitted things as items in the one category too', () => {
+    expect(i18n.t('agentChat.olderMessages.omitted', { count: 1, displayCount: '1' })).toBe(
+      'इस सत्र के कुछ पुराने आइटम दिखाए नहीं जा सके।'
+    );
+    expect(i18n.t('agentChat.olderMessages.omitted', { count: 4, displayCount: '4' })).toBe(
+      'इस सत्र के 4 पुराने आइटम दिखाए नहीं जा सके।'
+    );
+  });
+
+  it('names the earlier messages the same way in every key', () => {
+    expect(i18n.t('agentChat.olderMessages.arrived')).toBe('पुराने संदेश लोड हो गए');
+  });
+
+  it('names the text display setting rather than the shown text', () => {
+    expect(i18n.t('agentChat.partDetail.textDisplay')).toBe('टेक्स्ट प्रदर्शन');
+  });
+
+  it('keeps the visible deny verb inside the accessible name', () => {
+    expect(i18n.t('agentChat.permissionCard.deny')).toBe('अस्वीकार करें');
+    expect(i18n.t('agentChat.permissionCard.denyPermission')).toContain('अस्वीकार करें');
+  });
+
+  it('writes the scope prefix number-neutrally and without a colon', () => {
+    expect(i18n.t('agentChat.permissionCard.appliesTo')).toBe('लागू क्षेत्र');
+  });
+
+  it('names the agent-management subject without narrowing it to subagents', () => {
+    expect(i18n.t('agentChat.permissionCard.subjectAgentManager')).toBe('एजेंट प्रबंधन');
+  });
+
+  it('counts the further missing files with a distinct word for more', () => {
+    expect(
+      i18n.t('agentChat.preparation.detailRestoreIncompleteMore', { listed: 'a.ts', omitted: '3' })
+    ).toBe('a.ts और 3 अन्य');
+  });
+
+  it('phrases the diff counts so a count of one stays grammatical', () => {
+    expect(
+      i18n.t('agentChat.sessionChanges.openFile', {
+        path: 'src/app.ts',
+        status: 'Modified',
+        additions: '1',
+        deletions: '12',
+      })
+    ).toBe('src/app.ts खोलें, Modified, जोड़: 1, हटाए: 12');
+  });
+
+  it('ends the goal suspense when its trigger fires, not when the goal completes', () => {
+    const description = i18n.t('agentChat.slashCommands.goalDescription');
+    expect(description).toContain('जब तक कोई ट्रिगर न हो जाए');
+    expect(description).not.toContain('जब तक वह पूरा न हो');
+    expect(description).toContain('/goal pause');
+    expect(description).toContain('/goal clear');
   });
 });

@@ -35,6 +35,7 @@ export const baseProps: SheetProps = {
   eyebrow: 'octocat/hello#1',
   onRefetch: vi.fn<() => Promise<void>>(),
   onDismiss: vi.fn<() => void>(),
+  mergeStateRetry: { retry: vi.fn<() => void>(), isRetrying: false },
 };
 export const mergeResult = { merged: true, sha: 'merged-sha', branchDeleted: true };
 export const draftKey = 'pr-merge:octocat/hello#1';

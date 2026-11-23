@@ -20,20 +20,21 @@ async function loseNextIndexPush(stub: DurableObjectStub<SessionSyncDO>, userID:
       ...exposed.env,
       SESSION_SYNC_TENANT_DO: {
         idFromName: namespace.idFromName.bind(namespace),
-        get: () =>
-          new Proxy(realTenant, {
-            get(target, property: string) {
-              if (property !== 'updateCreatedSession')
-                return (...args: unknown[]) => target[property](...args);
-              return async (input: unknown) => {
-                if (!lost) {
-                  lost = true;
-                  throw new Error('Synthetic refused tenant call');
-                }
-                return await target.updateCreatedSession(input);
-              };
-            },
-          }),
+        get: () => ({
+          reserve: (input: unknown) => realTenant.reserve(input),
+          release: (input: unknown) => realTenant.release(input),
+          trackCreatedSession: (input: unknown) => realTenant.trackCreatedSession(input),
+          forgetCreatedSession: (input: unknown) => realTenant.forgetCreatedSession(input),
+          listCreatedSessions: (input: unknown) => realTenant.listCreatedSessions(input),
+          eraseUser: (input: unknown) => realTenant.eraseUser(input),
+          updateCreatedSession: async (input: unknown) => {
+            if (!lost) {
+              lost = true;
+              throw new Error('Synthetic refused tenant call');
+            }
+            return await realTenant.updateCreatedSession(input);
+          },
+        }),
       } as unknown as Env['SESSION_SYNC_TENANT_DO'],
     };
   });

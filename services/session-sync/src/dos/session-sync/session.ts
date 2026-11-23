@@ -212,7 +212,8 @@ export function register(
     if (meta.deleted_at !== null) {
       raise('session_deleted', 'A deleted session cannot be registered again');
     }
-    joinSource(db, meta.source_id, 'cli', meta.created_at);
+    // The first source needs no row: `listSources` and `isJoined` read the
+    // immutable binding on the session row.
     joinSource(db, sourceID, client, now);
     return { created: false, state: toState(db, meta) };
   }

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -20,6 +20,11 @@ import {
 } from '../protocol';
 import * as erasure from './session-sync/user-erasure';
 import { foldTitle } from './session-sync/notifications';
+
+/** Rows repaired per pass of the one-time index backfill. */
+const BACKFILL_PAGE = 64;
+/** Producers may run ahead of this object; a larger jump is a clock fault. */
+const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 const inputSchema = z.strictObject({
   tenant: tenantSchema,
@@ -48,17 +53,36 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
-      // One-time backfill: rows created before list metadata sort by creation time.
+      // One-time backfill: rows created before list metadata sort by creation
+      // time and need the folded title the search compares against.
       if (!(await ctx.storage.get<boolean>('listMetadataBackfilled'))) {
         this.db
           .update(createdSessions)
           .set({ updated_at: sql`${createdSessions.created_at}` })
           .where(and(eq(createdSessions.updated_at, 0), sql`${createdSessions.created_at} > 0`))
           .run();
+        this.repairFoldedTitles();
         await ctx.storage.put('listMetadataBackfilled', true);
       }
       await erasure.schedule(this.db, ctx);
     });
+  }
+
+  /** Folds titles written before the folded column existed; a page per call. */
+  private repairFoldedTitles(): void {
+    const page = this.db
+      .select({ target: createdSessions.target, title: createdSessions.title })
+      .from(createdSessions)
+      .where(and(isNotNull(createdSessions.title), isNull(createdSessions.title_folded)))
+      .limit(BACKFILL_PAGE)
+      .all();
+    for (const row of page) {
+      this.db
+        .update(createdSessions)
+        .set({ title_folded: foldTitle(row.title ?? '') })
+        .where(eq(createdSessions.target, row.target))
+        .run();
+    }
   }
 
   async reserve(input: unknown): Promise<Result<{ bytes: number }>> {
@@ -154,8 +178,9 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
             }
           : {}),
         ...(metadata.directory !== undefined ? { directory: metadata.directory } : {}),
-        // Producers can clock-skew; the index never moves backwards.
-        updated_at: sql`max(${createdSessions.updated_at}, ${metadata.updatedAt})`,
+        // Producers can clock-skew; the index never moves backwards and never
+        // lets one bad timestamp pin the row far into the future.
+        updated_at: sql`max(${createdSessions.updated_at}, ${Math.min(metadata.updatedAt, Date.now() + MAX_CLOCK_SKEW_MS)})`,
         ...(metadata.archived !== undefined ? { archived: metadata.archived ? 1 : 0 } : {}),
       })
       .where(eq(createdSessions.target, JSON.stringify([tenant.type, tenant.id, sessionID])))
@@ -183,6 +208,8 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     if (this.db.select().from(userErasure).get()) {
       return ok({ items: [], next: null });
     }
+    // A row written before folding still has to match a folded search term.
+    if (parsed.data.q !== undefined) this.repairFoldedTitles();
     const { before, limit, q, client, directory, archived } = parsed.data;
     const escaped =
       q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);

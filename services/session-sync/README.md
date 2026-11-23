@@ -75,7 +75,7 @@ The CLI retains the typed error and uses its existing jittered backoff.
 | Register session | `PUT /v1/sessions/:id` | Create a session, or join one more source of the same creator to it. |
 | List sessions | `GET /v1/sessions` | List the creator's sessions with title, origin client, directory, and archive filters. |
 | Apply batch | `POST /v1/sessions/:id/batches` | Atomically apply an incremental batch and return its durable receipt. |
-| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities. |
+| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities; add `?include=source` for the writer tag. |
 | Upload blob | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes. |
 | Read blob | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization. |
 | Remove cloud session | `DELETE /v1/sessions/:id` | Tombstone the cloud copy and prevent its automatic recreation. |
@@ -107,8 +107,9 @@ as `{sourceID, client, joinedAt}`. Batches and status writes must name a
 joined source or fail with `source_conflict`; every joined source writes
 under the same position check, so a stale writer gets `position_conflict`
 with the committed position and never overwrites newer entities. Each entity
-row and batch receipt records its writer: entity pages expose it as
-`sourceID` (null for rows written before side tags existed).
+row and batch receipt records its writer. Entity pages stay byte-identical to
+their pre-tag shape by default; pass `?include=source` to add `sourceID`
+(null for rows written before side tags existed) to each item.
 
 A batch supplies `{version, sourceID, batchID, after, through, changes}`.
 `after` is the last acknowledged source position.
@@ -820,7 +821,7 @@ Late runner `command_not_found` replies are informational: routing has expired
 or the controller left; do not retry the reply. Live request/reply needs no fake/control session.
 
 Session discovery pages the user's personal creator index across all tenants,
-newest registration first with stable cursor ties, and merges matching presence
+newest update first with stable cursor ties, and merges matching presence
 into `live`. It may show a creator's session IDs after leaving an organization,
 but opening still requires a current grant and session ACL. The index is discovery,
 never authorization. Deletion removes entries and durably retries relay purge:

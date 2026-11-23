@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it } from 'vitest';
 
 import { listMetadata } from '../../src/db/sqlite-schema';
+import { createdSessions } from '../../src/db/tenant-sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
@@ -349,7 +350,59 @@ describe('session list search folding', () => {
     const refused = await api.register(id, crypto.randomUUID(), 'mobile');
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({ error: { code: 'source_limit_exceeded' } });
-    // A joined source still re-registers as a no-op.
+    // Every further unregistered source is refused the same way.
     expect((await api.register(id, crypto.randomUUID(), 'mobile')).status).toBe(409);
+  });
+});
+
+describe('index maintenance', () => {
+  it('folds titles of rows created before the folded column existed', async () => {
+    const userID = `usr-${crypto.randomUUID()}`;
+    const api = client(personal(userID));
+    const id = await seed(api, {
+      client: 'cli',
+      title: 'Legacy École',
+      directory: '/repo/old',
+      updated: Date.now(),
+    });
+    const tenant = getTenantStub(testEnv, { type: 'user', id: userID });
+    // Simulate a row written before folding and before the one-time pass.
+    await runInDurableObject(tenant, async (_instance, state) => {
+      drizzle(state.storage).update(createdSessions).set({ title_folded: null }).run();
+      await state.storage.delete('listMetadataBackfilled');
+    });
+    // The next request reaches the tenant object, which repairs the row.
+    expect((await listing(api, '?q=ecole')).items.map(item => item.sessionID)).toEqual([id]);
+    expect((await listing(api, '?q=ÉCOLE')).items.map(item => item.sessionID)).toEqual([id]);
+  });
+
+  it('clamps an absurd producer update time instead of pinning the row', async () => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const id = newSessionID();
+    const sourceID = crypto.randomUUID();
+    expect((await api.register(id, sourceID)).status).toBe(201);
+    const now = Date.now();
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(sourceID, 0, 1, [
+            {
+              op: 'put',
+              kind: 'session',
+              id,
+              value: {
+                id,
+                title: 'Clocked',
+                time: { created: now, updated: now + 365 * 24 * 3600_000 },
+              },
+            },
+          ])
+        )
+      ).status
+    ).toBe(200);
+    const listed = (await listing(api)).items.find(item => item.sessionID === id);
+    expect(listed?.updatedAt).toBeGreaterThanOrEqual(now);
+    expect(listed?.updatedAt).toBeLessThanOrEqual(Date.now() + 6 * 60_000);
   });
 });

@@ -676,7 +676,8 @@ export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
  * annotate refs with `import type { Text }` or `type Text as RNText` — but a
  * runtime import renders the raw component under whatever name it takes, so an
  * alias is reported like a bare import, and a namespace or default import is
- * reported where its binding is used as `.Text`.
+ * reported where its binding is used as `.Text`, whether by a member access or
+ * by destructuring `Text` out of the binding.
  */
 const RAW_TEXT_EXEMPT = new Set([
   // The shared component itself: it is the replacement the rule names, and it
@@ -1728,6 +1729,11 @@ function fileFacts(program, text) {
       if (name !== null) {
         memberUses.push(name);
       }
+    } else if (node.type === 'VariableDeclarator') {
+      const name = destructuredTextSource(node.id, node.init);
+      if (name !== null) {
+        memberUses.push(name);
+      }
     }
   });
   return { chunks, elements, imports, calls, memberUses };
@@ -1749,6 +1755,28 @@ function textMemberUse(object, property, computed = false) {
     return null;
   }
   return object.type === 'Identifier' || object.type === 'JSXIdentifier' ? object.name : null;
+}
+
+/**
+ * The binding name one `const { Text } = <binding>` takes `Text` out of, or
+ * null when the pattern has no `Text` key or the source is not a plain
+ * identifier. Taking `Text` out of the namespace binding reaches the same
+ * member, so it is one more way that binding renders the platform component.
+ */
+function destructuredTextSource(pattern, init) {
+  if (pattern?.type !== 'ObjectPattern' || init?.type !== 'Identifier') {
+    return null;
+  }
+  const takesText = pattern.properties.some(property => {
+    if (property.type !== 'Property') {
+      return false;
+    }
+    const { key } = property;
+    const named = key.type === 'Identifier' && key.name === 'Text';
+    const literal = key.type === 'Literal' && key.value === 'Text';
+    return property.computed ? literal : named || literal;
+  });
+  return takesText ? init.name : null;
 }
 
 /**

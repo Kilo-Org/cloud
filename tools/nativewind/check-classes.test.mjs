@@ -512,9 +512,19 @@ test('flags a namespace or default Text import only where its binding is used as
       "import * as RN from 'react-native';\n\nexport const a = <RN.View />;\n",
     'apps/mobile/src/type-namespace.tsx':
       "import type * as T from 'react-native';\n\nexport const a = <T.Text>hi</T.Text>;\n",
+    'apps/mobile/src/destructured.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = RN;\n\nexport const a = <Text>hi</Text>;\n",
+    'apps/mobile/src/destructured-alias.tsx':
+      "import RNative from 'react-native';\n\nconst { Text: T } = RNative;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-computed.tsx':
+      "import * as RN from 'react-native';\n\nconst { ['Text']: T } = RN;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-view.tsx':
+      "import * as RN from 'react-native';\n\nconst { View } = RN;\n\nexport const a = <View />;\n",
+    'apps/mobile/src/destructured-elsewhere.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = strings;\n\nexport const a = <Text>hi</Text>;\n",
   });
   const text = found.join('\n');
-  assert.equal(found.length, 3);
+  assert.equal(found.length, 6);
   assert.match(
     text,
     /namespace\.tsx:1: imports Text from 'react-native' as RN\.Text; use @\/components\/ui\/text so the copy follows the RTL paragraph direction/
@@ -522,8 +532,21 @@ test('flags a namespace or default Text import only where its binding is used as
   assert.match(text, /default\.tsx:1: imports Text from 'react-native' as RNative\.Text/);
   // A bare `RN.Text` expression renders the same platform component.
   assert.match(text, /expression\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  // Taking `Text` out of the namespace binding destructures the same member, so
+  // the aliased and computed-key forms are reported like the direct one.
+  assert.match(text, /destructured\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  assert.match(
+    text,
+    /destructured-alias\.tsx:1: imports Text from 'react-native' as RNative\.Text/
+  );
+  assert.match(text, /destructured-computed\.tsx:1: imports Text from 'react-native' as RN\.Text/);
   assert.ok(!text.includes('view-only'), 'a binding used as RN.View alone renders no copy');
   assert.ok(!text.includes('type-namespace'), 'a type-only namespace import is silent');
+  assert.ok(!text.includes('destructured-view'), 'destructuring View renders no copy');
+  assert.ok(
+    !text.includes('destructured-elsewhere'),
+    'a destructure from a binding that is not the react-native import is silent'
+  );
 });
 
 test('exempts the shared Text module by its own path, not by a suffix', () => {

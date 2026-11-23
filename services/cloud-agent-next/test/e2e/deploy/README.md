@@ -23,7 +23,9 @@ modified, so the production/default deploy is unaffected.
   runtime-free image. It refuses an absent or non-downloaded configuration. The
   `Cloud Agent E2E deploy` workflow runs this preparation for its own SHA, so it only deploys a SHA
   whose exact-SHA runtime publication has completed. The deploy workflow accepts a `runtime_source_sha`
-  only when it is a commit on `main`, because only `main` publishes a runtime.
+  only when it is a commit on `main`, because only `main` publishes a runtime. A branch run borrows the
+  prepared config of that revision, so its `wrangler.jsonc` and `runtime-targets.json` must match it; the
+  workflow compares the two before it prepares the runtime and stops when they differ.
 - A fake-llm admin token, exported as `FAKE_LLM_ADMIN_TOKEN` or provided by
   `E2E_AUTH_FILE`, and a user token supplied by `E2E_USER_TOKEN` or
   `E2E_AUTH_FILE` (see [Environment variables](#environment-variables)).

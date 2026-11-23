@@ -79,6 +79,25 @@ jobs:
           ref: ${{ steps.runtime_source.outputs.runtime_source_sha }}
           lfs: true
 
+      # The prepared config is rendered from the runtime SHA's Worker config, so
+      # the run SHA may borrow the runtime only when the two agree. Comparing
+      # here costs one shallow fetch and fails before preparation, which can
+      # wait up to 45 minutes for a publication the run could never use.
+      - name: Verify the run SHA shares the runtime Worker config
+        if: steps.runtime_source.outputs.runtime_source_sha != github.sha
+        env:
+          RUNTIME_SOURCE_SHA: ${{ steps.runtime_source.outputs.runtime_source_sha }}
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$RUN_SHA"
+          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
+            services/cloud-agent-next/wrangler.jsonc \
+            services/cloud-agent-next/runtime-targets.json; then
+            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
+            exit 1
+          fi
+
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
@@ -121,15 +140,8 @@ jobs:
           set -euo pipefail
           generated=services/cloud-agent-next/wrangler.runtime-generated.json
           mv "$generated" "$RUNNER_TEMP/wrangler.runtime-generated.json"
-          git fetch --no-tags --depth=1 origin "$RUN_SHA"
-          # The prepared config is rendered from the runtime SHA's Worker config.
-          # Borrowing it is only valid when the run SHA has the same config.
-          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
-            services/cloud-agent-next/wrangler.jsonc \
-            services/cloud-agent-next/runtime-targets.json; then
-            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
-            exit 1
-          fi
+          # The Worker config matches the runtime SHA; the earlier comparison
+          # already fetched this revision and refused a mismatch.
           git checkout --detach "$RUN_SHA"
           pnpm install --frozen-lockfile
           mv "$RUNNER_TEMP/wrangler.runtime-generated.json" "$generated"

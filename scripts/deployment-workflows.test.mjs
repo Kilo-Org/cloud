@@ -1573,12 +1573,15 @@ test('Cloud Agent e2e deploy admits a main runtime source and scopes each creden
   const admissionIndex = index('Checkout main for admission');
   const runtimeSourceIndex = steps.findIndex(step => step.id === 'runtime_source');
   const checkoutIndex = index('Checkout the runtime source');
+  const guardIndex = index('Verify the run SHA shares the runtime Worker config');
   const prepareIndex = index('Prepare downloaded Cloud Agent runtime');
   const fakeIndex = index('Deploy fake-LLM Worker');
   const workerIndex = index('Deploy Cloud Agent e2e Worker');
   assert.ok(admissionIndex < runtimeSourceIndex);
   assert.ok(runtimeSourceIndex < checkoutIndex);
-  assert.ok(checkoutIndex < prepareIndex);
+  assert.ok(checkoutIndex < guardIndex);
+  assert.ok(guardIndex < index('Setup pnpm'));
+  assert.ok(guardIndex < prepareIndex);
   assert.ok(prepareIndex < fakeIndex);
   assert.ok(fakeIndex < workerIndex);
 
@@ -1598,7 +1601,96 @@ test('Cloud Agent e2e deploy admits a main runtime source and scopes each creden
 
   const switchStep = steps[index('Switch to the run SHA')];
   assert.equal(switchStep.if, 'steps.runtime_source.outputs.runtime_source_sha != github.sha');
-  assert.ok(switchStep.run.indexOf('git fetch') < switchStep.run.indexOf('git diff --quiet'));
+
+  // The guard compares the run SHA's Worker config with the runtime SHA's
+  // before preparation, so a mismatch fails in seconds instead of waiting for
+  // a publication the run could never use.
+  const guardStep = steps[guardIndex];
+  assert.equal(guardStep.if, switchStep.if);
+  assert.equal(
+    guardStep.env.RUNTIME_SOURCE_SHA,
+    '${{ steps.runtime_source.outputs.runtime_source_sha }}'
+  );
+  assert.equal(guardStep.env.RUN_SHA, '${{ github.sha }}');
+  assert.ok(guardStep.run.indexOf('git fetch') < guardStep.run.indexOf('git diff --quiet'));
+  assert.match(guardStep.run, /services\/cloud-agent-next\/wrangler\.jsonc/);
+  assert.match(guardStep.run, /services\/cloud-agent-next\/runtime-targets\.json/);
+  assert.match(
+    guardStep.run,
+    /if ! git diff --quiet[\s\S]*echo "::error::wrangler\.jsonc or runtime-targets\.json differs from the runtime SHA"\n\s*exit 1/
+  );
+
+  // The guard fetched and checked the run SHA, so switching only moves the
+  // prepared config aside and checks the revision out.
+  assert.doesNotMatch(switchStep.run, /git diff --quiet/);
+  assert.match(switchStep.run, /git checkout --detach/);
+  assert.match(switchStep.run, /wrangler\.runtime-generated\.json/);
+});
+
+test('Cloud Agent e2e deploy refuses a run SHA whose runtime Worker config differs', () => {
+  // The guard is the only step between the runtime-source checkout and
+  // preparation, so a refusal here is what keeps a mismatched run SHA from
+  // waiting on that preparation.
+  const directory = mkdtempSync(join(tmpdir(), 'e2e-runtime-config-'));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const commit = message => {
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
+  };
+  git('init', '-q', '--initial-branch=main', '.');
+  mkdirSync(join(directory, 'services', 'cloud-agent-next'), { recursive: true });
+  const wrangler = join(directory, 'services', 'cloud-agent-next', 'wrangler.jsonc');
+  const targets = join(directory, 'services', 'cloud-agent-next', 'runtime-targets.json');
+  writeFileSync(wrangler, '{ "name": "cloud-agent-next" }\n');
+  writeFileSync(targets, '["cloud-agent-next-e2e"]\n');
+  git('add', 'services');
+  commit('runtime config');
+  const mainSha = git('rev-parse', 'HEAD');
+
+  // A run SHA must be fetchable from origin by its full SHA, so the fixture
+  // publishes each branch to a bare repository the guard's fetch reads.
+  const origin = join(directory, 'origin.git');
+  git('clone', '-q', '--bare', directory, origin);
+  git('remote', 'add', 'origin', origin);
+
+  git('checkout', '-q', '-b', 'same');
+  writeFileSync(join(directory, 'unrelated.txt'), 'unrelated change\n');
+  git('add', 'unrelated.txt');
+  commit('unrelated change');
+  const sameSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'same');
+
+  git('checkout', '-q', '-b', 'differs');
+  writeFileSync(wrangler, '{ "name": "cloud-agent-next", "workers_dev": true }\n');
+  git('add', 'services');
+  commit('worker config change');
+  const diffSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'differs');
+
+  const script = e2eDeploy.jobs.deploy.steps.find(
+    step => step.name === 'Verify the run SHA shares the runtime Worker config'
+  ).run;
+  const runGuard = runSha =>
+    spawnSync('bash', ['-e', '-c', script], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, RUNTIME_SOURCE_SHA: mainSha, RUN_SHA: runSha },
+    });
+
+  try {
+    // The run SHA may change anything but the two Worker config files.
+    const same = runGuard(sameSha);
+    assert.equal(same.status, 0, `${same.stdout}${same.stderr}`);
+    assert.doesNotMatch(`${same.stdout}${same.stderr}`, /::error::/);
+
+    const differs = runGuard(diffSha);
+    assert.equal(differs.status, 1);
+    assert.match(
+      `${differs.stdout}${differs.stderr}`,
+      /::error::wrangler\.jsonc or runtime-targets\.json differs from the runtime SHA/
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {

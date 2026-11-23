@@ -137,11 +137,17 @@ export function ModelAccessForm({
     const { height } = event.nativeEvent.layout;
     setFooterHeight(previous => (previous === height ? previous : height));
   }, []);
+  const [tab, setTab] = useState<Tab>('models');
   // The list's own band: the frame with the header above it and the pinned bar
   // below it taken out. Those two already claim their points of the frame, so
   // clamping the pad against the frame alone would spend the viewport minimum
-  // on them and leave the list at zero height.
-  const bodyBand = frame === null ? null : Math.max(0, frame.height - headerHeight - footerHeight);
+  // on them and leave the list at zero height. The Gateways tab commits each
+  // control as it changes and renders no bar, and an unmounted bar never
+  // reports a height of zero, so its last measurement would keep reserving
+  // room the list has back: the band counts the bar only while it is drawn.
+  const footerBand = tab === 'gateways' ? 0 : footerHeight;
+  const bodyBand =
+    frame === null ? null : Math.max(0, frame.height - headerHeight - footerBand);
   const keyboardLiftPad = clampLiftPad(
     Math.max(0, keyboardHeight - bottom),
     frame === null || bodyBand === null
@@ -159,7 +165,6 @@ export function ModelAccessForm({
   // must act.
   const save = useSaveOrgModelAccess(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
-  const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
   // still gates routing, so the list keeps it instead of hiding a value the
   // admin can then never remove. The rows themselves come from the whole

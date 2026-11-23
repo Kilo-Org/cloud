@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
     "storeTimedOut": "App Store haikujibu kwa wakati. Jaribu tena.",
     "storeTimedOutPlay": "Google Play haikujibu kwa wakati. Jaribu tena.",
+    "storeUnreachable": "App Store haipatikani. Jaribu tena.",
+    "storeUnreachablePlay": "Google Play haipatikani. Jaribu tena.",
     "unresolvedPurchase": "Ununuzi wako wa awali bado unaweza kukamilika na kuongeza salio ulilonunua. Kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",
     "unresolvedPurchaseFound": "Ununuzi wako wa awali umepatikana dukani na salio lake litaongezwa ukikamilika; kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",
     "unresolvedPurchaseNotFound": "Ununuzi wako wa awali haujapatikana dukani, lakini unaweza kukamilika baadaye na kuongeza salio lake; kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",

@@ -5014,6 +5014,8 @@
     "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
     "storeTimedOut": "Níor fhreagair an App Store in am. Bain triail as arís.",
     "storeTimedOutPlay": "Níor fhreagair Google Play in am. Bain triail as arís.",
+    "storeUnreachable": "Ní féidir teacht ar an App Store. Bain triail as arís.",
+    "storeUnreachablePlay": "Ní féidir teacht ar Google Play. Bain triail as arís.",
     "unresolvedPurchase": "D’fhéadfadh do cheannachán roimhe seo dul i gcrích fós agus na creidmheasanna a bhaineann leis a chur le do chothromas. Má cheannaíonn tú arís, cuirtear tús le ceannachán eile agus d’fhéadfaí táille a ghearradh ort arís.",
     "unresolvedPurchaseFound": "Fuarthas do cheannachán roimhe seo sa siopa agus cuirfear a chreidmheasanna leis nuair a bheidh sé críochnaithe; má cheannaíonn tú arís, tosófar ceannachán eile agus d’fhéadfaí táille eile a ghearradh ort.",
     "unresolvedPurchaseNotFound": "Ní bhfuarthas do cheannachán roimhe seo sa siopa ach d’fhéadfadh sé dul i gcrích fós agus a chreidmheasanna a chur leis; má cheannaíonn tú arís, tosófar ceannachán eile agus d’fhéadfaí táille eile a ghearradh ort.",

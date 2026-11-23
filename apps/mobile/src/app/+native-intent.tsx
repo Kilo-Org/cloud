@@ -290,10 +290,11 @@ export function redirectSystemPath({
     if (profilePickerRoute) {
       return profilePickerRoute;
     }
-    // Dev-only Buy credits rows against fixed store answers
-    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
+    // Dev-only Buy credits rows against fixed store answers. `failed` shows a
+    // store that lost its billing connection and `timed-out` the store deadline
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed|timed-out>`).
     const creditsPackPrices =
-      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed|timed-out)\/?$/.exec(
         path
       );
     if (creditsPackPrices) {

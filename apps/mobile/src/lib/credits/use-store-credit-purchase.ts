@@ -56,6 +56,9 @@ export function creditStoreTimeoutKey(storefront: 'app_store' | 'play'): string 
   return storefront === 'play' ? STORE_TIMEOUT_PLAY_KEY : STORE_TIMEOUT_KEY;
 }
 
+const CREDIT_STORE_UNREACHABLE_KEY = 'credits.storeUnreachable';
+const CREDIT_STORE_UNREACHABLE_PLAY_KEY = 'credits.storeUnreachablePlay';
+
 /**
  * Catalog keys, never translated copy: the screen translates them. The keys
  * that name Kilo Pass in their copy are reused where the sentence is
@@ -377,6 +380,17 @@ export function getStoreCreditPurchaseErrorMessageKey(
   }
   if (readTrpcErrorField(error, 'message') === STORE_PURCHASE_PENDING_MESSAGE) {
     return null;
+  }
+
+  // The store has no live billing connection, so nothing reached the store and
+  // the same tap succeeds after `reconnect()`. Name the connection, not the
+  // purchase. The inline tile is one `text-sm` band beside the pack rows, and
+  // the store-unavailable card's connection sentence is too long to hold one
+  // line there on a compact window, where it would cover the last row it
+  // reports on, so this flow owns these shorter keys and the card keeps its
+  // longer body.
+  if (isStoreNotReadyError(error)) {
+    return storefront === 'play' ? CREDIT_STORE_UNREACHABLE_PLAY_KEY : CREDIT_STORE_UNREACHABLE_KEY;
   }
 
   const ownedByAnotherAccountKey =

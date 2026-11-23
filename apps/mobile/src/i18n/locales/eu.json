@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
     "storeTimedOut": "App Store-k ez du denboran erantzun. Saiatu berriro.",
     "storeTimedOutPlay": "Google Play-k ez du denboran erantzun. Saiatu berriro.",
+    "storeUnreachable": "App Store ez da irisgarri. Saiatu berriro.",
+    "storeUnreachablePlay": "Google Play ez da irisgarri. Saiatu berriro.",
     "unresolvedPurchase": "Baliteke zure aurreko erosketa oraindik burutzea eta dagozkion kredituak zure saldoari gehitzea. Berriro erosiz gero, beste erosketa bat hasiko da, eta baliteke berriro kobratzea.",
     "unresolvedPurchaseFound": "Dendan zure aurreko erosketa aurkitu da eta burutzean dagozkion kredituak gehituko dira; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
     "unresolvedPurchaseNotFound": "Dendan ez da zure aurreko erosketa aurkitu, baina baliteke gero burutzea eta kredituak gehitzea; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",

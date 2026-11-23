@@ -5099,6 +5099,8 @@
     "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
     "storeTimedOut": "Ni ymatebodd yr App Store mewn amser. Rhoi cynnig eto.",
     "storeTimedOutPlay": "Ni ymatebodd Google Play mewn amser. Rhoi cynnig eto.",
+    "storeUnreachable": "Methu cyrraedd yr App Store. Rhoi cynnig eto.",
+    "storeUnreachablePlay": "Methu cyrraedd Google Play. Rhoi cynnig eto.",
     "unresolvedPurchase": "Mae’n bosibl y bydd eich pryniant blaenorol yn cael ei gwblhau o hyd ac y caiff ei gredydau eu hychwanegu. Mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
     "unresolvedPurchaseFound": "Canfu’r siop eich pryniant blaenorol a chaiff ei gredydau eu hychwanegu pan fydd wedi’i gwblhau; mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
     "unresolvedPurchaseNotFound": "Ni chanfu’r siop eich pryniant blaenorol, ond mae’n bosibl y caiff ei gwblhau a’i gredydau eu hychwanegu’n hwyrach; mae prynu eto’n dechrau pryniant arall a gellid codi tâl arnoch eto.",

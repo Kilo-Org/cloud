@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
     "storeTimedOut": "A App Store non respondeu a tempo. Téntao de novo.",
     "storeTimedOutPlay": "Google Play non respondeu a tempo. Téntao de novo.",
+    "storeUnreachable": "Non se puido chegar á App Store. Téntao de novo.",
+    "storeUnreachablePlay": "Non se puido chegar a Google Play. Téntao de novo.",
     "unresolvedPurchase": "A túa compra anterior aínda pode completarse e engadir os seus créditos ao teu saldo. Se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",
     "unresolvedPurchaseFound": "A tenda atopou a túa compra anterior e engadiranse os seus créditos cando se complete; se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",
     "unresolvedPurchaseNotFound": "A tenda non atopou a túa compra anterior, pero aínda pode completarse e engadir os seus créditos; se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",

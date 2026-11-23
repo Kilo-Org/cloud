@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
     "storeTimedOut": "Az App Store nem válaszolt időben. Próbáld újra.",
     "storeTimedOutPlay": "A Google Play nem válaszolt időben. Próbáld újra.",
+    "storeUnreachable": "Az App Store nem érhető el. Próbáld újra.",
+    "storeUnreachablePlay": "A Google Play nem érhető el. Próbáld újra.",
     "unresolvedPurchase": "A korábbi vásárlásod még teljesülhet, és az érte járó kreditek hozzáadódhatnak az egyenlegedhez. Ha újra vásárolsz, azzal egy külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseFound": "Az áruházban megtaláltuk a korábbi vásárlásodat, és teljesülésekor megkapod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseNotFound": "Az áruházban nem találtuk a korábbi vásárlásodat, de az még teljesülhet, és megkaphatod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",

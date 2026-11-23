@@ -1,15 +1,24 @@
+/* eslint-disable max-lines -- One fixture file holds the fixed catalogs, the states and the purchase wiring; a second file would split one screen's answers. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
-import { useMemo, useState } from 'react';
+import { createPurchaseError, ErrorCode } from 'expo-iap';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   joinStoreCreditProducts,
+  type StoreCreditProduct,
   type StoreCreditProductListing,
 } from '@/lib/credits/store-products';
-import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { getCreditStorefront } from '@/lib/credits/storefront';
+import {
+  createStoreCreditPurchaseActions,
+  type CreditPurchaseFailure,
+  creditStoreTimeoutKey,
+  getStoreCreditPurchaseErrorMessageKey,
+} from '@/lib/credits/use-store-credit-purchase';
 import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { TRPCProvider, useTRPC } from '@/lib/trpc';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 import {
@@ -32,8 +41,10 @@ import {
 // charge on a current SKU, `legacy-unresolved` restores a retired Play SKU whose
 // replacement is the consent target, `refused-unresolved` restores a charge the
 // backend will never credit, `waiting` and `pending` show the store-wait and
-// pending-payment copy on the pack's row and in the card, and `failed` shows the
-// inline error beside it, in the storefront's own wording.
+// pending-payment copy on the pack's row and in the card, `failed` shows the
+// inline error for a store that lost its billing connection, which a pack row
+// tap starts again through the real purchase path, and `timed-out` shows the
+// store deadline's inline error.
 
 export type CreditPackPricesFixtureState =
   | 'priced'
@@ -45,7 +56,8 @@ export type CreditPackPricesFixtureState =
   | 'refused-unresolved'
   | 'waiting'
   | 'pending'
-  | 'failed';
+  | 'failed'
+  | 'timed-out';
 
 const FIXTURE_STATES = [
   'priced',
@@ -58,6 +70,7 @@ const FIXTURE_STATES = [
   'waiting',
   'pending',
   'failed',
+  'timed-out',
 ] as const satisfies readonly CreditPackPricesFixtureState[];
 
 export function isCreditPackPricesFixtureState(
@@ -78,10 +91,53 @@ const WAIT_KIND_BY_STATE = {
   waiting: 'store',
   pending: 'pending',
   failed: null,
+  'timed-out': null,
 } as const satisfies Record<CreditPackPricesFixtureState, 'store' | 'pending' | null>;
 
 /** Store prices in the shape the German Play store returns for these packs. */
 const PLAY_PRICES = ['10,99 €', '54,99 €', '109,99 €', '549,99 €'] as const;
+
+/**
+ * The refusal a store answers with when it has no live billing connection. It is
+ * the fault the `failed` state shows: nothing reached the store, so the same tap
+ * can repeat it after a reconnect. The store's own factory builds it, so it
+ * carries the shape the real purchase path maps; its message is the store's
+ * diagnostic and never reaches the screen.
+ */
+const STORE_CONNECTION_REFUSAL = createPurchaseError({
+  code: ErrorCode.NotPrepared,
+  message: 'Billing client not ready',
+});
+
+/**
+ * How long the stand-in store takes to refuse a purchase. A real store answers
+ * from another process, so the screen's clear-then-publish cycle lasts long
+ * enough to see: the tile goes while the request is open and returns after it.
+ */
+const STORE_ANSWER_DELAY_MS = 600;
+
+/** Waits out the store's own answer time, so the refusal is not instantaneous. */
+async function waitForStoreAnswer(): Promise<void> {
+  const answer = Promise.withResolvers<undefined>();
+  setTimeout(answer.resolve, STORE_ANSWER_DELAY_MS);
+  await answer.promise;
+}
+
+/**
+ * The inline error tile a state starts with, before any tap publishes its own.
+ * `failed` reads the real mapper's key for a store that lost its billing
+ * connection, so its tile is the sentence production shows; `timed-out` reads
+ * the deadline key of the storefront this device buys from.
+ */
+function initialErrorMessageKey(state: CreditPackPricesFixtureState): string | null {
+  if (state === 'failed') {
+    return getStoreCreditPurchaseErrorMessageKey(STORE_CONNECTION_REFUSAL, getCreditStorefront());
+  }
+  if (state === 'timed-out') {
+    return creditStoreTimeoutKey(getCreditStorefront());
+  }
+  return null;
+}
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
@@ -280,6 +336,120 @@ function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
 
 export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
   const waitKind = WAIT_KIND_BY_STATE[state];
+  // The purchase phase, keyed by store product id, as the owner reports it: the
+  // failed state publishes its refusal here, and no other state publishes one.
+  const {
+    begin: beginPurchase,
+    clearWhere: clearPurchaseFailure,
+    snapshot: { states, pendingKeys },
+  } = useKeyedSurfaceFeedback<string, CreditPurchaseFailure>();
+  // Only the failed state runs the real start path, so only there can a row
+  // report its own open request.
+  const tapDriven = state === 'failed';
+  const pendingProductId = tapDriven ? (pendingKeys[0] ?? null) : null;
+  // The screen renders one error line, so the first failed entry names it. A
+  // state that never taps keeps its own tile, and a tap replaces it with the key
+  // the mapper published. Only the tap state reads the entry, so an entry
+  // another state left behind cannot repaint this one.
+  const failedFailure = tapDriven
+    ? [...states.values()].find(phase => phase.status === 'failed')
+    : undefined;
+  // The tile has two owners and only one at a time. The state's own key stands
+  // until the person taps a pack. The first tap hands the tile to the attempt,
+  // so the screen's clear-then-publish cycle runs: no tile while the request is
+  // open, the mapper's key after it refuses. Deriving that from the feedback
+  // alone cannot work, because clearing removes the entry and the seed would
+  // come back in its place.
+  //
+  // The hand-off names the state that made it. This component stays mounted
+  // across a link for another state, so a bare flag would leave the next state
+  // without the tile it exists to show, and the hand-off therefore survives a
+  // link for another state. Only the state that runs a purchase may clear: an
+  // inert tap publishes no replacement, so clearing there would take away the
+  // refusal the failed state published and leave nothing to paint.
+  const [tappedState, setTappedState] = useState<CreditPackPricesFixtureState | null>(null);
+  const tapped = tapDriven && tappedState === state;
+  const errorMessageKey = tapped
+    ? (failedFailure?.failure.messageKey ?? null)
+    : initialErrorMessageKey(state);
+  const clearError = useCallback(() => {
+    if (!tapDriven) {
+      return;
+    }
+    setTappedState(state);
+    for (const [key, phase] of states) {
+      if (phase.status === 'failed') {
+        clearPurchaseFailure(key, () => true);
+      }
+    }
+  }, [clearPurchaseFailure, state, states, tapDriven]);
+
+  const storefront = getCreditStorefront();
+  const catalog = backendProductsFor(state);
+  // The real actions for the tap path: the store refuses the request the way a
+  // device without a billing client does, and every follow-up is inert because
+  // nothing was charged.
+  const actions = useMemo(
+    () =>
+      createStoreCreditPurchaseActions({
+        storefront,
+        appAccountToken: catalog.appAccountToken,
+        creditPackAppleProductIds: catalog.products.map(product => product.appleProductId),
+        creditPackGoogleProductIds: catalog.products.map(product => product.googleProductId),
+        // The store answers the way a device without a billing client does, and
+        // it takes a moment to do so. A store call answers from another process,
+        // so an instant refusal would hide the screen's own clear-then-publish
+        // cycle behind one frame.
+        requestPurchase: async () => {
+          await waitForStoreAnswer();
+          throw STORE_CONNECTION_REFUSAL;
+        },
+        completeAppStorePurchase: async () => {
+          await Promise.resolve();
+        },
+        completePlayPurchase: async () => {
+          await Promise.resolve();
+        },
+        finishTransaction: async () => {
+          await Promise.resolve();
+        },
+        invalidateAfterCompletion: async () => {
+          await Promise.resolve();
+        },
+        isAccountCurrent: () => true,
+        // The screen paints the inline tile here; a toast would repeat it.
+        showError: () => undefined,
+      }),
+    [catalog, storefront]
+  );
+
+  const purchase = useCallback(
+    async (pack: StoreCreditProduct): Promise<boolean> => {
+      const storeProductId = pack.storeProductId;
+      if (!tapDriven || storeProductId === null) {
+        // Every other state keeps the inert tap: nothing is chargeable, and the
+        // state under test is the layout or a hand-seeded tile.
+        await Promise.resolve();
+        return false;
+      }
+      const attempt = beginPurchase(storeProductId);
+      if (attempt === null) {
+        return false;
+      }
+      const outcome = await actions.purchase(pack);
+      if (!attempt.owns()) {
+        return false;
+      }
+      const failure = outcome.started ? null : outcome.failure;
+      if (failure === null) {
+        attempt.abandon();
+        return outcome.started;
+      }
+      attempt.fail(failure);
+      return false;
+    },
+    [actions, beginPurchase, tapDriven]
+  );
 
   const store = useMemo<CreditNativeIapContextValue>(() => {
     const fixtureListings = listings(state);
@@ -304,12 +474,7 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
         await Promise.resolve();
         return true;
       },
-      // A press in the fixture never reaches a store: nothing is chargeable
-      // here, and the state under test is the layout, not a purchase.
-      purchase: async () => {
-        await Promise.resolve();
-        return false;
-      },
+      purchase,
       // The money exits are inert in every state, including the ones that
       // restore an earlier charge: a reconciliation here reports nothing held
       // and a Buy again tap charges nothing.
@@ -328,21 +493,17 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
       hasUnresolvedPurchase,
       purchaseResolution,
       // The completing state keeps the first pack's purchase open, which is the
-      // only way to render its in-flight label without a store.
-      completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
+      // only way to render its in-flight label without a store. The failed state
+      // reads the entry its own request holds.
+      completingProductId:
+        state === 'completing' ? (fixtureListings[0]?.id ?? null) : pendingProductId,
       purchaseWait:
         waitKind === null ? null : { productId: fixtureListings[0]?.id ?? '', kind: waitKind },
-      // The loader's own wording for a store that missed the deadline, which
-      // differs per storefront: the fixture must not show App Store copy on
-      // Android.
-      errorMessageKey:
-        state === 'failed'
-          ? getStoreUnavailableCopyKeys(getCreditStorefront()).timeoutBodyKey
-          : null,
+      errorMessageKey,
       completedPurchaseCount: 0,
-      clearError: () => undefined,
+      clearError,
     };
-  }, [state, waitKind]);
+  }, [clearError, errorMessageKey, pendingProductId, purchase, state, waitKind]);
 
   return (
     <CreditNativeIapContext.Provider value={store}>

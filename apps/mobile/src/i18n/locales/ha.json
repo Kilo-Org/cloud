@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
     "storeTimedOut": "App Store bai amsa a kan lokaci ba. Sake gwadawa.",
     "storeTimedOutPlay": "Google Play bai amsa a kan lokaci ba. Sake gwadawa.",
+    "storeUnreachable": "Ba a iya isa ga App Store ba. Sake gwadawa.",
+    "storeUnreachablePlay": "Ba a iya isa ga Google Play ba. Sake gwadawa.",
     "unresolvedPurchase": "Har yanzu sayayyar da ka yi a baya na iya kammaluwa, a kuma ƙara kuɗin amfaninta a ma'auninka. Idan ka sake saya, za ka fara wata sayayya dabam kuma ana iya sake cajinka.",
     "unresolvedPurchaseFound": "An gano sayayyarka ta baya a shagon, za a ƙara kuɗin amfaninta da zarar ta kammalu, kuma sake saya zai fara wata sayayya dabam da ka iya sa a sake cajinka.",
     "unresolvedPurchaseNotFound": "Ba a gano sayayyarka ta baya a shagon ba, amma tana iya kammaluwa daga baya a ƙara kuɗin amfaninta, kuma sake saya zai fara wata sayayya dabam da ka iya sa a sake cajinka.",

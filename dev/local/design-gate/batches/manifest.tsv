@@ -160,6 +160,7 @@ T2-G17b	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/organization-invoic
 T2-G17b	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/credits-pack-prices-fixture/priced	screen	(app)/credits-pack-prices-fixture
 T2-G17b	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/credits-pack-prices-fixture/unresolved	screen	(app)/credits-pack-prices-fixture
 T2-G17c	T2	signed-in	base	android,ios	retryable-error	-	kiloapp:///dev/credits-pack-prices-fixture/failed	screen	(app)/credits-pack-prices-fixture
+T2-G17c	T2	signed-in	base	android,ios	retryable-error	-	kiloapp:///dev/credits-pack-prices-fixture/timed-out	screen	(app)/credits-pack-prices-fixture
 T2-G17c	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///dev/render-recovery-fixture/payload	screen	(app)/render-recovery-fixture
 T2-G17c	T2	signed-in	base	android,ios	long-content	-	kiloapp:///dev/instance-picker-fixture/instance?name=dev-vm&project=ux	clean	-
 T2-G18	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/voice-language-picker	screen	(app)/voice-language-picker

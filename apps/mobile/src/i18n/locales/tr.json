@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
     "storeTimedOut": "App Store zamanında yanıt vermedi. Tekrar dene.",
     "storeTimedOutPlay": "Google Play zamanında yanıt vermedi. Tekrar dene.",
+    "storeUnreachable": "App Store'a ulaşılamıyor. Tekrar dene.",
+    "storeUnreachablePlay": "Google Play'e ulaşılamıyor. Tekrar dene.",
     "unresolvedPurchase": "Önceki satın alma işleminiz daha sonra tamamlanabilir ve bu işleme ait krediler bakiyenize eklenebilir. Yeniden satın almak ayrı bir satın alma işlemi başlatır ve sizden tekrar ücret alınmasına neden olabilir.",
     "unresolvedPurchaseFound": "Önceki satın alma işleminiz mağazada bulundu ve tamamlandığında kredileri bakiyenize eklenecek; yeniden satın almak ayrı bir işlem başlatır ve tekrar ücret alınmasına neden olabilir.",
     "unresolvedPurchaseNotFound": "Önceki satın alma işleminiz mağazada bulunamadı ancak daha sonra tamamlanıp kredileri bakiyenize eklenebilir; yeniden satın almak ayrı bir işlem başlatır ve tekrar ücret alınmasına neden olabilir.",

@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
     "storeTimedOut": "Der App Store hat nicht rechtzeitig geantwortet. Erneut versuchen.",
     "storeTimedOutPlay": "Google Play hat nicht rechtzeitig geantwortet. Erneut versuchen.",
+    "storeUnreachable": "Der App Store war nicht erreichbar. Erneut versuchen.",
+    "storeUnreachablePlay": "Google Play war nicht erreichbar. Erneut versuchen.",
     "unresolvedPurchase": "Dein vorheriger Kauf kann noch abgeschlossen und das zugehörige Guthaben deinem Kontostand hinzugefügt werden. Wenn du erneut kaufst, startest du einen separaten Kauf, der dir erneut berechnet werden kann und bei erfolgreichem Abschluss weiteres Guthaben hinzufügt.",
     "unresolvedPurchaseFound": "Dein vorheriger Kauf wurde im Store gefunden und sein Guthaben wird bei Abschluss hinzugefügt; erneutes Kaufen startet einen separaten Kauf und kann erneut berechnet werden.",
     "unresolvedPurchaseNotFound": "Dein vorheriger Kauf wurde im Store nicht gefunden, kann aber später noch abgeschlossen werden und Guthaben hinzufügen; erneutes Kaufen startet einen separaten Kauf und kann erneut berechnet werden.",

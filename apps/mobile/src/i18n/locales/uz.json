@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
     "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
     "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
+    "storeUnreachable": "App Store'ga ulanib bo'lmadi. Qayta urinish.",
+    "storeUnreachablePlay": "Google Play'ga ulanib bo'lmadi. Qayta urinish.",
     "unresolvedPurchase": "Avvalgi xaridingiz hali ham yakunlanishi va unga tegishli kreditlar balansingizga qo'shilishi mumkin. Yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
     "unresolvedPurchaseFound": "Avvalgi xaridingiz do'konda topildi va yakunlangach kreditlari balansingizga qo'shiladi; yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
     "unresolvedPurchaseNotFound": "Avvalgi xaridingiz do'konda topilmadi, ammo keyinroq yakunlanib, kreditlari balansingizga qo'shilishi mumkin; yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",

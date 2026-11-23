@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "I-Google Play ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
     "storeTimedOut": "I-App Store ayizange iphendle ngasikhathi. Zama futhi.",
     "storeTimedOutPlay": "I-Google Play ayizange iphendle ngasikhathi. Zama futhi.",
+    "storeUnreachable": "I-App Store ayikwazanga ukufinyeleleka. Zama futhi.",
+    "storeUnreachablePlay": "I-Google Play ayikwazanga ukufinyeleleka. Zama futhi.",
     "unresolvedPurchase": "Ukuthenga kwakho kwangaphambilini kusengaphothulwa bese kwengezwa amakhredithi alokho kuthenga kubhalansi yakho. Ukuthenga futhi kuqala ukuthenga okusha okuhlukile futhi ungase ukhokhiswe futhi.",
     "unresolvedPurchaseFound": "Ukuthenga kwakho kwangaphambilini kwatholakala esitolo futhi amakhredithi azongezwa uma sekuqediwe; ukuthenga futhi kuqala ukuthenga okusha futhi ungase ukhokhiswe futhi.",
     "unresolvedPurchaseNotFound": "Ukuthenga kwakho kwangaphambilini akutholakalanga esitolo kodwa kungaqedwa kamuva bese kwengezwa amakhredithi; ukuthenga futhi kuqala ukuthenga okusha futhi ungase ukhokhiswe futhi.",

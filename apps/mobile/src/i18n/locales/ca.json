@@ -4844,6 +4844,8 @@
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
     "storeTimedOut": "L'App Store no ha respost a temps. Torna-ho a provar.",
     "storeTimedOutPlay": "Google Play no ha respost a temps. Torna-ho a provar.",
+    "storeUnreachable": "No es pot accedir a l'App Store. Torna-ho a provar.",
+    "storeUnreachablePlay": "No es pot accedir a Google Play. Torna-ho a provar.",
     "unresolvedPurchase": "La teva compra anterior encara es pot completar i afegir els crèdits corresponents al teu saldo. Si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",
     "unresolvedPurchaseFound": "S'ha trobat la teva compra anterior a la botiga i se t'afegiran els crèdits quan es completi; si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",
     "unresolvedPurchaseNotFound": "No s'ha trobat la teva compra anterior a la botiga, però es pot completar més endavant i afegir els crèdits; si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",

@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
     "storeTimedOut": "App Store không phản hồi kịp thời. Thử lại.",
     "storeTimedOutPlay": "Google Play không phản hồi kịp thời. Thử lại.",
+    "storeUnreachable": "Không thể kết nối đến App Store. Thử lại.",
+    "storeUnreachablePlay": "Không thể kết nối đến Google Play. Thử lại.",
     "unresolvedPurchase": "Giao dịch mua trước đó của bạn vẫn có thể hoàn tất và thêm số tín dụng tương ứng vào số dư của bạn. Mua lần nữa sẽ bắt đầu một giao dịch mua riêng biệt và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseFound": "Cửa hàng đã tìm thấy giao dịch mua trước đó của bạn và sẽ cộng tín dụng khi giao dịch hoàn tất; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseNotFound": "Cửa hàng không tìm thấy giao dịch mua trước đó của bạn nhưng giao dịch vẫn có thể hoàn tất sau và cộng tín dụng; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",

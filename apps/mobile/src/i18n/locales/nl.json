@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
     "storeTimedOut": "De App Store reageerde niet op tijd. Opnieuw proberen.",
     "storeTimedOutPlay": "Google Play reageerde niet op tijd. Opnieuw proberen.",
+    "storeUnreachable": "Kon de App Store niet bereiken. Opnieuw proberen.",
+    "storeUnreachablePlay": "Kon Google Play niet bereiken. Opnieuw proberen.",
     "unresolvedPurchase": "Je eerdere aankoop kan alsnog worden afgerond, waarna de bijbehorende credits aan je saldo worden toegevoegd. Als je opnieuw koopt, start je een aparte aankoop waarvoor je mogelijk opnieuw moet betalen.",
     "unresolvedPurchaseFound": "Je eerdere aankoop is gevonden bij de winkel en de credits worden na afronding toegevoegd; opnieuw kopen start een aparte aankoop waarvoor je mogelijk opnieuw betaalt.",
     "unresolvedPurchaseNotFound": "Je eerdere aankoop is niet gevonden bij de winkel, maar kan later alsnog worden afgerond en credits opleveren; opnieuw kopen start een aparte aankoop waarvoor je mogelijk opnieuw betaalt.",

@@ -4759,6 +4759,8 @@
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
     "storeTimedOut": "App Store vaxtında cavab vermədi. Yenidən cəhd et.",
     "storeTimedOutPlay": "Google Play vaxtında cavab vermədi. Yenidən cəhd et.",
+    "storeUnreachable": "App Store əlçatmazdır. Yenidən cəhd et.",
+    "storeUnreachablePlay": "Google Play əlçatmazdır. Yenidən cəhd et.",
     "unresolvedPurchase": "Əvvəlki alışınız hələ də tamamlana və həmin alışın kreditləri balansınıza əlavə oluna bilər. Yenidən aldıqda ayrıca alış əməliyyatı başlayır və sizdən yenidən ödəniş tutula bilər.",
     "unresolvedPurchaseFound": "Əvvəlki alışınız mağazada tapıldı və tamamlandıqda kreditləri balansınıza əlavə olunacaq; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
     "unresolvedPurchaseNotFound": "Əvvəlki alışınız mağazada tapılmadı, amma sonradan tamamlanıb kreditləri balansınıza əlavə oluna bilər; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",

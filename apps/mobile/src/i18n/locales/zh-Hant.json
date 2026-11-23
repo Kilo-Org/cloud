@@ -4681,6 +4681,8 @@
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
     "storeTimedOut": "App Store 未及時回應。請再試一次。",
     "storeTimedOutPlay": "Google Play 未及時回應。請再試一次。",
+    "storeUnreachable": "無法連線 App Store。請再試一次。",
+    "storeUnreachablePlay": "無法連線 Google Play。請再試一次。",
     "unresolvedPurchase": "你先前的購買仍可能完成，並將該次購買的點數加入你的餘額。再次購買會建立另一筆購買，並可能再次向你收費。",
     "unresolvedPurchaseFound": "商店已找到你先前的購買紀錄，該次購買完成後，點數將加入你的餘額；再次購買會建立另一筆購買，並可能再次向你收費。",
     "unresolvedPurchaseNotFound": "商店未找到你先前的購買紀錄，但該次購買仍可能於稍後完成，並將點數加入你的餘額；再次購買會建立另一筆購買，並可能再次向你收費。",

@@ -4929,6 +4929,8 @@
     "noMatchingProductsPlay": "O Google Play não devolveu nenhum pacote de créditos correspondente.",
     "storeTimedOut": "A App Store não respondeu a tempo. Tenta novamente.",
     "storeTimedOutPlay": "O Google Play não respondeu a tempo. Tenta novamente.",
+    "storeUnreachable": "A App Store não está acessível. Tenta novamente.",
+    "storeUnreachablePlay": "O Google Play não está acessível. Tenta novamente.",
     "unresolvedPurchase": "A sua compra anterior pode ainda ser concluída e adicionar os respetivos créditos. Comprar novamente inicia uma nova compra e pode resultar numa nova cobrança.",
     "unresolvedPurchaseFound": "A sua compra anterior foi encontrada na loja e os créditos serão adicionados quando for concluída; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
     "unresolvedPurchaseNotFound": "A sua compra anterior não foi encontrada na loja, mas ainda pode ser concluída e adicionar os respetivos créditos; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",

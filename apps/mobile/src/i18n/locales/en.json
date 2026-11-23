@@ -4861,6 +4861,8 @@
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
     "storeTimedOut": "App Store didn't respond in time. Try again.",
     "storeTimedOutPlay": "Google Play didn't respond in time. Try again.",
+    "storeUnreachable": "Couldn't reach the App Store. Try again.",
+    "storeUnreachablePlay": "Couldn't reach Google Play. Try again.",
     "unresolvedPurchase": "Your earlier purchase may still complete and add its credits. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseFound": "Your earlier purchase was found at the store. Its credits will be added when it completes. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseNotFound": "Your earlier purchase was not found at the store, but it may still complete later and add its credits. Buying again starts another purchase and may charge you again.",

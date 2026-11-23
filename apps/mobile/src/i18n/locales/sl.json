@@ -4929,6 +4929,8 @@
     "noMatchingProductsPlay": "Google Play ni vrnil ustreznih paketov kreditov.",
     "storeTimedOut": "App Store ni pravočasno odgovoril. Poskusi znova.",
     "storeTimedOutPlay": "Google Play ni pravočasno odgovoril. Poskusi znova.",
+    "storeUnreachable": "App Store ni dosegljiv. Poskusi znova.",
+    "storeUnreachablePlay": "Google Play ni dosegljiv. Poskusi znova.",
     "unresolvedPurchase": "Tvoj prejšnji nakup se lahko še vedno zaključi in ti doda pripadajoče kredite. S ponovnim nakupom začneš ločen nakup, ki ti je lahko znova zaračunan.",
     "unresolvedPurchaseFound": "Trgovina je našla tvoj prejšnji nakup in krediti ti bodo dodani, ko se zaključi; s ponovnim nakupom začneš ločen nakup, ki ti je lahko znova zaračunan.",
     "unresolvedPurchaseNotFound": "Trgovina ni našla tvojega prejšnjega nakupa, a se lahko pozneje še zaključi in ti doda kredite; s ponovnim nakupom začneš ločen nakup, ki ti je lahko znova zaračunan.",

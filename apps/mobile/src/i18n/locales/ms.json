@@ -4682,6 +4682,8 @@
     "noMatchingProductsPlay": "Google Play tidak memulangkan pek kredit yang sepadan.",
     "storeTimedOut": "App Store tidak membalas dalam masa yang ditetapkan. Cuba lagi.",
     "storeTimedOutPlay": "Google Play tidak membalas dalam masa yang ditetapkan. Cuba lagi.",
+    "storeUnreachable": "App Store tidak dapat dihubungi. Cuba lagi.",
+    "storeUnreachablePlay": "Google Play tidak dapat dihubungi. Cuba lagi.",
     "unresolvedPurchase": "Pembelian terdahulu anda mungkin masih akan diselesaikan dan kreditnya ditambah pada baki anda. Membeli sekali lagi memulakan pembelian berasingan dan anda mungkin dikenakan bayaran sekali lagi.",
     "unresolvedPurchaseFound": "Pembelian terdahulu anda ditemui di kedai dan kreditnya akan ditambah apabila selesai; membeli sekali lagi memulakan pembelian berasingan dan anda mungkin dikenakan bayaran sekali lagi.",
     "unresolvedPurchaseNotFound": "Pembelian terdahulu anda tidak ditemui di kedai tetapi mungkin selesai kelak dan kreditnya ditambah; membeli sekali lagi memulakan pembelian berasingan dan anda mungkin dikenakan bayaran sekali lagi.",

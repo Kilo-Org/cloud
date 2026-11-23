@@ -265,9 +265,15 @@ export function NewSessionPrompt({
     frameHeight: keyboardClosedFrameHeight ?? frameHeight ?? 0,
   });
   const keyboardProgress = useKeyboardMotionProgress();
-  const promptHeightStyle = useAnimatedStyle(() => ({
-    height: resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value),
-  }));
+  // Explicit dependencies: without them reanimated re-derives this mapper's
+  // closure on every render and restarts it, so each commit of this card
+  // re-registers work that only these two heights can change.
+  const promptHeightStyle = useAnimatedStyle(
+    () => ({
+      height: resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value),
+    }),
+    [closedPromptHeight, promptHeight]
+  );
 
   // The draft's own laid-out height, reported by the input on every content
   // change on Android. The field keeps its size, so this only decides whether a
@@ -282,9 +288,28 @@ export function NewSessionPrompt({
   // lines past the third and the caret were hidden. The iOS field always scrolls:
   // a text view whose content fits does not take a vertical drag, so the form
   // still gets it.
-  const [contentHeight, setContentHeight] = useState(0);
-  const promptScrolls =
-    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  // The report's own value is a ref, and only the gate it decides is state: the
+  // card reads the gate and nothing else from the report, so committing the raw
+  // height re-rendered this card — toolbar, attachment strip, controls and voice
+  // surface — once per wrapped line of a long draft, while every one of those
+  // renders drew the same gate. The gate is re-derived when the field's own
+  // height moves, because that moves the threshold the report is compared to.
+  const contentHeightRef = useRef(0);
+  const [promptScrolls, setPromptScrolls] = useState(Platform.OS === 'ios');
+  const publishPromptScrolls = useCallback(
+    (contentHeight: number) => {
+      const scrolls =
+        Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
+      setPromptScrolls(current => (current === scrolls ? current : scrolls));
+    },
+    [promptHeight]
+  );
+  useEffect(() => {
+    // The field's own height moved: the same reported content height may now
+    // cross the new threshold, and a drag over a scrolled draft must still reach
+    // the field instead of the form behind it.
+    publishPromptScrolls(contentHeightRef.current);
+  }, [publishPromptScrolls]);
   // The fade band over the clipped top line, driven from the field's scroll
   // offset. It lives in a shared value, not React state: a drag reports a frame
   // per few pixels, and this card's toolbar, attachment strip and controls are
@@ -296,17 +321,20 @@ export function NewSessionPrompt({
   // The first line box starts `PROMPT_INPUT_VERTICAL_INSET` below the content's
   // top, so the offset into the cut line is measured from the clip edge: on iOS
   // the field scrolls through the padding before it cuts any text.
-  const promptTopFadeStyle = useAnimatedStyle(() => ({
-    height: resolveComposerEdgeFadeHeight({
-      clipEdgeOffset: Math.max(
-        0,
-        promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
-      ),
-      edge: 'top',
-      lineHeight: promptLineHeight,
-      ramp: promptEdgeFadeRamp,
+  const promptTopFadeStyle = useAnimatedStyle(
+    () => ({
+      height: resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: Math.max(
+          0,
+          promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
+        ),
+        edge: 'top',
+        lineHeight: promptLineHeight,
+        ramp: promptEdgeFadeRamp,
+      }),
     }),
-  }));
+    [promptLineHeight, promptEdgeFadeRamp]
+  );
   // The same band at the bottom edge, for the line a scrolled field cuts there.
   // It covers only the part of that line still inside the field, so it cannot
   // dim the line above it. No content height is needed: a draft that ends above
@@ -314,23 +342,26 @@ export function NewSessionPrompt({
   // matters because iOS cannot report the content height. The band stays
   // mounted, and its height is 0 where the edge lands on a line boundary. Only
   // iOS renders it.
-  const promptBottomFadeStyle = useAnimatedStyle(() => {
-    // The bottom clip edge in content coordinates: the scroll offset plus the
-    // field's rendered height, where the iOS text view clips at its own bounds.
-    // The first line box starts one inset into the content, so the edge is
-    // measured from that line box.
-    const clipEdge =
-      promptScrollOffset.value +
-      resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
-    return {
-      height: resolveComposerEdgeFadeHeight({
-        clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
-        edge: 'bottom',
-        lineHeight: promptLineHeight,
-        ramp: promptEdgeFadeRamp,
-      }),
-    };
-  });
+  const promptBottomFadeStyle = useAnimatedStyle(
+    () => {
+      // The bottom clip edge in content coordinates: the scroll offset plus the
+      // field's rendered height, where the iOS text view clips at its own bounds.
+      // The first line box starts one inset into the content, so the edge is
+      // measured from that line box.
+      const clipEdge =
+        promptScrollOffset.value +
+        resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
+      return {
+        height: resolveComposerEdgeFadeHeight({
+          clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+          edge: 'bottom',
+          lineHeight: promptLineHeight,
+          ramp: promptEdgeFadeRamp,
+        }),
+      };
+    },
+    [closedPromptHeight, promptHeight, promptLineHeight, promptEdgeFadeRamp]
+  );
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = Math.max(0, event.nativeEvent.contentOffset.y);
@@ -621,12 +652,13 @@ export function NewSessionPrompt({
             }
             onContentSizeChange={event => {
               const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
-              setContentHeight(current => (current === next ? current : next));
+              contentHeightRef.current = next;
+              publishPromptScrolls(next);
               if (!shouldEnableComposerInputScroll(next, promptHeight)) {
                 // The draft fits again: the field is back at its top, where the
                 // first line is whole.
                 promptScrollOffset.value = 0;
-                setPromptFaded(false);
+                setPromptFaded(current => (current ? false : current));
               }
             }}
             onScroll={handlePromptScroll}

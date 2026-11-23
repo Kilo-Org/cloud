@@ -75,6 +75,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { hasVisibleComposerText } from '@/lib/composer-text';
+import { shouldRescanPromptVisibility } from '@/components/agents/new-session-prompt-state';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useCollapsedConnectCtas } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
@@ -214,6 +215,10 @@ export function NewSessionScreenBody() {
   // Start is never a silent no-op; a retryable one keeps the Retry control.
   const [cloudCreateError, setCloudCreateError] = useState<CloudCreateFailure | null>(null);
   const [hasPrompt, setHasPrompt] = useState(false);
+  // The value `hasPrompt` holds, readable from the keystroke path without a
+  // render: the visible-text scan is skipped for an append while it is true, and
+  // every writer below keeps this in step with the state it publishes.
+  const publishedHasPromptRef = useRef(false);
   // The profile picked for THIS session; null keeps the effective default.
   const [overrideProfileId, setOverrideProfileId] = useState<string | null>(null);
   // The manual env vars and setup commands typed under Advanced Configuration.
@@ -884,6 +889,7 @@ export function NewSessionScreenBody() {
     }
     if (decision.type === 'reset') {
       promptRef.current = '';
+      publishedHasPromptRef.current = false;
       setHasPrompt(false);
       setPromptSeed('pending');
       return;
@@ -896,6 +902,7 @@ export function NewSessionScreenBody() {
     // on submit, so seeding both from one value keeps the Start gate and the
     // submitted text in agreement.
     promptRef.current = decision.prompt;
+    publishedHasPromptRef.current = decision.hasPrompt;
     setHasPrompt(decision.hasPrompt);
     setPromptSeed(decision.seed);
   }, [draftState.settled, initialPrompt, promptRef, promptSeed, sharePrefillText]);
@@ -992,9 +999,23 @@ export function NewSessionScreenBody() {
   );
   function handlePromptChange(text: string) {
     promptEditedRef.current = true;
+    const previous = promptRef.current;
     promptRef.current = text;
-    const nextHasPrompt = hasVisibleComposerText(text);
-    setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
+    // The visible-text walk is the only O(draft length) work on the keystroke
+    // path, and an append cannot change its answer while it is already true.
+    if (
+      shouldRescanPromptVisibility({
+        previous,
+        next: text,
+        publishedVisible: publishedHasPromptRef.current,
+      })
+    ) {
+      const nextHasPrompt = hasVisibleComposerText(text);
+      if (nextHasPrompt !== publishedHasPromptRef.current) {
+        publishedHasPromptRef.current = nextHasPrompt;
+        setHasPrompt(nextHasPrompt);
+      }
+    }
     if (userId && !isCloneEntry) {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
     }

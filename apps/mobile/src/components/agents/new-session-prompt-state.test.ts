@@ -7,6 +7,7 @@ import {
   resolveNewSessionPromptControlState,
   resolveNewSessionPromptForCreate,
   resolvePromptCounterRemaining,
+  shouldRescanPromptVisibility,
 } from './new-session-prompt-state';
 
 describe('resolveNewSessionPromptForCreate', () => {
@@ -147,5 +148,62 @@ describe('resolvePromptCounterRemaining', () => {
 
   it('reports the overshoot rather than clamping a paste past the limit', () => {
     expect(resolvePromptCounterRemaining(CLOUD_AGENT_PROMPT_MAX_LENGTH + 25)).toBe(-25);
+  });
+});
+
+describe('shouldRescanPromptVisibility', () => {
+  it('skips the walk for an append while the draft is already visible', () => {
+    const previous = 'build the report';
+    for (const next of [
+      `${previous} `,
+      `${previous}x`,
+      `${previous}\u00A0`,
+      `${previous}\nthe next line`,
+    ]) {
+      expect(
+        shouldRescanPromptVisibility({ previous, next, publishedVisible: true })
+      ).toBe(false);
+    }
+  });
+
+  it('walks again for an append onto an invisible draft, where the first glyph can arrive', () => {
+    expect(
+      shouldRescanPromptVisibility({ previous: '   ', next: '   a', publishedVisible: false })
+    ).toBe(true);
+  });
+
+  it('walks again for an edit that can remove the last visible character', () => {
+    const previous = 'build the report';
+    for (const next of [
+      '',
+      ' ',
+      'build the repor',
+      'build the\u200B report',
+      `X${previous}`,
+      `${previous.slice(0, 5)}${previous.slice(6)}`,
+    ]) {
+      expect(shouldRescanPromptVisibility({ previous, next, publishedVisible: true })).toBe(true);
+    }
+  });
+
+  it('keeps the published answer correct across a typed draft', () => {
+    // The property the skip relies on: a visible draft stays visible through an
+    // append, so skipping the walk there cannot publish a stale answer.
+    let visible = false;
+    let draft = '';
+    for (const character of 'the session reads the report first') {
+      const next = draft + character;
+      const mustRescan = shouldRescanPromptVisibility({
+        previous: draft,
+        next,
+        publishedVisible: visible,
+      });
+      if (mustRescan) {
+        visible = /[^\s\u200B]/.test(next);
+      }
+      expect(visible).toBe(/[^\s\u200B]/.test(next));
+      draft = next;
+    }
+    expect(visible).toBe(true);
   });
 });

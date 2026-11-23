@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { type OrgModeConfigInput } from '@/components/organization/org-mode-form-model';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -42,6 +43,7 @@ export function useOrgModeMutations(organizationId: string, canManageBilling = f
 
   return {
     create: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: { name: string; slug: string; config: OrgModeConfigInput }) =>
         trpcClient.organizations.modes.create.mutate({ organizationId, ...input }),
       onSuccess,
@@ -49,6 +51,7 @@ export function useOrgModeMutations(organizationId: string, canManageBilling = f
       scope,
     }),
     update: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: {
         modeId: string;
         name: string;
@@ -60,6 +63,7 @@ export function useOrgModeMutations(organizationId: string, canManageBilling = f
       scope,
     }),
     remove: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: { modeId: string }) =>
         trpcClient.organizations.modes.delete.mutate({ organizationId, modeId: input.modeId }),
       onSuccess,

@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { toast } from 'sonner-native';
 
+import { MUTATE_WHILE_OFFLINE, SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -37,7 +37,7 @@ export function useSaveOrgGuardrails(organizationId: string | null, canManageBil
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.guardrails.update.mutationOptions({
-      networkMode: 'always',
+      ...MUTATE_WHILE_OFFLINE,
       onSuccess: async result => {
         if (organizationId != null) {
           queryClient.setQueryData(
@@ -116,7 +116,7 @@ export function useSaveOrgModelAccess(organizationId: string | null, canManageBi
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.settings.updateAllowLists.mutationOptions({
-      networkMode: 'always',
+      ...MUTATE_WHILE_OFFLINE,
       onSuccess: async () => {
         if (organizationId != null) {
           await Promise.all([
@@ -147,7 +147,7 @@ export function useSaveOrgGatewaySettings(organizationId: string | null, canMana
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.settings.updateGatewaySettings.mutationOptions({
-      networkMode: 'always',
+      ...MUTATE_WHILE_OFFLINE,
       onSuccess: async () => {
         if (organizationId != null) {
           await queryClient.invalidateQueries({

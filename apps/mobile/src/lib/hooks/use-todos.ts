@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -95,6 +96,11 @@ function useOptimisticArray<TRow>(queryKey: readonly unknown[]) {
     reportFailure: MutationFailureReporter = showMutationError
   ) {
     return {
+      // A todo write is a tap with a visible pending state: attempting it while
+      // the online manager reports offline fails through the normal path, so the
+      // row's busy state always returns and its failure is announced. Pausing
+      // would hold both until the connection returned.
+      ...MUTATE_WHILE_OFFLINE,
       onMutate: async (input: TInput) => {
         await queryClient.cancelQueries({ queryKey });
         const previous = queryClient.getQueryData<TRow[]>(queryKey);
@@ -145,6 +151,7 @@ export function useTodoListMutations(
 
   const create = useMutation(
     trpc.todos.lists.create.mutationOptions({
+      ...MUTATE_WHILE_OFFLINE,
       onError: reportFailure,
       onSuccess: created => {
         // The created list's screen reads this cache as it mounts, before the
@@ -228,6 +235,7 @@ export function useTodoItemMutations(listId: string) {
   const itemsKey = trpc.todos.items.list.queryKey({ listId });
   const optimistic = useOptimisticArray<TodoItem>(itemsKey);
   const reconcile = {
+    ...MUTATE_WHILE_OFFLINE,
     onError: showMutationError,
     onSettled: async () => {
       await invalidateTodoQueries(queryClient, trpc);

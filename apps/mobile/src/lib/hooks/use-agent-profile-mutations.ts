@@ -20,6 +20,7 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 // Optimistic writes on the same cache region are generation-stamped so an older
@@ -101,12 +102,12 @@ export function useAgentProfileMutations(
   const toastError = (error: { message: string }) => {
     toast.error(agentProfileMutationErrorMessage(error.message));
   };
-  // `networkMode: 'always'` keeps a save settling while the online manager is
+  // `MUTATE_WHILE_OFFLINE` keeps a save settling while the online manager is
   // offline (NetInfo can misreport while the backend is reachable): the request
   // either succeeds or fails fast, so `isPending` can never stick and the save
   // button always returns to idle.
   const callbacks = {
-    networkMode: 'always' as const,
+    ...MUTATE_WHILE_OFFLINE,
     onSuccess: invalidateProfiles,
     onError: (error: { message: string }) => {
       toastError(error);
@@ -116,7 +117,7 @@ export function useAgentProfileMutations(
   // drops only the toast: the caller states the refusal on its own surface, so
   // the same failure must not appear twice.
   const quietCreateCallbacks = {
-    networkMode: callbacks.networkMode,
+    ...MUTATE_WHILE_OFFLINE,
     onSuccess: callbacks.onSuccess,
   };
 

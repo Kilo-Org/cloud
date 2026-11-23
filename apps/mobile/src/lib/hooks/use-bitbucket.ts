@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isPersonal } from '@/lib/code-reviewer-config';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Bitbucket is org-only, so unlike the GitHub/GitLab status hooks there is no
@@ -67,6 +68,7 @@ export function useBitbucketIntegrationStatus(scope: string | undefined, enabled
 export function useConnectBitbucket(scope: string) {
   const refresh = useBitbucketRefresh(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { accessToken: string }) =>
       trpcClient.organizations.bitbucket.connect.mutate({
@@ -86,6 +88,7 @@ export function useConnectBitbucket(scope: string) {
 export function useReplaceBitbucketToken(scope: string) {
   const refresh = useBitbucketRefresh(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { integrationId: string; accessToken: string }) =>
       trpcClient.organizations.bitbucket.replaceToken.mutate({
@@ -102,6 +105,7 @@ export function useReplaceBitbucketToken(scope: string) {
 export function useRefreshBitbucketRepositories(scope: string) {
   const refresh = useBitbucketRefresh(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { integrationId: string }) =>
       trpcClient.organizations.bitbucket.refreshRepositories.mutate({

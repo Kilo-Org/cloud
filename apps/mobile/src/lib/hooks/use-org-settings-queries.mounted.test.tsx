@@ -74,10 +74,16 @@ vi.mock('@/lib/trpc', () => ({
           }),
         },
         listAvailableModels: {
-          queryKey: (input: unknown) => [['organizations', 'settings', 'listAvailableModels'], input],
+          queryKey: (input: unknown) => [
+            ['organizations', 'settings', 'listAvailableModels'],
+            input,
+          ],
         },
         getGatewaySettings: {
-          queryKey: (input: unknown) => [['organizations', 'settings', 'getGatewaySettings'], input],
+          queryKey: (input: unknown) => [
+            ['organizations', 'settings', 'getGatewaySettings'],
+            input,
+          ],
         },
       },
       withMembers: { queryKey: () => [['organizations', 'withMembers']] },
@@ -218,30 +224,27 @@ describe('organization settings saves refresh the audit log', () => {
 
   it('guardrails save reconciles the audit log page one', async () => {
     rpc.guardrailsUpdate.mockResolvedValue(undefined);
-    const { queryClient, unmount } = await pressSave(
-      () => useSaveOrgGuardrails('org-1', true),
-      {
-        organizationId: 'org-1',
-        enabled: false,
-        detectors: {
-          injection_attack: { enabled: false, action: 'block' },
-          pii: { enabled: false, action: 'block', entities: [] },
-          keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-          topic_detector: { enabled: false, topic: [] },
-          policy_violation: {
-            enabled: false,
-            action: 'block',
-            format: 'policy_text',
-            policy_text: '',
-            rules: [],
-          },
-          toxicity: { enabled: false },
-          nsfw: { enabled: false },
-          bias: { enabled: false, action: 'block' },
-          sponge_attack: { enabled: false },
+    const { queryClient, unmount } = await pressSave(() => useSaveOrgGuardrails('org-1', true), {
+      organizationId: 'org-1',
+      enabled: false,
+      detectors: {
+        injection_attack: { enabled: false, action: 'block' },
+        pii: { enabled: false, action: 'block', entities: [] },
+        keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
+        topic_detector: { enabled: false, topic: [] },
+        policy_violation: {
+          enabled: false,
+          action: 'block',
+          format: 'policy_text',
+          policy_text: '',
+          rules: [],
         },
-      }
-    );
+        toxicity: { enabled: false },
+        nsfw: { enabled: false },
+        bias: { enabled: false, action: 'block' },
+        sponge_attack: { enabled: false },
+      },
+    });
 
     expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClient, [
       'organizations.auditLogs.list',
@@ -252,10 +255,9 @@ describe('organization settings saves refresh the audit log', () => {
 
   it('model access save reconciles the audit log page one', async () => {
     rpc.updateAllowLists.mockResolvedValue({ success: true });
-    const { queryClient, unmount } = await pressSave(
-      () => useSaveOrgModelAccess('org-1', true),
-      { organizationId: 'org-1' }
-    );
+    const { queryClient, unmount } = await pressSave(() => useSaveOrgModelAccess('org-1', true), {
+      organizationId: 'org-1',
+    });
 
     expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClient, [
       'organizations.auditLogs.list',
@@ -292,7 +294,10 @@ describe('organization settings saves refresh the audit log', () => {
     // Wait for the mutation to report success, so the assertion covers a save
     // whose `onSuccess` really ran instead of one that never settled.
     await waitFor(() =>
-      queryClient.getMutationCache().getAll().some(mutation => mutation.state.status === 'success')
+      queryClient
+        .getMutationCache()
+        .getAll()
+        .some(mutation => mutation.state.status === 'success')
     );
 
     expect(rpc.updateGatewaySettings).toHaveBeenCalled();

@@ -89,6 +89,31 @@ const CASES: Case[] = [
     key: 'agentChat.environment.buildsUnavailable',
     value: 'ఈ వాతావరణానికి స్నాప్‌షాట్ బిల్డ్‌లు అందుబాటులో లేవు.',
   },
+  { key: 'agentChat.newSession.environment', value: 'వాతావరణం' },
+  {
+    key: 'agentChat.newSession.couldNotLoadEnvironment',
+    value: 'మీ వాతావరణాన్ని లోడ్ చేయలేకపోయాము.',
+  },
+  {
+    key: 'agentChat.newSession.retryLoadingEnvironment',
+    value: 'వాతావరణాన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి',
+  },
+  { key: 'agentChat.newSession.defaultEnvironment', value: 'డిఫాల్ట్ వాతావరణం' },
+  {
+    key: 'agentChat.preparation.preparingEnvironment',
+    value: 'వాతావరణాన్ని సిద్ధం చేస్తోంది',
+  },
+  { key: 'agentChat.preparation.stepReady', value: 'వాతావరణం సిద్ధంగా ఉంది' },
+  { key: 'agentChat.preparation.stepFailed', value: 'వాతావరణ సెటప్ విఫలమైంది' },
+  { key: 'agentChat.preparation.stepUnknown', value: 'వాతావరణ సెటప్' },
+  {
+    key: 'agentChat.preparation.errorPreparationTimeout',
+    value: 'వాతావరణ సిద్ధత సమయం ముగిసింది',
+  },
+  {
+    key: 'agentChat.composer.preparingPlaceholder',
+    value: 'వాతావరణాన్ని సిద్ధం చేస్తోంది…',
+  },
 ];
 
 describe('Telugu status and run-target copy', () => {

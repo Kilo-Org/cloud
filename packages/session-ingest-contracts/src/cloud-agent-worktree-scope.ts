@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import {
-  containedKiloSessionIdSchema,
-  cloudAgentWorktreeIdSchema,
-} from './cloud-agent-session-scope';
+import { containedKiloSessionIdSchema } from './cloud-agent-session-scope';
+
+export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
+export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 
 export const cloudAgentSessionScopeProtocolVersionV2 = '2' as const;
 
@@ -14,6 +14,10 @@ export const cloudAgentSessionScopeV2Headers = {
 } as const;
 
 export const CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION = 'personal' as const;
+
+/** The organization id a v2 scope asserts: a bare UUID, never the wire's personal sentinel. */
+export const cloudAgentOrganizationIdSchema = z.uuid().brand<'CloudAgentOrganizationId'>();
+export type CloudAgentOrganizationId = z.infer<typeof cloudAgentOrganizationIdSchema>;
 
 export const MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS = 32;
 
@@ -33,6 +37,12 @@ export const cloudAgentSessionScopeV2AssertionSchema = z.object({
     z.literal(CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION),
     z.uuid(),
   ]),
+  /**
+   * The member roots of the scope. The cap counts distinct roots: trimming and
+   * de-duplication happen only when a header value is parsed. The encoder accepts
+   * a repeated entry in the caller's array and writes it unchanged, so encoding
+   * then parsing returns the distinct list.
+   */
   memberRootKiloSessionIds: z
     .array(containedKiloSessionIdSchema)
     .min(1)
@@ -45,7 +55,7 @@ export type CloudAgentSessionScopeV2Assertion = z.infer<
 
 export type CloudAgentSessionScopeV2 = {
   worktreeId: CloudAgentSessionScopeV2Assertion['worktreeId'];
-  organizationId: CloudAgentSessionScopeV2Assertion['expectedOrganization'] | null;
+  organizationId: CloudAgentOrganizationId | null;
   memberRootKiloSessionIds: CloudAgentSessionScopeV2Assertion['memberRootKiloSessionIds'];
 };
 
@@ -64,12 +74,8 @@ function headerValue(value: string | undefined): string {
 }
 
 /**
- * The encoded size of the v2 header values alone, the number
- * `MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES` bounds. Header names, the
- * `: ` separators, the line terminators, and the protocol header contribute
- * nothing, because `parseCloudAgentSessionScopeV2Headers` compares exactly the
- * value bytes `encodeCloudAgentSessionScopeV2Headers` writes. A caller that
- * needs the size on the wire adds that framing itself.
+ * Returns the encoded byte count of the three header values, the number
+ * `MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES` bounds.
  */
 export function measureCloudAgentSessionScopeV2HeaderValueBytes(
   input: CloudAgentSessionScopeV2HeaderInput
@@ -121,6 +127,11 @@ export function tryEncodeCloudAgentSessionScopeV2Headers(
   };
 }
 
+/**
+ * Parses a v2 header block. It splits the member-root value, trims each entry,
+ * drops duplicates, then applies the same assertion schema, so the member-root
+ * cap counts distinct roots.
+ */
 export function parseCloudAgentSessionScopeV2Headers(
   input: CloudAgentSessionScopeV2HeaderInput
 ): CloudAgentSessionScopeV2ParseResult {
@@ -151,14 +162,19 @@ export function parseCloudAgentSessionScopeV2Headers(
   });
   if (!parsed.success) return { kind: 'invalid' };
 
+  // The assertion union already admits only a UUID here, so this cannot fail; it
+  // is a checked narrowing so the returned value carries the domain brand.
+  const organizationId =
+    parsed.data.expectedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
+      ? null
+      : cloudAgentOrganizationIdSchema.safeParse(parsed.data.expectedOrganization);
+  if (organizationId !== null && !organizationId.success) return { kind: 'invalid' };
+
   return {
     kind: 'ok',
     scope: {
       worktreeId: parsed.data.worktreeId,
-      organizationId:
-        parsed.data.expectedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
-          ? null
-          : parsed.data.expectedOrganization,
+      organizationId: organizationId === null ? null : organizationId.data,
       memberRootKiloSessionIds: parsed.data.memberRootKiloSessionIds,
     },
   };

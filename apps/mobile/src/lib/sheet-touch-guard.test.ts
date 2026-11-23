@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { holdSheetTouch, isSheetTouchHeld, SHEET_TOUCH_HOLD_MS } from '@/lib/sheet-touch-guard';
+import {
+  DESTRUCTIVE_TOUCH_ADMISSION_MS,
+  holdDestructiveTouch,
+  holdSheetTouch,
+  isDestructiveTouchPending,
+  isSheetTouchHeld,
+  SHEET_TOUCH_HOLD_MS,
+} from '@/lib/sheet-touch-guard';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -62,5 +69,49 @@ describe('sheet touch hold', () => {
   // aim at them, which is the defect this pins.
   it('lets the sheet take its own presses once touch has handed over', () => {
     expect(SHEET_TOUCH_HOLD_MS).toBeLessThanOrEqual(500);
+  });
+});
+
+describe('destructive touch admission', () => {
+  // A destructive choice must outlast the gate, not match it: a press aimed at
+  // Cancel signs the reader out about once in 23 presses in the band where a
+  // sheet is still moving (measured on the emulator), and one more press is the
+  // cheaper outcome.
+  it('outlasts the opening window', () => {
+    expect(DESTRUCTIVE_TOUCH_ADMISSION_MS).toBeGreaterThan(SHEET_TOUCH_HOLD_MS);
+  });
+
+  it('declines presses while a fresh sheet is still moving, then admits them', () => {
+    vi.useFakeTimers();
+    const release = holdDestructiveTouch();
+    expect(isDestructiveTouchPending()).toBe(true);
+
+    vi.advanceTimersByTime(DESTRUCTIVE_TOUCH_ADMISSION_MS + 1);
+    expect(isDestructiveTouchPending()).toBe(false);
+    release();
+  });
+
+  it('ends the hold when the caller unmounts before the window closes', () => {
+    vi.useFakeTimers();
+    const release = holdDestructiveTouch();
+    expect(isDestructiveTouchPending()).toBe(true);
+
+    // A dismissed sheet must not leave the next one refusing presses.
+    release();
+    expect(isDestructiveTouchPending()).toBe(false);
+    vi.advanceTimersByTime(DESTRUCTIVE_TOUCH_ADMISSION_MS + 1);
+    expect(isDestructiveTouchPending()).toBe(false);
+  });
+
+  it('stays closed while any presented sheet is still inside its admission', () => {
+    vi.useFakeTimers();
+    const first = holdDestructiveTouch();
+    holdDestructiveTouch();
+
+    first();
+    expect(isDestructiveTouchPending()).toBe(true);
+
+    vi.advanceTimersByTime(DESTRUCTIVE_TOUCH_ADMISSION_MS + 1);
+    expect(isDestructiveTouchPending()).toBe(false);
   });
 });

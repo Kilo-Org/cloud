@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 
 /**
  * How long a sheet is given to hand touch over to its own window — when it
@@ -14,10 +14,16 @@ import { useLayoutEffect } from 'react';
  * appeared got nothing and had to press again. Measured with the window at this
  * value on the emulator, a press on a destructive confirm's Cancel 200–650 ms
  * after it opened ran Cancel in every clean trial, while a press on the screen
- * behind the sheet stayed claimed. A window long enough to cover the slowest
- * device would bring the dead window back, so this one is the handover itself
- * and a slow device may still drop a press made in the first frame or two of
- * the animation.
+ * behind the sheet stayed claimed up to the window's end. A window long enough
+ * to cover the slowest device would bring the dead window back, so this one is
+ * the handover itself and a slow device may still drop a press made in the
+ * first frame or two of the animation.
+ *
+ * Ending the claim with the handover leaves one hazard this file also answers:
+ * while a sheet is still moving, a press aimed at a safe control can land on a
+ * different one. That is tolerable for Cancel and the header Close and not
+ * tolerable for a destructive choice, which keeps its own longer admission
+ * window (`DESTRUCTIVE_TOUCH_ADMISSION_MS`).
  */
 export const SHEET_TOUCH_HOLD_MS = 500;
 
@@ -95,4 +101,75 @@ export function useSheetTouchHold(
   const { opening, dismissing } = windows;
   useLayoutEffect(() => (opening ? holdSheetTouch() : undefined), [opening]);
   useLayoutEffect(() => (dismissing ? holdSheetTouch() : undefined), [dismissing]);
+}
+
+/**
+ * How long a destructive choice declines presses after its sheet is asked to
+ * open, whatever the app-wide gate does.
+ *
+ * The gate keeps a press made while a sheet opens off the screen behind it, and
+ * it ends with the handover so the sheet's own controls are reachable as soon as
+ * they are painted. Those two goals leave one hazard: in the frames where the
+ * sheet is still sliding, a press aimed at Cancel can land on whatever control
+ * is under the finger at the moment it commits. Measured on the Android
+ * emulator with the gate at `SHEET_TOUCH_HOLD_MS`, one press in 23 in the
+ * 600–750 ms band reached the confirm's destructive button that way.
+ *
+ * A safe choice — Cancel, the header Close, the platform's own dismissal —
+ * never needs this: doing what the reader asked for is the right outcome even
+ * if they aimed at a control the sheet had not finished moving. A destructive
+ * choice does, so it alone keeps a longer admission window. A press it declines
+ * costs the reader one more press; a press it accepted in error would sign them
+ * out or delete something they meant to keep.
+ */
+export const DESTRUCTIVE_TOUCH_ADMISSION_MS = 800;
+
+let destructivePending = 0;
+
+/** Whether a destructive control must still decline a press. */
+export function isDestructiveTouchPending(): boolean {
+  return destructivePending > 0;
+}
+
+/**
+ * Holds every destructive control for `DESTRUCTIVE_TOUCH_ADMISSION_MS`. The
+ * returned release ends the hold sooner, and unmounting the caller ends it too,
+ * so a dismissed sheet never leaves a later one refusing presses.
+ */
+export function holdDestructiveTouch(): () => void {
+  destructivePending += 1;
+  let released = false;
+  const release = (): void => {
+    if (released) {
+      return;
+    }
+    released = true;
+    destructivePending -= 1;
+  };
+  const timer = setTimeout(release, DESTRUCTIVE_TOUCH_ADMISSION_MS);
+  return () => {
+    clearTimeout(timer);
+    release();
+  };
+}
+
+/**
+ * Whether a destructive control on a freshly presented sheet may answer a press
+ * yet. False for `DESTRUCTIVE_TOUCH_ADMISSION_MS` from mount, then true; the
+ * safe controls beside it never wait. Reported as state, so the control paints
+ * its own disabled appearance and assistive technology announces it, and read
+ * again at press time by the guard below so a press cannot slip through in the
+ * render that follows the timer.
+ */
+export function useDestructiveAdmission(): boolean {
+  const [admitted, setAdmitted] = useState(false);
+  useEffect(() => {
+    const release = holdDestructiveTouch();
+    const timer = setTimeout(() => setAdmitted(true), DESTRUCTIVE_TOUCH_ADMISSION_MS);
+    return () => {
+      clearTimeout(timer);
+      release();
+    };
+  }, []);
+  return admitted;
 }

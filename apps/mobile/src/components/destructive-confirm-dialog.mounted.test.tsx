@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { DESTRUCTIVE_TOUCH_ADMISSION_MS } from '@/lib/sheet-touch-guard';
 
 import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
@@ -170,8 +171,19 @@ describe('DestructiveConfirmDialog', () => {
   });
 
   it('keeps the request on screen through dismissal, then runs the action', () => {
+    vi.useFakeTimers();
     const root = mount();
 
+    // The destructive control declines presses for its own admission window: a
+    // press that lands on it while the sheet is still moving must not sign the
+    // reader out.
+    callProp(pressableWith(root, 'bg-destructive-solid'), 'onPress');
+    expect(root.find(node => isType(node, 'BottomSheet')).props.index).toBe(0);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(DESTRUCTIVE_TOUCH_ADMISSION_MS + 1);
+    });
     callProp(pressableWith(root, 'bg-destructive-solid'), 'onPress');
 
     // The sheet is dismissing, not empty: the title and the message are still
@@ -193,6 +205,7 @@ describe('DestructiveConfirmDialog', () => {
 
     callProp(sheet, 'onDismiss');
     expect(onConfirm).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('dismisses the sheet before running the extra action', () => {
@@ -304,8 +317,13 @@ describe('DestructiveConfirmDialog', () => {
   // destructive press must not override the pending action, so the sheet still
   // goes out through it and the safe choice never fires.
   it('does not override a pending destructive choice when the dismissal is then requested', () => {
+    vi.useFakeTimers();
     const root = mount();
 
+    // The destructive control admits a press only after its sheet has settled.
+    act(() => {
+      vi.advanceTimersByTime(DESTRUCTIVE_TOUCH_ADMISSION_MS + 1);
+    });
     callProp(pressableWith(root, 'bg-destructive'), 'onPress');
     expect(onConfirm).not.toHaveBeenCalled();
 
@@ -319,5 +337,30 @@ describe('DestructiveConfirmDialog', () => {
     callProp(sheet, 'onDismiss');
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  // The whole point of the separate admission window: a press that lands on the
+  // destructive control while the sheet is still moving must not sign the reader
+  // out. The safe choices are never held, because doing what the reader asked
+  // for is the right outcome even when the sheet had not finished moving.
+  it('refuses the destructive choice until its sheet has settled, and never holds Cancel', () => {
+    vi.useFakeTimers();
+    const root = mount();
+
+    callProp(pressableWith(root, 'bg-destructive-solid'), 'onPress');
+    expect(root.find(node => isType(node, 'BottomSheet')).props.index).toBe(0);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // Cancel answers inside that same window.
+    callProp(pressableWith(root, 'border-input'), 'onPress');
+    expect(root.find(node => isType(node, 'BottomSheet')).props.index).toBe(-1);
+    callProp(
+      root.find(node => isType(node, 'BottomSheet')),
+      'onDismiss'
+    );
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

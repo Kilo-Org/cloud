@@ -391,54 +391,6 @@ export async function upsertPlatformIntegration(data: {
 }
 
 /**
- * Updates repository list for an integration by installation ID.
- * GitHub rows are unique per `(platform, github_app_type, installation_id)`;
- * pass `githubAppType` when the caller knows it so the update targets only the
- * matching standard or lite row.
- */
-export async function updateIntegrationRepositories(
-  platform: string,
-  installationId: string,
-  repositories: PlatformRepository[],
-  githubAppType?: GitHubAppType
-) {
-  const conditions = [
-    eq(platform_integrations.platform, platform),
-    eq(platform_integrations.platform_installation_id, installationId),
-  ];
-  if (githubAppType) conditions.push(effectiveAppTypeCondition(githubAppType));
-  if (platform === PLATFORM.GITHUB)
-    conditions.push(isNull(platform_integrations.github_disconnected_at));
-
-  await db
-    .update(platform_integrations)
-    .set({
-      repositories,
-      repositories_synced_at: new Date().toISOString(),
-      auth_invalid_at: null,
-      auth_invalid_reason: null,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
-  if (platform === PLATFORM.GITHUB && githubAppType) {
-    await db
-      .update(github_app_installations)
-      .set({
-        repositories,
-        repositories_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(github_app_installations.github_app_type, githubAppType),
-          eq(github_app_installations.installation_id, installationId),
-          ne(github_app_installations.lifecycle_state, 'deleted')
-        )
-      );
-  }
-}
-
-/**
  * Updates repository list for an integration by integration ID
  */
 export async function updateRepositoriesForIntegration(

@@ -522,6 +522,7 @@
       "receiptLabel": "ਰਸੀਦ",
       "copyReceiptId": "ਰਸੀਦ ਦੀ ID ਕਾਪੀ ਕਰੋ",
       "appealLabel": "ਅਪੀਲ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ਪ੍ਰਾਪਤ ਹੋਈ",
       "triageOpen": "ਸਮੀਖਿਆ ਅਧੀਨ",
       "triageActioned": "ਸਹੀ ਪਾਈ ਗਈ",
@@ -555,7 +556,7 @@
       "title": "ਰਿਪੋਰਟਾਂ",
       "rowSubtitle": "ਤੁਹਾਡੀਆਂ ਦਰਜ ਕੀਤੀਆਂ ਰਿਪੋਰਟਾਂ ਅਤੇ ਉਨ੍ਹਾਂ ਦੇ ਨਤੀਜੇ",
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਰਟ ਨਹੀਂ",
-      "emptyDescription": "ਕਿਸੇ ਟਿੱਪਣੀ ਜਾਂ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
+      "emptyDescription": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਚਰਚਾ ਦੀ ਕਿਸੇ ਟਿੱਪਣੀ ਤੋਂ ਜਾਂ ਏਜੰਟ ਸੈਸ਼ਨ ਦੇ AI ਜਵਾਬ ਤੋਂ ਤੁਸੀਂ ਜੋ ਰਿਪੋਰਟਾਂ ਦਰਜ ਕਰਦੇ ਹੋ, ਉਹ ਆਪਣੇ ਨਤੀਜਿਆਂ ਸਮੇਤ ਇੱਥੇ ਦਿਖਦੀਆਂ ਹਨ।",
       "couldNotLoad": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਰਟਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
       "capped": "ਤੁਹਾਡੀਆਂ ਸਭ ਤੋਂ ਹਾਲੀਆ ਰਿਪੋਰਟਾਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।"
     },
@@ -1501,7 +1502,9 @@
       "githubError": "GitHub ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
+      "notConnectedTitle": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "githubAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।"
     },
     "overview": {
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",
@@ -2175,7 +2178,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ਸੈਸ਼ਨ",
       "live": "ਲਾਈਵ",
-      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+      "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵੇਂ ਸੈਸ਼ਨ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।"
     },
     "sessionRow": {
       "deleteTitle": "ਕੀ ਸੈਸ਼ਨ ਮਿਟਾਉਣਾ ਹੈ?",
@@ -2245,7 +2249,6 @@
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "emptyReadOnlyTitle": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
-      "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "historyTooLarge": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡੀ ਹੈ।",
@@ -3094,6 +3097,12 @@
     "retryLoadingAccount": "ਖਾਤਾ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     "retryLoadingPrivacy": "ਪਰਦੇਦਾਰੀ ਦੇ ਵਿਕਲਪ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
   },
+  "accountBlocked": {
+    "title": "ਖਾਤਾ ਬਲਾਕ ਹੋ ਗਿਆ",
+    "description": "Kilo ਨੇ ਇਹ ਖਾਤਾ ਬਲਾਕ ਕਰ ਦਿੱਤਾ ਹੈ, ਅਤੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਨਾਲ ਇਹ ਨਹੀਂ ਖੁੱਲ੍ਹੇਗਾ। ਬੇਨਤੀ 'ਤੇ ਸਹਾਇਤਾ ਟੀਮ ਬਲਾਕ ਦੀ ਸਮੀਖਿਆ ਕਰ ਸਕਦੀ ਹੈ।",
+    "domainDescription": "Kilo ਇਸ ਈਮੇਲ ਡੋਮੇਨ 'ਤੇ ਖਾਤਿਆਂ ਨੂੰ ਬਲਾਕ ਕਰ ਦਿੰਦਾ ਹੈ, ਅਤੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਨਾਲ ਇਹ ਨਹੀਂ ਬਦਲੇਗਾ। ਬੇਨਤੀ 'ਤੇ ਸਹਾਇਤਾ ਟੀਮ ਡੋਮੇਨ ਦੀ ਸਮੀਖਿਆ ਕਰ ਸਕਦੀ ਹੈ।",
+    "contactSupport": "ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ"
+  },
   "addCredits": {
     "cta": "ਕ੍ਰੈਡਿਟ ਜੋੜੋ",
     "billingPage": "ਬਿਲਿੰਗ ਪੰਨਾ"
@@ -3166,8 +3175,7 @@
     "timeoutDescription": "ਬੇਨਤੀ ਪੂਰੀ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਹੀ ਸਮਾਂ ਸਮਾਪਤ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "screenHeader": {
-    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ",
-    "openMenuFor": "{{title}} ਲਈ ਮੀਨੂ ਖੋਲ੍ਹੋ"
+    "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ"
   },
   "picker": {
     "optionsExpired": "ਵਿਕਲਪਾਂ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ",
@@ -3401,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "ਆਡਿਟ ਲੌਗ",
-      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ਕੋਈ ਆਡਿਟ ਇਵੈਂਟ ਨਹੀਂ",
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਕੀਤੀਆਂ ਕਾਰਵਾਈਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ।",
       "truncated": "ਸਭ ਤੋਂ ਹਾਲੀਆ ਇਵੈਂਟ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।",
@@ -3451,11 +3459,147 @@
         "guardrailUpdate": "ਗਾਰਡਰੇਲ ਅੱਪਡੇਟ ਕੀਤਾ",
         "guardrailRemove": "ਗਾਰਡਰੇਲ ਹਟਾਇਆ",
         "unknown": "ਆਡਿਟ ਇਵੈਂਟ"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "ਮੋਡ \"{{name}}\" (ਪਛਾਣਕਰਤਾ: {{slug}})",
+        "modeUpdate": "ਮੋਡ \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "ਆਟੋਮੈਟਿਕ ਰੂਟਿੰਗ",
+          "defaultModel": "ਡਿਫਾਲਟ ਮਾਡਲ"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} ਨੂੰ {{role}} ਵਜੋਂ ਸ਼ਾਮਲ ਕੀਤਾ",
+        "memberRemoved": "{{email}} ਹਟਾਇਆ",
+        "memberParentAdded": "ਪੇਰੈਂਟ ਸੰਸਥਾ {{parent}} ਤੋਂ {{email}} ਸ਼ਾਮਲ ਕੀਤਾ",
+        "memberParentRemoved": "ਪੇਰੈਂਟ ਸੰਸਥਾ {{parent}} ਤੋਂ {{email}} ਹਟਾਇਆ",
+        "inviteSent": "{{email}} {{role}} ਵਜੋਂ",
+        "inviteRevoked": "{{email}} ਲਈ ਸੱਦਾ ਰੱਦ ਕੀਤਾ",
+        "inviteAccepted": "{{email}} ਸਵੀਕਾਰ ਕੀਤਾ",
+        "groupIdentity": "ਗਰੁੱਪ \"{{name}}\"",
+        "groupMembers": "ਗਰੁੱਪ \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ਗਰੁੱਪ",
+        "groupMemberGroups_one": "{{displayCount}} ਗਰੁੱਪ",
+        "groupMemberGroups_other": "{{displayCount}} ਗਰੁੱਪ",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ਗਰੁੱਪ",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ਗਰੁੱਪ",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ਗਰੁੱਪ",
+        "groupPolicySet": "ਗਰੁੱਪ \"{{name}}\": {{policy}} ਪਾਲਿਸੀ ਸੈੱਟ ਕੀਤੀ",
+        "groupPolicyRemoved": "ਗਰੁੱਪ \"{{name}}\": {{policy}} ਪਾਲਿਸੀ ਹਟਾਈ",
+        "groupDefaultPolicySet": "ਡਿਫਾਲਟ {{policy}} ਪਾਲਿਸੀ ਸੈੱਟ ਕੀਤੀ",
+        "groupDefaultPolicyRemoved": "ਡਿਫਾਲਟ {{policy}} ਪਾਲਿਸੀ ਹਟਾਈ",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "ਏਆਈ ਗਾਰਡਰੇਲ {{state}}",
+        "guardrailConfigGroup": "ਗਰੁੱਪ \"{{group}}\" ਲਈ {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO ਡੋਮੇਨ {{domain}}",
+        "ssoDomainChanged": "{{domain}} (ਪਹਿਲਾਂ {{previous}} ਸੀ)",
+        "ssoDomainRemoved": "SSO ਡੋਮੇਨ {{domain}} ਹਟਾਇਆ",
+        "fundsPurchased": "{{amount}} {{method}} ਰਾਹੀਂ",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} ਚਾਈਲਡ ਸੰਸਥਾਵਾਂ ਨੂੰ {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} ਚਾਈਲਡ ਸੰਸਥਾ ਨੂੰ {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} ਚਾਈਲਡ ਸੰਸਥਾਵਾਂ ਨੂੰ {{amount}}",
+        "fundsReceived": "{{parent}} ਤੋਂ {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} ਕੌਂਫਿਗਰੇਸ਼ਨ",
+        "reviewAgentConfigStyle": "{{platform}}: ਢੰਗ {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} ਅੱਪਡੇਟ ਹੋਏ",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} ਅੱਪਡੇਟ ਹੋਇਆ",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} ਅੱਪਡੇਟ ਹੋਏ",
+        "reviewAgentSecretsFailed": "{{displayCount}} ਗਲਤੀਆਂ",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} ਗਲਤੀ",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} ਗਲਤੀਆਂ",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "ਇਨਫਰੈਂਸ ਖੇਤਰ: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "ਮੋਡ \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ਗਲੋਬਲ ਡਿਫਾਲਟ",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "ਮਨਜ਼ੂਰ",
+          "denied": "ਅਸਵੀਕਾਰ",
+          "followSetting": "ਐਕਸਟੈਂਸ਼ਨ ਸੈਟਿੰਗ ਦੀ ਪਾਲਣਾ ਕਰਦਾ ਹੈ"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "ਪ੍ਰੋਜੈਕਟ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} 'ਤੇ {{emails}} ਨੂੰ",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "ਸਿਫ਼ਾਰਸ਼ਾਂ ਡਾਇਜੈਸਟ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ਕੋਈ ਮਨਜ਼ੂਰ ਓਰੀਜਨ ਨਹੀਂ",
+        "settingName": "{{previous}} ਤੋਂ {{next}} ਵਜੋਂ ਨਾਮ ਬਦਲਿਆ",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "ਵਰਤੋਂ ਤੋਂ ਪਹਿਲਾਂ ਸਕੈਨ ਚਾਲੂ",
+        "scanBeforeUseOff": "ਵਰਤੋਂ ਤੋਂ ਪਹਿਲਾਂ ਸਕੈਨ ਬੰਦ",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "ਹਟਾਏ ਗਏ: {{models}}",
+        "browserPolicyOff": "ਬ੍ਰਾਊਜ਼ਰ ਵਰਤੋਂ ਰੁਕੀ ਹੋਈ",
+        "browserPolicyAllow": "ਸਿਰਫ਼ ਮਨਜ਼ੂਰ ਓਰੀਜਨ",
+        "browserPolicyPlaywrightOnly": "ਸਿਰਫ਼ ਬ੍ਰਾਊਜ਼ਰ ਵਰਤੋਂ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "ਮਾਡਲ ਬਦਲੇ: {{values}}",
+        "integrationConnected": "{{integration}} ਜੁੜਿਆ ਹੋਇਆ",
+        "integrationDisconnected": "{{integration}} ਡਿਸਕਨੈਕਟ ਹੋਇਆ",
+        "integrationRefreshed": "{{integration}} ਰਿਫ੍ਰੈਸ਼ ਹੋਇਆ",
+        "integrationCancelled": "{{integration}} ਰੱਦ",
+        "integrationModelUpdated": "{{integration}}: ਮਾਡਲ {{model}}",
+        "integrationKeyAdded": "{{provider}} ਲਈ ਕੁੰਜੀ ਸ਼ਾਮਲ ਕੀਤੀ",
+        "integrationKeyUpdated": "{{provider}} ਲਈ ਕੁੰਜੀ ਅੱਪਡੇਟ ਕੀਤੀ",
+        "integrationKeyDeleted": "{{provider}} ਲਈ ਕੁੰਜੀ ਹਟਾਈ",
+        "integrationKeyToggled": "{{provider}} ਲਈ ਕੁੰਜੀ: {{state}}",
+        "namedPolicyCreated": "{{kind}} ਪਾਲਿਸੀ {{id}} ਬਣਾਈ",
+        "namedPolicyUpdated": "{{kind}} ਪਾਲਿਸੀ {{id}} ਅੱਪਡੇਟ ਕੀਤੀ",
+        "namedPolicyDeleted": "{{kind}} ਪਾਲਿਸੀ {{id}} ਹਟਾਈ",
+        "namedPolicyLinked": "{{kind}} ਪਾਲਿਸੀ {{next}} ਨਾਲ ਲਿੰਕ ਕੀਤੀ",
+        "webhookTriggerUpdated": "ਟ੍ਰਿਗਰ {{trigger}}",
+        "organizationRenamed": "ਸੰਸਥਾ ਦਾ ਨਾਮ {{previous}} ਤੋਂ {{next}} ਬਦਲਿਆ",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "ਆਪਣੀ ਖੁਦ ਦੀ API ਕੁੰਜੀ"
+        }
       }
     },
     "billing": {
       "title": "ਬਿਲਿੰਗ",
-      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ",
       "state": "ਸਥਿਤੀ",
       "stateNone": "ਕੋਈ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਨਹੀਂ",
@@ -3632,7 +3776,7 @@
       "emptyDescription": "ਪਿਛਲੀਆਂ ਬੇਨਤੀਆਂ ਵੇਖਣ ਲਈ 'ਪਿਛਲਾ ਘੰਟਾ' ਦੀ ਵਰਤੋਂ ਕਰੋ।",
       "emptyBoundDescription": "ਬੇਨਤੀਆਂ ਦਾ ਇਤਿਹਾਸ ਇੱਥੋਂ ਤੱਕ ਹੀ ਉਪਲਬਧ ਹੈ।",
       "loadError": "ਬੇਨਤੀ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ਇਨਪੁੱਟ · {{output}} ਆਉਟਪੁੱਟ",
       "byok": "BYOK"
     },
@@ -3952,6 +4096,9 @@
       "fieldName": "ਦਿਖਾਇਆ ਨਾਮ",
       "fieldUrl": "ਸਰਵਰ URL",
       "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
+      "fieldUrlCredentials": "ਪਤੇ ਵਿੱਚੋਂ ਵਰਤੋਂਕਾਰ ਨਾਮ ਅਤੇ ਪਾਸਵਰਡ ਹਟਾਓ।",
+      "fieldUrlFragment": "ਪਤੇ ਦਾ # ਵਾਲਾ ਹਿੱਸਾ ਹਟਾਓ।",
+      "fieldUrlInsecure": "ਇੱਕ https ਪਤਾ ਦਾਖਲ ਕਰੋ, ਜਾਂ ਸਿਰਫ਼ localhost ਲਈ http।",
       "duplicateUrl": "ਇਹ URL ਪਹਿਲਾਂ ਹੀ ਸੰਭਾਲਿਆ ਗਿਆ ਹੈ।",
       "serverNotFound": "ਇਹ ਸਰਵਰ ਹੁਣ ਸੰਭਾਲਿਆ ਨਹੀਂ ਰਿਹਾ।",
       "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ: {{name}}",
@@ -3977,6 +4124,7 @@
       "app": {
         "label": "ਸਾਧਨ ਇੰਟਰਫੇਸ",
         "failed": "ਇਸ ਸਾਧਨ ਦਾ ਇੰਟਰਫੇਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ.",
+        "tooLarge": "ਇਸ ਸਾਧਨ ਦਾ ਇੰਟਰਫੇਸ {{size}} ਸੀਮਾ ਤੋਂ ਵੱਡਾ ਹੈ।",
         "empty": "ਇਸ ਸਾਧਨ ਦੇ ਇੰਟਰਫੇਸ ਵਿੱਚ ਵੇਖਾਉਣ ਲਈ ਕੁਝ ਵੀ ਨਹੀਂ ਹੈ."
       }
     },
@@ -4092,6 +4240,7 @@
         "network": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "invalidFile": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਅਜਿਹਾ ਮਾਡਲ ਨਹੀਂ ਹੈ ਜੋ ਇਹ ਐਪ ਚਲਾ ਸਕੇ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ।",
         "checksum": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਆਪਣੇ ਪ੍ਰਕਾਸ਼ਿਤ ਚੈੱਕਸਮ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।",
+        "unreadable": "ਇਹ ਡਿਵਾਈਸ ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਦੀ ਜਾਂਚ ਨਹੀਂ ਕਰ ਸਕੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।",
         "writeFailed": "ਇਹ ਡਿਵਾਈਸ ਮਾਡਲ ਨੂੰ ਸੰਭਾਲ ਨਹੀਂ ਸਕੀ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।"
       }
     },
@@ -4700,6 +4849,7 @@
     "contextAll": "ਸਾਰੇ ਸੰਦਰਭ",
     "dismiss": "ਬ੍ਰੀਫਿੰਗ ਖਾਰਜ ਕਰੋ",
     "dismissFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਹਾਲੇ ਖਾਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਇਹ ਬੈਕਗਰਾਉਂਡ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦੀ ਹੈ।",
+    "readMarkFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਪੜ੍ਹੀ ਹੋਈ ਵਜੋਂ ਨਿਸ਼ਾਨਿਤ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਬ੍ਰੀਫਿੰਗ ਦੁਬਾਰਾ ਲੋਡ ਹੋਣ ’ਤੇ ਇਹ ਫਿਰ ਕੋਸ਼ਿਸ਼ ਕਰੇਗੀ।",
     "offline": "ਆਫਲਾਈਨ · ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ",
     "cached": "ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ · ਤਾਜ਼ਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ",
     "summary": "AI ਸਾਰ",
@@ -4719,16 +4869,21 @@
     "morningEnd": "ਬ੍ਰੀਫਿੰਗ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ",
     "timeHint": "ਹੋਮ ਕਾਰਡ ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਖਤਮ ਹੋਣ 'ਤੇ ਲਾਈਵ ਸਥਿਤੀ ਮੁੜ ਦਿਖਾਉਂਦਾ ਹੈ, ਆਫਲਾਈਨ ਵੀ।",
     "invalidSchedule": "ਇੱਕ ਸਹੀ ਸਮਾਂ ਖੇਤਰ ਅਤੇ ਇੱਕ ਗੈਰ-ਖਾਲੀ ਬ੍ਰੀਫਿੰਗ ਮਿਆਦ ਚੁਣੋ।",
+    "scheduleEmptyNight": "ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਖਾਲੀ ਹੈ। ਮਿਆਦ ਦੇ ਸ਼ੁਰੂ ਹੋਣ ਤੋਂ ਬਾਅਦ ਦਾ ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ ਚੁਣੋ।",
+    "scheduleEmptyMorning": "ਤਿਆਰ ਹੋਣ ਦਾ ਸਮਾਂ ਅਤੇ ਉਪਲਬਧ ਰਹਿਣ ਦਾ ਅੰਤਿਮ ਸਮਾਂ ਇੱਕੋ ਜਿਹੇ ਹਨ। ਚੁਣੋ ਕਿ ਬ੍ਰੀਫਿੰਗ ਕਿੰਨੀ ਦੇਰ ਉਪਲਬਧ ਰਹੇਗੀ।",
+    "scheduleFullDay": "ਦੋਵੇਂ ਮਿਆਦਾਂ ਇੱਕ ਪੂਰਾ ਦਿਨ ਕਵਰ ਕਰਦੀਆਂ ਹਨ। ਦਿਨ ਦਾ ਕੁਝ ਹਿੱਸਾ ਬ੍ਰੀਫਿੰਗ ਤੋਂ ਬਾਹਰ ਛੱਡੋ।",
     "notificationsHint": "ਹਰ ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗ ਲਈ ਇੱਕ ਆਮ ਸੂਚਨਾ। ਭੁਗਤਾਨ ਵਾਲੇ AI ਸਾਰਾਂ ਤੋਂ ਸੁਤੰਤਰ।",
     "notificationPermission": "ਆਪਣੀ ਬ੍ਰੀਫਿੰਗ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ।",
     "defaultModel": "Kilo ਦਾ ਡਿਫਾਲਟ ਮਾਡਲ ਵਰਤੋ",
     "duration": "ਸਮਾਂ ਸੀਮਾ (ਮਿੰਟ)",
     "spendLimit": "ਖਰਚ ਸੀਮਾ (USD)",
-    "invalidSafeguards": "ਸਕਾਰਾਤਮਕ, ਸੀਮਤ ਸਮਾਂ ਅਤੇ ਖਰਚ ਸੀਮਾਵਾਂ ਦਰਜ ਕਰੋ।",
+    "invalidSafeguards": "ਅਨੁਮਤ ਸੀਮਾ ਅੰਦਰ ਧਨਾਤਮਕ ਸੰਖਿਆ ਦਰਜ ਕਰੋ।",
     "estimate": "ਅਨੁਮਾਨ {{estimate}} · ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}",
     "estimateUnavailable": "ਇਨ੍ਹਾਂ ਸੈਟਿੰਗਾਂ ਲਈ ਭੁਗਤਾਨ ਵਾਲਾ ਸਾਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਮਾਡਲ ਜਾਂ ਸੀਮਾਵਾਂ ਬਦਲੋ, ਜਾਂ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "confirmPaid": "ਕੀ {{context}} ਲਈ ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਚਾਲੂ ਕਰਨੇ ਹਨ?",
+    "paidDisclosure_one": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
     "paidDisclosure": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
+    "paidDisclosure_other": "ਅਨੁਮਾਨਿਤ {{estimate}}, ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}, {{minutes}} ਮਿੰਟ ਦੀ ਸੀਮਾ ਨਾਲ। ਸਾਰ ਬਣਾਉਣਾ ਅਸਫਲ ਹੋਣ 'ਤੇ ਵੀ ਖਰਚੇ ਲੱਗਦੇ ਹਨ।",
     "enable": "ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਚਾਲੂ ਕਰੋ",
     "allContexts": "ਨਿੱਜੀ ਅਤੇ ਸੰਸਥਾ ਬ੍ਰੀਫਿੰਗਾਂ ਵੱਖਰੀਆਂ ਰਹਿੰਦੀਆਂ ਹਨ।",
     "emptyHistory": "ਕੋਈ ਸੁਰੱਖਿਅਤ ਕੀਤੀਆਂ ਬ੍ਰੀਫਿੰਗਾਂ ਨਹੀਂ",
@@ -4771,7 +4926,7 @@
     "sourceActivity": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਵਾਲੀ ਗਤੀਵਿਧੀ",
     "metadataFailureProvider": "ਪ੍ਰਦਾਤਾ ਗਲਤੀ",
     "metadataFailureTool": "ਟੂਲ ਗਲਤੀ",
-    "metadataFailureCancelled": "ਰੱਦ",
+    "metadataStopped": "ਪਿਛਲਾ ਟਰਨ ਰੋਕਿਆ ਗਿਆ",
     "metadataFailureOther": "ਅਣਦੱਸੀ ਗਲਤੀ"
   },
   "systemSearch": {
@@ -4888,10 +5043,15 @@
       "autoCommit": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਬਦਲਾਅ ਕਮਿਟ ਕਰੋ",
       "condenseOnComplete": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਸੰਦਰਭ ਨੂੰ ਸੰਖੇਪ ਕਰੋ",
       "activeTitle": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ",
+      "activeSwitchA11y": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ: {{name}}",
+      "copyLinkA11y": "{{name}} ਲਈ ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
       "activeDescription": "ਰੋਕੇ ਗਏ ਵੈਬਹੁੱਕ 404 ਨਾਲ ਜਵਾਬ ਦਿੰਦੇ ਹਨ।",
       "runAsCreator": "ਮੇਰੇ ਵਜੋਂ ਚਲਾਓ",
       "runAsCreatorDescription": "ਹਰ ਰਨ ਤੁਹਾਡੇ ਖਾਤੇ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਗੁਪਤ ਹੈਡਰ ਲਾਜ਼ਮੀ ਹੈ।",
       "saveFailedTitle": "ਟ੍ਰਿਗਰ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+      "nameTaken": "“{{name}}” ਨਾਮ ਦਾ ਟ੍ਰਿਗਰ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ।",
+      "saveFailedRetry": "ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "saveFailedCheck": "ਫ਼ਾਰਮ ਵਿੱਚ ਦਿੱਤੇ ਮੁੱਲ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "deleteTitle": "ਇਹ ਟ੍ਰਿਗਰ ਮਿਟਾਉਣਾ ਹੈ?",
       "deleteMessage": "{{name}} ਲਈ ਕਾਲਾਂ ਫੇਲ੍ਹ ਹੋਣਗੀਆਂ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "deleteMessageScheduled": "{{name}} ਟ੍ਰਿਗਰ ਦੇ ਨਿਰਧਾਰਿਤ ਰਨ ਰੁਕ ਜਾਣਗੇ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",

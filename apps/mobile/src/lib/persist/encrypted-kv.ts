@@ -95,6 +95,13 @@ export type KVPair = {
   updatedAt: number;
 };
 
+/** One entry of {@link listEntryValues}: the key, its stored value, and its write time. */
+export type KVValuePair = {
+  k: string;
+  v: string;
+  updatedAt: number;
+};
+
 // The empty check is load-bearing, not a type duplicate: an empty scope
 // silently widens `clearScopePrefix` to every scope in the database.
 export function validateScope(scope: string): void {
@@ -795,6 +802,23 @@ export async function listEntries(scope: string): Promise<KVPair[]> {
   const db = await openDatabase();
   return db
     .select({ k: kv.k, updatedAt: kv.updatedAt })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all();
+}
+
+/**
+ * Lists one scope's entries with their values, oldest-first (by `updated_at`) —
+ * the draft eviction read path, which has to know which entries hold text
+ * before it chooses what to drop. `listEntries` stays the keys-only read for
+ * the cases that never look at a value.
+ */
+export async function listEntryValues(scope: string): Promise<KVValuePair[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ k: kv.k, v: kv.v, updatedAt: kv.updatedAt })
     .from(kv)
     .where(eq(kv.scope, scope))
     .orderBy(asc(kv.updatedAt))

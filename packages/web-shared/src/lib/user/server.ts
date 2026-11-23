@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
+import type { AccountBlockedRefusalReason } from '@kilocode/app-shared/auth';
 import {
   validateAuthorizationHeader,
   isRejectedCredentialReason,
@@ -61,7 +62,10 @@ import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
-import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
+import {
+  isWebSessionCurrent,
+  readWebSessionPepper,
+} from '@kilocode/web-shared/lib/web-session-revocation';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -159,6 +163,14 @@ export async function getUserFromSession(): Promise<{ id: string } | null> {
 export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
+  /**
+   * Admits an account the authorization refuses — the R0 domain blacklist or
+   * the R1 block — so it can end its own session. Only a request that does
+   * nothing but that cleanup may set it: the app's sign-out has to end the
+   * session server-side even while a refusal stands, or the app clears its
+   * credentials and leaves a usable session and refresh token behind.
+   */
+  allowRefusedAccountSelfCleanup?: boolean;
   expectedAudience?: string;
   // Derive from an actual Request URL or fixed route path, never a request header.
   requestPathname?: string;
@@ -215,6 +227,21 @@ type GetAuthResponse =
        * The authentication response is the answer for such a request.
        */
       authorizationRefused?: boolean;
+      /**
+       * Set only when authorization refused the account itself — R0 (domain
+       * blacklisted) or R1 (blocked account) — rather than the request. The
+       * tRPC context turns it into the blocked-account refusal so the client
+       * explains the block instead of signing the user out; every other
+       * refusal (nonadmin, org membership, 401/400) leaves it unset.
+       *
+       * The two branches set different values because they promise different
+       * things: R0 sets `email_domain_blocked`, which no client action can
+       * change (the domain is on an admin-managed blacklist), while R1 sets
+       * `account_blocked`, which support can lift, so only R1 may offer a
+       * retry. Both stay refused, and the admission below is keyed on its
+       * option, not this value.
+       */
+      refusalReason?: AccountBlockedRefusalReason;
       rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: Organization['id'];
@@ -235,6 +262,7 @@ type GetAuthResponse =
       authFailedResponse: null;
       credentialsRejected?: undefined;
       authorizationRefused?: undefined;
+      refusalReason?: undefined;
       rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
@@ -686,7 +714,14 @@ async function resolveUserFromSession(
   const user = await findUserById(maybeKiloUserId, fromDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
-  if (!isWebSessionCurrent(session.webSessionPepper, user))
+  // `revokeWebSessions` commits the pepper on the primary and that write is the
+  // authoritative revocation. A replica cannot answer either way: after a
+  // revocation it still holds the previous pepper, and a pepper minted after a
+  // revocation reaches the session before the replica does. So the replica row
+  // supplies the payload only, and the verdict comes from the primary.
+  const pepperSource =
+    fromDb === db ? user : { web_session_pepper: await readWebSessionPepper(maybeKiloUserId) };
+  if (!isWebSessionCurrent(session.webSessionPepper, pepperSource))
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
@@ -755,6 +790,7 @@ function authError(
   options?: {
     credentialsRejected?: boolean;
     authorizationRefused?: boolean;
+    refusalReason?: AccountBlockedRefusalReason;
     rejectionReason?: 'empty_organization_context';
     internalApiUse?: boolean;
     tokenSource?: string;
@@ -771,6 +807,7 @@ function authError(
     ),
     credentialsRejected: options?.credentialsRejected ?? false,
     authorizationRefused: options?.authorizationRefused ?? false,
+    refusalReason: options?.refusalReason,
     internalApiUse: options?.internalApiUse,
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
@@ -821,21 +858,33 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user, readDb)) {
-    return authError(403, 'Access denied (R0)', kiloUserId, {
-      authorizationRefused: true,
-      internalApiUse,
-      tokenSource,
-      cloudAgentAuthority,
-    });
-  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
-    return authError(403, 'Access denied (R1)', kiloUserId, {
-      authorizationRefused: true,
-      internalApiUse,
-      tokenSource,
-      cloudAgentAuthority,
-    });
-  } else if (opts.adminOnly && !user.is_admin) {
+  }
+
+  // The self-cleanup admission covers only the account refusals below, so every
+  // other gate — including `adminOnly` — still runs for a cleanup request.
+  if (!opts.allowRefusedAccountSelfCleanup) {
+    if (await isUserBlacklistedByDomain(user, readDb)) {
+      return authError(403, 'Access denied (R0)', kiloUserId, {
+        authorizationRefused: true,
+        refusalReason: 'email_domain_blocked',
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+
+    if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
+      return authError(403, 'Access denied (R1)', kiloUserId, {
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+  }
+
+  if (opts.adminOnly && !user.is_admin) {
     return authError(403, 'Access denied (nonadmin)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,

@@ -7,6 +7,7 @@ type CenteredStateBandInput = {
   bottomInset?: number;
   nativeViewportFillsSurface?: boolean;
   nativeViewportBottom?: number;
+  topReserve?: number;
 };
 
 type CenteredStateLayoutInput = CenteredStateBandInput & {
@@ -136,6 +137,7 @@ export function getCenteredStateLayout({
   bottomInset = 0,
   nativeViewportFillsSurface = false,
   nativeViewportBottom = windowFrame.bottom,
+  topReserve = 0,
   roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
@@ -153,9 +155,22 @@ export function getCenteredStateLayout({
   // in that first paint, so the content would jump by the amount it pushed for
   // every band, not only for that strip. A band narrow enough to crowd the state
   // is also short enough that the state scrolls there.
+  //
+  // `topReserve` is decoration the content box paints above the visible stack —
+  // the box `RefreshProgress` reserves — so it is not part of what the eye reads
+  // as the state: subtract it and centre that visible stack in the band instead
+  // of the box that carries it. `getCenteredStateBandStyle` and
+  // `getPendingCenteredStateStyle` carry the same reserve in their bottom
+  // padding, so their centred first paint lands the stack on this same point and
+  // a state does not move when its height arrives. Clamping the reserve to the
+  // content height keeps the visible height non-negative, so a reserve larger
+  // than the reported content cannot invert the placement.
+  const reserve = Math.max(0, Math.min(topReserve, contentHeight));
   const bandHeight = bottom - top;
-  const fits = contentHeight <= roundToPixel(bandHeight);
-  const contentTop = fits ? top + (bandHeight - contentHeight) / 2 : top + STATE_GAP;
+  const visibleHeight = contentHeight - reserve;
+  const fits = visibleHeight <= roundToPixel(bandHeight);
+  const visibleTop = fits ? top + (bandHeight - visibleHeight) / 2 : top + STATE_GAP;
+  const contentTop = visibleTop - reserve;
 
   const paddingTop = Math.max(0, contentTop - viewport.top);
   const paddingBottom = fits
@@ -184,6 +199,13 @@ export function getCenteredStateLayout({
  * its height lands; the state is scrollable there either way. The bands the
  * app paints are tens of dp away from their content's height, so no screen in
  * the design-gate matrix lands in that strip.
+ *
+ * `topReserve` is decoration above the visible stack — the box `RefreshProgress`
+ * reserves — so the layout engine would otherwise centre the box rather than the
+ * stack inside it. It rides the bottom padding instead, which lifts the whole box
+ * half the reserve; the stack starts one full reserve below the box's top, so its
+ * centre lands on the band's centre, exactly where `getCenteredStateLayout`
+ * places it. First paint and measured placement stay equal.
  */
 export function getCenteredStateBandStyle({
   window: windowFrame,
@@ -192,6 +214,7 @@ export function getCenteredStateBandStyle({
   bottomInset = 0,
   nativeViewportFillsSurface = false,
   nativeViewportBottom = windowFrame.bottom,
+  topReserve = 0,
 }: CenteredStateBandInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
   const { top, bottom } = getCenteredStateBand({
@@ -204,7 +227,7 @@ export function getCenteredStateBandStyle({
     minHeight: Math.max(0, viewportBottom - viewport.top),
     justifyContent: 'center' as const,
     paddingTop: Math.max(0, top - viewport.top) + STATE_GAP,
-    paddingBottom: Math.max(0, viewportBottom - bottom) + STATE_GAP,
+    paddingBottom: Math.max(0, viewportBottom - bottom) + STATE_GAP + Math.max(0, topReserve),
   };
 }
 
@@ -221,11 +244,15 @@ export function getCenteredStateBandStyle({
  * cannot follow either move, so `CenteredState` keeps its content back until the
  * scroller measures for such a band, and paints this box there only when the
  * measurement cannot place the state at all.
+ *
+ * `topReserve` is the decoration above the visible stack, so it rides the bottom
+ * padding here too: the engine then centres the visible stack instead of the box
+ * that carries the reserve, matching `getCenteredStateLayout` for the same band.
  */
-export function getPendingCenteredStateStyle(bottomInset: number) {
+export function getPendingCenteredStateStyle(bottomInset: number, topReserve = 0) {
   return {
     justifyContent: 'center' as const,
     paddingTop: STATE_GAP,
-    paddingBottom: STATE_GAP + bottomInset,
+    paddingBottom: STATE_GAP + bottomInset + Math.max(0, topReserve),
   };
 }

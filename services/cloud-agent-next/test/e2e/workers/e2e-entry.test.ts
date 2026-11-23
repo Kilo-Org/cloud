@@ -1,4 +1,5 @@
 import { createExecutionContext, env, SELF } from 'cloudflare:test';
+import { Socket } from 'node:net';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
@@ -19,7 +20,7 @@ let secret: string;
 let internalApiSecret: string;
 const db = createDrizzleClient({
   connectionString: env.HYPERDRIVE.connectionString,
-  poolConfig: { max: 1 },
+  poolConfig: { max: 1, stream: () => new Socket() },
 });
 
 function tokenFor(userId: string): string {

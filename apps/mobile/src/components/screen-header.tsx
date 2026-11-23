@@ -434,11 +434,15 @@ type ScreenHeaderProps = {
   backFallback?: Href;
   onTitlePress?: () => void;
   /**
-   * Accessibility hint for the pressable title: the action it opens. The
-   * title's own text stays the label, so a screen reader announces which
-   * screen it is on before the action. Defaults to the generic open-menu copy.
-   * Detail screens (e.g. session rename) supply a verb that describes their
-   * action, not "open menu".
+   * Accessibility hint for the pressable title: the action it opens, named on
+   * its own. The copy must not repeat the title, because on Android the title
+   * is spoken first and this copy follows it in one utterance, so a title in
+   * the copy would be heard twice ("Sessions, Open menu for Sessions"). iOS
+   * reads this as the hint, and Android — where React Native maps the hint to
+   * the node's tooltip rather than to its content description (the rule
+   * `ConfigureRow` documents) — hears it as the second half of the announced
+   * name. Defaults to `screenHeader.openMenu`. Detail screens (e.g. session
+   * rename) supply a verb that describes their action, not "open menu".
    */
   onTitlePressAccessibilityHint?: string;
   backIcon?: 'back' | 'close';
@@ -578,15 +582,23 @@ export function ScreenHeader({
   const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
   const handleBack = useHeaderBack({ onBack, backFallback, canGoBack: historyCanGoBack });
   const isOfflineBannerVisible = useOfflineBannerSpace();
+  // The row the header's slots actually lay out in: the window minus the side
+  // clearance the inner wrapper pads on top of the gutter. A landscape cutout
+  // narrows the row without narrowing the window, so the stacking checks below
+  // measure this rather than `windowWidth`. `contentInset` still carries the
+  // caller's own gutter, which the row loses as well.
+  const actionsRowWidth = Math.max(0, windowWidth - insets.left - insets.right);
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter
   // column. Only a header that has actions can reflow this way, and a caller
   // that declares its cluster's width reflows before that cluster eats the
-  // title's readable minimum (see `headerRightWidth`).
+  // title's readable minimum (see `headerRightWidth`). The width measured is
+  // the row's own (`actionsRowWidth`), so the side insets a landscape cutout
+  // adds shorten the room the title and the cluster share.
   const stackActions =
     allowHeaderRightStacking &&
     Boolean(headerRight) &&
-    shouldStackHeaderActions(windowWidth, fontScale, {
+    shouldStackHeaderActions(actionsRowWidth, fontScale, {
       headerRightWidth: headerRightWidth ?? 0,
       titleMinWidth,
       contentInset,
@@ -630,7 +642,7 @@ export function ScreenHeader({
     (largeFont ||
       titleOverflows ||
       (allowInlineActionsStacking &&
-        shouldStackHeaderActions(windowWidth, fontScale, {
+        shouldStackHeaderActions(actionsRowWidth, fontScale, {
           headerRightWidth: inlineActionsWidth ?? 0,
           titleMinWidth,
           contentInset,
@@ -727,8 +739,6 @@ export function ScreenHeader({
   const reserveOfflineBanner = safeAreaTop && isOfflineBannerVisible && !modal;
   const paddingTop = baseTopPadding + offlineHeaderReservation(reserveOfflineBanner);
 
-  // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
-  // vertical padding through `className`.
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
   // The shared inset hook keeps the chrome and body clear of side status areas
@@ -759,14 +769,17 @@ export function ScreenHeader({
   // touch area is the same box in both directions.
   const titleHitSlop = { top: 13, bottom: 13 };
 
-  // What pressing the title does. The pressable title itself is labelled with
-  // the title's own text, so this is the hint, never the label: a screen reader
-  // must hear which screen it is on before the action. It names the title it
-  // opens, or falls back to the generic menu copy for a header with no text
-  // title.
-  const titlePressHint =
-    onTitlePressAccessibilityHint ??
-    (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'));
+  const titlePressHint = onTitlePressAccessibilityHint ?? t('screenHeader.openMenu');
+
+  // The announced name of the pressable title. The title stays first so a
+  // reader hears which screen it is on before the action. iOS reads the action
+  // from the hint beside it; Android has no announcement path through
+  // `accessibilityHint`, which React Native maps to the node's tooltip and
+  // never to its content description (the same rule `ConfigureRow` documents),
+  // so there the action has to ride in the name after the title. The hint is
+  // kept on both platforms.
+  const titlePressName =
+    title != null && Platform.OS === 'android' ? `${title}, ${titlePressHint}` : title;
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
@@ -815,16 +828,18 @@ export function ScreenHeader({
     // text, so the eyebrow keeps its tight pair with the title's first line.
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
-    // unrelated and stays. The label is the title text, never the action: a
-    // screen reader must hear which screen it is on, and the action goes in
-    // the hint (a rename control announced in place of the title left the
-    // title unreadable on the to-do detail screen).
+    // unrelated and stays. The announced name starts with the title text, so a
+    // reader hears which screen it is on before the action: a rename control
+    // announced in place of the title left the title unreadable on the to-do
+    // detail screen. Android appends the action to that name, because its hint
+    // is only a tooltip there (see `titlePressName` and `ConfigureRow`); iOS
+    // reads the action from the hint, so its name stays the title alone.
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
         hitSlop={titleHitSlop}
         accessibilityRole="button"
-        accessibilityLabel={title}
+        accessibilityLabel={titlePressName}
         accessibilityHint={titlePressHint}
         className={cn(HEADER_TITLE_TARGET_CLASS, 'justify-center active:opacity-70')}
       >
@@ -839,8 +854,6 @@ export function ScreenHeader({
     eyebrow || reserveEyebrow ? (
       <View className={cn('mb-0.5', centerTitle && 'items-center')}>
         {eyebrow === undefined && eyebrowPlaceholder ? (
-          // The reserved text below still holds the line's height, so the
-          // placeholder is painted over it rather than sizing the slot.
           <View
             className={cn(
               'absolute inset-0 justify-center',
@@ -876,11 +889,6 @@ export function ScreenHeader({
         centerTitle && 'text-center',
         !subtitle && 'opacity-0'
       )}
-      // One line: the subtitle is context for the title, so it truncates at its
-      // tail instead of taking a second line and moving the body. The reserved
-      // copy is a no-break space in the same style, so the height it holds is
-      // the height the name will take. At a large font scale the name takes up
-      // to two lines instead of losing its tail.
       numberOfLines={largeFont ? 2 : 1}
       ellipsizeMode="tail"
       accessible={Boolean(subtitle)}
@@ -894,8 +902,6 @@ export function ScreenHeader({
     subtitle || reserveSubtitle || subtitlePlaceholder ? (
       <View className={cn('mt-0.5', centerTitle && 'items-center')}>
         {subtitle === undefined && subtitlePlaceholder ? (
-          // The reserved text below still holds the line's height, so the
-          // placeholder is painted over it rather than sizing the slot.
           <View
             className={cn(
               'absolute inset-0 justify-center',

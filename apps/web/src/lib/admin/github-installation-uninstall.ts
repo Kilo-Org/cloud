@@ -1,3 +1,4 @@
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
 import 'server-only';
 
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
@@ -48,12 +49,18 @@ async function writeAudit(
   status: AuditStatus
 ) {
   if (record.ownerType === 'organization') {
+    // The detail says the integration is disconnected, which only a confirmed
+    // uninstall is; an attempt or an unconfirmed one has no such claim.
+    const details: AuditDetail | undefined = status.startsWith('confirmed')
+      ? { id: 'integration.uninstalled', integration: 'github' }
+      : undefined;
     const audit = {
       organization_id: record.ownerId,
       action: 'organization.settings.change',
       actor_id: actor.id,
       actor_email: actor.email,
       actor_name: actor.name,
+      details,
       message: auditMessage(record, status),
     } as const;
     if (executor === db) await createAuditLog(audit);

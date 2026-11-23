@@ -522,6 +522,7 @@
       "receiptLabel": "Անդորրագիր",
       "copyReceiptId": "Պատճենել անդորրագրի ID-ն",
       "appealLabel": "Բողոքարկում",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ստացված է",
       "triageOpen": "Վերանայվում է",
       "triageActioned": "Բավարարված է",
@@ -555,7 +556,7 @@
       "title": "Հաղորդումներ",
       "rowSubtitle": "Ձեր ներկայացրած հաղորդումները և դրանց արդյունքները",
       "emptyTitle": "Դեռ հաղորդումներ չկան",
-      "emptyDescription": "Մեկնաբանությունից կամ AI պատասխանից ձեր ներկայացրած հաղորդումները հայտնվում են այստեղ։",
+      "emptyDescription": "PR-ի քննարկման մեկնաբանությունից կամ գործակալի նստաշրջանում տրված ԱԲ պատասխանից ներկայացված հաղորդումները և դրանց արդյունքները հայտնվում են այստեղ։",
       "couldNotLoad": "Չհաջողվեց բեռնել ձեր հաղորդումները",
       "capped": "Ցուցադրվում են ձեր ամենավերջին հաղորդումները։"
     },
@@ -1501,7 +1502,9 @@
       "githubError": "Չհաջողվեց բացել GitHub-ի կարգավորումը։ Կրկին փորձիր։",
       "gitlabAccount": "GitLab հաշիվ",
       "gitlabError": "Չհաջողվեց բացել GitLab-ի կարգավորումը։ Կրկին փորձիր։",
-      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։"
+      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։",
+      "notConnectedTitle": "{{platform}}-ը միացված չէ",
+      "githubAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը և ադմինիստրատորները կարող են այն միացնել։"
     },
     "overview": {
       "allAreas": "Բոլոր ոլորտները",
@@ -2175,7 +2178,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} նստաշրջան",
       "sectionAccessibility": "{{title}}: {{displayCount}} նստաշրջան",
       "live": "ԱԿՏԻՎ",
-      "updating": "Թարմացվում է"
+      "updating": "Թարմացվում է",
+      "retentionLimit": "Ցուցադրվում են ամենավերջին նստաշրջանները։"
     },
     "sessionRow": {
       "deleteTitle": "Ջնջե՞լ նստաշրջանը",
@@ -2245,7 +2249,6 @@
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "emptyReadOnlyTitle": "Այս նստաշրջանում հաղորդագրություններ չկան",
-      "renameAccessibility": "Վերանվանել նստաշրջանը՝ {{title}}",
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
       "historyTooLarge": "Այս նստաշրջանի արձանագրությունը չափազանց մեծ է՝ բեռնելու համար։",
@@ -3094,6 +3097,12 @@
     "retryLoadingAccount": "Կրկին փորձել բեռնել հաշիվը",
     "retryLoadingPrivacy": "Կրկին փորձել բեռնել գաղտնիության ընտրանքները"
   },
+  "accountBlocked": {
+    "title": "Հաշիվն արգելափակված է",
+    "description": "Kilo-ն արգելափակել է այս հաշիվը, և նորից մուտք գործելը չի վերացնի արգելափակումը։ Աջակցության ծառայությունը հարցումով կարող է վերանայել արգելափակումը։",
+    "domainDescription": "Kilo-ն չի թույլատրում հաշիվներ այս էլ. փոստի տիրույթում, և նորից մուտք գործելը դա չի փոխի։ Աջակցության ծառայությունը հարցումով կարող է վերանայել տիրույթը։",
+    "contactSupport": "Կապվել աջակցության ծառայության հետ"
+  },
   "addCredits": {
     "cta": "Ավելացնել կրեդիտներ",
     "billingPage": "վճարումների էջ"
@@ -3166,8 +3175,7 @@
     "timeoutDescription": "Հարցումը չհասցրեց ավարտվել և ընդհատվեց։ Փորձիր կրկին։"
   },
   "screenHeader": {
-    "openMenu": "Բացել ընտրացանկը",
-    "openMenuFor": "Բացել {{title}}-ի ընտրացանկը"
+    "openMenu": "Բացել ընտրացանկը"
   },
   "picker": {
     "optionsExpired": "Ընտրանքների ժամկետն անցել է",
@@ -3401,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Աուդիտի մատյան",
-      "permissionDenied": "Կազմակերպության աուդիտի մատյանը կարող են դիտել միայն Enterprise պլանով կազմակերպության սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։",
+      "permissionDenied": "Կազմակերպության աուդիտի մատյանը կարող են դիտել միայն Enterprise պլանով կազմակերպության սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Աուդիտի իրադարձություններ չկան",
       "emptyDescription": "Այս կազմակերպությունում կատարված գործողությունները կհայտնվեն այստեղ։",
       "truncated": "Ցուցադրվում են վերջին իրադարձությունները։",
@@ -3451,11 +3459,147 @@
         "guardrailUpdate": "Guardrail-ը թարմացվեց",
         "guardrailRemove": "Guardrail-ը հեռացվեց",
         "unknown": "Աուդիտի իրադարձություն"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Ռեժիմ \"{{name}}\" (նույնացուցիչ՝ {{slug}})",
+        "modeUpdate": "Ռեժիմ \"{{name}}\"՝ {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Ավտոմատ երթուղավորում",
+          "defaultModel": "Լռելյայն մոդել"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Ավելացվեց {{email}} որպես {{role}}",
+        "memberRemoved": "Հեռացվեց {{email}}",
+        "memberParentAdded": "Ավելացվեց {{email}}՝ {{parent}} մայր կազմակերպությունից",
+        "memberParentRemoved": "Հեռացվեց {{email}}՝ {{parent}} մայր կազմակերպությունից",
+        "inviteSent": "{{email}}՝ որպես {{role}}",
+        "inviteRevoked": "Չեղարկվեց {{email}}-ի հրավերը",
+        "inviteAccepted": "Ընդունվեց {{email}}",
+        "groupIdentity": "Խումբ \"{{name}}\"",
+        "groupMembers": "Խումբ \"{{name}}\"՝ {{members}}",
+        "groupMemberGroups": "{{displayCount}} խումբ",
+        "groupMemberGroups_one": "{{displayCount}} խումբ",
+        "groupMemberGroups_other": "{{displayCount}} խումբ",
+        "groupMemberGroupsOf": "{{email}}՝ {{displayCount}} խումբ",
+        "groupMemberGroupsOf_one": "{{email}}՝ {{displayCount}} խումբ",
+        "groupMemberGroupsOf_other": "{{email}}՝ {{displayCount}} խումբ",
+        "groupPolicySet": "Խումբ \"{{name}}\"՝ սահմանվեց {{policy}} քաղաքականությունը",
+        "groupPolicyRemoved": "Խումբ \"{{name}}\"՝ հեռացվեց {{policy}} քաղաքականությունը",
+        "groupDefaultPolicySet": "Սահմանվեց լռելյայն {{policy}} քաղաքականությունը",
+        "groupDefaultPolicyRemoved": "Հեռացվեց լռելյայն {{policy}} քաղաքականությունը",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "ԱԲ պաշտպանիչներ՝ {{state}}",
+        "guardrailConfigGroup": "{{state}} \"{{group}}\" խմբի համար",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO տիրույթ՝ {{domain}}",
+        "ssoDomainChanged": "{{domain}} (նախկինում՝ {{previous}})",
+        "ssoDomainRemoved": "Մաքրվեց SSO տիրույթը՝ {{domain}}",
+        "fundsPurchased": "{{amount}}՝ {{method}}-ով",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}}՝ {{displayCount}} դուստր կազմակերպության",
+        "fundsDistributed_one": "{{amount}}՝ {{displayCount}} դուստր կազմակերպության",
+        "fundsDistributed_other": "{{amount}}՝ {{displayCount}} դուստր կազմակերպության",
+        "fundsReceived": "{{amount}}՝ {{parent}}-ից",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} կարգավորում",
+        "reviewAgentConfigStyle": "{{platform}}՝ {{style}} ոճ",
+        "reviewAgentSecretsUpdated": "{{displayCount}} թարմացված",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} թարմացված",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} թարմացված",
+        "reviewAgentSecretsFailed": "{{displayCount}} սխալ",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} սխալ",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} սխալ",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Եզրակացության տարածաշրջան՝ {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Ռեժիմ \"{{mode}}\"՝ {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Գլոբալ լռելյայն",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Թույլատրված",
+          "denied": "Արգելված",
+          "followSetting": "Հետևում է ընդլայնման կարգավորմանը"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI՝ {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}}՝ {{emails}}-ին",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Առաջարկությունների ամփոփում՝ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}՝ {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}՝ թույլատրված ծագումներ չկան",
+        "settingName": "Վերանվանվեց՝ {{previous}}-ից {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Սկանավորում օգտագործելուց առաջ՝ միացված",
+        "scanBeforeUseOff": "Սկանավորում օգտագործելուց առաջ՝ անջատված",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Հեռացվեց՝ {{models}}",
+        "browserPolicyOff": "Զննարկիչի օգտագործումը արգելափակված է",
+        "browserPolicyAllow": "Միայն թույլատրված ծագումներ",
+        "browserPolicyPlaywrightOnly": "Միայն զննարկիչի օգտագործում",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Մոդելները փոփոխվեցին՝ {{values}}",
+        "integrationConnected": "{{integration}} միացված է",
+        "integrationDisconnected": "{{integration}} անջատված է",
+        "integrationRefreshed": "{{integration}} թարմացված է",
+        "integrationCancelled": "{{integration}} չեղարկված է",
+        "integrationModelUpdated": "{{integration}}՝ մոդել {{model}}",
+        "integrationKeyAdded": "Ավելացվեց {{provider}}-ի բանալին",
+        "integrationKeyUpdated": "Թարմացվեց {{provider}}-ի բանալին",
+        "integrationKeyDeleted": "Հեռացվեց {{provider}}-ի բանալին",
+        "integrationKeyToggled": "{{provider}}-ի բանալին՝ {{state}}",
+        "namedPolicyCreated": "Ստեղծվեց {{kind}} քաղաքականություն {{id}}",
+        "namedPolicyUpdated": "Թարմացվեց {{kind}} քաղաքականություն {{id}}",
+        "namedPolicyDeleted": "Հեռացվեց {{kind}} քաղաքականություն {{id}}",
+        "namedPolicyLinked": "Կապակցվեց {{kind}} քաղաքականություն {{next}}",
+        "webhookTriggerUpdated": "Տրիգեր՝ {{trigger}}",
+        "organizationRenamed": "Կազմակերպությունը վերանվանվեց {{previous}}-ից {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Ձեր սեփական API բանալին"
+        }
       }
     },
     "billing": {
       "title": "Վճարումներ",
-      "permissionDenied": "Վճարումները կարող են տեսնել միայն կազմակերպության սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։",
+      "permissionDenied": "Վճարումները կարող են տեսնել միայն կազմակերպության սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Բաժանորդագրություն",
       "state": "Կարգավիճակ",
       "stateNone": "Բաժանորդագրություն չկա",
@@ -3632,7 +3776,7 @@
       "emptyDescription": "Օգտագործեք «Նախորդ ժամ» կոճակը՝ ավելի վաղ հարցումները տեսնելու համար։",
       "emptyBoundDescription": "Սրանից ավելի վաղ հարցումների մատյաններ չկան։",
       "loadError": "Չհաջողվեց բեռնել հարցումների մատյանները։",
-      "permissionDenied": "Կազմակերպության հարցումների մատյանները կարող են դիտել միայն նրա սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։",
+      "permissionDenied": "Կազմակերպության հարցումների մատյանները կարող են դիտել միայն նրա սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} մուտք · {{output}} ելք",
       "byok": "BYOK"
     },
@@ -3952,6 +4096,9 @@
       "fieldName": "Ցուցադրվող անուն",
       "fieldUrl": "Սերվերի URL",
       "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
+      "fieldUrlCredentials": "Հեռացրեք օգտանունը և գաղտնաբառը URL-ից։",
+      "fieldUrlFragment": "Հեռացրեք URL-ի # մասը։",
+      "fieldUrlInsecure": "Մուտքագրեք https URL, կամ http՝ միայն localhost-ի համար։",
       "duplicateUrl": "Այս URL-ն արդեն պահված է։",
       "serverNotFound": "Այս սերվերն այլևս պահված չէ։",
       "enableServer": "Միացնել այս սերվերը: {{name}}",
@@ -3977,6 +4124,7 @@
       "app": {
         "label": "Գործիքի միջերես",
         "failed": "Այս գործիքի միջերեսը չհաջողվեց բեռնել։",
+        "tooLarge": "Այս գործիքի միջերեսը գերազանցում է {{size}} սահմանաչափը։",
         "empty": "Այս գործիքի միջերեսում ցուցադրելու ոչինչ չկա։"
       }
     },
@@ -4092,6 +4240,7 @@
         "network": "Ներբեռնումը չավարտվեց։ Ստուգեք ձեր կապը և կրկին փորձեք։",
         "invalidFile": "Ներբեռնված ֆայլը մոդել չէ, որը այս հավելվածը կարող է գործարկել, ուստի այն հեռացվել է։",
         "checksum": "Ներբեռնված ֆայլը չի համապատասխանում իր հրապարակված ստուգիչ գումարին, ուստի այն հեռացվել է։ Փորձեք կրկին ներբեռնել։",
+        "unreadable": "Այս սարքը չկարողացավ ստուգել ներբեռնված ֆայլը, ուստի այն հեռացվել է։ Փորձեք կրկին ներբեռնել։",
         "writeFailed": "Այս սարքը չկարողացավ պահել մոդելը։ Փորձեք կրկին ներբեռնել։"
       }
     },
@@ -4700,6 +4849,7 @@
     "contextAll": "Բոլոր համատեքստերը",
     "dismiss": "Մերժել հաշվետվությունը",
     "dismissFailed": "Այս հաշվետվությունը դեռ չհաջողվեց մերժել։ Ֆոնային ռեժիմում կրկին փորձ կկատարվի։",
+    "readMarkFailed": "Չհաջողվեց այս հաշվետվությունը նշել որպես կարդացված։ Կրկին փորձ կկատարվի, երբ հաշվետվությունը վերաբեռնվի։",
     "offline": "Անցանց · պահված հաշվետվություն",
     "cached": "Պահված հաշվետվություն · թարմացումն անհասանելի է",
     "summary": "AI ամփոփում",
@@ -4719,15 +4869,20 @@
     "morningEnd": "Հաշվետվությունը հասանելի է մինչև",
     "timeHint": "Գլխավոր քարտը վերականգնում է ընթացիկ կարգավիճակը, երբ ավարտվում է հաշվետվության պատուհանը, նույնիսկ անցանց։",
     "invalidSchedule": "Ընտրեք վավեր ժամային գոտի և ոչ դատարկ հաշվետվության պատուհան։",
+    "scheduleEmptyNight": "Հաշվետվության պատուհանը դատարկ է։ Ընտրեք պատրաստության ժամ՝ պատուհանի սկզբից ավելի ուշ։",
+    "scheduleEmptyMorning": "Պատրաստության ժամը և հասանելիության ավարտի ժամը համընկնում են։ Ընտրեք, թե ինչքան ժամանակ հաշվետվությունը հասանելի մնա։",
+    "scheduleFullDay": "Երկու պատուհանները ընդգրկում են ամբողջ օրը։ Թողեք օրվա մի մասը հաշվետվությունից դուրս։",
     "notificationsHint": "Մեկ ընդհանուր ծանուցում յուրաքանչյուր պլանավորված հաշվետվության համար։ Կախված չէ վճարովի AI ամփոփումներից։",
     "notificationPermission": "Միացրեք push ծանուցումները՝ ձեր հաշվետվությունը ստանալու համար։",
     "defaultModel": "Օգտագործել Kilo-ի լռելյայն մոդելը",
     "duration": "Ժամանակի սահմանափակում (րոպե)",
     "spendLimit": "Ծախսի սահմանափակում (USD)",
-    "invalidSafeguards": "Մուտքագրեք դրական, վերջավոր ժամանակի և ծախսի սահմաններ։",
+    "invalidSafeguards": "Մուտքագրեք դրական թիվ թույլատրելի միջակայքում։",
     "estimate": "Գնահատում՝ {{estimate}} · առավելագույնը {{maximum}}",
     "estimateUnavailable": "Վճարովի ամփոփումը հասանելի չէ այս կարգավորումների համար։ Փոխեք մոդելը կամ սահմանները, կամ փորձեք ավելի ուշ։",
     "confirmPaid": "Միացնե՞լ վճարովի ամփոփումները {{context}}-ի համար",
+    "paidDisclosure_one": "Գնահատված՝ {{estimate}}, մինչև {{maximum}}, {{minutes}} րոպե սահմանով։ Վճարը գանձվում է նույնիսկ ստեղծման ձախողման դեպքում։",
+    "paidDisclosure_other": "Գնահատված՝ {{estimate}}, մինչև {{maximum}}, {{minutes}} րոպե սահմանով։ Վճարը գանձվում է նույնիսկ ստեղծման ձախողման դեպքում։",
     "paidDisclosure": "Գնահատված՝ {{estimate}}, մինչև {{maximum}}, {{minutes}} րոպե սահմանով։ Վճարը գանձվում է նույնիսկ ստեղծման ձախողման դեպքում։",
     "enable": "Միացնել վճարովի ամփոփումները",
     "allContexts": "Անձնական և կազմակերպության հաշվետվությունները մնում են առանձին։",
@@ -4771,7 +4926,7 @@
     "sourceActivity": "Անվերնագիր ակտիվություն",
     "metadataFailureProvider": "մատակարարի սխալ",
     "metadataFailureTool": "գործիքի սխալ",
-    "metadataFailureCancelled": "Չեղարկված",
+    "metadataStopped": "Վերջին փուլը դադարեցվել է",
     "metadataFailureOther": "չճշտված սխալ"
   },
   "systemSearch": {
@@ -4888,10 +5043,15 @@
       "autoCommit": "Կատարել փոփոխությունների ամրագրում, երբ գործարկումն ավարտվի",
       "condenseOnComplete": "Խտացնել համատեքստը, երբ գործարկումն ավարտվի",
       "activeTitle": "Գործարկիչն ակտիվ է",
+      "activeSwitchA11y": "Ակտիվ գործարկիչ: {{name}}",
+      "copyLinkA11y": "Պատճենել հղումը: {{name}}",
       "activeDescription": "Դադարեցված վեբհուկները պատասխանում են 404-ով։",
       "runAsCreator": "Գործարկել իմ անունից",
       "runAsCreatorDescription": "Յուրաքանչյուր գործարկում օգտագործում է ձեր հաշիվը, ուստի գաղտնի վերնագիրն անհրաժեշտ է։",
       "saveFailedTitle": "Չհաջողվեց պահպանել գործարկիչը",
+      "nameTaken": "«{{name}}» անունով գործարկիչ արդեն գոյություն ունի։",
+      "saveFailedRetry": "Չհաջողվեց կապվել սերվերի հետ։ Ստուգեք ձեր կապը և կրկին փորձեք։",
+      "saveFailedCheck": "Ստուգեք ձևի արժեքները և կրկին փորձեք։",
       "deleteTitle": "Ջնջե՞լ այս գործարկիչը։",
       "deleteMessage": "Կանչերը դեպի {{name}} կձախողվեն։ Սա հնարավոր չէ հետարկել։",
       "deleteMessageScheduled": "{{name}} գործարկիչի պլանավորված գործարկումները կդադարեն։ Սա հնարավոր չէ հետարկել։",

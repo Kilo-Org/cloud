@@ -7,6 +7,7 @@
       "spendAlert": "Forbruket ditt krever oppmerksomhet",
       "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
       "securityUpdate": "En sikkerhetssjekk har en oppdatering",
+      "agentBriefing": "Agentbriefen din er klar",
       "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
     }
   },

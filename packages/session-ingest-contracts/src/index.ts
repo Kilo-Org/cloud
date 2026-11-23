@@ -1,4 +1,5 @@
 export * from './rpc-contract';
+export * from './git-branch';
 export * from './part-text';
 export * from './session-live-summary';
 export * from './cloud-agent-session-scope';

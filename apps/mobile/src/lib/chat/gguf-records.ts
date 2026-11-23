@@ -53,9 +53,17 @@ export type GgufDownload = {
  * `space` is the device running out of room. `writeFailed` is the device
  * refusing a storage call at the end of a download - a permission or I/O
  * refusal writing the saved list, moving a file, or reading its size - which
- * says nothing about free space.
+ * says nothing about free space. `checksum` is a digest that was computed and
+ * differs, so the bytes are wrong; `unreadable` is the device refusing to
+ * compute one at all, which says nothing about the bytes.
  */
-export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum' | 'writeFailed';
+export type GgufDownloadProblem =
+  | 'space'
+  | 'network'
+  | 'invalidFile'
+  | 'checksum'
+  | 'unreadable'
+  | 'writeFailed';
 
 export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];

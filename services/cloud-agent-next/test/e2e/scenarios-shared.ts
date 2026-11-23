@@ -204,17 +204,10 @@ type CorrelatedProgressStats = {
   maxTextLength: number;
 };
 
-/**
- * Collect what a stream shows for direct assistant children of
- * `parentMessageId`. Child ids are collected from the whole event list first, so
- * a part emitted before its `message.updated` still counts. Shared by
- * `hasCorrelatedStreamProgress` and `correlatedProgressSummary` so the pass
- * rule and its diagnosis cannot drift.
- */
-function collectCorrelatedProgress(
+export function assistantChildMessageIds(
   events: readonly StreamEvent[],
   parentMessageId: string
-): CorrelatedProgressStats {
+): Set<string> {
   const childMessageIds = new Set<string>();
   for (const event of events) {
     if (event.streamEventType !== 'kilocode') continue;
@@ -228,7 +221,14 @@ function collectCorrelatedProgress(
     if (!info || info.role !== 'assistant' || info.parentID !== parentMessageId) continue;
     if (typeof info.id === 'string' && info.id.length > 0) childMessageIds.add(info.id);
   }
+  return childMessageIds;
+}
 
+function collectCorrelatedProgress(
+  events: readonly StreamEvent[],
+  parentMessageId: string
+): CorrelatedProgressStats {
+  const childMessageIds = assistantChildMessageIds(events, parentMessageId);
   const stats: CorrelatedProgressStats = {
     children: childMessageIds.size,
     parts: 0,

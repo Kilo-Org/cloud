@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native regression tests. */
+/* oxlint-disable max-lines -- one mounted row suite covers the action cell's frame, its name and busy state, the pending placeholder, and the compact buttons */
 
 // An uninstalled row offers one control: the trailing cell's Connect text
 // action. Four filled primary buttons on one screen read as four primary
@@ -12,6 +13,7 @@ import {
   TEXT_ACTION_PENDING_BAND_CLASS,
   TEXT_ACTION_SKELETON_CLASS,
 } from '@/components/ui/row-trailing';
+import { i18n } from '@/i18n';
 import {
   COMPACT_BUTTON_FRAME_CLASS,
   COMPACT_BUTTON_HIT_SLOP,
@@ -123,7 +125,7 @@ function renderRow(props: {
   return renderer.root;
 }
 
-afterEach(() => {
+afterEach(async () => {
   act(() => {
     renderer?.unmount();
   });
@@ -131,6 +133,7 @@ afterEach(() => {
   for (const spy of Object.values(calls)) {
     spy.mockClear();
   }
+  await i18n.changeLanguage('en');
 });
 
 /** Every control the row renders, found by the handler it carries. */
@@ -178,12 +181,36 @@ describe('IntegrationProviderRow action cell', () => {
     expect(calls.manageOnWeb).not.toHaveBeenCalled();
   });
 
-  it('names the trailing action after the provider it connects', () => {
+  it('names the trailing action after the action it offers', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
     const [connect] = controls(root);
-    expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
+    expect(connect?.props.accessibilityLabel).toBe('GitHub, Connect');
     expect(connect?.props.accessibilityRole).toBe('button');
+  });
+
+  it('names the Bitbucket Connect action through the catalog list joiner in Hindi and Arabic', async () => {
+    // The provider joins the action with the catalog's own list joiner, not a
+    // sentence joiner: the name is a label list, so it needs no agreement
+    // between the brand and the verb in any language.
+    for (const tag of ['hi', 'ar']) {
+      await i18n.changeLanguage(tag); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      const t = i18n.getFixedT(tag);
+      const [connect] = controls(
+        renderRow({ row: integrationRow({ provider: 'bitbucket' }), scope: 'personal' })
+      );
+
+      expect(connect?.props.accessibilityLabel, tag).toBe(
+        [t('agentChat.repoPicker.platformBitbucket'), t('common.connect')].join(
+          t('common.listJoiner')
+        )
+      );
+      // The visible label is still the bare verb.
+      expect(
+        renderer?.root.findAllByType('TextMock').map(node => node.props.children),
+        tag
+      ).toContain(t('common.connect'));
+    }
   });
 
   it('carries the Connect label in the row cell', () => {
@@ -227,7 +254,7 @@ describe('IntegrationProviderRow action cell', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal', connecting: true });
 
     const [connect] = controls(root);
-    expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
+    expect(connect?.props.accessibilityLabel).toBe('GitHub, Connect');
     expect(connect?.props.accessibilityState).toEqual({ disabled: true, busy: true });
     expect(root.findAllByType('TextMock').map(node => node.props.children)).toContain('Connect');
   });
@@ -244,7 +271,7 @@ describe('IntegrationProviderRow action cell', () => {
     });
 
     const [disconnect] = controls(root);
-    expect(disconnect?.props.accessibilityLabel).toBe('Disconnect. GitHub');
+    expect(disconnect?.props.accessibilityLabel).toBe('GitHub, Disconnect');
     expect(calls.connect).not.toHaveBeenCalled();
   });
 
@@ -355,7 +382,7 @@ describe('IntegrationProviderRow action cell', () => {
     if (!retry) {
       throw new Error('the unnamed row rendered no retry');
     }
-    expect(retry.props.accessibilityLabel).toBe('Retry. Bitbucket');
+    expect(retry.props.accessibilityLabel).toBe('Bitbucket, Retry');
     expect(retry.props.loading).toBe(false);
     press(retry);
     expect(calls.retryConnection).toHaveBeenCalledOnce();

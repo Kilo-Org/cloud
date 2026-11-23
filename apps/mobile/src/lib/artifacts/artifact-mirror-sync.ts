@@ -14,12 +14,17 @@ import {
   type MirrorMessagePage,
   type MirrorSessionRow,
 } from '@/lib/artifacts/artifact-crawl';
-import { applyArtifactSnapshot, mirrorSessionDir } from '@/lib/artifacts/artifact-mirror';
+import {
+  applyArtifactSnapshot,
+  mirrorSessionDir,
+  readArtifactMirror,
+} from '@/lib/artifacts/artifact-mirror';
 import {
   ARTIFACT_MIRROR_MANIFEST_VERSION,
   type ArtifactMirrorManifest,
   type ArtifactMirrorSession,
   selectSessionsWithinBudget,
+  serializeArtifactMirrorManifest,
 } from '@/lib/artifacts/artifact-mirror-manifest';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -53,7 +58,9 @@ export { MIRROR_SESSION_LIMIT } from '@/lib/artifacts/artifact-crawl';
  * Runs are single-flight and gated on the persisted `lastRunAt`
  * ({@link MIRROR_SYNC_MIN_INTERVAL_MS}) unless `force` is set. Every write is
  * fenced on the auth epoch captured at entry, so a run that resolves after
- * sign-out cannot repopulate what teardown just cleared.
+ * sign-out cannot repopulate what teardown just cleared. A run that fails
+ * records its attempt time too, with the pre-run crawl state, so a failing
+ * condition is retried on the same interval instead of on every trigger.
  */
 
 /** Shortest gap between two runs unless a caller forces one. */
@@ -113,8 +120,6 @@ const sessionStateSchema = z.object({
   updatedAt: z.string(),
   /**
    * When this session last got one of {@link MAX_SESSIONS_PER_RUN}'s slots.
-   * The budget goes to the sessions that waited longest, so a session that
-   * keeps changing cannot hold a slot while the ones behind it starve.
    */
   lastAdvancedAt: z.number().nullable().default(null),
 });
@@ -133,13 +138,19 @@ type TerminalCause = z.infer<typeof terminalCauseSchema>;
  * member has a production default; a caller overrides only what a test drives.
  */
 export type ArtifactMirrorSyncDeps = Partial<ArtifactCrawlDeps> & {
-  /** Applies the reconciled snapshot; the mirror's own best-effort writer. */
-  applySnapshot: (manifest: ArtifactMirrorManifest) => void;
+  /**
+   * Applies the reconciled snapshot; the mirror's own best-effort writer. Its
+   * result is the tree-repair report: whether the applied snapshot created or
+   * pruned an entry, which is a change the index bytes cannot show.
+   */
+  applySnapshot: (manifest: ArtifactMirrorManifest) => boolean;
   /** The folder for one session's files, or null with no browsable container. */
   mirrorSessionDir: (sessionId: string) => Directory | null;
   /** Tells the platform provider the tree changed. */
   notify: () => void;
   readState: (scope: string, key: string) => Promise<string | null>;
+  /** The index currently on disk, or null when there is none. */
+  readSnapshot: () => ArtifactMirrorManifest | null;
   writeState: (scope: string, key: string, value: string) => Promise<void>;
   /** Current authoritative user id, or null while signed out. */
   resolveUserId: () => string | null;
@@ -156,6 +167,10 @@ export type ArtifactMirrorSyncOptions = {
 export type ArtifactMirrorSyncOutcome =
   | { status: 'skipped'; reason: 'interval' | 'no-user' }
   | { status: 'discarded' }
+  /**
+   * The run threw. Its attempt time is still recorded (unless the fence had
+   * tripped), so the interval gate spaces the retry as it spaces a success.
+   */
   | { status: 'failed' }
   | { failed: number; files: number; sessions: number; status: 'synced' };
 
@@ -165,6 +180,7 @@ const DEFAULT_DEPS: ArtifactMirrorSyncDeps = {
   mirrorSessionDir,
   notify: notifyArtifactsChanged,
   readState: (scope, key) => encryptedKv.getItem(scope, key),
+  readSnapshot: readArtifactMirror,
   writeState: (scope, key, value) => encryptedKv.setItem(scope, key, value),
   resolveUserId: () => readCachedUserId(queryClient),
   now: () => Date.now(),
@@ -210,7 +226,8 @@ let inFlightGeneration = 0;
 /**
  * Bring the mirror in line with the signed-in user's sessions. While a run is
  * in flight every caller gets that same promise; otherwise the run is gated on
- * the persisted `lastRunAt` unless `force`. Never rejects.
+ * the persisted `lastRunAt` unless `force`. A failed run records its attempt
+ * time, so the interval spaces retries as well as successes. Never rejects.
  */
 // eslint-disable-next-line typescript-eslint/promise-function-async -- must return the same in-flight promise to every caller
 export function syncArtifactMirror(
@@ -262,6 +279,10 @@ async function runSyncOnce(
   const scope = readCacheScope(userId);
   const key = syncStateItemKey(userId);
   const stored = parseSyncState(await deps.readState(scope, key));
+  // A failed run re-persists the pre-run crawl state, so it needs its own copy:
+  // the run's `states` share the stored `files` array and the `terminal` and
+  // `attempts` maps, and advance them in place.
+  const preRun = cloneSessions(stored.sessions);
   const now = deps.now();
   if (!options.force && isWithinMinInterval(stored.lastRunAt, now)) {
     return { status: 'skipped', reason: 'interval' };
@@ -269,41 +290,140 @@ async function runSyncOnce(
   if (!canPublish(epoch)) {
     return { status: 'discarded' };
   }
-  // Reconcile only once the run is going ahead: the probe stats the mirror, and
-  // a run the interval gate skips must not pay for that on the JS thread.
-  const page = await listSessionPage({}, deps);
-  const run: SyncRun = {
-    deps,
-    epoch,
-    generation,
-    now,
-    states: nextSessionStates(page.sessions, reconcileWithDisk(stored, deps).sessions),
-  };
-  const advanced = await advanceSessions(page.sessions, run);
-  if (advanced.discarded || !canPublish(epoch)) {
-    return { status: 'discarded' };
-  }
+  // The crawl and the publication are the parts that can throw (a transport
+  // error, a refused filesystem call, a storage failure), and they sit in their
+  // own guard so a caught error still knows this run's `deps`, scope, epoch and
+  // the pre-run state. That is what lets the attempt be stamped before the
+  // interval gate would otherwise let the next trigger retry at once.
+  try {
+    // Reconcile only once the run is going ahead: the probe stats the mirror, and
+    // a run the interval gate skips must not pay for that on the JS thread.
+    const page = await listSessionPage({}, deps);
+    const run: SyncRun = {
+      deps,
+      epoch,
+      generation,
+      now,
+      states: nextSessionStates(page.sessions, reconcileWithDisk(stored, deps).sessions),
+    };
+    const advanced = await advanceSessions(page.sessions, run);
+    if (advanced.discarded || !canPublish(epoch)) {
+      return { status: 'discarded' };
+    }
 
-  const snapshot = applyByteBudget(page.sessions, run.states);
-  deps.applySnapshot({
-    version: ARTIFACT_MIRROR_MANIFEST_VERSION,
-    updatedAt: new Date(now).toISOString(),
-    sessions: snapshot,
-  });
-  await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
-  // The state write is awaited as well, so the fence is read once more before
-  // the provider is signalled: a sign-out during the write has cleared the
-  // mirror, and re-announcing it would be a stale-browser signal.
-  if (!canPublish(epoch)) {
-    return { status: 'discarded' };
+    const snapshot = applyByteBudget(page.sessions, run.states);
+    // The index already on disk, read once: comparing against it is what lets an
+    // unchanged tree keep its bytes (and its `updatedAt`) instead of being
+    // rewritten and re-announced every run.
+    const previous = deps.readSnapshot();
+    const candidate: ArtifactMirrorManifest = {
+      version: ARTIFACT_MIRROR_MANIFEST_VERSION,
+      updatedAt: new Date(now).toISOString(),
+      sessions: snapshot,
+    };
+    const changed = previous === null || !hasSameContent(previous, candidate);
+    // An unchanged tree is published with the stamp already on disk, so the
+    // serialized bytes match the document `writeManifest` finds there and its
+    // unchanged-bytes guard leaves the file untouched. The snapshot is applied
+    // either way: it is the idempotent tree writer that prunes stale entries, and
+    // skipping it would leave a pruned session's folder behind.
+    const published: ArtifactMirrorManifest =
+      previous !== null && !changed ? { ...candidate, updatedAt: previous.updatedAt } : candidate;
+    const repaired = deps.applySnapshot(published);
+    await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
+    // The state write is awaited as well, so the fence is read once more before
+    // the provider is signalled: a sign-out during the write has cleared the
+    // mirror, and re-announcing it would be a stale-browser signal.
+    if (!canPublish(epoch)) {
+      return { status: 'discarded' };
+    }
+    // The provider is told to re-query when the tree moved in any of three
+    // ways: the index differs from the document on disk (the first index, an
+    // added or dropped artifact), the run materialized bytes, or the applied
+    // snapshot repaired the tree. A tree that stayed as it was stays quiet:
+    // signalling it makes an open browser re-query a listing that cannot have
+    // changed, and the bytes-on-disk guard in `writeManifest` leaves the index
+    // untouched too.
+    //
+    // The last two are invisible in the index bytes. A run that rewrote a file
+    // counts as a change because the disk reconcile can drop a file whose
+    // bytes the device removed and the crawl then materializes it again under
+    // the same id, size and name, so the listing is unchanged while the file
+    // behind it is new. And a snapshot-only repair -- a session with no files
+    // whose folder the file browser deleted is re-created, or a crashed run's
+    // staging file is pruned -- changes the tree while the listing reads exactly
+    // the same. Both are invisible to an open browser until it re-reads, which
+    // is what the notify is for.
+    if (changed || repaired || advanced.files > 0) {
+      deps.notify();
+    }
+    return {
+      status: 'synced',
+      sessions: page.sessions.length,
+      files: advanced.files,
+      failed: advanced.failed,
+    };
+  } catch {
+    await recordFailedAttempt({ deps, epoch, key, now, preRun, scope });
+    return { status: 'failed' };
   }
-  deps.notify();
-  return {
-    status: 'synced',
-    sessions: page.sessions.length,
-    files: advanced.files,
-    failed: advanced.failed,
-  };
+}
+
+/**
+ * Whether two indexes describe the same tree, ignoring their `updatedAt`. The
+ * canonical serializer decides it so there is one comparison format: anything
+ * it does not write (a field both sides lack, key order) cannot make a run
+ * announce a change the bytes on disk would not show.
+ */
+function hasSameContent(a: ArtifactMirrorManifest, b: ArtifactMirrorManifest): boolean {
+  return (
+    serializeArtifactMirrorManifest({ ...a, updatedAt: '' }) ===
+    serializeArtifactMirrorManifest({ ...b, updatedAt: '' })
+  );
+}
+
+/** The context a failed run needs to stamp its attempt. */
+type AttemptStamp = {
+  deps: ArtifactMirrorSyncDeps;
+  epoch: number;
+  key: string;
+  now: number;
+  /** The crawl state as it was read, copied before the failed run touched it. */
+  preRun: Record<string, MirrorSyncSessionState>;
+  scope: string;
+};
+
+/**
+ * Stamp a failed run's attempt time, so the interval gate also spaces retries.
+ * A run that threw left `lastRunAt` at its previous value, and without this
+ * stamp the next foreground refresh or remount would start another full crawl at
+ * once, against the condition that just failed.
+ *
+ * Only the PRE-RUN crawl state is persisted. A run that failed partway may have
+ * advanced cursors and appended files in memory, but none of that reached the
+ * mirror, so saving it would record a cursor and a file list that describe bytes
+ * the run never published. Keeping the stored state means the next run re-reads
+ * from the cursors that were already saved.
+ *
+ * The write is fenced like every other one: a run that resolves after a sign-out
+ * must not resurrect state for a context that just ended. It also never
+ * escalates, because the caller is already reporting `failed` and a storage
+ * error here must not change that.
+ */
+async function recordFailedAttempt(attempt: AttemptStamp): Promise<void> {
+  if (!canPublish(attempt.epoch)) {
+    return;
+  }
+  try {
+    await attempt.deps.writeState(
+      attempt.scope,
+      attempt.key,
+      JSON.stringify({ lastRunAt: attempt.now, sessions: attempt.preRun })
+    );
+  } catch {
+    // Best effort: the stamp only paces the next run, and the failure it
+    // describes has already been reported.
+  }
 }
 
 /**
@@ -549,6 +669,25 @@ function promote(staging: File, canonical: File): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * A copy of stored crawl state that a run cannot mutate. {@link nextSessionStates}
+ * carries the prior `files` array, `terminal` and `attempts` maps themselves into
+ * the new state, and the crawl pushes and records into them in place, so the
+ * pre-run state a failed run re-persists has to own every one of them.
+ */
+function cloneSessions(sessions: Record<string, MirrorSyncSessionState>) {
+  const copy: Record<string, MirrorSyncSessionState> = {};
+  for (const [sessionId, session] of Object.entries(sessions)) {
+    copy[sessionId] = {
+      ...session,
+      files: [...session.files],
+      terminal: { ...session.terminal },
+      attempts: { ...session.attempts },
+    };
+  }
+  return copy;
 }
 
 /**

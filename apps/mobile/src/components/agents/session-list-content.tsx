@@ -72,6 +72,8 @@ type AgentSessionListContentProps = {
    * list never reads as the end of the history.
    */
   isFetchNextPageError: boolean;
+  /** The retention bound ended the list while the server still had older rows. */
+  isRetentionLimited: boolean;
   onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
@@ -108,6 +110,7 @@ export function AgentSessionListContent({
   hasFreshHistory,
   isFetchingNextPage,
   isFetchNextPageError,
+  isRetentionLimited,
   onRetryNextPage,
   refetch,
   onRetry,
@@ -343,9 +346,11 @@ export function AgentSessionListContent({
 
   // A failed next page keeps every loaded row and says so at the end of the
   // list: the spinner alone ended the list silently, so the last loaded row
-  // read as the end of the history. The retry calls `fetchNextPage`, and the
-  // end-reach gate stops re-firing while this line stands (see
-  // `shouldLoadMoreSessions`).
+  // read as the end of the history. The retention bound is a third ending, and
+  // a list that stopped at it says so instead of ending silently like a
+  // complete history. The retry calls `fetchNextPage`, and the end-reach gate
+  // stops re-firing while this line stands (see `shouldLoadMoreSessions`); a
+  // failed or in-flight next page owns the footer ahead of the bound.
   let listFooter: ReactNode = null;
   if (isFetchNextPageError) {
     listFooter = (
@@ -369,6 +374,14 @@ export function AgentSessionListContent({
     listFooter = (
       <View className="py-4">
         <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  } else if (isRetentionLimited) {
+    listFooter = (
+      <View className="items-center gap-3 px-4 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('agents.sessionList.retentionLimit')}
+        </Text>
       </View>
     );
   }

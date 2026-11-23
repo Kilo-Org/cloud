@@ -2,7 +2,7 @@ import { type MarkedToken, type Token } from 'marked';
 
 import { lexMarkdown } from '@/components/agents/markdown-parse-cache';
 import { i18n } from '@/i18n';
-import { segmenter } from '@/lib/intl-cache';
+import { boundedOneLineExcerpt } from '@/lib/format';
 
 /**
  * The longest line a chat derives from a message it holds.
@@ -50,8 +50,6 @@ function windowStart(text: string): string {
   }
   return cut;
 }
-
-const ELLIPSIS = '…';
 
 /**
  * The plain text of inline markdown: emphasis, strong text, inline code,
@@ -162,40 +160,9 @@ function markedTokenText(token: MarkedToken): string {
  * window is labelled from the start of its body, and the rest is never read.
  */
 export function derivedChatText(text: string): string {
-  const source = windowStart(text);
-  const oneLine = chatPlainText(source).replaceAll(/\s+/gu, ' ').trim();
-  // A string no longer than the cap in code units holds no more characters
-  // than that, so the common short message never reaches the segmenter.
-  if (oneLine.length <= DERIVED_CHAT_TEXT_MAX_LENGTH) {
-    return oneLine;
-  }
-  const head = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH);
-  if (!head.more) {
-    return oneLine;
-  }
-  const cut = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH - 1).text;
-  return `${cut.trimEnd()}${ELLIPSIS}`;
-}
-
-/**
- * The first `count` user-perceived characters of `value`, and whether the value
- * holds more.
- *
- * Cutting by code unit could end a label on half a surrogate pair; cutting by
- * code point could still split a character this reader sees as one, such as a
- * family emoji or a Devanagari syllable with its vowel sign. The segmenter is
- * iterated only as far as `count` plus one, so a long message costs the cap
- * rather than its own length.
- */
-function firstGraphemes(value: string, count: number) {
-  let text = '';
-  let seen = 0;
-  for (const { segment } of segmenter(i18n.language, { granularity: 'grapheme' }).segment(value)) {
-    if (seen === count) {
-      return { text, more: true };
-    }
-    text += segment;
-    seen += 1;
-  }
-  return { text, more: false };
+  return boundedOneLineExcerpt(
+    chatPlainText(windowStart(text)),
+    DERIVED_CHAT_TEXT_MAX_LENGTH,
+    i18n.language
+  );
 }

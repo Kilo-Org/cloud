@@ -159,7 +159,8 @@ function AndroidPendingPickerRecovery({
 }
 
 export function NewSessionScreenBody() {
-  const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
+  const { mode, setMode, model, setModel, variant, setVariant, modelSelectionFailure } =
+    useNewSessionModelState();
   const { t } = useTranslation();
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
@@ -1491,6 +1492,13 @@ export function NewSessionScreenBody() {
         model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
         variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
         modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
+        modelSelectionFailure={
+          // A pinned agent locks the row to its own model, and a remote target
+          // lists its computer's catalog, so the organization default cannot
+          // decide either row: the failure would sit under a chip that already
+          // names a model, with a Retry that cannot change it.
+          isRemoteTargetSelected || pinned.model ? null : modelSelectionFailure
+        }
         customOptions={isRemoteTargetSelected ? remoteCustomOptions : customOptions}
         modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
         modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}

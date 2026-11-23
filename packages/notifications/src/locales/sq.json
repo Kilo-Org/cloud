@@ -7,6 +7,7 @@
       "spendAlert": "Shpenzimi juaj ka nevojë për vëmendje",
       "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
       "securityUpdate": "Një kontroll sigurie ka një përditësim",
+      "agentBriefing": "Raporti juaj i agjentit është gati",
       "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
     }
   },

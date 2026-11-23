@@ -14,8 +14,6 @@ vi.mock('react-native', () => ({
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
 describe('SectionHeader gutter', () => {
-  // A section header inside a padded body adds no inset of its own; a
-  // full-bleed list passes `inset` so the label lines up with its rows.
   it('draws the page gutter only for a full-bleed list', () => {
     const rowClasses = (inset: boolean) => {
       // The renderer lives in a holder: the assignment happens inside the `act`

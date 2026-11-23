@@ -522,6 +522,7 @@
       "receiptLabel": "Ontvangsbewys",
       "copyReceiptId": "Kopieer ontvangsbewys-ID",
       "appealLabel": "Appèl",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Ontvang",
       "triageOpen": "Word hersien",
       "triageActioned": "Gehandhaaf",
@@ -555,7 +556,7 @@
       "title": "Verslae",
       "rowSubtitle": "Verslae wat jy ingedien het en die uitkomste daarvan",
       "emptyTitle": "Nog geen verslae nie",
-      "emptyDescription": "Verslae wat jy van 'n kommentaar of 'n KI-antwoord indien, verskyn hier.",
+      "emptyDescription": "Verslae wat jy uit 'n kommentaar in 'n pull request-bespreking of uit 'n KI-antwoord in 'n agentsessie indien, verskyn hier saam met die uitkoms daarvan.",
       "couldNotLoad": "Kon nie jou verslae laai nie",
       "capped": "Wys jou mees onlangse verslae."
     },
@@ -1501,7 +1502,9 @@
       "githubError": "Die GitHub-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
       "gitlabAccount": "GitLab-rekening",
       "gitlabError": "Die GitLab-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien."
+      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien.",
+      "notConnectedTitle": "{{platform}} is nie gekoppel nie",
+      "githubAdminOnlyDescription": "Slegs organisasie-eienaars en administrateurs kan dit koppel."
     },
     "overview": {
       "allAreas": "Alle fokusareas",
@@ -2175,7 +2178,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sessies",
       "sectionAccessibility": "{{title}}: {{displayCount}} sessies",
       "live": "REGSTREEKS",
-      "updating": "Besig om op te dateer"
+      "updating": "Besig om op te dateer",
+      "retentionLimit": "Die mees onlangse sessies word gewys."
     },
     "sessionRow": {
       "deleteTitle": "Skrap sessie?",
@@ -2245,7 +2249,6 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "emptyReadOnlyTitle": "Geen boodskappe in hierdie sessie nie",
-      "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "historyTooLarge": "Hierdie sessie se transkripsie is te groot om te laai.",
@@ -3094,6 +3097,12 @@
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
+  "accountBlocked": {
+    "title": "Rekening geblokkeer",
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
+    "domainDescription": "Kilo blokkeer rekeninge op hierdie e-posdomein, en weer aanmeld sal dit nie verander nie. Ondersteuning kan die domein op versoek hersien.",
+    "contactSupport": "Kontak ondersteuning"
+  },
   "addCredits": {
     "cta": "Voeg krediete by",
     "billingPage": "faktureringsbladsy"
@@ -3166,8 +3175,7 @@
     "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },
   "screenHeader": {
-    "openMenu": "Maak spyskaart oop",
-    "openMenuFor": "Maak spyskaart vir {{title}} oop"
+    "openMenu": "Maak spyskaart oop"
   },
   "picker": {
     "optionsExpired": "Opsies verval",
@@ -3401,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Ouditlog",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen ouditgebeure nie",
       "emptyDescription": "Aksies wat in hierdie organisasie geneem word, verskyn hier.",
       "truncated": "Die mees onlangse gebeure word gewys.",
@@ -3451,11 +3459,147 @@
         "guardrailUpdate": "Veiligheidsreël opgedateer",
         "guardrailRemove": "Veiligheidsreël verwyder",
         "unknown": "Ouditgebeurtenis"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modus \"{{name}}\" (identifiseerder: {{slug}})",
+        "modeUpdate": "Modus \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Outomatiese roetering",
+          "defaultModel": "Standaardmodel"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} as {{role}} bygevoeg",
+        "memberRemoved": "{{email}} verwyder",
+        "memberParentAdded": "{{email}} vanaf hooforganisasie {{parent}} bygevoeg",
+        "memberParentRemoved": "{{email}} vanaf hooforganisasie {{parent}} verwyder",
+        "inviteSent": "{{email}} in die rol van {{role}}",
+        "inviteRevoked": "Uitnodiging vir {{email}} herroep",
+        "inviteAccepted": "{{email}} aanvaar",
+        "groupIdentity": "Groep \"{{name}}\"",
+        "groupMembers": "Groep \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} groepe",
+        "groupMemberGroups_one": "{{displayCount}} groep",
+        "groupMemberGroups_other": "{{displayCount}} groepe",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} groepe",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} groep",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} groepe",
+        "groupPolicySet": "Groep \"{{name}}\": {{policy}}-beleid ingestel",
+        "groupPolicyRemoved": "Groep \"{{name}}\": {{policy}}-beleid verwyder",
+        "groupDefaultPolicySet": "Verstek-{{policy}}-beleid ingestel",
+        "groupDefaultPolicyRemoved": "Verstek-{{policy}}-beleid verwyder",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "KI-veiligheidsreëls {{state}}",
+        "guardrailConfigGroup": "{{state}} vir groep \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO-domein {{domain}}",
+        "ssoDomainChanged": "{{domain}} (voorheen {{previous}})",
+        "ssoDomainRemoved": "SSO-domein {{domain}} verwyder",
+        "fundsPurchased": "{{amount}} deur {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} aan {{displayCount}} dogterorganisasies",
+        "fundsDistributed_one": "{{amount}} aan {{displayCount}} dogterorganisasie",
+        "fundsDistributed_other": "{{amount}} aan {{displayCount}} dogterorganisasies",
+        "fundsReceived": "{{amount}} vanaf {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}}-konfigurasie",
+        "reviewAgentConfigStyle": "{{platform}}: styl {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} opgedateer",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} opgedateer",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} opgedateer",
+        "reviewAgentSecretsFailed": "{{displayCount}} foute",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} fout",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} foute",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Inferensiestreek: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modus \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globale verstek",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Toegelaat",
+          "denied": "Geweier",
+          "followSetting": "Volg die uitbreiding se instelling"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects-UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} aan {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Aanbevelingsopsomming {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: geen toegelate oorspronge",
+        "settingName": "Hernoem van {{previous}} na {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skandeer voor gebruik aan",
+        "scanBeforeUseOff": "Skandeer voor gebruik af",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Verwyder: {{models}}",
+        "browserPolicyOff": "Blaaiergebruik geblokkeer",
+        "browserPolicyAllow": "Slegs toegelate oorspronge",
+        "browserPolicyPlaywrightOnly": "Slegs blaaiergebruik",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modelle verander: {{values}}",
+        "integrationConnected": "{{integration}} gekoppel",
+        "integrationDisconnected": "{{integration}} ontkoppel",
+        "integrationRefreshed": "{{integration}} verfris",
+        "integrationCancelled": "{{integration}} gekanselleer",
+        "integrationModelUpdated": "{{integration}}: KI-model {{model}}",
+        "integrationKeyAdded": "Sleutel vir {{provider}} bygevoeg",
+        "integrationKeyUpdated": "Sleutel vir {{provider}} opgedateer",
+        "integrationKeyDeleted": "Sleutel vir {{provider}} verwyder",
+        "integrationKeyToggled": "Sleutel vir {{provider}}: {{state}}",
+        "namedPolicyCreated": "{{kind}}-beleid {{id}} geskep",
+        "namedPolicyUpdated": "{{kind}}-beleid {{id}} opgedateer",
+        "namedPolicyDeleted": "{{kind}}-beleid {{id}} verwyder",
+        "namedPolicyLinked": "{{kind}}-beleid {{next}} gekoppel",
+        "webhookTriggerUpdated": "Sneller {{trigger}}",
+        "organizationRenamed": "Organisasie hernoem van {{previous}} na {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Jou eie API-sleutel"
+        }
       }
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien.",
+      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Intekening",
       "state": "Status",
       "stateNone": "Geen intekening",
@@ -3632,7 +3776,7 @@
       "emptyDescription": "Gebruik Vroeër uur om vroeëre versoeke te sien.",
       "emptyBoundDescription": "Versoeklogboeke strek nie verder terug nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder kan die organisasie se versoeklogs lees. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },
@@ -3952,6 +4096,9 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
+      "fieldUrlCredentials": "Verwyder die gebruikersnaam en wagwoord uit die URL.",
+      "fieldUrlFragment": "Verwyder die #-gedeelte van die URL.",
+      "fieldUrlInsecure": "Voer 'n https-URL in, of http slegs vir localhost.",
       "duplicateUrl": "Daardie URL is reeds gestoor.",
       "serverNotFound": "Hierdie bediener is nie meer gestoor nie.",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
@@ -3977,6 +4124,7 @@
       "app": {
         "label": "Gereedskapkoppelvlak",
         "failed": "Hierdie gereedskap se koppelvlak kon nie laai nie.",
+        "tooLarge": "Hierdie gereedskap se koppelvlak is groter as die {{size}}-limiet.",
         "empty": "Hierdie gereedskap se koppelvlak het niks om te wys nie."
       }
     },
@@ -4092,6 +4240,7 @@
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
         "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
         "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer.",
+        "unreadable": "Hierdie toestel kon nie die afgelaaide lêer kontroleer nie, so dit is verwyder. Probeer die aflaai weer.",
         "writeFailed": "Hierdie toestel kon nie die model stoor nie. Probeer die aflaai weer."
       }
     },
@@ -4700,6 +4849,7 @@
     "contextAll": "Alle kontekste",
     "dismiss": "Verwerp verslag",
     "dismissFailed": "Hierdie verslag kon nog nie verwerp word nie. Dit word op die agtergrond weer probeer.",
+    "readMarkFailed": "Kon nie hierdie verslag as gelees merk nie. Dit word weer probeer wanneer die verslag herlaai.",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfrissing nie beskikbaar nie",
     "summary": "AI-opsomming",
@@ -4719,15 +4869,20 @@
     "morningEnd": "Verslag beskikbaar tot",
     "timeHint": "Die Tuis-kaart herstel regstreekse status wanneer die verslagvenster eindig, selfs vanlyn.",
     "invalidSchedule": "Kies 'n geldige tydsone en 'n nie-leë verslagvenster.",
+    "scheduleEmptyNight": "Die verslagvenster is leeg. Kies 'n gereedheidstyd later as die begin van die venster.",
+    "scheduleEmptyMorning": "Die gereedheidstyd en die beskikbaar-tot-tyd stem ooreen. Kies hoe lank die verslag beskikbaar bly.",
+    "scheduleFullDay": "Die twee vensters dek 'n volle dag. Los 'n deel van die dag buite die verslag.",
     "notificationsHint": "Een algemene kennisgewing per geskeduleerde verslag. Onafhanklik van betaalde AI-opsommings.",
     "notificationPermission": "Skakel druk-kennisgewings aan om jou verslag te ontvang.",
     "defaultModel": "Gebruik Kilo se verstekmodel",
     "duration": "Tydbeveiliging (minute)",
     "spendLimit": "Bestedingsbeveiliging (USD)",
-    "invalidSafeguards": "Voer positiewe, eindige tyd- en bestedingslimiete in.",
+    "invalidSafeguards": "Voer ’n positiewe getal binne die toegelate reeks in.",
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie. Verander die model of die perke, of probeer later weer.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
+    "paidDisclosure_one": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
+    "paidDisclosure_other": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
@@ -4771,7 +4926,7 @@
     "sourceActivity": "Aktiwiteit sonder titel",
     "metadataFailureProvider": "verskafferfout",
     "metadataFailureTool": "hulpmiddelfout",
-    "metadataFailureCancelled": "Gekanselleer",
+    "metadataStopped": "Laaste beurt is gestop",
     "metadataFailureOther": "ongespesifiseerde fout"
   },
   "systemSearch": {
@@ -4888,10 +5043,15 @@
       "autoCommit": "Pleeg veranderinge wanneer die lopie klaar is",
       "condenseOnComplete": "Verdig die konteks wanneer die lopie klaar is",
       "activeTitle": "Sneller aktief",
+      "activeSwitchA11y": "Sneller aktief: {{name}}",
+      "copyLinkA11y": "Kopieer skakel vir {{name}}",
       "activeDescription": "Gepauzeerde webhake antwoord met 404.",
       "runAsCreator": "Loop as ek",
       "runAsCreatorDescription": "Elke lopie gebruik jou rekening, so die geheime-opskrif is nodig.",
       "saveFailedTitle": "Kon nie die sneller stoor nie",
+      "nameTaken": "’n Sneller met die naam “{{name}}” bestaan reeds.",
+      "saveFailedRetry": "Kon nie die bediener bereik nie. Kyk jou verbinding na en probeer weer.",
+      "saveFailedCheck": "Kontroleer die waardes in die vorm en probeer weer.",
       "deleteTitle": "Vee hierdie sneller uit?",
       "deleteMessage": "Oproepe na {{name}} sal misluk. Dit kan nie ongedaan gemaak word nie.",
       "deleteMessageScheduled": "Geskeduleerde lopies van die sneller {{name}} stop. Dit kan nie ongedaan gemaak word nie.",

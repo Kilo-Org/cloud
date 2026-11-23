@@ -250,8 +250,6 @@ export function RowFrame({
   ) : null;
 
   const trailingNode = renderRowTrailing(trailing);
-  // A caller that hands a footer gets the column frame: the row's own line
-  // first, then that line under both columns at the row's full width.
   const frameClass =
     footer === undefined
       ? cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className)
@@ -283,12 +281,6 @@ export function RowFrame({
     </View>
   );
 
-  /**
-   * The row's own line, in the order the caller's shape asks for. A footer
-   * closes the column below it, so the line keeps the leading cell, the text
-   * column and the trailing cell side by side. A stack puts the leading cell and
-   * the trailing cell on a line above the text column.
-   */
   const renderBody = (): ReactNode => {
     if (footer !== undefined) {
       return (

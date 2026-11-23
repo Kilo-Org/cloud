@@ -26,12 +26,10 @@ import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { ICON_TARGET_BOX_CLASS, TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { i18n } from '@/i18n';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
-import { formatList } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -79,8 +77,9 @@ function TriggerRow({
   // The row hosts a switch, so the press covers the leading tile and the text
   // only: the switch owns its own touch and its own accessible node instead of
   // sitting inside a button. The content press needs a name of its own, and the
-  // switch joins its caption to the trigger id through the shared list
-  // formatter, so a reader hears which trigger either control acts on.
+  // switch and the copy control each name their trigger through a catalog
+  // string with the trigger id interpolated, so a reader hears which trigger
+  // either control acts on.
   return (
     <View>
       <ConfigureRow
@@ -92,10 +91,9 @@ function TriggerRow({
         onPress={onOpen}
         trailing={renderRowTrailing({
           kind: 'switch',
-          accessibilityLabel: formatList(
-            [t('cloudAgent.triggers.activeTitle'), trigger.triggerId],
-            i18n.language
-          ),
+          accessibilityLabel: t('cloudAgent.triggers.activeSwitchA11y', {
+            name: trigger.triggerId,
+          }),
           value: trigger.isActive,
           onValueChange: onToggle,
           disabled: busy || !canToggle,
@@ -115,7 +113,9 @@ function TriggerRow({
         // trigger row than to the next one.
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={formatList([t('common.copyLink'), trigger.inboundUrl], i18n.language)}
+          accessibilityLabel={t('cloudAgent.triggers.copyLinkA11y', {
+            name: trigger.triggerId,
+          })}
           onPress={() => {
             void copyWebhookUrl(trigger.inboundUrl);
           }}

@@ -3052,10 +3052,12 @@ describe('GitHub installation persistence', () => {
         ([message]) => message === '[uninstallExclusiveGitHubInstallation] completing local cleanup'
       );
       expect(completionLogs).toHaveLength(1);
-      // The injected trigger raises a plain exception, so no SQLSTATE is
-      // available; the field must still be present so the log shape stays
-      // uniform.
-      expect(completionLogs[0]?.[1]).toMatchObject({ integrationId: connected.integrationId });
+      // `RAISE EXCEPTION` carries SQLSTATE P0001, so the log payload names the
+      // injected condition and not an unknown error.
+      expect(completionLogs[0]?.[1]).toMatchObject({
+        integrationId: connected.integrationId,
+        sqlState: 'P0001',
+      });
 
       const [integrationRow] = await db
         .select({ id: platform_integrations.id })

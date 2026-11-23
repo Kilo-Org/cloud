@@ -158,9 +158,6 @@ describe('useCurrentUserId', () => {
   });
 
   it('answers the awaitable retry with the identity the read produced', async () => {
-    // React Query resolves `refetch` with a result rather than rejecting, so a
-    // caller cannot treat a finished attempt as an answer: this form hands back
-    // the user id, and a repeat failure yields undefined.
     query.refetch.mockResolvedValue({ data: { id: 'user-1', email: 'user@example.com' } });
     await expect(useCurrentUserId().refetchAsync()).resolves.toBe('user-1');
 

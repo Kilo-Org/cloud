@@ -22,9 +22,6 @@ describe('code reviewer analytics filters', () => {
     const selection = getCodeReviewerAnalyticsSelection('org-analytics-default');
 
     expect(selection).toEqual({ platform: 'github', period: 30 });
-    // One stable object per organization without an entry: `useSyncExternalStore`
-    // compares snapshots by identity, so a fresh default per read would re-render
-    // on every store check.
     expect(getCodeReviewerAnalyticsSelection('org-analytics-default')).toBe(selection);
   });
 
@@ -94,8 +91,6 @@ describe('code reviewer analytics filters', () => {
 
     expect(getCodeReviewerAnalyticsSelection(mounted)).toEqual({ platform: 'github', period: 30 });
     expect(getCodeReviewerAnalyticsSelection(other)).toEqual({ platform: 'github', period: 30 });
-    // The screen behind this organization is still mounted across the account
-    // boundary, so its controls re-render on the default.
     expect(listener).toHaveBeenCalledTimes(1);
 
     unsubscribe();

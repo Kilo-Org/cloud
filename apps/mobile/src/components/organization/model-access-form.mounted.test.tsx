@@ -1210,7 +1210,7 @@ describe('ModelAccessForm keyboard lift', () => {
     expect(liftPad(root)).toBe(20);
   });
 
-  it('gives the bar`s points back to the list on the Gateways tab, which draws no footer', () => {
+  it('gives the bar its points back to the list on the Gateways tab, which draws no footer', () => {
     // The bar unmounts on the Gateways tab, so it never reports a height of
     // zero and its last measurement must not keep shrinking the band the list
     // has: the band there is the whole 272 - 60 = 212 points between the header

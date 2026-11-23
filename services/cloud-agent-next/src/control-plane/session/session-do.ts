@@ -3200,6 +3200,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return listPreparationAttempts(this.eventQueries);
   }
 
+  /** The most recent preparation attempt, for the session's read model. */
+  async getLatestPreparationAttempt(): Promise<PreparationAttempt | null> {
+    await this.initialized;
+    if (this.registration === null) return null;
+    return listPreparationAttempts(this.eventQueries).at(-1) ?? null;
+  }
+
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };

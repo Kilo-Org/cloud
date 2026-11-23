@@ -160,12 +160,14 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     token: string;
     createdOnPlatform: string | undefined;
     egress: WorkspaceEgress | undefined;
+    environmentSetup: CloudAgentAuthority['environmentSetup'];
   }> {
     const live = await this.liveAuthority(authority);
     return {
       token: live.token,
       createdOnPlatform: live.record.createdOnPlatform,
       egress: live.record.egress,
+      environmentSetup: live.record.environmentSetup,
     };
   }
 

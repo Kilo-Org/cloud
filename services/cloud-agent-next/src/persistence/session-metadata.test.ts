@@ -629,6 +629,30 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
   });
 
+  it('round-trips the environment setup binding and rejects an unknown key', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_setup', userId: 'user_setup' },
+      auth: {},
+      environmentSetup: {
+        runId: '22222222-2222-4222-8222-222222222222',
+        environmentId: '33333333-3333-4333-8333-333333333333',
+        role: 'verification' as const,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    expect(() =>
+      CurrentSessionMetadataSchema.parse({
+        ...current,
+        environmentSetup: { ...current.environmentSetup, extra: true },
+      })
+    ).toThrow();
+  });
+
   describe('placed sandbox metadata', () => {
     const placedId = `sbx-${'a'.repeat(48)}`;
     const base = {

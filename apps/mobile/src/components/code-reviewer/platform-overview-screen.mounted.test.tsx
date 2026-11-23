@@ -59,7 +59,12 @@ const focusEffects = vi.hoisted(() => [] as (() => undefined | (() => void))[]);
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
 
-const councilUi = vi.hoisted(() => ({ allowed: false }));
+const councilEntry = vi.hoisted(() => ({ available: false }));
+
+/** Every row the screen handed the row primitive, in render order. */
+const configureRows = vi.hoisted(
+  () => [] as { title?: string; subtitle?: string; onPress?: () => void }[]
+);
 
 // The header's scope subtitle reads the membership list; this suite tests the
 // overview body, so the subtitle is a fixed name for each kind of scope.
@@ -123,9 +128,13 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
   BitbucketOverview: () => null,
 }));
-vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
-  buildOverviewRows: () => [],
-  resolveRowOnPress: () => undefined,
+vi.mock('@/components/ui/configure-row', () => ({
+  // The row primitive is a stub that records what it was handed: this suite
+  // asks which rows the screen wires and what a press does, not how a row looks.
+  ConfigureRow: (props: { title?: string; subtitle?: string; onPress?: () => void }) => {
+    configureRows.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/platform-error-screen', () => ({
@@ -148,12 +157,18 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/preference-row', () => ({
   PreferenceRow: () => null,
 }));
-vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  Brain: 'Brain',
+  FileSliders: 'FileSliders',
+  FolderGit2: 'FolderGit2',
+  Gauge: 'Gauge',
   GitBranch: 'GitBranch',
   GitMerge: 'GitMerge',
+  MessageSquareText: 'MessageSquareText',
   ScrollText: 'ScrollText',
+  ShieldCheck: 'ShieldCheck',
+  Users: 'Users',
 }));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
@@ -174,17 +189,19 @@ vi.mock('@/components/tab-screen', () => ({
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: {
-    github: { label: 'GitHub', reviewMd: true },
-    gitlab: { label: 'GitLab', reviewMd: true },
-    bitbucket: { label: 'Bitbucket', reviewMd: false },
+    github: { label: 'GitHub', reviewMd: true, council: true },
+    gitlab: { label: 'GitLab', reviewMd: true, council: true },
+    bitbucket: { label: 'Bitbucket', reviewMd: false, council: false },
   },
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
-  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
-  useCouncilUiEnabled: () => councilUi.allowed,
+  // The real hook answers the build gate and the org-only rule together; its
+  // own suite covers that pair, so this one asks what the screen does with the
+  // answer, keeping the personal refusal the hook really applies.
+  useCouncilEntryAvailable: (scope: string) => councilEntry.available && scope !== 'personal',
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,
@@ -357,6 +374,8 @@ beforeEach(() => {
   focusEffects.length = 0;
   openExternal.mockClear();
   openPicker.mockClear();
+  councilEntry.available = false;
+  configureRows.length = 0;
 });
 
 describe('PlatformOverviewScreen disconnected setup', () => {
@@ -867,5 +886,56 @@ describe('PlatformOverviewScreen rows entrance', () => {
     const renderer = await render();
 
     expect(rowsContainer(renderer)?.props.entering).toBeDefined();
+  });
+});
+
+describe('PlatformOverviewScreen council entry', () => {
+  /** The council row the screen wired, if it wired one at all. */
+  function councilRow() {
+    return configureRows.find(row => row.title === i18n.t('codeReviewer.council.title'));
+  }
+
+  it('offers the council row on an organization that the build can serve', async () => {
+    councilEntry.available = true;
+    config.data = makeConfig();
+
+    const renderer = await render('org-1', 'github');
+    const row = councilRow();
+
+    expect(row).toBeDefined();
+    // No council is stored on this config, so the row reuses the overview's own
+    // not-set subtitle rather than inventing council-specific copy.
+    expect(row?.subtitle).toBe(i18n.t('codeReviewer.overview.notSet'));
+
+    act(() => {
+      row?.onPress?.();
+    });
+
+    expect(routerPush).toHaveBeenCalledWith('/(app)/code-reviewer/org-1/github/council');
+    renderer.unmount();
+  });
+
+  it('omits the council row when the build cannot offer it', async () => {
+    // A build that predates the rollout flag: the row would open a route whose
+    // only surface is an app-update refusal, so the entry stays away.
+    councilEntry.available = false;
+    config.data = makeConfig();
+
+    const renderer = await render('org-1', 'github');
+
+    expect(councilRow()).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('omits the council row on the personal scope', async () => {
+    // Council is an organization entitlement, so the hook refuses a personal
+    // scope even where the flag is on; the row must not reach it.
+    councilEntry.available = true;
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'github');
+
+    expect(councilRow()).toBeUndefined();
+    renderer.unmount();
   });
 });

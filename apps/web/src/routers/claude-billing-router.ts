@@ -8,6 +8,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import {
   ClaudeBillingShareError,
+  claudeBillingEffectiveConnection,
   claudeBillingOwnerKey,
   describeClaudeBillingSharing,
   getGrantedClaudeBillingConnection,
@@ -133,7 +134,8 @@ async function buildScopeStatus(
   owner: ClaudeBillingOwner,
   canManage: boolean
 ): Promise<ClaudeBillingStatus> {
-  const current = await getGrantedClaudeBillingConnection(owner);
+  const granted = await getGrantedClaudeBillingConnection(owner);
+  const current = granted ? claudeBillingEffectiveConnection(granted) : null;
   const [sharing, state] = await Promise.all([
     describeClaudeBillingSharing(userId, owner, canManage, current),
     claudeBillingConnectionState(owner, current),

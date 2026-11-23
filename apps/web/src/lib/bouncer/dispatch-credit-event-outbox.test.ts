@@ -132,6 +132,39 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('delivers an organization row whose attributed account became soft-deleted', async () => {
+    const user = await insertTestUser({ blocked_reason: createSoftDeletedBlockedReason() });
+    const row = await insertPending({
+      user_id: user.id,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-org-deleted-owner',
+        userId: user.id,
+        orgId: '2f1c0a3e-0000-4000-8000-000000000001',
+        flow: 'auto_topup',
+        amountCents: 5_000,
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledTimes(1);
+    expect(mockDeliver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'charge.attempted',
+        orgId: '2f1c0a3e-0000-4000-8000-000000000001',
+      })
+    );
+    const [after] = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.id, row.id));
+    expect(after?.status).toBe('delivered');
+  });
+
   it('fails a row with an unvalidatable payload without calling the transport', async () => {
     const row = await insertPending({ payload: { not: 'a credit event' } });
 

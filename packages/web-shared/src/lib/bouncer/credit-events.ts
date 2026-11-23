@@ -66,26 +66,34 @@ export async function organizationBouncerAccountId(
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,
  * else a SHA-256 digest — so the dedupe key equals the id bouncer receives and two distinct source
- * events never merge. The payload is the same wire body. A gone/deleting account is skipped with a
- * visible log. An organization event is reported against the root of the organization family, with
- * the family's totals, so a sub-organization lands on the payer its family is known by.
+ * events never merge. The payload is the same wire body. A personal event whose account is
+ * gone/deleting is skipped with a visible log. An organization event is reported against the root of
+ * the organization family, with the family's totals, so a sub-organization lands on the payer its
+ * family is known by; its `userId` is attribution, so the attributed account's state does not decide
+ * the report.
  */
 export async function enqueueCreditEvent(
   database: BouncerCreditEventOutboxTransaction,
   event: CreditEvent
 ): Promise<EnqueueBouncerCreditEventResult> {
-  const [owner] = await database
-    .select({ blockedReason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, event.userId))
-    .limit(1)
-    .for('update');
-  if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
-    logWarning('Skipped bouncer credit event for a soft-deleted user', {
-      eventType: event.type,
-      eventId: event.eventId,
-    });
-    return { enqueued: false };
+  // The gone/deleting skip is for the event's subject. A personal event's subject is the account
+  // in `userId`, so the `FOR UPDATE` lock serializes the insert against a concurrent soft delete.
+  // An organization event's subject is the organization, which `withOrganizationPayer` resolves
+  // to the family payer; its `userId` is attribution only.
+  if (!event.orgId) {
+    const [owner] = await database
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, event.userId))
+      .limit(1)
+      .for('update');
+    if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
+      logWarning('Skipped bouncer credit event for a soft-deleted user', {
+        eventType: event.type,
+        eventId: event.eventId,
+      });
+      return { enqueued: false };
+    }
   }
   const payerEvent = await withOrganizationPayer(database, event);
   return enqueueBouncerCreditEvent(database, {

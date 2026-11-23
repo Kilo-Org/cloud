@@ -218,6 +218,47 @@ describe('bouncer credit-event outbox (integration)', () => {
     await db.delete(organizations).where(eq(organizations.id, parent.id));
   });
 
+  it('enqueues an organization event when its attributed account is soft-deleted', async () => {
+    const userId = 'oauth/deleted-org-actor';
+    await insertTestUser({
+      id: userId,
+      blocked_reason: createSoftDeletedBlockedReason(),
+    });
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization with a deleted billing actor',
+        microdollars_used: 1_000,
+        total_microdollars_acquired: 50_000,
+      })
+      .returning();
+
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-deleted-actor',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 50_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+      })
+    );
+
+    expect(result.enqueued).toBe(true);
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-deleted-actor'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(userId);
+    expect(rows[0]?.payload.orgId).toBe(org.id);
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  });
+
   it('treats the same event_id with a different type as a distinct row', async () => {
     await enqueueBouncerCreditEvent(db, {
       eventId: 'shared-id',

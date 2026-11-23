@@ -45,6 +45,15 @@ const CLAIM_BATCH_SIZE = 10;
 /** Wall-clock budget for one pass; each delivery has its own 5s timeout. */
 const DEFAULT_BUDGET_MS = 45_000;
 
+/**
+ * True when the persisted payload carries an organization id: the organization is then the
+ * event's subject, so its attribution `userId` does not decide delivery.
+ */
+function isOrganizationCreditEvent(row: BouncerCreditEventOutboxRow): boolean {
+  const orgId = row.payload?.orgId;
+  return typeof orgId === 'string' && orgId.length > 0;
+}
+
 export type BouncerCreditEventOutboxDispatchSummary = {
   reclaimed: number;
   claimed: number;
@@ -149,16 +158,19 @@ async function dispatchCreditEvent(
   // A soft delete after enqueue must not send the deleted account's PII: recheck the owner here and
   // drop the claim instead. This only prevents a send that has not happened; a delivery already
   // made before the deletion cannot be undone. The delete is fenced on this claim, so it never
-  // removes a row a newer claim owns.
-  const [owner] = await db
-    .select({ blockedReason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, row.user_id))
-    .limit(1);
-  if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
-    logWarning('Dropping bouncer credit event for a soft-deleted user', outboxLogFields(row));
-    await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
-    return 'failed';
+  // removes a row a newer claim owns. An organization row is delivered: its subject is the payer
+  // organization, not the attributed account.
+  if (!isOrganizationCreditEvent(row)) {
+    const [owner] = await db
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, row.user_id))
+      .limit(1);
+    if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
+      logWarning('Dropping bouncer credit event for a soft-deleted user', outboxLogFields(row));
+      await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
+      return 'failed';
+    }
   }
 
   // Persisted JSON is untrusted at this boundary; fail a malformed row visibly, never silently.

@@ -345,7 +345,8 @@ async function performAutoTopUpForEntity(
     }
 
     const amountCents = config.amount_cents;
-    // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
+    // Bouncer's payer for an org charge is the organization, resolved to its family root; the user
+    // id is the org's billing actor, reported as attribution only.
     const bouncerUserId =
       entity.type === 'user'
         ? entity.user.id

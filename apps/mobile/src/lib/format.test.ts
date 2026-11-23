@@ -213,9 +213,12 @@ describe('localized format helpers', () => {
 
   it('reads a twelve-hour clock on a device set to one', () => {
     stubDeviceCalendars(false);
+    const quarterToTwo = new Date(2026, 0, 1, 13, 45);
     // `de` writes 13:45 on its own clock, so only the forced twelve-hour cycle
-    // can print the language's own day period for this instant.
-    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'de')).toBe('1:45 PM');
+    // can print the day period there. `en` already writes twelve-hour time, and
+    // pins the shape the device setting must leave alone.
+    expect(formatClockTime(quarterToTwo, 'de')).toBe('1:45 PM');
+    expect(formatClockTime(quarterToTwo, 'en')).toBe('1:45 PM');
   });
 
   it('leaves the language clock in place on a device that reports no setting', () => {

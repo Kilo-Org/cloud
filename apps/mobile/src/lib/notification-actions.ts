@@ -539,6 +539,25 @@ function resultTitleFor(args: {
 }
 
 /**
+ * The typed answer a failed reply still owes the person, or undefined for every
+ * other result. A retryable reply that had visible text keeps it, capped at the
+ * length the push schema admits.
+ */
+function undeliveredReplyDraft(args: {
+  outcome: NeedsInputActionOutcome;
+  action: NeedsInputAction;
+  text: string | undefined;
+}): string | undefined {
+  const { outcome, action, text } = args;
+  return outcome === 'retryable' &&
+    action === 'reply' &&
+    text !== undefined &&
+    hasVisibleComposerText(text)
+    ? text.slice(0, ANSWER_DRAFT_MAX_LENGTH)
+    : undefined;
+}
+
+/**
  * The payload the posted result carries.
  *
  * A reply that failed retryably keeps the text the person typed in the result's
@@ -552,18 +571,11 @@ function resumeAnswerDraft(
   data: NeedsInputRaiseData,
   args: { outcome: NeedsInputActionOutcome; action: NeedsInputAction; text: string | undefined }
 ): NeedsInputRaiseData {
-  const { outcome, action, text } = args;
   // The acted-on payload may already carry an earlier attempt's draft, because
   // a retryable result is the notification the next tap reads. Only the failure
   // of a reply that had text may carry one, so every other result drops the
   // field instead of inheriting a stale answer.
-  const carried =
-    outcome === 'retryable' &&
-    action === 'reply' &&
-    text !== undefined &&
-    hasVisibleComposerText(text)
-      ? text.slice(0, ANSWER_DRAFT_MAX_LENGTH)
-      : undefined;
+  const carried = undeliveredReplyDraft(args);
   if (carried === undefined) {
     const { answerDraft: _previousDraft, ...rest } = data;
     return rest;
@@ -619,20 +631,14 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
-  if (
-    !posted &&
-    outcome === 'retryable' &&
-    action === 'reply' &&
-    response.userText !== undefined &&
-    hasVisibleComposerText(response.userText)
-  ) {
-    // The result that would carry the text never landed, and the notification
-    // that stays still holds its earlier payload, so the slot is the only
-    // carrier left. Same check and cap as `resumeAnswerDraft`.
-    rememberNeedsInputReplyDraft(
-      data.cliSessionId,
-      response.userText.slice(0, ANSWER_DRAFT_MAX_LENGTH)
-    );
+  if (!posted) {
+    const undelivered = undeliveredReplyDraft({ outcome, action, text: response.userText });
+    if (undelivered !== undefined) {
+      // The result that would carry the text never landed, and the notification
+      // that stays still holds its earlier payload, so the slot is the only
+      // carrier left.
+      rememberNeedsInputReplyDraft(data.cliSessionId, undelivered);
+    }
   }
 
   if (

@@ -3880,7 +3880,22 @@
       "paymentPending": "در انتظار پرداخت",
       "processingBlocked": "پردازش متوقف شده است",
       "processingNeedsReview": "پردازش نیاز به بررسی دارد",
-      "retryHint": "دوباره برای بارگذاری وضعیت Kilo Pass تلاش می‌کند."
+      "retryHint": "دوباره برای بارگذاری وضعیت Kilo Pass تلاش می‌کند.",
+      "usage": {
+        "bonusExpired": "پاداش دیگر قابل دریافت نیست",
+        "bonusLocked": "{{spent}} از {{target}} مصرف شده",
+        "bonusMissed": "در حال بررسی پاداش شما",
+        "bonusUnlocked": "پاداش فعال شد",
+        "bonusUpfront": "پاداش از قبل اضافه شده است",
+        "empty": "هنوز اعتبار ماهانه‌ای صادر نشده است. پس از پردازش دورهٔ جاری، اینجا نمایش داده می‌شود.",
+        "noPasses": "برای این دوره پاسی تخصیص نیافته است",
+        "passLine": "{{passes}} پاس · {{credits}} اعتبار ماهانه",
+        "passLine_one": "{{passes}} پاس · {{credits}} اعتبار ماهانه",
+        "passLine_other": "{{passes}} پاس · {{credits}} اعتبار ماهانه",
+        "proratedNote": "شامل اعتبار محاسبه‌شدهٔ نسبی برای پاس‌های افزوده‌شده در میانهٔ دوره است. یک ماه کامل {{credits}} برای هر پاس است.",
+        "title": "مصرف Kilo Pass",
+        "unavailable": "مصرف Kilo Pass برای این سازمان در دسترس نیست."
+      }
     }
   },
   "authErrors": {

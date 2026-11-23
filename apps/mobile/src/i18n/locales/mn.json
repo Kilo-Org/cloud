@@ -3880,7 +3880,22 @@
       "paymentPending": "Төлбөр хүлээгдэж байна",
       "processingBlocked": "Боловсруулах ажиллагаа зогссон",
       "processingNeedsReview": "Боловсруулах ажиллагааг шалгах шаардлагатай",
-      "retryHint": "Kilo Pass-ийн төлөвийг дахин ачаална."
+      "retryHint": "Kilo Pass-ийн төлөвийг дахин ачаална.",
+      "usage": {
+        "bonusExpired": "Үнэгүй бонусыг цаашид авах боломжгүй",
+        "bonusLocked": "{{target}}-аас {{spent}} зарцуулсан",
+        "bonusMissed": "Таны үнэгүй бонусыг шалгаж байна",
+        "bonusUnlocked": "Үнэгүй бонус нээгдлээ",
+        "bonusUpfront": "Үнэгүй бонус аль хэдийн нэмэгдсэн",
+        "empty": "Сарын кредит хараахан олгогдоогүй байна. Одоогийн хугацаа боловсруулагдсаны дараа энд харагдана.",
+        "noPasses": "Энэ хугацаанд Kilo Pass олгогдоогүй",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} сарын кредит",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} сарын кредит",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} сарын кредит",
+        "proratedNote": "Хугацааны дунд нэмэгдсэн Kilo Pass-ийн хувь тэнцүүлсэн кредитийг багтаана. Бүтэн сард Kilo Pass тутамд {{credits}} ноогдоно.",
+        "title": "Kilo Pass-ийн хэрэглээ",
+        "unavailable": "Энэ байгууллагад Kilo Pass-ийн хэрэглээ боломжгүй."
+      }
     }
   },
   "authErrors": {

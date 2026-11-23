@@ -4012,7 +4012,24 @@
       "processingNeedsReview": "Обробка потребує перевірки",
       "retryHint": "Повторює завантаження стану Kilo Pass.",
       "paidSeat_few": "{{displayCount}} оплачені місця",
-      "paidSeat_many": "{{displayCount}} оплачених місць"
+      "paidSeat_many": "{{displayCount}} оплачених місць",
+      "usage": {
+        "bonusExpired": "Бонус уже не можна отримати",
+        "bonusLocked": "Витрачено {{spent}} з {{target}}",
+        "bonusMissed": "Перевірка бонусу",
+        "bonusUnlocked": "Бонус розблоковано",
+        "bonusUpfront": "Бонус уже додано",
+        "empty": "Щомісячні кредити ще не нараховано. Вони з'являться тут після обробки поточного періоду.",
+        "noPasses": "На цей період не призначено підписок Kilo Pass",
+        "passLine": "{{passes}} підписок Kilo Pass · {{credits}} щомісячних кредитів",
+        "passLine_few": "{{passes}} підписки Kilo Pass · {{credits}} щомісячних кредитів",
+        "passLine_many": "{{passes}} підписок Kilo Pass · {{credits}} щомісячних кредитів",
+        "passLine_one": "{{passes}} підписка Kilo Pass · {{credits}} щомісячних кредитів",
+        "passLine_other": "{{passes}} підписок Kilo Pass · {{credits}} щомісячних кредитів",
+        "proratedNote": "Включає пропорційні кредити для підписок Kilo Pass, доданих у середині періоду. Повний місяць — це {{credits}} за підписку.",
+        "title": "Використання Kilo Pass",
+        "unavailable": "Використання Kilo Pass недоступне для цієї організації."
+      }
     }
   },
   "feedback": {

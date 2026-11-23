@@ -4020,7 +4020,24 @@
       "processingNeedsReview": "Spracovanie si vyžaduje kontrolu",
       "retryHint": "Znova skúša načítať stav Kilo Pass.",
       "paidSeat_few": "{{displayCount}} platené miesta",
-      "paidSeat_many": "{{displayCount}} plateného miesta"
+      "paidSeat_many": "{{displayCount}} plateného miesta",
+      "usage": {
+        "bonusExpired": "Bonus už nie je možné získať",
+        "bonusLocked": "Minutých {{spent}} z {{target}}",
+        "bonusMissed": "Kontroluje sa váš bonus",
+        "bonusUnlocked": "Bonus odomknutý",
+        "bonusUpfront": "Bonus už bol pridaný",
+        "empty": "Zatiaľ neboli vydané žiadne mesačné Kredity. Zobrazia sa tu po spracovaní aktuálneho obdobia.",
+        "noPasses": "Pre toto obdobie nie je pridelené žiadne predplatné Kilo Pass",
+        "passLine": "{{passes}} predplatných Kilo Pass · {{credits}} mesačných Kreditov",
+        "passLine_few": "{{passes}} predplatné Kilo Pass · {{credits}} mesačných Kreditov",
+        "passLine_many": "{{passes}} predplatného Kilo Pass · {{credits}} mesačných Kreditov",
+        "passLine_one": "{{passes}} predplatné Kilo Pass · {{credits}} mesačných Kreditov",
+        "passLine_other": "{{passes}} predplatných Kilo Pass · {{credits}} mesačných Kreditov",
+        "proratedNote": "Zahŕňa pomerné Kredity za predplatné pridané v priebehu obdobia. Celý mesiac predstavuje {{credits}} za jedno predplatné.",
+        "title": "Využitie Kilo Pass",
+        "unavailable": "Využitie Kilo Pass nie je pre túto organizáciu dostupné."
+      }
     }
   },
   "authErrors": {

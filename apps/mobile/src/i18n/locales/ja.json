@@ -3809,7 +3809,21 @@
       "paymentPending": "お支払い保留中",
       "processingBlocked": "処理がブロックされています",
       "processingNeedsReview": "処理内容の確認が必要",
-      "retryHint": "Kilo Passのステータスの読み込みを再試行します。"
+      "retryHint": "Kilo Passのステータスの読み込みを再試行します。",
+      "usage": {
+        "bonusExpired": "ボーナスは獲得できなくなりました",
+        "bonusLocked": "{{spent}} / {{target}} 使用済み",
+        "bonusMissed": "ボーナスを確認中",
+        "bonusUnlocked": "ボーナスが利用可能になりました",
+        "bonusUpfront": "ボーナスは追加済みです",
+        "empty": "月次クレジットはまだ発行されていません。現在の期間が処理されると、ここに表示されます。",
+        "noPasses": "この期間に割り当てられたパスはありません",
+        "passLine": "{{passes}}パス · 月次クレジット {{credits}}",
+        "passLine_other": "{{passes}}パス · 月次クレジット {{credits}}",
+        "proratedNote": "期間途中で追加されたパスの日割りクレジットを含みます。1パスあたりの1か月分は {{credits}} です。",
+        "title": "Kilo Pass の利用状況",
+        "unavailable": "この組織では Kilo Pass の利用状況を表示できません。"
+      }
     }
   },
   "feedback": {

@@ -3880,7 +3880,22 @@
       "paymentPending": "Kei te tatari kia utua",
       "processingBlocked": "Kua āraitia te tukatuka",
       "processingNeedsReview": "Me arotake te tukatuka",
-      "retryHint": "Ka whakamātau anō ki te uta i te tūnga Kilo Pass."
+      "retryHint": "Ka whakamātau anō ki te uta i te tūnga Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Kua kore e taea te whiwhi pāinga",
+        "bonusLocked": "Kua whakapaua {{spent}} o {{target}}",
+        "bonusMissed": "Kei te tirohia tō pāinga",
+        "bonusUnlocked": "Kua huakina te pāinga",
+        "bonusUpfront": "Kua tāpiri kētia te pāinga",
+        "empty": "Kāore anō kia tukuna he moni tōmua ā-marama. Ka puta mai ki konei ina tukatukahia te wā o nāianei.",
+        "noPasses": "Kāore he Kilo Pass i whakaritea mō tēnei wā",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} moni tōmua ā-marama",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} moni tōmua ā-marama",
+        "passLine_other": "{{passes}} ngā Kilo Pass · {{credits}} moni tōmua ā-marama",
+        "proratedNote": "Kei roto ko ngā moni tōmua ōwehenga mō ngā Kilo Pass i tāpirihia i waenga i te wā. He {{credits}} te marama kī tonu mō ia Kilo Pass.",
+        "title": "Whakamahinga Kilo Pass",
+        "unavailable": "Kāore te whakamahinga Kilo Pass i te wātea mō tēnei whakahaere."
+      }
     }
   },
   "authErrors": {

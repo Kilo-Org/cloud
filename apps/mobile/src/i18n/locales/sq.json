@@ -3880,7 +3880,22 @@
       "paymentPending": "Pagesa në pritje",
       "processingBlocked": "Përpunimi i bllokuar",
       "processingNeedsReview": "Përpunimi kërkon shqyrtim",
-      "retryHint": "Riprovon ngarkimin e statusit të Kilo Pass."
+      "retryHint": "Riprovon ngarkimin e statusit të Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonusi falas nuk mund të fitohet më",
+        "bonusLocked": "{{spent}} nga {{target}} të shpenzuara",
+        "bonusMissed": "Po kontrollohet bonusi juaj falas",
+        "bonusUnlocked": "Bonusi falas u zhbllokua",
+        "bonusUpfront": "Bonusi falas u shtua tashmë",
+        "empty": "Nuk janë lëshuar ende Kredite mujore. Ato shfaqen këtu pasi të përpunohet periudha aktuale.",
+        "noPasses": "Nuk është caktuar asnjë abonim Kilo Pass për këtë periudhë",
+        "passLine": "{{passes}} abonime Kilo Pass · {{credits}} Kredite mujore",
+        "passLine_one": "{{passes}} abonim Kilo Pass · {{credits}} Kredite mujore",
+        "passLine_other": "{{passes}} abonime Kilo Pass · {{credits}} Kredite mujore",
+        "proratedNote": "Përfshin Kredite të proporcionalizuara për abonime Kilo Pass që shtohen në mes të periudhës. Një muaj i plotë është {{credits}} për abonim.",
+        "title": "Përdorimi i Kilo Pass",
+        "unavailable": "Përdorimi i Kilo Pass nuk është i disponueshëm për këtë organizatë."
+      }
     }
   },
   "authErrors": {

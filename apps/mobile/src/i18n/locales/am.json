@@ -3880,7 +3880,22 @@
       "paymentPending": "ክፍያው በመጠባበቅ ላይ ነው",
       "processingBlocked": "ሂደቱ ታግዷል",
       "processingNeedsReview": "ሂደቱ ግምገማ ይፈልጋል",
-      "retryHint": "የKilo Pass ሁኔታን ለመጫን እንደገና ይሞክራል።"
+      "retryHint": "የKilo Pass ሁኔታን ለመጫን እንደገና ይሞክራል።",
+      "usage": {
+        "bonusExpired": "ጉርሻን ከእንግዲህ ማግኘት አይቻልም",
+        "bonusLocked": "{{spent}} ከ{{target}} ተጠቅሷል",
+        "bonusMissed": "ጉርሻዎን በመፈተሽ ላይ",
+        "bonusUnlocked": "ጉርሻው ተከፍቷል",
+        "bonusUpfront": "ጉርሻ ቀድሞ ተጨምሯል",
+        "empty": "እስካሁን ምንም ወርሃዊ ክሬዲቶች አልተሰጡም። የአሁኑ ጊዜ ሲስተናገድ እዚህ ይታያሉ።",
+        "noPasses": "ለዚህ ጊዜ ምንም ፓስ አልተመደበም",
+        "passLine": "{{passes}} ፓስዎች · {{credits}} ወርሃዊ ክሬዲቶች",
+        "passLine_one": "{{passes}} ፓስ · {{credits}} ወርሃዊ ክሬዲቶች",
+        "passLine_other": "{{passes}} ፓስዎች · {{credits}} ወርሃዊ ክሬዲቶች",
+        "proratedNote": "በጊዜው መካከል ለተጨመሩ ፓስዎች የተመጣጠነ ክሬዲት ያካትታል። ሙሉ ወር በአንድ ፓስ {{credits}} ነው።",
+        "title": "የKilo Pass አጠቃቀም",
+        "unavailable": "የKilo Pass አጠቃቀም ለዚህ ድርጅት አይገኝም"
+      }
     }
   },
   "authErrors": {

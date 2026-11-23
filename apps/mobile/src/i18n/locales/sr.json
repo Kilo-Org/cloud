@@ -3950,7 +3950,23 @@
       "processingBlocked": "Obrada blokirana",
       "processingNeedsReview": "Potrebna je provera obrade",
       "retryHint": "Pokušava ponovo da učita status pretplate Kilo Pass.",
-      "paidSeat_few": "{{displayCount}} plaćena mesta"
+      "paidSeat_few": "{{displayCount}} plaćena mesta",
+      "usage": {
+        "bonusExpired": "Bonus se više ne može zaraditi",
+        "bonusLocked": "Potrošeno {{spent}} od {{target}}",
+        "bonusMissed": "Provera bonusa",
+        "bonusUnlocked": "Bonus otključan",
+        "bonusUpfront": "Bonus je već dodat",
+        "empty": "Još nisu izdati mesečni Krediti. Prikazaće se ovde kada se obradi tekući period.",
+        "noPasses": "Nema dodeljenih pretplata Kilo Pass za ovaj period",
+        "passLine": "{{passes}} pretplata · {{credits}} mesečnih Kredita",
+        "passLine_few": "{{passes}} pretplate · {{credits}} mesečnih Kredita",
+        "passLine_one": "{{passes}} pretplata · {{credits}} mesečnih Kredita",
+        "passLine_other": "{{passes}} pretplata · {{credits}} mesečnih Kredita",
+        "proratedNote": "Uključuje srazmerne Kredite za pretplate dodate tokom perioda. Pun mesec iznosi {{credits}} po pretplati.",
+        "title": "Korišćenje Kilo Pass",
+        "unavailable": "Korišćenje Kilo Pass nije dostupno za ovu organizaciju."
+      }
     }
   },
   "authErrors": {

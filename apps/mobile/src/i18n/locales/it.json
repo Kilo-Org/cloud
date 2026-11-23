@@ -3942,6 +3942,22 @@
       "processingBlocked": "Elaborazione bloccata",
       "processingNeedsReview": "Elaborazione da verificare",
       "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonus non più ottenibile",
+        "bonusLocked": "Spesi {{spent}} su {{target}}",
+        "bonusMissed": "Verifica del tuo bonus in corso",
+        "bonusUnlocked": "Bonus sbloccato",
+        "bonusUpfront": "Bonus già aggiunto",
+        "empty": "I crediti mensili non sono ancora stati emessi. Compariranno qui una volta elaborato il periodo corrente.",
+        "noPasses": "Nessun pass assegnato per questo periodo",
+        "passLine": "{{passes}} pass · {{credits}} di crediti mensili",
+        "passLine_many": "{{passes}} pass · {{credits}} di crediti mensili",
+        "passLine_one": "{{passes}} pass · {{credits}} di crediti mensili",
+        "passLine_other": "{{passes}} pass · {{credits}} di crediti mensili",
+        "proratedNote": "Include crediti proporzionali per i pass aggiunti a metà periodo. Un mese completo vale {{credits}} per pass.",
+        "title": "Utilizzo di Kilo Pass",
+        "unavailable": "L'utilizzo di Kilo Pass non è disponibile per questa organizzazione."
+      },
       "paidSeat_many": "{{displayCount}} posti acquistati"
     }
   },

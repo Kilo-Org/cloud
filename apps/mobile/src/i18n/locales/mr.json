@@ -3880,7 +3880,22 @@
       "paymentPending": "पेमेंट प्रलंबित",
       "processingBlocked": "प्रक्रिया अडवली आहे",
       "processingNeedsReview": "प्रक्रिया तपासणे आवश्यक आहे",
-      "retryHint": "Kilo Pass ची स्थिती लोड करण्याचा पुन्हा प्रयत्न करते."
+      "retryHint": "Kilo Pass ची स्थिती लोड करण्याचा पुन्हा प्रयत्न करते.",
+      "usage": {
+        "bonusExpired": "मोफत बोनस आता मिळवता येणार नाही",
+        "bonusLocked": "{{target}} पैकी {{spent}} खर्च झाले",
+        "bonusMissed": "तुमचा मोफत बोनस तपासला जात आहे",
+        "bonusUnlocked": "मोफत बोनस अनलॉक झाला",
+        "bonusUpfront": "मोफत बोनस आधीच जोडला आहे",
+        "empty": "अद्याप मासिक क्रेडिट जारी केलेले नाहीत. चालू कालावधीवर प्रक्रिया झाल्यावर ते येथे दिसतील.",
+        "noPasses": "या कालावधीसाठी कोणतेही पास नियुक्त केलेले नाहीत",
+        "passLine": "{{passes}} पास · {{credits}} मासिक क्रेडिट",
+        "passLine_one": "{{passes}} पास · {{credits}} मासिक क्रेडिट",
+        "passLine_other": "{{passes}} पास · {{credits}} मासिक क्रेडिट",
+        "proratedNote": "कालावधीच्या मध्यात जोडलेल्या पाससाठीचे आनुपातिक क्रेडिट यात समाविष्ट आहेत. संपूर्ण महिन्याचे प्रति पास {{credits}} आहे.",
+        "title": "Kilo Pass वापर",
+        "unavailable": "या संस्थेसाठी Kilo Pass वापर उपलब्ध नाही."
+      }
     }
   },
   "authErrors": {

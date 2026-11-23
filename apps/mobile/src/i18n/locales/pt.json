@@ -4020,7 +4020,23 @@
       "processingBlocked": "Processamento bloqueado",
       "processingNeedsReview": "O processamento requer revisão",
       "retryHint": "Volta a tentar carregar o estado do Kilo Pass.",
-      "paidSeat_many": "{{displayCount}} lugares pagos"
+      "paidSeat_many": "{{displayCount}} lugares pagos",
+      "usage": {
+        "bonusExpired": "Já não é possível ganhar o bónus",
+        "bonusLocked": "{{spent}} de {{target}} gastos",
+        "bonusMissed": "A verificar o teu bónus",
+        "bonusUnlocked": "Bónus desbloqueado",
+        "bonusUpfront": "Bónus já adicionado",
+        "empty": "Ainda não foram emitidos Créditos mensais. Aparecem aqui assim que o período atual for processado.",
+        "noPasses": "Nenhum Pass atribuído para este período",
+        "passLine": "{{passes}} Passes · {{credits}} Créditos mensais",
+        "passLine_many": "{{passes}} Passes · {{credits}} Créditos mensais",
+        "passLine_one": "{{passes}} Pass · {{credits}} Créditos mensais",
+        "passLine_other": "{{passes}} Passes · {{credits}} Créditos mensais",
+        "proratedNote": "Inclui Créditos proporcionais para Passes adicionados a meio do período. Um mês completo é {{credits}} por Pass.",
+        "title": "Utilização do Kilo Pass",
+        "unavailable": "A utilização do Kilo Pass não está disponível para esta organização."
+      }
     }
   },
   "authErrors": {

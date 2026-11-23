@@ -3880,7 +3880,22 @@
       "paymentPending": "Վճարումը սպասման մեջ է",
       "processingBlocked": "Մշակումն արգելափակված է",
       "processingNeedsReview": "Մշակումը ստուգման կարիք ունի",
-      "retryHint": "Կրկին փորձում է բեռնել Kilo Pass-ի կարգավիճակը։"
+      "retryHint": "Կրկին փորձում է բեռնել Kilo Pass-ի կարգավիճակը։",
+      "usage": {
+        "bonusExpired": "Բոնուսն այլևս հնարավոր չէ ստանալ",
+        "bonusLocked": "{{spent}}-ը {{target}}-ից ծախսված",
+        "bonusMissed": "Բոնուսը ստուգվում է",
+        "bonusUnlocked": "Բոնուսը հասանելի է",
+        "bonusUpfront": "Բոնուսն արդեն ավելացված է",
+        "empty": "Ամսական կրեդիտներ դեռ չեն թողարկվել։ Դրանք այստեղ կերևան, երբ ընթացիկ ժամանակաշրջանը մշակվի։",
+        "noPasses": "Այս ժամանակաշրջանի համար Kilo Pass նշանակված չէ",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} ամսական կրեդիտ",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} ամսական կրեդիտ",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} ամսական կրեդիտ",
+        "proratedNote": "Ներառում է ժամանակաշրջանի կեսին ավելացված Kilo Pass-ների համամասնական կրեդիտները։ Ամբողջ ամիսը {{credits}} է մեկ Kilo Pass-ի համար։",
+        "title": "Kilo Pass-ի օգտագործում",
+        "unavailable": "Kilo Pass-ի օգտագործումը հասանելի չէ այս կազմակերպությանը։"
+      }
     }
   },
   "authErrors": {

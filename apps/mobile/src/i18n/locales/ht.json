@@ -3880,7 +3880,22 @@
       "paymentPending": "Peman annatant",
       "processingBlocked": "Tretman bloke",
       "processingNeedsReview": "Tretman an bezwen verifikasyon",
-      "retryHint": "Eseye chaje estati Kilo Pass la ankò."
+      "retryHint": "Eseye chaje estati Kilo Pass la ankò.",
+      "usage": {
+        "bonusExpired": "Yo pa ka genyen bonis la ankò",
+        "bonusLocked": "{{spent}} depanse sou {{target}}",
+        "bonusMissed": "N ap tcheke bonis ou",
+        "bonusUnlocked": "Bonis debloke",
+        "bonusUpfront": "Bonis deja ajoute",
+        "empty": "Poko gen kredi chak mwa ki te emèt. Y ap parèt isit la lè peryòd aktyèl la fin trete.",
+        "noPasses": "Pa gen Pass ki asiyen pou peryòd sa a",
+        "passLine": "{{passes}} Pass · {{credits}} kredi chak mwa",
+        "passLine_one": "{{passes}} Pass · {{credits}} kredi chak mwa",
+        "passLine_other": "{{passes}} Pass · {{credits}} kredi chak mwa",
+        "proratedNote": "Gen ladan kredi pwo rata pou Pass ki ajoute nan mitan peryòd la. Yon mwa konplè se {{credits}} pou chak Pass.",
+        "title": "Itilizasyon Kilo Pass",
+        "unavailable": "Itilizasyon Kilo Pass pa disponib pou òganizasyon sa a."
+      }
     }
   },
   "authErrors": {

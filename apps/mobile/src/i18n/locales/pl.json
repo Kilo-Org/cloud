@@ -4012,7 +4012,24 @@
       "processingNeedsReview": "Przetwarzanie wymaga sprawdzenia",
       "retryHint": "Ponawia wczytywanie statusu Kilo Pass.",
       "paidSeat_few": "{{displayCount}} opłacone miejsca",
-      "paidSeat_many": "{{displayCount}} opłaconych miejsc"
+      "paidSeat_many": "{{displayCount}} opłaconych miejsc",
+      "usage": {
+        "bonusExpired": "Bonusu nie można już uzyskać",
+        "bonusLocked": "Wydano {{spent}} z {{target}}",
+        "bonusMissed": "Sprawdzanie bonusu",
+        "bonusUnlocked": "Bonus odblokowany",
+        "bonusUpfront": "Bonus już dodany",
+        "empty": "Nie przyznano jeszcze miesięcznych Środków. Pojawią się tutaj po przetworzeniu bieżącego okresu.",
+        "noPasses": "Brak przydziałów Kilo Pass w tym okresie",
+        "passLine": "{{passes}} przydziału · {{credits}} miesięcznych Środków",
+        "passLine_few": "{{passes}} przydziały · {{credits}} miesięcznych Środków",
+        "passLine_many": "{{passes}} przydziałów · {{credits}} miesięcznych Środków",
+        "passLine_one": "{{passes}} przydział · {{credits}} miesięcznych Środków",
+        "passLine_other": "{{passes}} przydziału · {{credits}} miesięcznych Środków",
+        "proratedNote": "Obejmuje proporcjonalnie naliczone Środki za przydziały dodane w trakcie okresu. Pełny miesiąc to {{credits}} na przydział.",
+        "title": "Użycie Kilo Pass",
+        "unavailable": "Użycie Kilo Pass nie jest dostępne dla tej organizacji."
+      }
     }
   },
   "feedback": {

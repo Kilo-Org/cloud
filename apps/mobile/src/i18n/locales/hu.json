@@ -3880,7 +3880,22 @@
       "paymentPending": "A fizetés függőben",
       "processingBlocked": "A feldolgozás blokkolva",
       "processingNeedsReview": "A feldolgozás felülvizsgálatot igényel",
-      "retryHint": "Újra megpróbálja betölteni a Kilo Pass állapotát."
+      "retryHint": "Újra megpróbálja betölteni a Kilo Pass állapotát.",
+      "usage": {
+        "bonusExpired": "Bónusz már nem szerezhető meg",
+        "bonusLocked": "{{spent}} / {{target}} elköltve",
+        "bonusMissed": "Bónusz ellenőrzése",
+        "bonusUnlocked": "Bónusz feloldva",
+        "bonusUpfront": "Bónusz már hozzáadva",
+        "empty": "Még nem került sor havi Kilo-kredit kiadására. Az aktuális időszak feldolgozása után itt jelennek meg.",
+        "noPasses": "Ebben az időszakban nincs hozzárendelt Pass-előfizetés.",
+        "passLine": "{{passes}} Pass-előfizetés · {{credits}} havi Kilo-kredit",
+        "passLine_one": "{{passes}} Pass-előfizetés · {{credits}} havi Kilo-kredit",
+        "passLine_other": "{{passes}} Pass-előfizetés · {{credits}} havi Kilo-kredit",
+        "proratedNote": "Tartalmazza az időszak közben hozzáadott Pass-előfizetések időarányos Kilo-kreditjeit. Egy teljes hónap {{credits}} Pass-előfizetésenként.",
+        "title": "Kilo Pass használata",
+        "unavailable": "A Kilo Pass használata nem érhető el ennél a szervezetnél."
+      }
     }
   },
   "authErrors": {

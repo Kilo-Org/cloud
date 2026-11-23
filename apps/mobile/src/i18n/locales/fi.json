@@ -3880,7 +3880,22 @@
       "paymentPending": "Odottaa maksua",
       "processingBlocked": "Käsittely estetty",
       "processingNeedsReview": "Käsittely vaatii tarkistusta",
-      "retryHint": "Yrittää ladata Kilo Passin tilan uudelleen."
+      "retryHint": "Yrittää ladata Kilo Passin tilan uudelleen.",
+      "usage": {
+        "bonusExpired": "Bonusta ei voi enää ansaita",
+        "bonusLocked": "{{spent}} / {{target}} käytetty",
+        "bonusMissed": "Tarkistetaan bonustasi",
+        "bonusUnlocked": "Bonus avattu",
+        "bonusUpfront": "Bonus on jo lisätty",
+        "empty": "Kuukausikrediittejä ei ole vielä myönnetty. Ne näkyvät täällä, kun kuluva kausi on käsitelty.",
+        "noPasses": "Tälle kaudelle ei ole osoitettu passeja",
+        "passLine": "{{passes}} passia · {{credits}} kuukausikrediittiä",
+        "passLine_one": "{{passes}} passi · {{credits}} kuukausikrediittiä",
+        "passLine_other": "{{passes}} passia · {{credits}} kuukausikrediittiä",
+        "proratedNote": "Sisältää kesken kauden lisättyjen passien suhteutetut krediitit. Täysi kuukausi on {{credits}} passia kohden.",
+        "title": "Kilo Passin käyttö",
+        "unavailable": "Kilo Passin käyttö ei ole saatavilla tälle organisaatiolle."
+      }
     }
   },
   "authErrors": {

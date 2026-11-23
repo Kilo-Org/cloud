@@ -4019,6 +4019,23 @@
       "processingBlocked": "Apdorojimas užblokuotas",
       "processingNeedsReview": "Reikia patikrinti apdorojimą",
       "retryHint": "Bando iš naujo įkelti Kilo Pass būseną.",
+      "usage": {
+        "bonusExpired": "Bonuso nebegalima uždirbti",
+        "bonusLocked": "Išleista {{spent}} iš {{target}}",
+        "bonusMissed": "Tikrinamas jūsų bonusas",
+        "bonusUnlocked": "Bonusas atrakintas",
+        "bonusUpfront": "Bonusas jau pridėtas",
+        "empty": "Mėnesio kreditų dar neišduota. Jie atsiras čia, kai bus apdorotas dabartinis laikotarpis.",
+        "noPasses": "Šiam laikotarpiui prenumeratų nepriskirta",
+        "passLine": "{{passes}} prenumeratų · {{credits}} mėnesio kreditų",
+        "passLine_few": "{{passes}} prenumeratos · {{credits}} mėnesio kreditų",
+        "passLine_many": "{{passes}} prenumeratos · {{credits}} mėnesio kreditų",
+        "passLine_one": "{{passes}} prenumerata · {{credits}} mėnesio kreditų",
+        "passLine_other": "{{passes}} prenumeratų · {{credits}} mėnesio kreditų",
+        "proratedNote": "Įtraukti proporcingai apskaičiuoti kreditai už laikotarpio viduryje pridėtas prenumeratas. Visas mėnuo – {{credits}} už prenumeratą.",
+        "title": "Kilo Pass naudojimas",
+        "unavailable": "Šiai organizacijai Kilo Pass naudojimas neprieinamas."
+      },
       "paidSeat_few": "{{displayCount}} apmokėtos vietos",
       "paidSeat_many": "{{displayCount}} apmokėtos vietos"
     }

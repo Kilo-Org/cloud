@@ -3880,7 +3880,22 @@
       "paymentPending": "پارەدان لە چاوەڕوانیدایە",
       "processingBlocked": "پرۆسەکردن ڕاگیراوە",
       "processingNeedsReview": "پرۆسەکردن پێویستی بە پێداچوونەوە هەیە",
-      "retryHint": "دووبارە هەوڵ دەدات دۆخی Kilo Pass بار بکات."
+      "retryHint": "دووبارە هەوڵ دەدات دۆخی Kilo Pass بار بکات.",
+      "usage": {
+        "bonusExpired": "چیتر پاداشت بەدەست ناهێنرێت",
+        "bonusLocked": "{{spent}} لە {{target}} خەرجکراوە",
+        "bonusMissed": "پاداشتەکەت دەپشکنرێت",
+        "bonusUnlocked": "پاداشتەکە کرایەوە",
+        "bonusUpfront": "پاداشتەکە پێشتر زیادکراوە",
+        "empty": "هێشتا هیچ کرێدیتی مانگانە دەرنەکراوە. کاتێک ماوەی ئێستا پرۆسێس بکرێت، لێرە دەردەکەون.",
+        "noPasses": "هیچ پاسێک بۆ ئەم ماوەیە تەرخان نەکراوە",
+        "passLine": "{{passes}} پاس · {{credits}} کرێدیتی مانگانە",
+        "passLine_one": "{{passes}} پاس · {{credits}} کرێدیتی مانگانە",
+        "passLine_other": "{{passes}} پاس · {{credits}} کرێدیتی مانگانە",
+        "proratedNote": "کرێدیتی ڕێژەیی بۆ پاسەکانی زیادکراو لە ناوەڕاستی ماوەدا لەخۆدەگرێت. مانگێکی تەواو بۆ هەر پاسێک {{credits}} دەبێت.",
+        "title": "بەکارهێنانی Kilo Pass",
+        "unavailable": "بەکارهێنانی Kilo Pass بۆ ئەم ڕێکخراوە بەردەست نییە."
+      }
     }
   },
   "authErrors": {

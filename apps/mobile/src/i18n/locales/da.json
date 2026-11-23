@@ -3880,7 +3880,22 @@
       "paymentPending": "Afventer betaling",
       "processingBlocked": "Behandling blokeret",
       "processingNeedsReview": "Behandlingen skal gennemgås",
-      "retryHint": "Prøver at indlæse status for Kilo Pass igen."
+      "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
+      "usage": {
+        "bonusExpired": "Bonus kan ikke længere optjenes",
+        "bonusLocked": "{{spent}} af {{target}} forbrugt",
+        "bonusMissed": "Tjekker din bonus",
+        "bonusUnlocked": "Bonus låst op",
+        "bonusUpfront": "Bonus allerede tilføjet",
+        "empty": "Der er endnu ikke tildelt månedlige kreditter. De vises her, når den aktuelle periode er behandlet.",
+        "noPasses": "Ingen Kilo Pass tildelt for denne periode",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} månedlige kreditter",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} månedlige kreditter",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} månedlige kreditter",
+        "proratedNote": "Inkluderer forholdsmæssige kreditter for Kilo Pass tilføjet midt i perioden. En hel måned er {{credits}} pr. Kilo Pass.",
+        "title": "Forbrug af Kilo Pass",
+        "unavailable": "Forbruget af Kilo Pass er ikke tilgængeligt for denne organisation."
+      }
     }
   },
   "authErrors": {

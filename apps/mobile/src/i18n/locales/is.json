@@ -3880,7 +3880,22 @@
       "paymentPending": "Greiðsla í bið",
       "processingBlocked": "Vinnsla stöðvuð",
       "processingNeedsReview": "Vinnsla þarfnast yfirferðar",
-      "retryHint": "Reynir aftur að hlaða stöðu Kilo Pass."
+      "retryHint": "Reynir aftur að hlaða stöðu Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Ekki lengur hægt að vinna sér inn bónus",
+        "bonusLocked": "{{spent}} af {{target}} notað",
+        "bonusMissed": "Athuga bónusinn þinn",
+        "bonusUnlocked": "Bónus opnaður",
+        "bonusUpfront": "Bónus hefur verið bætt við",
+        "empty": "Engin mánaðarleg inneign hefur enn verið gefin út. Hún birtist hér þegar núverandi tímabil hefur verið afgreitt.",
+        "noPasses": "Engum áskriftum úthlutað fyrir þetta tímabil",
+        "passLine": "{{passes}} áskriftir · {{credits}} mánaðarleg inneign",
+        "passLine_one": "{{passes}} áskrift · {{credits}} mánaðarleg inneign",
+        "passLine_other": "{{passes}} áskriftir · {{credits}} mánaðarleg inneign",
+        "proratedNote": "Inniheldur hlutfallslega inneign fyrir áskriftir sem bætt var við mitt tímabilið. Fullur mánuður er {{credits}} á hverja áskrift.",
+        "title": "Notkun Kilo Pass",
+        "unavailable": "Notkun Kilo Pass er ekki fáanleg fyrir þetta félag."
+      }
     }
   },
   "authErrors": {

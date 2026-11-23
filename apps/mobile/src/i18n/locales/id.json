@@ -3812,6 +3812,20 @@
       "processingBlocked": "Pemrosesan terhambat",
       "processingNeedsReview": "Pemrosesan perlu ditinjau",
       "retryHint": "Mencoba memuat ulang status Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonus tidak dapat diperoleh lagi",
+        "bonusLocked": "{{spent}} dari {{target}} terpakai",
+        "bonusMissed": "Memeriksa bonus Anda",
+        "bonusUnlocked": "Bonus terbuka",
+        "bonusUpfront": "Bonus sudah ditambahkan",
+        "empty": "Belum ada kredit bulanan yang diterbitkan. Kredit akan muncul di sini setelah periode berjalan diproses.",
+        "noPasses": "Tidak ada Pass yang ditetapkan untuk periode ini",
+        "passLine": "{{passes}} Pass · {{credits}} kredit per bulan",
+        "passLine_other": "{{passes}} Pass · {{credits}} kredit per bulan",
+        "proratedNote": "Termasuk kredit prorata untuk Pass yang ditambahkan di tengah periode. Satu bulan penuh adalah {{credits}} per Pass.",
+        "title": "Penggunaan Kilo Pass",
+        "unavailable": "Penggunaan Kilo Pass tidak tersedia untuk organisasi ini."
+      },
       "paidSeat_one": "{{displayCount}} lisensi berbayar"
     }
   },

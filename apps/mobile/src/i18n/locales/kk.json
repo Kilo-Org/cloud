@@ -3880,7 +3880,22 @@
       "paymentPending": "Төлем күтілуде",
       "processingBlocked": "Өңдеу бұғатталған",
       "processingNeedsReview": "Өңдеуді тексеру қажет",
-      "retryHint": "Kilo Pass күйін жүктеуді қайталайды."
+      "retryHint": "Kilo Pass күйін жүктеуді қайталайды.",
+      "usage": {
+        "bonusExpired": "Бонус енді берілмейді",
+        "bonusLocked": "{{target}} сомасынан {{spent}} жұмсалды",
+        "bonusMissed": "Бонусыңыз тексерілуде",
+        "bonusUnlocked": "Бонус ашылды",
+        "bonusUpfront": "Бонус әлдеқашан қосылған",
+        "empty": "Айлық кредиттер әлі берілген жоқ. Олар ағымдағы кезең өңделгеннен кейін осында көрсетіледі.",
+        "noPasses": "Бұл кезеңге Kilo Pass тағайындалмаған",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} айлық кредит",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} айлық кредит",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} айлық кредит",
+        "proratedNote": "Кезең ортасында қосылған Kilo Pass үшін пропорционалды кредиттерді қамтиды. Толық ай бір Kilo Pass үшін {{credits}} құрайды.",
+        "title": "Kilo Pass қолданылуы",
+        "unavailable": "Бұл ұйым үшін Kilo Pass қолданылуы қолжетімсіз."
+      }
     }
   },
   "authErrors": {

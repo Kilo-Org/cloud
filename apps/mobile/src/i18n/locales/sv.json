@@ -3880,7 +3880,22 @@
       "paymentPending": "Väntar på betalning",
       "processingBlocked": "Bearbetningen blockerad",
       "processingNeedsReview": "Bearbetningen kräver granskning",
-      "retryHint": "Försöker läsa in Kilo Pass-status igen."
+      "retryHint": "Försöker läsa in Kilo Pass-status igen.",
+      "usage": {
+        "bonusExpired": "Bonusen kan inte längre tjänas in",
+        "bonusLocked": "{{spent}} av {{target}} använt",
+        "bonusMissed": "Kontrollerar din bonus",
+        "bonusUnlocked": "Bonus upplåst",
+        "bonusUpfront": "Bonusen har redan lagts till",
+        "empty": "Inga månatliga Krediter har utfärdats ännu. De visas här när den aktuella perioden har bearbetats.",
+        "noPasses": "Inga pass tilldelade för den här perioden",
+        "passLine": "{{passes}} pass · {{credits}} månatliga Krediter",
+        "passLine_one": "{{passes}} pass · {{credits}} månatliga Krediter",
+        "passLine_other": "{{passes}} pass · {{credits}} månatliga Krediter",
+        "proratedNote": "Inkluderar proportionerliga Krediter för pass som lagts till mitt i perioden. En hel månad är {{credits}} per pass.",
+        "title": "Kilo Pass-användning",
+        "unavailable": "Kilo Pass-användning är inte tillgänglig för den här organisationen."
+      }
     }
   },
   "authErrors": {

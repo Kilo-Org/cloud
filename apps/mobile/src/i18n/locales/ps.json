@@ -3880,7 +3880,22 @@
       "paymentPending": "تادیه په تمه ده",
       "processingBlocked": "پروسس بند شوی",
       "processingNeedsReview": "پروسس بیاکتنې ته اړتیا لري",
-      "retryHint": "د Kilo Pass د حالت د بارولو بیا هڅه کوي."
+      "retryHint": "د Kilo Pass د حالت د بارولو بیا هڅه کوي.",
+      "usage": {
+        "bonusExpired": "بونس نور نه شي ترلاسه کېدای",
+        "bonusLocked": "له {{target}} څخه {{spent}} لګول شوي",
+        "bonusMissed": "ستاسو بونس څېړل کېږي",
+        "bonusUnlocked": "بونس خلاص شو",
+        "bonusUpfront": "بونس لا دمخه اضافه شوی",
+        "empty": "تر دې دمه میاشتني کریډیټونه نه دي صادر شوي. د اوسنۍ مودې له پروسس کېدو وروسته به دلته ښکاره شي.",
+        "noPasses": "د دې مودې لپاره هېڅ پاس نه دی ټاکل شوی",
+        "passLine": "{{passes}} پاسونه · {{credits}} میاشتني کریډیټونه",
+        "passLine_one": "{{passes}} پاس · {{credits}} میاشتني کریډیټونه",
+        "passLine_other": "{{passes}} پاسونه · {{credits}} میاشتني کریډیټونه",
+        "proratedNote": "د مودې په منځ کې د اضافه شوو پاسونو لپاره تناسبي کریډیټونه شامل دي. بشپړه میاشت د هر پاس لپاره {{credits}} ده.",
+        "title": "د Kilo Pass کارېدنه",
+        "unavailable": "د دې سازمان لپاره د Kilo Pass کارېدنه شتون نه لري."
+      }
     }
   },
   "authErrors": {

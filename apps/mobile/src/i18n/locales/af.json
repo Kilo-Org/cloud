@@ -3880,7 +3880,22 @@
       "paymentPending": "Betaling hangend",
       "processingBlocked": "Verwerking geblokkeer",
       "processingNeedsReview": "Verwerking vereis hersiening",
-      "retryHint": "Probeer weer om die Kilo Pass-status te laai."
+      "retryHint": "Probeer weer om die Kilo Pass-status te laai.",
+      "usage": {
+        "bonusExpired": "Bonus kan nie meer verdien word nie",
+        "bonusLocked": "{{spent}} van {{target}} bestee",
+        "bonusMissed": "Jou bonus word nagegaan",
+        "bonusUnlocked": "Bonus ontsluit",
+        "bonusUpfront": "Bonus reeds bygevoeg",
+        "empty": "Nog geen maandelikse krediete uitgereik nie. Dit verskyn hier sodra die huidige tydperk verwerk is.",
+        "noPasses": "Geen passe vir hierdie tydperk toegewys nie",
+        "passLine": "{{passes}} passe · {{credits}} maandelikse krediete",
+        "passLine_one": "{{passes}} pas · {{credits}} maandelikse krediete",
+        "passLine_other": "{{passes}} passe · {{credits}} maandelikse krediete",
+        "proratedNote": "Sluit pro rata-krediete in vir passe wat middel in die tydperk bygevoeg is. 'n Volle maand is {{credits}} per pas.",
+        "title": "Kilo Pass-gebruik",
+        "unavailable": "Kilo Pass-gebruik is nie vir hierdie organisasie beskikbaar nie."
+      }
     }
   },
   "authErrors": {

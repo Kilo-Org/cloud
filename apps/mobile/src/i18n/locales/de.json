@@ -3872,7 +3872,22 @@
       "paymentPending": "Zahlung ausstehend",
       "processingBlocked": "Verarbeitung blockiert",
       "processingNeedsReview": "Verarbeitung muss geprüft werden",
-      "retryHint": "Lädt den Status von Kilo Pass erneut."
+      "retryHint": "Lädt den Status von Kilo Pass erneut.",
+      "usage": {
+        "bonusExpired": "Bonus kann nicht mehr verdient werden",
+        "bonusLocked": "{{spent}} von {{target}} verbraucht",
+        "bonusMissed": "Bonus wird geprüft",
+        "bonusUnlocked": "Bonus freigeschaltet",
+        "bonusUpfront": "Bonus bereits hinzugefügt",
+        "empty": "Noch keine monatlichen Credits vergeben. Sie erscheinen hier, sobald der aktuelle Zeitraum verarbeitet wurde.",
+        "noPasses": "Keine Pässe für diesen Zeitraum zugewiesen",
+        "passLine": "{{passes}} Pässe · {{credits}} monatliche Credits",
+        "passLine_one": "{{passes}} Pass · {{credits}} monatliche Credits",
+        "passLine_other": "{{passes}} Pässe · {{credits}} monatliche Credits",
+        "proratedNote": "Enthält anteilige Credits für mitten im Zeitraum hinzugefügte Pässe. Ein voller Monat entspricht {{credits}} pro Pass.",
+        "title": "Kilo Pass: Nutzung",
+        "unavailable": "Die Nutzung von Kilo Pass ist für diese Organisation nicht verfügbar."
+      }
     }
   },
   "feedback": {

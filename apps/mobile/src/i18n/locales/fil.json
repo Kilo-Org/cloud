@@ -3880,7 +3880,22 @@
       "paymentPending": "Nakabinbin ang pagbabayad",
       "processingBlocked": "Naharang ang pagproseso",
       "processingNeedsReview": "Kailangang suriin ang pagproseso",
-      "retryHint": "Muling sinusubukang i-load ang status ng Kilo Pass."
+      "retryHint": "Muling sinusubukang i-load ang status ng Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Hindi na makukuha ang bonus",
+        "bonusLocked": "{{spent}} sa {{target}} ang nagastos",
+        "bonusMissed": "Sinusuri ang iyong bonus",
+        "bonusUnlocked": "Na-unlock ang bonus",
+        "bonusUpfront": "Naidagdag na ang bonus",
+        "empty": "Wala pang naibigay na buwanang kredito. Lalabas ang mga ito dito kapag naproseso na ang kasalukuyang panahon.",
+        "noPasses": "Walang itinalagang Pass para sa panahong ito",
+        "passLine": "{{passes}} Pass · {{credits}} na buwanang kredito",
+        "passLine_one": "{{passes}} Pass · {{credits}} na buwanang kredito",
+        "passLine_other": "{{passes}} Pass · {{credits}} na buwanang kredito",
+        "proratedNote": "Kasama ang proporsyonal na kredito para sa mga Pass na idinagdag sa gitna ng panahon. Ang buong buwan ay {{credits}} bawat Pass.",
+        "title": "Paggamit ng Kilo Pass",
+        "unavailable": "Hindi available ang paggamit ng Kilo Pass para sa organisasyong ito."
+      }
     }
   },
   "authErrors": {

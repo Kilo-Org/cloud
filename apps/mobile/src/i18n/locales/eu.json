@@ -3880,7 +3880,22 @@
       "paymentPending": "Ordainketa egiteko zain",
       "processingBlocked": "Prozesamendua blokeatuta",
       "processingNeedsReview": "Prozesamenduak berrikuspena behar du",
-      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro."
+      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro.",
+      "usage": {
+        "bonusExpired": "Bonusa ezin da jada irabazi",
+        "bonusLocked": "{{spent}} / {{target}} gastatuta",
+        "bonusMissed": "Zure bonusa egiaztatzen",
+        "bonusUnlocked": "Bonusa desblokeatuta",
+        "bonusUpfront": "Bonusa dagoeneko gehituta",
+        "empty": "Oraindik ez da hileko krediturik eman. Hemen agertuko dira uneko aldia prozesatu ondoren.",
+        "noPasses": "Ez dago Kilo Passik esleituta aldi honetarako",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} hileko kreditu",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} hileko kreditu",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} hileko kreditu",
+        "proratedNote": "Aldiaren erdian gehitutako Kilo Passen kreditu proportzionalak barne hartzen ditu. Hile osoa {{credits}} da Kilo Pass bakoitzeko.",
+        "title": "Kilo Pass erabilera",
+        "unavailable": "Kilo Pass erabilera ez dago erakunde honentzat erabilgarri."
+      }
     }
   },
   "authErrors": {

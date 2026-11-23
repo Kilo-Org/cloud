@@ -3809,7 +3809,21 @@
       "paymentPending": "付款待處理",
       "processingBlocked": "處理受阻",
       "processingNeedsReview": "處理程序待審查",
-      "retryHint": "重新載入 Kilo Pass 狀態。"
+      "retryHint": "重新載入 Kilo Pass 狀態。",
+      "usage": {
+        "bonusExpired": "已無法再獲得免費獎勵",
+        "bonusLocked": "已消費 {{spent}}，共 {{target}}",
+        "bonusMissed": "正在檢查您的免費獎勵",
+        "bonusUnlocked": "免費獎勵已解鎖",
+        "bonusUpfront": "免費獎勵已新增",
+        "empty": "尚未發放任何每月點數。目前期間處理完成後，點數就會顯示在這裡。",
+        "noPasses": "此期間未指派任何 Kilo Pass",
+        "passLine": "{{passes}} 個 Kilo Pass · 每月 {{credits}} 點數",
+        "passLine_other": "{{passes}} 個 Kilo Pass · 每月 {{credits}} 點數",
+        "proratedNote": "包含期間中途新增 Kilo Pass 的按比例點數。完整一個月為每個 Kilo Pass {{credits}}。",
+        "title": "Kilo Pass 用量",
+        "unavailable": "此組織無法使用 Kilo Pass 用量。"
+      }
     }
   },
   "feedback": {

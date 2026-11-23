@@ -4090,7 +4090,25 @@
       "retryHint": "Jerġa' jipprova jgħabbi l-istatus ta' Kilo Pass.",
       "paidSeat_two": "{{displayCount}} postijiet imħallsa",
       "paidSeat_few": "{{displayCount}} postijiet imħallsa",
-      "paidSeat_many": "{{displayCount}}-il post imħallas"
+      "paidSeat_many": "{{displayCount}}-il post imħallas",
+      "usage": {
+        "bonusExpired": "Il-Bonus ma jistax jinkiseb aktar",
+        "bonusLocked": "{{spent}} minn {{target}} minfuq",
+        "bonusMissed": "Qed jiġi vverifikat il-bonus tiegħek",
+        "bonusUnlocked": "Bonus żblukkat",
+        "bonusUpfront": "Bonus diġà miżjud",
+        "empty": "Għadhom ma nħarġu l-ebda Krediti fix-xahar. Jidhru hawn ladarba l-perjodu attwali jiġi pproċessat.",
+        "noPasses": "M'hemm l-ebda pass assenjat għal dan il-perjodu",
+        "passLine": "{{passes}} passijiet · {{credits}} Krediti fix-xahar",
+        "passLine_few": "{{passes}} passijiet · {{credits}} Krediti fix-xahar",
+        "passLine_many": "{{passes}}-il pass · {{credits}} Krediti fix-xahar",
+        "passLine_one": "{{passes}} pass · {{credits}} Krediti fix-xahar",
+        "passLine_other": "{{passes}} passijiet · {{credits}} Krediti fix-xahar",
+        "passLine_two": "{{passes}} passijiet · {{credits}} Krediti fix-xahar",
+        "proratedNote": "Jinkludi Krediti pproporzjonati għal passijiet miżjuda f'nofs il-perjodu. Xahar sħiħ huwa {{credits}} għal kull pass.",
+        "title": "Użu tal-Kilo Pass",
+        "unavailable": "L-użu tal-Kilo Pass mhuwiex disponibbli għal din l-organizzazzjoni."
+      }
     }
   },
   "authErrors": {

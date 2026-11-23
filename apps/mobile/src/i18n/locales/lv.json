@@ -3950,6 +3950,22 @@
       "processingBlocked": "Apstrāde bloķēta",
       "processingNeedsReview": "Apstrāde jāpārbauda",
       "retryHint": "Atkārtoti mēģina ielādēt Kilo Pass statusu.",
+      "usage": {
+        "bonusExpired": "Bonusu vairs nevar nopelnīt",
+        "bonusLocked": "{{spent}} no {{target}} iztērēti",
+        "bonusMissed": "Pārbauda bonusu",
+        "bonusUnlocked": "Bonuss atbloķēts",
+        "bonusUpfront": "Bonuss jau pievienots",
+        "empty": "Ikmēneša kredīti vēl nav izsniegti. Tie parādīsies šeit, kad pašreizējais periods tiks apstrādāts.",
+        "noPasses": "Šim periodam nav piešķirtu abonementu",
+        "passLine": "{{passes}} Kilo Pass abonementi · {{credits}} ikmēneša kredīti",
+        "passLine_one": "{{passes}} Kilo Pass abonements · {{credits}} ikmēneša kredīti",
+        "passLine_other": "{{passes}} Kilo Pass abonementi · {{credits}} ikmēneša kredīti",
+        "passLine_zero": "{{passes}} Kilo Pass abonementu · {{credits}} ikmēneša kredīti",
+        "proratedNote": "Ietver proporcionāli aprēķinātus kredītus par perioda vidū pievienotiem abonementiem. Pilns mēnesis ir {{credits}} par abonementu.",
+        "title": "Kilo Pass lietojums",
+        "unavailable": "Kilo Pass lietojums šai organizācijai nav pieejams."
+      },
       "paidSeat_zero": "{{displayCount}} apmaksātu vietu"
     }
   },

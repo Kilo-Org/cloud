@@ -3880,7 +3880,22 @@
       "paymentPending": "Inkokhelo ilindile",
       "processingBlocked": "Ukucutshungulwa kuvinjiwe",
       "processingNeedsReview": "Ukucutshungulwa kudinga ukuhlolwa",
-      "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass."
+      "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Ibhonasi ayisenakutholwa",
+        "bonusLocked": "{{spent}} kwe-{{target}} kusetshenzisiwe",
+        "bonusMissed": "Kuhlolwa ibhonasi yakho",
+        "bonusUnlocked": "Ibhonasi ivuliwe",
+        "bonusUpfront": "Ibhonasi isivele yengezwe",
+        "empty": "Awekho Amakhredithi enyanga zonke akhishiwe okwamanje. Azovela lapha lapho inkathi yamanje isicutshungulwa.",
+        "noPasses": "Awekho ama-Pass abelwe le nkathi",
+        "passLine": "ama-Pass angu-{{passes}} · Amakhredithi enyanga zonke angu-{{credits}}",
+        "passLine_one": "i-Pass engu-{{passes}} · Amakhredithi enyanga zonke angu-{{credits}}",
+        "passLine_other": "ama-Pass angu-{{passes}} · Amakhredithi enyanga zonke angu-{{credits}}",
+        "proratedNote": "Kufaka Amakhredithi abekwe ngesilinganiso ama-Pass engezwe phakathi nenkathi. Inyanga ephelele ingu-{{credits}} nge-Pass ngayinye.",
+        "title": "Ukusetshenziswa kwe-Kilo Pass",
+        "unavailable": "Ukusetshenziswa kwe-Kilo Pass akutholakali kule nhlangano."
+      }
     }
   },
   "authErrors": {

@@ -3872,7 +3872,22 @@
       "paymentPending": "Ödeme bekleniyor",
       "processingBlocked": "İşleme engellendi",
       "processingNeedsReview": "İşlemin incelenmesi gerekiyor",
-      "retryHint": "Kilo Pass durumunu yüklemeyi tekrar dener."
+      "retryHint": "Kilo Pass durumunu yüklemeyi tekrar dener.",
+      "usage": {
+        "bonusExpired": "Ücretsiz bonus artık kazanılamaz",
+        "bonusLocked": "{{target}} tutarından {{spent}} harcandı",
+        "bonusMissed": "Ücretsiz bonusunuz kontrol ediliyor",
+        "bonusUnlocked": "Ücretsiz bonusun kilidi açıldı",
+        "bonusUpfront": "Ücretsiz bonus zaten eklendi",
+        "empty": "Henüz aylık Kredi tanımlanmadı. Mevcut dönem işlendiğinde burada görünür.",
+        "noPasses": "Bu dönem için atanmış Kilo Pass yok",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} aylık Kredi",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} aylık Kredi",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} aylık Kredi",
+        "proratedNote": "Dönem ortasında eklenen Kilo Pass'ler için orantılı Kredi içerir. Tam ay, Kilo Pass başına {{credits}} olur.",
+        "title": "Kilo Pass kullanımı",
+        "unavailable": "Kilo Pass kullanımı bu kuruluş için kullanılamıyor."
+      }
     }
   },
   "feedback": {

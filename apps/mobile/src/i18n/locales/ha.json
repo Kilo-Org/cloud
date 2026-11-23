@@ -3880,7 +3880,22 @@
       "paymentPending": "Ana jiran biyan kuɗi",
       "processingBlocked": "An toshe sarrafawa",
       "processingNeedsReview": "Ana buƙatar duba yadda ake sarrafawa",
-      "retryHint": "Yana sake gwada loda halin Kilo Pass."
+      "retryHint": "Yana sake gwada loda halin Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Ba za a ƙara samun kyautar ba",
+        "bonusLocked": "An kashe {{spent}} daga cikin {{target}}",
+        "bonusMissed": "Ana duba kyautarka",
+        "bonusUnlocked": "An buɗe kyauta",
+        "bonusUpfront": "An riga an ƙara kyauta",
+        "empty": "Ba a fitar da kiredit na wata tukuna ba. Za su bayyana a nan da zarar an sarrafa wannan lokaci.",
+        "noPasses": "Babu Pass da aka ba a wannan lokaci",
+        "passLine": "Pass {{passes}} · kiredit {{credits}} na wata",
+        "passLine_one": "Pass {{passes}} · kiredit {{credits}} na wata",
+        "passLine_other": "Pass {{passes}} · kiredit {{credits}} na wata",
+        "proratedNote": "Ya haɗa da kiredit gwargwadon lokaci don Pass ɗin da aka ƙara a tsakiyar lokaci. Cikakken wata {{credits}} ne ga kowane Pass.",
+        "title": "Amfanin Kilo Pass",
+        "unavailable": "Amfanin Kilo Pass ba ya samuwa ga wannan ƙungiya."
+      }
     }
   },
   "authErrors": {

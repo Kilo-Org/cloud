@@ -3817,7 +3817,21 @@
       "paymentPending": "កំពុងរង់ចាំការទូទាត់",
       "processingBlocked": "ការដំណើរការត្រូវបានរារាំង",
       "processingNeedsReview": "ការដំណើរការត្រូវការការពិនិត្យ",
-      "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។"
+      "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។",
+      "usage": {
+        "bonusExpired": "មិនអាចទទួលបានរង្វាន់ទៀតទេ",
+        "bonusLocked": "ចំណាយរួច {{spent}} ក្នុងចំណោម {{target}}",
+        "bonusMissed": "កំពុងពិនិត្យរង្វាន់របស់អ្នក",
+        "bonusUnlocked": "រង្វាន់បានដោះសោ",
+        "bonusUpfront": "រង្វាន់ត្រូវបានបន្ថែមរួចហើយ",
+        "empty": "មិនទាន់បានចេញក្រេឌីតប្រចាំខែនៅឡើយទេ។ វានឹងបង្ហាញនៅទីនេះ នៅពេលរយៈពេលបច្ចុប្បន្នត្រូវបានដំណើរការ។",
+        "noPasses": "មិនមាន Kilo Pass ដែលបានចាត់ចែងសម្រាប់រយៈពេលនេះទេ",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} ក្រេឌីតប្រចាំខែ",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} ក្រេឌីតប្រចាំខែ",
+        "proratedNote": "រួមបញ្ចូលក្រេឌីតតាមសមាមាត្រសម្រាប់ Kilo Pass ដែលបានបន្ថែមនៅកណ្តាលរយៈពេល។ មួយខែពេញគឺ {{credits}} ក្នុងមួយ Kilo Pass។",
+        "title": "ការប្រើប្រាស់ Kilo Pass",
+        "unavailable": "ការប្រើប្រាស់ Kilo Pass មិនមានសម្រាប់អង្គការនេះទេ។"
+      }
     }
   },
   "authErrors": {

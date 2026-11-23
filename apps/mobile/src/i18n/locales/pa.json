@@ -3880,7 +3880,22 @@
       "paymentPending": "ਭੁਗਤਾਨ ਬਕਾਇਆ",
       "processingBlocked": "ਪ੍ਰਕਿਰਿਆ ਰੁਕੀ ਹੋਈ ਹੈ",
       "processingNeedsReview": "ਪ੍ਰਕਿਰਿਆ ਦੀ ਸਮੀਖਿਆ ਦੀ ਲੋੜ ਹੈ",
-      "retryHint": "Kilo Pass ਦੀ ਸਥਿਤੀ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦਾ ਹੈ।"
+      "retryHint": "Kilo Pass ਦੀ ਸਥਿਤੀ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦਾ ਹੈ।",
+      "usage": {
+        "bonusExpired": "ਬੋਨਸ ਹੁਣ ਕਮਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ",
+        "bonusLocked": "{{target}} ਵਿੱਚੋਂ {{spent}} ਖਰਚ ਹੋਏ",
+        "bonusMissed": "ਤੁਹਾਡੇ ਬੋਨਸ ਦੀ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ",
+        "bonusUnlocked": "ਬੋਨਸ ਅਨਲਾਕ ਹੋ ਗਿਆ",
+        "bonusUpfront": "ਬੋਨਸ ਪਹਿਲਾਂ ਹੀ ਸ਼ਾਮਲ ਕੀਤਾ ਗਿਆ",
+        "empty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਮਹੀਨਾਵਾਰ ਕ੍ਰੈਡਿਟ ਜਾਰੀ ਨਹੀਂ ਕੀਤੇ ਗਏ। ਜਦੋਂ ਮੌਜੂਦਾ ਮਿਆਦ ਦੀ ਪ੍ਰਕਿਰਿਆ ਹੋ ਜਾਵੇਗੀ, ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
+        "noPasses": "ਇਸ ਮਿਆਦ ਲਈ ਕੋਈ ਪਾਸ ਨਿਰਧਾਰਿਤ ਨਹੀਂ ਕੀਤਾ ਗਿਆ",
+        "passLine": "{{passes}} ਪਾਸ · {{credits}} ਮਹੀਨਾਵਾਰ ਕ੍ਰੈਡਿਟ",
+        "passLine_one": "{{passes}} ਪਾਸ · {{credits}} ਮਹੀਨਾਵਾਰ ਕ੍ਰੈਡਿਟ",
+        "passLine_other": "{{passes}} ਪਾਸ · {{credits}} ਮਹੀਨਾਵਾਰ ਕ੍ਰੈਡਿਟ",
+        "proratedNote": "ਇਸ ਵਿੱਚ ਮਿਆਦ ਦੇ ਵਿਚਕਾਰ ਸ਼ਾਮਲ ਕੀਤੇ ਪਾਸਾਂ ਲਈ ਅਨੁਪਾਤਿਕ ਕ੍ਰੈਡਿਟ ਸ਼ਾਮਲ ਹਨ। ਪੂਰਾ ਮਹੀਨਾ ਪ੍ਰਤੀ ਪਾਸ {{credits}} ਹੁੰਦਾ ਹੈ।",
+        "title": "Kilo Pass ਦੀ ਵਰਤੋਂ",
+        "unavailable": "ਇਸ ਸੰਗਠਨ ਲਈ Kilo Pass ਦੀ ਵਰਤੋਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      }
     }
   },
   "authErrors": {

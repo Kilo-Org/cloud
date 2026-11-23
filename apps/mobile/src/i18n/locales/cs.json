@@ -4019,6 +4019,23 @@
       "processingBlocked": "Zpracování blokováno",
       "processingNeedsReview": "Zpracování vyžaduje kontrolu",
       "retryHint": "Znovu načte stav Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonus už nelze získat",
+        "bonusLocked": "Vyčerpáno {{spent}} z {{target}}",
+        "bonusMissed": "Kontrola bonusu",
+        "bonusUnlocked": "Bonus odemčen",
+        "bonusUpfront": "Bonus už přidán",
+        "empty": "Zatím nebyly vydány žádné měsíční kredity. Zobrazí se zde po zpracování aktuálního období.",
+        "noPasses": "V tomto období nejsou přiřazena žádná předplatná Kilo Pass",
+        "passLine": "{{passes}} předplatných Kilo Pass · {{credits}} měsíčních kreditů",
+        "passLine_few": "{{passes}} předplatná Kilo Pass · {{credits}} měsíčních kreditů",
+        "passLine_many": "{{passes}} předplatného Kilo Pass · {{credits}} měsíčních kreditů",
+        "passLine_one": "{{passes}} předplatné Kilo Pass · {{credits}} měsíčních kreditů",
+        "passLine_other": "{{passes}} předplatných Kilo Pass · {{credits}} měsíčních kreditů",
+        "proratedNote": "Zahrnuje poměrné kredity za předplatná přidaná uprostřed období. Celý měsíc je {{credits}} za předplatné.",
+        "title": "Využití Kilo Pass",
+        "unavailable": "Využití Kilo Pass není pro tuto organizaci dostupné."
+      },
       "paidSeat_few": "{{displayCount}} placená místa",
       "paidSeat_many": "{{displayCount}} placeného místa"
     }

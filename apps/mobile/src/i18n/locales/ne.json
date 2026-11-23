@@ -3880,7 +3880,22 @@
       "paymentPending": "भुक्तानी पर्खाइमा",
       "processingBlocked": "प्रशोधन रोकिएको",
       "processingNeedsReview": "प्रशोधनको समीक्षा आवश्यक",
-      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।"
+      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।",
+      "usage": {
+        "bonusExpired": "अब बोनस कमाउन सकिँदैन",
+        "bonusLocked": "{{target}} मध्ये {{spent}} खर्च भयो",
+        "bonusMissed": "तपाईंको बोनस जाँच गर्दै",
+        "bonusUnlocked": "बोनस अनलक भयो",
+        "bonusUpfront": "बोनस पहिले नै थपिएको छ",
+        "empty": "अझै कुनै मासिक क्रेडिटहरू जारी गरिएका छैनन्। चालु अवधि प्रशोधन भएपछि ती यहाँ देखिनेछन्।",
+        "noPasses": "यो अवधिका लागि कुनै पास तोकिएको छैन",
+        "passLine": "{{passes}} पासहरू · {{credits}} मासिक क्रेडिटहरू",
+        "passLine_one": "{{passes}} पास · {{credits}} मासिक क्रेडिटहरू",
+        "passLine_other": "{{passes}} पासहरू · {{credits}} मासिक क्रेडिटहरू",
+        "proratedNote": "अवधिको बीचमा थपिएका पासहरूका लागि समानुपातिक क्रेडिटहरू समावेश छन्। पूरा महिनामा प्रति पास {{credits}} हुन्छ।",
+        "title": "Kilo Pass को प्रयोग",
+        "unavailable": "यो संस्थाका लागि Kilo Pass को प्रयोग उपलब्ध छैन।"
+      }
     }
   },
   "authErrors": {

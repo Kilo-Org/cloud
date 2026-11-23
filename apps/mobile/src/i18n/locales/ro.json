@@ -3950,7 +3950,23 @@
       "processingBlocked": "Procesare blocată",
       "processingNeedsReview": "Procesarea necesită verificare",
       "retryHint": "Reîncearcă încărcarea stării Kilo Pass.",
-      "paidSeat_few": "{{displayCount}} locuri plătite"
+      "paidSeat_few": "{{displayCount}} locuri plătite",
+      "usage": {
+        "bonusExpired": "Bonusul nu mai poate fi obținut",
+        "bonusLocked": "{{spent}} din {{target}} cheltuite",
+        "bonusMissed": "Se verifică bonusul",
+        "bonusUnlocked": "Bonus deblocat",
+        "bonusUpfront": "Bonus deja adăugat",
+        "empty": "Nu au fost emise încă Credite lunare. Acestea apar aici după procesarea perioadei curente.",
+        "noPasses": "Niciun abonament atribuit pentru această perioadă",
+        "passLine": "{{passes}} de abonamente · {{credits}} Credite lunare",
+        "passLine_few": "{{passes}} abonamente · {{credits}} Credite lunare",
+        "passLine_one": "{{passes}} abonament · {{credits}} Credite lunare",
+        "passLine_other": "{{passes}} de abonamente · {{credits}} Credite lunare",
+        "proratedNote": "Include Credite calculate proporțional pentru abonamentele adăugate la mijlocul perioadei. O lună întreagă înseamnă {{credits}} per abonament.",
+        "title": "Utilizare Kilo Pass",
+        "unavailable": "Utilizarea Kilo Pass nu este disponibilă pentru această organizație."
+      }
     }
   },
   "authErrors": {

@@ -3880,7 +3880,22 @@
       "paymentPending": "ගෙවීම පොරොත්තුවේ",
       "processingBlocked": "සැකසීම අවහිර වී ඇත",
       "processingNeedsReview": "සැකසීම සමාලෝචනය කළ යුතුයි",
-      "retryHint": "Kilo Pass තත්ත්වය පූරණය කිරීමට නැවත උත්සාහ කරයි."
+      "retryHint": "Kilo Pass තත්ත්වය පූරණය කිරීමට නැවත උත්සාහ කරයි.",
+      "usage": {
+        "bonusExpired": "ප්‍රසාදය තවදුරටත් උපයා ගත නොහැක",
+        "bonusLocked": "{{target}} කින් {{spent}} වියදම් කර ඇත",
+        "bonusMissed": "ඔබේ ප්‍රසාදය පරීක්ෂා කරමින්",
+        "bonusUnlocked": "ප්‍රසාදය විවෘත විය",
+        "bonusUpfront": "ප්‍රසාදය දැනටමත් එකතු කර ඇත",
+        "empty": "තවම මාසික ක්‍රෙඩිට් නිකුත් කර නැත. වත්මන් කාල සීමාව සැකසූ පසු ඒවා මෙහි දිස්වනු ඇත.",
+        "noPasses": "මෙම කාල සීමාව සඳහා Kilo Pass පැවරුම් නොමැත",
+        "passLine": "Kilo Pass {{passes}}ක් · මාසික ක්‍රෙඩිට් {{credits}}",
+        "passLine_one": "Kilo Pass {{passes}}ක් · මාසික ක්‍රෙඩිට් {{credits}}",
+        "passLine_other": "Kilo Pass {{passes}}ක් · මාසික ක්‍රෙඩිට් {{credits}}",
+        "proratedNote": "කාල සීමාව මැදදී එකතු කළ Kilo Pass සඳහා සමානුපාතික ක්‍රෙඩිට් ඇතුළත් වේ. සම්පූර්ණ මාසයක් සඳහා Kilo Pass එකකට {{credits}} වේ.",
+        "title": "Kilo Pass භාවිතය",
+        "unavailable": "මෙම සංවිධානය සඳහා Kilo Pass භාවිතය නොමැත."
+      }
     }
   },
   "authErrors": {

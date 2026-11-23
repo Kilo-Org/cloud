@@ -4012,7 +4012,24 @@
       "processingNeedsReview": "Нужно проверить обработку",
       "retryHint": "Повторяет загрузку статуса Kilo Pass.",
       "paidSeat_few": "{{displayCount}} оплаченных места",
-      "paidSeat_many": "{{displayCount}} оплаченных мест"
+      "paidSeat_many": "{{displayCount}} оплаченных мест",
+      "usage": {
+        "bonusExpired": "Бонус больше нельзя заработать",
+        "bonusLocked": "Потрачено {{spent}} из {{target}}",
+        "bonusMissed": "Проверяем ваш бонус",
+        "bonusUnlocked": "Бонус разблокирован",
+        "bonusUpfront": "Бонус уже начислен",
+        "empty": "Ежемесячные кредиты ещё не начислены. Они появятся здесь после обработки текущего периода.",
+        "noPasses": "На этот период абонементы не назначены",
+        "passLine": "{{passes}} абонементов · {{credits}} ежемесячных кредитов",
+        "passLine_few": "{{passes}} абонемента · {{credits}} ежемесячных кредитов",
+        "passLine_many": "{{passes}} абонементов · {{credits}} ежемесячных кредитов",
+        "passLine_one": "{{passes}} абонемент · {{credits}} ежемесячных кредитов",
+        "passLine_other": "{{passes}} абонемента · {{credits}} ежемесячных кредитов",
+        "proratedNote": "Включает пропорционально рассчитанные кредиты за абонементы, добавленные в середине периода. За полный месяц — {{credits}} за абонемент.",
+        "title": "Использование Kilo Pass",
+        "unavailable": "Использование Kilo Pass недоступно для этой организации."
+      }
     }
   },
   "feedback": {

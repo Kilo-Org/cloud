@@ -3880,7 +3880,22 @@
       "paymentPending": "Kaffaltiin eegumsarra jira",
       "processingBlocked": "Adeemsi uggurameera",
       "processingNeedsReview": "Adeemsi sakatta'uu barbaada",
-      "retryHint": "Haala Kilo Pass fe'uuf deebi'ee yaala."
+      "retryHint": "Haala Kilo Pass fe'uuf deebi'ee yaala.",
+      "usage": {
+        "bonusExpired": "Boonasii bilisaa ammas argachuun hin danda'amu",
+        "bonusLocked": "{{target}} keessaa {{spent}} baasameera",
+        "bonusMissed": "Boonasii bilisaa kee sakatta'aa jira",
+        "bonusUnlocked": "Boonasii bilisaa banameera",
+        "bonusUpfront": "Boonasii bilisaa dursee dabalameera",
+        "empty": "Kiriiditii ji'aa hanga ammaatti hin kennamne. Yeroon ammaa erga adeemsifamee booda asitti mul'atu.",
+        "noPasses": "Yeroo kanaaf Paasii hin ramadamne",
+        "passLine": "Paasiiwwan {{passes}} · Kiriiditii ji'aa {{credits}}",
+        "passLine_one": "Paasii {{passes}} · Kiriiditii ji'aa {{credits}}",
+        "passLine_other": "Paasiiwwan {{passes}} · Kiriiditii ji'aa {{credits}}",
+        "proratedNote": "Paasiiwwan yeroo gidduutti dabalameef Kiriiditii qoodamaa dabalata. Ji'ni guutuun Paasii tokkoof {{credits}} ta'a.",
+        "title": "Itti fayyadama Kilo Pass",
+        "unavailable": "Itti fayyadama Kilo Pass dhaabbata kanaaf hin argamu."
+      }
     }
   },
   "authErrors": {

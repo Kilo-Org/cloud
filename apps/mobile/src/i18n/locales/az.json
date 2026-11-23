@@ -3880,7 +3880,22 @@
       "paymentPending": "Ödəniş gözlənilir",
       "processingBlocked": "Emal bloklanıb",
       "processingNeedsReview": "Emalı yoxlamaq lazımdır",
-      "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir."
+      "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir.",
+      "usage": {
+        "bonusExpired": "Bonus artıq qazanıla bilməz",
+        "bonusLocked": "{{target}} məbləğindən {{spent}} xərclənib",
+        "bonusMissed": "Bonus yoxlanılır",
+        "bonusUnlocked": "Bonus açılıb",
+        "bonusUpfront": "Bonus artıq əlavə edilib",
+        "empty": "Hələ aylıq Kredit verilməyib. Cari dövr emal edildikdən sonra burada görünəcək.",
+        "noPasses": "Bu dövr üçün heç bir Kilo Pass təyin edilməyib",
+        "passLine": "{{passes}} Kilo Pass · aylıq {{credits}} Kredit",
+        "passLine_one": "{{passes}} Kilo Pass · aylıq {{credits}} Kredit",
+        "passLine_other": "{{passes}} Kilo Pass · aylıq {{credits}} Kredit",
+        "proratedNote": "Dövrün ortasında əlavə edilən Kilo Pass üçün mütənasib Kreditlər daxildir. Tam ay üçün hər Kilo Pass-a {{credits}} Kredit düşür.",
+        "title": "Kilo Pass istifadəsi",
+        "unavailable": "Kilo Pass istifadəsi bu təşkilat üçün əlçatan deyil."
+      }
     }
   },
   "authErrors": {

@@ -3872,7 +3872,22 @@
       "paymentPending": "Đang chờ xử lý thanh toán",
       "processingBlocked": "Không thể tiếp tục xử lý",
       "processingNeedsReview": "Cần kiểm tra quá trình xử lý",
-      "retryHint": "Thử tải lại trạng thái Kilo Pass."
+      "retryHint": "Thử tải lại trạng thái Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Không thể nhận Thưởng miễn phí nữa",
+        "bonusLocked": "Đã chi {{spent}} trên {{target}}",
+        "bonusMissed": "Đang kiểm tra Thưởng miễn phí của bạn",
+        "bonusUnlocked": "Đã mở khóa Thưởng miễn phí",
+        "bonusUpfront": "Thưởng miễn phí đã được cộng",
+        "empty": "Chưa có Số dư hàng tháng nào được cấp. Số dư sẽ xuất hiện ở đây khi kỳ hiện tại được xử lý.",
+        "noPasses": "Không có Kilo Pass nào được cấp trong kỳ này",
+        "passLine": "{{passes}} Kilo Pass · {{credits}} Số dư hàng tháng",
+        "passLine_one": "{{passes}} Kilo Pass · {{credits}} Số dư hàng tháng",
+        "passLine_other": "{{passes}} Kilo Pass · {{credits}} Số dư hàng tháng",
+        "proratedNote": "Bao gồm Số dư được tính theo tỷ lệ cho các Kilo Pass thêm giữa kỳ. Một tháng đầy đủ là {{credits}} mỗi Kilo Pass.",
+        "title": "Mức sử dụng Kilo Pass",
+        "unavailable": "Không có thông tin mức sử dụng Kilo Pass cho tổ chức này."
+      }
     }
   },
   "feedback": {

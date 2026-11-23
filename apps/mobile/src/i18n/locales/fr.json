@@ -3942,6 +3942,22 @@
       "processingBlocked": "Traitement bloqué",
       "processingNeedsReview": "Traitement à examiner",
       "retryHint": "Relance le chargement du statut de Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonus ne peut plus être obtenu",
+        "bonusLocked": "{{spent}} dépensés sur {{target}}",
+        "bonusMissed": "Vérification du bonus",
+        "bonusUnlocked": "Bonus débloqué",
+        "bonusUpfront": "Bonus déjà ajouté",
+        "empty": "Aucun crédit mensuel n'a encore été émis. Ils apparaîtront ici une fois la période en cours traitée.",
+        "noPasses": "Aucun pass attribué pour cette période",
+        "passLine": "{{passes}} pass · {{credits}} de crédits mensuels",
+        "passLine_many": "{{passes}} pass · {{credits}} de crédits mensuels",
+        "passLine_one": "{{passes}} pass · {{credits}} de crédits mensuels",
+        "passLine_other": "{{passes}} pass · {{credits}} de crédits mensuels",
+        "proratedNote": "Inclut des crédits au prorata pour les pass ajoutés en cours de période. Un mois complet correspond à {{credits}} par pass.",
+        "title": "Utilisation de Kilo Pass",
+        "unavailable": "L'utilisation de Kilo Pass n'est pas disponible pour cette organisation."
+      },
       "paidSeat_many": "{{displayCount}} licences payées"
     }
   },

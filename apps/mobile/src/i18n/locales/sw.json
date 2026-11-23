@@ -3880,7 +3880,22 @@
       "paymentPending": "Malipo yanasubiri",
       "processingBlocked": "Uchakataji umezuiliwa",
       "processingNeedsReview": "Uchakataji unahitaji ukaguzi",
-      "retryHint": "Hujaribu tena kupakia hali ya Kilo Pass."
+      "retryHint": "Hujaribu tena kupakia hali ya Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Bonasi ya bure haiwezi kupatikana tena",
+        "bonusLocked": "{{spent}} kati ya {{target}} imetumika",
+        "bonusMissed": "Inakagua bonasi yako ya bure",
+        "bonusUnlocked": "Bonasi ya bure imefunguliwa",
+        "bonusUpfront": "Bonasi ya bure imeongezwa tayari",
+        "empty": "Hakuna Salio la mwezi lililotolewa bado. Litaonekana hapa pindi kipindi cha sasa kitakapochakatwa.",
+        "noPasses": "Hakuna Pass zilizopangwa kwa kipindi hiki",
+        "passLine": "Pass {{passes}} · Salio la mwezi {{credits}}",
+        "passLine_one": "Pass {{passes}} · Salio la mwezi {{credits}}",
+        "passLine_other": "Pass {{passes}} · Salio la mwezi {{credits}}",
+        "proratedNote": "Inajumuisha Salio lililogawanywa kwa uwiano kwa Pass zilizoongezwa katikati ya kipindi. Mwezi kamili ni {{credits}} kwa kila Pass.",
+        "title": "Matumizi ya Kilo Pass",
+        "unavailable": "Matumizi ya Kilo Pass hayapatikani kwa shirika hili."
+      }
     }
   },
   "authErrors": {

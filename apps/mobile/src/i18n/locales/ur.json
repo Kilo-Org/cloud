@@ -3880,7 +3880,22 @@
       "paymentPending": "ادائیگی زیر التواء",
       "processingBlocked": "پروسیسنگ مسدود",
       "processingNeedsReview": "پروسیسنگ کا جائزہ درکار ہے",
-      "retryHint": "Kilo Pass کی حالت دوبارہ لوڈ کرنے کی کوشش کرتا ہے۔"
+      "retryHint": "Kilo Pass کی حالت دوبارہ لوڈ کرنے کی کوشش کرتا ہے۔",
+      "usage": {
+        "bonusExpired": "مفت بونس اب مزید حاصل نہیں کیا جا سکتا",
+        "bonusLocked": "{{target}} میں سے {{spent}} خرچ ہو چکے",
+        "bonusMissed": "آپ کے مفت بونس کی جانچ ہو رہی ہے",
+        "bonusUnlocked": "مفت بونس غیر مقفل ہو گیا",
+        "bonusUpfront": "مفت بونس پہلے ہی شامل ہو چکا ہے",
+        "empty": "ابھی تک کوئی ماہانہ کریڈٹس جاری نہیں ہوئے۔ موجودہ مدت پروسیس ہونے کے بعد یہ یہاں ظاہر ہوں گے۔",
+        "noPasses": "اس مدت کے لیے کوئی پاس تفویض نہیں کیا گیا",
+        "passLine": "{{passes}} پاسز · {{credits}} ماہانہ کریڈٹس",
+        "passLine_one": "{{passes}} پاس · {{credits}} ماہانہ کریڈٹس",
+        "passLine_other": "{{passes}} پاسز · {{credits}} ماہانہ کریڈٹس",
+        "proratedNote": "اس میں مدت کے دوران شامل کیے گئے پاسز کے تناسبی کریڈٹس شامل ہیں۔ مکمل مہینہ فی پاس {{credits}} ہوتا ہے۔",
+        "title": "Kilo Pass کا استعمال",
+        "unavailable": "اس تنظیم کے لیے Kilo Pass کا استعمال دستیاب نہیں ہے۔"
+      }
     }
   },
   "authErrors": {

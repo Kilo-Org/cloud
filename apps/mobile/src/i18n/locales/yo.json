@@ -3823,7 +3823,21 @@
       "processingBlocked": "A ti dí ìmúṣẹ lọ́wọ́",
       "processingNeedsReview": "Ìmúṣẹ nílò àyẹ̀wò",
       "retryHint": "Ó tún gbìyànjú láti gbé ipò Kilo Pass wọlé.",
-      "paidSeat_one": "ààyè {{displayCount}} tí a san owó rẹ̀"
+      "paidSeat_one": "ààyè {{displayCount}} tí a san owó rẹ̀",
+      "usage": {
+        "bonusExpired": "A kò lè jèrè ẹ̀bùn ọ̀fẹ́ mọ́",
+        "bonusLocked": "{{spent}} nínú {{target}} ni a ti ná",
+        "bonusMissed": "Ń ṣàyẹ̀wò ẹ̀bùn ọ̀fẹ́ rẹ",
+        "bonusUnlocked": "A ti ṣí ẹ̀bùn ọ̀fẹ́",
+        "bonusUpfront": "A ti fi ẹ̀bùn ọ̀fẹ́ kún un tẹ́lẹ̀",
+        "empty": "A kò tíì pín Kirẹ́dítì oṣooṣù kankan. Wọ́n á hàn níbí nígbà tí a bá ti ṣe àkókò ìsinsìnyí.",
+        "noPasses": "A kò pín Pass kankan fún àkókò yìí",
+        "passLine": "{{passes}} Pass · {{credits}} Kirẹ́dítì oṣooṣù",
+        "passLine_other": "{{passes}} Pass · {{credits}} Kirẹ́dítì oṣooṣù",
+        "proratedNote": "Ó ní Kirẹ́dítì ìpín-àkókò fún àwọn Pass tí a fi kún àárín àkókò. Oṣù kíkún jẹ́ {{credits}} fún Pass kọ̀ọ̀kan.",
+        "title": "Ìlò Kilo Pass",
+        "unavailable": "Ìlò Kilo Pass kò sí fún àjọ yìí."
+      }
     }
   },
   "authErrors": {

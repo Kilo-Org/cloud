@@ -3807,6 +3807,20 @@
       "processingBlocked": "처리 차단됨",
       "processingNeedsReview": "처리 검토 필요",
       "retryHint": "Kilo Pass 상태를 다시 불러옵니다.",
+      "usage": {
+        "bonusExpired": "더 이상 보너스를 받을 수 없습니다",
+        "bonusLocked": "{{target}} 중 {{spent}} 사용",
+        "bonusMissed": "보너스 확인 중",
+        "bonusUnlocked": "보너스 잠금 해제됨",
+        "bonusUpfront": "보너스가 이미 추가됨",
+        "empty": "아직 월 크레딧이 발급되지 않았습니다. 현재 기간 처리가 완료되면 여기에 표시됩니다.",
+        "noPasses": "이 기간에 배정된 패스가 없습니다",
+        "passLine": "패스 {{passes}}개 · 월 크레딧 {{credits}}",
+        "passLine_other": "패스 {{passes}}개 · 월 크레딧 {{credits}}",
+        "proratedNote": "기간 중 추가된 패스의 일할 크레딧이 포함됩니다. 한 달 전체 크레딧은 패스당 {{credits}}입니다.",
+        "title": "Kilo Pass 사용량",
+        "unavailable": "이 조직에서는 Kilo Pass 사용량을 확인할 수 없습니다."
+      },
       "paidSeat_one": "유료 라이선스 {{displayCount}}개"
     }
   },

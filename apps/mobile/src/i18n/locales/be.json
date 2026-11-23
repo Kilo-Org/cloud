@@ -4019,6 +4019,23 @@
       "processingBlocked": "Апрацоўка заблакаваная",
       "processingNeedsReview": "Апрацоўка патрабуе праверкі",
       "retryHint": "Паўтарае загрузку статусу Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Бонус больш нельга атрымаць",
+        "bonusLocked": "Выдаткавана {{spent}} з {{target}}",
+        "bonusMissed": "Правяраем ваш бонус",
+        "bonusUnlocked": "Бонус разблакаваны",
+        "bonusUpfront": "Бонус ужо дададзены",
+        "empty": "Штомесячныя крэдыты яшчэ не налічаны. Яны з'явяцца тут пасля апрацоўкі бягучага перыяду.",
+        "noPasses": "На гэты перыяд не прызначана ніводнай падпіскі Kilo Pass",
+        "passLine": "{{passes}} падпіскі Kilo Pass · {{credits}} крэдытаў штомесяц",
+        "passLine_few": "{{passes}} падпіскі Kilo Pass · {{credits}} крэдытаў штомесяц",
+        "passLine_many": "{{passes}} падпісак Kilo Pass · {{credits}} крэдытаў штомесяц",
+        "passLine_one": "{{passes}} падпіска Kilo Pass · {{credits}} крэдытаў штомесяц",
+        "passLine_other": "{{passes}} падпіскі Kilo Pass · {{credits}} крэдытаў штомесяц",
+        "proratedNote": "Уключае прапарцыйныя крэдыты за падпіскі Kilo Pass, дададзеныя ў сярэдзіне перыяду. Поўны месяц — {{credits}} за кожную падпіску Kilo Pass.",
+        "title": "Выкарыстанне Kilo Pass",
+        "unavailable": "Выкарыстанне Kilo Pass недаступнае для гэтай арганізацыі."
+      },
       "paidSeat_few": "{{displayCount}} аплачаныя месцы",
       "paidSeat_many": "{{displayCount}} аплачаных месцаў"
     }

@@ -3872,7 +3872,22 @@
       "paymentPending": "Betaling in behandeling",
       "processingBlocked": "Verwerking geblokkeerd",
       "processingNeedsReview": "Verwerking moet worden beoordeeld",
-      "retryHint": "Probeert de Kilo Pass-status opnieuw te laden."
+      "retryHint": "Probeert de Kilo Pass-status opnieuw te laden.",
+      "usage": {
+        "bonusExpired": "Bonus kan niet meer worden verdiend",
+        "bonusLocked": "{{spent}} van {{target}} besteed",
+        "bonusMissed": "Je bonus wordt gecontroleerd",
+        "bonusUnlocked": "Bonus ontgrendeld",
+        "bonusUpfront": "Bonus al toegevoegd",
+        "empty": "Er is nog geen maandelijks tegoed uitgegeven. Het verschijnt hier zodra de huidige periode is verwerkt.",
+        "noPasses": "Geen passen toegewezen voor deze periode",
+        "passLine": "{{passes}} passen · {{credits}} maandelijks tegoed",
+        "passLine_one": "{{passes}} pas · {{credits}} maandelijks tegoed",
+        "passLine_other": "{{passes}} passen · {{credits}} maandelijks tegoed",
+        "proratedNote": "Bevat naar rato berekend tegoed voor passen die midden in de periode zijn toegevoegd. Een volledige maand is {{credits}} per pas.",
+        "title": "Kilo Pass-gebruik",
+        "unavailable": "Kilo Pass-gebruik is niet beschikbaar voor deze organisatie."
+      }
     }
   },
   "feedback": {

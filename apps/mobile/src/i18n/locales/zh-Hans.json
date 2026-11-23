@@ -3808,7 +3808,21 @@
       "processingBlocked": "处理受阻",
       "processingNeedsReview": "处理情况需要审核",
       "retryHint": "重新加载 Kilo Pass 状态。",
-      "paidSeat_one": "{{displayCount}} 个已付费席位"
+      "paidSeat_one": "{{displayCount}} 个已付费席位",
+      "usage": {
+        "bonusExpired": "无法再获得免费奖励",
+        "bonusLocked": "已消费 {{spent}}，目标 {{target}}",
+        "bonusMissed": "正在检查免费奖励",
+        "bonusUnlocked": "免费奖励已解锁",
+        "bonusUpfront": "免费奖励已添加",
+        "empty": "尚未发放月度额度。当前周期处理完成后，额度将显示在这里。",
+        "noPasses": "本周期未分配 Kilo Pass",
+        "passLine": "{{passes}} 个 Kilo Pass · 每月 {{credits}} 额度",
+        "passLine_other": "{{passes}} 个 Kilo Pass · 每月 {{credits}} 额度",
+        "proratedNote": "包含周期中途添加的 Kilo Pass 的按比例额度。每个 Kilo Pass 的完整月度额度为 {{credits}}。",
+        "title": "Kilo Pass 用量",
+        "unavailable": "此组织无法查看 Kilo Pass 用量。"
+      }
     }
   },
   "feedback": {

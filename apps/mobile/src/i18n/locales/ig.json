@@ -3821,7 +3821,21 @@
       "paymentPending": "Ịkwụ ụgwọ na-echere",
       "processingBlocked": "Egbochiri nhazi",
       "processingNeedsReview": "Nhazi chọrọ nyocha",
-      "retryHint": "Ọ na-anwa ibudata ọnọdụ Kilo Pass ọzọ."
+      "retryHint": "Ọ na-anwa ibudata ọnọdụ Kilo Pass ọzọ.",
+      "usage": {
+        "bonusExpired": "A gaghịzi enweta Bonus",
+        "bonusLocked": "{{spent}} n'ime {{target}} e mefuru",
+        "bonusMissed": "Na-enyocha Bonus gị",
+        "bonusUnlocked": "E meghere Bonus",
+        "bonusUpfront": "E tinyelarị Bonus",
+        "empty": "Enwebeghị kredit ọnwa e nyerela. Ha ga-apụta ebe a ozugbo e mechara nhazi oge ugbu a.",
+        "noPasses": "E kenyeghị Pass ọ bụla maka oge a",
+        "passLine": "{{passes}} Pass · {{credits}} kredit Kilo kwa ọnwa",
+        "passLine_other": "{{passes}} Pass · {{credits}} kredit Kilo kwa ọnwa",
+        "proratedNote": "Gụnyere kredit e gbakọrọ dabere n'oge maka Pass ndị agbakwunyere n'etiti oge. Ọnwa zuru oke bụ {{credits}} maka Pass ọ bụla.",
+        "title": "Ojiji Kilo Pass",
+        "unavailable": "Ojiji Kilo Pass adịghị maka ụlọ ọrụ a."
+      }
     }
   },
   "authErrors": {

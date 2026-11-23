@@ -3880,7 +3880,22 @@
       "paymentPending": "To'lov kutilmoqda",
       "processingBlocked": "Qayta ishlash bloklandi",
       "processingNeedsReview": "Qayta ishlash jarayonini tekshirish kerak",
-      "retryHint": "Kilo Pass holatini qayta yuklaydi."
+      "retryHint": "Kilo Pass holatini qayta yuklaydi.",
+      "usage": {
+        "bonusExpired": "Bonusni endi qo'lga kiritish mumkin emas",
+        "bonusLocked": "{{target}}dan {{spent}} sarflandi",
+        "bonusMissed": "Bonusingiz tekshirilmoqda",
+        "bonusUnlocked": "Bonus ochildi",
+        "bonusUpfront": "Bonus allaqachon qo'shilgan",
+        "empty": "Hali oylik Kreditlar berilmagan. Joriy davr qayta ishlangach, ular shu yerda ko'rinadi.",
+        "noPasses": "Bu davr uchun Kilo Pass obunalari tayinlanmagan",
+        "passLine": "{{passes}} ta Kilo Pass obunasi · oylik {{credits}} Kredit",
+        "passLine_one": "{{passes}} ta Kilo Pass obunasi · oylik {{credits}} Kredit",
+        "passLine_other": "{{passes}} ta Kilo Pass obunasi · oylik {{credits}} Kredit",
+        "proratedNote": "Davr o'rtasida qo'shilgan Kilo Pass obunalari uchun mutanosib Kreditlarni o'z ichiga oladi. To'liq oy uchun har bir obunaga {{credits}} to'g'ri keladi.",
+        "title": "Kilo Pass foydalanishi",
+        "unavailable": "Bu tashkilot uchun Kilo Pass foydalanishi mavjud emas."
+      }
     }
   },
   "authErrors": {

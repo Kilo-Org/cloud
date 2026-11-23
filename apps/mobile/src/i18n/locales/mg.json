@@ -3880,7 +3880,22 @@
       "paymentPending": "Miandry fandoavana",
       "processingBlocked": "Voasakana ny fikirakirana",
       "processingNeedsReview": "Mila dinihina ny fikirakirana",
-      "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass."
+      "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Tsy azo alaina intsony ny Tombony maimaim-poana",
+        "bonusLocked": "{{spent}} amin'ny {{target}} no efa lany",
+        "bonusMissed": "Dinihina ny tomboninao",
+        "bonusUnlocked": "Vohana ny Tombony maimaim-poana",
+        "bonusUpfront": "Efa nampiana ny Tombony maimaim-poana",
+        "empty": "Tsy mbola nisy Kireditra isam-bolana navoaka. Miseho eto izy ireo rehefa voakirakira ny fe-potoana ankehitriny.",
+        "noPasses": "Tsy misy Pass natokana ho an'ity fe-potoana ity",
+        "passLine": "{{passes}} Pass · {{credits}} Kireditra isam-bolana",
+        "passLine_one": "{{passes}} Pass · {{credits}} Kireditra isam-bolana",
+        "passLine_other": "{{passes}} Pass · {{credits}} Kireditra isam-bolana",
+        "proratedNote": "Ahitana Kireditra kajy araka ny ampahany ho an'ny Pass nampiana tao anatin'ny fe-potoana. Ny volana feno dia {{credits}} isaky ny Pass.",
+        "title": "Fampiasana Kilo Pass",
+        "unavailable": "Tsy misy ny fampiasana Kilo Pass ho an'ity fikambanana ity."
+      }
     }
   },
   "authErrors": {

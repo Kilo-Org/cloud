@@ -3821,6 +3821,20 @@
       "processingBlocked": "ບໍ່ສາມາດປະມວນຜົນຕໍ່ໄດ້",
       "processingNeedsReview": "ຕ້ອງກວດສອບການປະມວນຜົນ",
       "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
+      "usage": {
+        "bonusExpired": "ບໍ່ສາມາດຮັບໂບນັດໄດ້ອີກແລ້ວ",
+        "bonusLocked": "ໃຊ້ໄປ {{spent}} ຈາກ {{target}}",
+        "bonusMissed": "ກຳລັງກວດເບິ່ງໂບນັດ",
+        "bonusUnlocked": "ປົດລັອກໂບນັດແລ້ວ",
+        "bonusUpfront": "ເພີ່ມໂບນັດແລ້ວ",
+        "empty": "ຍັງບໍ່ມີການອອກເຄຣດິດລາຍເດືອນເທື່ອ. ເຄຣດິດຈະສະແດງຢູ່ນີ້ເມື່ອຮອບປັດຈຸບັນຖືກປະມວນຜົນແລ້ວ.",
+        "noPasses": "ບໍ່ມີສິດທີ່ມອບໝາຍໃນຮອບນີ້",
+        "passLine": "{{passes}} ສິດ · ເຄຣດິດລາຍເດືອນ {{credits}}",
+        "passLine_other": "{{passes}} ສິດ · ເຄຣດິດລາຍເດືອນ {{credits}}",
+        "proratedNote": "ລວມເຄຣດິດທີ່ຄິດໄລ່ຕາມສັດສ່ວນສຳລັບສິດທີ່ເພີ່ມກາງຮອບ. ເດືອນເຕັມແມ່ນ {{credits}} ຕໍ່ສິດ.",
+        "title": "ການໃຊ້ງານ Kilo Pass",
+        "unavailable": "ການໃຊ້ງານ Kilo Pass ບໍ່ມີໃຫ້ສຳລັບອົງກອນນີ້."
+      },
       "paidSeat_one": "ສິດຜູ້ໃຊ້ທີ່ຊຳລະແລ້ວ {{displayCount}} ສິດ"
     }
   },

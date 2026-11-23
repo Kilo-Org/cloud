@@ -4020,7 +4020,24 @@
       "processingNeedsReview": "Potreben je pregled obdelave",
       "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
       "paidSeat_two": "{{displayCount}} plačani uporabniški mesti",
-      "paidSeat_few": "{{displayCount}} plačana uporabniška mesta"
+      "paidSeat_few": "{{displayCount}} plačana uporabniška mesta",
+      "usage": {
+        "bonusExpired": "Brezplačnega bonusa ni več mogoče pridobiti",
+        "bonusLocked": "Porabljenih {{spent}} od {{target}}",
+        "bonusMissed": "Preverjanje brezplačnega bonusa",
+        "bonusUnlocked": "Brezplačni bonus je odklenjen",
+        "bonusUpfront": "Brezplačni bonus je že dodan",
+        "empty": "Mesečni Krediti še niso bili izdani. Prikažejo se tukaj, ko bo obdelano trenutno obdobje.",
+        "noPasses": "Za to obdobje ni dodeljena nobena naročnina Kilo Pass",
+        "passLine": "{{passes}} naročnin Kilo Pass · {{credits}} mesečnih Kreditov",
+        "passLine_few": "{{passes}} naročnine Kilo Pass · {{credits}} mesečnih Kreditov",
+        "passLine_one": "{{passes}} naročnina Kilo Pass · {{credits}} mesečnih Kreditov",
+        "passLine_other": "{{passes}} naročnin Kilo Pass · {{credits}} mesečnih Kreditov",
+        "passLine_two": "{{passes}} naročnini Kilo Pass · {{credits}} mesečnih Kreditov",
+        "proratedNote": "Vključuje sorazmerne Kredite za naročnine Kilo Pass, dodane sredi obdobja. Polni mesec znaša {{credits}} na naročnino Kilo Pass.",
+        "title": "Poraba Kilo Pass",
+        "unavailable": "Poraba Kilo Pass za to organizacijo ni na voljo."
+      }
     }
   },
   "authErrors": {

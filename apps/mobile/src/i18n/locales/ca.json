@@ -3950,6 +3950,22 @@
       "processingBlocked": "Processament bloquejat",
       "processingNeedsReview": "Cal revisar el processament",
       "retryHint": "Torna a provar de carregar l'estat de Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Ja no es pot obtenir el bonus",
+        "bonusLocked": "{{spent}} de {{target}} gastats",
+        "bonusMissed": "S'està comprovant el bonus",
+        "bonusUnlocked": "Bonus desbloquejat",
+        "bonusUpfront": "Bonus ja afegit",
+        "empty": "Encara no s'han emès crèdits mensuals. Apareixeran aquí quan es processi el període actual.",
+        "noPasses": "No hi ha passis assignats per a aquest període",
+        "passLine": "{{passes}} passis · {{credits}} crèdits mensuals",
+        "passLine_many": "{{passes}} passis · {{credits}} crèdits mensuals",
+        "passLine_one": "{{passes}} passi · {{credits}} crèdits mensuals",
+        "passLine_other": "{{passes}} passis · {{credits}} crèdits mensuals",
+        "proratedNote": "Inclou crèdits prorratejats pels passis afegits a mitjan període. Un mes complet equival a {{credits}} per passi.",
+        "title": "Ús del Kilo Pass",
+        "unavailable": "L'ús del Kilo Pass no està disponible per a aquesta organització."
+      },
       "paidSeat_many": "{{displayCount}} llicències de pagament"
     }
   },

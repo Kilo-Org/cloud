@@ -3880,7 +3880,22 @@
       "paymentPending": "Pagamento pendente",
       "processingBlocked": "Procesamento bloqueado",
       "processingNeedsReview": "Cómpre revisar o procesamento",
-      "retryHint": "Volve tentar cargar o estado de Kilo Pass."
+      "retryHint": "Volve tentar cargar o estado de Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Xa non se pode obter o bono",
+        "bonusLocked": "{{spent}} de {{target}} gastados",
+        "bonusMissed": "Comprobando o teu bono",
+        "bonusUnlocked": "Bono desbloqueado",
+        "bonusUpfront": "Bono xa engadido",
+        "empty": "Aínda non se emitiu ningún crédito mensual. Aparecerán aquí cando se procese o período actual.",
+        "noPasses": "Non hai pases asignados para este período",
+        "passLine": "{{passes}} pases · {{credits}} créditos mensuais",
+        "passLine_one": "{{passes}} pase · {{credits}} créditos mensuais",
+        "passLine_other": "{{passes}} pases · {{credits}} créditos mensuais",
+        "proratedNote": "Inclúe créditos proporcionais polos pases engadidos a mediados do período. Un mes completo son {{credits}} por pase.",
+        "title": "Uso de Kilo Pass",
+        "unavailable": "O uso de Kilo Pass non está dispoñible para esta organización."
+      }
     }
   },
   "authErrors": {

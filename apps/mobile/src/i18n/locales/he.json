@@ -3942,6 +3942,22 @@
       "processingBlocked": "העיבוד נחסם",
       "processingNeedsReview": "העיבוד דורש בדיקה",
       "retryHint": "מנסה שוב לטעון את מצב Kilo Pass.",
+      "usage": {
+        "bonusExpired": "לא ניתן עוד לצבור את הבונוס",
+        "bonusLocked": "{{spent}} מתוך {{target}} נוצלו",
+        "bonusMissed": "בודק את הבונוס שלך",
+        "bonusUnlocked": "הבונוס נפתח",
+        "bonusUpfront": "הבונוס כבר נוסף",
+        "empty": "עדיין לא הונפקו קרדיטים חודשיים. הם יופיעו כאן לאחר עיבוד התקופה הנוכחית.",
+        "noPasses": "לא הוקצו הקצאות לתקופה זו",
+        "passLine": "{{passes}} הקצאות · {{credits}} קרדיטים חודשיים",
+        "passLine_one": "{{passes}} הקצאה · {{credits}} קרדיטים חודשיים",
+        "passLine_other": "{{passes}} הקצאות · {{credits}} קרדיטים חודשיים",
+        "passLine_two": "{{passes}} הקצאות · {{credits}} קרדיטים חודשיים",
+        "proratedNote": "כולל קרדיטים יחסיים עבור הקצאות שנוספו באמצע התקופה. חודש מלא הוא {{credits}} לכל הקצאה.",
+        "title": "שימוש ב-Kilo Pass",
+        "unavailable": "השימוש ב-Kilo Pass אינו זמין עבור ארגון זה."
+      },
       "paidSeat_two": "רישיונות בתשלום: {{displayCount}}"
     }
   },

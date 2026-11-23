@@ -3880,7 +3880,22 @@
       "paymentPending": "Lacag bixinta waa la sugayaa",
       "processingBlocked": "Habayntu waa la xannibay",
       "processingNeedsReview": "Habayntu waxay u baahan tahay dib-u-eegis",
-      "retryHint": "Wuxuu mar kale isku dayaa inuu soo shubo xaaladda Kilo Pass."
+      "retryHint": "Wuxuu mar kale isku dayaa inuu soo shubo xaaladda Kilo Pass.",
+      "usage": {
+        "bonusExpired": "Gunada bilaashka ah dib looma kasban karo",
+        "bonusLocked": "{{spent}} oo ka mid ah {{target}} ayaa la isticmaalay",
+        "bonusMissed": "Gunadaada bilaashka ah waa la hubinayaa",
+        "bonusUnlocked": "Gunada bilaashka ah waa la furay",
+        "bonusUpfront": "Gunada bilaashka ah hore ayaa loo daray",
+        "empty": "Weli lama soo saarin Lacagta isticmaalka bil kasta. Waxay halkan ka muuqan doonaan marka xilliga hadda la habiyo.",
+        "noPasses": "Ma jiraan Pass-yo loo qoondeeyay xilligan",
+        "passLine": "{{passes}} Pass-yo · {{credits}} Lacagta isticmaalka bil kasta",
+        "passLine_one": "{{passes}} Pass · {{credits}} Lacagta isticmaalka bil kasta",
+        "passLine_other": "{{passes}} Pass-yo · {{credits}} Lacagta isticmaalka bil kasta",
+        "proratedNote": "Waxaa ku jira Lacagta isticmaalka qayb ahaan loo xisaabiyay ee Pass-yada xilliga bartamihiisa lagu daray. Bil buuxda waa {{credits}} Pass kasta.",
+        "title": "Isticmaalka Kilo Pass",
+        "unavailable": "Isticmaalka Kilo Pass lama heli karo ururkan."
+      }
     }
   },
   "authErrors": {

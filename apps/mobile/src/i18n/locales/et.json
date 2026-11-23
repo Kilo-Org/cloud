@@ -3880,7 +3880,22 @@
       "paymentPending": "Makse ootel",
       "processingBlocked": "Töötlemine blokeeritud",
       "processingNeedsReview": "Töötlemine vajab ülevaatamist",
-      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti."
+      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti.",
+      "usage": {
+        "bonusExpired": "Boonust ei saa enam teenida",
+        "bonusLocked": "Kasutatud {{spent}} / {{target}}",
+        "bonusMissed": "Boonuse kontrollimine",
+        "bonusUnlocked": "Boonus on avatud",
+        "bonusUpfront": "Boonus on juba lisatud",
+        "empty": "Kuukrediite pole veel väljastatud. Need kuvatakse siin pärast praeguse perioodi töötlemist.",
+        "noPasses": "Selleks perioodiks pole passe määratud",
+        "passLine": "{{passes}} passi · {{credits}} kuukrediiti",
+        "passLine_one": "{{passes}} pass · {{credits}} kuukrediiti",
+        "passLine_other": "{{passes}} passi · {{credits}} kuukrediiti",
+        "proratedNote": "Sisaldab proportsionaalseid krediite perioodi keskel lisatud passide eest. Täiskuu eest on {{credits}} passi kohta.",
+        "title": "Kilo Passi kasutus",
+        "unavailable": "Kilo Passi kasutus pole selle organisatsiooni jaoks saadaval."
+      }
     }
   },
   "authErrors": {

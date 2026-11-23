@@ -3818,7 +3818,21 @@
       "processingBlocked": "การประมวลผลถูกบล็อก",
       "processingNeedsReview": "ต้องตรวจสอบการประมวลผล",
       "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
-      "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์"
+      "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์",
+      "usage": {
+        "bonusExpired": "ไม่สามารถรับโบนัสได้อีกแล้ว",
+        "bonusLocked": "ใช้ไป {{spent}} จาก {{target}}",
+        "bonusMissed": "กำลังตรวจสอบโบนัสของคุณ",
+        "bonusUnlocked": "ปลดล็อกโบนัสแล้ว",
+        "bonusUpfront": "เพิ่มโบนัสแล้ว",
+        "empty": "ยังไม่มีการออกเครดิตประจำเดือน จะแสดงที่นี่เมื่อประมวลผลรอบปัจจุบันแล้ว",
+        "noPasses": "ไม่มีการมอบหมาย Pass สำหรับรอบนี้",
+        "passLine": "{{passes}} Pass · {{credits}} เครดิตต่อเดือน",
+        "passLine_other": "{{passes}} Pass · {{credits}} เครดิตต่อเดือน",
+        "proratedNote": "รวมเครดิตแบบเฉลี่ยตามสัดส่วนสำหรับ Pass ที่เพิ่มระหว่างรอบ เดือนเต็มคือ {{credits}} ต่อ Pass",
+        "title": "การใช้งาน Kilo Pass",
+        "unavailable": "การใช้งาน Kilo Pass ไม่พร้อมใช้งานสำหรับองค์กรนี้"
+      }
     }
   },
   "authErrors": {

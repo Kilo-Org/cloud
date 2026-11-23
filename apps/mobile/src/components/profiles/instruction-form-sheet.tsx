@@ -184,12 +184,6 @@ export function InstructionFormSheet({
   // boundary and the spoken name through `outsideError` below.
   const rule = t(instructionErrorKey('bad-name'));
   const ruleError = nameHint.kind === 'rule' ? rule : undefined;
-  // The two messages a refused instruction name can show, reserved as one slot
-  // under the field so a refusal never moves the form under the keyboard. A
-  // long name is cut to the stored slug rather than refused, so it has no
-  // message to reserve. The keys come from the same mapping the refused-save
-  // path reads, so a renamed catalog key cannot leave one path behind.
-  const nameErrorMessages = [t(instructionErrorKey('empty')), t(instructionErrorKey('reserved'))];
   const contentKey = instructionContentErrorKey(error);
   const contentError =
     contentKey === null ? undefined : t(contentKey, { max: INSTRUCTION_CONTENT_MAX_LENGTH });
@@ -271,7 +265,6 @@ export function InstructionFormSheet({
           defaultValue={nameRef.current}
           error={nameError}
           outsideError={ruleError}
-          reserveErrorMessages={nameErrorMessages}
           disabled={isSaving}
           required
           autoCapitalize="none"

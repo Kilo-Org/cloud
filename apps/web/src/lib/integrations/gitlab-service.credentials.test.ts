@@ -2373,7 +2373,8 @@ describe('GitLab encrypted credential persistence', () => {
       'glpat-primary-token',
       '42',
       555,
-      'https://gitlab.com'
+      'https://gitlab.com',
+      expect.any(AbortSignal)
     );
     expect(credentials).toEqual([
       expect.objectContaining({
@@ -2579,7 +2580,8 @@ describe('GitLab encrypted credential persistence', () => {
       'glpat-primary-token',
       '42',
       555,
-      'https://gitlab.com'
+      'https://gitlab.com',
+      expect.any(AbortSignal)
     );
     expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
     const credentials = await db
@@ -2737,7 +2739,7 @@ describe('GitLab encrypted credential persistence', () => {
         currentAccountId: '202',
         signal: controller.signal,
       })
-    ).resolves.toEqual({ retired: 1, retained: 2, skipped: 2 });
+    ).resolves.toEqual({ retired: 1, retained: 2, skippedWithinRetained: 2 });
 
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
@@ -2834,7 +2836,7 @@ describe('GitLab encrypted credential persistence', () => {
         currentAccountId: '202',
         signal: controller.signal,
       })
-    ).resolves.toEqual({ retired: 0, retained: 2, skipped: 2 });
+    ).resolves.toEqual({ retired: 0, retained: 2, skippedWithinRetained: 2 });
 
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
     const credentials = await db
@@ -2914,7 +2916,7 @@ describe('GitLab encrypted credential persistence', () => {
         currentAccountId: '202',
         signal: controller.signal,
       })
-    ).resolves.toEqual({ retired: 0, retained: 1, skipped: 1 });
+    ).resolves.toEqual({ retired: 0, retained: 1, skippedWithinRetained: 1 });
 
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
   });
@@ -2978,7 +2980,7 @@ describe('GitLab encrypted credential persistence', () => {
         currentAccountId: '202',
         signal: new AbortController().signal,
       })
-    ).resolves.toEqual({ retired: 1, retained: 1, skipped: 0 });
+    ).resolves.toEqual({ retired: 1, retained: 1, skippedWithinRetained: 0 });
 
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(

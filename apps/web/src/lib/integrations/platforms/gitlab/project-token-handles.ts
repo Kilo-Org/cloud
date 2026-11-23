@@ -568,7 +568,12 @@ export async function removeStoredProjectAccessToken(
   return { outcome: 'removed' };
 }
 
-/** Share one walk budget between the settlement and retirement walks. */
+/**
+ * Budget for one project-token walk inside one request. The settlement walk and
+ * the retirement walk each create their own deadline at this value, so a request
+ * that runs both can spend up to twice this, and each credential replacement a
+ * request performs gets its own budget.
+ */
 export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
 
 /** What the mark statement did with one project the walk did not reach. */
@@ -635,6 +640,11 @@ async function markUnreachedProjectCredentialsUnusable(input: {
       failures.push({ projectId, error: parsed.error });
       continue;
     }
+    // The walk loop settles a project of the connected account when its metadata
+    // entry names an older token id, because only a revocation settles that id.
+    // The deadline leaves no time for the call, so such a row takes the marker
+    // and the next use replaces it, exactly as an unreached row of another
+    // account does.
     if (
       parsed.data.authorizedAccountId === input.currentAccountId &&
       readLegacyProjectTokenId(input.integration.metadata, projectId) === null
@@ -703,13 +713,13 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
   userToken: string;
   currentAccountId: string;
   signal?: AbortSignal;
-}): Promise<{ retired: number; retained: number; skipped: number }> {
+}): Promise<{ retired: number; retained: number; skippedWithinRetained: number }> {
   const signal = input.signal ?? AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS);
   const projectIds = await listProjectIdsWithStoredTokens(input.integration);
 
   let retired = 0;
   let retained = 0;
-  let skipped = 0;
+  let skippedWithinRetained = 0;
   let unreachedProjectIds: string[] = [];
   for (const [index, projectId] of projectIds.entries()) {
     // Check the deadline before each row read.
@@ -810,7 +820,7 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
       projectId => !ignoredProjectIds.has(projectId)
     );
     retained += countedProjectIds.length;
-    skipped += countedProjectIds.length;
+    skippedWithinRetained += countedProjectIds.length;
   }
 
   logExceptInTest('[retireProjectCredentialsForReplacedAccount] Retirement finished', {
@@ -818,7 +828,7 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
     currentAccountId: input.currentAccountId,
     retired,
     retained,
-    skipped,
+    skippedWithinRetained,
   });
-  return { retired, retained, skipped };
+  return { retired, retained, skippedWithinRetained };
 }

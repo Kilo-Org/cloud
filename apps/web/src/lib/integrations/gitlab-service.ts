@@ -1015,6 +1015,7 @@ export async function getOrCreateProjectAccessToken(
           credential: storedCredential,
           userToken: await getValidGitLabToken(integration, actor),
           instanceUrl,
+          signal: AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS),
         });
       } catch (error) {
         logExceptInTest(
@@ -1036,6 +1037,7 @@ export async function getOrCreateProjectAccessToken(
       credential: storedCredential,
       userToken,
       instanceUrl,
+      signal: AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS),
     });
     storedCredential = null;
   }
@@ -1733,7 +1735,7 @@ export async function connectWithPAT(
         integrationId: existingIntegration.id,
         retired: retirement.retired,
         retained: retirement.retained,
-        skipped: retirement.skipped,
+        skippedWithinRetained: retirement.skippedWithinRetained,
       });
     }
 

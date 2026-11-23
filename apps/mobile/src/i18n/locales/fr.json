@@ -5440,12 +5440,12 @@
     "emptyDescription": "Essayez un autre nom de préférence ou un autre mot-clé.",
     "resultsStatus": "Préférences trouvées : {{resultCount}}",
     "keywords": {
-      "signOut": "déconnexion|se déconnecter",
-      "appearance": "thème|couleurs|mode sombre",
-      "appUnlock": "biométrie|visage|empreinte digitale",
-      "language": "langue|traduction",
-      "notifications": "alertes|notifications",
-      "privacy": "statistiques|suivi|confidentialité"
+      "signOut": ["déconnexion", "se déconnecter"],
+      "appearance": ["thème", "couleurs", "mode sombre"],
+      "appUnlock": ["biométrie", "visage", "empreinte digitale"],
+      "language": ["langue", "traduction"],
+      "notifications": ["alertes", "notifications"],
+      "privacy": ["statistiques", "suivi", "confidentialité"]
     }
   }
 }

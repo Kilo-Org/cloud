@@ -5266,12 +5266,12 @@
     "emptyDescription": "Gbìyànjú orúkọ ààyò tàbí ọ̀rọ̀ kókó mìíràn.",
     "resultsStatus": "Àwọn ààyò tí a rí: {{resultCount}}",
     "keywords": {
-      "signOut": "jáde|kúrò",
-      "appearance": "ìrísí|àwọ̀|àkópọ̀ àwọ̀",
-      "appUnlock": "ìdánimọ̀ àbùdá ara|ojú|ìtẹ̀ka",
-      "language": "èdè|ìtumọ̀",
-      "notifications": "ìfitónilétí|ìkìlọ̀",
-      "privacy": "ìtúpalẹ̀|ìtọpinpin|àṣírí"
+      "signOut": ["jáde", "kúrò"],
+      "appearance": ["ìrísí", "àwọ̀", "àkópọ̀ àwọ̀"],
+      "appUnlock": ["ìdánimọ̀ àbùdá ara", "ojú", "ìtẹ̀ka"],
+      "language": ["èdè", "ìtumọ̀"],
+      "notifications": ["ìfitónilétí", "ìkìlọ̀"],
+      "privacy": ["ìtúpalẹ̀", "ìtọpinpin", "àṣírí"]
     }
   }
 }

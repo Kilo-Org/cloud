@@ -54,6 +54,53 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
+/**
+ * The six keyword ids `settingsSearch.keywords` carries, the keyword section's
+ * English and translated fixture lists, and the six translate calls the source
+ * makes for them. Every fixture catalog carries the section, the way a real
+ * catalog ships it, because the rule that reads it works on the parsed document
+ * rather than on the flattened value.
+ */
+const SETTINGS_KEYWORDS = [
+  'signOut',
+  'appearance',
+  'appUnlock',
+  'language',
+  'notifications',
+  'privacy',
+];
+const SETTINGS_KEYWORDS_ENGLISH = {
+  signOut: ['logout', 'log off'],
+  appearance: ['theme', 'color scheme'],
+  appUnlock: ['biometrics', 'face ID', 'fingerprint'],
+  language: ['locale', 'translation'],
+  notifications: ['alerts', 'push notifications'],
+  privacy: ['analytics', 'tracking'],
+};
+// Latin words, so a catalog of any script accepts them as its own copy.
+const SETTINGS_KEYWORDS_TRANSLATED = {
+  signOut: ['bye', 'leaving'],
+  appearance: ['look', 'colours'],
+  appUnlock: ['unlock', 'finger'],
+  language: ['lingo', 'speech'],
+  notifications: ['pings', 'alerts seen'],
+  privacy: ['data', 'tracking seen'],
+};
+const SETTINGS_KEYWORDS_SOURCE = SETTINGS_KEYWORDS.map(
+  id => `t('settingsSearch.keywords.${id}');`
+).join('\n');
+
+/**
+ * One fixture catalog carrying the keyword section, unless the case states its
+ * own — a case that tests a malformed section hands its own object over as is.
+ */
+function withSettingsKeywords(catalog, keywords) {
+  const stated = catalog.settingsSearch;
+  if (stated !== undefined && stated.keywords !== undefined) {
+    return catalog;
+  }
+  return { ...catalog, settingsSearch: { ...(stated ?? {}), keywords } };
+}
 // Hindi selects only `one` and `other`, so a fixture catalog for it declares
 // those two forms and nothing else: a form Hindi cannot select is now a
 // reported problem of its own.
@@ -109,8 +156,13 @@ function run({
   const root = fixture({
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', '${language}'];`,
     'apps/mobile/src/example.ts': source,
-    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
-    [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
+    'apps/mobile/src/settings-keywords.ts': SETTINGS_KEYWORDS_SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(
+      withSettingsKeywords(english, SETTINGS_KEYWORDS_ENGLISH)
+    ),
+    [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(
+      withSettingsKeywords(translated, SETTINGS_KEYWORDS_TRANSLATED)
+    ),
     'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
     [`packages/notifications/src/locales/${language}.json`]: JSON.stringify(pushTranslated),
     'packages/notifications/src/push-copy.ts': pushSource,
@@ -167,8 +219,13 @@ function standardFiles({ english = ENGLISH, translated = TRANSLATED, source = SO
     // repository root inside the copied checker, so a root absent here is the
     // strict case: the audit has to have every declared source tree.
     'services/example.ts': "export const pushExample = 'Example';",
-    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
-    'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(translated),
+    'apps/mobile/src/settings-keywords.ts': SETTINGS_KEYWORDS_SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(
+      withSettingsKeywords(english, SETTINGS_KEYWORDS_ENGLISH)
+    ),
+    'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(
+      withSettingsKeywords(translated, SETTINGS_KEYWORDS_TRANSLATED)
+    ),
     'packages/notifications/src/locales/en.json': '{}',
     'packages/notifications/src/locales/ru.json': '{}',
     'packages/notifications/src/i18n.ts': [
@@ -365,14 +422,22 @@ test('admits a form the shipped plural data selects', () => {
   const root = fixture({
     'apps/mobile/src/i18n/languages.ts': "export const SUPPORTED_LANGUAGES = ['en', 'vi'];",
     'apps/mobile/src/example.ts': SOURCE,
-    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(ENGLISH),
-    'apps/mobile/src/i18n/locales/vi.json': JSON.stringify({
-      agents: {
-        title: 'Tác nhân bản địa hoá',
-        liveCount_one: '{{count}} phiên bản địa hoá',
-        liveCount_other: '{{count}} phiên bản địa hoá',
-      },
-    }),
+    'apps/mobile/src/settings-keywords.ts': SETTINGS_KEYWORDS_SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(
+      withSettingsKeywords(ENGLISH, SETTINGS_KEYWORDS_ENGLISH)
+    ),
+    'apps/mobile/src/i18n/locales/vi.json': JSON.stringify(
+      withSettingsKeywords(
+        {
+          agents: {
+            title: 'Tác nhân bản địa hoá',
+            liveCount_one: '{{count}} phiên bản địa hoá',
+            liveCount_other: '{{count}} phiên bản địa hoá',
+          },
+        },
+        SETTINGS_KEYWORDS_TRANSLATED
+      )
+    ),
     'packages/notifications/src/locales/en.json': '{}',
     'packages/notifications/src/locales/vi.json': '{}',
     'packages/notifications/src/i18n.ts': [
@@ -525,7 +590,11 @@ test('accepts values that read as a brace or a key-shaped run', () => {
     },
   };
   const found = run({
-    extraFiles: { 'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english) },
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': JSON.stringify(
+        withSettingsKeywords(english, SETTINGS_KEYWORDS_ENGLISH)
+      ),
+    },
     translated: {
       agents: {
         title: 'Агенты',
@@ -555,6 +624,16 @@ test('still reports a repeated key after a value closes a brace', () => {
         '    "summary": "Read as text",',
         '    "title": "Agents }",',
         '    "summary": "Read as text"',
+        '  },',
+        '  "settingsSearch": {',
+        '    "keywords": {',
+        '      "signOut": ["logout"],',
+        '      "appearance": ["theme"],',
+        '      "appUnlock": ["biometrics"],',
+        '      "language": ["locale"],',
+        '      "notifications": ["alerts"],',
+        '      "privacy": ["analytics"]',
+        '    }',
         '  }',
         '}',
       ].join('\n'),
@@ -2692,7 +2771,9 @@ function runWithFrench({ english, french, russian, source }) {
     extraFiles: {
       ...PER_CATALOG_FRENCH_PUSH,
       'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
-      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(french),
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(
+        withSettingsKeywords(french, SETTINGS_KEYWORDS_TRANSLATED)
+      ),
     },
   });
 }
@@ -2793,7 +2874,9 @@ test('accepts a mobile value its catalog lists as English on purpose', () => {
       ...standardFiles({ english, translated: russian, source }),
       ...PER_CATALOG_FRENCH_PUSH,
       'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
-      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(
+        withSettingsKeywords(english, SETTINGS_KEYWORDS_TRANSLATED)
+      ),
     },
     withException
   );
@@ -2827,8 +2910,12 @@ test('stays silent when every catalog lists the prose value as English on purpos
         ...standardFiles({ english, translated: english, source }),
         ...PER_CATALOG_FRENCH_PUSH,
         'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
-        'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
-        'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(english),
+        'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(
+          withSettingsKeywords(english, SETTINGS_KEYWORDS_TRANSLATED)
+        ),
+        'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(
+          withSettingsKeywords(english, SETTINGS_KEYWORDS_TRANSLATED)
+        ),
       },
       checker
     );
@@ -3814,4 +3901,163 @@ test('reads the Serbian conjunction from the Latin script the app formats with',
   // The Cyrillic conjunction is not what this catalog renders, so a label that
   // happens to contain it is no finding.
   assert.doesNotMatch(text, /contains the list conjunction "и"/);
+});
+
+// `settingsSearch.keywords` is the one catalog section whose shape the
+// flattened values cannot show: `flattenCatalog` joins a list into one
+// comma-joined string, so the rule reads the parsed document. Each case below
+// states the keyword lists for both catalogs and asserts the lines the rule
+// emits for them.
+function runKeywords({
+  englishKeywords = SETTINGS_KEYWORDS_ENGLISH,
+  translatedKeywords = SETTINGS_KEYWORDS_TRANSLATED,
+} = {}) {
+  return run({
+    english: withSettingsKeywords({ ...ENGLISH }, englishKeywords),
+    translated: withSettingsKeywords({ ...TRANSLATED }, translatedKeywords),
+  });
+}
+
+/** The English keyword section with `id` holding `value` instead of its list. */
+function withKeywordValue(id, value) {
+  return { ...SETTINGS_KEYWORDS_ENGLISH, [id]: value };
+}
+
+/** The English keyword section without `id`. */
+function withoutKeyword(id) {
+  return Object.fromEntries(
+    Object.entries(SETTINGS_KEYWORDS_ENGLISH).filter(([key]) => key !== id)
+  );
+}
+
+test('accepts the keyword lists every mobile catalog ships', () => {
+  const found = runKeywords();
+  assert.deepEqual(
+    found.filter(problem => problem.includes('settingsSearch.keywords')),
+    [],
+    found.join('\n')
+  );
+});
+
+test('rejects a keyword value stored as one "|"-joined string', () => {
+  // The shape this section replaced: the matcher reads one unusable phrase.
+  const found = runKeywords({ englishKeywords: withKeywordValue('signOut', 'logout|log off') });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.signOut" is not a list of keyword strings: found a string',
+  ]);
+});
+
+test('rejects a keyword section that is not one list per id', () => {
+  // The section as the `|`-joined string it replaced: the flattened catalog
+  // holds that string at the section key itself, and the keyword rule — not the
+  // prose value rules — names the defect once.
+  const found = runKeywords({ englishKeywords: 'logout|log off' });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords" is not a plain object holding one keyword list per id',
+  ]);
+});
+
+test('reports every violation of one keyword list, in index order', () => {
+  const found = runKeywords({ englishKeywords: withKeywordValue('signOut', ['  ', 'log|off']) });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.signOut" has an empty keyword at index 0',
+    'mobile/en: "settingsSearch.keywords.signOut" keeps the removed "|" separator in the keyword at index 1',
+  ]);
+});
+
+test('reports a missing keyword id only through the keyword rule', () => {
+  const found = runKeywords({ englishKeywords: withoutKeyword('privacy') });
+  assert.deepEqual(found, ['mobile/en: "settingsSearch.keywords.privacy" is missing']);
+  const text = found.join('\n');
+  assert.doesNotMatch(text, /missing key/);
+  assert.doesNotMatch(text, /which en\.json does not define/);
+});
+
+test('reports an id outside the six only through the keyword rule', () => {
+  const found = runKeywords({
+    englishKeywords: { ...SETTINGS_KEYWORDS_ENGLISH, account: ['profile'] },
+  });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.account" is not one of the six keyword ids',
+  ]);
+  const text = found.join('\n');
+  assert.doesNotMatch(text, /extra key/);
+  assert.doesNotMatch(text, /which no source file uses/);
+});
+
+test('still holds a locale keyword list to translation', () => {
+  // The keyword section is skipped by the prose value rules, but the English-copy
+  // rule still judges it: a list a locale left in English is reported, exactly as
+  // it was for the joined string.
+  const found = runKeywords({ translatedKeywords: SETTINGS_KEYWORDS_ENGLISH });
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "settingsSearch\.keywords\.signOut" is English; translate it/m
+  );
+});
+
+for (const [name, keywords, reason] of [
+  [
+    'an empty list',
+    withKeywordValue('signOut', []),
+    '"settingsSearch.keywords.signOut" is an empty list',
+  ],
+  [
+    'an empty item',
+    withKeywordValue('signOut', ['logout', '']),
+    '"settingsSearch.keywords.signOut" has an empty keyword at index 1',
+  ],
+  [
+    'a whitespace-only item',
+    withKeywordValue('signOut', ['  ']),
+    '"settingsSearch.keywords.signOut" has an empty keyword at index 0',
+  ],
+  [
+    'a padded item',
+    withKeywordValue('signOut', ['logout', ' log off']),
+    '"settingsSearch.keywords.signOut" has leading or trailing space in the keyword at index 1',
+  ],
+  [
+    'an item that keeps the "|" separator',
+    withKeywordValue('signOut', ['log|off']),
+    '"settingsSearch.keywords.signOut" keeps the removed "|" separator in the keyword at index 0',
+  ],
+  [
+    'an item that is not a string',
+    withKeywordValue('signOut', ['logout', 1]),
+    '"settingsSearch.keywords.signOut" has a number at index 1, where a keyword string belongs',
+  ],
+]) {
+  test(`rejects ${name} in the keyword section`, () => {
+    const found = runKeywords({ englishKeywords: keywords });
+    const expected = `mobile/en: ${reason}`;
+    // One defect, one line: the keyword rule names the value defect, and no
+    // prose rule reads the flattened list as copy (an empty list flattens to
+    // "", a padded item to " logout", and so on), so nothing else is reported.
+    assert.deepEqual(found, [expected]);
+  });
+}
+
+test('holds a non-English catalog to the same keyword lists', () => {
+  const translatedKeywords = Object.fromEntries(
+    Object.entries(SETTINGS_KEYWORDS_TRANSLATED).filter(([id]) => id !== 'language')
+  );
+  const found = runKeywords({ translatedKeywords });
+  // One defect, one line: the keyword rule names the missing id and the key-parity
+  // rule does not restate it, on the locale side as well as the English side.
+  assert.deepEqual(found, ['mobile/ru: "settingsSearch.keywords.language" is missing']);
+});
+
+test('reports only the parse problem of a catalog the keyword rule cannot read', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/ru.json': '{ "agents": { "title": "Агенты }" }',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance$/
+  );
+  assert.ok(!found.some(problem => problem.includes('settingsSearch.keywords')));
 });

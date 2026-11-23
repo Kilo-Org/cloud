@@ -5440,12 +5440,12 @@
     "emptyDescription": "Prova con un altro nome o un'altra parola chiave.",
     "resultsStatus": "Preferenze trovate: {{resultCount}}",
     "keywords": {
-      "signOut": "esci|disconnetti|disconnessione",
-      "appearance": "tema|colori|modalità scura",
-      "appUnlock": "biometria|volto|impronta digitale",
-      "language": "lingua|traduzione",
-      "notifications": "avvisi|notifiche push",
-      "privacy": "analisi|tracciamento"
+      "signOut": ["esci", "disconnetti", "disconnessione"],
+      "appearance": ["tema", "colori", "modalità scura"],
+      "appUnlock": ["biometria", "volto", "impronta digitale"],
+      "language": ["lingua", "traduzione"],
+      "notifications": ["avvisi", "notifiche push"],
+      "privacy": ["analisi", "tracciamento"]
     }
   }
 }

@@ -5346,12 +5346,12 @@
     "emptyDescription": "Prova ett annat inställningsnamn eller sökord.",
     "resultsStatus": "Hittade inställningar: {{resultCount}}",
     "keywords": {
-      "signOut": "logga ut|utloggning",
-      "appearance": "tema|färgschema",
-      "appUnlock": "biometri|ansiktsigenkänning|fingeravtryck",
-      "language": "språk|översättning",
-      "notifications": "aviseringar|notiser|pushnotiser",
-      "privacy": "analys|statistik|spårning"
+      "signOut": ["logga ut", "utloggning"],
+      "appearance": ["tema", "färgschema"],
+      "appUnlock": ["biometri", "ansiktsigenkänning", "fingeravtryck"],
+      "language": ["språk", "översättning"],
+      "notifications": ["aviseringar", "notiser", "pushnotiser"],
+      "privacy": ["analys", "statistik", "spårning"]
     }
   }
 }

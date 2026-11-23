@@ -5346,12 +5346,12 @@
     "emptyDescription": "Try a different setting name or keyword.",
     "resultsStatus": "Settings found: {{resultCount}}",
     "keywords": {
-      "signOut": "logout|log off",
-      "appearance": "theme|color scheme",
-      "appUnlock": "biometrics|face ID|fingerprint",
-      "language": "locale|translation",
-      "notifications": "alerts|push notifications",
-      "privacy": "analytics|tracking"
+      "signOut": ["logout", "log off"],
+      "appearance": ["theme", "color scheme"],
+      "appUnlock": ["biometrics", "face ID", "fingerprint"],
+      "language": ["locale", "translation"],
+      "notifications": ["alerts", "push notifications"],
+      "privacy": ["analytics", "tracking"]
     }
   }
 }

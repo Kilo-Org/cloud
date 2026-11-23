@@ -4,8 +4,8 @@ import { type ParseKeys } from 'i18next';
 /**
  * The one concept a setting can also be found by, beyond its visible label.
  * Each keyword resolves to a catalog entry under
- * `settingsSearch.keywords.<keyword>` whose value holds the localized synonyms
- * separated by `|`.
+ * `settingsSearch.keywords.<keyword>` whose value is the list of localized
+ * synonyms for that concept, one term per entry.
  */
 export type SettingsKeyword =
   | 'signOut'

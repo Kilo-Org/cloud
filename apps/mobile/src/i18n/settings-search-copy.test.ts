@@ -31,7 +31,7 @@ type SettingsSearchCopy = {
   noMatches: string;
   emptyDescription: string;
   resultsStatus: string;
-  keywords: Record<KeywordName, string>;
+  keywords: Record<KeywordName, string[]>;
 };
 
 /**
@@ -67,8 +67,9 @@ function settingsCatalog(tag: SupportedLanguage): SettingsCatalog {
   return CATALOG_LOADERS[tag]() as SettingsCatalog;
 }
 
+/** The catalog's own synonym list for a keyword, in shipped order. */
 function alternatives(copy: SettingsSearchCopy, name: KeywordName): string[] {
-  return copy.keywords[name].split('|');
+  return copy.keywords[name];
 }
 
 /** The six indexed settings and the catalog label each one carries. */

@@ -5534,12 +5534,12 @@
     "emptyDescription": "Skúste iný názov predvoľby alebo kľúčové slovo.",
     "resultsStatus": "Nájdené predvoľby: {{resultCount}}",
     "keywords": {
-      "signOut": "odhlásiť sa|odhlásenie",
-      "appearance": "téma|farebná schéma",
-      "appUnlock": "biometria|tvár|odtlačok prsta",
-      "language": "jazyk|preklad",
-      "notifications": "upozornenia|oznámenia",
-      "privacy": "analytika|sledovanie"
+      "signOut": ["odhlásiť sa", "odhlásenie"],
+      "appearance": ["téma", "farebná schéma"],
+      "appUnlock": ["biometria", "tvár", "odtlačok prsta"],
+      "language": ["jazyk", "preklad"],
+      "notifications": ["upozornenia", "oznámenia"],
+      "privacy": ["analytika", "sledovanie"]
     }
   }
 }

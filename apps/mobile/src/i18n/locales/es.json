@@ -5440,12 +5440,12 @@
     "emptyDescription": "Prueba con otro nombre o palabra clave.",
     "resultsStatus": "Preferencias encontradas: {{resultCount}}",
     "keywords": {
-      "signOut": "cerrar sesión|salir|desconectar",
-      "appearance": "tema|colores|modo oscuro",
-      "appUnlock": "biometría|rostro|huella",
-      "language": "idioma|traducción",
-      "notifications": "alertas|avisos|notificaciones",
-      "privacy": "analítica|seguimiento|rastreo"
+      "signOut": ["cerrar sesión", "salir", "desconectar"],
+      "appearance": ["tema", "colores", "modo oscuro"],
+      "appUnlock": ["biometría", "rostro", "huella"],
+      "language": ["idioma", "traducción"],
+      "notifications": ["alertas", "avisos", "notificaciones"],
+      "privacy": ["analítica", "seguimiento", "rastreo"]
     }
   }
 }

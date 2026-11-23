@@ -5346,12 +5346,12 @@
     "emptyDescription": "Provoni një emër tjetër preference ose fjalë kyçe.",
     "resultsStatus": "Preferenca të gjetura: {{resultCount}}",
     "keywords": {
-      "signOut": "dil|dalje",
-      "appearance": "temë|skema e ngjyrave",
-      "appUnlock": "biometri|fytyrë|gjurmë gishti",
-      "language": "gjuhë|përkthim",
-      "notifications": "sinjalizime|njoftime",
-      "privacy": "analiza|gjurmim"
+      "signOut": ["dil", "dalje"],
+      "appearance": ["temë", "skema e ngjyrave"],
+      "appUnlock": ["biometri", "fytyrë", "gjurmë gishti"],
+      "language": ["gjuhë", "përkthim"],
+      "notifications": ["sinjalizime", "njoftime"],
+      "privacy": ["analiza", "gjurmim"]
     }
   }
 }

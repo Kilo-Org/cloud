@@ -5262,12 +5262,12 @@
     "emptyDescription": "Coba nama preferensi atau kata kunci lain.",
     "resultsStatus": "Preferensi ditemukan: {{resultCount}}",
     "keywords": {
-      "signOut": "keluar|keluar akun",
-      "appearance": "tema|skema warna",
-      "appUnlock": "biometrik|wajah|sidik jari",
-      "language": "bahasa|terjemahan",
-      "notifications": "peringatan|pemberitahuan",
-      "privacy": "analitik|pelacakan"
+      "signOut": ["keluar", "keluar akun"],
+      "appearance": ["tema", "skema warna"],
+      "appUnlock": ["biometrik", "wajah", "sidik jari"],
+      "language": ["bahasa", "terjemahan"],
+      "notifications": ["peringatan", "pemberitahuan"],
+      "privacy": ["analitik", "pelacakan"]
     }
   }
 }

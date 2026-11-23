@@ -129,8 +129,8 @@ describe('ProfileScreen settings search', () => {
     expect(findConfigureRows(root, signOutLabel)).toHaveLength(1);
     expect(targetHighlights(root)).toEqual([]);
 
-    // The field matches the localized keyword ("logout|log off"), not only the
-    // visible label.
+    // The field matches the localized keyword list (["logout", "log off"]), not
+    // only the visible label.
     query(root, 'logout');
     const entry = results(root).find(result => result.entry.id === 'profile.signOut');
     if (!entry) {

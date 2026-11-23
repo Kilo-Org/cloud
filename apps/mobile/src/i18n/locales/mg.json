@@ -5346,12 +5346,12 @@
     "emptyDescription": "Manandrama anaran-tsafidy na teny fikarohana hafa.",
     "resultsStatus": "Safidy hita: {{resultCount}}",
     "keywords": {
-      "signOut": "mivoaha|fivoahana",
-      "appearance": "bika|endrika|loko",
-      "appUnlock": "biometrika|tarehy|dian-tanana",
-      "language": "fiteny|fandikan-teny",
-      "notifications": "fampandrenesana|fanairana",
-      "privacy": "fanadihadiana|fanarahana"
+      "signOut": ["mivoaha", "fivoahana"],
+      "appearance": ["bika", "endrika", "loko"],
+      "appUnlock": ["biometrika", "tarehy", "dian-tanana"],
+      "language": ["fiteny", "fandikan-teny"],
+      "notifications": ["fampandrenesana", "fanairana"],
+      "privacy": ["fanadihadiana", "fanarahana"]
     }
   }
 }

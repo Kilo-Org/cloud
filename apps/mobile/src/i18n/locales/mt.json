@@ -5628,12 +5628,12 @@
     "emptyDescription": "Ipprova isem ieħor ta’ preferenza jew kelma ewlenija oħra.",
     "resultsStatus": "Preferenzi misjuba: {{resultCount}}",
     "keywords": {
-      "signOut": "oħroġ|ittemm is-sessjoni",
-      "appearance": "tema|kuluri|dehra",
-      "appUnlock": "bijometrija|wiċċ|marka tas-swaba’",
-      "language": "lingwa|traduzzjoni",
-      "notifications": "twissijiet|notifiki",
-      "privacy": "analiżi|traċċar|privatezza"
+      "signOut": ["oħroġ", "ittemm is-sessjoni"],
+      "appearance": ["tema", "kuluri", "dehra"],
+      "appUnlock": ["bijometrija", "wiċċ", "marka tas-swaba’"],
+      "language": ["lingwa", "traduzzjoni"],
+      "notifications": ["twissijiet", "notifiki"],
+      "privacy": ["analiżi", "traċċar", "privatezza"]
     }
   }
 }

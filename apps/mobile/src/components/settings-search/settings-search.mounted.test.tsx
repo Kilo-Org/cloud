@@ -16,8 +16,6 @@ const copy = vi.hoisted(() => {
     'settingsSearch.noMatches': 'No matching settings',
     'settingsSearch.emptyDescription': 'Try a different setting name or keyword.',
     'settingsSearch.resultsStatus': 'Settings found: {{resultCount}}',
-    'settingsSearch.keywords.appearance': 'theme|color scheme',
-    'settingsSearch.keywords.privacy': 'analytics|tracking',
     'common.preferences': 'Preferences',
     'preferences.appearance': 'Appearance',
     'preferences.appearanceSystem': 'System',
@@ -27,9 +25,16 @@ const copy = vi.hoisted(() => {
     'consent.helpImprove': 'Help improve Kilo',
     'preferences.hideThinking': 'Hide thinking details',
   };
-  return { values };
+  // The two keyword concepts this suite indexes; the real catalog holds six.
+  const keywords: Record<string, readonly string[]> = {
+    'settingsSearch.keywords.appearance': ['theme', 'color scheme'],
+    'settingsSearch.keywords.privacy': ['analytics', 'tracking'],
+  };
+  return { values, keywords };
 });
 const announce = vi.hoisted(() => vi.fn());
+
+type MockOptions = Readonly<{ resultCount?: number; returnObjects?: boolean }>;
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -41,9 +46,10 @@ vi.mock('react-native', () => ({
 vi.mock('react-i18next', () => {
   // One stable `t` per language, like the real hook: the index memo must not
   // rebuild on a keystroke because the translator identity changed.
-  const t = (key: string, options?: Readonly<{ resultCount?: number }>) => {
+  const t = (key: string, options?: MockOptions) => {
     if (key.startsWith('settingsSearch.keywords.')) {
       lookups.keyword[key] = (lookups.keyword[key] ?? 0) + 1;
+      return options?.returnObjects === true ? (copy.keywords[key] ?? key) : key;
     }
     const value = copy.values[key] ?? key;
     return options?.resultCount === undefined
@@ -137,15 +143,12 @@ function render(
 }
 
 function typeQuery(root: ReactTestInstance, text: string) {
-  const field = root.findByType('SearchField');
   act(() => {
-    (field.props.onChangeText as (next: string) => void)(text);
+    (root.findByType('SearchField').props.onChangeText as (next: string) => void)(text);
   });
 }
 
-function rows(root: ReactTestInstance) {
-  return root.findAll(node => Object.is(node.type, 'RowFrame'));
-}
+const rows = (root: ReactTestInstance) => root.findAll(node => Object.is(node.type, 'RowFrame'));
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -222,13 +225,22 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     const root = render();
     typeQuery(root, 'theme');
 
-    const themedRows = rows(root);
-    expect(themedRows).toHaveLength(1);
-    expect(themedRows[0]?.props.accessibilityLabel).toBe('Appearance');
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual(['Appearance']);
     const marked = root.findAll(
       node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-semibold')
     );
     expect(marked).toEqual([]);
+  });
+
+  it('degrades an unexpected keyword shape to no synonyms', () => {
+    // `signOut` is absent from the mock's keyword map, so it resolves to its own
+    // key string, not a list; a throw would fail this case.
+    const source = { settings: [defineSetting('x', 'common.language', 'signOut')] };
+    const root = render(undefined, [source]);
+    typeQuery(root, 'logout');
+    expect(rows(root)).toEqual([]);
+    typeQuery(root, 'lang');
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual(['Language']);
   });
 
   it('finds one themed result and all three options by name in the real hub index', () => {
@@ -284,9 +296,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
   it('announces one settled result count on iOS', () => {
     const root = render();
     typeQuery(root, 'appearance');
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    act(() => vi.advanceTimersByTime(500));
 
     expect(announce).toHaveBeenLastCalledWith('Settings found: 3');
     const live = root.findAll(
@@ -299,9 +309,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     platform.OS = 'android';
     const root = render();
     typeQuery(root, 'appearance');
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    act(() => vi.advanceTimersByTime(500));
 
     const live = root.findAll(
       node => Object.is(node.type, 'Text') && node.props.children === 'Settings found: 3'

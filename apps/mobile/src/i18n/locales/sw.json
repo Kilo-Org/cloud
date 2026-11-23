@@ -5346,12 +5346,12 @@
     "emptyDescription": "Jaribu jina jingine la pendeleo au neno kuu.",
     "resultsStatus": "Mapendeleo yaliyopatikana: {{resultCount}}",
     "keywords": {
-      "signOut": "toka|ondoka",
-      "appearance": "mandhari|rangi",
-      "appUnlock": "bayometriki|utambuzi wa uso|alama ya kidole",
-      "language": "lugha|tafsiri",
-      "notifications": "arifa|tahadhari",
-      "privacy": "uchanganuzi|ufuatiliaji"
+      "signOut": ["toka", "ondoka"],
+      "appearance": ["mandhari", "rangi"],
+      "appUnlock": ["bayometriki", "utambuzi wa uso", "alama ya kidole"],
+      "language": ["lugha", "tafsiri"],
+      "notifications": ["arifa", "tahadhari"],
+      "privacy": ["uchanganuzi", "ufuatiliaji"]
     }
   }
 }

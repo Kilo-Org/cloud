@@ -938,6 +938,60 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
+  it('reports a name that is taken once the unanswered write has completed', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The first attempt's response never arrives; the retry collides on the row
+    // that write stored, and the third attempt collides on the same row after
+    // the save has already completed.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValue(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The retry converged on the row the unanswered write stored.
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(1);
+
+    // The completed save retires the record of that write, so a later collision
+    // on the same name is a name that is taken, not another completion. The
+    // panel is already expanded, so the draft is filled directly.
+    addVariable(renderer, 'API_KEY', 'abc');
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command 1', 'pnpm install');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(3);
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+  });
+
   it('keeps the save sheet open and the typed name when the save fails', async () => {
     const mocks = mutations();
     mocks.create.mutateAsync.mockRejectedValue(new Error('nope'));

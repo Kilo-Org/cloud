@@ -140,6 +140,18 @@ export function useAgentProfileSave({
     // The confirmation describes a write this panel made in the account that
     // received it, so it is not withheld once the account on screen has moved.
     toast.success(t('agentChat.newSession.profileSaved', { name: profile.name }));
+    // This write is no longer unanswered, so the attempt that recorded it stops
+    // describing anything: keeping it would let a later collision in that
+    // account credit the completed row as that attempt's own commit. Only that
+    // account's entry goes, so the account on screen keeps its own.
+    setLostAttempts(previous => {
+      if (!previous.has(savedUnder)) {
+        return previous;
+      }
+      const next = new Map(previous);
+      next.delete(savedUnder);
+      return next;
+    });
     // A profile belongs to the account it was created in. A save that completes
     // after the account moved publishes nothing here: the form keeps the
     // configuration it holds, and the new account's picks come only from its own

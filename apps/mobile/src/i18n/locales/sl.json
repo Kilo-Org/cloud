@@ -4194,6 +4194,7 @@
       "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
       "invalidApiKey": "Ključ API vsebuje znak, ki ga ni mogoče poslati. Uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
+      "invalidHeaders": "Glave po meri ni mogoče poslati. Preveri njeno ime in uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
       "httpApprovalRequired": "Pred shranjevanjem ali povezovanjem odobri to lokalno končno točko HTTP.",

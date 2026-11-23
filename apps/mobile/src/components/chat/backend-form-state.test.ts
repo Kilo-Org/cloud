@@ -102,18 +102,26 @@ describe('backend form boundary', () => {
     }
   );
 
+  it.each(['not-json-secret', '[]', 'null', '{"Authorization": 42}'])(
+    'refuses an unparseable or malformed header object as invalidInput: %s',
+    headers => {
+      expect(() => backendDraftFromFields({ ...fields, headers }, false)).toThrow('invalidInput');
+      expect(() => backendConnectionFromFields({ ...fields, headers }, false)).toThrow(
+        'invalidInput'
+      );
+    }
+  );
+
   it.each([
-    'not-json-secret',
-    '[]',
-    'null',
-    '{"Authorization": 42}',
     '{"x-kilocode-feature":"mobile-chat"}',
     '{"bad header":"private"}',
     String.raw`{"Authorization":"private\r\nsecond: header"}`,
+    '{"Authorization":"Bearer private\u00A0value"}',
+    '{"Authorization":"Bearer private\u00ADvalue"}',
   ])('refuses invalid headers without echoing input: %s', headers => {
-    expect(() => backendDraftFromFields({ ...fields, headers }, false)).toThrow('invalidInput');
+    expect(() => backendDraftFromFields({ ...fields, headers }, false)).toThrow('invalidHeaders');
     expect(() => backendConnectionFromFields({ ...fields, headers }, false)).toThrow(
-      'invalidInput'
+      'invalidHeaders'
     );
   });
 

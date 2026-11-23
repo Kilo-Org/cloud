@@ -46,6 +46,7 @@ export type ChatBackendDraft = Omit<StoredChatBackend, 'id' | 'revision'>;
 export const BACKEND_INPUT_ERROR_KEYS = {
   invalidInput: 'modelChat.backends.invalidInput',
   invalidApiKey: 'modelChat.backends.invalidApiKey',
+  invalidHeaders: 'modelChat.backends.invalidHeaders',
   invalidUrl: 'modelChat.backends.invalidUrl',
   publicHttp: 'modelChat.backends.publicHttp',
   httpApprovalRequired: 'modelChat.backends.httpApprovalRequired',
@@ -99,13 +100,24 @@ export class BackendRequestError extends Error {
   }
 }
 
-export function parseChatBackendHeaders(input: string): ChatBackendDraft['headers'] {
+/** The wrapper object puts the field name on every issue path, so one rule names the failure. */
+const headersInputSchema = z.object({ headers: backendHeadersSchema });
+
+/** Unparseable JSON is not a header failure: it names no field at all. */
+function parseHeaderInput(input: string) {
   try {
-    const parsed: unknown = JSON.parse(input.trim() || '{}');
-    return backendHeadersSchema.parse(parsed);
+    return headersInputSchema.safeParse({ headers: JSON.parse(input.trim() || '{}') });
   } catch {
     throw new BackendInputError('invalidInput');
   }
+}
+
+export function parseChatBackendHeaders(input: string): ChatBackendDraft['headers'] {
+  const parsed = parseHeaderInput(input);
+  if (!parsed.success) {
+    throw new BackendInputError(inputProblem(parsed.error));
+  }
+  return parsed.data.headers;
 }
 
 export function validateChatBackendDraft(input: unknown): ChatBackendDraft {

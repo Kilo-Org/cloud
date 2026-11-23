@@ -4046,6 +4046,7 @@
       "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",
       "invalidApiKey": "API-lykillinn inniheldur staf sem ekki er hægt að senda. Notaðu aðeins bókstafi, tölustafi og venjuleg tákn, án línubrota.",
+      "invalidHeaders": "Ekki er hægt að senda sérsniðinn haus. Athugaðu heiti hans og notaðu aðeins bókstafi, tölustafi og venjuleg tákn, án línubrota.",
       "invalidUrl": "Sláðu inn HTTP- eða HTTPS-grunnslóð API án auðkenningarupplýsinga, fyrirspurnarhluta eða brotahluta.",
       "publicHttp": "Opinberir HTTP-endapunktar eru ekki leyfðir. Notaðu HTTPS eða einkarekinn endapunkt á staðarneti.",
       "httpApprovalRequired": "Samþykktu þennan staðbundna HTTP-endapunkt áður en þú vistar eða tengist.",

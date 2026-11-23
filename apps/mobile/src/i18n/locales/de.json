@@ -4046,6 +4046,7 @@
       "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",
       "invalidApiKey": "Der API-Schlüssel enthält ein Zeichen, das nicht gesendet werden kann. Verwende nur Buchstaben, Ziffern und Standardzeichen, ohne Zeilenumbrüche.",
+      "invalidHeaders": "Ein benutzerdefinierter Header kann nicht gesendet werden. Prüfe seinen Namen und verwende nur Buchstaben, Ziffern und Standardzeichen, ohne Zeilenumbrüche.",
       "invalidUrl": "Gib eine HTTP- oder HTTPS-API-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment ein.",
       "publicHttp": "Öffentliche HTTP-Endpunkte sind nicht erlaubt. Verwende HTTPS oder einen privaten lokalen Endpunkt.",
       "httpApprovalRequired": "Genehmige diesen lokalen HTTP-Endpunkt, bevor du speicherst oder eine Verbindung herstellst.",

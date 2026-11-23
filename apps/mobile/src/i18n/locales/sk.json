@@ -4194,6 +4194,7 @@
       "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
       "invalidApiKey": "API kľúč obsahuje znak, ktorý sa nedá odoslať. Používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
+      "invalidHeaders": "Vlastnú hlavičku nie je možné odoslať. Skontrolujte jej názov a používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
       "httpApprovalRequired": "Pred uložením alebo pripojením schváľte tento lokálny koncový bod HTTP.",

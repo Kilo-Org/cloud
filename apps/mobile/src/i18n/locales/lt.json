@@ -4194,6 +4194,7 @@
       "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",
       "invalidApiKey": "API rakte yra simbolis, kurio negalima išsiųsti. Naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
+      "invalidHeaders": "Pasirinktinės antraštės išsiųsti negalima. Patikrinkite jos pavadinimą ir naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
       "invalidUrl": "Įveskite bazinį HTTP arba HTTPS API URL be prisijungimo duomenų, užklausos parametrų ar fragmento.",
       "publicHttp": "Viešieji HTTP prieigos taškai neleidžiami. Naudokite HTTPS arba privatų vietinį prieigos tašką.",
       "httpApprovalRequired": "Prieš išsaugodami ar prisijungdami patvirtinkite šį vietinį HTTP prieigos tašką.",

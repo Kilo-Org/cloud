@@ -5,6 +5,7 @@ import { hasControlCharacters } from './backend-url';
 export type BackendInputProblem =
   | 'invalidInput'
   | 'invalidApiKey'
+  | 'invalidHeaders'
   | 'invalidUrl'
   | 'publicHttp'
   | 'httpApprovalRequired'
@@ -30,8 +31,13 @@ const backendModelSchema = z
   })
   .strip();
 
-/** The printable text the app sends: one rule for the key and every header value. */
-const SENDABLE_TEXT = /^[\u0020-\u007E\u00A0-\u00FF]*$/;
+/**
+ * The printable text the app sends: one rule for the key and every header value.
+ * The no-break space (U+00A0) and the soft hyphen (U+00AD) are excluded because they
+ * are invisible and are outside the letters, digits and standard symbols the refusal
+ * copy promises.
+ */
+const SENDABLE_TEXT = /^[\u0020-\u007E\u00A1-\u00AC\u00AE-\u00FF]*$/;
 
 /**
  * The set every shipped build accepted before the printable rule narrowed it, and
@@ -108,7 +114,10 @@ export const storedDraftSchema = z
 
 /** A draft can fail several fields at once and the form shows one line, so this order decides it. */
 type NamedProblem = { field: string; problem: BackendInputProblem };
-const NAMED_PROBLEMS: readonly NamedProblem[] = [{ field: 'apiKey', problem: 'invalidApiKey' }];
+const NAMED_PROBLEMS: readonly NamedProblem[] = [
+  { field: 'apiKey', problem: 'invalidApiKey' },
+  { field: 'headers', problem: 'invalidHeaders' },
+];
 
 /**
  * The problem a failed draft names. Read the issue PATH and its code, never its

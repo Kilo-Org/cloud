@@ -142,23 +142,31 @@ describe('secure backend profiles', () => {
   });
 
   it.each([
-    { name: ' ' },
-    { models: [] },
-    { models: [draft.models[0], draft.models[0]] },
-    { headers: { 'invalid header': 'secret' } },
-    { headers: { authorization: 'secret\r\ninjected: true' } },
-    { headers: { 'X-KILOCODE-FEATURE': 'mobile-chat' } },
-    { headers: { 'x-kilo-organization-id': 'org' } },
-    { headers: { Authorization: 'one', authorization: 'two' } },
-    { headers: { 'Content-Type': 'application/json' } },
-    { apiKind: 'unknown' },
-    { completionTokenField: 'max_output_tokens' },
-    { completionTokenField: null },
-    { headers: { Authorization: 'invalid-\u0100' } },
-    { models: [{ id: 'bad\nid', name: 'Bad', tools: false }] },
-  ])('rejects invalid user input without leaking secrets: %j', async patch => {
+    { patch: { name: ' ' }, problem: 'invalidInput' },
+    { patch: { models: [] }, problem: 'invalidInput' },
+    { patch: { models: [draft.models[0], draft.models[0]] }, problem: 'invalidInput' },
+    { patch: { apiKind: 'unknown' }, problem: 'invalidInput' },
+    { patch: { completionTokenField: 'max_output_tokens' }, problem: 'invalidInput' },
+    { patch: { completionTokenField: null }, problem: 'invalidInput' },
+    { patch: { models: [{ id: 'bad\nid', name: 'Bad', tools: false }] }, problem: 'invalidInput' },
+    { patch: { headers: { 'invalid header': 'secret' } }, problem: 'invalidHeaders' },
+    {
+      patch: { headers: { authorization: 'secret\r\ninjected: true' } },
+      problem: 'invalidHeaders',
+    },
+    { patch: { headers: { 'X-KILOCODE-FEATURE': 'mobile-chat' } }, problem: 'invalidHeaders' },
+    { patch: { headers: { 'x-kilo-organization-id': 'org' } }, problem: 'invalidHeaders' },
+    {
+      patch: { headers: { Authorization: 'one', authorization: 'two' } },
+      problem: 'invalidHeaders',
+    },
+    { patch: { headers: { 'Content-Type': 'application/json' } }, problem: 'invalidHeaders' },
+    { patch: { headers: { Authorization: 'invalid-\u0100' } }, problem: 'invalidHeaders' },
+  ])('rejects invalid user input without leaking secrets: %j', async ({ patch, problem }) => {
     const store = await import('./backend-store');
-    expect(() => store.validateChatBackendDraft({ ...draft, ...patch })).toThrow(/^invalidInput$/u);
+    expect(() => store.validateChatBackendDraft({ ...draft, ...patch })).toThrow(
+      new RegExp(`^${problem}$`, 'u')
+    );
   });
 
   it('trims whitespace around the API key and keeps the key body intact', async () => {
@@ -167,82 +175,48 @@ describe('secure backend profiles', () => {
     expect(parsed.apiKey).toBe('new-secret');
   });
 
-  it('names a control character inside the API key without quoting the key', async () => {
-    const store = await import('./backend-store');
-    const failure = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, apiKey: 'sec\nret' })
-    );
-    expect(failure).toBeInstanceOf(store.BackendInputError);
-    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
-    expect(failure.message).toBe('invalidApiKey');
-    expect(failure.message).not.toContain('sec');
-    expect(failure.message).not.toContain('ret');
+  it.each(['sec\nret', 'sec\u0085ret', 'sec\u00A0ret', 'sec\u00ADret'])(
+    'refuses an unprintable code point inside the API key without quoting the key: %j',
+    async apiKey => {
+      const store = await import('./backend-store');
+      const failure = captureError(() => store.validateChatBackendDraft({ ...draft, apiKey }));
+      expect(failure).toBeInstanceOf(store.BackendInputError);
+      expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidApiKey'
+      );
+      expect(failure.message).toBe('invalidApiKey');
+      expect(failure.message).not.toContain('sec');
+      expect(failure.message).not.toContain('ret');
 
-    const connection = captureError(() =>
-      store.validateBackendConnection({ ...draft, apiKey: 'sec\nret' })
-    );
-    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidApiKey'
-    );
-  });
+      const connection = captureError(() => store.validateBackendConnection({ ...draft, apiKey }));
+      expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidApiKey'
+      );
+    }
+  );
 
-  it('refuses an invisible C1 control inside the API key without quoting the key', async () => {
-    const store = await import('./backend-store');
-    const failure = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, apiKey: 'sec\u0085ret' })
-    );
-    expect(failure).toBeInstanceOf(store.BackendInputError);
-    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
-    expect(failure.message).not.toContain('sec');
-    expect(failure.message).not.toContain('ret');
+  it.each([
+    { patch: { apiKey: 'sec\u0085ret' }, problem: 'invalidApiKey' },
+    { patch: { apiKey: 'sec\u00A0ret' }, problem: 'invalidApiKey' },
+    { patch: { apiKey: 'sec\u00ADret' }, problem: 'invalidApiKey' },
+    { patch: { headers: { Authorization: 'Bearer sec\u0085ret' } }, problem: 'invalidHeaders' },
+    { patch: { headers: { Authorization: 'Bearer sec\u00A0ret' } }, problem: 'invalidHeaders' },
+    { patch: { headers: { Authorization: 'Bearer sec\u00ADret' } }, problem: 'invalidHeaders' },
+  ])(
+    'keeps a stored profile holding a value a save refuses, while that save names it: %j',
+    async ({ patch, problem }) => {
+      const store = await import('./backend-store');
+      const stored = { ...draft, ...patch, id: firstId, revision: 3 };
+      expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
+        { id: firstId, revision: 3, baseUrl: 'https://models.example/v1', ...patch },
+      ]);
 
-    const connection = captureError(() =>
-      store.validateBackendConnection({ ...draft, apiKey: 'sec\u0085ret' })
-    );
-    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidApiKey'
-    );
-  });
-
-  it('keeps a stored profile whose key holds a C1 control, while a save still refuses it', async () => {
-    const store = await import('./backend-store');
-    const stored = { ...draft, apiKey: 'sec\u0085ret', id: firstId, revision: 3 };
-    expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
-      {
-        id: firstId,
-        revision: 3,
-        name: 'Local model',
-        baseUrl: 'https://models.example/v1',
-        apiKey: 'sec\u0085ret',
-        models: draft.models,
-      },
-    ]);
-    expect(store.parseChatBackends(JSON.stringify([stored]))[0]?.apiKey).toBe('sec\u0085ret');
-
-    const save = captureError(() => store.validateChatBackendDraft(stored));
-    expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
-    const connection = captureError(() => store.validateBackendConnection(stored));
-    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidApiKey'
-    );
-  });
-
-  it('keeps a stored profile whose header value holds a C1 control, while a save refuses it', async () => {
-    const store = await import('./backend-store');
-    const stored = {
-      ...draft,
-      headers: { Authorization: 'Bearer sec\u0085ret' },
-      id: secondId,
-      revision: 1,
-    };
-    expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
-      { id: secondId, headers: { Authorization: 'Bearer sec\u0085ret' } },
-    ]);
-
-    const save = captureError(() => store.validateChatBackendDraft(stored));
-    expect(save).toBeInstanceOf(store.BackendInputError);
-    expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
-  });
+      const save = captureError(() => store.validateChatBackendDraft(stored));
+      expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe(problem);
+      const connection = captureError(() => store.validateBackendConnection(stored));
+      expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(problem);
+    }
+  );
 
   it('drops a stored profile holding a value no build could have stored', async () => {
     const store = await import('./backend-store');
@@ -258,42 +232,69 @@ describe('secure backend profiles', () => {
     expect(store.parseChatBackends(JSON.stringify([headerWithNul]))).toEqual([]);
   });
 
-  it('names the API key before a blank name, so one line reports the credential problem', async () => {
+  it('names the API key before a blank name or a header failure, so one line reports the credential problem', async () => {
     const store = await import('./backend-store');
     const failure = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, name: ' ', apiKey: 'sec\u0085ret' })
+      store.validateChatBackendDraft({
+        ...draft,
+        name: ' ',
+        apiKey: 'sec\u0085ret',
+        headers: { Authorization: 'a\u0085b' },
+      })
     );
     expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
   });
 
-  it('refuses a C1 control inside a header value on the save path and the header parser', async () => {
+  it.each(['\u0085', '\u00A0', '\u00AD'])(
+    'refuses an unprintable code point inside a header value on every path: %j',
+    async char => {
+      const store = await import('./backend-store');
+      const value = `a${char}b`;
+      const headers = { Authorization: value };
+      const failure = captureError(() => store.validateChatBackendDraft({ ...draft, headers }));
+      expect(failure).toBeInstanceOf(store.BackendInputError);
+      expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidHeaders'
+      );
+      expect(failure.message).not.toContain(value);
+
+      const connection = captureError(() => store.validateBackendConnection({ ...draft, headers }));
+      expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidHeaders'
+      );
+      expect(() => store.parseChatBackendHeaders(JSON.stringify(headers))).toThrow(
+        /^invalidHeaders$/u
+      );
+    }
+  );
+
+  it('reports a wrong-typed header object, a wrong-typed key and a blank name as invalidInput', async () => {
     const store = await import('./backend-store');
-    const failure = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, headers: { Authorization: 'a\u0085b' } })
+    const wrongHeaders = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, headers: 'Authorization: secret' })
     );
-    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
-    expect(() => store.parseChatBackendHeaders(String.raw`{"Authorization":"a\u0085b"}`)).toThrow(
-      /^invalidInput$/u
+    expect((wrongHeaders as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidInput'
     );
+
+    const wrongKey = captureError(() => store.validateChatBackendDraft({ ...draft, apiKey: 42 }));
+    expect((wrongKey as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
+
+    const blankName = captureError(() => store.validateChatBackendDraft({ ...draft, name: ' ' }));
+    expect(blankName).toBeInstanceOf(store.BackendInputError);
+    expect((blankName as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidInput'
+    );
+    expect(blankName.message).toBe('invalidInput');
+
+    expect(() => store.parseChatBackendHeaders('{"Authorization": 42}')).toThrow(/^invalidInput$/u);
+    expect(() => store.parseChatBackendHeaders('not-json-secret')).toThrow(/^invalidInput$/u);
   });
 
   it('keeps a printable Latin-1 letter in the API key intact', async () => {
     const store = await import('./backend-store');
     const parsed = store.validateChatBackendDraft({ ...draft, apiKey: 'señor-key' });
     expect(parsed.apiKey).toBe('señor-key');
-  });
-
-  it('reports a failure that names no field as invalidInput', async () => {
-    const store = await import('./backend-store');
-    const failure = captureError(() => store.validateChatBackendDraft({ ...draft, name: ' ' }));
-    expect(failure).toBeInstanceOf(store.BackendInputError);
-    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
-    expect(failure.message).toBe('invalidInput');
-
-    const wrongType = captureError(() => store.validateChatBackendDraft({ ...draft, apiKey: 42 }));
-    expect((wrongType as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidInput'
-    );
   });
 
   it('persists the selected limit field and defaults profiles that predate the setting', async () => {

@@ -4120,6 +4120,7 @@
       "connectionIncomplete": "Model je odgovorio, ali nije dovršio. Pokušaj ponovno ili provjeri ID modela i protokol.",
       "invalidInput": "Unesi naziv pozadinskog sustava, valjana zaglavlja i barem jedan model s jedinstvenim ID-jem i nazivom. Ograničenja broja tokena moraju biti pozitivni cijeli brojevi.",
       "invalidApiKey": "API ključ sadrži znak koji se ne može poslati. Koristi samo slova, znamenke i standardne simbole, bez prijeloma retka.",
+      "invalidHeaders": "Prilagođeno zaglavlje nije moguće poslati. Provjeri njegov naziv i koristi samo slova, znamenke i standardne simbole, bez prijeloma retka.",
       "invalidUrl": "Unesi osnovni HTTP ili HTTPS URL API-ja bez vjerodajnica, upita ili fragmenta.",
       "publicHttp": "Javne HTTP krajnje točke nisu dopuštene. Koristi HTTPS ili privatnu lokalnu krajnju točku.",
       "httpApprovalRequired": "Odobri ovu lokalnu HTTP krajnju točku prije spremanja ili povezivanja.",

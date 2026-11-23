@@ -4046,6 +4046,7 @@
       "connectionIncomplete": "I whakautu te tauira, engari kāore i oti te tono. Ngana anō, tirohia rānei te tautuhi tauira me te kawa.",
       "invalidInput": "Whakaurua he ingoa pūnaha tuarā, he pane tika, me tētahi tauira neke atu rānei, he tautuhi me te ingoa ahurei tō ia tauira. Me tau tōpū nui ake i te kore ngā tepe waeine kupu.",
       "invalidApiKey": "Kei roto i te kī API tētahi pūāhua kāore e taea te tuku. Whakamahia ngā reta, ngā mati, me ngā tohu paerewa anake, kāore he whati raina.",
+      "invalidHeaders": "Kāore e taea te tuku i tētahi pane ritenga. Tirohia tōna ingoa, ā, whakamahia ngā reta, ngā mati, me ngā tohu paerewa anake, kāore he whati raina.",
       "invalidUrl": "Whakaurua he pūtake API HTTP, HTTPS rānei, kāore he taipitopito motuhēhēnga, he uiui, he wāhanga URL rānei.",
       "publicHttp": "Kāore e whakaaetia ngā pūwāhi HTTP tūmatanui. Whakamahia te HTTPS, tētahi pūwāhi paetata tūmataiti rānei.",
       "httpApprovalRequired": "Whakaaetia tēnei pūwāhi HTTP paetata i mua i te tiaki, te hono rānei.",

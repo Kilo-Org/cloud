@@ -71,6 +71,8 @@ describe('Cloud Agent upload-only access', () => {
     expect(await retry.json()).toEqual(await first.json());
     expect((await f.request('GET', `/v1/sessions/${f.id}`)).status).toBe(200);
     expect(f.authorizeUpload).toHaveBeenCalledTimes(5);
+    expect(f.authorizeUpload).toHaveBeenNthCalledWith(1, { handle: f.handle });
+    expect(f.authorizeUpload).toHaveBeenNthCalledWith(2, { handle: f.handle, sessionID: f.id });
     const reader = client(personal(f.userID));
     const snapshot = await reader.entities(f.id);
     expect(await snapshot.json()).toMatchObject({

@@ -1,8 +1,10 @@
 import { SELF, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { eq, isNotNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { SignJWT } from 'jose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { app } from '../../src/app';
 import {
   getPresenceStub,
   SessionPresenceDO,
@@ -52,7 +54,13 @@ async function connect(
   role: 'runner' | 'viewer' | 'controller',
   transport: 'bearer' | 'subprotocol' = 'bearer'
 ): Promise<Connection> {
-  const token = await ticket(principal, role);
+  return open(await ticket(principal, role), transport);
+}
+
+async function open(
+  token: string,
+  transport: 'bearer' | 'subprotocol' = 'bearer'
+): Promise<Connection> {
   const protocol = `kilo-session-ticket.${token}`;
   const headers: HeadersInit =
     transport === 'bearer'
@@ -1359,5 +1367,143 @@ describe('live instance commands', () => {
     await controller.closed;
     replacement.ws.send(JSON.stringify({ type: 'reply', commandID: command.commandID }));
     expect((await replacement.next('error')).body).toMatchObject({ code: 'command_not_found' });
+  });
+});
+
+describe('Cloud Agent presence runner tickets', () => {
+  const ORIGIN_PROOF = 'synthetic-origin-proof-AAAAAAAAAAAAAAAAAAAA';
+
+  async function hosted(options: { organizationID?: string } = {}) {
+    const userID = `usr-${crypto.randomUUID()}`;
+    const handle = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setAudience('cloud-agent-next:runtime-credential-proxy')
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(new TextEncoder().encode('synthetic-hosted-presence-handle-secret'));
+    let outcome: 'allow' | 'deny' | 'fail' = 'allow';
+    const authorizeUpload = vi.fn(
+      async (input: { handle: string; sessionID?: string; originProof?: string }) => {
+        if (outcome === 'fail') throw new Error('Synthetic binding failure');
+        if (outcome === 'deny' || input.handle !== handle) return null;
+        return {
+          userID,
+          ...(options.organizationID ? { organizationID: options.organizationID } : {}),
+          expiresAt: Date.now() + 3_600_000,
+        };
+      }
+    );
+    const env: Env = { ...testEnv, CLOUD_AGENT_SYNC_AUTH: { authorizeUpload } };
+    const request = (
+      path: string,
+      body: unknown,
+      { proof = true, binding = env }: { proof?: boolean; binding?: Env } = {}
+    ) =>
+      app.fetch(
+        new Request(`https://session-sync.test${path}`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${handle}`,
+            'content-type': 'application/json',
+            ...(proof ? { 'x-kilo-runtime-proxy-origin': ORIGIN_PROOF } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+        binding
+      );
+    return {
+      userID,
+      handle,
+      authorizeUpload,
+      request,
+      set: (next: typeof outcome) => {
+        outcome = next;
+      },
+    };
+  }
+
+  it('lets a sandbox mint a runner ticket and advertise itself instead of returning 401', async () => {
+    const organizationID = crypto.randomUUID();
+    const h = await hosted({ organizationID });
+    const response = await h.request('/v1/presence/ticket', { role: 'runner' });
+    expect(response.status).toBe(200);
+    const { ticket: token } = await response.json<{ ticket: string }>();
+    expect(h.authorizeUpload).toHaveBeenCalledExactlyOnceWith({
+      handle: h.handle,
+      originProof: ORIGIN_PROOF,
+    });
+    const principal = member(h.userID, organizationID);
+    const viewer = await connect(principal, 'viewer');
+    await viewer.next('hello');
+    const runner = await open(token);
+    await runner.next('hello');
+    const ad = advertisement([newSessionID()]);
+    await heartbeat(runner, 'sandbox-instance', ad);
+    viewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await viewer.next('instances')).body).toEqual({
+      instances: [
+        {
+          instanceID: 'sandbox-instance',
+          tenant: principal.tenant,
+          advertisement: ad,
+          online: true,
+          lastHeartbeatAt: expect.any(Number),
+        },
+      ],
+    });
+    runner.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await runner.next('error')).body).toMatchObject({ code: 'forbidden' });
+  });
+
+  it.each(['viewer', 'controller'])('refuses a %s ticket for a Cloud Agent handle', async role => {
+    const h = await hosted();
+    const response = await h.request('/v1/presence/ticket', { role });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: 'runner_only' } });
+    expect(h.authorizeUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses a handle without the sandbox origin proof', async () => {
+    const h = await hosted();
+    const response = await h.request('/v1/presence/ticket', { role: 'runner' }, { proof: false });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: 'invalid_credential' } });
+    expect(h.authorizeUpload).not.toHaveBeenCalled();
+  });
+
+  it('maps binding rejection to 401 and binding unavailability to 503', async () => {
+    const h = await hosted();
+    h.set('deny');
+    const denied = await h.request('/v1/presence/ticket', { role: 'runner' });
+    expect(denied.status).toBe(401);
+    expect(await denied.json()).toMatchObject({ error: { code: 'invalid_credential' } });
+    h.set('fail');
+    const failed = await h.request('/v1/presence/ticket', { role: 'runner' });
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toMatchObject({ error: { code: 'auth_unavailable' } });
+    const unbound = await h.request(
+      '/v1/presence/ticket',
+      { role: 'runner' },
+      { binding: { ...testEnv, CLOUD_AGENT_SYNC_AUTH: undefined } }
+    );
+    expect(unbound.status).toBe(503);
+    expect(await unbound.json()).toMatchObject({ error: { code: 'auth_unavailable' } });
+  });
+
+  it('keeps instance commands on a sync grant', async () => {
+    const h = await hosted();
+    const response = await h.request('/v1/presence/instances/sandbox-instance/commands', {
+      type: 'list_directories',
+      commandID: crypto.randomUUID(),
+    });
+    expect(response.status).toBe(401);
+    expect(h.authorizeUpload).not.toHaveBeenCalled();
+  });
+
+  it('still issues every role for a sync grant', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    for (const role of ['viewer', 'runner', 'controller'] as const) {
+      expect(await ticket(principal, role)).toEqual(expect.any(String));
+    }
   });
 });

@@ -72,8 +72,23 @@ export async function mintTicket(
   ) {
     throw new LiveTicketError(401, 'invalid_grant', 'The sync grant is invalid or expired');
   }
+  return signTicket(env, grant.principal, grant.expiresAt, audience, role, sessionID);
+}
+
+/** Signs a ticket for a principal that the caller has already authorized until `expiresAt` (seconds). */
+export async function signTicket(
+  env: Env,
+  principal: Principal,
+  expiresAt: number,
+  audience: LiveAudience,
+  role: LiveRole,
+  sessionID?: string
+): Promise<{ ticket: string; expiresAt: string }> {
+  if (!env.ENVIRONMENT) {
+    throw new LiveTicketError(503, 'auth_unavailable', 'Authentication is temporarily unavailable');
+  }
   const now = Math.floor(Date.now() / 1000);
-  const exp = Math.min(now + MAX_TICKET_SECONDS, grant.expiresAt);
+  const exp = Math.min(now + MAX_TICKET_SECONDS, expiresAt);
   if (exp <= now) {
     throw new LiveTicketError(401, 'invalid_grant', 'The sync grant is invalid or expired');
   }
@@ -81,9 +96,9 @@ export async function mintTicket(
     version: 1,
     aud: audience,
     env: env.ENVIRONMENT,
-    tenant: grant.principal.tenant,
+    tenant: principal.tenant,
     ...(sessionID === undefined ? {} : { sessionID }),
-    userID: grant.principal.userID,
+    userID: principal.userID,
     role,
     exp,
     iat: now,

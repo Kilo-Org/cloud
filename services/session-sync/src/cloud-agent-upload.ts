@@ -2,6 +2,7 @@ import {
   cloudAgentSyncAuthorizationSchema,
   cloudAgentSyncUploadSession,
   isCloudAgentSyncHandle,
+  RUNTIME_PROXY_ORIGIN_HEADER,
   type CloudAgentSyncAuthorizationBinding,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
@@ -26,12 +27,15 @@ function failure(status: number, code: string, message: string): Response {
   );
 }
 
-async function resolve(env: CloudAgentUploadEnv, handle: string, sessionID?: string) {
+async function resolve(
+  env: CloudAgentUploadEnv,
+  input: { handle: string; sessionID?: string; originProof?: string }
+) {
   if (!env.CLOUD_AGENT_SYNC_AUTH)
     return failure(503, 'auth_unavailable', 'Cloud Agent upload authorization is unavailable');
   try {
     const result = await withTimeout(
-      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload({ handle, sessionID }),
+      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload(input),
       5_000,
       'Cloud Agent upload authorization timed out'
     );
@@ -65,7 +69,7 @@ export async function exchangeCloudAgentUpload(
   env: CloudAgentUploadEnv
 ): Promise<Response | undefined> {
   if (!isCloudAgentSyncHandle(token)) return undefined;
-  const authorization = await resolve(env, token);
+  const authorization = await resolve(env, { handle: token });
   if (authorization instanceof Response) return authorization;
   if (authorization.organizationID !== organizationID)
     return failure(
@@ -95,6 +99,34 @@ export async function authorizeCloudAgentUpload(
   const sessionID = url.search ? null : cloudAgentSyncUploadSession(request.method, url.pathname);
   if (sessionID === null)
     return failure(403, 'upload_only', 'Cloud Agent credentials permit session uploads only');
-  const authorization = await resolve(env, token, sessionID);
+  const authorization = await resolve(env, { handle: token, sessionID });
   return authorization instanceof Response ? authorization : principal(authorization);
+}
+
+/**
+ * A sandbox may advertise itself as a presence runner. It cannot view instances or send
+ * commands, and the handle must arrive through the platform egress of its own sandbox.
+ */
+export async function authorizeCloudAgentPresenceRunner(
+  request: Request,
+  env: CloudAgentUploadEnv,
+  role: unknown
+): Promise<{ principal: Principal; expiresAt: number } | Response | undefined> {
+  const token = extractBearerToken(request.headers.get('Authorization'));
+  if (!token || !isCloudAgentSyncHandle(token)) return undefined;
+  if (role !== 'runner')
+    return failure(
+      403,
+      'runner_only',
+      'Cloud Agent credentials permit presence runner tickets only'
+    );
+  const originProof = request.headers.get(RUNTIME_PROXY_ORIGIN_HEADER);
+  if (!originProof)
+    return failure(401, 'invalid_credential', 'The Cloud Agent credential is invalid or expired');
+  const authorization = await resolve(env, { handle: token, originProof });
+  if (authorization instanceof Response) return authorization;
+  return {
+    principal: principal(authorization),
+    expiresAt: Math.floor(authorization.expiresAt / 1000),
+  };
 }

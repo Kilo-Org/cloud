@@ -109,12 +109,12 @@ type OrgUsageStatsProps = {
  * sighted member, who would otherwise see four read-only-looking cards. The
  * action ends in the chevron the hub's other destinations carry, so the header
  * reads as one more way out of the screen. It is that short name rather than
- * the hint's wording ("view details"): that copy measured 145 dp at the gate's
- * widest cell and pushed the action onto a second line in a 360 dp compact
- * header, away from the eyebrow it belongs to, and the screen's own title
- * (`usage.orgTitle`, "Organization usage") is no shorter. The header action is
- * painted only in the pressable state, so the informational grid keeps the
- * header and the geometry it has.
+ * the hint's wording ("View usage details"): that copy measured 145 dp at the
+ * gate's widest cell and pushed the action onto a second line in a 360 dp
+ * compact header, away from the eyebrow it belongs to, and the screen's own
+ * title (`usage.orgTitle`, "Organization usage") is no shorter. The header
+ * action is painted only in the pressable state, so the informational grid
+ * keeps the header and the geometry it has.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();

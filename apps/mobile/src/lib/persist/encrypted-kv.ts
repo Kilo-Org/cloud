@@ -396,9 +396,8 @@ function probeSchema(db: KVDatabase): void {
 
 async function migrateSchema(db: KVDatabase): Promise<void> {
   // Drizzle owns the schema; a recreated (deleted) file has no
-  // `__drizzle_migrations` table, so the migrations run again on it. A failure
-  // here is a migration error on a file that opened and keyed correctly, not
-  // a corrupt file.
+  // `__drizzle_migrations` table, so the migrations run again on it. Every
+  // rejection is tagged below, and the open classifies the tagged cause.
   try {
     await migrate(db, migrations);
   } catch (error) {
@@ -525,11 +524,9 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       if (isBusySignal(openError.cause) || isEnvironmentSignal(openError.cause)) {
         await reportTransientOpenFailure(db, openError.cause);
       }
-      // A corruption signal means the file is unreadable after all: route it
-      // into the delete-and-recreate recovery below, like a failed probe. The
-      // corruption report rides on the reset report; a separate capture would
-      // file the same unreadable file twice. The close stays with the shared
-      // reset block, which closes the handle exactly once.
+      // The corruption report rides on the reset report; a separate capture
+      // would file the same unreadable file twice. The close stays with the
+      // shared reset block, which closes the handle exactly once.
       if (isCorruptionSignal(openError.cause)) {
         resetCause = openError.cause;
       } else {

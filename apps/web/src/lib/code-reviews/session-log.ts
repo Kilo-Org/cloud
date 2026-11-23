@@ -4,9 +4,7 @@ import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { CloudMessage } from '@/components/cloud-agent-next/legacy-session-types';
 import { convertToCloudMessages } from '@/components/cloud-agent-next/legacy-session-types';
 
-// ---------------------------------------------------------------------------
 // Shared log entry type (matches DisplayEvent in CodeReviewStreamView)
-// ---------------------------------------------------------------------------
 
 export type SessionLogEntry = {
   timestamp: string;
@@ -19,9 +17,7 @@ export type SessionLogConversionOptions = {
   includeFullAssistantText?: boolean;
 };
 
-// ---------------------------------------------------------------------------
 // V2 (cloud-agent-next / session-ingest) conversion
-// ---------------------------------------------------------------------------
 
 /**
  * Convert a v2 session snapshot into flat log entries for the terminal view.
@@ -42,7 +38,6 @@ export function v2SnapshotToLogEntries(
     const time = info.time as { created?: number } | undefined;
     const baseTs = time?.created ? new Date(time.created).toISOString() : '';
 
-    // Show the initial user prompt as a single log line
     if (role === 'user') {
       if (options.includeFullAssistantText) continue;
       const textContent = (msg.parts ?? [])
@@ -56,7 +51,6 @@ export function v2SnapshotToLogEntries(
       continue;
     }
 
-    // Assistant messages: walk parts
     if (role !== 'assistant') continue;
 
     const error = info.error as Record<string, unknown> | undefined;
@@ -71,7 +65,6 @@ export function v2SnapshotToLogEntries(
         const status = state?.status as string | undefined;
         const input = state?.input as Record<string, unknown> | undefined;
 
-        // Extract a short detail from tool input
         let detail: string | undefined;
         if (input) {
           const filePath = input.filePath ?? input.file_path ?? input.path;
@@ -120,7 +113,6 @@ export function v2SnapshotToLogEntries(
       // Skip reasoning, compaction, file, step-start, step-finish, patch, subtask
     }
 
-    // Show message-level error if present and no parts captured it
     if (error) {
       const data = error.data as Record<string, unknown> | undefined;
       const errorMsg = typeof data?.message === 'string' ? data.message : 'An error occurred';
@@ -139,17 +131,8 @@ export function v2SnapshotToLogEntries(
   return entries;
 }
 
-// ---------------------------------------------------------------------------
 // V1 (cloud-agent / R2 blob) conversion
-// ---------------------------------------------------------------------------
 
-/**
- * Convert v1 blob messages into flat log entries.
- *
- * The blob contains raw CLI event objects. We use the existing
- * `convertToCloudMessages` utility to normalise them, then extract
- * the interesting bits (tool calls, text, errors) into log lines.
- */
 export function v1BlobToLogEntries(
   rawMessages: unknown,
   options: SessionLogConversionOptions = {}
@@ -188,7 +171,6 @@ function cloudMessageToLogEntry(
   ts: string,
   options: SessionLogConversionOptions
 ): SessionLogEntry | null {
-  // Tool calls
   if (msg.say === 'tool' || msg.ask === 'tool' || msg.ask === 'command') {
     const meta = msg.metadata;
     const toolName = (meta?.tool as string) ?? (msg.ask === 'command' ? 'command' : 'tool');
@@ -202,7 +184,6 @@ function cloudMessageToLogEntry(
     return { timestamp: ts, eventType: 'tool', message: `Tool: ${toolName}`, content: detail };
   }
 
-  // API request
   if (msg.say === 'api_req_started') {
     return { timestamp: ts, eventType: 'status', message: 'API request started' };
   }
@@ -217,7 +198,6 @@ function cloudMessageToLogEntry(
     return { timestamp: ts, eventType: 'text', message: text };
   }
 
-  // General text output
   if (msg.say === 'text') {
     const text = (msg.text || msg.content || '').trim();
     if (!text) return null;
@@ -227,7 +207,6 @@ function cloudMessageToLogEntry(
     return { timestamp: ts, eventType: 'text', message: text };
   }
 
-  // Error messages
   if (msg.say === 'error') {
     const text = (msg.text || msg.content || '').trim();
     return {

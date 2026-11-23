@@ -456,9 +456,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Gets the GitHub App installation status
-   */
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
     return await getGitHubConnectionStatusForOwner({
       type: 'org',
@@ -466,9 +463,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     });
   }),
 
-  /**
-   * List GitHub repositories accessible by the organization's GitHub integration
-   */
   listGitHubRepositories: organizationMemberProcedure
     .input(
       OrganizationIdInputSchema.extend({
@@ -482,9 +476,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Gets the GitLab OAuth integration status for organization
-   */
   getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
@@ -553,9 +544,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     };
   }),
 
-  /**
-   * List GitLab repositories accessible by the organization's GitLab integration
-   */
   listGitLabRepositories: organizationMemberProcedure
     .input(
       OrganizationIdInputSchema.extend({
@@ -570,9 +558,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Gets the review agent configuration
-   */
   getReviewConfig: organizationMemberProcedure
     .input(OrganizationIdInputSchema.extend({ platform: PlatformSchema }))
     .query(async ({ input }) => {
@@ -585,7 +570,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -651,10 +635,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       };
     }),
 
-  /**
-   * Saves the review agent configuration
-   * For GitLab: optionally syncs webhooks for selected repositories
-   */
   saveReviewConfig: organizationBillingMutationProcedure
     .input(SaveReviewConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -751,7 +731,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           createdBy: ctx.user.id,
         });
 
-        // For GitLab: sync webhooks if auto-configure is enabled
         let webhookSyncResult = null;
         if (
           platform === PLATFORM.GITLAB &&
@@ -772,7 +751,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                   organizationId: input.organizationId,
@@ -833,7 +811,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           }
         }
 
-        // Audit log
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',

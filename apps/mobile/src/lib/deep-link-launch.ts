@@ -300,9 +300,6 @@ function applyPendingDeepLink(
   ) {
     return;
   }
-  // A notification applies only when the slot is empty or already a notification:
-  // a system-search tap is newer evidence and must not be overwritten by a
-  // stale notification response.
   if (source === 'notification' && pendingDeepLink !== null && pendingSource !== 'notification') {
     return;
   }
@@ -311,8 +308,6 @@ function applyPendingDeepLink(
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
   pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
-  // A live capture is stamped now. A restore passes the time the record was
-  // captured, so the age keeps counting from capture across process starts.
   const storedAt = options?.storedAt ?? Date.now();
   pendingDeepLinkOrganizationId = options?.organizationId ?? null;
   pendingArrival = options?.arrival ?? 'live';
@@ -357,12 +352,6 @@ export function consumePendingDeepLink(): ConsumedPendingDeepLink | null {
   return result;
 }
 
-/**
- * The single gated consumer step `_layout.tsx` runs: the organization switches
- * the app before the href navigates, so the route's first fetch runs in the
- * session's context. A destination with no organization leaves the selection
- * untouched; a null destination does nothing.
- */
 export function applyConsumedPendingDeepLink(
   pending: ConsumedPendingDeepLink | null,
   setOrganizationId: (organizationId: string) => void,
@@ -573,12 +562,6 @@ export function captureLaunchDeepLink(): void {
   // fallback of an unusable session capture would replace the restored screen
   // with it. `redirectSystemPath` applies the same rule to a warm arrival.
   if (resume && opensDestination(resume.href)) {
-    // An app-scheme launch URL is the shape the Android system-search tap
-    // delivers; flag it so the exact `system-search` route for that tap may
-    // replace this lossy web-table mapping. An `https://` link is never flagged.
-    // An app-scheme URL that names a family the phone's search indexes is a
-    // search result's identifier, so it is session-bound: it must not open for
-    // the account that signs in after the one that indexed it.
     launchCapturedHref = resumeDeepLinkHref(resume);
     setPendingDeepLink(launchCapturedHref, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),

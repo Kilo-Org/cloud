@@ -320,11 +320,9 @@ export function isTerminalGlanceableStatus(
 
 /**
  * Map one session status to the kind the glanceable surfaces and the session
- * lists both show. Total on strings: needs-input statuses → `needsInput`,
- * `idle` → `idle`, the literal `scheduled` → `scheduled`, everything else →
- * `running` (starting, empty, unknown included). A session is idle only when
- * the agent says so, so a working or unrecognized session can never render
- * idle and a row can never disagree with the widget beside it.
+ * lists both show. A session is idle only when the agent says so, so a working
+ * or unrecognized session can never render idle and a row can never disagree
+ * with the widget beside it.
  */
 export function glanceableStatusKind(status: string): GlanceableStatusKind {
   if (glanceableNeedsInputKind(status) !== null) {

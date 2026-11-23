@@ -288,11 +288,6 @@ export function buildHomeWidgetData(
  * the flag.
  */
 function staleness(data: HomeWidgetData): {
-  /**
-   * The narrowed terminal status, or null when the snapshot is not terminal.
-   * One value, so no caller keeps a boolean beside a status a later branch can
-   * contradict.
-   */
   terminal: GlanceableTerminalStatus | null;
   primaryKind: GlanceableStatusKind | null;
   checkedAt: string | null;

@@ -438,7 +438,6 @@ function bareTagName(name) {
   return name.replace(/^Animated\./, '');
 }
 
-/** The inventory's answer for one tag, with any `Animated.` wrapper removed. */
 function isScrollContainer(name) {
   return SCROLL_CONTAINERS.has(bareTagName(name));
 }
@@ -623,7 +622,6 @@ function chunksWithin(chunks, node) {
   return found;
 }
 
-/** Whether one JSX node is the plain attribute named `name`. */
 function isJsxAttributeNamed(node, name) {
   return (
     node.type === 'JSXAttribute' && node.name.type === 'JSXIdentifier' && node.name.name === name
@@ -1844,7 +1842,6 @@ function layoutFindings(findings) {
   return byFile;
 }
 
-/** One parsed value is a plain object (not an array, not null). */
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

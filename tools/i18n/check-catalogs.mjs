@@ -2253,7 +2253,6 @@ const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
 /** Reject a catalog value that a JSON encoder wrote instead of a label. */
 function checkSerializedJson(label, key, value) {
-  // Only the JSON sample is JSON text by design; every other label must be prose.
   if (key === JSON_SAMPLE_KEY || !isSerializedJson(value)) {
     return [];
   }

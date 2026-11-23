@@ -11,9 +11,17 @@ const pushMock = vi.hoisted(() => vi.fn());
 const replaceMock = vi.hoisted(() => vi.fn());
 const resetMock = vi.hoisted(() => vi.fn());
 
-type Nav = { state: State; transitionEnd: (() => void) | undefined };
+type Nav = {
+  current: State;
+  transitionEnd: (() => void) | undefined;
+  stateListener: (() => void) | undefined;
+};
 
-const nav = vi.hoisted<Nav>(() => ({ state: { routes: [], index: 0 }, transitionEnd: undefined }));
+const nav = vi.hoisted<Nav>(() => ({
+  current: { routes: [], index: 0 },
+  transitionEnd: undefined,
+  stateListener: undefined,
+}));
 
 vi.mock('expo-router', () => {
   // Real expo-router returns the same router and navigator objects on every
@@ -21,14 +29,18 @@ vi.mock('expo-router', () => {
   const router = { push: pushMock, replace: replaceMock };
   const navigation = {
     addListener: (event: string, listener: () => void) => {
-      if (event === 'transitionEnd') {
-        nav.transitionEnd = listener;
+      if (event !== 'transitionEnd' && event !== 'state') {
+        return () => undefined;
       }
+      // Each event owns its own slot, so one unsubscribe never clears the
+      // other listener the hook registered.
+      const slot = event === 'state' ? 'stateListener' : 'transitionEnd';
+      nav[slot] = listener;
       return () => {
-        nav.transitionEnd = undefined;
+        nav[slot] = undefined;
       };
     },
-    getState: () => nav.state,
+    getState: () => nav.current,
     reset: resetMock,
   };
   return {
@@ -59,7 +71,12 @@ function mount() {
 }
 
 function setStack(routes: Route[], index: number) {
-  nav.state = { routes, index };
+  nav.current = { routes, index };
+  // The real navigator emits `state` after every committed navigation, so the
+  // hook observes the new stack through the listener as well as `getState`.
+  act(() => {
+    nav.stateListener?.();
+  });
 }
 
 const TABS: Route = { key: 'tabs-1', name: '(tabs)' };
@@ -83,6 +100,7 @@ describe('useStackSafeReplace', () => {
     replaceMock.mockReset();
     resetMock.mockReset();
     nav.transitionEnd = undefined;
+    nav.stateListener = undefined;
     latestRouter = undefined;
     latestReplace = undefined;
     setStack([TABS, r('new-1', 'agent-chat/new')], 1);
@@ -276,6 +294,74 @@ describe('useStackSafeReplace', () => {
     expect(resetMock).toHaveBeenCalledTimes(1);
     expect(resetMock.mock.calls[0]?.[0]).toEqual({
       routes: [TABS, r('session-1', 'agent-chat/[session-id]')],
+      index: 1,
+    });
+
+    unmount(renderer);
+  });
+
+  it('does not retire the source when a later push lands after a lost push end', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    // The push commits, but its `transitionEnd` never arrives.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-1', 'agent-chat/[session-id]')], 2);
+
+    // The reader pops back to the source; that pop ends normally. The source is
+    // pending, but judging it by depth alone would leave it waiting for an end
+    // that already happened.
+    setStack([TABS, r('new-1', 'agent-chat/new')], 1);
+    endTransition();
+    expect(resetMock).not.toHaveBeenCalled();
+
+    // A push from the source reaches the old depth again. Retiring the source
+    // here would remove the screen the reader is on.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-2', 'agent-chat/[session-id]')], 2);
+    endTransition();
+
+    expect(resetMock).not.toHaveBeenCalled();
+
+    unmount(renderer);
+  });
+
+  it('forgets the source when the committed stack falls back, even without a pop end', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    // The push commits and the navigator shows the pushed route, so the source
+    // is in its `pushed` phase.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-1', 'agent-chat/[session-id]')], 2);
+
+    // The reader pops back to the source, but that pop's `transitionEnd` never
+    // arrives. The state alone says the pushed route is gone.
+    setStack([TABS, r('new-1', 'agent-chat/new')], 1);
+
+    // A later push from the source reaching the old depth must not retire the
+    // source: the pending entry was already forgotten.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-2', 'agent-chat/[session-id]')], 2);
+    endTransition();
+
+    expect(resetMock).not.toHaveBeenCalled();
+
+    unmount(renderer);
+  });
+
+  it('still retires the source when the pushed route supersedes itself in place', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    // The push commits.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-1', 'agent-chat/[session-id]')], 2);
+    // The pushed screen redirects before the transition ends: the route at the
+    // pushed depth now has another key, and the stack did not grow or shrink.
+    setStack([TABS, r('new-1', 'agent-chat/new'), r('session-2', 'agent-chat/[session-id]')], 2);
+    endTransition();
+
+    // Tracking the pushed route by key would have forgotten the source here,
+    // leaving the replaced screen in the stack for good.
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock.mock.calls[0]?.[0]).toEqual({
+      routes: [TABS, r('session-2', 'agent-chat/[session-id]')],
       index: 1,
     });
 

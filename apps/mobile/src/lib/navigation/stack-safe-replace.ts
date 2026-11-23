@@ -9,18 +9,35 @@ export type StackSafeReplaceRouter = {
   replace: (href: Href) => void;
 };
 
-/** A source route waiting for the push that replaces it to settle. */
+/**
+ * A source route waiting for the push that replaces it to settle.
+ *
+ * The phase is the whole state, not a flag beside one: before the commit is
+ * observed an arrival event can still belong to the source's own navigation,
+ * and after it a stack that falls back can only mean the pushed route was
+ * popped. The pushed route is never tracked by key: a screen can supersede
+ * itself in place before this transition ends (a redirect or a guard's own
+ * `replace`), and its key changing must not make the source forgettable.
+ */
 type PendingSource = {
   /**
-   * The route count the stack must reach before this source can be retired. A
-   * transition that ends while the stack is still shorter is the event of the
-   * source screen's own arrival (or of the navigation that opened it), not the
-   * end of the push this source belongs to.
+   * The route count the stack reaches once the push commits. Below it the push
+   * has not committed (or its route was popped); at or above it the stack holds
+   * the pushed route.
    */
   readonly routesAfterPush: number;
   /** When this source stops being retirable, so a lost event cannot act later. */
   readonly expiresAt: number;
-};
+} & (
+  | {
+      /** The push is dispatched; the stack has not shown the pushed route yet. */
+      readonly phase: 'awaiting-push';
+    }
+  | {
+      /** The navigator has shown the pushed route. */
+      readonly phase: 'pushed';
+    }
+);
 
 /**
  * How long a pending source stays retirable. The push transition ends within a
@@ -53,14 +70,24 @@ function pendingSourceOutcome({
   if (now > source.expiresAt) {
     return 'drop';
   }
-  // The stack has not gained the pushed route yet, so this end belongs to an
-  // earlier navigation of the source screen, not to the push.
-  if (routes.length < source.routesAfterPush) {
-    return 'keep';
+  // The source left the stack some other way: it is not ours to remove any
+  // more.
+  if (!routes.some(route => route.key === key)) {
+    return 'drop';
   }
-  // The source left the stack some other way, or another navigation made it
-  // the focused screen again: it is not ours to remove any more.
-  if (key === focusedKey || !routes.some(route => route.key === key)) {
+  if (routes.length < source.routesAfterPush) {
+    // The stack has not gained the pushed route yet, so this end belongs to an
+    // earlier navigation of the source screen, not to the push.
+    if (source.phase === 'awaiting-push') {
+      return 'keep';
+    }
+    // The commit was observed and the stack has fallen back since: the pushed
+    // route was popped, so the swap this source belongs to is over.
+    return 'drop';
+  }
+  // Another navigation made the source the focused screen again: removing it
+  // would tear the screen the reader is on.
+  if (key === focusedKey) {
     return 'drop';
   }
   return 'retire';
@@ -94,6 +121,15 @@ function pendingSourceOutcome({
  * already replaced. A source therefore waits until the stack holds the route the
  * push added.
  *
+ * Depth alone cannot say which push an end closes. If the push's own end is
+ * lost and the reader pops back to the source, the source stays pending at the
+ * old depth, and a later push that reaches that depth again would retire the
+ * screen the reader is on. So the navigator's `state` event moves the source to
+ * its `pushed` phase once the stack reaches `routesAfterPush`; from then on a
+ * stack that falls back means the pushed route was popped, and the source is
+ * forgotten. The reset still waits for `transitionEnd`: running it from the
+ * `state` event would land it inside the push animation and crash the same way.
+ *
  * The removal is keyed on the routes focused when the navigations started, so a
  * duplicate route name elsewhere in the stack is never dropped by mistake.
  * A second `replace` before the first transition ends only adds its source to
@@ -105,50 +141,83 @@ export function useStackSafeReplace(): StackSafeReplaceRouter {
   const navigation = useNavigation<NativeStackNavigationProp<Record<string, undefined>>>();
   const pendingSourcesRef = useRef<Map<string, PendingSource>>(new Map());
 
-  useEffect(
-    () =>
-      navigation.addListener('transitionEnd', () => {
-        const pendingSources = pendingSourcesRef.current;
-        if (pendingSources.size === 0) {
-          return;
-        }
-        const state = navigation.getState();
-        const focusedKey = state.routes[state.index]?.key;
-        const now = Date.now();
-        // Keep a key pending only while it can still be retired; a source that
-        // left the stack some other way, that some other navigation made the
-        // focused screen, or whose push never settled is no longer ours to
-        // remove.
-        const outcomes = new Map(
-          [...pendingSources].map(([key, source]) => [
-            key,
-            pendingSourceOutcome({ key, source, routes: state.routes, focusedKey, now }),
-          ])
-        );
-        const retirable = new Set(
-          [...outcomes].filter(([, outcome]) => outcome === 'retire').map(([key]) => key)
-        );
-        for (const [key, outcome] of outcomes) {
-          if (outcome === 'drop') {
-            pendingSources.delete(key);
-          }
-        }
-        if (retirable.size === 0) {
-          return;
-        }
-        const routes = state.routes.filter(route => !retirable.has(route.key));
-        // The reset would empty the navigator: leave the stack alone rather
-        // than commit a bad reset.
-        if (routes.length === 0) {
-          return;
-        }
-        for (const key of retirable) {
+  useEffect(() => {
+    const unsubscribeTransitionEnd = navigation.addListener('transitionEnd', () => {
+      const pendingSources = pendingSourcesRef.current;
+      if (pendingSources.size === 0) {
+        return;
+      }
+      const state = navigation.getState();
+      const focusedKey = state.routes[state.index]?.key;
+      const now = Date.now();
+      // Keep a key pending only while it can still be retired; a source that
+      // left the stack some other way, that some other navigation made the
+      // focused screen, or whose push never settled is no longer ours to
+      // remove.
+      const outcomes = new Map(
+        [...pendingSources].map(([key, source]) => [
+          key,
+          pendingSourceOutcome({ key, source, routes: state.routes, focusedKey, now }),
+        ])
+      );
+      const retirable = new Set(
+        [...outcomes].filter(([, outcome]) => outcome === 'retire').map(([key]) => key)
+      );
+      for (const [key, outcome] of outcomes) {
+        if (outcome === 'drop') {
           pendingSources.delete(key);
         }
-        navigation.reset({ ...state, routes, index: routes.length - 1 });
-      }),
-    [navigation]
-  );
+      }
+      if (retirable.size === 0) {
+        return;
+      }
+      const routes = state.routes.filter(route => !retirable.has(route.key));
+      // The reset would empty the navigator: leave the stack alone rather
+      // than commit a bad reset.
+      if (routes.length === 0) {
+        return;
+      }
+      for (const key of retirable) {
+        pendingSources.delete(key);
+      }
+      navigation.reset({ ...state, routes, index: routes.length - 1 });
+    });
+    // Every committed navigation reports the stack here. The phase is decided
+    // from that state alone, and retirement stays on `transitionEnd` so the
+    // reset never lands inside the running push animation.
+    const unsubscribeState = navigation.addListener('state', () => {
+      const pendingSources = pendingSourcesRef.current;
+      if (pendingSources.size === 0) {
+        return;
+      }
+      const state = navigation.getState();
+      const focusedKey = state.routes[state.index]?.key;
+      const now = Date.now();
+      for (const [key, source] of pendingSources) {
+        if (now > source.expiresAt || !state.routes.some(route => route.key === key)) {
+          // Expired, or the source left the stack some other way.
+          pendingSources.delete(key);
+        } else if (source.phase === 'awaiting-push') {
+          // An arrival event of the source's own navigation can only be seen
+          // before the commit, so a short stack leaves the entry alone; once
+          // the stack reaches the pushed depth the commit is observed.
+          if (state.routes.length >= source.routesAfterPush) {
+            pendingSources.set(key, { ...source, phase: 'pushed' });
+          }
+        } else if (state.routes.length < source.routesAfterPush || focusedKey === key) {
+          // The stack fell back below the pushed depth (the pushed route was
+          // popped), or the reader reversed the replace by focusing the source
+          // again. Forgetting it is safe where retiring it could remove the
+          // screen the reader is on.
+          pendingSources.delete(key);
+        }
+      }
+    });
+    return () => {
+      unsubscribeTransitionEnd();
+      unsubscribeState();
+    };
+  }, [navigation]);
 
   const replace = useCallback(
     (href: Href) => {
@@ -156,6 +225,7 @@ export function useStackSafeReplace(): StackSafeReplaceRouter {
       const sourceKey = state.routes[state.index]?.key ?? null;
       if (sourceKey !== null) {
         pendingSourcesRef.current.set(sourceKey, {
+          phase: 'awaiting-push',
           routesAfterPush: state.routes.length + 1,
           expiresAt: Date.now() + PENDING_SOURCE_TTL_MS,
         });

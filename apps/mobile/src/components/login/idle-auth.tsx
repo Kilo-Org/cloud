@@ -310,8 +310,10 @@ export function IdleAuth({
         busy={busy}
         // A resend that fails has no field to sit under here, and the pending-link options are off
         // screen, so the code step shows that refusal in its own slot. Without a pending link the
-        // hook toasts it instead and this stays the verify message alone.
-        error={verifyRefusal?.message ?? pendingLinkFailure?.message}
+        // hook toasts it instead and this stays the verify message alone. The newest refusal wins:
+        // a terminal verify refusal is kept on the step, so it must not mask a resend failure that
+        // lands after it, which would make the tap look like it did nothing.
+        error={pendingLinkFailure?.message ?? verifyRefusal?.message}
         // The refusal's data tag decides, never the message: both refusals a code
         // cannot clear — the admission gate and a silently refused address — show
         // the other sign-in methods their copy names. The handler is always passed,
@@ -327,6 +329,9 @@ export function IdleAuth({
             // code (clearing the message), requested a resend, or gone back.
             // Only the attempt this refusal belongs to may write its message.
             if (!outcome.ok && attempt === verifyAttemptRef.current) {
+              // The refusal is the newest word on the step, so an older resend
+              // failure must not stay in the slot ahead of it.
+              clearPendingLinkFailure();
               setVerifyRefusal(outcome);
             }
           })();

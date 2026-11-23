@@ -49,7 +49,7 @@ export async function pullChat(
     case 'failed': {
       return { kind: 'failed', code: pulled.code };
     }
-    case 'pulled': {
+    default: {
       if (
         pulled.snapshot.position === ready.record.acknowledged &&
         ready.record.phase === 'synced'

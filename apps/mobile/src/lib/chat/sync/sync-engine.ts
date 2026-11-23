@@ -4,7 +4,6 @@ import {
   type NativeSyncPacket,
   nextSeq,
 } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
 
 import { commitFrozen } from './sync-commit';
 import { imagePartsOf, turnsToPortable } from './sync-mapping';
@@ -140,12 +139,18 @@ export async function uploadChat(
   const idleSeq = lastAssistant ? nextSeq(maxSeq, maxSeq) : null;
   const finalMaxSeq = idleSeq ?? maxSeq;
 
-  const blobs = new Map<string, UploadedBlob>();
-  for (const image of imagePartsOf(sequenced.map(one => one.turn))) {
-    blobs.set(image.partId, await deps.transport.putBlob(serverId, base64ToBytes(image.base64), image.media));
-  }
+  const uploaded = await Promise.all(
+    imagePartsOf(sequenced.map(one => one.turn)).map(async image => ({
+      partId: image.partId,
+      blob: await deps.transport.putBlob(
+        serverId,
+        base64ToBytes(image.base64),
+        image.media
+      ),
+    }))
+  );
+  const blobs = new Map<string, UploadedBlob>(uploaded.map(one => [one.partId, one.blob]));
   const session = sessionOf({
-    record,
     serverId,
     title: input.title,
     model: input.model,

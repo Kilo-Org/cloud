@@ -1,10 +1,9 @@
 import type { PulledSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { pulledToTurns } from './sync-mapping';
-import { saveSyncRecord, syncRecordOf } from './sync-store';
 import { importedTurnId } from './sync-ids';
 import type { SyncDeps } from './sync-protocol';
-import type { MutableMessageMap } from './sync-store';
+import { type MutableMessageMap, saveSyncRecord, syncRecordOf } from './sync-store';
 
 /**
  * Importing a pulled log: the messages this device has not seen become

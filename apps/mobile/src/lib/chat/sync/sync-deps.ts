@@ -7,9 +7,8 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
 import { chatLayers, organizationIdOf } from '../layers';
-import { SYSTEM } from '../registry';
+import { releaseChat, SYSTEM } from '../registry';
 import type { ChatPlace } from '../scope';
-import { releaseChat } from '../registry';
 import { type ChatDatabase, deleteChat } from '../store';
 import { announceDeleted, setBanner } from './sync-banners';
 import { type SyncClient, syncClientFor } from './sync-client';
@@ -30,13 +29,24 @@ export function runtimeFor(place: ChatPlace, db: SQLiteDatabase) {
     return held;
   }
   const made = ManagedRuntime.make(chatLayers(db, place.org));
-  runtimes.set(place.chatScope, made as ManagedRuntime.ManagedRuntime<unknown, unknown>);
-  return made;
+  const heldRuntime = made as ManagedRuntime.ManagedRuntime<unknown, unknown>;
+  runtimes.set(place.chatScope, heldRuntime);
+  return heldRuntime;
+}
+
+export /** The app's database, read through the sync engine's narrower contract. */
+function chatDbOf(database: SQLiteDatabase): ChatDatabase {
+  return {
+    getAllSync: database.getAllSync.bind(database),
+    runSync: database.runSync.bind(database),
+    withTransactionSync: database.withTransactionSync.bind(database),
+    isInTransactionSync: database.isInTransactionSync.bind(database),
+  };
 }
 
 export async function depsFor(place: ChatPlace): Promise<{ deps: SyncDeps; client: SyncClient; db: ChatDatabase }> {
   const database = await encryptedDatabase();
-  const db = database as unknown as ChatDatabase;
+  const db = chatDbOf(database);
   const client = syncClientFor(organizationIdOf(place.org));
   const runtime = runtimeFor(place, database);
   const deps: SyncDeps = {

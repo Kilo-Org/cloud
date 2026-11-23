@@ -1,7 +1,7 @@
 import { classifyConflict, type NativeSyncPacket } from '@kilocode/cloud-agent-sdk';
 
 import { applyPulled } from './sync-import';
-import { freeze, type FrozenPacket, sessionOf } from './sync-protocol';
+import { freeze, type FrozenPacket } from './sync-protocol';
 import type { SyncDeps, UploadChatInput, UploadOutcome } from './sync-protocol';
 import { saveSyncRecord, syncRecordOf } from './sync-store';
 

@@ -151,14 +151,13 @@ export function thaw(raw: string): FrozenPacket | null {
 }
 
 export function sessionOf(input: {
-  readonly record: SyncRecord;
   readonly serverId: string;
   readonly title: string | null;
   readonly model: PortableModelRef;
   readonly created: number;
   readonly now: number;
 }): PortableSession {
-  const { record, serverId, title, model, created, now } = input;
+  const { serverId, title, model, created, now } = input;
   return {
     id: serverId,
     ...(title === null || title === '' ? {} : { title }),

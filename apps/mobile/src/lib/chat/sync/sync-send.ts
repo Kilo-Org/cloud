@@ -64,6 +64,9 @@ export async function prepareSend(
       case 'unavailable': {
         return { kind: 'blocked', reason: 'unavailable' };
       }
+      default: {
+        return { kind: 'blocked', reason: 'unavailable' };
+      }
     }
   } catch {
     return { kind: 'blocked', reason: 'unavailable' };

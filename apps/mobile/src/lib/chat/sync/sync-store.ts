@@ -143,7 +143,7 @@ export type SyncRecordPatch = Partial<{
   readonly messageMap: SyncMessageMap;
 }>;
 
-const PATCH_COLUMNS: Readonly<Record<keyof SyncRecordPatch, string>> = {
+const PATCH_COLUMNS = {
   sourceId: 'sync_source_id',
   phase: 'sync_state',
   acknowledged: 'sync_acknowledged',
@@ -153,7 +153,7 @@ const PATCH_COLUMNS: Readonly<Record<keyof SyncRecordPatch, string>> = {
   ackedSeq: 'sync_acked_seq',
   outbox: 'sync_outbox',
   messageMap: 'sync_message_map',
-};
+} satisfies Record<keyof SyncRecordPatch, string>;
 
 /** Writes one patch of the sync record. An empty patch writes nothing. */
 export function saveSyncRecord(db: ChatDatabase, sessionId: string, patch: SyncRecordPatch): void {

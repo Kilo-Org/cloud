@@ -61,7 +61,13 @@ async function uploadOne(run: Run, sessionId: string): Promise<Verdict> {
 }
 
 /** Retries one chat `attempts` times, doubling the wait between tries. */
-async function retryChat(run: Run, sessionId: string, attempt: number, delay: number): Promise<Verdict> {
+async function retryChat(input: {
+  readonly run: Run;
+  readonly sessionId: string;
+  readonly attempt: number;
+  readonly delay: number;
+}): Promise<Verdict> {
+  const { run, sessionId, attempt, delay } = input;
   if (attempt > run.attempts) {
     return 'park';
   }
@@ -76,7 +82,7 @@ async function retryChat(run: Run, sessionId: string, attempt: number, delay: nu
   if (!(await run.deps.stillOn())) {
     return 'stop';
   }
-  return retryChat(run, sessionId, attempt + 1, Math.min(run.cap, delay * 2));
+  return retryChat({ run, sessionId, attempt: attempt + 1, delay: Math.min(run.cap, delay * 2) });
 }
 
 /** Uploads each chat in order, one at a time. */
@@ -88,7 +94,12 @@ async function eachChat(run: Run, index: number): Promise<BackfillOutcome> {
   if (!(await run.deps.stillOn())) {
     return { kind: 'stopped', uploaded: run.uploaded };
   }
-  const verdict = await retryChat(run, chats[index] as string, 1, run.base);
+  const verdict = await retryChat({
+    run,
+    sessionId: chats[index] as string,
+    attempt: 1,
+    delay: run.base,
+  });
   if (verdict === 'stop') {
     return { kind: 'stopped', uploaded: run.uploaded };
   }
@@ -104,7 +115,7 @@ async function eachChat(run: Run, index: number): Promise<BackfillOutcome> {
  * attempts, `done` when every chat either reached the server or was skipped
  * for a reason no retry fixes.
  */
-export async function runBackfill(deps: BackfillDeps): Promise<BackfillOutcome> {
+export function runBackfill(deps: BackfillDeps): Promise<BackfillOutcome> {
   const run: Run = {
     deps,
     attempts: deps.attemptsPerChat ?? DEFAULTS.attemptsPerChat,

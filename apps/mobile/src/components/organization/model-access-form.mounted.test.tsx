@@ -10,6 +10,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
+import { compileClassName } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
 import { KeyboardLiftView } from '@/components/keyboard-lift-view';
@@ -338,6 +339,27 @@ function buttonWithLabel(root: ReactTestInstance, label: string) {
 /** The lift the form asks for: the pad its `KeyboardLiftView` reserves. */
 function liftPad(root: ReactTestInstance): number {
   return root.findByType(KeyboardLiftView as never).props.height as number;
+}
+
+/**
+ * The one region inside the lift that holds both the tab header and the tab's
+ * body: the lowest enclosing view of the segmented control that also holds the
+ * list. Finding it by structure rather than by class keeps the assertion about
+ * the region's place in the column, not about the string that spells it.
+ */
+function bodyRegion(
+  root: ReactTestInstance,
+  listType: 'ModelDenyList' | 'ProviderAllowList' = 'ModelDenyList'
+): ReactTestInstance {
+  const control = root.findByType('SegmentedControl' as never);
+  let node = control.parent;
+  while (node !== null) {
+    if (String(node.type) === 'View' && node.findAllByType(listType as never).length === 1) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('the tab header and the tab body share no enclosing region');
 }
 
 afterEach(() => {
@@ -1290,5 +1312,74 @@ describe('ModelAccessForm keyboard lift', () => {
     selectTab(root, 'gateways');
 
     expect(liftPad(root)).toBe(280);
+  });
+
+  it('lays the pinned footer out after the body region, never inside it', () => {
+    // The deficit of a short window has to come out of the body region. That
+    // holds only while the footer is a sibling that follows it: a footer nested
+    // in the region would be clipped by it, and a footer placed first would let
+    // the region's content paint over its edge. So the lifted column's own
+    // children are read in order — the region that holds the tab header, then
+    // the bar, and nothing else.
+    geometry.keyboardHeight = 300;
+    const root = render(undefined);
+    const region = bodyRegion(root);
+    const column = region.parent;
+    if (column === null) {
+      throw new Error('the body region has no column');
+    }
+    const siblings = column.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+    const regionIndex = siblings.findIndex(
+      child => child.findAllByType('SegmentedControl' as never).length === 1
+    );
+    const footerIndex = siblings.findIndex(child => child.type === 'ScreenFooter');
+
+    expect(regionIndex).toBe(0);
+    expect(footerIndex).toBe(regionIndex + 1);
+    expect(siblings).toHaveLength(2);
+    // The column is the lifted one, and the bar is not inside the region.
+    const ancestors: unknown[] = [];
+    for (let node: ReactTestInstance | null = column; node; node = node.parent) {
+      ancestors.push(node.type);
+    }
+    expect(ancestors).toContain(KeyboardLiftView);
+    expect(region.findAllByType('ScreenFooter' as never)).toHaveLength(0);
+    expect(region.findAllByType('ModelDenyList' as never)).toHaveLength(1);
+  });
+
+  it('gives the body region the only flexible, shrinkable and clipped box in the column', async () => {
+    // Two facts decide whether the bar reaches the pad. `flex-1` makes the
+    // region the child that takes the column's free room; `flexShrink` and
+    // `min-height: 0` are what let yoga take the deficit out of it instead of
+    // out of the bar (React Native's `flexShrink` default is 0, so a region
+    // without them keeps its content's height and pushes the bar down);
+    // `overflow-hidden` is what keeps the overflowing content from painting over
+    // the bar once the bar is in the right place.
+    //
+    // The renderer's `View` mock is a host string, so the class string is the
+    // only prop this tree exposes. The app's own class compiler turns that
+    // string into the declarations the layout pass applies, so the assertions
+    // read the resolved style rather than the spelling.
+    geometry.keyboardHeight = 300;
+    const region = bodyRegion(render(undefined));
+    const declarations = await compileClassName(String(region.props.className));
+
+    expect(declarations).toContainEqual(
+      expect.objectContaining({ flexGrow: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden' })
+    );
+  });
+
+  it('keeps the header and the providers list in the one region the bar follows', () => {
+    // The Providers tab renders its own `flex-1` frame under the header: the
+    // region still has to be the one box holding both, with the bar after it.
+    const root = render(['anthropic']);
+    selectTab(root, 'providers');
+
+    const region = bodyRegion(root, 'ProviderAllowList');
+    expect(region.findAllByType('ProviderAllowList' as never)).toHaveLength(1);
+    expect(region.findAllByType('SegmentedControl' as never)).toHaveLength(1);
+    expect(region.findAllByType('ScreenFooter' as never)).toHaveLength(0);
   });
 });

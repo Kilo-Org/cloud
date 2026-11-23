@@ -345,110 +345,128 @@ export function ModelAccessForm({
           and the pinned footer rises with it. The lift is the keyboard's own
           measured height less the bottom inset the footer already pads, so it
           follows the keyboard instead of depending on a frame the platform
-          reports late — the same reasoning as the new-session form. */}
+          reports late — the same reasoning as the new-session form. With that
+          pad the bar's content ends exactly at the IME's top edge: the pad is the
+          keyboard's own height, and the footer pads the inset the reduction took
+          out, so neither one overlaps the other. */}
       <KeyboardLiftView className="flex-1" height={keyboardLiftPad}>
-        {/* The inset rides on this wrapper: inline padding on the padded block
-            would replace the page gutter its class draws. */}
-        <View style={sideInsetStyle}>
-          <View className="gap-3 px-4 pt-3">
-            {/* The warning tile marks missing data; the message takes the body
-                ink, because the muted neutral fails body-text contrast on it. */}
-            {notice === null ? null : (
-              <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-                <Text className="flex-1 text-foreground">{notice}</Text>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  loading={catalogIsFetching}
-                  onPress={onRetryCatalog}
-                >
-                  <Text>{t('common.retry')}</Text>
-                </Button>
-              </View>
-            )}
-            <SegmentedControl
-              options={[
-                { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
-                { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
-                { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
-              ]}
-              value={tab}
-              onChange={nextTab => {
-                // A tab change is the person looking elsewhere: a draft that lands
-                // after it must not move the lists under the tab they chose. A
-                // viewer has no edits of their own on the form, because the lists
-                // show the saved policy either way, so looking at another tab is
-                // not the person touching anything: marking the form touched would
-                // keep a stored draft from being adopted if the role arrives later
-                // in the same mount, and the person's next edit would overwrite it.
-                if (canEdit) {
-                  touchedRef.current = true;
-                }
-                setTab(nextTab);
-              }}
-              accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
-            />
-            {canEdit ? null : (
-              <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
-            )}
+        {/* The header and the tab's body share one clipped region, and that
+            region is the only flexible child of the lifted column, so it takes
+            whatever room the bar leaves and nothing above can borrow the bar's:
+            `flex-1` grows into the free room, `min-h-0` lets yoga shrink the
+            region under its content's own height (a child keeps its intrinsic
+            box and would otherwise push the bar out), and `overflow-hidden` is
+            what actually keeps the content inside the region — a plain `flex-1`
+            View still paints its overflow over the bar. In a window too short for
+            the header, the list and the bar, the deficit therefore comes out of
+            this region: its bottom edge cuts the header, then the list, instead
+            of pushing the pinned actions down into the pad. */}
+        <View className="flex-1 min-h-0 overflow-hidden">
+          {/* The inset rides on this wrapper: inline padding on the padded block
+              would replace the page gutter its class draws. */}
+          <View style={sideInsetStyle}>
+            <View className="gap-3 px-4 pt-3">
+              {/* The warning tile marks missing data; the message takes the body
+                  ink, because the muted neutral fails body-text contrast on it. */}
+              {notice === null ? null : (
+                <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+                  <Text className="flex-1 text-foreground">{notice}</Text>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={catalogIsFetching}
+                    onPress={onRetryCatalog}
+                  >
+                    <Text>{t('common.retry')}</Text>
+                  </Button>
+                </View>
+              )}
+              <SegmentedControl
+                options={[
+                  { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
+                  { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
+                  { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
+                ]}
+                value={tab}
+                onChange={nextTab => {
+                  // A tab change is the person looking elsewhere: a draft that lands
+                  // after it must not move the lists under the tab they chose. A
+                  // viewer has no edits of their own on the form, because the lists
+                  // show the saved policy either way, so looking at another tab is
+                  // not the person touching anything: marking the form touched would
+                  // keep a stored draft from being adopted if the role arrives later
+                  // in the same mount, and the person's next edit would overwrite it.
+                  if (canEdit) {
+                    touchedRef.current = true;
+                  }
+                  setTab(nextTab);
+                }}
+                accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
+              />
+              {canEdit ? null : (
+                <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
+              )}
+            </View>
           </View>
-        </View>
 
-        {tab === 'models' ? (
-          <ModelDenyList
-            models={denyRows}
-            draft={draft}
-            onChange={onDraftChange}
-            disabled={!canEdit || saving}
-          />
-        ) : null}
-        {/* An empty row set shows the screen-level notice above instead of a list
-            whose only row would be a misleading empty-policy message. */}
-        {tab === 'providers' && !providersEmpty ? (
-          <View className="flex-1">
-            {/* The refusal under the tabs carries this sentence only while no
-                failure owns that line: a failed save shows its own message, so the
-                caption stays to keep the read-only explanation on screen. */}
-            {providerRowsIncomplete &&
-            !(
-              savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed'
-            ) ? (
-              // The inset rides on this wrapper: an inline padding on the text
-              // would replace the page gutter its class draws.
-              <View style={sideInsetStyle}>
-                <Text variant="caption" className="px-4 pb-2">
-                  {t('organizationModelAccess.providersNeedCatalog')}
-                </Text>
-              </View>
-            ) : null}
-            <ProviderAllowList
-              providers={providers}
-              names={providerNames}
+          {tab === 'models' ? (
+            <ModelDenyList
+              models={denyRows}
               draft={draft}
               onChange={onDraftChange}
-              disabled={!canEdit || saving || providerRowsIncomplete}
+              disabled={!canEdit || saving}
             />
-          </View>
-        ) : null}
-        {tab === 'gateways' ? (
-          <GatewaySettingsSection
-            organizationId={organizationId}
-            canManageBilling={canManageBilling}
-            settings={gateway}
-            isError={gatewayIsError}
-            isFetching={gatewayIsFetching}
-            canEdit={canEdit}
-            onRetry={onRetryGateway}
-          />
-        ) : null}
+          ) : null}
+          {/* An empty row set shows the screen-level notice above instead of a list
+              whose only row would be a misleading empty-policy message. */}
+          {tab === 'providers' && !providersEmpty ? (
+            <View className="flex-1">
+              {/* The refusal under the tabs carries this sentence only while no
+                  failure owns that line: a failed save shows its own message, so the
+                  caption stays to keep the read-only explanation on screen. */}
+              {providerRowsIncomplete &&
+              !(
+                savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed'
+              ) ? (
+                // The inset rides on this wrapper: an inline padding on the text
+                // would replace the page gutter its class draws.
+                <View style={sideInsetStyle}>
+                  <Text variant="caption" className="px-4 pb-2">
+                    {t('organizationModelAccess.providersNeedCatalog')}
+                  </Text>
+                </View>
+              ) : null}
+              <ProviderAllowList
+                providers={providers}
+                names={providerNames}
+                draft={draft}
+                onChange={onDraftChange}
+                disabled={!canEdit || saving || providerRowsIncomplete}
+              />
+            </View>
+          ) : null}
+          {tab === 'gateways' ? (
+            <GatewaySettingsSection
+              organizationId={organizationId}
+              canManageBilling={canManageBilling}
+              settings={gateway}
+              isError={gatewayIsError}
+              isFetching={gatewayIsFetching}
+              canEdit={canEdit}
+              onRetry={onRetryGateway}
+            />
+          ) : null}
+        </View>
         {/* The commit actions are the screen's one pinned footer, outside the
-            body above, because both lists save together: a save that settles
-            must never move the rows it just wrote. The Gateways tab saves each
-            control as it changes, so it has nothing to commit and no footer.
-            The bar pins itself to the bottom edge, because the Providers tab
-            renders no `flex-1` list while its rows are missing. */}
+            clipped region above, because both lists save together: a save that
+            settles must never move the rows it just wrote. The Gateways tab
+            saves each control as it changes, so it has nothing to commit and no
+            footer. It follows that region as a sibling, so the region takes the
+            slack and the bar keeps its whole height: the bar sets no shrink of
+            its own (React Native's `flexShrink` default is 0), so the only place
+            a short window can take room from is the region above it. */}
         {tab === 'gateways' ? null : (
-          <ScreenFooter keyboard="host" className="mt-auto">
+          <ScreenFooter keyboard="host">
             <View className="gap-3">
               <View className="flex-row gap-2">
                 <Button

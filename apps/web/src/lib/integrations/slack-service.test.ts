@@ -90,6 +90,7 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   SlackWorkspaceRebindNotAllowedError,
   SlackWorkspaceRebindUnsettledError,
+  SLACK_RETIREMENT_REMOVAL_TIMEOUT_MS,
   SLACK_SCOPES,
   testConnection,
   uninstallApp,
@@ -1238,8 +1239,8 @@ describe('upsertSlackInstallation workspace rebind', () => {
 });
 
 describe('retirePreviousSlackWorkspace', () => {
-  // The locked retirement section resolves the previous workspace through the
-  // transaction it is handed.
+  // Both retirement sections ask whether a row records the previous workspace
+  // through the transaction they are handed.
   const mockTxLimit = jest.fn();
 
   beforeEach(() => {
@@ -1256,6 +1257,10 @@ describe('retirePreviousSlackWorkspace', () => {
           select: () => ({ from: () => ({ where: () => ({ limit: mockTxLimit }) }) }),
         })
     );
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('revokes the replaced token before clearing the Chat SDK state of its workspace', async () => {
@@ -1330,7 +1335,7 @@ describe('retirePreviousSlackWorkspace', () => {
     );
   });
 
-  it('keeps the state of a workspace another row records, and reports it', async () => {
+  it('keeps the state and the token of a workspace another row records, and reports it', async () => {
     mockAuthRevoke.mockResolvedValue({ ok: true });
     mockTxLimit.mockResolvedValue([
       buildSlackIntegration({
@@ -1349,17 +1354,46 @@ describe('retirePreviousSlackWorkspace', () => {
       { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
 
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { component: 'slack-service', op: 'retire-previous-workspace' },
-      extra: { teamId: 'T_OLD', outcome: 'recorded_by_another_owner' },
+      extra: { teamId: 'T_OLD', outcome: 'recorded_by_another_row' },
     });
   });
 
-  it('revokes the replaced token when another row records the workspace', async () => {
+  it("keeps the state and the token when the same owner's row records the workspace", async () => {
     mockAuthRevoke.mockResolvedValue({ ok: true });
     mockTxLimit.mockResolvedValue([
+      buildSlackIntegration({
+        id: 'integration-same-owner',
+        owned_by_user_id: owner.id,
+        platform_installation_id: 'T_OLD',
+        platform_account_id: 'T_OLD',
+      }),
+    ]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await retirePreviousSlackWorkspace(
+      owner,
+      { teamId: 'T_OLD', botToken: 'xoxb-old' },
+      { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
+    );
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: 'T_OLD', outcome: 'recorded_by_another_row' },
+    });
+  });
+
+  it('skips the removals when a row records the workspace after the revoke', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+    mockTxLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([
       buildSlackIntegration({
         id: 'integration-2',
         owned_by_user_id: 'user-2',
@@ -1368,15 +1402,45 @@ describe('retirePreviousSlackWorkspace', () => {
       }),
     ]);
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await retirePreviousSlackWorkspace(
       owner,
-      { teamId: 'T_OLD', botToken: '$$SLACKTOKEN_OLDWORKSPACE:L$$' },
-      { deleteChatSdkInstallation }
+      { teamId: 'T_OLD', botToken: 'xoxb-old' },
+      { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
 
     expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: 'T_OLD', outcome: 'recorded_by_another_row' },
+    });
+  });
+
+  it('resolves and reports when a removal does not finish within its budget', async () => {
+    jest.useFakeTimers();
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+    const deleteChatSdkInstallation = jest.fn(
+      (_teamId: string): Promise<void> => new Promise<void>(() => {})
+    );
+
+    const retirement = retirePreviousSlackWorkspace(
+      owner,
+      { teamId: 'T_OLD', botToken: 'xoxb-old' },
+      { deleteChatSdkInstallation }
+    );
+    // Let both lock sections and the revoke settle before the budget expires.
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(SLACK_RETIREMENT_REMOVAL_TIMEOUT_MS);
+
+    await expect(retirement).resolves.toBeUndefined();
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T_OLD');
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: 'T_OLD', outcome: 'removal_timed_out' },
+    });
   });
 
   it('reports a failing identity-cache cleanup without rejecting', async () => {

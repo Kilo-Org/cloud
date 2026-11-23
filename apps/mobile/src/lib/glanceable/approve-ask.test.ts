@@ -489,7 +489,6 @@ describe('resolveLeadingPendingPermissionId', () => {
   });
 
   it('rejects as unreadable for a decodable frame with no projection', async () => {
-    // The control plane omits the projection when it holds no snapshot: absence is unknown, not empty.
     const stream = fakeStream([connectedFrameWithData({})]);
     const pending = resolveLeadingPendingPermissionId(
       { cloudAgentSessionId: 'agent_1' },
@@ -641,11 +640,6 @@ describe('runGlanceableApprove', () => {
   });
 
   it('acks the answered raise so the republish counts it as answered', async () => {
-    // The tray row keeps reading permission until the control plane's status
-    // sync lands, and the caller republishes immediately after this resolves.
-    // Without the ack the republish would draw the answered session as still
-    // waiting, with Approve back on the ongoing notification it was just
-    // answered from.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockResolvedValue(undefined);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
@@ -861,11 +855,6 @@ describe('refreshGlanceableSnapshot', () => {
   });
 
   it('counts a raise the answer acked as answered while its tray row still trails', async () => {
-    // The tray keeps reading permission until the control plane's status sync
-    // lands, and this poll runs immediately after the answer. Counting the raw
-    // row would republish the pre-action snapshot — the answered session still
-    // waiting — on the ongoing card and the widget, which is what the ack is
-    // for. The poll still reads the raw row: that is what proves the sync.
     ackSessionAttention('ses_1', 'permission');
     const publisher = makePublisher();
     const rows = [{ id: 'ses_1', status: 'permission' }];
@@ -981,9 +970,6 @@ describe('refreshGlanceableSnapshot', () => {
       { sleep: vi.fn(), deadlineMs: 0 }
     );
 
-    // The skip happens at selection, not after it: recording the answered row
-    // would put Approve back on the surface the user already actioned, and
-    // discarding it after selection left a second waiting session unrecorded.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       context: { userId: 'user_1', organizationId: null },
       skipWaitingAskSessionId: 'ses_1',

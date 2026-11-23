@@ -18,7 +18,7 @@ import {
   mockOpenRouterModels,
   withoutFillerModels,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   AUTO_MODELS,
   AUTO_SMALL_TARGET_MODELS,
@@ -117,7 +117,7 @@ beforeEach(() => {
   resetOpenRouterModelsCaches();
 });
 
-function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+function buildModel(overrides: Partial<OpenRouterCatalogModel> = {}): OpenRouterCatalogModel {
   return {
     id: 'vendor/model',
     name: 'Test Model',
@@ -683,7 +683,7 @@ describe('alias pricing', () => {
     };
   }
 
-  async function getCatalog(catalog: OpenRouterModel[] = [alias, target]) {
+  async function getCatalog(catalog: OpenRouterCatalogModel[] = [alias, target]) {
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: cataloguePayload(catalog) }))
     ) as unknown as typeof fetch;
@@ -821,6 +821,87 @@ describe('alias pricing', () => {
 
     expect(model(target.id)).toBeUndefined();
     expect(model(alias.id)?.pricing).toEqual(firstRoutePricing);
+  });
+});
+
+describe('alias free class', () => {
+  const freeTarget = buildModel({
+    id: 'vendor/model:free',
+    pricing: { prompt: '0', completion: '0' },
+  });
+  const paidTarget = buildModel({ id: 'vendor/paid-model' });
+  const freeAlias = buildModel({
+    id: '~vendor/free-latest',
+    pricing: { prompt: '0', completion: '0' },
+  });
+  const paidAlias = buildModel({ id: '~vendor/paid-latest' });
+
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [freeAlias.id]: {
+        id: freeAlias.id,
+        name: freeAlias.name,
+        endpoints: [],
+        alias_target: { slug: freeTarget.id },
+      },
+      [freeTarget.id]: { id: freeTarget.id, name: freeTarget.name, endpoints: [] },
+      [paidAlias.id]: {
+        id: paidAlias.id,
+        name: paidAlias.name,
+        endpoints: [],
+        alias_target: { slug: paidTarget.id },
+      },
+      [paidTarget.id]: { id: paidTarget.id, name: paidTarget.name, endpoints: [] },
+    });
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+  });
+
+  it('classifies an alias row by the model it serves', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: cataloguePayload([freeAlias, freeTarget, paidAlias, paidTarget]),
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.find(model => model.id === freeAlias.id)).toMatchObject({
+      isFree: true,
+      mayTrainOnYourPrompts: true,
+    });
+    expect(models.data.find(model => model.id === paidAlias.id)).toMatchObject({
+      isFree: false,
+      mayTrainOnYourPrompts: false,
+    });
+  });
+
+  it('reports the training flag of the model an alias serves', async () => {
+    jest.mocked(getDataCollectionRequiredModelIds).mockResolvedValueOnce(new Set([paidTarget.id]));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: cataloguePayload([freeAlias, freeTarget, paidAlias, paidTarget]),
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    // The listing reports one training flag per served model, whatever id the row carries.
+    expect(models.data.find(model => model.id === paidAlias.id)).toMatchObject({
+      isFree: false,
+      mayTrainOnYourPrompts: true,
+    });
+    expect(models.data.find(model => model.id === paidTarget.id)).toMatchObject({
+      isFree: false,
+      mayTrainOnYourPrompts: true,
+    });
   });
 });
 

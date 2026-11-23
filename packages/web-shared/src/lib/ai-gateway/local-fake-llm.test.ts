@@ -11,7 +11,7 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 function replaceEnv(overrides: {
   NODE_ENV?: NodeJS.ProcessEnv['NODE_ENV'];
@@ -90,7 +90,7 @@ describe('local fake deterministic model', () => {
     expect(entry?.supported_parameters).toContain('tools');
     expect(entry?.pricing).toMatchObject({ prompt: '0', completion: '0' });
 
-    const existing: OpenRouterModel[] = [
+    const existing: OpenRouterCatalogModel[] = [
       {
         id: 'anthropic/claude-sonnet-4.5',
         name: 'Claude',

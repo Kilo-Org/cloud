@@ -258,10 +258,14 @@ export function BitbucketOverview({
               entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
               className="gap-6"
             >
+              {/* The card's role sentence names the same organization the
+                  header does, including the header's stand-in, so an
+                  unresolved membership name still reads as one sentence. */}
               {readiness.data?.ready === false && (
                 <BitbucketSetupRecovery
                   scope={scope}
                   readiness={readiness.data}
+                  organizationName={scopeTitle}
                   message={t('common.couldNotLoadRepositories')}
                 />
               )}
@@ -315,6 +319,8 @@ export function BitbucketOverview({
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
+                    // Focus areas is a comma list; short values like "Set" stay on one line.
+                    subtitleNumberOfLines={2}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}

@@ -65,6 +65,12 @@ export type TrpcErrorContext = {
   httpStatus?: number;
   path?: string;
   /**
+   * The account-blocked refusal marker (`data.accountBlocked`). The app answers
+   * it with the blocked-account explanation, so a 403 carrying it is a handled
+   * state, not a defect.
+   */
+  accountBlocked?: boolean;
+  /**
    * The input paths a `BAD_REQUEST` validation failure names, comma-separated,
    * never its messages: a Zod message can echo the input value back, while the
    * path only names the field. Capped by {@link MAX_INVALID_FIELD_PATHS} and
@@ -159,6 +165,10 @@ const TrpcErrorDataSchema = z.looseObject({
   // (`trpcErrorFormatter` fills it from the `ZodError` cause), and `null` for
   // every other failure. Read through {@link readValidationContext}.
   zodError: z.unknown().optional(),
+  // The account-blocked refusal marker (`data.accountBlocked`, see
+  // `packages/web-shared/src/lib/trpc/transport.ts`): the app answers it with
+  // the blocked-account explanation, so it is a handled state, not a defect.
+  accountBlocked: z.boolean().optional(),
 });
 
 const DirectTrpcErrorSchema = z.looseObject({
@@ -253,8 +263,11 @@ const HANDLED_FORBIDDEN_PROCEDURE = 'cloudAgentNext.listRepositoryBranches';
 
 /**
  * True when a status is an expected answer: one of
- * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a
- * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}. Production 403s come
+ * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, a
+ * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}, or a 403 whose body
+ * carries the account-blocked marker (`data.accountBlocked`), which the app
+ * answers with the blocked-account explanation — the same refusal the 401 path
+ * exempted before the dedicated error shape landed. Production 403s come
  * from the edge firewall (OFAC-sanctioned regions, IP blocks), whose body is not
  * a tRPC error. A 403 from a tRPC procedure carries its code (`FORBIDDEN`) and
  * names app code, so it is still reported unless the caller renders the refusal.
@@ -265,6 +278,9 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   }
   if (status !== FORBIDDEN_STATUS) {
     return false;
+  }
+  if (trpc.accountBlocked === true) {
+    return true;
   }
   if (trpc.code === undefined) {
     return true;
@@ -305,11 +321,6 @@ export function normalizeUrlPath(url: string): string {
   }
 }
 
-/**
- * Extract `<procs>` from a `/api/trpc/<procs>` URL, query string removed. The
- * rule and the strip step live in `request-target.ts`, so the latency sampler
- * reports the same text for the same request.
- */
 export function trpcProcedureFromUrl(url: string): string | undefined {
   return trpcProcedureText(url);
 }
@@ -336,6 +347,10 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
       code: code !== undefined && isTrpcErrorCode(code) ? code : undefined,
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
+      accountBlocked:
+        directData?.accountBlocked === true || shapedData?.accountBlocked === true
+          ? true
+          : undefined,
       ...readValidationContext(directData?.zodError ?? shapedData?.zodError),
     };
   } catch {
@@ -706,9 +721,6 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
     const trpc = readTrpcErrorContext(context.error);
     const { procedure, messagePath } = failureIdentity(context, trpc, normalizedPath);
-    // The claim's key is the Sentry group key, so a repeat can never be filed
-    // under a different issue than the one it repeats. The expected-answer
-    // latch builds the same key ({@link contextNetworkErrorFingerprint}).
     const fingerprint = networkErrorFingerprint(context, trpc, {
       procedure,
       messagePath,
@@ -827,7 +839,8 @@ function isExpectedResponse(
  * for the first expected answer per fingerprint per process
  * ({@link claimExpectedAnswerBreadcrumb}); later expected answers record
  * nothing. A breadcrumb still shows in the trail that explains the next real
- * event. Same message and tags as a report; no query string.
+ * event. The breadcrumb carries the synthetic message and the network metadata,
+ * never tags or a query string.
  */
 function recordNetworkErrorBreadcrumb(context: NetworkErrorContext): void {
   try {
@@ -953,8 +966,6 @@ function recordFailedResponse(
       reportNetworkError(context);
       return;
     }
-    // An expected answer never spends the fingerprint's event, so a later real
-    // answer for the same endpoint still files its event.
     if (claimExpectedAnswerBreadcrumb(contextNetworkErrorFingerprint(context))) {
       recordNetworkErrorBreadcrumb(context);
     }

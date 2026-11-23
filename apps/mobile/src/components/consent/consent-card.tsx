@@ -1,6 +1,7 @@
 import { LineChart, Shield } from '@/components/ui/icons';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
@@ -12,6 +13,10 @@ import {
 } from '@/components/consent/consent-load-status';
 import { useConsentCardState } from '@/components/consent/use-consent-card-state';
 import { ScreenHeader } from '@/components/screen-header';
+import {
+  SettingsSearchTargetScope,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
@@ -25,9 +30,11 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
+import { CONSENT_HELP_IMPROVE_SETTING } from '@/lib/settings-search/privacy-source';
 import { cn } from '@/lib/utils';
 
-type ConsentCardProps = {
+type ConsentCardProps = SettingsTargetProps & {
   readonly mode?: ConsentMode;
 };
 
@@ -54,6 +61,17 @@ type ConsentCardProps = {
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
 /**
+ * Line cap shared by the optional disclosure's two rows.
+ *
+ * The pending placeholder and the settled row paint the same copy, so the row
+ * must reserve the same height in both: both branches pass this one cap. No
+ * count bounds this copy: the English disclosure already fills three lines at
+ * the compact text column, and the longer catalogs need more, so a reader must
+ * be able to finish the sentence in every language.
+ */
+const CONSENT_OPTIONAL_SUBTITLE_LINES = 'all';
+
+/**
  * Whether the optional switch holds the same-size placeholder.
  *
  * The placeholder covers every render with a resolved account and no stored
@@ -76,11 +94,12 @@ export function optionalIsPending(hasAccount: boolean, load: ConsentLoadStatus):
  * review screen an updated disclosure reopens). `useConsentCardState` owns the
  * behaviour; this component renders it.
  */
-export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
+export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCardProps) {
   const colors = useThemeColors();
   const { top } = useSafeAreaInsets();
   const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const actions = getConsentActions(mode);
   const {
     userId,
@@ -106,90 +125,101 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // `optionalIsPending` owns the rule (its doc carries the reasoning and the
   // cases).
   const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
+  // The search target wraps whichever row the load state renders, under one
+  // definition: a reveal therefore points at the control that appears once the
+  // stored choice settles instead of pinning the placeholder that stood in for
+  // it. Until then the placeholder keeps the row's size, so nothing moves.
+  const optionalRow = optionalControlPending ? (
+    <ConfigureRow
+      icon={LineChart}
+      title={t('consent.helpImprove')}
+      subtitle={t('consent.helpImproveDescription')}
+      subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
+      trailing={<Skeleton className="h-8 w-14 rounded-full" />}
+    />
+  ) : (
+    <PreferenceRow
+      icon={LineChart}
+      title={t('consent.helpImprove')}
+      subtitle={t('consent.helpImproveDescription')}
+      subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
+      value={optionalToggle}
+      disabled={mode === 'review' && savingOptional}
+      onValueChange={handleToggleOptional}
+    />
+  );
 
   return (
     <View className="flex-1 bg-background">
       {mode === 'review' ? <ScreenHeader title={t('consent.summaryTitle')} /> : null}
       {/* The body keeps the platform scroll indicator: at a compact window it
           is taller than the viewport, and the hidden thumb made the rest of
-          it read as missing rather than as one scroll away. */}
-      <ScrollView
-        className="flex-1"
-        style={bodyStyle}
-        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
-      >
-        {/* The badge alone carries the brand: the title above already states
+          it read as missing rather than as one scroll away. The target scope
+          renders a provider only: it wraps the scroller so a search result can
+          bring its row into view, and leaves the flex layout, body class and
+          pinned footer exactly as they are. */}
+      <SettingsSearchTargetScope settingsTarget={settingsTarget} scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          className="flex-1"
+          style={bodyStyle}
+          contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+        >
+          {/* The badge alone carries the brand: the title above already states
             what the screen is about, and repeating the product name beside
             the mark said nothing a reader did not already see. The mark keeps
             the name for assistive tech, which cannot read the glyph. */}
-        <View
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={t('consent.kilo')}
-          className="h-10 w-10 items-center justify-center rounded-lg border border-border"
-        >
-          <Shield size={20} color={colors.foreground} />
-        </View>
+          <View
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('consent.kilo')}
+            className="h-10 w-10 items-center justify-center rounded-lg border border-border"
+          >
+            <Shield size={20} color={colors.foreground} />
+          </View>
 
-        <View className="gap-1">
-          {/* Review mode's title sits in the header above, so the body starts
+          <View className="gap-1">
+            {/* Review mode's title sits in the header above, so the body starts
               with the sentence that explains the summary. */}
-          {mode === 'review' ? null : (
-            <Text variant="large">{t('consent.beforeWeGetStarted')}</Text>
-          )}
-          <Text variant="muted">{t('consent.introDescription')}</Text>
-        </View>
-
-        <Section label={t('consent.required')}>
-          <ConsentRequiredRows />
-        </Section>
-
-        <Section
-          label={mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
-        >
-          <RowGroup leadingTile>
-            {/* Until the stored choice loads the row shows no switch: a switch
-                would present a value the user has not chosen and a tap could
-                flip the wrong way, so the slot holds a control-sized
-                placeholder in the same row shape instead. */}
-            {optionalControlPending ? (
-              <ConfigureRow
-                icon={LineChart}
-                title={t('consent.helpImprove')}
-                subtitle={t('consent.helpImproveDescription')}
-                trailing={<Skeleton className="h-8 w-14 rounded-full" />}
-              />
-            ) : (
-              <PreferenceRow
-                icon={LineChart}
-                title={t('consent.helpImprove')}
-                subtitle={t('consent.helpImproveDescription')}
-                value={optionalToggle}
-                disabled={mode === 'review' && savingOptional}
-                onValueChange={handleToggleOptional}
-              />
+            {mode === 'review' ? null : (
+              <Text variant="large">{t('consent.beforeWeGetStarted')}</Text>
             )}
-          </RowGroup>
-        </Section>
+            <Text variant="muted">{t('consent.introDescription')}</Text>
+          </View>
 
-        <Pressable
-          onPress={() => {
-            handleOpenDetails();
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('consent.seeFullDetails')}
-          // The row's own node carries the control-size floor: the link's text
-          // line is below the audit's 28dp minimum, and the 8dp slop carries the
-          // 44pt region on top of `ROW_TARGET_CLASS`.
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
-        >
-          <Text variant="small" className="text-primary">
-            {t('consent.seeFullDetails')}
-          </Text>
-          <RowChevron />
-        </Pressable>
-      </ScrollView>
+          <Section label={t('consent.required')}>
+            <ConsentRequiredRows />
+          </Section>
+
+          <Section
+            label={
+              mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')
+            }
+          >
+            <RowGroup leadingTile>
+              <SettingsTarget item={CONSENT_HELP_IMPROVE_SETTING}>{optionalRow}</SettingsTarget>
+            </RowGroup>
+          </Section>
+
+          <Pressable
+            onPress={() => {
+              handleOpenDetails();
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('consent.seeFullDetails')}
+            // The row's own node carries the control-size floor: the link's text
+            // line is below the audit's 28dp minimum, and the 8dp slop carries the
+            // 44pt region on top of `ROW_TARGET_CLASS`.
+            className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
+          >
+            <Text variant="small" className="text-primary">
+              {t('consent.seeFullDetails')}
+            </Text>
+            <RowChevron />
+          </Pressable>
+        </ScrollView>
+      </SettingsSearchTargetScope>
 
       <ScreenFooter>
         <View className="gap-3">

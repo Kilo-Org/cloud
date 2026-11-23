@@ -303,7 +303,12 @@ function supportAccessReasonFor(params: {
   if (params.decision === 'deny_not_allowlisted' || params.decision === 'deny_never_list') {
     return 'support_access_not_allowlisted';
   }
-  if (params.decision === 'deny_action_class') return 'support_access_action_class';
+  // Both a too-weak grant and a grant whose role cannot stand in for the
+  // request are reported to the client as the action-class refusal; a distinct
+  // client code is deliberately not added.
+  if (params.decision === 'deny_action_class' || params.decision === 'deny_actor_permission') {
+    return 'support_access_action_class';
+  }
   return 'support_grant_required';
 }
 
@@ -552,8 +557,7 @@ export function organizationAccessRole(
 
 /**
  * Returns a role for the caller, admitting a support grant only when the exact
- * procedure is on the allowlist. Use this instead of `ensureOrganizationAccess`
- * on allowlisted reads and writes.
+ * procedure is on the allowlist.
  */
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,

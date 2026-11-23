@@ -7,7 +7,6 @@ import { LANGUAGE_PREFERENCE_KEY } from '@/lib/storage-keys';
 
 export type LanguagePreference = 'device' | SupportedLanguage;
 
-/** Maps any raw stored value to a valid preference; unknown values become `device`. */
 export function parseLanguagePreference(raw: string | null): LanguagePreference {
   if (raw === 'device') {
     return 'device';
@@ -62,11 +61,6 @@ export async function setLanguagePreferenceAsync(
 ): Promise<boolean> {
   const result = await store.setAsync(preference, toastLng);
   return result;
-}
-
-/** Start the disk read at module scope, before React mounts. */
-export function preloadLanguagePreference(): void {
-  store.preload();
 }
 
 /** Await the stored preference. For callers with no React tree. */

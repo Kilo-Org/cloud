@@ -1,12 +1,7 @@
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
-import type {
-  CustomLlmProvider,
-  OpenCodePrompt,
-  OpenCodeSettings,
-  ReasoningOption,
-} from '@kilocode/db/schema-types';
+import type { OpenCodePrompt, OpenCodeSettings, ReasoningOption } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
@@ -30,7 +25,6 @@ import {
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
-/** The catalog id a request's model resolves to: the exact id, else its normalized base id. */
 function resolveCatalogModelId(models: GatewayModelMap, model: string): string {
   return Object.hasOwn(models, model) ? model : normalizeModelId(model);
 }
@@ -118,9 +112,8 @@ export async function getModelVariants(
   return (await getGatewayOpenCodeSettings(model, allowFallback)).variants;
 }
 
-export function getAiSdkProvider(
-  model: string
-): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
+// OpenRouter is the default, so a model with no AI SDK provider of its own gets `undefined`.
+export function getAiSdkProvider(model: string): 'anthropic' | 'openai' | undefined {
   if (isClaudeModel(model)) {
     return 'anthropic';
   }

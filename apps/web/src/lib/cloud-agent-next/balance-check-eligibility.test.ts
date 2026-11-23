@@ -80,6 +80,7 @@ const mockResolveClaudeBillingModel = jest.fn();
 const mockResolveConnectionConnector = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/claude-billing/store'),
   getGrantedClaudeBillingConnection: (...args: unknown[]) =>
     mockGetClaudeBillingConnection(...args),
 }));
@@ -96,6 +97,20 @@ const PAID_MODEL = 'anthropic/claude-sonnet-4';
 
 const fakeDb = {} as never;
 const fakeUser = { id: 'user-1' };
+
+/** A mocked stored row whose grant gives it to the same scope, so both views agree. */
+function granted(row: Record<string, unknown> | null) {
+  return row
+    ? {
+        connection: row,
+        grant: {
+          kilo_user_id: row.kilo_user_id ?? null,
+          organization_id: row.organization_id ?? null,
+          created_by: row.created_by ?? '',
+        },
+      }
+    : null;
+}
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -284,7 +299,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("counts the organization's Claude link for every request in it", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'connected' } : null
+        granted(owner.kind === 'organization' ? { status: 'connected' } : null)
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -298,7 +313,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("does not use the person's own Claude link for an organization request", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'personal' ? { status: 'connected' } : null
+        granted(owner.kind === 'personal' ? { status: 'connected' } : null)
       );
 
       expect(await eligibility(true, 'org-1')).toEqual({
@@ -313,7 +328,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("counts the person's own Claude link outside an organization", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'personal' ? { status: 'connected' } : null
+        granted(owner.kind === 'personal' ? { status: 'connected' } : null)
       );
 
       expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: true });
@@ -324,10 +339,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     });
 
     it('does not count an organization link whose recorded connector is gone', async () => {
-      mockGetClaudeBillingConnection.mockImplementation(async () => ({
-        status: 'connected',
-        created_by: 'connector',
-      }));
+      mockGetClaudeBillingConnection.mockImplementation(async () =>
+        granted({ status: 'connected', created_by: 'connector' })
+      );
       mockResolveConnectionConnector.mockResolvedValue({ kind: 'gone' });
 
       expect(await eligibility(true, 'org-1')).toEqual({
@@ -340,7 +354,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it('counts an organization link whose recorded connector still resolves', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
+        granted(
+          owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
+        )
       );
       mockResolveConnectionConnector.mockResolvedValue({ kind: 'present' });
 
@@ -352,7 +368,11 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it('does not count an organization link that cannot bill', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'billing_unavailable' } : { status: 'connected' }
+        granted(
+          owner.kind === 'organization'
+            ? { status: 'billing_unavailable' }
+            : { status: 'connected' }
+        )
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,

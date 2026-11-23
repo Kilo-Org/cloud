@@ -32,9 +32,6 @@ describe('shouldRetrySessionNotFound', () => {
   });
 
   it('never retries an access denial, so the account boundary stays immediate', () => {
-    // The restored-identity open used to be denied the budget to keep this
-    // boundary quick; the boundary is these codes, and they are never repeated
-    // for any open.
     for (const errorCode of ['UNAUTHORIZED', 'FORBIDDEN']) {
       for (let attempt = 0; attempt <= SPAWNED_NOT_FOUND_MAX_ATTEMPTS; attempt += 1) {
         expect(shouldRetrySessionNotFound({ attempt, errorCode })).toBe(false);

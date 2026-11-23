@@ -29,10 +29,31 @@ type NamedModel = { readonly id: string; readonly name: string };
  * - `"~deepseek/deepseek-v4-flash-latest"` → `"deepseek v4 flash latest"`
  * - `"custom-model-id"` → `"custom model id"`
  */
-export function formatModelReferenceName(reference: string): string {
+function formatModelReferenceName(reference: string): string {
   const segment = reference.slice(reference.lastIndexOf('/') + 1).replace(/^~/, '');
   const words = segment.replaceAll(/-+/g, ' ').trim();
   return words === '' ? reference : words;
+}
+
+/**
+ * The label the model chip shows for a stored value no catalog row matched:
+ * the `Vendor: ` display prefix stripped, and for a `vendor/model` id the
+ * readable last segment (see `formatModelReferenceName`).
+ *
+ * A value is treated as a reference — and rewritten — when it still carries a
+ * `/` or a leading `~` latest-alias marker. Anything else is already a name, so
+ * the chip keeps it unchanged (`custom-model-id` → `custom-model-id`) and
+ * `~kilo-auto` becomes `kilo auto` rather than printing the alias marker.
+ *
+ * `resolveCatalogModelName` deliberately does not use this gate: a briefing
+ * report or a session model stores an id whose segments are always readable,
+ * so that resolver formats every unmatched value.
+ */
+export function modelReferenceLabel(reference: string): string {
+  const shortName = formatShortModelDisplayName(reference);
+  return shortName.includes('/') || shortName.startsWith('~')
+    ? formatModelReferenceName(shortName)
+    : shortName;
 }
 
 /**
@@ -43,14 +64,14 @@ export function formatModelReferenceName(reference: string): string {
  * so printing them verbatim put `~deepseek/deepseek-flash-latest` under the
  * summary text while the briefing settings picker showed the same model as
  * `DeepSeek Flash Latest`. Copy never prints a raw reference: a reference the
- * catalog does not carry (offline, cold cache, retired model) falls back to its
- * last path segment with hyphens as spaces, without the `~` latest-alias marker.
+ * catalog does not carry (offline, cold cache, retired model) falls back to
+ * the form `formatModelReferenceName` describes.
  */
 export function resolveCatalogModelName(model: string, catalog: readonly NamedModel[]): string {
   const option = catalog.find(item => item.id === model);
   if (option) {
     return option.name;
   }
-  const reference = formatShortModelDisplayName(model);
-  return formatModelReferenceName(reference) || reference;
+  const reference = formatModelReferenceName(formatShortModelDisplayName(model));
+  return reference || model;
 }

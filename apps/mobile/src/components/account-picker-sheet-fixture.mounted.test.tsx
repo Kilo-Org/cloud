@@ -33,14 +33,21 @@ const organizations = vi.hoisted(() => {
   return query;
 });
 const openPicker = vi.hoisted(() => vi.fn());
+// The hand-off goes through the stack-safe replace hook; its double is separate
+// from `router.replace` so the assertions also prove no literal replace runs.
+const stackSafeReplace = vi.hoisted(() => ({ replace: vi.fn() }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
 }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => organizations }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => stackSafeReplace,
+}));
+// The fixture must observe the shared memberships entry through the hook that
+// owns its options, so the suite mocks that hook rather than the query itself.
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => organizations,
 }));
 vi.mock('@/components/context-control', () => ({ useContextPicker: () => ({ openPicker }) }));
 
@@ -63,6 +70,7 @@ describe('AccountPickerSheetFixture', () => {
     router.canGoBack.mockReturnValue(true);
     navigation.focusListeners.clear();
     openPicker.mockClear();
+    stackSafeReplace.replace.mockClear();
     organizations.data = [];
   });
 
@@ -77,6 +85,7 @@ describe('AccountPickerSheetFixture', () => {
 
     expect(router.back).toHaveBeenCalledOnce();
     expect(router.replace).not.toHaveBeenCalled();
+    expect(stackSafeReplace.replace).not.toHaveBeenCalled();
     expect(openPicker).toHaveBeenCalledOnce();
     act(() => {
       renderer.unmount();
@@ -92,7 +101,8 @@ describe('AccountPickerSheetFixture', () => {
     });
 
     expect(router.back).not.toHaveBeenCalled();
-    expect(router.replace).toHaveBeenCalledExactlyOnceWith('/');
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(stackSafeReplace.replace).toHaveBeenCalledExactlyOnceWith('/');
     act(() => {
       renderer.unmount();
     });
@@ -109,6 +119,7 @@ describe('AccountPickerSheetFixture', () => {
     expect(openPicker).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
+    expect(stackSafeReplace.replace).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

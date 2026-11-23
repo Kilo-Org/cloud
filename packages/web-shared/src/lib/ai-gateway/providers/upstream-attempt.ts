@@ -72,7 +72,12 @@ export type SendUpstreamAttemptInput = {
 
 export type SendUpstreamAttemptResult =
   | { type: 'unknown-gateway-model' }
-  | { type: 'error'; response: NextResponse }
+  | {
+      type: 'error';
+      response: NextResponse;
+      /** The gateway proved nothing was dialled; see `UpstreamFetchResult['notInvoked']`. */
+      notInvoked?: true;
+    }
   | {
       type: 'success';
       response: Response;
@@ -120,20 +125,20 @@ export async function sendUpstreamAttempt({
   }
 
   const extraHeaders: Record<string, string> = {};
-  await applyProviderSpecificLogic(
-    providerContext.provider,
+  await applyProviderSpecificLogic({
+    provider: providerContext.provider,
     requestedModel,
-    request,
+    requestToMutate: request,
     extraHeaders,
-    providerContext.userByok,
-    fraudHeaders,
+    userByok: providerContext.userByok,
+    originalHeaders: fraudHeaders,
     userId,
     organizationId,
     sessionId,
     taskId,
     isNonTrialEnterprise,
-    dataRegion
-  );
+    dataRegion,
+  });
   if (
     anthropicUserProfileId &&
     isAnthropicUserProfileRoute(providerContext) &&
@@ -157,6 +162,8 @@ export async function sendUpstreamAttempt({
       return {
         type: 'error',
         response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
+        // The bound is enforced before the send, so the provider was never dialled.
+        notInvoked: true,
       };
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
   }

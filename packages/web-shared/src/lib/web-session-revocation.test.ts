@@ -1,6 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   isWebSessionCurrent,
+  readWebSessionPepper,
   revokeWebSessions,
 } from '@kilocode/web-shared/lib/web-session-revocation';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -63,6 +64,20 @@ describe('web session revocation', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe(user.web_session_pepper);
     expect(updated.api_token_pepper).toBe('api-pepper');
+  });
+
+  it('reads the current pepper from the primary, null before one is set', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'before-revocation' });
+    const neverRevoked = await insertTestUser({ web_session_pepper: null });
+
+    expect(await readWebSessionPepper(user.id)).toBe('before-revocation');
+
+    await revokeWebSessions(user.id);
+
+    const rotated = await readWebSessionPepper(user.id);
+    expect(rotated).not.toBeNull();
+    expect(rotated).not.toBe('before-revocation');
+    expect(await readWebSessionPepper(neverRevoked.id)).toBeNull();
   });
 
   it('revokes every live step-up proof in the same call', async () => {

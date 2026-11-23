@@ -242,7 +242,6 @@ describe('OrganizationProvider default organization', () => {
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: 'restore' });
     onlineManager.setOnline(true);
-    // Recovery through Retry is covered by the failure test above.
   });
 
   it('re-resolves the default through Retry after a list failure', async () => {

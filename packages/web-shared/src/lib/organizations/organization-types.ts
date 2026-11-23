@@ -4,6 +4,7 @@ import {
   ORGANIZATION_ROLES,
 } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
+import type { RunningTrialStage } from '@kilocode/organization-entitlement';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema } from './company-domain';
@@ -37,7 +38,6 @@ export function billingCycleToDb(cycle: BillingCycle): 'monthly' | 'yearly' {
   return cycle === 'annual' ? 'yearly' : 'monthly';
 }
 
-// Maps DB ('yearly') or Stripe ('year') interval values to the domain BillingCycle.
 export function toBillingCycle(source: 'monthly' | 'yearly' | 'month' | 'year'): BillingCycle {
   return source === 'yearly' || source === 'year' ? 'annual' : 'monthly';
 }
@@ -110,6 +110,29 @@ export type UserOrganizationWithSeats = {
    * balance, so the surfaced refusal always matches `requireActiveSubscriptionOrTrial`.
    */
   isTrialExpiredForEnforcement: boolean;
+  /**
+   * The stage of a trial that is still running, from the same
+   * `classifyOrganizationEntitlement` verdict as the gate above: one of the
+   * `RunningTrialStage` set (`trial_active`, `trial_ending_soon`,
+   * `trial_ending_very_soon`, or `trial_expires_today`). It is `null` whenever
+   * the trial is not the organization's operative state — a paying seat
+   * subscription, a sponsorship, suppressed trial messaging, or a disabled
+   * seat requirement replaced it, or the trial has already expired — so a
+   * client can render "on trial" from this field alone instead of re-deriving
+   * it on the device. The declared type is the set the server actually
+   * publishes: the expired stages and `subscribed` never appear here, so a
+   * consumer cannot render a stage the wire never sends.
+   */
+  trialStatus: RunningTrialStage | null;
+  /**
+   * The ISO instant the running trial ends, carrying
+   * `getOrganizationTrialEndDate`'s answer (`free_trial_end_at`, or creation
+   * plus the trial duration when the organization never set one). It is `null`
+   * exactly when `trialStatus` is, so the date is only ever published for a
+   * trial that is still running. Informational only: `isTrialExpiredForEnforcement`
+   * remains the verdict a client gates on.
+   */
+  trialEndsAt: string | null;
   seatCount: {
     used: number;
     total: number;

@@ -38,11 +38,21 @@ function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
   return node;
 }
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  placement?: string;
+  onRetry?: () => void;
+};
+
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as unknown,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -60,6 +70,9 @@ const permissionState = vi.hoisted(() => ({
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
@@ -70,6 +83,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -121,8 +137,10 @@ describe('ProfileSkillsScreen', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -142,12 +160,60 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     act(() => {
       (findOne(renderer.root, 'QueryError').props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+    // A read with nothing under it owns the surface, so it centres and no
+    // tab scroller holds it.
+    expect(queryError.placement).toBe('center');
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -795,6 +861,96 @@ describe('ProfileSkillsScreen', () => {
 
     unmount();
   });
+
+  it('hides a stored add sheet from a member and names the required role', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'StateAction')).toHaveLength(0);
+    expect(
+      findAll(second.renderer.root, 'Text').filter(node => node.props.children === ROLE_SENTENCE)
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('does not reopen the stored sheet once the denied read dropped it', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    second.unmount();
+  });
+
+  it('keeps the stored sheet while the role resolves and reopens it on its text', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'resolving';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Skill name').props.defaultValue).toBe('portal-skill');
+    expect(findField(second.renderer.root, 'Skill content').props.defaultValue).toBe(
+      'Use the portal carefully.'
+    );
+    second.unmount();
+  });
+
+  it('closes the open sheet when the role drops and keeps it closed on return', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Skill name', 'portal-skill');
+
+    permissionState.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    unmount();
+  });
 });
 
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
@@ -822,7 +978,9 @@ describe('ProfileSkillsScreen delete confirmation', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     h.query.data = testSkills([testSkill({ name: SKILL_NAME })]);
+    h.query.error = undefined;
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;

@@ -12,6 +12,7 @@
  * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
+import { sessionLiveCut } from '@kilocode/session-ingest-contracts';
 import type { ServiceEvent } from './normalizer';
 import type { SessionSnapshotFailure } from './snapshot-page';
 import { removePendingRequest, upsertByRequestId } from './pending-requests';
@@ -32,6 +33,7 @@ import type {
   AgentStatus,
   QuestionState,
   PermissionState,
+  UnreadableQuestionState,
   UnreadablePermissionState,
   ServiceStateSnapshot,
   SuggestionAction,
@@ -53,6 +55,23 @@ function utf8Tail(text: string, maxBytes: number): { text: string; truncated: bo
   let start = bytes.length - maxBytes;
   while (start < bytes.length && ((bytes[start] ?? 0) & 0b1100_0000) === 0b1000_0000) start++;
   return { text: new TextDecoder().decode(bytes.subarray(start)), truncated: true };
+}
+
+const SHORT_COMMIT_HASH_LENGTH = 7;
+// UTF-16 code units, so the cut can share the workspace's grapheme reader.
+const AUTOCOMMIT_SUBJECT_MAX_LENGTH = 72;
+
+/** The first line of a commit message, trimmed, or undefined when it is blank. */
+function commitSubject(commitMessage: string): string | undefined {
+  const firstLine = commitMessage.split('\n', 1)[0] ?? '';
+  const subject = (firstLine.endsWith('\r') ? firstLine.slice(0, -1) : firstLine).trim();
+  return subject.length === 0 ? undefined : subject;
+}
+
+/** Bound a subject to whole graphemes so no joined glyph, flag pair, or mark is split. */
+function boundCommitSubject(subject: string): { subject: string; truncated: boolean } {
+  if (subject.length <= AUTOCOMMIT_SUBJECT_MAX_LENGTH) return { subject, truncated: false };
+  return { subject: sessionLiveCut(subject, AUTOCOMMIT_SUBJECT_MAX_LENGTH), truncated: true };
 }
 
 /**
@@ -141,6 +160,8 @@ type ServiceState = {
   clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  /** Pending question requests this app could not read, oldest first. */
+  getUnreadableQuestions(): readonly UnreadableQuestionState[];
   /** Pending permission requests this app could not read, oldest first. */
   getUnreadablePermissions(): readonly UnreadablePermissionState[];
   getSuggestion(): SuggestionState | null;
@@ -190,6 +211,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
+  let unreadableQuestions: readonly UnreadableQuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
   let unreadablePermissions: readonly UnreadablePermissionState[] = [];
   let suggestion: SuggestionState | null = null;
@@ -454,12 +476,26 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       requestId: event.requestId,
       questions: payload,
     });
+    // A readable request supersedes an unreadable notice for the same id.
+    unreadableQuestions = removePendingRequest(unreadableQuestions, event.requestId);
     config.onQuestionAsked?.(event.requestId, payload);
+    notify();
+  }
+
+  function processQuestionUnreadable(requestId: string): void {
+    // The list could not be read, so no answer card may stand for this id: a
+    // card already shown for it would ask questions the app no longer holds.
+    if (questions.some(entry => entry.requestId === requestId)) {
+      questions = removePendingRequest(questions, requestId);
+      config.onQuestionResolved?.(requestId);
+    }
+    unreadableQuestions = upsertByRequestId(unreadableQuestions, { requestId });
     notify();
   }
 
   function processQuestionResolved(requestId: string): void {
     questions = removePendingRequest(questions, requestId);
+    unreadableQuestions = removePendingRequest(unreadableQuestions, requestId);
     config.onQuestionResolved?.(requestId);
     notify();
   }
@@ -835,12 +871,26 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       );
     }
     if (event.success || commitHash) {
-      const parts = [event.commitHash, event.commitMessage].filter(Boolean);
-      const message = parts.length > 0 ? parts.join(' ') : 'Committed';
+      // The line is one status row rendered verbatim by web and mobile, so it
+      // carries the short hash and the bounded subject only: the full hash
+      // already rides the structured commitHash, and a 16 KiB message must not
+      // stretch the row.
+      const shortHash = event.commitHash?.slice(0, SHORT_COMMIT_HASH_LENGTH);
+      const rawSubject =
+        event.commitMessage === undefined ? undefined : commitSubject(event.commitMessage);
+      const bounded = rawSubject === undefined ? undefined : boundCommitSubject(rawSubject);
+      // Only our own bound can cut the subject, and it never cuts inside a
+      // joined glyph: a server cut of a message with no newline is far longer
+      // than the bound and is already cut by it.
+      const cutSubject = bounded !== undefined && bounded.truncated;
+      const parts = [shortHash, bounded?.subject].filter(
+        (part): part is string => part !== undefined && part.length > 0
+      );
+      const base = parts.length === 0 ? 'Committed' : parts.join(' · ');
       status = {
         type: 'autocommit',
         step: 'completed',
-        message,
+        message: cutSubject ? `${base}…` : base,
         ...(commitHash ? { commitHash } : {}),
         ...(parts.length === 0 ? { code: 'committed' } : {}),
       };
@@ -856,9 +906,6 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processCloudStatus(event: Extract<ServiceEvent, { type: 'cloud.status' }>): void {
-    // A user Stop retires a preparing route as a failed route whose reason is
-    // the cancellation code. The live event and a durable refresh carry the
-    // same status, so both must read as a stop rather than an error.
     if (isPreparationCancellationStatus(event.cloudStatus)) {
       settlePreparationCancellation();
     } else {
@@ -1024,14 +1071,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
   function clearPendingInteractions(): void {
     const clearedQuestions = questions;
+    const clearedUnreadableQuestions = unreadableQuestions;
     const clearedPermissions = permissions;
     const clearedUnreadablePermissions = unreadablePermissions;
     const clearedSuggestion = suggestion;
     questions = [];
+    unreadableQuestions = [];
     permissions = [];
     unreadablePermissions = [];
     suggestion = null;
     for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
+    for (const entry of clearedUnreadableQuestions) config.onQuestionResolved?.(entry.requestId);
     for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
     for (const entry of clearedUnreadablePermissions)
       config.onPermissionResolved?.(entry.requestId);
@@ -1122,6 +1172,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         break;
       case 'question.rejected':
         processQuestionResolved(event.requestId);
+        break;
+      case 'question.unreadable':
+        processQuestionUnreadable(event.requestId);
         break;
       case 'permission.asked':
         processPermissionAsked(
@@ -1286,6 +1339,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
+    getUnreadableQuestions: () => unreadableQuestions,
     getUnreadablePermissions: () => unreadablePermissions,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
@@ -1320,6 +1374,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
+      unreadableQuestions,
       unreadablePermissions,
       suggestion,
       pendingMessages,
@@ -1360,6 +1415,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       seenCommits.clear();
       sessionInfo = null;
       questions = [];
+      unreadableQuestions = [];
       permissions = [];
       unreadablePermissions = [];
       suggestion = null;

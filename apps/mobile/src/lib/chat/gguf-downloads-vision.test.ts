@@ -181,12 +181,12 @@ describe('downloading a vision model', () => {
     ]);
   });
 
-  it('keeps no model file when its projector cannot be moved into place', async () => {
+  it('reports a projector the device refuses to move as a write failure', async () => {
     const h = harness({ failMove: ggufProjectorName('eyes') });
     h.store.start(VISION_CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
     await finish(taskAt(h.tasks, 1), 200);
-    expect(h.store.snapshot().failure).toEqual({ fileId: 'eyes', problem: 'invalidFile' });
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'eyes', problem: 'writeFailed' });
     expect(h.files.size).toBe(0);
   });
 

@@ -1,7 +1,10 @@
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
+import {
+  RuntimeAuthorizationRevokedError,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
@@ -777,6 +780,28 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           step: { verb: 'searching', target: 'TODO' },
           plan: { done: 1, total: 2, current: 'Write the tests' },
         },
+      });
+    });
+
+    // The previous turn ends, and a list tool named with the CLI's filePath spelling opens
+    // the next one: the card resolves the basename the same way an edit does.
+    await stub.onEvents({ events: [status('idle')] });
+    await stub.onEvents({
+      events: [
+        notice('msg_v2_list_notice', 6),
+        status('busy'),
+        working('msg_v2_list_answer', 7, {
+          type: 'tool',
+          id: 'call_list',
+          name: 'list',
+          state: { status: 'running', input: { filePath: '/workspace/app/src/index.ts' } },
+        }),
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: { step: { verb: 'searching', target: 'index.ts' } },
       });
     });
 
@@ -1898,6 +1923,57 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       expect(shouldCaptureCloudAgentException(error)).toBe(false);
     });
     expect(resolveScope).not.toHaveBeenCalled();
+
+    // The rest of this test offers a sibling that CAN serve the handle, so the
+    // two branches are told apart by whether that sibling is consulted at all.
+    const siblingSessionId = newSessionId();
+    const served = {
+      type: 'served' as const,
+      token: 'synthetic-sibling-backing-token',
+      organizationId: ORG_ID,
+      runtimeAuthorization: {
+        userId: USER_ID,
+        authorizationId: crypto.randomUUID(),
+        resourceId: siblingSessionId,
+      },
+      scopeView: {
+        scopeId: 'scope_1',
+        expectedOrganizationId: ORG_ID,
+        memberRootKiloSessionIds: [kiloSessionId()],
+      },
+    };
+    readFence.mockResolvedValue({ ...fence });
+    resolveScope.mockResolvedValue(served);
+
+    /**
+     * Fails the local grant resolution at its backing-token read. An own
+     * property shadows the DO method, so the path under test runs unchanged up
+     * to the injected fault, and the call stays inside the DO so the rejection
+     * is handled where it is raised.
+     */
+    const failLocalGrant = (error: Error) =>
+      runInDurableObject(sessionStub, async instance => {
+        Object.defineProperty(instance, 'getStoredRuntimeToken', {
+          value: () => Promise.reject(error),
+          configurable: true,
+        });
+        return await instance.resolveRuntimeCredentialProxyGrant(handle);
+      });
+
+    // An unrecognized grant failure keeps the retryable 503 answer. A sibling
+    // that can serve exists here and is not consulted.
+    await expect(failLocalGrant(new Error('storage read failed'))).rejects.toThrow(
+      'storage read failed'
+    );
+    expect(resolveScope).not.toHaveBeenCalled();
+
+    // A revoked local runtime authorization uses the scope fallback, and the
+    // sibling serves the handle with its own backing credential.
+    await expect(failLocalGrant(new RuntimeAuthorizationRevokedError())).resolves.toMatchObject({
+      token: 'synthetic-sibling-backing-token',
+      runtimeAuthorization: { resourceId: siblingSessionId },
+    });
+    expect(resolveScope).toHaveBeenCalledOnce();
   });
 });
 

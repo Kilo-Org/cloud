@@ -27,6 +27,8 @@ import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearMergeOperationKeys } from '@/lib/pr-review/merge/pr-merge-operation-key';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
+import { clearAccountStagedShareNavigation } from '@/lib/share-navigation';
+import { clearAccountStagedSharePayloads } from '@/lib/share-payload';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -54,12 +56,32 @@ function clearSearchIndexBestEffort(): void {
 /**
  * Re-runs the clears for a launch with no stored session, so the surfaces that
  * outlive a session start empty.
+ *
+ * The members here are the ones the account boundary clears that a signed-out
+ * launch can still observe: the OS search index, the App Intents catalog, the
+ * on-disk artifact mirror, the device-global PR recents and the OS launcher
+ * surfaces. The boundary's clear of any of them can be lost to a process killed
+ * during sign-out's awaited teardown, or to an OS call the platform refused, so
+ * a launch that positively restored no session repeats them. The rest of the
+ * boundary's in-process members start empty in a fresh process, and the durable
+ * preferences it clears are not re-run here.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
   clearSessionCatalogBestEffort();
   runClear(clearArtifactMirror);
   runClear(notifyArtifactsChanged);
+  // The launcher shortcuts, quick-settings tile and Quick Actions are
+  // device-wide and their labels come from the signed-in account's sessions, so
+  // a launch with no stored session must not keep offering the previous
+  // account's session. Recording the clear in the surface revision makes a
+  // publisher that mounts later write its own derivation instead of trusting
+  // the surface it wrote before.
+  runClear(() => {
+    clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+  });
+  runClear(clearRecentPrsBestEffort);
 }
 
 /**
@@ -96,10 +118,11 @@ function clearRecentPrsBestEffort(): void {
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
- * PR discussion conversation, the phone's own search index, the OS launcher
- * shortcuts and tile, the per-organization code reviewer analytics platform and
- * period selection, the durable last-opened-session and last-route
- * records, and the remembered Code Reviewer scope names. Every member is
+ * PR discussion conversation, the staged share deliveries, the phone's own
+ * search index, the OS launcher shortcuts and tile, the per-organization code
+ * reviewer analytics platform and period selection, the durable
+ * last-opened-session and last-route records, and the remembered Code Reviewer
+ * scope names. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
@@ -158,23 +181,25 @@ export function clearSessionScopedState(): void {
   runClear(() => {
     reapTempFiles({ all: true });
   });
-  // The stored PR recents are account-bound data the index folds in, and the
-  // key is device-global, so the account boundary must drop them as well as the
-  // index itself. Without this, an account switch re-indexes the previous
-  // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
   // Cross-account separation for the retained PR discussion conversation: the
   // sign-in account switch and the sign-out clear it with the other
   // account-scoped members. Within one account, the organization component of
   // `conversationRetentionKey` separates organizations' reads of the same PR.
   runClear(clearConversationRetention);
+  // Staged share deliveries are account-scoped: the boundary drops the payloads
+  // and queued destinations stamped with a signed-in account, together with
+  // their cache copies. A delivery staged before an account resolves stays in
+  // memory, so a same-process sign-in can still open the gate for it (DEC-01).
+  // The durable drafts are left alone on purpose: each one lives under its own
+  // account's `draft:<userId>` scope and resumes at that account's next
+  // sign-in, so staged share work stays with the account that staged it.
+  runClear(clearAccountStagedSharePayloads);
+  runClear(clearAccountStagedShareNavigation);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a
-  // sign-out or an account switch. Fire-and-forget via
-  // `clearSearchIndexBestEffort`: the native clear also wipes the fingerprint
-  // ledger the indexer diffs against, so the next sync re-indexes whatever the
-  // new account can see.
+  // sign-out or an account switch.
   runClear(clearSearchIndexBestEffort);
   // The App Intents session catalog is device-wide for the same reason, and it
   // is the same titles in another place: without this, Shortcuts and Siri would

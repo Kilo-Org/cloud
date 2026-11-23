@@ -563,7 +563,7 @@
   "agentProfiles.create": {
     "path": "agentProfiles.create",
     "kind": "mutation",
-    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization.",
+    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -581,6 +581,73 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "vars": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {
+                "type": "string",
+                "maxLength": 10000
+              },
+              "isSecret": {
+                "type": "boolean"
+              },
+              "networkSecret": {
+                "type": "object",
+                "properties": {
+                  "allowedHosts": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 254,
+                      "pattern": "^[A-Za-z0-9.-]+$"
+                    }
+                  },
+                  "locations": {
+                    "default": [
+                      "header"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "const": "header"
+                    }
+                  }
+                },
+                "required": [
+                  "allowedHosts"
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "isSecret"
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 21,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "setAsDefault": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -592,9 +659,12 @@
       "create",
       "name",
       "description",
-      "organizationid"
+      "organizationid",
+      "vars",
+      "commands",
+      "setasdefault"
     ],
-    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid name description organizationId"
+    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default. agentprofiles create name description organizationid vars commands setasdefault name description organizationId vars commands setAsDefault"
   },
   "agentProfiles.createAgent": {
     "path": "agentProfiles.createAgent",
@@ -2284,7 +2354,7 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "commands": {
-          "maxItems": 20,
+          "maxItems": 21,
           "type": "array",
           "items": {
             "type": "string",
@@ -10437,6 +10507,731 @@
     ],
     "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
   },
+  "cloudEnvironments.setupRuns.agent.complete": {
+    "path": "cloudEnvironments.setupRuns.agent.complete",
+    "kind": "mutation",
+    "summary": "Complete the setup run after the server validates the current draft verification and publication gate.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        }
+      },
+      "required": [
+        "runId",
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "complete",
+      "runid",
+      "summary"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.complete Complete the setup run after the server validates the current draft verification and publication gate. cloudenvironments setupruns agent complete runid summary runId summary"
+  },
+  "cloudEnvironments.setupRuns.agent.fail": {
+    "path": "cloudEnvironments.setupRuns.agent.fail",
+    "kind": "mutation",
+    "summary": "Stop the authorized environment setup run with a specific reason.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "runId",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "fail",
+      "runid",
+      "reason"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.fail Stop the authorized environment setup run with a specific reason. cloudenvironments setupruns agent fail runid reason runId reason"
+  },
+  "cloudEnvironments.setupRuns.agent.getDraft": {
+    "path": "cloudEnvironments.setupRuns.agent.getDraft",
+    "kind": "query",
+    "summary": "Read the setup draft, final network policy, and paginated discovery audit of observed hosts without exposing secret values.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "auditCursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "runId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "getdraft",
+      "runid",
+      "auditcursor"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.getDraft Read the setup draft, final network policy, and paginated discovery audit of observed hosts without exposing secret values. cloudenvironments setupruns agent getdraft runid auditcursor runId auditCursor"
+  },
+  "cloudEnvironments.setupRuns.agent.recordVerification": {
+    "path": "cloudEnvironments.setupRuns.agent.recordVerification",
+    "kind": "mutation",
+    "summary": "Record reported smoke check results alongside observed preparation, revision and network facts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "childSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "results": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "evidence": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "name",
+              "passed",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "childSessionId",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "recordverification",
+      "runid",
+      "childsessionid",
+      "results"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.recordVerification Record reported smoke check results alongside observed preparation, revision and network facts. cloudenvironments setupruns agent recordverification runid childsessionid results runId childSessionId results"
+  },
+  "cloudEnvironments.setupRuns.agent.requestNetworkHosts": {
+    "path": "cloudEnvironments.setupRuns.agent.requestNetworkHosts",
+    "kind": "mutation",
+    "summary": "Recommend required hosts from the setup discovery audit or a bound verification audit for user approval before restricted verification.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "childSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "auditCursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "hosts": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "host",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "hosts"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "requestnetworkhosts",
+      "runid",
+      "childsessionid",
+      "auditcursor",
+      "hosts"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.requestNetworkHosts Recommend required hosts from the setup discovery audit or a bound verification audit for user approval before restricted verification. cloudenvironments setupruns agent requestnetworkhosts runid childsessionid auditcursor hosts runId childSessionId auditCursor hosts"
+  },
+  "cloudEnvironments.setupRuns.agent.requestSecrets": {
+    "path": "cloudEnvironments.setupRuns.agent.requestSecrets",
+    "kind": "mutation",
+    "summary": "Request user-owned secret keys through the environment editor with repository references.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "secrets": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "references": {
+                "minItems": 1,
+                "maxItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "repoFullName": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 200
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "repoFullName",
+                    "path",
+                    "line"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "key",
+              "reason",
+              "references"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "secrets"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "requestsecrets",
+      "runid",
+      "secrets"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.requestSecrets Request user-owned secret keys through the environment editor with repository references. cloudenvironments setupruns agent requestsecrets runid secrets runId secrets"
+  },
+  "cloudEnvironments.setupRuns.agent.startVerification": {
+    "path": "cloudEnvironments.setupRuns.agent.startVerification",
+    "kind": "mutation",
+    "summary": "Rerun setup and smoke checks in a fresh session using the user-selected Full or Restricted network policy.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "checks": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "expect": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "name",
+              "command",
+              "expect"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "startverification",
+      "runid",
+      "checks"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.startVerification Rerun setup and smoke checks in a fresh session using the user-selected Full or Restricted network policy. cloudenvironments setupruns agent startverification runid checks runId checks"
+  },
+  "cloudEnvironments.setupRuns.agent.updateDraft": {
+    "path": "cloudEnvironments.setupRuns.agent.updateDraft",
+    "kind": "mutation",
+    "summary": "Save setup script, variables, generated secrets, sandbox allocation or required hosts in the authorized draft.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "script": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requiredHosts": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "updatedraft",
+      "runid",
+      "expectedrevision",
+      "script",
+      "plainvars",
+      "secrets",
+      "sandboxallocation",
+      "requiredhosts"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.updateDraft Save setup script, variables, generated secrets, sandbox allocation or required hosts in the authorized draft. cloudenvironments setupruns agent updatedraft runid expectedrevision script plainvars secrets sandboxallocation requiredhosts runId expectedRevision script plainVars secrets sandboxAllocation requiredHosts"
+  },
+  "cloudEnvironments.setupRuns.buildSnapshot": {
+    "path": "cloudEnvironments.setupRuns.buildSnapshot",
+    "kind": "mutation",
+    "summary": "Build a snapshot of the environment revision published by this setup run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "buildsnapshot",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.buildSnapshot Build a snapshot of the environment revision published by this setup run. cloudenvironments setupruns buildsnapshot organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.cancel": {
+    "path": "cloudEnvironments.setupRuns.cancel",
+    "kind": "mutation",
+    "summary": "Cancel an environment setup run and interrupt its setup and verification sessions when possible.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "cancel",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.cancel Cancel an environment setup run and interrupt its setup and verification sessions when possible. cloudenvironments setupruns cancel organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.get": {
+    "path": "cloudEnvironments.setupRuns.get",
+    "kind": "query",
+    "summary": "Read an environment setup run, its configuration changes and current agent state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "get",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.get Read an environment setup run, its configuration changes and current agent state. cloudenvironments setupruns get organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.getBySession": {
+    "path": "cloudEnvironments.setupRuns.getBySession",
+    "kind": "query",
+    "summary": "Find the environment setup run belonging to the supplied Cloud Agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "getbysession",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.getBySession Find the environment setup run belonging to the supplied Cloud Agent session. cloudenvironments setupruns getbysession organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
+  "cloudEnvironments.setupRuns.isEnabled": {
+    "path": "cloudEnvironments.setupRuns.isEnabled",
+    "kind": "query",
+    "summary": "Check whether the environment setup agent is enabled and the caller can start setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "isenabled",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.isEnabled Check whether the environment setup agent is enabled and the caller can start setup. cloudenvironments setupruns isenabled organizationid organizationId"
+  },
+  "cloudEnvironments.setupRuns.listForEnvironment": {
+    "path": "cloudEnvironments.setupRuns.listForEnvironment",
+    "kind": "query",
+    "summary": "List recent setup runs for an environment without configuration changes or live agent state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "listforenvironment",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.listForEnvironment List recent setup runs for an environment without configuration changes or live agent state. cloudenvironments setupruns listforenvironment organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.setupRuns.resume": {
+    "path": "cloudEnvironments.setupRuns.resume",
+    "kind": "mutation",
+    "summary": "Resume a stopped environment setup agent and optionally allow more verification attempts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "raiseVerificationLimit": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "resume",
+      "organizationid",
+      "runid",
+      "raiseverificationlimit"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.resume Resume a stopped environment setup agent and optionally allow more verification attempts. cloudenvironments setupruns resume organizationid runid raiseverificationlimit organizationId runId raiseVerificationLimit"
+  },
   "cloudEnvironments.update": {
     "path": "cloudEnvironments.update",
     "kind": "mutation",
@@ -10694,6 +11489,15 @@
             }
           ]
         },
+        "requiredHosts": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        },
         "egressMode": {
           "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
           "type": "string",
@@ -10733,11 +11537,12 @@
       "commands",
       "startcommands",
       "sandboxallocation",
+      "requiredhosts",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets networksecrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets networksecrets commands startcommands sandboxallocation requiredhosts egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation requiredHosts egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -11792,6 +12597,188 @@
       "supportscreditexpiry"
     ],
     "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts supportscreditexpiry supportsCreditExpiry"
+  },
+  "customRouterBenchmarks.blockedModels": {
+    "path": "customRouterBenchmarks.blockedModels",
+    "kind": "query",
+    "summary": "Check whether models are permanently blocked from a custom router pool.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "models": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "baseRouter": {
+          "type": "string",
+          "enum": [
+            "efficient",
+            "frontier"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "models",
+        "baseRouter"
+      ]
+    },
+    "tags": [
+      "customrouterbenchmarks",
+      "blockedmodels",
+      "models",
+      "baserouter",
+      "organizationid"
+    ],
+    "searchBlob": "customRouterBenchmarks.blockedModels Check whether models are permanently blocked from a custom router pool. customrouterbenchmarks blockedmodels models baserouter organizationid models baseRouter organizationId"
+  },
+  "customRouterBenchmarks.pause": {
+    "path": "customRouterBenchmarks.pause",
+    "kind": "mutation",
+    "summary": "Pause future benchmark charges for the authorized custom router pool.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "slug",
+        "requestId"
+      ]
+    },
+    "tags": [
+      "customrouterbenchmarks",
+      "pause",
+      "slug",
+      "organizationid",
+      "requestid"
+    ],
+    "searchBlob": "customRouterBenchmarks.pause Pause future benchmark charges for the authorized custom router pool. customrouterbenchmarks pause slug organizationid requestid slug organizationId requestId"
+  },
+  "customRouterBenchmarks.progress": {
+    "path": "customRouterBenchmarks.progress",
+    "kind": "query",
+    "summary": "Read a custom pool benchmark’s progress, current charges, and remaining cases.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "slug"
+      ]
+    },
+    "tags": [
+      "customrouterbenchmarks",
+      "progress",
+      "slug",
+      "organizationid",
+      "requestid",
+      "cursor"
+    ],
+    "searchBlob": "customRouterBenchmarks.progress Read a custom pool benchmark’s progress, current charges, and remaining cases. customrouterbenchmarks progress slug organizationid requestid cursor slug organizationId requestId cursor"
+  },
+  "customRouterBenchmarks.quote": {
+    "path": "customRouterBenchmarks.quote",
+    "kind": "query",
+    "summary": "Estimate charges and show which custom pool benchmark cases can be reused, covered, or shared.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "slug"
+      ]
+    },
+    "tags": [
+      "customrouterbenchmarks",
+      "quote",
+      "slug",
+      "organizationid"
+    ],
+    "searchBlob": "customRouterBenchmarks.quote Estimate charges and show which custom pool benchmark cases can be reused, covered, or shared. customrouterbenchmarks quote slug organizationid slug organizationId"
+  },
+  "customRouterBenchmarks.table": {
+    "path": "customRouterBenchmarks.table",
+    "kind": "query",
+    "summary": "Read the current routing table and measured candidates for a custom router pool.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "slug"
+      ]
+    },
+    "tags": [
+      "customrouterbenchmarks",
+      "table",
+      "slug",
+      "organizationid"
+    ],
+    "searchBlob": "customRouterBenchmarks.table Read the current routing table and measured candidates for a custom router pool. customrouterbenchmarks table slug organizationid slug organizationId"
   },
   "debug.badInputError": {
     "path": "debug.badInputError",
@@ -17121,6 +18108,17 @@
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
   },
+  "models.providerNames": {
+    "path": "models.providerNames",
+    "kind": "query",
+    "summary": "List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "providernames"
+    ],
+    "searchBlob": "models.providerNames List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model. models providernames"
+  },
   "models.selectorList": {
     "path": "models.selectorList",
     "kind": "query",
@@ -17276,6 +18274,34 @@
       "listhiddenusers"
     ],
     "searchBlob": "moderation.listHiddenUsers List the GitHub logins of all users the current user has blocked and muted. moderation listhiddenusers"
+  },
+  "moderation.listReportReceipts": {
+    "path": "moderation.listReportReceipts",
+    "kind": "query",
+    "summary": "List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "tags": [
+      "moderation",
+      "listreportreceipts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "moderation.listReportReceipts List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history. moderation listreportreceipts cursor limit cursor limit"
   },
   "moderation.muteUser": {
     "path": "moderation.muteUser",
@@ -17655,6 +18681,7 @@
               "organization.group.default_policy.remove",
               "organization.group.policy_type.enable",
               "organization.group.policy_type.disable",
+              "organization.named_policy.change",
               "organization.created",
               "organization.token.generate",
               "organization.funds.distribute_to_children",
@@ -22218,7 +23245,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {
@@ -22285,7 +23311,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 200
                                 }
                               },
                               "provider_allow_list": {
@@ -22293,7 +23320,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               }
                             },
@@ -22302,7 +23330,8 @@
                               "model_allow_list",
                               "provider_allow_list"
                             ],
-                            "additionalProperties": false
+                            "additionalProperties": false,
+                            "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                           }
                         ]
                       }
@@ -22730,7 +23759,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22738,7 +23768,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22747,7 +23778,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }
@@ -22982,7 +24014,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22990,7 +24023,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22999,7 +24033,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }
@@ -23067,7 +24102,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {
@@ -23147,7 +24181,6 @@
             },
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 80
             },
             "description": {
@@ -36612,10 +37645,10 @@
     ],
     "searchBlob": "unifiedSessions.search Full-text search over a user's CLI sessions (title or session ID substring match) with optional scoping by organization, platform, git URL, or sub-session inclusion, returning paginated results plus total match count. Use for keyword lookup of past sessions. unifiedsessions search search_string limit offset createdonplatform organizationid includesubsessions giturl search_string limit offset createdOnPlatform organizationId includeSubSessions gitUrl"
   },
-  "usageAnalytics.getBreakdown": {
-    "path": "usageAnalytics.getBreakdown",
+  "usageAnalytics.getBenchmarkCharges": {
+    "path": "usageAnalytics.getBenchmarkCharges",
     "kind": "query",
-    "summary": "Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages.",
+    "summary": "Read benchmark usage charges by custom pool and concrete model.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -36805,6 +37838,246 @@
             "maxLength": 256
           }
         },
+        "poolLimit": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "startDate",
+        "endDate",
+        "granularity"
+      ]
+    },
+    "tags": [
+      "usageanalytics",
+      "getbenchmarkcharges",
+      "startdate",
+      "enddate",
+      "granularity",
+      "costsource",
+      "organizationid",
+      "organizationids",
+      "personalscope",
+      "viewas",
+      "features",
+      "models",
+      "automodels",
+      "modes",
+      "userids",
+      "providers",
+      "inferenceproviders",
+      "projects",
+      "excludedfeatures",
+      "excludedmodels",
+      "excludedautomodels",
+      "excludedmodes",
+      "excludeduserids",
+      "excludedproviders",
+      "excludedinferenceproviders",
+      "excludedprojects",
+      "poollimit"
+    ],
+    "searchBlob": "usageAnalytics.getBenchmarkCharges Read benchmark usage charges by custom pool and concrete model. usageanalytics getbenchmarkcharges startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects poollimit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects poolLimit"
+  },
+  "usageAnalytics.getBreakdown": {
+    "path": "usageAnalytics.getBreakdown",
+    "kind": "query",
+    "summary": "Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "granularity": {
+          "type": "string",
+          "enum": [
+            "hour",
+            "day",
+            "week",
+            "month"
+          ]
+        },
+        "costSource": {
+          "default": "cost",
+          "type": "string",
+          "enum": [
+            "cost",
+            "market"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationIds": {
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "personalScope": {
+          "default": "personal-only",
+          "type": "string",
+          "enum": [
+            "personal-only",
+            "include-orgs"
+          ]
+        },
+        "viewAs": {
+          "default": "self",
+          "type": "string",
+          "enum": [
+            "self",
+            "org-wide"
+          ]
+        },
+        "features": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "models": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "modes": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "userIds": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "projects": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "benchmarkProjects": {
+          "type": "boolean"
+        },
+        "excludedFeatures": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedModes": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedUserIds": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedProjects": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "dimension": {
           "type": "string",
           "enum": [
@@ -36861,6 +38134,7 @@
       "providers",
       "inferenceproviders",
       "projects",
+      "benchmarkprojects",
       "excludedfeatures",
       "excludedmodels",
       "excludedautomodels",
@@ -36873,7 +38147,7 @@
       "metric",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects dimension metric limit"
+    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects benchmarkprojects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects benchmarkProjects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects dimension metric limit"
   },
   "usageAnalytics.getScopeOrganizations": {
     "path": "usageAnalytics.getScopeOrganizations",
@@ -37029,6 +38303,9 @@
             "maxLength": 256
           }
         },
+        "benchmarkProjects": {
+          "type": "boolean"
+        },
         "excludedFeatures": {
           "maxItems": 500,
           "type": "array",
@@ -37119,6 +38396,7 @@
       "providers",
       "inferenceproviders",
       "projects",
+      "benchmarkprojects",
       "excludedfeatures",
       "excludedmodels",
       "excludedautomodels",
@@ -37128,7 +38406,7 @@
       "excludedinferenceproviders",
       "excludedprojects"
     ],
-    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects"
+    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects benchmarkprojects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects benchmarkProjects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects"
   },
   "usageAnalytics.getTable": {
     "path": "usageAnalytics.getTable",
@@ -37259,6 +38537,9 @@
             "maxLength": 256
           }
         },
+        "benchmarkProjects": {
+          "type": "boolean"
+        },
         "excludedFeatures": {
           "maxItems": 500,
           "type": "array",
@@ -37373,6 +38654,7 @@
       "providers",
       "inferenceproviders",
       "projects",
+      "benchmarkprojects",
       "excludedfeatures",
       "excludedmodels",
       "excludedautomodels",
@@ -37384,7 +38666,7 @@
       "groupby",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects groupBy limit"
+    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects benchmarkprojects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects benchmarkProjects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects groupBy limit"
   },
   "usageAnalytics.getTimeseries": {
     "path": "usageAnalytics.getTimeseries",
@@ -37515,6 +38797,9 @@
             "maxLength": 256
           }
         },
+        "benchmarkProjects": {
+          "type": "boolean"
+        },
         "excludedFeatures": {
           "maxItems": 500,
           "type": "array",
@@ -37636,6 +38921,7 @@
       "providers",
       "inferenceproviders",
       "projects",
+      "benchmarkprojects",
       "excludedfeatures",
       "excludedmodels",
       "excludedautomodels",
@@ -37647,7 +38933,7 @@
       "metric",
       "splitby"
     ],
-    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects metric splitBy"
+    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects benchmarkprojects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects benchmarkProjects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects metric splitBy"
   },
   "usageAnalytics.resolveOrgUsers": {
     "path": "usageAnalytics.resolveOrgUsers",
@@ -37854,6 +39140,21 @@
       "getcreditblocks"
     ],
     "searchBlob": "user.getCreditBlocks Get the current user's credit balance breakdown, including credit blocks, deductions enriched with instance names, and auto top-up status. user getcreditblocks"
+  },
+  "user.getCreditGrantHistory": {
+    "path": "user.getCreditGrantHistory",
+    "kind": "query",
+    "summary": "List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "tags": [
+      "user",
+      "getcreditgranthistory"
+    ],
+    "searchBlob": "user.getCreditGrantHistory List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page. user getcreditgranthistory"
   },
   "user.getCreditPurchaseConfirmation": {
     "path": "user.getCreditPurchaseConfirmation",

@@ -1,6 +1,10 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { I18nManager, Platform } from 'react-native';
-import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
+import {
+  type AccessibilityLabels,
+  EnrichedMarkdownText,
+  type MarkdownStyle,
+} from 'react-native-enriched-markdown';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
@@ -165,6 +169,32 @@ export function MarkdownEnriched({
   // Markdown is always copy the app did not write, so every block keeps the
   // renderer's own per-paragraph direction (`enrichedStyle`).
   const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
+  // The renderer's own screen-reader strings (table rows, list items,
+  // blockquotes, math, and the iOS rotor) so a translation is spoken in the
+  // app language instead of the library's English default. `t` changes
+  // identity on a language switch, so this memo tracks the app language.
+  const accessibilityLabels = useMemo<AccessibilityLabels>(
+    () => ({
+      list: {
+        bulletPoint: t('common.markdownA11y.list.bulletPoint'),
+        nestedBulletPoint: t('common.markdownA11y.list.nestedBulletPoint'),
+        orderedItem: t('common.markdownA11y.list.orderedItem'),
+        nestedOrderedItem: t('common.markdownA11y.list.nestedOrderedItem'),
+      },
+      blockquote: {
+        quote: t('common.markdownA11y.blockquote.quote'),
+        nestedQuote: t('common.markdownA11y.blockquote.nestedQuote'),
+      },
+      table: { row: t('common.markdownA11y.table.row') },
+      math: { equation: t('common.markdownA11y.math.equation') },
+      rotor: {
+        headings: t('common.markdownA11y.rotor.headings'),
+        links: t('common.markdownA11y.rotor.links'),
+        images: t('common.markdownA11y.rotor.images'),
+      },
+    }),
+    [t]
+  );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.
@@ -200,6 +230,7 @@ export function MarkdownEnriched({
         flavor="github"
         markdown={renderedMarkdown}
         markdownStyle={markdownStyle}
+        accessibilityLabels={accessibilityLabels}
         selectable={selectable}
         // A long press on a message opens the host's message details; the
         // library's own block menu would open on top of it. Copy stays on the
@@ -224,7 +255,7 @@ export function MarkdownEnriched({
           if (isMarkdownImageDisplayable(url)) {
             setViewer({
               uri: resolveMarkdownImageSrc(url),
-              filename: markdownImageFilename(url, altText),
+              filename: markdownImageFilename(url, altText, t('common.image')),
             });
           }
         }}

@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile, layoutFindingText } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -34,9 +34,16 @@ const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source
  * repository's app tree because the Intl rule decides by it whether the
  * formatter rule applies; the shared parse entry reads nothing from that path
  * but the text it is given.
+ *
+ * The layout rules now return records the report formats where it prints them,
+ * so this flattens them the same way: every assertion below reads the printable
+ * lines, in the order the report prints them.
  */
 function check(relative, text) {
-  return checkParsedFile(parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text));
+  const { problems, layout } = checkParsedFile(
+    parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text)
+  );
+  return [...problems, ...layout.map(layoutFindingText)];
 }
 
 /** The diagnostics of several files, in the order they are listed. */
@@ -423,6 +430,58 @@ test('accepts theme tokens without an opacity modifier', () => {
   );
 });
 
+test('flags a bracketed opacity modifier on a theme token', () => {
+  const found = check(
+    'apps/mobile/src/panel.ts',
+    'export const a = "bg-card/[0.6] border-primary/[0.35] bg-card/[60%] bg-card/60 bg-card bg-white/50";\n'
+  );
+  const text = found.join('\n');
+  assert.equal(found.length, 4);
+  // The arbitrary spellings compile to the same deferred color-mix as the bare
+  // number, so the runtime drops them the same way.
+  for (const spelling of [
+    'bg-card/[0.6]',
+    'border-primary/[0.35]',
+    'bg-card/[60%]',
+    'bg-card/60',
+  ]) {
+    assert.ok(text.includes(`"${spelling}"`), `expected ${spelling} to be reported`);
+  }
+  assert.ok(found.every(line => line.includes('/opacity modifier is dropped')));
+  // A token with no modifier paints, and `white` is not a theme token.
+  assert.ok(!text.includes('"bg-card"'));
+  assert.ok(!text.includes('"bg-white/50"'));
+});
+
+test('flags a bracketed unitless leading and keeps explicit lengths', () => {
+  const found = check(
+    'apps/mobile/src/bans.ts',
+    'export const a = "leading-[1.5] leading-[9] leading-[.5] leading-9";\n' +
+      'export const b = "leading-[1.25rem] leading-[20px] leading-[1.5em] leading-[normal] leading-[150%]";\n'
+  );
+  const text = found.join('\n');
+  assert.equal(found.length, 4);
+  // `leading-[9]` and `leading-[.5]` compile to the same deferred `em`
+  // multiplier as `leading-9`.
+  for (const spelling of ['leading-[1.5]', 'leading-[9]', 'leading-[.5]', 'leading-9']) {
+    assert.ok(
+      text.includes(`"${spelling}" a numeric leading-N`),
+      `expected ${spelling} to be reported`
+    );
+  }
+  // An explicit length resolves as a length, and `normal` / a percentage emit no
+  // line height at all, so they keep passing.
+  for (const spelling of [
+    'leading-[1.25rem]',
+    'leading-[20px]',
+    'leading-[1.5em]',
+    'leading-[normal]',
+    'leading-[150%]',
+  ]) {
+    assert.ok(!text.includes(`"${spelling}"`), `expected ${spelling} to pass`);
+  }
+});
+
 test('flags a runtime Text import under any name and allows the type-only forms', () => {
   const found = checkAll({
     'apps/mobile/src/bare.tsx': "import { Text } from 'react-native';\n",
@@ -439,6 +498,64 @@ test('flags a runtime Text import under any name and allows the type-only forms'
   assert.match(text, /mixed\.tsx:1: imports Text from 'react-native'/);
   assert.doesNotMatch(text, /type-aliased/);
   assert.doesNotMatch(text, /type-import/);
+});
+
+test('flags a namespace or default Text import only where its binding is used as .Text', () => {
+  const found = checkAll({
+    'apps/mobile/src/namespace.tsx':
+      "import * as RN from 'react-native';\n\nexport const a = <RN.Text>hi</RN.Text>;\n",
+    'apps/mobile/src/default.tsx':
+      "import RNative from 'react-native';\n\nexport const a = <RNative.Text>hi</RNative.Text>;\n",
+    'apps/mobile/src/expression.tsx':
+      "import * as RN from 'react-native';\n\nexport const T = RN.Text;\n",
+    'apps/mobile/src/view-only.tsx':
+      "import * as RN from 'react-native';\n\nexport const a = <RN.View />;\n",
+    'apps/mobile/src/type-namespace.tsx':
+      "import type * as T from 'react-native';\n\nexport const a = <T.Text>hi</T.Text>;\n",
+    'apps/mobile/src/destructured.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = RN;\n\nexport const a = <Text>hi</Text>;\n",
+    'apps/mobile/src/destructured-alias.tsx':
+      "import RNative from 'react-native';\n\nconst { Text: T } = RNative;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-computed.tsx':
+      "import * as RN from 'react-native';\n\nconst { ['Text']: T } = RN;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-view.tsx':
+      "import * as RN from 'react-native';\n\nconst { View } = RN;\n\nexport const a = <View />;\n",
+    'apps/mobile/src/destructured-elsewhere.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = strings;\n\nexport const a = <Text>hi</Text>;\n",
+  });
+  const text = found.join('\n');
+  assert.equal(found.length, 6);
+  assert.match(
+    text,
+    /namespace\.tsx:1: imports Text from 'react-native' as RN\.Text; use @\/components\/ui\/text so the copy follows the RTL paragraph direction/
+  );
+  assert.match(text, /default\.tsx:1: imports Text from 'react-native' as RNative\.Text/);
+  // A bare `RN.Text` expression renders the same platform component.
+  assert.match(text, /expression\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  // Taking `Text` out of the namespace binding destructures the same member, so
+  // the aliased and computed-key forms are reported like the direct one.
+  assert.match(text, /destructured\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  assert.match(
+    text,
+    /destructured-alias\.tsx:1: imports Text from 'react-native' as RNative\.Text/
+  );
+  assert.match(text, /destructured-computed\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  assert.ok(!text.includes('view-only'), 'a binding used as RN.View alone renders no copy');
+  assert.ok(!text.includes('type-namespace'), 'a type-only namespace import is silent');
+  assert.ok(!text.includes('destructured-view'), 'destructuring View renders no copy');
+  assert.ok(
+    !text.includes('destructured-elsewhere'),
+    'a destructure from a binding that is not the react-native import is silent'
+  );
+});
+
+test('exempts the shared Text module by its own path, not by a suffix', () => {
+  const source = "import { Text } from 'react-native';\n";
+  assert.deepEqual(check('apps/mobile/src/components/ui/text.tsx', source), []);
+  assert.match(
+    check('packages/app-shared/src/components/ui/text.tsx', source).join('\n'),
+    /imports Text from 'react-native'/
+  );
 });
 
 test('runs the whole audit over a clean tree through the CLI and ignores test scaffolding', context => {
@@ -533,8 +650,8 @@ function stubbedCompilerFixture(
 /**
  * A stylesheet still holding both declarations the bans warn about: a deferred
  * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. It
- * answers every fixture that is not a text-align one, so a case that fails a
- * text-align pin leaves the other pins passing.
+ * answers every fixture that is not a text-align or unitless-line-height one,
+ * so a case that fails a text-align pin leaves the other pins passing.
  */
 const HOLDING_STYLESHEET =
   "{ s: [['x', [{ d: [" +
@@ -549,10 +666,16 @@ const HOLDING_STYLESHEET =
  * `textAlign.left` is null: it is the literal declaration the pins' read is
  * proven against. A `start` or `end` key makes that keyword's fixture emit
  * `{ textAlign: <value> }`; an omitted keyword emits no declaration, which is
- * what its pin holds on. Every other fixture emits `stylesheet` — the holding
- * declarations by default.
+ * what its pin holds on. The `line-height: 9` unitless fixture emits
+ * `unitless` — the deferred `em` descriptor by default — because the two
+ * line-height fixtures cannot share one stylesheet. Every other fixture emits
+ * `stylesheet` — the holding declarations by default.
  */
-function compilerStub({ textAlign = {}, stylesheet = HOLDING_STYLESHEET } = {}) {
+function compilerStub({
+  textAlign = {},
+  stylesheet = HOLDING_STYLESHEET,
+  unitless = [[['em', 9], 'lineHeight']],
+} = {}) {
   const branches = [];
   if (textAlign.left !== null) {
     branches.push(['text-align: left', JSON.stringify('left')]);
@@ -572,6 +695,10 @@ function compilerStub({ textAlign = {}, stylesheet = HOLDING_STYLESHEET } = {}) 
           `    if (css.includes('${fixture}')) return run([{ textAlign: ${value} }]);\n`
       )
       .join('') +
+    // The two line-height fixtures emit different declarations, and the pin's
+    // read returns only the first declaration of a property, so one stylesheet
+    // cannot answer both: the unitless fixture gets its own branch.
+    `    if (css.includes('line-height: 9')) return run(${JSON.stringify(unitless)});\n` +
     `    return { stylesheet() { return ${stylesheet}; } };\n` +
     '  },\n' +
     '};\n'
@@ -586,22 +713,35 @@ for (const [name, entrySource, expected, absent] of [
     'the compiler failed on',
   ],
   [
-    'throws at compile, and every fixture still reports',
+    'throws at compile, and the one control problem is the whole report',
     "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
+    // The control is the precondition for every pin, so a compiler that throws
+    // on it reports one problem and no pin runs: the other fixtures are never
+    // compiled, which the absent fragment below pins.
     [
       'the compiler failed on the text-align: left control fixture (stubbed compiler exploded on line one)',
-      'the compiler failed on the color-mix over an @theme inline variable fixture (stubbed compiler exploded on line one)',
-      'the compiler failed on the spacing-scale line-height fixture (stubbed compiler exploded on line one)',
+    ],
+    [
+      'the compiler failed on the color-mix over an @theme inline variable fixture',
+      'the compiler failed on the spacing-scale line-height fixture',
+      'the compiler failed on the unitless line-height fixture',
+      'color-mix over an @theme inline variable emits no',
+      'a spacing-scale line height emits no',
+      'a unitless line height emits no',
+      'drop the numeric leading rule',
     ],
   ],
   [
     'throws for the color-mix fixture only',
     // The fixture CSS is the stub's only input, so a throw it raises for one
-    // fixture leaves the other pins running on the same stylesheet.
+    // fixture leaves the other pins running on the same stylesheet. The control
+    // compiles, or no pin would run at all.
     [
       'module.exports = {',
       '  compile(css) {',
       "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
+      "    if (css.includes('text-align: left')) return runLeft();",
+      "    if (css.includes('line-height: 9')) return runUnitless();",
       '    return {',
       '      stylesheet() {',
       "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
@@ -609,12 +749,13 @@ for (const [name, entrySource, expected, absent] of [
       '    };',
       '  },',
       '};',
+      "function runLeft() { return { stylesheet() { return { s: [['x', [{ d: [{ textAlign: 'left' }] }]]] }; } }; }",
+      "function runUnitless() { return { stylesheet() { return { s: [['x', [{ d: [[['em', 9], 'lineHeight']] }]]] }; } }; }",
     ].join('\n') + '\n',
     [
       'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
-      'the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it',
     ],
-    'drop the numeric leading rule',
+    'the text-align: left control fixture emits no',
   ],
   [
     'emits textAlign for the text-align: start fixture only',
@@ -636,7 +777,7 @@ for (const [name, entrySource, expected, absent] of [
     'emits no textAlign for the control fixture',
     compilerStub({ textAlign: { left: null } }),
     [
-      'the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it',
+      'the text-align: left control fixture emits no textAlign declaration — the compiler pins cannot be verified without it',
     ],
     'is no longer dropped',
   ],
@@ -669,6 +810,21 @@ for (const [name, entrySource, expected, absent] of [
     ],
     'drop the numeric leading rule',
   ],
+  [
+    'folds the unitless line height to a length',
+    compilerStub({ unitless: [[{ lineHeight: 9 }, 'lineHeight']] }),
+    [
+      'a unitless line height now compiles to {"lineHeight":9} instead of a deferred em — drop the numeric leading rule',
+    ],
+  ],
+  [
+    'emits no lineHeight declaration for the unitless line-height fixture',
+    compilerStub({ unitless: [] }),
+    [
+      'a unitless line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
+    ],
+    'drop the numeric leading rule',
+  ],
 ]) {
   test(`reports compiler pins when the stub ${name}, keeping the source findings`, context => {
     const root = stubbedCompilerFixture(context, entrySource);
@@ -685,7 +841,9 @@ for (const [name, entrySource, expected, absent] of [
       assert.match(result.stderr, new RegExp(fragment.replace(/[()]/g, m => `\\${m}`)));
     }
     if (absent !== undefined) {
-      assert.doesNotMatch(result.stderr, new RegExp(absent));
+      for (const fragment of [absent].flat()) {
+        assert.doesNotMatch(result.stderr, new RegExp(fragment));
+      }
     }
     assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
     assert.doesNotMatch(result.stderr, /Error:|at /);
@@ -734,16 +892,21 @@ test('checkParsedFile reports one file and keeps no state between calls', contex
   writeFileSync(
     join(root, 'probe.mjs'),
     [
-      "import { checkParsedFile } from './tools/nativewind/check-classes.mjs';",
+      "import { checkParsedFile, layoutFindingText } from './tools/nativewind/check-classes.mjs';",
       "import { parseSourceEntry } from './tools/lib/source-files.mjs';",
       `const source = ${JSON.stringify(source)};`,
       `const absolute = ${JSON.stringify(absolute)};`,
       `const dir = ${JSON.stringify(dir)};`,
       `const root = ${JSON.stringify(root)};`,
       'const entry = parseSourceEntry(dir, root, absolute, source);',
-      'const first = checkParsedFile(entry);',
-      'const firstAgain = checkParsedFile(entry);',
-      'const clean = checkParsedFile(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
+      // The printable lines of one call, built the way the report builds them.
+      'const lines = entry => {',
+      '  const { problems, layout } = checkParsedFile(entry);',
+      '  return [...problems, ...layout.map(layoutFindingText)];',
+      '};',
+      'const first = lines(entry);',
+      'const firstAgain = lines(entry);',
+      'const clean = lines(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
       'console.log(JSON.stringify({ first, firstAgain, clean }));',
     ].join('\n')
   );
@@ -944,6 +1107,126 @@ test('flags arbitrary spacing outside the allowlist and passes it inside', () =>
   assert.match(found[0], /screen\.tsx:3: \[L1\] "mt-\[6px\]"/);
   assert.match(found[0], /@\/lib\/layout/);
   assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="mt-[6px]" />')), []);
+});
+
+// A class that is the first thing on its source line is the closest a match can
+// sit to the chunk's origin, so every source character the chunk spends before
+// it — an escape, a line continuation — is a line the diagnostic can lose. Each
+// source below writes `mt-[6px]` at the start of its fifth line: the template
+// cooks six spaces and a newline ahead of it, and the quoted literal joins its
+// line continuation onto the class's line.
+test('names the line a layout class is written on, past the escape before it', () => {
+  const sources = [
+    [
+      'a template chunk that opens six escapes before the newline',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020\\u0020\\u0020\\u0020\\u0020\\u0020',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a quoted literal whose line continuation joins the class onto the next line',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className="px-4\\',
+        'mt-[6px]" />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+  ];
+  for (const [name, source] of sources) {
+    const found = layoutProblems(SCREEN_FILE, source);
+    assert.equal(found.length, 1, name);
+    const line = source.split('\n').findIndex(text => text.includes('mt-[6px]')) + 1;
+    assert.equal(line, 5, `${name}: the fixture writes the class on line 5`);
+    assert.match(found[0], new RegExp(`screen\\.tsx:${line}: \\[L1\\] "mt-\\[6px\\]"`), name);
+  }
+});
+
+// Every escape the offset map walks is a branch of its own, and the tree has
+// none of them today, so each is exercised only here. A quoted escape must sit
+// in a `{…}` expression: a bare attribute string is not cooked, so it takes the
+// identity path and would exercise nothing. Each fixture writes `mt-[6px]` as
+// the first thing on its own source line, behind the escape named in its row,
+// and the expected line is that class's own line.
+test('maps every escape branch to the line the class is written on', () => {
+  const cases = [
+    [
+      'an \\xXX and a \\uXXXX escape',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={"\\x41\\u0020\\',
+        'mt-[6px]"} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'an escape above the BMP',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={"\\u{1F600}\\u0020\\',
+        'mt-[6px]"} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a template line continuation',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020\\',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a template chunk ending its line in CRLF',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\r\n'),
+    ],
+    [
+      'a template chunk holding a raw CRLF',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`px-4',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\r\n'),
+    ],
+  ];
+  for (const [name, source] of cases) {
+    const found = layoutProblems(SCREEN_FILE, source);
+    assert.equal(found.length, 1, name);
+    const line = source.split(/\r\n|\n/).findIndex(text => text.startsWith('mt-')) + 1;
+    assert.equal(line, 5, `${name}: the fixture writes the class on line 5`);
+    assert.match(found[0], new RegExp(`screen\\.tsx:${line}: \\[L1\\] "mt-\\[6px\\]"`), name);
+  }
 });
 
 test('flags an arbitrary text size but not an arbitrary text colour', () => {
@@ -1491,6 +1774,51 @@ test('flags a horizontal inset wider than the page gutter', () => {
   assert.equal(variants.length, 2);
   assert.match(variants.join('\n'), /\[L12\] "px-8"/);
   assert.match(variants.join('\n'), /\[L12\] "-mx-6"/);
+  // The important modifier is written on either side of the utility and only
+  // raises its specificity, so both report the same inset; the diagnostic names
+  // the utility without the modifier.
+  const important = layoutProblems(SCREEN_FILE, screen('<View className="!px-6 px-6!" />'));
+  assert.equal(important.length, 2);
+  for (const problem of important) {
+    assert.match(problem, /\[L12\] "px-6"/);
+  }
+  // Every shape of a wider inset is one decision against the gutter: an
+  // all-side form and a half step are judged beside the side forms, and the
+  // diagnostic keeps the utility the call site wrote.
+  const shapes = layoutProblems(
+    SCREEN_FILE,
+    screen('<View className="p-6 m-10 px-4.5 px-12.5" />')
+  );
+  assert.equal(shapes.length, 4);
+  for (const token of ['p-6', 'm-10', 'px-4.5', 'px-12.5']) {
+    assert.match(shapes.join('\n'), new RegExp(`\\[L12\\] "${token.replace('.', '\\.')}"`));
+  }
+});
+
+test('gives one wider inset one decision from both inset rules', () => {
+  // The two rules read the same table: on a surface that owns the page column
+  // a wider inset is both the wrong gutter and wider than it, and on a plain
+  // element only the width rule applies.
+  const container = layoutProblems(
+    SCREEN_FILE,
+    screen('<ScrollView contentContainerClassName="p-6" />')
+  );
+  assert.equal(container.length, 2);
+  assert.match(container.join('\n'), /\[L2\] "p-6 on <ScrollView> contentContainerClassName"/);
+  assert.match(container.join('\n'), /\[L12\] "p-6"/);
+  const view = layoutProblems(SCREEN_FILE, screen('<View className="p-6" />'));
+  assert.equal(view.length, 1);
+  assert.match(view[0], /\[L12\] "p-6"/);
+  assert.doesNotMatch(view[0], /\[L2\]/);
+});
+
+test('leaves an arbitrary inset to the rule that bans it', () => {
+  // The width rule reads a number of steps; an arbitrary value is not one, so
+  // it stays L1's single finding instead of being reported twice.
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="px-[22px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L1\] "px-\[22px\]"/);
+  assert.doesNotMatch(found[0], /\[L12\]/);
 });
 
 test('accepts the gutter, a narrower inset and the modules that own one', () => {
@@ -1499,6 +1827,123 @@ test('accepts the gutter, a narrower inset and the modules that own one', () => 
     []
   );
   assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="px-6 mx-8" />')), []);
+});
+
+test('accepts the gutter in both all-side forms beside an exempt margin and a narrower step', () => {
+  // The gutter as a padding both ways, the same gutter under the important
+  // modifier on either side, a zero and an auto margin the rule exempts, a half
+  // step below the gutter, and the vertical utilities the family never held.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<View className="p-4 px-4 !px-4 px-4! m-0 mx-auto px-3.5 gap-6 py-6 mt-6 pb-5" />')
+    ),
+    []
+  );
+});
+
+test('flags a margin on a scroll content container as the page inset', () => {
+  // The page inset is one family: a margin moves the content container's
+  // column exactly as a padding does, so the gutter rule judges both.
+  for (const classes of ['mx-6', 'ms-4', 'ml-3', 'm-2', 'me-1']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<CenteredState contentContainerClassName="mx-6" />')).join(
+      '\n'
+    ),
+    /\[L2\] "mx-6 on <CenteredState> contentContainerClassName"/
+  );
+  // A margin on an element that is not one of those surfaces is L12's business
+  // when it is wider than the gutter and nobody's below it, so a plain View
+  // never reads as L2.
+  assert.doesNotMatch(
+    layoutProblems(SCREEN_FILE, screen('<View className="mx-6 ml-3 m-2" />')).join('\n'),
+    /\[L2\]/
+  );
+});
+
+test('exempts auto and zero margins from the page-inset rule', () => {
+  // An auto margin is centering geometry and a zero margin writes no inset at
+  // all, so neither moves the page column L2 judges; neither is a number of
+  // steps on the scale, so L12 skips both as well and no rule judges them.
+  for (const classes of ['mx-auto', 'ms-auto', 'm-auto', 'mx-0', 'm-0']) {
+    for (const tag of ['DetailScreenScrollView', 'CenteredState']) {
+      const found = layoutProblems(
+        SCREEN_FILE,
+        screen(`<${tag} contentContainerClassName="${classes}" />`)
+      ).filter(problem => problem.includes('[L2]'));
+      assert.deepEqual(found, [], `${classes} on <${tag}>`);
+    }
+  }
+  // A padding is not exempt, and a margin that moves the column still is the
+  // page inset: `px-0` on a content container is exactly the gutterless column
+  // this rule exists for.
+  for (const classes of ['mx-6', 'm-6', 'px-0', 'p-2']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+});
+
+test('keeps the header gutter rule padding-only', () => {
+  // A header owns its own gutter, so a screen must not write padding on it.
+  // A margin is not that: it moves the header's own box, and the all-side
+  // padding policy says nothing about it. `mx-2` is under L12's threshold too,
+  // so it is accepted outright.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="mx-2" />')), []);
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="ml-3" />')), []);
+  // A margin wider than the gutter is neither an L2 line (padding only) nor
+  // unflagged: L12 owns the page inset.
+  const margin = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="mx-6" />'));
+  assert.equal(margin.length, 1);
+  assert.match(margin[0], /\[L12\] "mx-6"/);
+  // A padding wider than the gutter is both: L2 because a header takes no
+  // padding of its own, L12 because the inset is wider than the gutter.
+  const padding = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="px-5" />'));
+  assert.equal(padding.length, 2);
+  assert.match(padding.join('\n'), /\[L12\] "px-5"/);
+  assert.match(padding.join('\n'), /\[L2\] "px-5 on <ScreenHeader> className"/);
+});
+
+test('leaves vertical inset out of the page-inset family', () => {
+  // The family is horizontal only: a page inset is the column a screen's
+  // content sits in, so a vertical margin or padding moves an element's own
+  // box and neither rule reports it.
+  for (const classes of ['mt-6', 'mb-8', 'py-6', 'my-4']) {
+    assert.deepEqual(
+      layoutProblems(
+        SCREEN_FILE,
+        screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+      ),
+      [],
+      classes
+    );
+    assert.deepEqual(
+      layoutProblems(SCREEN_FILE, screen(`<ScreenHeader className="${classes}" />`)),
+      [],
+      classes
+    );
+    assert.deepEqual(
+      layoutProblems(SCREEN_FILE, screen(`<View className="${classes}" />`)),
+      [],
+      classes
+    );
+  }
 });
 
 test('accepts the page gutter and vertical padding on a CenteredState', () => {
@@ -1511,6 +1956,40 @@ test('accepts the page gutter and vertical padding on a CenteredState', () => {
   const view = layoutProblems(SCREEN_FILE, screen('<View className="px-6" />'));
   assert.equal(view.length, 1);
   assert.match(view[0], /\[L12\] "px-6"/);
+});
+
+test('judges every side the inset table lists, all-side forms included', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="ml-6 mr-8" />'));
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /\[L12\] "ml-6"/);
+  assert.match(found.join('\n'), /\[L12\] "mr-8"/);
+  // The all-side utilities are the same family now: `p-5` and `m-6` are wider
+  // than the one gutter, so one rule judges them beside the side forms.
+  const all = layoutProblems(SCREEN_FILE, screen('<View className="p-5 m-6" />'));
+  assert.equal(all.length, 2);
+  assert.match(all.join('\n'), /\[L12\] "p-5"/);
+  assert.match(all.join('\n'), /\[L12\] "m-6"/);
+  // The gutter itself, a zero margin and an auto margin are not wider than it.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="p-4 m-0 mx-auto" />')), []);
+  // A vertical utility is not a page inset, whatever its step.
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="pb-5 my-6" />')), []);
+});
+
+test('reads an Animated container through the one bare-tag helper in both rules', () => {
+  // One lookup strips the wrapper, so both RTL rules judge `Animated.X` as the
+  // container it renders. The line still prints the source spelling.
+  const gutter = layoutProblems(
+    SCREEN_FILE,
+    screen('<Animated.FlatList contentContainerClassName="mx-6" />')
+  );
+  assert.match(
+    gutter.join('\n'),
+    /\[L2\] "mx-6 on <Animated\.FlatList> contentContainerClassName"/
+  );
+  assert.match(
+    screenProblems(screen('<Animated.ScrollView className="px-3" />')).join('\n'),
+    /<Animated\.ScrollView> carries "px-3" on its own className/
+  );
 });
 
 test('flags a plain Button passed as a state action', () => {
@@ -1564,6 +2043,26 @@ function runLayoutFixture(context, sources, baseline) {
   if (baseline !== undefined) {
     files['tools/nativewind/layout-baseline.json'] = `${JSON.stringify(baseline, null, 2)}\n`;
   }
+  return runFixtureRoot(context, files);
+}
+
+/**
+ * Run the entry point over a fixture whose baseline is written as raw text:
+ * the helper above always `JSON.stringify`s the baseline it is given, so it
+ * cannot produce a file whose text is not valid JSON, and rewriting that file's
+ * bytes is the only way to state one. Some shapes the shape check must reject
+ * would round-trip through the helper unchanged (`{"L1": "3"}` does, `[]` does),
+ * but unparseable text — a trailing comma — cannot, so this helper writes the
+ * file's own bytes for both kinds of defect.
+ */
+function runRawBaselineFixture(context, sources, baselineText) {
+  return runFixtureRoot(context, {
+    ...sources,
+    'tools/nativewind/layout-baseline.json': baselineText,
+  });
+}
+
+function runFixtureRoot(context, files) {
   const root = makeFixture(context, files);
   const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
     cwd: root,
@@ -1614,6 +2113,94 @@ test('fails a baseline entry the file is now below', context => {
     result.stderr,
     /layout-baseline\.json: apps\/mobile\/src\/screen\.tsx L1 baseline is 2 but the file now has 1; lower it to 1/
   );
+});
+
+test('reports a malformed baseline as an instrument problem and skips the comparison', context => {
+  // A shape the comparison cannot read is reported where the theme failure is,
+  // and the comparison is skipped: a string count or an array would otherwise
+  // be compared silently and pass or fail for the wrong reason.
+  for (const [name, baselineText, detail] of [
+    [
+      'a string count',
+      '{"apps/mobile/src/screen.tsx": {"L1": "3"}}',
+      'apps/mobile/src/screen.tsx L1 is not a non-negative integer',
+    ],
+    [
+      'a float count',
+      '{"apps/mobile/src/screen.tsx": {"L1": 1.5}}',
+      'apps/mobile/src/screen.tsx L1 is not a non-negative integer',
+    ],
+    [
+      'a negative count',
+      '{"apps/mobile/src/screen.tsx": {"L1": -1}}',
+      'apps/mobile/src/screen.tsx L1 is not a non-negative integer',
+    ],
+    [
+      'a null rule map',
+      '{"apps/mobile/src/screen.tsx": null}',
+      'apps/mobile/src/screen.tsx is not one rule map per file path',
+    ],
+    ['a top-level array', '[]', 'the file does not hold one rule map per file path'],
+  ]) {
+    const result = runRawBaselineFixture(
+      context,
+      { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+      baselineText
+    );
+    assert.equal(result.status, 1, name);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `check-classes: cannot read the layout baseline from tools/nativewind/layout-baseline\\.json \\(${detail.replace(/[.()]/g, m => `\\${m}`)}\\) — the layout baseline comparison cannot run without it and was skipped`
+      ),
+      name
+    );
+    // No comparison line: the finding is admitted by nothing and reported as
+    // neither exceeded nor stale.
+    assert.doesNotMatch(result.stderr, /exceeded|lower it to|now has \d+ violation/, name);
+    assert.match(result.stderr, /check-classes: 1 problem\(s\)/, name);
+    assert.doesNotMatch(result.stderr, /Error:|at /, name);
+  }
+});
+
+test('reports an unparseable baseline as an instrument problem and keeps the stale comparison', context => {
+  // Unparseable text is the one defect the shape check never sees: JSON.parse
+  // throws before it reaches. It is reported where the shape failure is, and
+  // the comparison is skipped rather than run against the empty shape.
+  const unparseable = runRawBaselineFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    '{"apps/mobile/src/screen.tsx": {"L1": 1,}}'
+  );
+  assert.equal(unparseable.status, 1, unparseable.stdout);
+  assert.match(
+    unparseable.stderr,
+    /cannot read the layout baseline from tools\/nativewind\/layout-baseline\.json \(Expected .* in JSON/
+  );
+  assert.match(
+    unparseable.stderr,
+    /the layout baseline comparison cannot run without it and was skipped/
+  );
+  assert.doesNotMatch(unparseable.stderr, /exceeded|lower it to|now has \d+ violation/);
+  assert.match(unparseable.stderr, /check-classes: 1 problem\(s\)/);
+  // No stack trace: the failure is reported, not thrown. The parse detail ends
+  // in "at position N", so only a stack frame's leading indentation is a tell.
+  assert.doesNotMatch(unparseable.stderr, /Error:/);
+  assert.doesNotMatch(unparseable.stderr, /^\s+at /m);
+
+  // A baseline that parses still compares: the same file with a stale entry
+  // keeps its own line and never mentions the instrument.
+  const stale = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 2 } }
+  );
+  assert.equal(stale.status, 1, stale.stdout);
+  assert.match(
+    stale.stderr,
+    /layout-baseline\.json: apps\/mobile\/src\/screen\.tsx L1 baseline is 2 but the file now has 1; lower it to 1/
+  );
+  assert.doesNotMatch(stale.stderr, /cannot read the layout baseline/);
 });
 
 test('writes the baseline with --write-layout-baseline', context => {
@@ -1689,10 +2276,17 @@ test('names the missing global.css and keeps the other findings', context => {
   assert.doesNotMatch(result.stderr, /Error:/);
 });
 
-test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+test('--write-layout-baseline writes the layout counts when the theme cannot be read', context => {
+  // The theme tokens feed only the `/opacity` ban rule, so an unreadable theme
+  // cannot make a layout count short: the rewrite records what the walk saw and
+  // the ordinary run is where the missing theme is reported.
   const root = makeFixture(
     context,
-    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    {
+      'apps/mobile/src/screen.tsx': screen(
+        '<View className="mt-[6px] uppercase bg-secondary rounded-lg" />'
+      ),
+    },
     ':root { --x: 1; }\n'
   );
   const result = spawnSync(
@@ -1701,17 +2295,14 @@ test('--write-layout-baseline reports a theme failure instead of rewriting the b
     { cwd: root, encoding: 'utf8', timeout: 30_000 }
   );
   assert.ifError(result.error);
-  assert.equal(result.status, 1, result.stdout);
-  assert.match(
-    result.stderr,
-    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
-  );
-  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
-  assert.doesNotMatch(result.stdout, /wrote/);
-  // A baseline written here would record a tree the audit never checked.
-  assert.throws(
-    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
-    /ENOENT/
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /wrote 1 file\(s\)/);
+  assert.doesNotMatch(result.stderr, /cannot read the @theme inline tokens/);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8')),
+    {
+      'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
+    }
   );
 });
 
@@ -1753,6 +2344,9 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
   console.error = message => {
     errors.push(String(message));
   };
+  // The injected writer is what a refused run must not reach: touching the
+  // baseline file itself would prove nothing about which writer ran.
+  let written = 0;
   let exitCode;
   try {
     run({
@@ -1762,7 +2356,9 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
         }
         return readFileSync(file, ...rest);
       },
-      writeBaseline: true,
+      writeBaseline: () => {
+        written += 1;
+      },
     });
     exitCode = process.exitCode;
   } finally {
@@ -1770,6 +2366,7 @@ test('--write-layout-baseline refuses when a walked file cannot be read', async 
     process.exitCode = previousExitCode;
   }
   assert.equal(exitCode, 1, errors.join('\n'));
+  assert.equal(written, 0);
   const report = errors.join('\n');
   assert.match(report, /apps\/mobile\/src\/screen\.tsx: cannot read: EACCES: permission denied/);
   assert.match(report, /check-classes: 1 problem\(s\)/);
@@ -1795,6 +2392,147 @@ test('--write-layout-baseline refuses when a fixture source does not parse', con
   assert.match(result.stderr, /check-classes: [1-9]\d* problem\(s\)/);
   assert.doesNotMatch(result.stdout, /wrote/);
   // The refused file may hold any number of violations, so no count is safe.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('a second run reads the theme through its own seam instead of the first run memo', async context => {
+  // The memo exists so one run reads the theme once. A module-level cache that
+  // survived the first run would report the first run's tokens (or its lack of
+  // a failure) on the second, which is exactly the leak this pins.
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View />'),
+  });
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const errors = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  console.log = () => {};
+  const readers = [
+    () => ({ tokens: ['primary'], failure: null }),
+    () => ({ tokens: null, failure: 'boom' }),
+  ];
+  let firstExitCode;
+  let secondExitCode;
+  try {
+    run({ readTheme: () => readers[0](), readBaseline: () => ({ baseline: {}, failure: null }) });
+    firstExitCode = process.exitCode;
+    process.exitCode = undefined;
+    run({ readTheme: () => readers[1](), readBaseline: () => ({ baseline: {}, failure: null }) });
+    secondExitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The first run read a theme with no failure and an admitted empty baseline.
+  assert.notEqual(firstExitCode, 1);
+  // The second run reports its own failure: the memo did not carry the first
+  // run's successful read into it.
+  assert.equal(secondExitCode, 1);
+  assert.match(errors.join('\n'), /boom/);
+});
+
+test('restores the theme memo after a run so a later direct check reads the real tokens', async context => {
+  // A run seeds the module-level memos from its own reader. Left there, an
+  // injected theme would decide what a direct check after the run reports, so
+  // the run restores the caches the module held before it.
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View />'),
+  });
+  const { run, checkParsedFile } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const { parseSourceEntry } = await import(
+    pathToFileURL(join(root, 'tools/lib/source-files.mjs')).href
+  );
+  const appSrc = join(root, 'apps/mobile/src');
+  const probe = () =>
+    checkParsedFile(
+      parseSourceEntry(
+        appSrc,
+        root,
+        join(appSrc, 'panel.tsx'),
+        'export const a = <View className="bg-primary/50" />;\n'
+      )
+    ).problems;
+  // The control: the theme rule reports before any run, so an empty result
+  // after one says the memo leaked and not that the rule never fires here.
+  const before = probe();
+  assert.match(before.join('\n'), /\/opacity modifier is dropped/);
+  const errors = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  console.log = () => {};
+  let exitCode;
+  try {
+    run({
+      readTheme: () => ({ tokens: null, failure: 'boom' }),
+      readBaseline: () => ({ baseline: {}, failure: null }),
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The seam was used: the run reports the injected failure and fails.
+  assert.equal(exitCode, 1);
+  assert.match(errors.join('\n'), /boom/);
+  // The direct check reads global.css again, exactly as it did before the run.
+  assert.deepEqual(probe(), before);
+});
+
+test('run writes and reads the baseline through its injected seams', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const written = [];
+  let reads = 0;
+  // The admitted run ends on its summary line, and a passing case owns that
+  // output instead of letting it land in the suite's.
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.log = () => {};
+  let exitCode;
+  try {
+    run({ writeBaseline: findings => written.push(findings) });
+    run({
+      readBaseline: () => {
+        reads += 1;
+        return { baseline: { 'apps/mobile/src/screen.tsx': { L1: 1 } }, failure: null };
+      },
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The injected writer received this run's findings instead of the file.
+  assert.equal(written.length, 1);
+  assert.equal(written[0].get('apps/mobile/src/screen.tsx').get('L1').length, 1);
+  // The injected reader supplied the admitted baseline, so the run passed.
+  assert.equal(reads, 1);
+  assert.doesNotMatch(String(exitCode ?? ''), /1/);
+  // Neither seam touched the tracked baseline: the fixture has no such file.
   assert.throws(
     () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
     /ENOENT/

@@ -218,13 +218,27 @@ function readNativeEvent(frame: NativeEvent) {
   return { ...event, data: schema.parse(event.data) };
 }
 
-/** Native public events use the runtime's message-updater semantics, not Cloud cursors. */
-export function applyNativeEvent(
+/** The entries one frame replaced, or `undefined` when it may have touched untracked ones. */
+export type NativeEventProjection = {
+  messages: NativeSnapshotMessage[];
+  /**
+   * Entries the frame replaced, in messages order; `[]` when the frame provably returns its
+   * input unchanged. `undefined` means the frame may have touched entries it does not report,
+   * so a caller that tracks per-entry work must re-examine the whole transcript.
+   */
+  changed: NativeSnapshotMessage[] | undefined;
+};
+
+/**
+ * Project one native frame, reporting the entries a common frame touched so a caller pays for
+ * the delta instead of the transcript.
+ */
+export function projectNativeEvent(
   messages: NativeSnapshotMessage[],
   frame: NativeEvent,
   session?: NativeSnapshotSession
-): NativeSnapshotMessage[] {
-  if (!nativeDataSchemas.has(frame.type)) return messages;
+): NativeEventProjection {
+  if (!nativeDataSchemas.has(frame.type)) return { messages, changed: [] };
   const event = readNativeEvent(frame);
   const data = event.data;
   const created =
@@ -232,14 +246,15 @@ export function applyNativeEvent(
       ? event.created
       : z.number().finite().parse(event.created);
   const messageID = data['assistantMessageID'] ?? data['messageID'];
-  const append = (value: unknown) => {
+  const append = (value: unknown): NativeEventProjection => {
     const message = messageSchema.parse(value);
-    if (messages.some(item => item.message.id === message.id)) return messages;
-    return [...messages, { message, seq: frame.seq }];
+    if (messages.some(item => item.message.id === message.id))
+      return { messages, changed: undefined };
+    return { messages: [...messages, { message, seq: frame.seq }], changed: undefined };
   };
   if (frame.type === 'session.inbox.enqueued') {
     const item = recordSchema.parse(data['item']);
-    if (item['type'] !== 'user' && item['type'] !== 'synthetic') return messages;
+    if (item['type'] !== 'user' && item['type'] !== 'synthetic') return { messages, changed: [] };
     const message = messageSchema.parse({
       ...recordSchema.parse(item['payload']),
       id: data['inboxID'],
@@ -247,26 +262,35 @@ export function applyNativeEvent(
       time: { created },
     });
     if (messages.some(entry => entry.message.id === message.id))
-      return messages.map(entry =>
-        entry.message.id === message.id ? { ...entry, message } : entry
-      );
-    return [...messages, { message, seq: frame.seq }];
+      return {
+        messages: messages.map(entry =>
+          entry.message.id === message.id ? { ...entry, message } : entry
+        ),
+        changed: undefined,
+      };
+    return { messages: [...messages, { message, seq: frame.seq }], changed: undefined };
   }
   if (frame.type === 'session.inbox.cancelled')
-    return messages.filter(item => item.message.id !== data['inboxID']);
+    return {
+      messages: messages.filter(item => item.message.id !== data['inboxID']),
+      changed: undefined,
+    };
   if (frame.type === 'session.inbox.delivered') {
     const current = messages.find(item => item.message.id === data['inboxID']);
-    if (!current) return messages;
-    return [
-      ...messages.filter(item => item !== current),
-      {
-        ...current,
-        message: {
-          ...current.message,
-          time: { ...current.message.time, created: z.number().parse(created) },
+    if (!current) return { messages, changed: undefined };
+    return {
+      messages: [
+        ...messages.filter(item => item !== current),
+        {
+          ...current,
+          message: {
+            ...current.message,
+            time: { ...current.message.time, created: z.number().parse(created) },
+          },
         },
-      },
-    ];
+      ],
+      changed: undefined,
+    };
   }
   if (frame.type === 'session.agent.selected' || frame.type === 'session.model.selected') {
     const agent = frame.type === 'session.agent.selected';
@@ -320,20 +344,23 @@ export function applyNativeEvent(
   }
   if (frame.type === 'session.shell.ended') {
     const shell = recordSchema.parse(data['shell']);
-    return messages.map(item =>
-      item.message.type !== 'shell' || item.message['shellID'] !== shell['id']
-        ? item
-        : {
-            ...item,
-            message: messageSchema.parse({
-              ...item.message,
-              status: shell['status'],
-              exit: shell['exit'],
-              output: data['output'],
-              time: { ...item.message.time, completed: created },
-            }),
-          }
-    );
+    return {
+      messages: messages.map(item =>
+        item.message.type !== 'shell' || item.message['shellID'] !== shell['id']
+          ? item
+          : {
+              ...item,
+              message: messageSchema.parse({
+                ...item.message,
+                status: shell['status'],
+                exit: shell['exit'],
+                output: data['output'],
+                time: { ...item.message.time, completed: created },
+              }),
+            }
+      ),
+      changed: undefined,
+    };
   }
   if (frame.type.startsWith('session.execution.') && frame.type !== 'session.execution.started') {
     let currentAssistant = -1;
@@ -349,7 +376,7 @@ export function applyNativeEvent(
         : item
     );
     if (frame.type === 'session.execution.interrupted' && data['reason'] === 'shutdown')
-      return settled;
+      return { messages: settled, changed: undefined };
     const message = messageSchema.parse({
       id: messageIDFromEventID(event['id']),
       type: 'idle',
@@ -363,7 +390,7 @@ export function applyNativeEvent(
       metadata: event['metadata'],
       time: { created },
     });
-    return [...settled, { message, seq: frame.seq }];
+    return { messages: [...settled, { message, seq: frame.seq }], changed: undefined };
   }
   if (frame.type === 'session.synthetic')
     return append({
@@ -418,11 +445,14 @@ export function applyNativeEvent(
       time: current?.message.status === 'running' ? current.message.time : { created },
     };
     if (current?.message.status !== 'running') return append(value);
-    return messages.map(item =>
-      item !== current ? item : { ...item, message: messageSchema.parse(value) }
-    );
+    return {
+      messages: messages.map(item =>
+        item !== current ? item : { ...item, message: messageSchema.parse(value) }
+      ),
+      changed: undefined,
+    };
   }
-  if (typeof messageID !== 'string') return messages;
+  if (typeof messageID !== 'string') return { messages, changed: [] };
   if (
     frame.type === 'session.step.started' &&
     !messages.some(item => item.message.id === messageID)
@@ -446,24 +476,29 @@ export function applyNativeEvent(
           }
         : item
     );
-    return [
-      ...prior,
-      {
-        seq: frame.seq,
-        message: messageSchema.parse({
-          id: messageID,
-          type: 'assistant',
-          agent: data['agent'],
-          model: data['model'],
-          metadata: event['metadata'],
-          time: { created: data['started'] },
-          content: [],
-          ...(data['snapshot'] ? { snapshot: { start: data['snapshot'] } } : {}),
-        }),
-      },
-    ];
+    return {
+      messages: [
+        ...prior,
+        {
+          seq: frame.seq,
+          message: messageSchema.parse({
+            id: messageID,
+            type: 'assistant',
+            agent: data['agent'],
+            model: data['model'],
+            metadata: event['metadata'],
+            time: { created: data['started'] },
+            content: [],
+            ...(data['snapshot'] ? { snapshot: { start: data['snapshot'] } } : {}),
+          }),
+        },
+      ],
+      changed: undefined,
+    };
   }
-  return messages.map(item => {
+  const changed: NativeSnapshotMessage[] = [];
+  let replaced: NativeSnapshotMessage[] | undefined;
+  const update = (item: NativeSnapshotMessage): NativeSnapshotMessage => {
     if (item.message.id !== messageID || item.message.type !== 'assistant') return item;
     const message = item.message;
     if (
@@ -472,6 +507,7 @@ export function applyNativeEvent(
     )
       return item;
     let contentToKeep = message.content;
+    let deltaContent: NativeSnapshotMessage['message']['content'];
     let next: Record<string, unknown> = { ...message };
     if (frame.type === 'session.step.started') {
       next = {
@@ -557,26 +593,31 @@ export function applyNativeEvent(
         }
         const previous = content[index];
         if (!previous) return item;
-        content[index] = contentPartSchema.parse({
-          ...previous,
-          text: frame.type.endsWith('.delta')
-            ? `${previous.text ?? ''}${z.string().parse(data['delta'])}`
-            : frame.type.endsWith('.started')
-              ? ''
-              : z.string().parse(data['text']),
-          ...(frame.type.endsWith('.ended') && data['native'] !== undefined
-            ? { native: data['native'] }
-            : {}),
-          ...(kind === 'reasoning' && frame.type.endsWith('.ended')
-            ? {
-                time: {
-                  ...previous.time,
-                  created: previous.time?.created ?? created,
-                  completed: created,
-                },
-              }
-            : {}),
-        });
+        if (frame.type.endsWith('.delta')) {
+          // The stored part was validated when it entered the projection; a delta only appends
+          // to its text, so re-validating the accumulated part would cost what it grew to.
+          content[index] = {
+            ...previous,
+            text: `${previous.text ?? ''}${z.string().parse(data['delta'])}`,
+          };
+        } else {
+          content[index] = contentPartSchema.parse({
+            ...previous,
+            text: frame.type.endsWith('.started') ? '' : z.string().parse(data['text']),
+            ...(frame.type.endsWith('.ended') && data['native'] !== undefined
+              ? { native: data['native'] }
+              : {}),
+            ...(kind === 'reasoning' && frame.type.endsWith('.ended')
+              ? {
+                  time: {
+                    ...previous.time,
+                    created: previous.time?.created ?? created,
+                    completed: created,
+                  },
+                }
+              : {}),
+          });
+        }
       } else if (frame.type.startsWith('session.tool.')) {
         let index = -1;
         for (let position = content.length - 1; position >= 0; position--) {
@@ -650,8 +691,15 @@ export function applyNativeEvent(
       } else return item;
       next['content'] = content;
       contentToKeep = content;
+      if (frame.type === 'session.text.delta' || frame.type === 'session.reasoning.delta')
+        deltaContent = content;
     }
-    const validated = messageSchema.parse(next);
+    const validated =
+      deltaContent === undefined
+        ? messageSchema.parse(next)
+        : // A delta appends one string: the stored message and part were validated when they
+          // entered the projection, so re-validating them would only re-read accumulated text.
+          { ...message, content: deltaContent };
     if (contentToKeep !== undefined) validated.content = contentToKeep;
     const updated: NativeSnapshotMessage = {
       ...item,
@@ -659,7 +707,26 @@ export function applyNativeEvent(
     };
     if (frame.type === 'session.message.content.updated') delete updated.partOrdinals;
     return updated;
-  });
+  };
+  for (let index = 0; index < messages.length; index++) {
+    const item = messages[index];
+    if (!item) continue;
+    const updated = update(item);
+    if (updated === item) continue;
+    replaced ??= messages.slice();
+    replaced[index] = updated;
+    changed.push(updated);
+  }
+  return { messages: replaced ?? messages, changed };
+}
+
+/** Native public events use the runtime's message-updater semantics, not Cloud cursors. */
+export function applyNativeEvent(
+  messages: NativeSnapshotMessage[],
+  frame: NativeEvent,
+  session?: NativeSnapshotSession
+): NativeSnapshotMessage[] {
+  return projectNativeEvent(messages, frame, session).messages;
 }
 
 /** Session identity remains the portable snapshot identity, never a runtime root grant. */

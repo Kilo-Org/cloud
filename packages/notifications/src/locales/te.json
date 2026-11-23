@@ -7,6 +7,7 @@
       "spendAlert": "మీ ఖర్చుకు శ్రద్ధ అవసరం",
       "securityFinding": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం",
       "securityUpdate": "భద్రతా తనిఖీకి నవీకరణ ఉంది",
+      "agentBriefing": "మీ ఏజెంట్ బ్రీఫింగ్ సిద్ధంగా ఉంది",
       "activeAgentsGlanceable": "చురుకైన ఏజెంట్లకు నవీకరణ ఉంది"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "కొత్త భద్రతా ఫైండింగ్ ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "అత్యంత తీవ్రమైనది",
+      "high": "అధికం",
+      "medium": "మధ్యస్థం",
+      "low": "తక్కువ"
     },
     "securityFindingSlaWarning": {
       "title": "SLA హెచ్చరిక"

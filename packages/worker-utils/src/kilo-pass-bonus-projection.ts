@@ -3,6 +3,7 @@ import {
   type KiloPassTier,
   type StripeSubscriptionStatus,
 } from '@kilocode/db/schema-types';
+import { MICRODOLLARS_PER_DOLLAR, toMicrodollars } from './microdollars';
 
 export type KiloPassBonusProjectionSubscription = {
   tier: KiloPassTier;
@@ -55,7 +56,7 @@ export function getEffectiveKiloPassThreshold(
   kiloPassThresholdMicrodollars: number | null
 ): number | null {
   if (kiloPassThresholdMicrodollars === null) return null;
-  return Math.max(0, kiloPassThresholdMicrodollars - 1_000_000);
+  return Math.max(0, kiloPassThresholdMicrodollars - MICRODOLLARS_PER_DOLLAR);
 }
 
 export function computeProjectedKiloPassMonthlyCadenceBonusPercent(params: {
@@ -89,9 +90,7 @@ export function computeProjectedKiloPassBonusMicrodollars(params: {
         })
       : KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT;
 
-  return Math.round(
-    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd * bonusPercent * 1_000_000
-  );
+  return toMicrodollars(KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd * bonusPercent);
 }
 
 function getSubscriptionRecencyMillis(
@@ -104,8 +103,28 @@ function getSubscriptionRecencyMillis(
   return Number.isFinite(createdAtMillis) ? createdAtMillis : Number.NEGATIVE_INFINITY;
 }
 
-export function isKiloPassSubscriptionEndedStatus(status: string): boolean {
-  return status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired';
+/**
+ * The terminal Stripe subscription statuses this projection treats as ended.
+ *
+ * `StripeSubscriptionStatus` is an open union, because the provider may return
+ * a value a pinned SDK version does not list. A comparison against that type
+ * alone therefore cannot reject a misspelled literal. Naming the ended
+ * statuses as their own closed union gives the list a checked domain: adding a
+ * wrong or misspelled entry here fails to compile, and callers get the ended
+ * statuses as a narrowed type instead of `string`.
+ */
+export type KiloPassEndedSubscriptionStatus = 'canceled' | 'unpaid' | 'incomplete_expired';
+
+const KILO_PASS_ENDED_SUBSCRIPTION_STATUSES: readonly KiloPassEndedSubscriptionStatus[] = [
+  'canceled',
+  'unpaid',
+  'incomplete_expired',
+];
+
+export function isKiloPassSubscriptionEndedStatus(
+  status: StripeSubscriptionStatus
+): status is KiloPassEndedSubscriptionStatus {
+  return KILO_PASS_ENDED_SUBSCRIPTION_STATUSES.some(ended => ended === status);
 }
 
 function getStatusPriority(row: KiloPassSubscriptionProjectionCandidate): number {

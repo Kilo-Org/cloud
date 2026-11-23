@@ -7,6 +7,7 @@
       "spendAlert": "Kailangan ng atensyon ang iyong gastos",
       "securityFinding": "Kailangan ng atensyon ang isang security finding",
       "securityUpdate": "May update ang isang security check",
+      "agentBriefing": "Handa na ang iyong briefing ng agent",
       "activeAgentsGlanceable": "May update ang mga aktibong ahente"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Bagong security finding ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritikal",
+      "high": "Mataas",
+      "medium": "Katamtaman",
+      "low": "Mababa"
     },
     "securityFindingSlaWarning": {
       "title": "Babala sa SLA"

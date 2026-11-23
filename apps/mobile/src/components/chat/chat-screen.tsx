@@ -142,6 +142,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     models,
     isLoading: modelsLoading,
     isError: modelsFailed,
+    refetch: refetchModels,
   } = useAvailableModels(organizationId ?? undefined);
 
   const modelOptions = useSessionModelOptions({
@@ -348,6 +349,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             variant={variant}
             onModelSelect={selectModel}
             modelOptions={availableOptions}
+            isLoadingModels={modelOptions.isLoading}
+            onRetryModels={() => void refetchModels()}
             attachmentsEnabled={imagesSupported}
             organizationId={organizationId ?? undefined}
             disabled={modelsFailed && availableOptions.length === 0}

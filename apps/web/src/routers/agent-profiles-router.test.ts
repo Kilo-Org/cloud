@@ -13,16 +13,75 @@ import {
   cloud_agent_webhook_triggers,
   cli_sessions_v2,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   bindProfileToRepo,
+  createProfileWithContent,
   MASKED_SECRET_VALUE,
   MAX_OWNER_PROFILES,
+  MAX_PROFILE_COMMANDS,
+  MAX_PROFILE_COMMAND_LENGTH,
   MAX_PROFILE_KILO_COMMANDS,
   MAX_PROFILE_VARS,
+  setCommands,
 } from '@kilocode/cloud-agent-profile';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { User, Organization } from '@kilocode/db/schema';
+import type * as ProfileModule from '@kilocode/cloud-agent-profile';
 import type { PoolClient } from 'pg';
+import { DrizzleQueryError } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+
+/**
+ * The router reaches `createProfileWithContent` through the package namespace,
+ * so replacing that one export puts a driver-shaped failure at the service
+ * boundary. Every other export stays the real module, and the default
+ * implementation is the real create, so no other case in this file changes.
+ *
+ * The factory delegates through an arrow closure, so it reads no `const`
+ * binding while the mock registers: the module is first required during this
+ * file's own imports, before the declarations below have run.
+ */
+jest.mock('@kilocode/cloud-agent-profile', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/cloud-agent-profile');
+  return {
+    ...actual,
+    createProfileWithContent: (...args: Parameters<typeof realCreateProfileWithContent>) =>
+      createProfileWithContentMock(...args),
+  };
+});
+
+const realCreateProfileWithContent = jest.requireActual<typeof ProfileModule>(
+  '@kilocode/cloud-agent-profile'
+).createProfileWithContent;
+
+const createProfileWithContentMock = jest.fn(realCreateProfileWithContent);
+
+// A queued once-value that a case never reached would fire inside the next one.
+afterEach(() => {
+  createProfileWithContentMock.mockReset();
+  createProfileWithContentMock.mockImplementation(realCreateProfileWithContent);
+});
+
+/** A `pg` driver error: SQLSTATE and index name on the same object. */
+function postgresConstraintError(code: string, constraint: string): Error {
+  const error = new Error('duplicate key value violates unique constraint');
+  return Object.assign(error, { code, constraint });
+}
+
+/**
+ * The error a service call rejects with once Drizzle has wrapped a driver
+ * failure twice: the transaction wraps the failing statement, and the failing
+ * statement wraps the driver error that carries the index name.
+ */
+function wrappedConstraintError(code: string, constraint: string): DrizzleQueryError {
+  const statement = new DrizzleQueryError(
+    'insert into "agent_environment_profile_vars" ("profile_id", "key") values ($1, $2)',
+    ['profile', 'DUPLICATE_KEY'],
+    postgresConstraintError(code, constraint)
+  );
+  return new DrizzleQueryError('insert into "agent_environment_profiles"', [], statement);
+}
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -204,6 +263,456 @@ describe('Agent Profiles Router', () => {
 
         expect(dbProfile.owned_by_user_id).toBe(memberUser.id);
         expect(dbProfile.owned_by_organization_id).toBeNull();
+      });
+
+      /**
+       * Creating a profile together with its content is one transaction: the
+       * vars, the commands and the default flag land with the profile row, or
+       * a rejected payload leaves nothing behind.
+       */
+      describe('with content', () => {
+        /** Every var row held by any profile this owner has. */
+        async function countOwnerVars(userId: string): Promise<number> {
+          const rows = await db
+            .select({ id: agent_environment_profile_vars.id })
+            .from(agent_environment_profile_vars)
+            .innerJoin(
+              agent_environment_profiles,
+              eq(agent_environment_profile_vars.profile_id, agent_environment_profiles.id)
+            )
+            .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+          return rows.length;
+        }
+
+        /** The var rows one profile holds, keyed by nothing else. */
+        async function countProfileVars(profileId: string): Promise<number> {
+          const rows = await db
+            .select({ id: agent_environment_profile_vars.id })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, profileId));
+          return rows.length;
+        }
+
+        test('stores vars, commands and the default flag in one create', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id } = await caller.agentProfiles.create({
+            name: 'Composite Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              { key: 'SECRET_VAR', value: 'the-plaintext', isSecret: true },
+            ],
+            commands: ['npm ci', 'npm run build'],
+            setAsDefault: true,
+          });
+
+          const profile = await caller.agentProfiles.get({ profileId: id });
+          expect(profile.vars.map(variable => variable.key)).toEqual(['PLAIN_VAR', 'SECRET_VAR']);
+          expect(profile.vars.find(variable => variable.key === 'PLAIN_VAR')?.value).toBe(
+            'plain-value'
+          );
+          expect(profile.vars.find(variable => variable.key === 'SECRET_VAR')?.value).toBe('***');
+          expect(profile.commands.map(row => row.command)).toEqual(['npm ci', 'npm run build']);
+          expect(profile.isDefault).toBe(true);
+
+          const storedSecret = await db
+            .select({
+              value: agent_environment_profile_vars.value,
+              isSecret: agent_environment_profile_vars.is_secret,
+            })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, id));
+          const secretRow = storedSecret.find(row => row.isSecret);
+          expect(secretRow).toBeDefined();
+          expect(secretRow?.value).not.toBe('the-plaintext');
+          expect(() => JSON.parse(secretRow?.value ?? '')).not.toThrow();
+          expect(JSON.parse(secretRow?.value ?? '{}')).toMatchObject({
+            algorithm: expect.any(String),
+            encryptedData: expect.any(String),
+            encryptedDEK: expect.any(String),
+          });
+        });
+
+        test('leaves no profile when a var key is invalid or duplicated', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Invalid Key Profile',
+              vars: [
+                { key: 'GOOD_KEY', value: 'value', isSecret: false },
+                { key: 'bad-key', value: 'value', isSecret: false },
+              ],
+            })
+          ).rejects.toThrow('Invalid environment variable key');
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Duplicate Key Profile',
+              vars: [
+                { key: 'SAME_KEY', value: 'first', isSecret: false },
+                { key: 'SAME_KEY', value: 'second', isSecret: true },
+              ],
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Duplicate environment variable key',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Invalid Key Profile')).toBe(false);
+          expect(listed.some(profile => profile.name === 'Duplicate Key Profile')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('stores a network secret with its delivery mode and policy', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id } = await caller.agentProfiles.create({
+            name: 'Network Secret Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              {
+                key: 'SERVICE_TOKEN',
+                value: 'the-network-plaintext',
+                isSecret: true,
+                networkSecret: { allowedHosts: ['registry.example.com'], locations: ['header'] },
+              },
+            ],
+          });
+
+          const rows = await db
+            .select({
+              key: agent_environment_profile_vars.key,
+              value: agent_environment_profile_vars.value,
+              isSecret: agent_environment_profile_vars.is_secret,
+              delivery: agent_environment_profile_vars.delivery,
+              allowedHosts: agent_environment_profile_vars.allowed_hosts,
+              locations: agent_environment_profile_vars.injection_locations,
+            })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, id));
+
+          const networkRow = rows.find(row => row.key === 'SERVICE_TOKEN');
+          expect(networkRow).toMatchObject({
+            isSecret: true,
+            delivery: 'network',
+            allowedHosts: ['registry.example.com'],
+            locations: ['header'],
+          });
+          expect(networkRow?.value).not.toBe('the-network-plaintext');
+          expect(JSON.parse(networkRow?.value ?? '{}')).toMatchObject({
+            network: {
+              algorithm: 'rsa-aes-256-gcm',
+              encryptedData: expect.any(String),
+              encryptedDEK: expect.any(String),
+            },
+          });
+
+          // The env variable of the same payload keeps env delivery.
+          expect(rows.find(row => row.key === 'PLAIN_VAR')).toMatchObject({
+            delivery: 'env',
+            allowedHosts: null,
+            locations: null,
+          });
+
+          const profile = await caller.agentProfiles.get({ profileId: id });
+          expect(profile.vars.find(variable => variable.key === 'SERVICE_TOKEN')?.value).toBe(
+            '***'
+          );
+          expect(profile.vars.find(variable => variable.key === 'SERVICE_TOKEN')?.delivery).toBe(
+            'network'
+          );
+        });
+
+        test('refuses a create past the network secret cap without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+          // The environment var cap is higher than the network secret cap, so a
+          // payload this long reaches the delivery rule instead of the var cap.
+          const tooManySecrets = Array.from({ length: 21 }, (_, index) => ({
+            key: `SECRET_${String(index)}`,
+            value: 'value',
+            isSecret: true,
+            networkSecret: {
+              allowedHosts: ['registry.example.com'],
+              locations: ['header' as const],
+            },
+          }));
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Over Cap Network Secrets',
+              vars: tooManySecrets,
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Maximum 20 network secrets allowed',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Network Secrets')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('leaves the previous default intact when a var write fails', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: previousDefaultId } = await caller.agentProfiles.create({
+            name: 'Previous Default',
+            setAsDefault: true,
+          });
+
+          // A secret with no configured public key throws after the profile row
+          // is inserted, so only the transaction rollback can keep the old state.
+          await expect(
+            createProfileWithContent(db, '', { type: 'user', id: ownerUser.id }, ownerUser.id, {
+              name: 'Broken Default',
+              vars: [{ key: 'SECRET_VAR', value: 'the-plaintext', isSecret: true }],
+              setAsDefault: true,
+            })
+          ).rejects.toThrow('Agent environment encryption key not configured');
+
+          const previousDefault = await caller.agentProfiles.get({
+            profileId: previousDefaultId,
+          });
+          expect(previousDefault.isDefault).toBe(true);
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Broken Default')).toBe(false);
+        });
+
+        test('refuses an over-cap var list without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+          const overCapVars = Array.from({ length: MAX_PROFILE_VARS + 1 }, (_, index) => ({
+            key: `VAR_${String(index)}`,
+            value: 'value',
+            isSecret: false,
+          }));
+
+          // The routing schema bounds the payload, so a list this long never
+          // reaches the service through the procedure.
+          await expect(
+            caller.agentProfiles.create({ name: 'Over Cap Profile', vars: overCapVars })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // The service holds the same cap for callers that bypass the schema.
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Over Cap Profile', vars: overCapVars }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Profiles are limited to ${String(MAX_PROFILE_VARS)} variables`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Profile')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('refuses an over-cap command list without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const overCapCommands = Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci');
+
+          // The routing schema bounds the payload, so a list this long never
+          // reaches the service through the procedure.
+          await expect(
+            caller.agentProfiles.create({ name: 'Over Cap Commands', commands: overCapCommands })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // The service holds the same cap for callers that bypass the schema.
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Over Cap Commands', commands: overCapCommands }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Profiles are limited to ${String(MAX_PROFILE_COMMANDS)} setup commands`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Commands')).toBe(false);
+        });
+
+        test('refuses a command past the length cap without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const tooLong = ['x'.repeat(MAX_PROFILE_COMMAND_LENGTH + 1)];
+
+          await expect(
+            caller.agentProfiles.create({ name: 'Long Command', commands: tooLong })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Long Command', commands: tooLong }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Setup commands are limited to ${String(MAX_PROFILE_COMMAND_LENGTH)} characters`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Long Command')).toBe(false);
+        });
+
+        test('refuses a duplicate name with CONFLICT and leaves the first profile intact', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: firstId } = await caller.agentProfiles.create({
+            name: 'Duplicate Name Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              { key: 'OTHER_VAR', value: 'other-value', isSecret: false },
+            ],
+            commands: ['npm ci'],
+          });
+          const varsBefore = await countProfileVars(firstId);
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Duplicate Name Profile',
+              vars: [{ key: 'DIFFERENT_VAR', value: 'different-value', isSecret: false }],
+              commands: ['npm run build'],
+              setAsDefault: true,
+            })
+          ).rejects.toMatchObject({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.filter(profile => profile.name === 'Duplicate Name Profile')).toHaveLength(
+            1
+          );
+          expect(await countProfileVars(firstId)).toBe(varsBefore);
+
+          const firstProfile = await caller.agentProfiles.get({ profileId: firstId });
+          expect(firstProfile.vars.map(variable => variable.key)).toEqual([
+            'OTHER_VAR',
+            'PLAIN_VAR',
+          ]);
+          expect(firstProfile.commands.map(row => row.command)).toEqual(['npm ci']);
+        });
+
+        test('replaces an existing default when a create sets the default', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: previousDefaultId } = await caller.agentProfiles.create({
+            name: 'Existing Default',
+            setAsDefault: true,
+          });
+
+          const { id: newDefaultId } = await caller.agentProfiles.create({
+            name: 'New Default',
+            setAsDefault: true,
+          });
+
+          // One default per owner, enforced by the partial unique index; the
+          // count asserts the create's clear-then-set left exactly one.
+          const defaults = await db
+            .select({ id: agent_environment_profiles.id })
+            .from(agent_environment_profiles)
+            .where(
+              and(
+                eq(agent_environment_profiles.owned_by_user_id, ownerUser.id),
+                eq(agent_environment_profiles.is_default, true)
+              )
+            );
+          expect(defaults.map(row => row.id)).toEqual([newDefaultId]);
+
+          const listed = await caller.agentProfiles.list({});
+          const defaultProfiles = listed.filter(profile => profile.isDefault);
+          expect(defaultProfiles).toHaveLength(1);
+          expect(defaultProfiles[0]?.id).toBe(newDefaultId);
+
+          const previousDefault = await caller.agentProfiles.get({ profileId: previousDefaultId });
+          expect(previousDefault.isDefault).toBe(false);
+        });
+      });
+
+      /**
+       * A create answers a CONFLICT whose sentence names the real problem. Only
+       * the per-owner profile name index earns the duplicate-name sentence;
+       * every other 23505 on this path must keep a different sentence, or the
+       * dialog tells the user to rename a profile that collided on a variable
+       * key.
+       *
+       * The var-key index cannot collide through the procedure: the payload
+       * rules reject a duplicate key, and a new profile holds no other rows. The
+       * refusal is injected at the service boundary in the shape Drizzle throws,
+       * with the index name two `.cause` levels below the top error.
+       */
+      describe('constraint refusals', () => {
+        async function ownerProfileIds(userId: string): Promise<string[]> {
+          const rows = await db
+            .select({ id: agent_environment_profiles.id })
+            .from(agent_environment_profiles)
+            .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+          return rows.map(row => row.id);
+        }
+
+        test('answers a non-name unique violation without the name sentence', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const profilesBefore = await ownerProfileIds(ownerUser.id);
+
+          createProfileWithContentMock.mockRejectedValueOnce(
+            wrappedConstraintError('23505', 'UQ_agent_env_profile_vars_profile_key')
+          );
+
+          const refusal = await caller.agentProfiles
+            .create({
+              name: 'Var Key Collision',
+              vars: [{ key: 'API_KEY', value: 'value', isSecret: false }],
+            })
+            .then(
+              () => null,
+              (error: unknown) => error
+            );
+
+          expect(refusal).toBeInstanceOf(TRPCError);
+          if (!(refusal instanceof TRPCError)) throw new Error('create must reject a TRPCError');
+
+          // Pre-fix every 23505 answered the duplicate-name sentence, which sent
+          // the user to rename a profile that collided on a variable key.
+          expect(refusal.code).toBe('CONFLICT');
+          expect(refusal.message.length).toBeGreaterThan(0);
+          expect(refusal.message).not.toBe('A profile with this name already exists');
+
+          expect(await ownerProfileIds(ownerUser.id)).toEqual(profilesBefore);
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Var Key Collision')).toBe(false);
+        });
+
+        test('keeps the duplicate-name sentence for the profile name index', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          createProfileWithContentMock.mockRejectedValueOnce(
+            wrappedConstraintError('23505', 'UQ_agent_env_profiles_user_name')
+          );
+
+          await expect(
+            caller.agentProfiles.create({ name: 'Name Collision' })
+          ).rejects.toMatchObject({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
+        });
       });
     });
 
@@ -1070,6 +1579,50 @@ describe('Agent Profiles Router', () => {
         const result = await caller.agentProfiles.get({ profileId });
 
         expect(result.commands).toHaveLength(0);
+      });
+
+      test('refuses an over-cap list at the schema and keeps the stored commands', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Cap Commands Test' });
+
+        await caller.agentProfiles.setCommands({ profileId, commands: ['keep me'] });
+
+        const overCap = Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci');
+        await expect(
+          caller.agentProfiles.setCommands({ profileId, commands: overCap })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+        // A request cannot spend its outer bound on rows that store nothing.
+        const padded = Array.from({ length: MAX_PROFILE_COMMANDS + 2 }, () => '');
+        await expect(
+          caller.agentProfiles.setCommands({ profileId, commands: padded })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+        // Bypassing the schema puts the same payload before the service, which
+        // refuses it before the delete so the stored list survives.
+        await expect(
+          setCommands(db, profileId, overCap, { type: 'user', id: ownerUser.id })
+        ).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: `Profiles are limited to ${String(MAX_PROFILE_COMMANDS)} setup commands`,
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.commands.map(row => row.command)).toEqual(['keep me']);
+      });
+
+      test('accepts a full list that also carries a blank row', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Blank At Cap Test' });
+
+        // A stored list can hold a row from before the service dropped blanks,
+        // so the widest shape a client can re-send is the cap plus the row an
+        // edit appends. The blank row is dropped, and the real commands fit.
+        const atCap = Array.from({ length: MAX_PROFILE_COMMANDS }, (_, index) => `cmd ${index}`);
+        await caller.agentProfiles.setCommands({ profileId, commands: [...atCap, ''] });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.commands.map(row => row.command)).toEqual(atCap);
       });
     });
 

@@ -4,9 +4,10 @@ import { captureMessage } from '@sentry/nextjs';
 import {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS,
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
+import { z } from 'zod';
+import { countAdmissionCondition } from './native-admission-counters';
 
 /**
  * Google Play Integrity verifier.
@@ -35,9 +36,41 @@ const accessTokenCache = new Map<
   { token: string; refreshAt: number; inflight?: Promise<string> }
 >();
 
+/**
+ * Parsed Play Integrity service-account document, memoized per raw credential
+ * string. The document is a process constant until the configured string
+ * changes, and re-parsing it only to read `client_email` makes every
+ * cached-token admission pay a full-document parse.
+ */
+const serviceAccountKeySchema = z.object({
+  client_email: z.string(),
+  private_key: z.string(),
+  token_uri: z.string().nullish(),
+});
+
+type ServiceAccountKey = z.infer<typeof serviceAccountKeySchema>;
+
+let serviceAccountKeyCache: { raw: string; parsed: ServiceAccountKey } | null = null;
+
+/**
+ * Parse the credential document once per raw string. A failed parse is not
+ * memoized, so a malformed document throws on every call exactly as an
+ * unmemoized parse would.
+ */
+function parseServiceAccountKey(raw: string): ServiceAccountKey {
+  if (serviceAccountKeyCache?.raw === raw) {
+    return serviceAccountKeyCache.parsed;
+  }
+
+  const parsed = serviceAccountKeySchema.parse(JSON.parse(raw));
+  serviceAccountKeyCache = { raw, parsed };
+  return parsed;
+}
+
 /** Exported for tests: clear the cache so each test exercises a cold start. */
 export function resetAccessTokenCacheForTests(): void {
   accessTokenCache.clear();
+  serviceAccountKeyCache = null;
 }
 
 // Required integrity labels per the plan
@@ -221,36 +254,32 @@ interface PlayIntegrityConfig {
 }
 
 function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
-  const projectNumber = GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
-  const serviceAccountKey = GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
-
-  if (!projectNumber || !serviceAccountKey || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME) {
+  const expectedCertDigests = parseCertDigestAllowlist();
+  if (isCredentialConfigMissing() || expectedCertDigests.length === 0) {
     return null;
   }
 
-  const expectedCertDigests = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS
-    ? GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS.split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-    : [];
-
   return {
-    serviceAccountKey,
+    serviceAccountKey: GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
     expectedPackageName: GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
     expectedCertDigests,
   };
 }
 
-/**
- * Verify a Play Integrity verdict token.
- *
- * Binds the token to the server-issued challenge via the nonce field.
- * Requires MEETS_DEVICE_INTEGRITY in the deviceRecognitionVerdict array.
- * Verifies package name and signing certificate digest.
- *
- * Throws on infrastructure faults (network errors, auth failures) so the
- * admission layer can surface them as 5xx.
- */
+/** True when a credential input the verifier cannot work without is absent. */
+function isCredentialConfigMissing(): boolean {
+  return !GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
+}
+
+/** The configured signing-certificate digests, or an empty list when unset. */
+function parseCertDigestAllowlist(): string[] {
+  return (
+    GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS?.split(',')
+      .map(s => s.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
 export type PlayIntegrityResult =
   | { ok: true; packageName: string }
   | { ok: false; error: PlayIntegrityError; diagnostics: PlayIntegrityDiagnostics };
@@ -265,6 +294,16 @@ const UNPARSED_VERDICT_DIAGNOSTICS: PlayIntegrityDiagnostics = {
   deviceIntegrity: 'missing',
 };
 
+/**
+ * Verify a Play Integrity verdict token.
+ *
+ * Binds the token to the server-issued challenge via the nonce field.
+ * Requires MEETS_DEVICE_INTEGRITY in the deviceRecognitionVerdict array.
+ * Verifies package name and signing certificate digest.
+ *
+ * Throws on infrastructure faults (network errors, auth failures) so the
+ * admission layer can surface them as 5xx.
+ */
 export async function verifyPlayIntegrity(
   integrityToken: string,
   challenge: string
@@ -272,16 +311,22 @@ export async function verifyPlayIntegrity(
   const config = getPlayIntegrityConfig();
 
   if (!config) {
-    captureMessage('google_play_integrity_missing_credentials');
-    // Fail-closed: missing credentials in production means we cannot verify.
-    throw new Error('Google Play Integrity credentials not configured');
+    // Report the credential inputs first: they are what the verifier cannot
+    // work without, so a coincident allowlist gap must not hide them.
+    if (isCredentialConfigMissing()) {
+      captureMessage('google_play_integrity_missing_credentials');
+      // Fail-closed: missing credentials in production means we cannot verify.
+      throw new Error('Google Play Integrity credentials not configured');
+    }
+    captureMessage('play_integrity_cert_digest_allowlist_missing');
+    throw new Error('Google Play Integrity certificate allowlist not configured');
   }
 
   // Decode and verify the integrity token
   let accessToken: string;
   let clientEmail: string;
   try {
-    const saKey = JSON.parse(config.serviceAccountKey);
+    const saKey = parseServiceAccountKey(config.serviceAccountKey);
     clientEmail = saKey.client_email;
     accessToken = await getAccessToken(
       clientEmail,
@@ -346,12 +391,10 @@ export async function verifyPlayIntegrity(
 
   const payload = result.tokenPayloadExternal;
   if (!payload) {
+    countAdmissionCondition('play_integrity_invalid_token');
     return { ok: false, error: 'INVALID_TOKEN', diagnostics: UNPARSED_VERDICT_DIAGNOSTICS };
   }
 
-  // The classification every refusal below reports. Built once from the parsed
-  // verdict, so the record says which fixed bucket the proof landed in and
-  // never carries Google's raw strings or the digest itself.
   const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const diagnostics: PlayIntegrityDiagnostics = {
     appRecognition: classifyAppRecognition(payload.appIntegrity?.appRecognitionVerdict),
@@ -367,13 +410,13 @@ export async function verifyPlayIntegrity(
   // against the same digest, so accepting either binds the same challenge.
   const binding = payload.requestDetails?.requestHash ?? payload.requestDetails?.nonce;
   if (!binding) {
-    captureMessage('play_integrity_missing_request_hash');
+    countAdmissionCondition('play_integrity_missing_request_hash');
     return { ok: false, error: 'NONCE_MISMATCH', diagnostics };
   }
 
   const expectedBinding = createHash('sha256').update(challenge, 'utf8').digest('base64');
   if (binding !== expectedBinding) {
-    captureMessage('play_integrity_request_hash_mismatch');
+    countAdmissionCondition('play_integrity_request_hash_mismatch');
     return { ok: false, error: 'NONCE_MISMATCH', diagnostics };
   }
 
@@ -381,16 +424,14 @@ export async function verifyPlayIntegrity(
   const actualPackageName =
     payload.requestDetails?.requestPackageName ?? payload.appIntegrity?.packageName;
   if (!actualPackageName || actualPackageName !== config.expectedPackageName) {
-    captureMessage(
-      `play_integrity_package_mismatch: expected=${config.expectedPackageName} got=${actualPackageName ?? 'null'}`
-    );
+    countAdmissionCondition('play_integrity_package_mismatch');
     return { ok: false, error: 'PACKAGE_MISMATCH', diagnostics };
   }
 
   // ── App recognition ─────────────────────────────────────────────────────
   const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
   if (appVerdict !== PLAY_RECOGNIZED) {
-    captureMessage(`play_integrity_app_unrecognized: ${appVerdict ?? 'null'}`);
+    countAdmissionCondition('play_integrity_app_unrecognized');
     return { ok: false, error: 'APP_NOT_RECOGNIZED', diagnostics };
   }
 
@@ -399,22 +440,21 @@ export async function verifyPlayIntegrity(
     certDigests.some(actual => actual.toLowerCase() === expected.toLowerCase())
   );
   if (!hasMatch) {
-    captureMessage(
-      `play_integrity_cert_digest_mismatch: expected=[${config.expectedCertDigests.join(',')}] got=[${certDigests.join(',')}]`
-    );
+    countAdmissionCondition('play_integrity_cert_digest_mismatch');
     return { ok: false, error: 'CERT_DIGEST_MISMATCH', diagnostics };
   }
 
   // ── Device integrity: must contain MEETS_DEVICE_INTEGRITY in the array ──
   const deviceVerdicts = payload.deviceIntegrity?.deviceRecognitionVerdict;
   if (!deviceVerdicts || !Array.isArray(deviceVerdicts) || deviceVerdicts.length === 0) {
+    // Same refusal reason as an array without the required label: the verdict
+    // did not establish device integrity, so both count on one metric.
+    countAdmissionCondition('play_integrity_device_verdict_insufficient');
     return { ok: false, error: 'DEVICE_NOT_RECOGNIZED', diagnostics };
   }
 
   if (!deviceVerdicts.includes(REQUIRED_INTEGRITY_LABEL)) {
-    captureMessage(
-      `play_integrity_device_verdict_insufficient: got=[${deviceVerdicts.join(',')}] needed=${REQUIRED_INTEGRITY_LABEL}`
-    );
+    countAdmissionCondition('play_integrity_device_verdict_insufficient');
     return { ok: false, error: 'DEVICE_NOT_RECOGNIZED', diagnostics };
   }
 

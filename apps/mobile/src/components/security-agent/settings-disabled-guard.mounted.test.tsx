@@ -120,11 +120,23 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// The deferred swap has its own suite; these screens assert the bounce's
+// destination, so it is dispatched straight into the router mock.
+vi.mock('@/lib/navigation/settled-replace', () => {
+  // One stable object, like the real memoized hook, so the focus effect these
+  // screens register is not torn down on every render.
+  const settled = {
+    replace: (href: unknown) => {
+      router.replace(href);
+    },
+  };
+  return { useSettledReplace: () => settled };
+});
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
-  useRetrySecurityAgentCapability: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAgentConfig: () => config,
   useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));

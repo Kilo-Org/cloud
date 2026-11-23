@@ -52,6 +52,7 @@ import type {
   SessionInfo,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
+  UnreadableQuestionState,
   UnreadablePermissionState,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
@@ -136,6 +137,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getUnreadableQuestions: jest.fn<readonly UnreadableQuestionState[], []>(() => []),
     getUnreadablePermissions: jest.fn<readonly UnreadablePermissionState[], []>(() => []),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
@@ -2953,6 +2955,43 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual({
         source: 'cli-catalog',
         selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      });
+    });
+
+    it('keeps a cli-catalog override through an empty-catalog error that retains the catalog', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
       });
     });
 
@@ -6320,9 +6359,12 @@ describe('createSessionManager', () => {
       const childHydrationState = atomValue<
         (childSessionId: string) => { status: string; message?: string }
       >(config.store, mgr.atoms.childSessionHydrationState);
-      expect(childHydrationState('child-retry')).toEqual(
-        expect.objectContaining({ status: 'error' })
-      );
+      // A thrown read carries no typed history kind: the state names no kind.
+      expect(childHydrationState('child-retry')).toEqual({
+        status: 'error',
+        kind: null,
+        message: 'Connection lost. Please retry in a moment.',
+      });
 
       await mgr.hydrateChildSession(kiloId('child-retry'));
 
@@ -6405,6 +6447,7 @@ describe('createSessionManager', () => {
       );
       expect(state('child-null')).toEqual({
         status: 'error',
+        kind: null,
         message: 'This session is no longer available.',
       });
     });
@@ -6423,8 +6466,36 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+      // The machine kind decides the Retry, and the canonical history copy
+      // replaces the generic one for the same read.
+      expect(state('child-fail')).toEqual({
+        status: 'error',
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
     });
+
+    it.each(['invalid_data', 'too_large'] as const)(
+      'names a terminal %s first child page as unavailable history',
+      async kind => {
+        const fetchSnapshotPage = createPageFetchMock(async () => ({ kind }));
+        const config = createMockConfig({ fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-root'));
+        await mgr.hydrateChildSession(kiloId(`child-${kind}`));
+
+        const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+        expect(state(`child-${kind}`)).toEqual({
+          status: 'error',
+          kind,
+          message: sessionSnapshotFailureMessage(kind).message,
+        });
+      }
+    );
 
     it('clears a stored first-page hydration error when a live child chat event arrives', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () => ({
@@ -8080,6 +8151,44 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onQuestionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+    });
+
+    it('tracks unreadable question notices from the service state', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      const unreadable = jest.fn<readonly { requestId: string }[], []>(() => []);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getUnreadableQuestions.mockImplementation(unreadable);
+      try {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue(config.store, mgr.atoms.unreadableQuestions)).toEqual([]);
+
+        unreadable.mockReturnValue([{ requestId: 'req-1' }, { requestId: 'req-2' }]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadableQuestions)).toEqual([
+          { requestId: 'req-1' },
+          { requestId: 'req-2' },
+        ]);
+
+        // A fresh array with the same ids in the same order keeps the atom
+        // identity, so unrelated state notifications do not repaint the notice.
+        unreadable.mockImplementation(() => [{ requestId: 'req-1' }, { requestId: 'req-2' }]);
+        const stable = atomValue(config.store, mgr.atoms.unreadableQuestions);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadableQuestions)).toBe(stable);
+
+        unreadable.mockReturnValue([]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadableQuestions)).toEqual([]);
+        mgr.destroy();
+      } finally {
+        mockSession.state.getUnreadableQuestions.mockImplementation(() => []);
+      }
     });
 
     it('tracks unreadable permission notices from the service state', async () => {

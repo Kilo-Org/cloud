@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 
 import { runIfMain } from '../../../tools/lib/entry-point.mjs';
+import { formatSingleQuotedLiteral } from '../../../tools/lib/literal.mjs';
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS_PATH = join(mobileDir, 'src', 'global.css');
@@ -74,11 +75,16 @@ function collectDeclarations(rule) {
   return declarations;
 }
 
+/** One definition of the rule both theme lookups select: the `:root` rule. */
+function isThemeRootRule(node) {
+  return node.type === 'rule' && node.selector === ':root';
+}
+
 export function readThemeColors() {
   const css = readFileSync(CSS_PATH, 'utf8');
   const root = postcss.parse(css);
 
-  const lightRule = root.nodes.find(node => node.type === 'rule' && node.selector === ':root');
+  const lightRule = root.nodes.find(isThemeRootRule);
   if (!lightRule) {
     throw new Error(`${CSS_PATH}: missing top-level :root block`);
   }
@@ -91,7 +97,7 @@ export function readThemeColors() {
         /prefers-color-scheme\s*:\s*dark/.test(node.params)
     )
     .flatMap(media => media.nodes ?? [])
-    .find(node => node.type === 'rule' && node.selector === ':root');
+    .find(isThemeRootRule);
   if (!darkRule) {
     throw new Error(`${CSS_PATH}: missing :root block inside @media (prefers-color-scheme: dark)`);
   }
@@ -107,29 +113,13 @@ function normalizeColorValue(value) {
   return value.startsWith('#') ? value.toUpperCase() : value;
 }
 
-/**
- * Encodes a declaration value as a single-quoted string literal that holds the
- * value as data. JSON.stringify supplies the escaping for quotes, backslashes
- * and control characters; its double quotes are unescaped and single quotes
- * escaped, so the literal keeps the repository's single-quote style.
- */
-function formatValueSource(value) {
-  const unquote = String.raw`\"`;
-  const quote = String.raw`\'`;
-  const escaped = JSON.stringify(value)
-    .slice(1, -1)
-    .replaceAll(unquote, '"')
-    .replaceAll(`'`, quote);
-  return `'${escaped}'`;
-}
-
 export function formatObject(declarations) {
   const lines = TOKEN_KEYS.map(([jsKey, cssVar]) => {
     const value = declarations[cssVar];
     if (value === undefined) {
       throw new Error(`${CSS_PATH}: missing ${cssVar} declaration`);
     }
-    return `  ${jsKey}: ${formatValueSource(value)},`;
+    return `  ${jsKey}: ${formatSingleQuotedLiteral(value)},`;
   });
   return `{\n${lines.join('\n')}\n} as const;`;
 }

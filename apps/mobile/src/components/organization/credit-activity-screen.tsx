@@ -20,7 +20,7 @@ import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
-import { formatDate, formatPrefixedMoney } from '@/lib/format';
+import { formatDate, formatSignedPrefixedMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
@@ -100,9 +100,7 @@ const CreditRow = memo(function CreditRow({
           {/* The sign and the symbol are neutral characters, which a
               right-to-left paragraph may move behind the number; the isolate
               keeps the amount in its own left-to-right run. */}
-          {isolateLtrBidiText(
-            `${isPositive ? '+' : '-'}${formatPrefixedMoney(Math.abs(amount), i18n.language)}`
-          )}
+          {isolateLtrBidiText(formatSignedPrefixedMoney(amount, i18n.language))}
         </Text>
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -263,7 +261,7 @@ export function OrganizationCreditActivityScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="caption" className="text-center">
-              {t('common.couldnTLoadMore')}
+              {t('common.couldNotLoadMore')}
             </Text>
             <Button
               variant="outline"

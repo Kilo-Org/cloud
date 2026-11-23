@@ -6,7 +6,13 @@ import { WriteToolCard, WriteToolCardBody } from './write-tool-card';
 import * as React from 'react';
 import type * as ReactI18next from 'react-i18next';
 
-vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+// `SelectableText` renders its read-only `TextInput` on iOS only; the walker
+// below invokes it directly, so the mock names the platform the assertions read.
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  TextInput: 'TextInput',
+}));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
@@ -34,6 +40,7 @@ vi.mock('react', async importOriginal => {
   return {
     default: actual,
     ...actual,
+    useMemo: <T>(fn: () => T): T => fn(),
     // `SelectableText` is invoked directly by the pure walker, outside a React
     // render, so the real `useContext` would throw on the null dispatcher.
     useContext: () => undefined,

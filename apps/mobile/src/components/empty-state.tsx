@@ -33,6 +33,18 @@ type EmptyStateProps = {
   /** The state's way out: one `StateAction`, in the shared state-action style
    *  and directly under the copy at the slot's one fixed gap. See `StateAction`. */
   action?: ReactNode;
+  /**
+   * Where the stack sits on its horizontal axis. `center` (the default) is the
+   * state that is the whole surface: the disc, the copy and the action share one
+   * centre line. `start` is the state that is a block inside a section, under a
+   * section label and above or below start-aligned rows: it then lines up with
+   * the label and the rows it belongs to, and its copy reads ragged-right at the
+   * start edge instead of being centred between them. The vertical rhythm, the
+   * reading cap and the disc are the same in both, except that a `top`-placed
+   * start state takes no top pin: its section already spaces it from the label
+   * above, so a call site never cancels that air with its own class.
+   */
+  align?: 'center' | 'start';
   /** Where a state sits, by what shares its surface: `center` (the default) when
    *  the state is the whole surface — with its one action and nothing else above
    *  it — and `top` only when it sits under intro text or controls. `center`
@@ -101,6 +113,7 @@ function EmptyStateBody({
   description,
   className,
   action,
+  align = 'center',
   placement,
   inset = placement === 'center' ? 'gutter' : 'none',
   compact: compactOverride,
@@ -112,11 +125,12 @@ function EmptyStateBody({
   compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
-  // The light disc is the card surface and the muted glyph reads on it. The
-  // dark disc is the filled neutral instead, where the muted glyph sits dimmer
-  // than its light counterpart, so dark takes the secondary ink and the mark
-  // stays as visible as it is in light. An explicit `iconColor` still wins.
   const stateIconInk = useColorScheme() === 'dark' ? colors.ink2 : colors.mutedForeground;
+  // A start-aligned state is a block inside a section, so its stack takes the
+  // section's own start edge and its copy reads from that edge; everything else
+  // about it — the disc, the gaps, the reading cap — stays the centered form's.
+  const stacked = align === 'start' ? 'items-start' : 'items-center';
+  const copyAlign = align === 'center' ? 'text-center' : undefined;
   // A centered state is handed the band between the page header and the fixed
   // bottom tab bar, and in a short landscape window that band is shorter than
   // the full stack: on a 411dp-tall window the band is ~120dp — ~49dp once the
@@ -140,26 +154,39 @@ function EmptyStateBody({
   const content = (
     <View
       className={cn(
-        'items-center',
+        stacked,
         inset === 'gutter' && STATE_GUTTER_CLASS,
-        placement === 'top' && !compact && 'pt-16',
+        // The top pin is the space a `top` state takes from the surface above
+        // it. A start-aligned state is a block inside a section that already
+        // spaces it from the label, so it takes none: the section's gap is the
+        // only air, and the call site never cancels it with its own class.
+        placement === 'top' && !compact && align === 'center' && 'pt-16',
         className
       )}
     >
-      <View className={cn('items-center', compact ? 'gap-2' : 'gap-4')}>
+      <View className={cn(stacked, compact ? 'gap-2' : 'gap-4')}>
         {compact ? null : (
           <View className={cn('items-center justify-center', iconContainerClassName)}>
             <Icon size={iconSize} color={iconColor ?? stateIconInk} strokeWidth={iconStrokeWidth} />
           </View>
         )}
-        <View className="items-center gap-1">
+        {/* The reading measure is the full form's alone. In the compact form
+            the band is already short, so the cap would add a line exactly where
+            vertical room is what the compact form buys; a landscape window's
+            content box is wider than the cap anyway. */}
+        <View className={cn(stacked, 'gap-1', !compact && 'max-w-sm')}>
           <Text
             variant="large"
-            className={cn('text-center', compact ? compactTitleClassName : undefined)}
+            className={cn(copyAlign, compact ? compactTitleClassName : undefined)}
+            // A paragraph with no alignment class takes the start edge of the
+            // interface direction, in a left-to-right UI and in a right-to-left
+            // one; the centered form names that centre explicitly instead. The
+            // build drops the logical `text-start` utility, so the start form
+            // asks for nothing rather than a class that would not paint.
             accessibilityRole={titleAccessibilityRole}
-            // A centered title is short and often narrower than the words allow:
-            // Android's default greedy wrap leaves the last word alone on its own
-            // line (the compact connect-gate title did). Balanced splits the title
+            // A short title is often narrower than the words allow: Android's
+            // default greedy wrap leaves the last word alone on its own line
+            // (the compact connect-gate title did). Balanced splits the title
             // into even lines instead. Android-only; iOS ignores the prop.
             textBreakStrategy="balanced"
           >
@@ -168,7 +195,14 @@ function EmptyStateBody({
           {
             // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
             typeof description === 'string' ? (
-              <Text variant="muted" className="text-center">
+              <Text
+                variant="muted"
+                className={copyAlign}
+                // The full form's block is capped at `max-w-sm`, so a long
+                // sentence wraps there; greedy wrap would leave one word alone
+                // on the second line. Android-only; iOS ignores the prop.
+                textBreakStrategy="balanced"
+              >
                 {description}
               </Text>
             ) : (
@@ -206,14 +240,28 @@ type StateActionProps = {
   accessibilityLabel?: string;
   /** Extra context a name cannot carry, e.g. what the retry re-reads. */
   accessibilityHint?: string;
+  /** How the action reads where it sits. `primary` is a state surface's one way out
+   *  (the default). `quiet` is the same 48pt compact frame as an outlined control,
+   *  for a content card on a screen that already owns its primary action: two
+   *  brand-filled controls on one screen make the eye choose between them
+   *  (`DESIGN.md` 'one primary action per surface'). */
+  emphasis?: 'primary' | 'quiet';
 };
 
 /**
- * The one way a state's `action` slot is filled: the primary, compact,
- * label-sized button, with its leading icon centred together with the label and
- * the shared 48pt state-action floor. Callers own nothing visual — the slot
- * above owns the gap, and this component owns the style — so no state can
- * invent a full-width, outlined or shadowed way out.
+ * The one way a state's `action` slot is filled: the compact, label-sized
+ * button, with its leading icon centred together with the label and the shared
+ * 48pt state-action floor. Callers own nothing visual — the slot above owns the
+ * gap, and this component owns the style — so no state can invent a full-width
+ * or shadowed way out.
+ *
+ * `emphasis` picks the weight it paints at, not its frame: `primary` (the
+ * default) is a state surface's one way out, on the brand fill; `quiet` is the
+ * same frame as an outlined control, for an action inside a content card on a
+ * screen whose primary action lives elsewhere. Two brand fills on one screen
+ * make the eye choose between them, so the card's way out takes the quiet face
+ * and the screen keeps its one primary (`DESIGN.md` 'one primary action per
+ * surface').
  *
  * `loading` is a busy state, not a different face of the control: the label and
  * its strength never change while the request runs, only the leading icon
@@ -230,20 +278,35 @@ export function StateAction({
   testID,
   accessibilityLabel,
   accessibilityHint,
+  emphasis = 'primary',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
-  // A busy action keeps its enabled face — the brand fill and the label ink the
+  const quiet = emphasis === 'quiet';
+  // A busy action keeps its enabled face — the fill and the label ink the
   // button paints on it (`Button` never dims or mutes a control that announces
   // busy) — so its mark must take that same ink. The muted ink is only for the
   // disabled face, whose fill is the palette's muted surface; on the brand fill
   // it measures about 1.4:1 and the spinner all but disappears.
-  const markColor = disabled === true && !busy ? mutedDisabledInk : colors.primaryForeground;
+  const showMutedInk = disabled === true && !busy;
+  // The quiet face is an outlined control, whose label ink `Button` paints as
+  // `foreground`; only the leading mark's colour is computed here, so it takes
+  // that same ink, and the primary face keeps the brand fill's contrasting ink.
+  let enabledInk = colors.primaryForeground;
+  if (quiet) {
+    enabledInk = colors.foreground;
+  }
+  const markColor = showMutedInk ? mutedDisabledInk : enabledInk;
   return (
     <Button
       size="sm"
-      className={STATE_ACTION_CLASS}
+      variant={quiet ? 'outline' : 'default'}
+      // The `outline` variant paints `bg-card dark:bg-secondary`, and `--card`
+      // is the same step as the `Card` a quiet action sits on, so the control
+      // would lose its fill in dark. The filled neutral takes a visible step
+      // above that card instead, as `AddCreditsButton`'s quiet face does.
+      className={cn(STATE_ACTION_CLASS, quiet && 'dark:bg-secondary-fill')}
       disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}

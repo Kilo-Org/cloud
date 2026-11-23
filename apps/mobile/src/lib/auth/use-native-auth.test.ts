@@ -227,7 +227,10 @@ describe('use-native-auth error mapping', () => {
   });
 
   it.each([
-    ['INVALID_CODE', "That code is incorrect or expired. Try again or use 'Resend code'."],
+    [
+      'INVALID_CODE',
+      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.",
+    ],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
     ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],
@@ -255,10 +258,12 @@ describe('use-native-auth error mapping', () => {
   });
 
   it('has a retryable admission error constant', () => {
-    expect(retryableAdmissionError()).toBe(
-      'We could not verify this device. Check your connection and try again.'
-    );
-    expect(retryableAdmissionError()).toMatch(/try again/i);
+    const message = retryableAdmissionError();
+    // A retryable admission refusal says what failed and offers the retry, and
+    // it must not diagnose a network cause the client has not proven.
+    expect(message).toMatch(/verify this device/i);
+    expect(message).toMatch(/try again/i);
+    expect(message).not.toMatch(/connection|network/i);
   });
 
   it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {

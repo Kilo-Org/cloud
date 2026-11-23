@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuté",
     "github": "GitHub",
+    "image": "Obrázok",
     "imageUnavailable": "Obrázok nie je dostupný.",
     "loading": "Načítava sa…",
     "loadMore": "Načítať viac",
@@ -124,10 +125,10 @@
     "connectProvider": "Pripojte poskytovateľa",
     "contentTruncated": "Obsah skrátený",
     "copyLink": "Kopírovať odkaz",
+    "couldNotLoad": "Nepodarilo sa načítať.",
+    "couldNotLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
     "couldNotLoadSessions": "Nepodarilo sa načítať relácie.",
-    "couldnTLoad": "Nepodarilo sa načítať.",
-    "couldnTLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "deviceSessions": "Relácie zariadení",
     "disabled": "Vypnuté",
     "email": "E-mail",
@@ -188,7 +189,30 @@
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
     "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
+    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnorená odrážka",
+        "orderedItem": "Položka zoznamu {n}",
+        "nestedOrderedItem": "Vnorená položka zoznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citácia",
+        "nestedQuote": "Vnorená citácia"
+      },
+      "table": {
+        "row": "Riadok {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -288,6 +312,7 @@
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
+    "availableToSpendInOrganization": "Dostupné na útratu v tejto organizácii",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -377,7 +402,7 @@
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "orgDescription": "Tieto kľúče zdieľajú všetci v organizácii a účtujú sa na jej účty u poskytovateľov.",
-      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo manažér fakturácie.",
+      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo správca fakturácie.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
@@ -429,6 +454,17 @@
       "location": "Umiestnenie Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Súkromný kľúč účtu služby",
+      "privateKeyBlockRequired": "Vlož celý blok kľúča, od riadku BEGIN po riadok END.",
+      "privateKeyEncrypted": "Tento blok kľúča je chránený prístupovou frázou. Vlož kľúč účtu služby, ktorý nemá prístupovú frázu.",
+      "names": {
+        "codestral": "Iba staršie Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prihlásiť sa cez ChatGPT)",
+        "xiaomi": "Xiaomi (platba podľa spotreby)",
+        "zai": "Z.ai (platba podľa spotreby)",
+        "bedrockByok": "Amazon Bedrock (priame účtovanie)",
+        "vertexByok": "Google Vertex AI (priame účtovanie)"
+      },
       "modelMappings": "Mapovania modelov",
       "modelMappingsDescription": "Presmeruj model brány na vlastný názov nasadenia.",
       "mappingTitle": "Mapovanie {{number}}",
@@ -489,13 +525,14 @@
       "receiptLabel": "Potvrdenie",
       "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Prijaté",
       "triageOpen": "Posudzuje sa",
       "triageActioned": "Opodstatnené",
       "triageRejected": "Neopodstatnené",
       "appealNone": "Nepodané",
       "appealSubmitted": "Čaká na posúdenie",
-      "appealAccepted": "Prijaté",
+      "appealAccepted": "Odvolanie prijaté",
       "appealRejected": "Zamietnuté",
       "appeal": "Odvolať sa proti rozhodnutiu",
       "appealTitle": "Odvolať sa proti rozhodnutiu?",
@@ -506,7 +543,25 @@
       "nextStepInReview": "Výsledok sa zobrazí na tejto obrazovke a po rozhodnutí sa môžeš odvolať.",
       "nextStepAppeal": "Výsledok odvolania sa zobrazí na tejto obrazovke.",
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
-      "viewReceipt": "Zobraziť potvrdenie"
+      "viewReceipt": "Zobraziť potvrdenie",
+      "targetLabel": "Nahlásená položka",
+      "reasonLabel": "Dôvod nahlásenia",
+      "targetMessage": "Odpoveď AI",
+      "targetComment": "Komentár v žiadosti",
+      "targetUser": "Používateľ",
+      "reasonHarmful": "Škodlivý obsah",
+      "reasonIllegal": "Nelegálny obsah",
+      "reasonHarassment": "Obťažovanie",
+      "reasonSpam": "Nevyžiadaná reklama",
+      "reasonOther": "Iný dôvod"
+    },
+    "reportReceipts": {
+      "title": "Nahlásenia",
+      "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
+      "emptyTitle": "Zatiaľ žiadne nahlásenia",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára v diskusii k pull requestu alebo z odpovede AI v relácii agenta, sa zobrazia tu aj s ich výsledkom.",
+      "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
+      "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
     },
     "changelog": "Čo je nové",
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
@@ -514,8 +569,11 @@
     "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
-      "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil i organizácie"
+      "signIn": "prihlásenie",
+      "profileOrganizations": "profil i organizácie",
+      "chat": "čet",
+      "notifications": "upozornenia",
+      "integrations": "integrácie"
     }
   },
   "preferences": {
@@ -992,8 +1050,9 @@
       "checkActiveConnection": "Pripojenie je aktívne, ale táto položka sa stále nedá načítať.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
-      "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
+      "reconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
       "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
+      "bitbucketAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho pripojil.",
       "adminOnlyConnectDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
@@ -1222,6 +1281,10 @@
       "emptyTitle": "Zatiaľ žiadne upozornenia",
       "emptyCategoryTitle": "Žiadne upozornenia v tejto kategórii",
       "emptyBody": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_one": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_few": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_many": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_other": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
       "capped": "Zobrazujú sa najnovšie upozornenia.",
       "loadError": "Históriu upozornení sa nepodarilo načítať.",
       "openFailed": "Toto upozornenie sa už nikde neotvorí."
@@ -1232,6 +1295,7 @@
     "needsInputAction": {
       "approved": "Žiadosť schválená",
       "replied": "Odpoveď odoslaná",
+      "empty": "Napíšte odpoveď a potom ju odošlite.",
       "failed": "Odpovedať sa nepodarilo. Ťuknutím to skúste znova.",
       "unavailable": "Táto žiadosť už nečaká."
     }
@@ -1302,6 +1366,7 @@
       "manageAccess": "Spravovať prístup",
       "bitbucketNoRepositoriesDescription": "V tomto pracovnom priestore na platforme Bitbucket nie sú dostupné žiadne repozitáre.",
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
+      "githubNoRepositoriesDescription": "Skontroluj prístup aplikácie Kilo k repozitárom v službe GitHub a potom obnov zoznam.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
       "repositoryAccess": "prístup k repozitárom",
@@ -1331,11 +1396,11 @@
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
       "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
-      "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
+      "findingsUnavailable": "Výsledky nie sú k dispozícii.",
       "findingsInProgress": "Táto kontrola stále prebieha. Nálezy sa tu zobrazia po jej dokončení.",
       "findingsEndedWithoutResults": "Táto kontrola bola ukončená skôr, než vznikli nejaké nálezy.",
       "serviceUnavailable": "Nepodarilo sa pripojiť k službe kontroly kódu. Zopakujte kontrolu, keď bude služba dostupná.",
-      "reviewFailed": "Kontrola zlyhala. Skúste to znova.",
+      "reviewFailed": "Kontrola zlyhala.",
       "showMore": "Zobraziť viac",
       "created": "Vytvorené",
       "started": "Spustené",
@@ -1457,6 +1522,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "deniedManagedByOwner": "Požiadajte vlastníka {{organization}}, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+      "deniedConnectRole": "Pripojiť ho môžu iba vlastníci {{organization}}, správcovia a správcovia fakturácie.",
+      "deniedReconnectRole": "Požiadajte vlastníka, správcu alebo správcu fakturácie {{organization}}, aby ho znova pripojil.",
       "managedOnWebTitle": "Spravuje sa na webe",
       "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
       "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",
@@ -1492,7 +1560,9 @@
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
+      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
+      "notConnectedTitle": "{{platform}} nie je pripojený",
+      "githubAdminOnlyDescription": "Pripojiť ju môžu iba vlastníci organizácie a správcovia."
     },
     "overview": {
       "allAreas": "Všetky oblasti",
@@ -1580,7 +1650,7 @@
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
       "offTitle": "Analytika je pre {{platform}} vypnutá",
-      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a správcovia fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
       "couldNotLoad": "Analytiku sa nepodarilo načítať",
       "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
       "trackedReviewsUncounted": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
@@ -1598,7 +1668,9 @@
       "unavailablePersonallySwitchAction": "Prepnúť organizáciu",
       "unavailableOrganizationTitle": "Kontrola rady momentálne nie je dostupná",
       "unavailableForOrganization": "Kontrola rady vyžaduje plán Enterprise s aktívnym predplatným alebo skúšobnou lehotou. Táto organizácia ho momentálne nemá.",
-      "unavailableForOrganizationNeutral": "Kontrola rady nie je pre túto organizáciu momentálne dostupná. Skúste to znova neskôr.",
+      "unavailablePlanCheck": "Kontrola rady nemohla skontrolovať plán tejto organizácie. Skúste to znova, aby sa plán znova skontroloval.",
+      "unavailableFlagRollout": "Kontrola rady zatiaľ nie je pre túto organizáciu dostupná. Ak ju chcete získať, aktualizujte aplikáciu na najnovšiu verziu.",
+      "unavailableForOrganizationMember": "Kontrola rady vyžaduje plán Enterprise s aktívnym predplatným alebo skúšobnou lehotou. Vlastník organizácie môže zmeniť plán.",
       "unavailableOnBitbucket": "Kontrola rady nie je dostupná pre repozitáre Bitbucket.",
       "noRepositories": "Zatiaľ nie je vybraný žiadny repozitár. Najprv vyberte repozitáre v nastaveniach repozitárov.",
       "specialists": "Špecialisti",
@@ -2202,7 +2274,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relácie",
       "sectionAccessibility": "{{title}}: {{displayCount}} relácie",
       "live": "NAŽIVO",
-      "updating": "Aktualizuje sa"
+      "updating": "Aktualizuje sa",
+      "retentionLimit": "Zobrazujú sa najnovšie relácie."
     },
     "sessionRow": {
       "deleteTitle": "Odstrániť reláciu?",
@@ -2276,11 +2349,11 @@
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "emptyReadOnlyTitle": "Žiadne správy v tejto relácii",
-      "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
       "historyUnavailable": "Pepis tejto relácie nie je možné prečítať.",
+      "historyTemporarilyUnavailable": "Prepis tejto relácie je dočasne nedostupný.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
       "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
@@ -2619,8 +2692,7 @@
       "searchPlaceholder": "Hľadať repozitáre",
       "noMatches": "Žiadne zhody",
       "noRepositories": "Žiadne dostupné repozitáre",
-      "noRepositoriesDescription": "K tvojmu účtu nie sú pripojené žiadne repozitáre.",
-      "loading": "Načítava sa…",
+      "noRepositoriesDescription": "Ak chcete načítať repozitáre, pripojte GitHub alebo GitLab.",
       "accessibility": "Repozitár: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2652,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti nie sú dostupné.",
+      "detailsUnavailableDescription": "Táto položka už nie je v relácii.",
       "textDisplay": "Zobrazenie textu",
       "thinking": "Uvažuje",
       "thought": "Uvažovanie",
@@ -2695,6 +2768,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nie je dostupný, skúsiť ho znova načítať",
+      "imageUnavailableRetryWithAlt": "Obrázok nie je dostupný, {{alt}}, skúsiť ho znova načítať",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tejto relácii dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",
@@ -2826,7 +2900,9 @@
       "skip": "Preskočiť",
       "retrySkip": "Skúsiť preskočiť znova",
       "submitting": "Odosiela sa…",
-      "sendAnswers": "Odoslať odpovede"
+      "sendAnswers": "Odoslať odpovede",
+      "unreadableTitle": "Túto otázku sa nepodarilo zobraziť",
+      "unreadableBody": "Agent čaká na otázku, ktorú táto aplikácia nedokáže zobraziť. Odpovedzte na otázku v CLI, aby ste mohli pokračovať."
     },
     "blockingCard": {
       "questionUnavailable": "Táto otázka už nie je dostupná.",
@@ -2853,6 +2929,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Reláciu pomocného agenta sa nepodarilo načítať.",
+      "historyTooLarge": "História tohto pomocného agenta je na načítanie príliš veľká.",
+      "historyUnavailable": "História tohto pomocného agenta nie je dostupná.",
+      "historyTemporarilyUnavailable": "História tohto pomocného agenta je dočasne nedostupná.",
       "failed": "Relácia pomocného agenta zlyhala.",
       "noMessages": "Žiadne správy pomocného agenta",
       "noMessagesDescription": "Táto relácia pomocného agenta sa skončila bez vytvorenia prepisu.",
@@ -3030,7 +3109,7 @@
       "windowUnavailable": "Veľkosť kontextového okna nie je k dispozícii",
       "tapToViewDetails": " Klepnutím zobrazíš podrobnosti kontextu.",
       "costClause": ", náklady {{cost}}",
-      "loadingCostSpoken": "cena {{cost}}.",
+      "loadingCostSpoken": "doterajšia cena {{cost}}.",
       "tokensWindowUnavailable": "Kontext: počet tokenov {{used}}, veľkosť okna nie je dostupná{{costClause}}.",
       "tokensUsage": "Kontext: {{used}} z {{window}} tokenov, využitie {{percentage}}{{costClause}}.",
       "title": "Využitie kontextu",
@@ -3150,6 +3229,12 @@
     "retryLoadingAccount": "Znova načítať účet",
     "retryLoadingPrivacy": "Znova načítať nastavenia súkromia"
   },
+  "accountBlocked": {
+    "title": "Účet je zablokovaný",
+    "description": "Kilo zablokovalo tento účet a nové prihlásenie blokovanie nezruší. Podpora môže blokovanie na požiadanie preveriť.",
+    "domainDescription": "Kilo blokuje účty na tejto e-mailovej doméne a nové prihlásenie to nezmení. Podpora môže doménu na požiadanie preveriť.",
+    "contactSupport": "Kontaktovať podporu"
+  },
   "addCredits": {
     "cta": "Doplniť kredity",
     "billingPage": "stránka fakturácie"
@@ -3222,8 +3307,7 @@
     "timeoutDescription": "Požiadavka trvala príliš dlho. Skúste to znova."
   },
   "screenHeader": {
-    "openMenu": "Otvoriť ponuku",
-    "openMenuFor": "Otvoriť ponuku pre {{title}}"
+    "openMenu": "Otvoriť ponuku"
   },
   "picker": {
     "optionsExpired": "Platnosť možností sa skončila",
@@ -3446,6 +3530,8 @@
     "voiceTranscriptionWho": "Tvoje zariadenie, Kilo Gateway s tebou zvoleným modelom prepisu alebo Apple či Google na rozpoznávanie online.",
     "installAttributionPromptTitle": "Povoliť zisťovanie zdroja inštalácie?",
     "installAttributionPromptMessage": "Kilo používa povolenie na sledovanie od spoločnosti Apple len na zistenie, odkiaľ si sa o aplikácii dozvedel. Tvoje zadania ani konverzácie na to nikdy nepoužívame.",
+    "installAttributionRequestFailedTitle": "Nepodarilo sa zobraziť výzvu na sledovanie",
+    "installAttributionRequestFailedMessage": "Kilo nemohlo zobraziť systémovú výzvu, preto zisťovanie zdroja inštalácie zostáva vypnuté.",
     "what": "Čo",
     "why": "Prečo",
     "who": "Kto"
@@ -3461,7 +3547,7 @@
   "organization": {
     "auditLog": {
       "title": "Protokol auditu",
-      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žiadne udalosti auditu",
       "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
       "truncated": "Zobrazujú sa najnovšie udalosti.",
@@ -3511,11 +3597,157 @@
         "guardrailUpdate": "Ochranné pravidlo aktualizované",
         "guardrailRemove": "Ochranné pravidlo odstránené",
         "unknown": "Auditná udalosť"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Režim \"{{name}}\" (identifikátor: {{slug}})",
+        "modeUpdate": "Režim \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatické smerovanie",
+          "defaultModel": "Predvolený model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} pridaný ako {{role}}",
+        "memberRemoved": "{{email}} odstránený",
+        "memberParentAdded": "{{email}} pridaný z materskej organizácie {{parent}}",
+        "memberParentRemoved": "{{email}} odstránený z materskej organizácie {{parent}}",
+        "inviteSent": "{{email}} ako {{role}}",
+        "inviteRevoked": "Pozvánka pre {{email}} odvolaná",
+        "inviteAccepted": "Pozvánka pre {{email}} prijatá",
+        "groupIdentity": "Skupina \"{{name}}\"",
+        "groupMembers": "Skupina \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} skupiny",
+        "groupMemberGroups_few": "{{displayCount}} skupiny",
+        "groupMemberGroups_many": "{{displayCount}} skupín",
+        "groupMemberGroups_one": "{{displayCount}} skupina",
+        "groupMemberGroups_other": "{{displayCount}} skupiny",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} skupiny",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} skupiny",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} skupín",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} skupina",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} skupiny",
+        "groupPolicySet": "Skupina \"{{name}}\": pravidlo {{policy}} nastavené",
+        "groupPolicyRemoved": "Skupina \"{{name}}\": pravidlo {{policy}} odstránené",
+        "groupDefaultPolicySet": "Predvolené pravidlo {{policy}} nastavené",
+        "groupDefaultPolicyRemoved": "Predvolené pravidlo {{policy}} odstránené",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI ochranné mechanizmy {{state}}",
+        "guardrailConfigGroup": "{{state}} pre skupinu \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Doména SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (predtým {{previous}})",
+        "ssoDomainRemoved": "Doména SSO {{domain}} odstránená",
+        "fundsPurchased": "{{amount}} cez {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} pre {{displayCount}} dcérske organizácie",
+        "fundsDistributed_few": "{{amount}} pre {{displayCount}} dcérske organizácie",
+        "fundsDistributed_many": "{{amount}} pre {{displayCount}} dcérskych organizácií",
+        "fundsDistributed_one": "{{amount}} pre {{displayCount}} dcérsku organizáciu",
+        "fundsDistributed_other": "{{amount}} pre {{displayCount}} dcérske organizácie",
+        "fundsReceived": "{{amount}} od {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfigurácia",
+        "reviewAgentConfigStyle": "{{platform}}: štýl {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} aktualizované",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} aktualizované",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} aktualizovaných",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} aktualizovaná",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} aktualizované",
+        "reviewAgentSecretsFailed": "{{displayCount}} chyby",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} chyby",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} chýb",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} chyba",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} chyby",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Región inferencie: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Režim \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globálne predvolené",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Povolené",
+          "denied": "Zamietnuté",
+          "followSetting": "Podľa nastavenia rozšírenia"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projekt UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} pre {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Zhrnutie odporúčaní {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: žiadne povolené pôvody",
+        "settingName": "Premenované z {{previous}} na {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skenovanie pred použitím zapnuté",
+        "scanBeforeUseOff": "Skenovanie pred použitím vypnuté",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Odstránené: {{models}}",
+        "browserPolicyOff": "Používanie prehliadača zablokované",
+        "browserPolicyAllow": "Iba povolené pôvody",
+        "browserPolicyPlaywrightOnly": "Iba používanie prehliadača",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Zmenené modely AI: {{values}}",
+        "integrationConnected": "{{integration}} pripojené",
+        "integrationDisconnected": "{{integration}} odpojené",
+        "integrationRefreshed": "{{integration}} obnovené",
+        "integrationCancelled": "{{integration}} zrušené",
+        "integrationModelUpdated": "{{integration}}: model AI {{model}}",
+        "integrationKeyAdded": "Kľúč pre {{provider}} pridaný",
+        "integrationKeyUpdated": "Kľúč pre {{provider}} aktualizovaný",
+        "integrationKeyDeleted": "Kľúč pre {{provider}} odstránený",
+        "integrationKeyToggled": "Kľúč pre {{provider}}: {{state}}",
+        "namedPolicyCreated": "Pravidlo {{kind}} {{id}} vytvorené",
+        "namedPolicyUpdated": "Pravidlo {{kind}} {{id}} aktualizované",
+        "namedPolicyDeleted": "Pravidlo {{kind}} {{id}} odstránené",
+        "namedPolicyLinked": "Pravidlo {{kind}} prepojené s {{next}}",
+        "webhookTriggerUpdated": "Spúšťač {{trigger}}",
+        "organizationRenamed": "Organizácia premenovaná z {{previous}} na {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Vlastný kľúč API"
+        }
       }
     },
     "billing": {
       "title": "Fakturácia",
-      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, správca alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Predplatné",
       "state": "Stav",
       "stateNone": "Bez predplatného",
@@ -3533,7 +3765,7 @@
       "manageOnWeb": "Nastavenia fakturácie na webe",
       "changePlan": "Zmeniť plán",
       "buySeats": "Kúpiť miesta",
-      "managedOnWeb": "Plán, miesta a automatické dobíjanie sa spravujú na webe.",
+      "managedOnWeb": "Plán, miesta a automatické dobíjanie sa spravujú na kilo.ai.",
       "setupAutoTopUp": "Nastaviť automatické dobíjanie",
       "manageAutoTopUp": "Spravovať automatické dobíjanie",
       "opensOnWeb": "Otvorí sa na webe"
@@ -3597,7 +3829,7 @@
       "noSeatsAvailable": "Všetky miesta sú obsadené. Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest."
     },
     "invoices": {
-      "downloadA11y": "Stiahnuť faktúru {{number}}",
+      "downloadA11y": "Stiahnuť faktúru {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktúry sa vytvárajú automaticky za každé fakturačné obdobie. Zobrazia sa tu po vyúčtovaní služieb tvojej organizácii.",
       "emptyTitle": "Žiadne faktúry",
       "invoiceFallback": "Faktúra",
@@ -3631,7 +3863,7 @@
       "limitLabel": "Limit (USD za deň)",
       "memberNotFound": "Člen sa nenašiel.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo administrátor organizácie.",
+      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo správca organizácie.",
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
@@ -3677,7 +3909,6 @@
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
-      "guardrails": "Ochranné pravidlá",
       "byok": "Vlastný kľúč",
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Zber údajov",
@@ -3692,7 +3923,7 @@
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
       "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
-      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -3715,13 +3946,14 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadajte identifikátor.",
       "identifierTaken": "Tento identifikátor už používa iný režim.",
+      "identifierTooLong": "Identifikátor môže mať najviac {{max}} znakov.",
       "nameLabel": "Názov režimu",
       "nameRequired": "Zadajte názov režimu.",
       "notFound": "Tento režim už neexistuje.",
-      "restrictionHint": "Upravovať možno iba súbory, ktoré zodpovedajú tomuto vzoru. Ak ho necháte prázdny, budú povolené všetky súbory.",
-      "restrictionInvalid": "Zadajte platný vzor.",
+      "restrictionHint": "Regulárny výraz vyberá súbory, ktoré môže tento režim upravovať, napríklad `\\.md$` len pre súbory markdown. Ak ho necháte prázdny, budú povolené všetky súbory.",
+      "restrictionInvalid": "Zadajte platný regulárny výraz.",
       "restrictionLabel": "Označenie obmedzenia",
-      "restrictionPattern": "Vzor súborov",
+      "restrictionPattern": "Obmedzenie súborov",
       "roleLabel": "Definícia roly",
       "roleRequired": "Opíšte, čo tento režim robí.",
       "tool": {
@@ -3800,7 +4032,7 @@
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Použi „$t(login.resendCode)“ alebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -3809,7 +4041,7 @@
     "emailDeliveryFailed": "Doručovanie e-mailov je dočasne nedostupné. Skús to neskôr.",
     "admissionRequired": "Tvoje zariadenie sa nedá overiť. Použi „$t(login.moreSignInOptions)“ a prihlás sa na inom zariadení alebo cez web.",
     "default": "Vyskytla sa chyba. Skús to znova.",
-    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skontroluj pripojenie a skús to znova.",
+    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skús to znova.",
     "startSignInFailed": "Prihlásenie sa nepodarilo spustiť. Skús to znova.",
     "couldNotOpenBrowser": "Prehliadač sa nepodarilo otvoriť. Skús to znova.",
     "signInTimedOut": "Čas na prihlásenie vypršal. Skús to znova.",
@@ -3881,6 +4113,50 @@
     "nextScheduled": "Ďalšie naplánované",
     "answerNeeded": "Čaká na odpoveď",
     "waitingToRetry": "Čaká na opakovanie",
+    "countNoun": {
+      "needsInput_one": "Čaká na odpoveď",
+      "needsInput_other": "Čaká na odpoveď",
+      "needsInput_few": "Čaká na odpoveď",
+      "needsInput_many": "Čaká na odpoveď",
+      "running_one": "Pracuje sa",
+      "running_other": "Pracuje sa",
+      "running_few": "Pracuje sa",
+      "running_many": "Pracuje sa",
+      "scheduled_one": "Naplánované",
+      "scheduled_other": "Naplánované",
+      "scheduled_few": "Naplánované",
+      "scheduled_many": "Naplánované",
+      "idle_one": "V nečinnosti",
+      "idle_other": "V nečinnosti",
+      "idle_few": "V nečinnosti",
+      "idle_many": "V nečinnosti"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_other": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_few": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_many": "{{displayCount}} Čaká na odpoveď",
+      "running_one": "{{displayCount}} Pracuje sa",
+      "running_other": "{{displayCount}} Pracuje sa",
+      "running_few": "{{displayCount}} Pracuje sa",
+      "running_many": "{{displayCount}} Pracuje sa",
+      "scheduled_one": "{{displayCount}} Naplánované",
+      "scheduled_other": "{{displayCount}} Naplánované",
+      "scheduled_few": "{{displayCount}} Naplánované",
+      "scheduled_many": "{{displayCount}} Naplánované",
+      "idle_one": "{{displayCount}} V nečinnosti",
+      "idle_other": "{{displayCount}} V nečinnosti",
+      "idle_few": "{{displayCount}} V nečinnosti",
+      "idle_many": "{{displayCount}} V nečinnosti"
+    },
+    "footer": {
+      "checked": "Overené {{time}}",
+      "lastKnown": "Posledný známy stav · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ďalšie spustenie {{time}}",
+      "wasDue": "Očakávalo sa {{time}}"
+    },
     "step": {
       "editing": "Úprava",
       "reading": "Čítanie",
@@ -3937,7 +4213,10 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "deleteTitle": "Odstrániť tento chat?"
+      "deleteTitle": "Odstrániť tento chat?",
+      "resetNoticeTitle": "Lokálne chaty a koncepty boli vymazané",
+      "resetNoticeBody": "Kilo nedokázalo otvoriť chaty uložené v tomto zariadení. Vaše cloudové relácie nie sú ovplyvnené.",
+      "resetNoticeDismiss": "Ignorovať oznámenie"
     },
     "rename": {
       "title": "Premenovať chat",
@@ -3987,6 +4266,9 @@
       "fieldName": "Zobrazovaný názov",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Zadajte platnú URL servera.",
+      "fieldUrlCredentials": "Odstráňte používateľské meno a heslo z URL.",
+      "fieldUrlFragment": "Odstráňte časť URL obsahujúcu #.",
+      "fieldUrlInsecure": "Zadajte URL s https, alebo http iba pre localhost.",
       "duplicateUrl": "Táto URL je už uložená.",
       "serverNotFound": "Tento server už nie je uložený.",
       "enableServer": "Povoliť tento server: {{name}}",
@@ -4014,6 +4296,7 @@
       "app": {
         "label": "Rozhranie nástroja",
         "failed": "Rozhranie tohto nástroja sa nepodarilo načítať.",
+        "tooLarge": "Rozhranie tohto nástroja je väčšie ako limit {{size}}.",
         "empty": "Rozhranie tohto nástroja nemá čo zobraziť."
       }
     },
@@ -4081,6 +4364,8 @@
       "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
       "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
+      "invalidApiKey": "API kľúč obsahuje znak, ktorý sa nedá odoslať. Používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
+      "invalidHeaders": "Vlastnú hlavičku nie je možné odoslať. Skontrolujte jej názov a používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
       "httpApprovalRequired": "Pred uložením alebo pripojením schváľte tento lokálny koncový bod HTTP.",
@@ -4128,7 +4413,9 @@
         "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
         "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
-        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova."
+        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova.",
+        "unreadable": "Toto zariadenie nedokázalo skontrolovať stiahnutý súbor, preto bol odstránený. Skúste ho stiahnuť znova.",
+        "writeFailed": "Toto zariadenie nedokázalo uložiť model. Skúste ho stiahnuť znova."
       }
     },
     "catalog": {
@@ -4213,7 +4500,15 @@
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
-      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
+      "cannotUse": "Nedá sa spustiť: {{items}}.",
+      "cannotUseOptions": "Nedá sa vyplniť: niektoré možnosti nástroja.",
+      "limitations": "Obmedzenia",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobraziť nastavenia",
+        "settingsSet": "Zmeniť nastavenia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
@@ -4316,7 +4611,7 @@
     "personalDefaultDescription": "Automaticky načítané, keď žiadne úložisko nemá pripnutý profil.",
     "organizationDefaultDescription": "Automaticky načítané pre členov, ktorí nemajú žiadne osobné predvolené nastavenia.",
     "setAsDefault": "Nastaviť ako predvolené",
-    "saveFailed": "Profil sa nepodarilo uložiť",
+    "saveFailed": "Profil sa nepodarilo uložiť. Skúste to znova.",
     "organizationRoleRequired": "Profil organizácie môžu zmeniť iba vlastníci organizácie a správcovia.",
     "deleteTitle": "Odstrániť profil",
     "deleteMessage": "Tým sa natrvalo odstráni profil a jeho nastavenia. Toto sa nedá vrátiť späť.",
@@ -4402,6 +4697,7 @@
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",
     "instructionToggleFailed": "Pokyn sa nepodarilo aktualizovať",
+    "instructionViewTitle": "Súbor pokynu",
     "instructionLimitReached": "Profil môže obsahovať najviac {{max}} pokynov. Ak chcete pridať ďalší, jeden odstráňte.",
     "mcp": {
       "title": "servery MCP",
@@ -4467,6 +4763,7 @@
       "promptPlaceholder": "Ty si…",
       "tools": "Nástroje",
       "wholeToolRule": "Tento agent uplatňuje jedno pravidlo na všetky nástroje naraz: {{rule}}. Tieto prepínače sú iba na čítanie.",
+      "toolRule": "Uložené pravidlo: {{rule}}",
       "visibility": "Viditeľnosť",
       "visibilityPrimary": "Primárne — zobrazí sa vo výbere",
       "visibilitySubagent": "Subagent — volateľný iba od ostatných",
@@ -4573,22 +4870,48 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
       "appStoreReceipt": "Doklad v obchode App Store",
+      "deduction": {
+        "adminCancel": "Zostatok uzavretý správcom",
+        "adminDebit": "Kredity odobral správca",
+        "codingPlan": "Plán programovania: {{plan}}",
+        "correction": "Úprava zostatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrátenie peňazí za balík kreditov v obchode App Store",
+        "refundGooglePlay": "Vrátenie peňazí za balík kreditov v obchode Google Play"
+      },
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
+      "expiredGrant": "Platnosť vypršala: {{description}}",
+      "expiredStatus": "Platnosť vypršala",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vplyvu na zostatok",
         "deduction": "Odpočet",
         "grant": "Pridelené kredity",
+        "promotionalCredits": "Propagačné kredity",
+        "welcomeCredits": "Uvítacie kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Pridelenie kreditov správcom",
+        "contributorChampion": "Kredity šampióna prispievateľov",
+        "feedback": "Kredity za spätnú väzbu",
+        "influencer": "Kredity pre influencerov",
+        "ossMonthlyReset": "Mesačné obnovenie kreditov OSS",
+        "ossSponsorship": "Kredity za sponzorstvo OSS",
+        "pullRequest": "Kredity za PR",
+        "usageIssue": "Kredity za problém s využívaním",
+        "vibeDay": "Kredity Vibe Day"
       },
       "purchaseFallback": "Nákup kreditov",
       "receipt": "Doklad",
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
-      "retentionLimit": "Zobrazuje sa najnovšia história kreditov."
+      "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
+      "voidedGrant": "Stornované: {{description}}",
+      "voidedStatus": "Stornované"
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
@@ -4740,6 +5063,7 @@
     "contextAll": "Všetky kontexty",
     "dismiss": "Ignorovať prehľad",
     "dismissFailed": "Tento prehľad sa zatiaľ nepodarilo ignorovať. Na pozadí sa to pokúsi znova.",
+    "readMarkFailed": "Tento prehľad sa nepodarilo označiť ako prečítaný. Pri ďalšom načítaní prehľadu sa to pokúsi znova.",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložený prehľad · obnovenie nedostupné",
     "summary": "AI zhrnutie",
@@ -4759,16 +5083,23 @@
     "morningEnd": "Prehľad dostupný do",
     "timeHint": "Karta Domov obnoví živý stav po skončení okna prehľadu, aj offline.",
     "invalidSchedule": "Vyberte platné časové pásmo a neprázdne okno prehľadu.",
+    "scheduleEmptyNight": "Okno prehľadu je prázdne. Vyberte čas pripravenosti, ktorý je neskôr ako začiatok okna.",
+    "scheduleEmptyMorning": "Čas pripravenosti sa zhoduje s časom, dokedy je prehľad dostupný. Vyberte, ako dlho má byť prehľad dostupný.",
+    "scheduleFullDay": "Obe okná pokrývajú celý deň. Nechajte časť dňa mimo prehľadu.",
     "notificationsHint": "Jedno všeobecné upozornenie na každý naplánovaný prehľad. Nezávisí od platených AI zhrnutí.",
     "notificationPermission": "Ak chcete dostávať prehľad, zapnite push upozornenia.",
     "defaultModel": "Použiť predvolený model Kilo",
     "duration": "Časový limit (minúty)",
     "spendLimit": "Limit výdavkov (USD)",
-    "invalidSafeguards": "Zadajte kladné, konečné limity času a výdavkov.",
+    "invalidSafeguards": "Zadajte kladné číslo v povolenom rozsahu.",
     "estimate": "Odhad {{estimate}} · maximálne {{maximum}}",
     "estimateUnavailable": "Platený súhrn nie je pre tieto nastavenia dostupný. Zmeňte model alebo limity, prípadne to skúste neskôr znova.",
     "confirmPaid": "Povoliť platené zhrnutia pre {{context}}?",
-    "paidDisclosure": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} min. Poplatky sa účtujú aj pri zlyhaní generovania.",
+    "paidDisclosure_one": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} minúta. Poplatky sa účtujú aj pri zlyhaní generovania.",
+    "paidDisclosure_few": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} minúty. Poplatky sa účtujú aj pri zlyhaní generovania.",
+    "paidDisclosure_many": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} minúty. Poplatky sa účtujú aj pri zlyhaní generovania.",
+    "paidDisclosure": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} minút. Poplatky sa účtujú aj pri zlyhaní generovania.",
+    "paidDisclosure_other": "Odhad {{estimate}}, najviac {{maximum}}, s limitom {{minutes}} minút. Poplatky sa účtujú aj pri zlyhaní generovania.",
     "enable": "Povoliť platené zhrnutia",
     "allContexts": "Osobné a organizačné prehľady zostávajú oddelené.",
     "emptyHistory": "Žiadne uložené prehľady",
@@ -4779,8 +5110,8 @@
     "estimateSpendLimitTooLow": "Zvýšte limit výdavkov, aby ste umožnili tento súhrn.",
     "saved": "Nastavenia prehľadu boli uložené",
     "selectedSessions": "Vybrané relácie",
-    "snapshotPullRequests": "PR vo vybraných reláciách",
-    "snapshotBlockers": "Prekážky vo vybraných reláciách",
+    "snapshotPullRequests": "PR",
+    "snapshotBlockers": "Prekážky",
     "capturedAt": "Zachytené {{time}}",
     "snapshotHint": "Snímka najnovšieho dostupného stavu relácií zachytená v naplánovanom rannom čase. Nemusí byť úplná. Počty sa týkajú vybraných relácií, nie celej nočnej aktivity.",
     "snapshotTruncated": "Niektoré relácie alebo podklady boli vynechané, aby sa obmedzil rozsah tejto snímky.",
@@ -4819,7 +5150,7 @@
     "sourceActivity": "Aktivita bez názvu",
     "metadataFailureProvider": "chyba poskytovateľa",
     "metadataFailureTool": "chyba nástroja",
-    "metadataFailureCancelled": "Zrušené",
+    "metadataStopped": "Posledné kolo bolo zastavené",
     "metadataFailureOther": "nešpecifikovaná chyba"
   },
   "systemSearch": {
@@ -4827,6 +5158,7 @@
   },
   "usage": {
     "title": "Využitie",
+    "personalTitle": "Využitie osobného účtu",
     "orgTitle": "Využitie organizácie",
     "entrySubtitle": "Výdavky, požiadavky a tokeny",
     "rangePicker": "Časové obdobie",
@@ -4840,7 +5172,8 @@
     "unavailableTitle": "Využitie nie je k dispozícii",
     "unavailableDescription": "Využitie nie je pre tento pracovný priestor nastavené. Ak očakávate, že sa tu využitie zobrazí, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
-    "viewDetails": "Zobraziť podrobnosti o využití"
+    "viewDetails": "Zobraziť podrobnosti o využití",
+    "orgSelfEntryTitle": "Vaše využitie"
   },
   "integrations": {
     "title": "Integrácie",
@@ -4853,6 +5186,8 @@
     "connectedTo": "Pripojené k účtu {{account}}",
     "disconnected": "Služba {{provider}} bola odpojená",
     "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "disconnectRetry": "Slack nevedel potvrdiť odpojenie. Skús to znova.",
+    "disconnectNeedsSupport": "Kilo nedokázalo prečítať uložený prístup k Slacku pre toto pripojenie. Kontaktuj podporu, aby sa odpojenie dokončilo.",
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
@@ -4934,10 +5269,15 @@
       "autoCommit": "Commitnúť zmeny po dokončení spustenia",
       "condenseOnComplete": "Zhustiť kontext po dokončení spustenia",
       "activeTitle": "Spúšťač je aktívny",
+      "activeSwitchA11y": "Aktívny spúšťač: {{name}}",
+      "copyLinkA11y": "Kopírovať odkaz pre {{name}}",
       "activeDescription": "Pozastavené webhooky odpovedajú 404.",
       "runAsCreator": "Spustiť ako ja",
       "runAsCreatorDescription": "Každé spustenie používa váš účet, preto je tajná hlavička povinná.",
       "saveFailedTitle": "Nepodarilo sa uložiť spúšťač",
+      "nameTaken": "Spúšťač s názvom „{{name}}“ už existuje.",
+      "saveFailedRetry": "Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.",
+      "saveFailedCheck": "Skontrolujte hodnoty vo formulári a skúste to znova.",
       "deleteTitle": "Odstrániť tento spúšťač?",
       "deleteMessage": "Volania na {{name}} zlyhajú. Toto sa nedá vrátiť späť.",
       "deleteMessageScheduled": "Naplánované spustenia spúšťača {{name}} sa zastavia. Toto sa nedá vrátiť späť.",
@@ -5182,6 +5522,20 @@
       "eu": "Európska únia",
       "au": "Austrália",
       "jp": "Japonsko"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hľadať predvoľby",
+    "noMatches": "Žiadne zodpovedajúce predvoľby",
+    "emptyDescription": "Skúste iný názov predvoľby alebo kľúčové slovo.",
+    "resultsStatus": "Nájdené predvoľby: {{resultCount}}",
+    "keywords": {
+      "signOut": "odhlásiť sa|odhlásenie",
+      "appearance": "téma|farebná schéma",
+      "appUnlock": "biometria|tvár|odtlačok prsta",
+      "language": "jazyk|preklad",
+      "notifications": "upozornenia|oznámenia",
+      "privacy": "analytika|sledovanie"
     }
   }
 }

@@ -1,19 +1,16 @@
-import { z } from 'zod';
-
 /**
  * The small derived summary of one session that the session card shows
  * (`.specs/mobile-session-live-activity.md` "Card data contract"). The ingest
  * service derives it from the tool, todo, diff and error items and stores only
  * this summary, never the raw text. It never carries assistant message text.
- *
- * It also owns the creation-title placeholder, the machine name the backend
- * seeds before a person names a session: every surface that decides whether a
- * session has a name yet reads it from here.
  */
+
+import { z } from 'zod';
 
 /**
  * The title the backend seeds at creation: `New session - <ISO>` for a root
- * session and `Child session - <ISO>` for a child.
+ * session and `Child session - <ISO>` for a child. Every surface that decides
+ * whether a session has a name yet reads the creation-title rule from here.
  */
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -37,6 +34,25 @@ export type SessionLiveStepVerb = (typeof SESSION_LIVE_STEP_VERBS)[number];
 export const SESSION_LIVE_FAILURE_KINDS = ['provider', 'tool', 'cancelled', 'other'] as const;
 
 export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number];
+
+/**
+ * The todo statuses `sessionLivePlan` classifies: it leaves `cancelled` out of
+ * the count, counts `completed` as done, and shows the first `in_progress` step
+ * as the current one. They are the values the `todowrite` field description
+ * names, not values its schema enforces, so a plan can also carry a status
+ * outside this set. Such an entry is still a task the session has to do, so it
+ * counts toward the total and is neither done nor current. The mobile task list
+ * reads such an entry as an outstanding task the same way; the web todo
+ * projection leaves it out, so the two can differ for that input.
+ */
+export const SESSION_LIVE_TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
+
+export type SessionLiveTodoStatus = (typeof SESSION_LIVE_TODO_STATUSES)[number];
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
@@ -116,9 +132,7 @@ function isFormatControl(code: number): boolean {
  * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
-  // Iterating code points keeps a surrogate pair whole while the control set is
-  // applied. The set is compared numerically: a character class that names the
-  // control range reads as a control character in the source itself.
+  // Iterating code points keeps a surrogate pair whole while the control set is applied.
   return [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
@@ -197,10 +211,14 @@ export function sessionLiveCut(text: string, limit: number): string {
  * `limit` ends with an ellipsis inside the limit. The cut falls on a character
  * boundary, so the line never ends half drawn, and the whole result stays
  * within `limit` UTF-16 code units. Empty text, white space, and text made only
- * of joiners give null.
+ * of joiners give null, and so does a limit below one: a caller that computed
+ * no room for text gets no text back, never an ellipsis that overruns the
+ * budget.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
+  // A non-positive limit cannot hold a drawn character, so it holds no text.
+  if (!(limit >= 1)) return null;
   const line = sessionDisplayLine(raw).replace(/\s+/g, ' ').trim();
   if (line === '') return null;
   // Joiners alone draw nothing, so they are empty display text like blanks.
@@ -219,10 +237,17 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
 function basename(value: unknown): string | null {
   const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
   if (text === null) return null;
-  const trimmed = text.replace(/[/\\]+$/, '');
-  const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
-  const base = last === -1 ? trimmed : trimmed.slice(last + 1);
-  return sessionLiveText(base === '' ? trimmed : base, SESSION_LIVE_TARGET_LIMIT);
+  // Trailing separators name no segment, so the target ends before them.
+  let end = text.length;
+  while (end > 0) {
+    const code = text.charCodeAt(end - 1);
+    if (code !== 0x2f && code !== 0x5c) break;
+    end--;
+  }
+  const last =
+    end === 0 ? -1 : Math.max(text.lastIndexOf('/', end - 1), text.lastIndexOf('\\', end - 1));
+  const base = last === -1 ? text.slice(0, end) : text.slice(last + 1, end);
+  return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
 }
 
 function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -283,12 +308,8 @@ export function sessionLiveToolStep(
         target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
       };
     case 'list':
-      return { verb: 'searching', target: basename(input['path']) };
+      return { verb: 'searching', target: basename(firstString(input, FILE_PATH_KEYS)) };
     case 'codesearch':
-      return {
-        verb: 'searching',
-        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
-      };
     case 'websearch':
     case 'web_search':
       return {
@@ -303,10 +324,39 @@ export function sessionLiveToolStep(
   }
 }
 
+/**
+ * What each classified todo status means to the plan. `satisfies` a record of
+ * `SessionLiveTodoStatus`, so adding a status to that set fails the type check
+ * until its role is written here, and the counting below reads only this table.
+ */
+const TODO_STATUS_ROLES = {
+  cancelled: 'skipped',
+  completed: 'done',
+  in_progress: 'current',
+  pending: 'outstanding',
+} as const satisfies Readonly<
+  Record<SessionLiveTodoStatus, 'skipped' | 'done' | 'current' | 'outstanding'>
+>;
+
+/** Whether the status is one this projection classifies, narrowing it to the set. */
+function isClassifiedTodoStatus(status: string): status is SessionLiveTodoStatus {
+  return SESSION_LIVE_TODO_STATUSES.some(candidate => candidate === status);
+}
+
 const todoSchema = z.object({ content: z.string(), status: z.string() });
 const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
 
-/** `todowrite` input: completed count, total (cancelled excluded) and the active step. */
+/**
+ * `todowrite` input: completed count, total (cancelled excluded) and the active
+ * step. `SESSION_LIVE_TODO_STATUSES` and `TODO_STATUS_ROLES` are the one place a
+ * status's meaning is written down; the loop only reads the role. The producer's
+ * schema declares `status` as a free string (its field description names the four
+ * values rather than enforcing them), so a status outside the set is possible: it
+ * counts toward `total` as an outstanding task that is neither done nor current.
+ * The mobile task list reads such an entry the same way; the web todo projection
+ * leaves it out, so the two can differ for that input. Null when no entry counts,
+ * which is an empty list and a list of only cancelled entries.
+ */
 export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
   const parsed = todoInputSchema.safeParse(input);
   if (!parsed.success) return null;
@@ -315,10 +365,15 @@ export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan
   let current: string | null = null;
   for (const raw of parsed.data.todos) {
     const todo = todoSchema.safeParse(raw);
-    if (!todo.success || todo.data.status === 'cancelled') continue;
+    if (!todo.success) continue;
+    const { status } = todo.data;
+    // An unclassified status reads as outstanding: it still counts, so a task
+    // the plan cannot place is shown rather than dropped from the total.
+    const role = isClassifiedTodoStatus(status) ? TODO_STATUS_ROLES[status] : 'outstanding';
+    if (role === 'skipped') continue;
     total++;
-    if (todo.data.status === 'completed') done++;
-    if (current === null && todo.data.status === 'in_progress') {
+    if (role === 'done') done++;
+    if (role === 'current' && current === null) {
       current = sessionLiveText(todo.data.content, SESSION_LIVE_PLAN_STEP_LIMIT);
     }
   }

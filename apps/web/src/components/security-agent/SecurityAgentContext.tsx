@@ -25,7 +25,10 @@ import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
+  isSecurityCommandInProgressError,
   securityAgentCommandAdmissionCopy,
+  securityCommandInProgressCopy,
+  securityCommandReplayedCopy,
 } from './security-agent-command-copy';
 import {
   deletedSecurityAgentFindingsScopes,
@@ -784,11 +787,22 @@ function useSecurityAgentProviderValue(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.sync.title, {
+            description: securityCommandReplayedCopy.sync.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
+        const inProgress = securityCommandInProgressCopy('sync');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub integration error', {
@@ -806,10 +820,21 @@ function useSecurityAgentProviderValue(
   const { mutate: orgDismissMutate, isPending: isOrgDismissPending } = useMutation(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
-        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.dismiss_finding.title, {
+            description: securityCommandReplayedCopy.dismiss_finding.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
+        const inProgress = securityCommandInProgressCopy('dismiss_finding');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         toast.error('Failed to dismiss finding', { description: error.message });
       },
     })
@@ -974,11 +999,22 @@ function useSecurityAgentProviderValue(
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.sync.title, {
+            description: securityCommandReplayedCopy.sync.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
+        const inProgress = securityCommandInProgressCopy('sync');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub integration error', {
@@ -996,10 +1032,21 @@ function useSecurityAgentProviderValue(
   const { mutate: personalDismissMutate, isPending: isPersonalDismissPending } = useMutation(
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: data => {
-        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        if ('replayed' in data) {
+          toast.info(securityCommandReplayedCopy.dismiss_finding.title, {
+            description: securityCommandReplayedCopy.dismiss_finding.description,
+          });
+        } else {
+          toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        }
         trackCommand(data.commandId);
       },
       onError: error => {
+        const inProgress = securityCommandInProgressCopy('dismiss_finding');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         toast.error('Failed to dismiss finding', { description: error.message });
       },
     })

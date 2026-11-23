@@ -99,6 +99,26 @@ function configForAtomicUpdate(
   )`;
 }
 
+type AgentConfigPatch = Record<string, unknown>;
+
+/**
+ * Returns the stored config with `patch` merged over it, for an `onConflictDoUpdate`
+ * or `update` set clause. The caller owns only the keys in `patch`, so every other key
+ * keeps the value stored at write time, including one another writer saved concurrently.
+ */
+export function configForAtomicMerge(patch: AgentConfigPatch) {
+  const serializedPatch = JSON.stringify(patch);
+  if (serializedPatch === undefined) {
+    throw new Error('Agent config patch must be JSON serializable');
+  }
+  return sql<CodeReviewAgentConfig | Record<string, unknown>>`(
+    CASE
+      WHEN jsonb_typeof(${agent_configs.config}) = 'object' THEN ${agent_configs.config}
+      ELSE '{}'::jsonb
+    END
+  ) || ${serializedPatch}::jsonb`;
+}
+
 /**
  * Gets agent configuration for an organization
  */
@@ -311,32 +331,35 @@ export async function setAgentEnabledForOwner(
  * Resets code review agent config for an owner.
  * Called when the GitLab instance URL changes on reconnection,
  * to clear stale repository selections from the previous instance.
+ *
+ * The update writes only the repository-selection keys and the enabled flag, so it
+ * cannot replace a config another writer saved concurrently, and it never creates a
+ * row: it returns false when the owner has none.
  */
 export async function resetCodeReviewConfigForOwner(
   owner: AgentConfigOwner,
   platform: string
 ): Promise<boolean> {
-  const config = await getAgentConfigForOwner(owner, 'code_review', platform);
-  if (!config) {
+  const [updated] = await db
+    .update(agent_configs)
+    .set({
+      config: configForAtomicMerge({
+        selected_repository_ids: [],
+        manually_added_repositories: [],
+        // repositoryModeForPlatform owns the GitLab-only mode rule.
+        repository_selection_mode: repositoryModeForPlatform(platform, 'all'),
+      }),
+      is_enabled: false,
+      updated_at: new Date().toISOString(),
+    })
+    .where(and(...agentConfigOwnerConditions(owner, 'code_review', platform)))
+    .returning({ id: agent_configs.id });
+
+  if (!updated) {
     return false;
   }
 
-  const existingConfig = config.config as CodeReviewAgentConfig;
-
-  await upsertAgentConfigForOwner({
-    owner,
-    agentType: 'code_review',
-    platform,
-    config: {
-      ...existingConfig,
-      selected_repository_ids: [],
-      manually_added_repositories: [],
-      // repositoryModeForPlatform owns the GitLab-only mode rule.
-      repository_selection_mode: repositoryModeForPlatform(platform, 'all'),
-    },
-    isEnabled: false,
-    createdBy: 'system',
-  });
+  await ensureCodeReviewBotUser(owner, 'code_review');
 
   logExceptInTest('[resetCodeReviewConfigForOwner] Reset config due to instance URL change', {
     ownerType: owner.type,

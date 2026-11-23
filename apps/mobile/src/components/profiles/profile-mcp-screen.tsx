@@ -13,6 +13,7 @@ import {
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -28,7 +29,9 @@ import {
   useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
@@ -68,6 +71,11 @@ export function ProfileMcpScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -81,7 +89,10 @@ export function ProfileMcpScreen({
   // row unfiltered, so the loaded length is the count the cap compares.
   const atServerCap = servers.length >= MAX_PROFILE_MCP_SERVERS;
   // The open form, its fields and the refusal the sheet shows are one draft, so
-  // opening or closing the form resets the refusal with everything else.
+  // opening or closing the form resets the refusal with everything else. A
+  // remount reopens it on what was typed. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:mcp:${profileId}`;
   const form = useProfileFormDraft<McpServerSource, McpSaveFailure | null>(
     draftScope,
@@ -97,6 +108,8 @@ export function ProfileMcpScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
     // The form this save belongs to. A remount keeps it alive; a later open or
@@ -152,17 +165,7 @@ export function ProfileMcpScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant="server"
-        placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <McpSkeleton />;
   } else if (rows.length === 0) {
     content = (
@@ -252,17 +255,30 @@ export function ProfileMcpScreen({
         title={t('profiles.mcp.title')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <McpFormSheet
           draftScope={draftScope}
           server={form.editing}

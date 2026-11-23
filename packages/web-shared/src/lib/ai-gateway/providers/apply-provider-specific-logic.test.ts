@@ -40,7 +40,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   resolveOpenRouterModelAlias: jest.fn(async (model: string) =>
-    model === '~vendor/model-latest' ? 'vendor/model-2' : model
+    model === '~vendor/model-latest'
+      ? 'vendor/model-2'
+      : model === '~vendor/free-latest'
+        ? 'vendor/model:free'
+        : model
   ),
 }));
 
@@ -198,20 +202,20 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       { role: 'tool', tool_call_id: 'call-1', content },
     ];
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     return request.body.messages.find(message => message.role === 'tool')?.content;
   }
@@ -235,20 +239,20 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
 describe('applyProviderSpecificLogic latest aliases', () => {
   async function upstreamModel(provider: Provider, model: string) {
     const request = makeRequest(model);
-    await applyProviderSpecificLogic(
+    await applyProviderSpecificLogic({
       provider,
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
     return request.body.model;
   }
 
@@ -295,20 +299,20 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
       },
     };
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     const tool = request.body.tools?.[0];
     return tool?.type === 'function' ? tool.parameters : undefined;
@@ -344,20 +348,20 @@ describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
       },
     ];
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     return request.body.tools[0];
   }
@@ -414,20 +418,20 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
       },
     };
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     const tool = request.body.tools?.[0];
     return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
@@ -470,20 +474,20 @@ describe('applyProviderSpecificLogic Gemini tool schemas', () => {
       },
     };
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     const tool = request.body.tools?.[0];
     return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
@@ -1101,20 +1105,20 @@ describe('removeModelsFallback', () => {
     request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     expect(request.body).not.toHaveProperty('fallbacks');
     expect(warn).toHaveBeenCalledWith(
@@ -1135,20 +1139,20 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 
   async function apply(userByok: BYOKResult[] | null, provider = makeProvider(null)) {
     const request = makeRequest(requestedModel, ['caller/fallback']);
-    await applyProviderSpecificLogic(
+    await applyProviderSpecificLogic({
       provider,
       requestedModel,
-      request,
-      {},
+      requestToMutate: request,
+      extraHeaders: {},
       userByok,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      true,
-      null
-    );
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: true,
+      dataRegion: null,
+    });
     return request;
   }
 
@@ -1184,6 +1188,59 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
     expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
   });
 
+  it('treats an empty key list as a user BYOK request, not a Kilo request', async () => {
+    const request = makeRequest(requestedModel);
+    const serverFeatures = { plugins: [{ id: 'web' }] };
+    Object.assign(request.body, structuredClone(serverFeatures));
+
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: [],
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: true,
+      dataRegion: null,
+    });
+
+    expect(request.body).not.toMatchObject(serverFeatures);
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('classifies a list that holds a gateway key and an inference key as a gateway key', async () => {
+    const userByok: BYOKResult[] = [
+      { providerId: 'anthropic', decryptedAPIKey: 'inference-key' },
+      { providerId: 'vercel-ai-gateway', decryptedAPIKey: 'gateway-key' },
+    ];
+    const request = makeRequest(requestedModel);
+    const serverFeatures = { plugins: [{ id: 'web' }] };
+    Object.assign(request.body, structuredClone(serverFeatures));
+
+    await applyProviderSpecificLogic({
+      provider: VERCEL_AI_GATEWAY,
+      requestedModel,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: true,
+      dataRegion: 'eu',
+    });
+
+    expect(request.body).toMatchObject(serverFeatures);
+    expect(request.body.provider).toBeUndefined();
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null, null);
+  });
+
   it.each([
     { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
     {
@@ -1198,20 +1255,20 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       const serverFeatures = { plugins: [{ id: 'web' }], tools: [{ type: tool }] };
       Object.assign(request.body, structuredClone(serverFeatures));
 
-      await applyProviderSpecificLogic(
+      await applyProviderSpecificLogic({
         provider,
         requestedModel,
-        request,
-        {},
-        [{ providerId, decryptedAPIKey: 'user-key' }],
-        EmptyFraudDetectionHeaders,
-        'user-1',
-        null,
-        null,
-        null,
-        true,
-        null
-      );
+        requestToMutate: request,
+        extraHeaders: {},
+        userByok: [{ providerId, decryptedAPIKey: 'user-key' }],
+        originalHeaders: EmptyFraudDetectionHeaders,
+        userId: 'user-1',
+        organizationId: null,
+        sessionId: null,
+        taskId: null,
+        isNonTrialEnterprise: true,
+        dataRegion: null,
+      });
 
       expect(request.body).toMatchObject(serverFeatures);
     }
@@ -1240,20 +1297,20 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
       { role: 'user', content: 'Continue.' }
     );
     const extraHeaders: Record<string, string> = {};
-    await applyProviderSpecificLogic(
+    await applyProviderSpecificLogic({
       provider,
       requestedModel,
-      request,
+      requestToMutate: request,
       extraHeaders,
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
     return { thinking: request.body.thinking, messages: request.body.messages, extraHeaders };
   }
 
@@ -1339,20 +1396,20 @@ describe('applyProviderSpecificLogic whitespace-only messages', () => {
       },
     ];
 
-    await applyProviderSpecificLogic(
+    await applyProviderSpecificLogic({
       provider,
-      model,
-      request,
-      {},
-      null,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     expect(request.body.messages).toEqual([
       { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
@@ -1388,20 +1445,20 @@ describe('applyProviderSpecificLogic paid server features', () => {
   async function applyTo(model: string, byok: BYOKResult[] | null = null) {
     const request = makeRequest(model);
     Object.assign(request.body, structuredClone(fields));
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
-      byok,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: byok,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
     return request.body;
   }
 
@@ -1412,6 +1469,20 @@ describe('applyProviderSpecificLogic paid server features', () => {
 
     expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
     expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('applies the free-model server-feature rules to a latest alias by its target', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('~vendor/free-latest');
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+      expect.objectContaining({ model: 'vendor/model:free' })
+    );
     warn.mockRestore();
   });
 
@@ -1444,20 +1515,20 @@ describe('applyProviderSpecificLogic paid server features', () => {
       tool_choice: { type: 'vercel:perplexity_search' },
     });
 
-    await applyProviderSpecificLogic(
-      VERCEL_AI_GATEWAY,
-      model,
-      request,
-      {},
+    await applyProviderSpecificLogic({
+      provider: VERCEL_AI_GATEWAY,
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
       userByok,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      null,
-      null,
-      null,
-      false,
-      null
-    );
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     expect(request.body.tools).toEqual([fields.tools[1]]);
     expect(request.body).not.toHaveProperty('tool_choice');
@@ -1621,20 +1692,20 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
     const model = 'anthropic/claude-sonnet-4.5';
     const request = makeRequest(model);
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      model,
-      request,
-      {},
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: model,
+      requestToMutate: request,
+      extraHeaders: {},
       userByok,
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      'org-1',
-      null,
-      null,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: 'org-1',
+      sessionId: null,
+      taskId: null,
       isNonTrialEnterprise,
-      null
-    );
+      dataRegion: null,
+    });
 
     return request.body.provider;
   }
@@ -1655,20 +1726,20 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
   it("adds no Kilo provider order to a request served by the user's own provider key", async () => {
     const request = makeRequest(USER_GATEWAY_TEST_MODEL);
 
-    await applyProviderSpecificLogic(
-      makeProvider(null),
-      USER_GATEWAY_TEST_MODEL,
-      request,
-      {},
-      [{ providerId: 'bedrock', decryptedAPIKey: 'key' }],
-      EmptyFraudDetectionHeaders,
-      'user-1',
-      'org-1',
-      null,
-      null,
-      false,
-      null
-    );
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel: USER_GATEWAY_TEST_MODEL,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: [{ providerId: 'bedrock', decryptedAPIKey: 'key' }],
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: 'org-1',
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
 
     expect(request.body.provider).toBeUndefined();
   });

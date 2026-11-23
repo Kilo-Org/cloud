@@ -9,6 +9,7 @@ import { reviewMemoryRetentionCutoff } from './retention';
 
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
   /\b(?:review\s+memory|kilo|feedback\s+systems?|this\s+analysis|llms?)\b/i;
+export const REVIEW_MEMORY_GATEWAY_TIMEOUT_MS = 120_000;
 
 /**
  * Caps applied in `validateReviewMemoryProposalDraft`, never in the schema the model
@@ -48,6 +49,7 @@ export type GenerateReviewMemoryProposal = (input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
+  signal?: AbortSignal;
 }) => Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -59,6 +61,7 @@ export async function generateReviewMemoryProposalWithGateway(input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
+  signal?: AbortSignal;
 }): Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -78,6 +81,7 @@ export async function generateReviewMemoryProposalWithGateway(input: {
     validate: output => ({
       proposal: validateReviewMemoryProposalDraft(output.proposal),
     }),
+    abortSignal: input.signal,
   });
 
   return {
@@ -93,6 +97,7 @@ export async function runReviewMemoryAnalysis(input: {
   repoFullName: string;
   generate?: GenerateReviewMemoryProposal;
   now?: Date;
+  signal?: AbortSignal;
 }): Promise<{ status: 'proposed' | 'no_change' | 'no_feedback'; proposalId?: string }> {
   const events = await listRecentFeedbackEvents({
     owner: input.owner,
@@ -110,6 +115,7 @@ export async function runReviewMemoryAnalysis(input: {
     platform: input.platform,
     repoFullName: input.repoFullName,
     events,
+    signal: input.signal ?? AbortSignal.timeout(REVIEW_MEMORY_GATEWAY_TIMEOUT_MS),
   });
 
   if (draft.status === 'no_change') return { status: 'no_change' };
@@ -118,7 +124,10 @@ export async function runReviewMemoryAnalysis(input: {
   const citedEvents = draft.evidenceEventIds
     .map(eventId => eventsById.get(eventId))
     .filter(event => event !== undefined);
-  const evidenceEvents = citedEvents.length > 0 ? citedEvents : events;
+  const evidenceEvents =
+    citedEvents.length > 0
+      ? citedEvents
+      : events.slice(0, REVIEW_MEMORY_PROPOSAL_LIMITS.evidenceEventIds);
   const proposal = await upsertScopeProposal({
     owner: input.owner,
     platform: input.platform,

@@ -184,7 +184,9 @@ still prevents an older reader from projecting a network value as a plaintext en
 
 A message stores `messageId`, its immutable intent (turn, agent, model, attachments,
 finalization), `state`, `createdAt`, `acceptedAt`, `settledAt` and a failure `reason` when
-terminal. Nothing else.
+terminal. It may also store a billing failure, container metadata and a settlement record.
+The settlement record holds the failure and gate facts, the final assistant message ID and
+the last seen branch available when the message settles.
 
 | Event | Effect |
 |---|---|
@@ -295,7 +297,14 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
-  sent as a new message.
+  sent as a new message. The answer call itself also reports a retryable refusal. That happens when
+  the live route cannot take the reply and the interaction still waits. The same reply is then
+  admissible after the route returns. The answer call only preflights that new turn; the admit call
+  rebuilds it from the session's current state and reports `sent`, `queue-full`, `retry` or
+  `not_connected`. `retry` means the named interaction is still pending and this reply could not be
+  taken, so the caller can use the same reply again; `not_connected` is terminal for that reply.
+  The answer call reports a non-terminal `invalid` refusal instead when the reply of a settled turn
+  carries no text, so the interaction stays answerable by a different reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
@@ -790,6 +799,36 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
+### Environment setup sessions
+
+- Grouped metadata MAY carry `environmentSetup: { runId, environmentId, role }`
+  with role `setup` or `verification`. Preflight sets it; clients cannot.
+- `setup`: accepted only from a non-authority internal-key `prepareSession`
+  with `environmentSetupRunId`, verified against
+  `cloud_agent_environment_setup_runs` (owner match, open status, draft equals
+  `requestedEnvironment.id`). The session may resolve its draft environment.
+  This role uses full network access with egress auditing for setup discovery,
+  even when the draft is restricted. It requires a Cloudflare Containers allocation.
+- `verification`: accepted only under a Cloud Agent authority whose
+  `environmentSetup` claim matches `verificationOf.runId` and
+  `requestedEnvironment.id`, and whose parent workspace authority recorded the
+  same binding from the setup session. The child resolves the draft and its
+  network policy instead of inheriting the parent workspace's policy.
+- The agent can read the discovery audit through `get_environment_draft` and
+  cite setup or verification audit records when requesting hosts. Pending host
+  requests block verification. Discovery alone cannot satisfy the completion gate.
+- The workspace MCP grant adds `environmentSetup` to `cloudAgentAuthority`
+  only for the workspace created by the setup session.
+- Drafts cannot be built into environment snapshots. Setup and verification
+  sessions run the draft's setup commands during session preparation.
+- When an environment applies and the resolved egress mode is `allowlist`,
+  the environment's required hosts are added to the allowlist.
+- `getSession` exposes the admitted environment revision, the latest
+  preparation outcome, and the workspace egress policy. A command failure
+  fails the verification preparation outcome without preventing the session
+  from starting. A setup authority can use `getEgressAudit` for the setup
+  session or a direct child.
+
 ### Workspace tail snapshots
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
@@ -850,7 +889,97 @@ keep environment snapshots and existing history/worktree recovery.
   The snapshot
   holds only the disk: like an environment snapshot, restore applies the current credentials,
   env, secrets and MCP configuration from the route before accepting work.
-  Existing native sessions are reused; missing native sessions use history-only recovery.
+  Existing native sessions are reused when their record names this workspace directory; a record
+  that names another directory takes history-only recovery, as Kilo v2 already requires.
+  Missing native sessions use history-only recovery.
+  A re-pointed record keeps the fields the import body can carry, including the wider shapes a record
+  may hold: the import accepts a summary that carries file diffs and a revert that carries a patch
+  diff, and the record read back returns the patch diff unchanged and each diff entry with its file,
+  additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
+  `model`, `path`, `cost` or `tokens`: it accepts those keys and silently drops them. A re-point
+  therefore clears the stored value of each. The record's own `slug` is carried: the import body has
+  a `slug` field, so a re-point keeps the share URL naming the record's own slug.
+  The native import also cannot carry a session permission ruleset or a session `metadata`, so both
+  obligations are remembered in one marker file per session beside the wrapper's durable state:
+  `$HOME/.kilo-control/rulesets/<encoded session id>.json` holds `{ permission?, metadata? }`,
+  either obligation may be present alone, and the file is deleted when neither remains. A marker
+  that holds a bare JSON array is read as `{ permission: array }`, which is the shape the earlier
+  code wrote. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
+  model from the route payload, so the stored pair is a mirror that no turn reads. `path` is not
+  restored either: no wrapper code reads it, and the import leaves it empty.
+  The marker goes down before the import commits the row, and the ruleset is applied right after the
+  metadata restore. Writing the marker before the import is what makes the guarantee hold: a marker
+  written only after a failed apply would leave a window where the process dies between the import
+  and the write, and the committed record then owes a ruleset and a metadata that nothing remembers.
+  The record's own `permission` is authoritative: when the marker and the record both hold a
+  ruleset, the record's set is the one applied, because the marker exists only because the native
+  import clears the row, and it is a durable copy of an obligation rather than a second source of
+  truth. The marker is rewritten before the import and only when it does not already name what the
+  record carries, so a directory that refuses the write cannot fail a route whose obligation is
+  already recorded. A rewrite that fails fails the route retryably with the record untouched, so the
+  retried prepare makes the same comparison again. A rule that only the marker held is dropped
+  rather than applied: the record's authenticated permission is the state of the session, and this
+  module is its only writer through the native API. Once the record's set is applied, the marker is
+  reduced to what is still owed and removed when nothing remains, so a rule the record does not
+  carry is not left behind as a standing obligation.
+  The wrapper restores `metadata` right after the import and before it applies the ruleset, because
+  metadata holds the session goal a user sees: a ruleset that cannot be applied throws, and the
+  next prepare settles that obligation without running the create path again, so a restore placed
+  after the apply would never reach the record. A metadata restore that fails is logged and does
+  not fail the route: the record is already committed, the metadata carries no authorization
+  decision, and the obligation stays recorded so the next prepare retries it.
+  The record's own `metadata` is authoritative in the same way its `permission` is: the wrapper
+  supplies an owed value only where the import left the record empty. The update replaces the whole
+  value and the server normalizes what it stores, so a record that carries a value may hold a newer
+  goal than the copy the marker kept, and writing that copy back would revert the user's own goal.
+  A marker obligation the record already satisfies is dropped without a write.
+  Every prepare settles both obligations through `settleOutstandingRuleset`, before the probe and
+  again after a successful history restore; a settle that finds no record leaves the marker in place
+  for the create path, which applies what it owes to the record it imports. A create path whose
+  marker already covers what the record carries does not rewrite it.
+  The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
+  already holds every rule, because the native update appends rather than replaces; a marker that
+  cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
+  does not repeat them. The marker ends with the record it describes: a worktree deletion removes the
+  marker of each session it deletes, because no later prepare can apply a ruleset to a record that no
+  longer exists. A release does not remove it, because release only stops the session and the record
+  survives with its obligation. A record that still names another directory never satisfies the
+  obligation, because the rules it carries belong to that directory; the marker waits for the record
+  the import re-points, and the settle first replaces the marker's metadata copy with that record's
+  own value, because the re-pointing import clears the column and that read is the last that can see
+  it. A marker that owes only a ruleset still takes that value. The remembered ruleset and a
+  record's own permission are parsed as rulesets before use: a value that is not a ruleset is never
+  applied and never becomes the record's grants, because a ruleset widens what the agent may do. A
+  marker that is present but not a ruleset fails the prepare with a permanent session-import reason
+  instead of reading as nothing owed, since reading it as nothing owed would drop rules the record
+  never received.
+  The marker directory is created `0700` and tightened to `0700` when it exists, and the file is
+  `0600`. There is no fallback to a shared temporary directory: a process without a home
+  directory cannot name the store, so recording or reading an obligation fails retryably instead of
+  reading as nothing owed, and forgetting one does nothing. The `0700` directory and the `0600` file
+  are defence in depth only while the wrapper and the agent share one uid inside the sandbox; a real
+  boundary needs wrapper-owned state outside any location the agent can write, which is a
+  sandbox-level change.
+  A record whose own permission is present but not a ruleset fails the create path the same way,
+  before the import, and the record is left unchanged: no rules are applied, so a later prepare in
+  the same allocation reads that record again and fails the same way until the record is replaced.
+  The settle path refuses a record that names the route directory and carries such a permission in
+  exactly the same way: it sends no update, keeps the remembered ruleset because the record is left
+  unchanged, and fails the prepare. A record under another directory is still treated as absent, so
+  the marker simply waits for the import to re-point it. Both entry points therefore refuse, rather
+  than prepare a route whose record lacks the rules it owes.
+  A marker or session read that cannot answer fails the prepare as retryable and sends no permission
+  update, because the retried step reads the same durable state and the native update appends. A
+  marker that cannot be written before the import fails as retryable too, because no record is
+  committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
+  ruleset, fail as the permanent session-import reason. The message names the store path and the
+  underlying cause in the wrapper log only — the marker path for a marker that cannot be
+  interpreted, the record's id for a record whose permission is not a ruleset — while the session
+  frame still carries the session-import reason with no detail. A settle whose permission update
+  fails fails retryably and reports the same session-import reason, because the marker is intact and
+  the retried step reads it again. An apply or a settle interrupted by the step budget's abort
+  reports the abort rather than the permanent or retryable ruleset classification, so the step keeps
+  its own classification and retry budget, and the marker stays for the next prepare.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads
@@ -1682,7 +1811,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
-| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress remains native-only. |
+| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress uses the shared [sandbox egress proxy](#sandbox-egress-proxy). |
 
 **Changed**
 
@@ -1802,6 +1931,105 @@ Cloudflare's public Worker ingress limit depends on the account plan: 100 MB, 20
 Workers HTTP duration has no fixed limit while connected, but Vercel forwarding duration remains
 unverified beyond the tested 8 MiB transfers and Git operations. Before production rollout,
 confirm ingress and duration compatibility and resolve any confirmed reduction. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+### Sandbox egress proxy
+
+An egress allowlist and an egress audit are product logic in one shared core,
+`proxySandboxEgress` (`src/egress/sandbox-egress.ts`). A provider supplies two primitives in the
+capability table (`packages/worker-utils/src/sandbox-provider-capabilities.ts`):
+
+| Feature | Meaning | Containers | Vercel | Cloudflare (retired) |
+|---|---|---|---|---|
+| `egressProxy` | Sandbox egress reaches the Worker proxy with a verified sandbox identity. | yes | yes | no |
+| `egressProxySeesAll` | The proxy sees all HTTP(S) egress, not only the listed hosts. | yes | no | no |
+
+One rule, `egressRequestSupported`, reads them: an allowlist needs `egressProxy`; an audit without
+an allowlist needs `egressProxySeesAll`; a session without an egress request is always supported.
+Registration, the sandbox selection and metadata schemas, the Sandbox DO pin checks, the
+saved-allocation skip and the web guidance use this rule. The pin checks and the schemas also
+require an isolated sandbox. The audit read requires `egressProxy`.
+
+**Core.** For each request: a strict URL check against the allowlist (`https` or `http`, the
+default port, no userinfo, an exact host); then one audit row when the policy has audit; then a 403
+`Egress destination disallowed`, or a fetch with `Host` from the URL and `redirect: 'manual'`.
+A failed audit write gives 502 `Egress audit unavailable` and sends nothing. Containers runs the
+core from its outbound handler. The audit store is one `EgressAuditStore` for each logical sandbox,
+reached only through `egressAuditStore` (`SANDBOX_CONTAINERS` by the logical sandbox id). Its use
+is provider-neutral: for a Vercel sandbox the object starts no container, sets no alarm and writes
+no billing record. Retention is the same on both providers: at most 256 chunks of 64 rows. When
+the store is full, a write deletes the oldest chunk if its last write is at least 60 seconds old;
+otherwise the write fails, and the request gets 502. Rows have no time-based expiry.
+
+**Vercel request path.** A restricted Vercel policy (`restrictVercelEgress`) has the effective
+allowlist as its keys and never `'*'`. The Worker host keeps its credential rules and a Host-pin
+transform; every other listed host keeps its credential rules and ends with a forward to
+`/scm/vercel/<sandboxId>`. An unlisted name does not resolve in the sandbox. A policy that cannot
+be built creates no sandbox and sends no update. The route then:
+
+1. reads the target from the `vercel-forwarded-*` headers;
+2. admits the request: the pin policy, then the live allocation (owner, allocation id, provider
+   ref, not stopping or stopped), then the Vercel OIDC token (issuer, audience, team, project,
+   sandbox name, `exp`). An unavailable allocation gives 403 `allocation_unavailable` before the
+   token check. A bad or expired token, or a token of another sandbox, gives 401;
+3. strips every `vercel-*`, `x-vercel-*` and `x-forwarded-*` header, the token and hop-by-hop
+   headers. It keeps `upgrade` only on a WebSocket upgrade;
+4. runs the core with the pin allowlist minus the Worker host, so the Worker host, another port,
+   userinfo, `http` and an IP literal give 403. The core writes a `denied` row only when the pin
+   has audit;
+5. sends an unmanaged request with `fetch`, and a managed SCM credential through the SCM admission.
+
+A Vercel sandbox without an allowlist keeps the SCM forward path unchanged. The route never
+proxies to a host outside the allowlist or the managed SCM targets.
+
+The runtime proxy facade middleware leaves `/scm/vercel/` paths alone, so a forwarded request with
+a runtime proxy handle in `Authorization` also reaches the route.
+
+**Admission caches.** The Sandbox DO caches a verified identity for each token hash and allocation
+(at most 64 entries, until the token `exp`); the live allocation check runs on every request. Each
+Worker isolate caches an admitted result by sandbox id and token hash: at most 256 entries, for at
+most 30 seconds and never past the token `exp`. A denial is not cached. So an isolate can admit a
+request for up to 30 seconds after the allocation stops or changes. In that window the request
+still passes the URL check against the admitted allowlist, and its audit row is still written.
+
+**Differences on Vercel.**
+
+| # | Case | Containers | Vercel |
+|---|---|---|---|
+| D1 | `http://` to a listed host | allowed | fails (connection reset); use `https://` |
+| D3 | unlisted host | 403, audited `denied` | does not resolve; not audited |
+| D13 | audit | any network mode | allowlist mode only |
+| D15 | Worker host; a request that a credential rule matches | through the proxy, audited | direct, not audited |
+| D16 | upload size | no edge limit | the request body limit of the Cloudflare plan |
+| D17 | HTTP/2-only client, gRPC | not checked | fails on forwarded hosts |
+
+**Failure.** Egress stays restricted in each case: a refused update leaves the old policy in
+force, and that policy has no `'*'`.
+
+| Path | Result of a policy that cannot be built or applied |
+|---|---|
+| Create | No sandbox. The routes fail with `network_policy_failed`. |
+| Release (`applyVercelNetworkPolicyOrStop`), workspace Stop (`cancelWorkspace`) | The sandbox stops: `network_policy_failed` on a restricted sandbox, `sandbox_lost` on an unrestricted one (`refusedPolicyStopReason`). |
+| Route grant at prepare (2 attempts) | That route fails with `workspace_setup_failed`, stage `credential_policy_unavailable`. The sandbox keeps running. |
+| A preparing route when the wrapper connects (`onWrapperConnected`) | That route fails with `workspace_setup_failed`. The sandbox keeps running. |
+| `bindRuntimeCredentialProxyHandle`, `updateNetworkPolicy` | The call fails. The sandbox keeps running. |
+
+**Rollback.**
+
+- No migration and no new Durable Object class.
+- Deploy the Worker before the web app: the web guidance reads the same capability table.
+- Revert of the Vercel `egressProxy = true` commit fails closed. Registration refuses a restricted
+  Vercel request, and a live restricted pin makes `readProviderPin` throw. The stored metadata and
+  registration of a restricted Vercel session fail validation, so the Session DO loads that session
+  as absent until the commit is deployed again. Audit rows stay in the store, but the audit read
+  refuses them. Nothing is deleted.
+- After that revert, a live restricted Vercel sandbox runs until the Vercel sandbox timeout.
+  `readProviderPin` runs in `initializeStorage`, so the Sandbox DO fails to initialize and cannot
+  stop the BYOC sandbox in the customer account. Egress stays closed: the Vercel policy stays in
+  force, and each forward gets 503 `forwarding_unavailable` because the admission cannot load the
+  pin. To prevent this, stop live restricted Vercel sandboxes before the rollback.
+- Revert the two `network_policy_failed` commits together (the reason, and the workspace Stop that
+  uses it), and only when no stored route row holds that reason: the failure reason schema is
+  strict, and a stored row with an unknown reason fails to parse.
 
 ### Compatibility and rollout
 
@@ -1976,8 +2204,12 @@ Registry entries are discovery hints: every returned child is reauthorized, and 
 outages fail the query rather than reporting an empty list. An empty page can still have a
 `nextCursor` when its entries no longer authorize. Children created before the original index was
 introduced are not backfilled; explicit management by ID still checks their lineage.
-Message-result queries preserve terminal assistant output and safe failure details. Prefer completion
-callbacks; bounded status checks are supported, but busy polling is not needed.
+`getMessageResult` returns the message status, structured failure with stage and code, final
+assistant message ID and text, gate result, and last seen branch when available. It also returns
+a preparation summary for the requested message with attempt status, failed step label and safe
+reason, without commands or output. Only the final message settled by an outcome captures an
+assistant answer. Prefer completion callbacks for notification when a batch drains and for recent
+activity, which polling does not return. Use bounded polling to check a specific message's result.
 
 Rollout: existing workspaces adopt their creating chat's authorization on first use, with the same
 authorization ID, so MCP credentials issued before the rollout stay valid until their own expiry.

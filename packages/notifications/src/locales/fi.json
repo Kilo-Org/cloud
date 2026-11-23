@@ -7,6 +7,7 @@
       "spendAlert": "Kulutuksesi vaatii huomiota",
       "securityFinding": "Tietoturvalöydös vaatii huomiota",
       "securityUpdate": "Tietoturvatarkistuksella on päivitys",
+      "agentBriefing": "Agenttikatsauksesi on valmis",
       "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Uusi tietoturvalöydös ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kriittinen",
+      "high": "Korkea",
+      "medium": "Keskitaso",
+      "low": "Matala"
     },
     "securityFindingSlaWarning": {
       "title": "SLA-varoitus"

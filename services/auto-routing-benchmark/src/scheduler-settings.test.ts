@@ -106,10 +106,14 @@ describe('scheduler settings (admin API, dispatch, real SQLite)', () => {
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
-        min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity
-      ) VALUES ('run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 4, 1, 'settings-test')
+        min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+        admission_marker
+      ) VALUES ('run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 4, 1,
+        'settings-test', ?)
     `)
-      .run(new Date().toISOString());
+      // A claimable run must carry the post-cutover admission marker; without it the lane
+      // heads are fenced and nothing is claimed.
+      .run(new Date().toISOString(), crypto.randomUUID());
     await scheduleRunChunks(db, {
       runId: 'run',
       entries: [{ model: 'deep/model', variant: '' }],

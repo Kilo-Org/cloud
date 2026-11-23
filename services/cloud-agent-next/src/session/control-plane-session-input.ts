@@ -188,20 +188,7 @@ export function buildControlPlaneSandboxSelection(
     binding?.kind === 'vercel' && binding.source.kind === 'byoc'
       ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
       : undefined;
-  if (provider === 'vercel') {
-    if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
-    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-    return {
-      provider,
-      configuration: resources === undefined ? { provider } : { provider, resources },
-      byoc,
-      ...(sandboxKind ? { sandboxKind } : {}),
-    };
-  }
-  const billing = buildSandboxBillingInput(metadata, sandboxId);
-  const pinned = {
-    billing,
-    ...(sandboxKind ? { sandboxKind } : {}),
+  const egress = {
     ...(metadata.workspace?.egressMode === undefined
       ? {}
       : { egressMode: metadata.workspace.egressMode }),
@@ -211,6 +198,23 @@ export function buildControlPlaneSandboxSelection(
     ...(metadata.workspace?.egressAudit === undefined
       ? {}
       : { egressAudit: metadata.workspace.egressAudit }),
+  };
+  if (provider === 'vercel') {
+    if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
+    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+    return {
+      provider,
+      configuration: resources === undefined ? { provider } : { provider, resources },
+      byoc,
+      ...(sandboxKind ? { sandboxKind } : {}),
+      ...egress,
+    };
+  }
+  const billing = buildSandboxBillingInput(metadata, sandboxId);
+  const pinned = {
+    billing,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...egress,
   };
   switch (provider) {
     case 'cloudflare-containers': {

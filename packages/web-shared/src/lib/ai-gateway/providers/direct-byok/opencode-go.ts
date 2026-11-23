@@ -5,10 +5,10 @@ import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/p
 import {
   apiKeyUpstream,
   credentialHeaders,
-  faviconIcon,
+  providerListing,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 
@@ -18,8 +18,10 @@ function sessionHeaders(session: string): Record<string, string> {
   return { [SESSION_HEADER]: session };
 }
 
+const id = 'opencode-go';
+
 export default {
-  id: 'opencode-go',
+  id,
   models_dev_id: 'opencode-go',
   ...apiKeyUpstream({
     apiUrl: 'https://opencode.ai/zen/go/v1',
@@ -53,15 +55,12 @@ export default {
   getAiSdkProvider(model) {
     return isMinimaxModel(model) || isQwenModel(model) ? { aiSdkProvider: 'anthropic' } : null;
   },
-  models: cachedDirectByokModelList('opencode-go'),
-  provider_listing: {
-    dataPolicy: {
-      training: true,
-      retainsPrompts: true,
-      canPublish: false,
-      termsOfServiceURL: 'https://opencode.ai/legal/terms-of-service',
-      privacyPolicyURL: 'https://opencode.ai/legal/privacy-policy',
-    },
-    icon: faviconIcon('https://opencode.ai/'),
-  },
+  models: cachedDirectByokModelList(id),
+  provider_listing: providerListing({
+    siteUrl: 'https://opencode.ai/',
+    training: true,
+    retainsPrompts: true,
+    termsOfServiceURL: 'https://opencode.ai/legal/terms-of-service',
+    privacyPolicyURL: 'https://opencode.ai/legal/privacy-policy',
+  }),
 } satisfies DirectByokProvider;

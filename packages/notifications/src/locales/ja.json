@@ -7,6 +7,7 @@
       "spendAlert": "支出の確認が必要です",
       "securityFinding": "セキュリティの検出結果の確認が必要です",
       "securityUpdate": "セキュリティチェックに更新があります",
+      "agentBriefing": "エージェントブリーフィングの準備ができました",
       "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "新しいセキュリティ検出結果 ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "重大",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
     },
     "securityFindingSlaWarning": {
       "title": "SLA 警告"

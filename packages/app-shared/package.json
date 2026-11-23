@@ -12,6 +12,7 @@
     "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
     "./organizations": "./src/organizations/index.ts",
+    "./organizations/model-access-providers": "./src/organizations/model-access-providers.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
     "./opencode": "./src/opencode.ts",
@@ -34,9 +35,11 @@
     "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./byok-errors": "./src/byok-errors.ts",
+    "./integrations-errors": "./src/integrations-errors.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",
     "./git-url-project": "./src/git-url-project.ts",
+    "./percent-encoded-segments": "./src/percent-encoded-segments.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
     "./worktree-review": "./src/worktree-review/index.ts",
     "./local-fake-llm": "./src/local-fake-llm.ts"
@@ -47,6 +50,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "zod": "catalog:"
   },

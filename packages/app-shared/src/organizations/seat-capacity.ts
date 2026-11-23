@@ -19,7 +19,7 @@ export function inviteConsumesSeat(role: OrganizationRole): boolean {
   return role !== 'billing_manager';
 }
 
-type InviteSeatCapacity = {
+export type InviteSeatCapacity = {
   plan: string | undefined;
   requireSeats: boolean | undefined;
   usedSeats: number;
@@ -43,7 +43,7 @@ export function hasInviteSeatCapacity({
   return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
 }
 
-type SeatCountReadout = {
+export type SeatCountReadout = {
   seatsEnforced: boolean;
   used: number;
   total: number;

@@ -18,6 +18,16 @@ type DeepLinkSource = PendingDeepLinkRecord['source'];
 
 type GetLinkingURL = () => string | null;
 
+/**
+ * How a pending destination arrived. `'live'` is a choice the person made while
+ * this process ran: a link tap, a notification tap, a launcher shortcut, an
+ * action URL. `'restored'` is a destination the app recovered for itself — the
+ * OS replaying the launch Intent, or a record an earlier process persisted — so
+ * nobody asked for it in this process. The layout reads it back through
+ * `getPendingDeepLinkArrival` before navigating.
+ */
+export type PendingDeepLinkArrival = 'live' | 'restored';
+
 /** Per-capture flags the precedence and account rules read back. */
 export type PendingDeepLinkOptions = {
   /** Only the cold-launch capture sets this; see the module flag below. */
@@ -35,6 +45,19 @@ export type PendingDeepLinkOptions = {
    * destination carries no organization: Personal, or a source that has none.
    */
   organizationId?: string | null;
+  /**
+   * How the destination arrived. Omitted means `'live'`: every source that does
+   * not set it fires only for a gesture someone just made. The cold-launch
+   * capture and the durable restore set `'restored'`.
+   */
+  arrival?: PendingDeepLinkArrival;
+  /**
+   * The capture time the destination already had. Only the persisted-record
+   * restore sets it, so a restore writes the original time back and the 24 h
+   * bound keeps counting from capture. A live capture leaves it unset and is
+   * stamped with the current time.
+   */
+  storedAt?: number;
 };
 
 /** Minimal SecureStore surface used by the durable mirror. */
@@ -44,7 +67,7 @@ type SecureStoreLike = {
   getItemAsync: (key: string) => Promise<string | null>;
 };
 
-/** A persisted record older than this is discarded on restore. */
+/** A persisted record captured longer ago than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 let pendingDeepLink: string | null = null;
@@ -94,6 +117,12 @@ let pendingDeepLinkUserId: string | null = null;
 // `pendingDeepLinkUserId`: it rides with the pending slot and never switches
 // anything on its own.
 let pendingDeepLinkOrganizationId: string | null = null;
+
+// How the CURRENT in-memory slot's destination arrived. A restored destination
+// was not chosen in this process — the OS replayed the launch Intent, or the
+// durable record was written by an earlier process — so the layout checks where
+// the person is before opening it. A live one is always delivered.
+let pendingArrival: PendingDeepLinkArrival = 'live';
 
 // Whether an account identity is known yet. A cold launch captures a
 // system-search tap at module scope, before auth restores, so `currentDeepLinkUserId`
@@ -166,7 +195,6 @@ function getSecureStore(): SecureStoreLike {
 // chain so a later delete (consume or sign-out) always lands after an earlier
 // persist. Each write stays fire-and-forget from the caller's view, but chains
 // onto the previous write so call order is preserved.
-// eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
 let pendingDeepLinkWriteChain: Promise<void> = Promise.resolve();
 
 function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
@@ -184,12 +212,13 @@ function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
 }
 
 /** Fire-and-forget durable mirror. A failure is reported to Sentry; the
- *  in-memory slot still works for the live process. */
-function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
+ *  in-memory slot still works for the live process. `storedAt` is the capture
+ *  time of the destination, so a restore keeps the original time. */
+function persistPendingDeepLink(href: string, source: DeepLinkSource, storedAt: number): void {
   const record: PendingDeepLinkRecord = {
     href,
     source,
-    storedAt: Date.now(),
+    storedAt,
     userId: currentDeepLinkUserId,
     sessionBound: pendingDeepLinkSessionBound,
     organizationId: pendingDeepLinkOrganizationId,
@@ -270,9 +299,6 @@ function applyPendingDeepLink(
   ) {
     return;
   }
-  // A notification applies only when the slot is empty or already a notification:
-  // a system-search tap is newer evidence and must not be overwritten by a
-  // stale notification response.
   if (source === 'notification' && pendingDeepLink !== null && pendingSource !== 'notification') {
     return;
   }
@@ -281,9 +307,11 @@ function applyPendingDeepLink(
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
   pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
+  const storedAt = options?.storedAt ?? Date.now();
   pendingDeepLinkOrganizationId = options?.organizationId ?? null;
+  pendingArrival = options?.arrival ?? 'live';
   pendingDeepLinkEpoch += 1;
-  persistPendingDeepLink(href, source);
+  persistPendingDeepLink(href, source, storedAt);
   notifyPendingDeepLinkListeners();
 }
 
@@ -323,12 +351,6 @@ export function consumePendingDeepLink(): ConsumedPendingDeepLink | null {
   return result;
 }
 
-/**
- * The single gated consumer step `_layout.tsx` runs: the organization switches
- * the app before the href navigates, so the route's first fetch runs in the
- * session's context. A destination with no organization leaves the selection
- * untouched; a null destination does nothing.
- */
 export function applyConsumedPendingDeepLink(
   pending: ConsumedPendingDeepLink | null,
   setOrganizationId: (organizationId: string) => void,
@@ -356,6 +378,7 @@ export function clearPendingDeepLink(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
+  pendingArrival = 'live';
   deferredSystemSearchHref = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
@@ -387,6 +410,14 @@ export function getPendingDeepLinkSnapshot(): string | null {
   return pendingDeepLink;
 }
 
+/**
+ * How the pending destination arrived. Read before `consumePendingDeepLink`,
+ * which clears the slot the arrival rides in.
+ */
+export function getPendingDeepLinkArrival(): PendingDeepLinkArrival {
+  return pendingArrival;
+}
+
 /** Subscribe to pending-slot changes. Returns an unsubscribe function. */
 export function subscribeToPendingDeepLink(listener: () => void): () => void {
   pendingDeepLinkListeners.add(listener);
@@ -397,8 +428,10 @@ export function subscribeToPendingDeepLink(listener: () => void): () => void {
 
 /**
  * Restore a destination persisted before process death. Reads the record,
- * discards it when older than 24 h or when it fails to parse, and otherwise
- * feeds it back through `setPendingDeepLink` (precedence rules unchanged).
+ * discards it when it was captured more than 24 h ago or when it fails to
+ * parse, and otherwise feeds it back through `setPendingDeepLink` (precedence
+ * rules unchanged). The restore keeps the record's capture time, so a start
+ * that finds the destination still unconsumed does not restart the 24 h bound.
  *
  * Fills ONLY an empty slot: a live capture (`checkInitialNotification`,
  * `captureLaunchDeepLink`) already ran at module scope and owns the slot, so a
@@ -450,8 +483,15 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
     return;
   }
 
-  const { href, source, sessionBound, organizationId } = record;
-  setPendingDeepLink(currentRouteHref(href), source, { sessionBound, organizationId });
+  const { href, source, sessionBound, organizationId, storedAt } = record;
+  setPendingDeepLink(currentRouteHref(href), source, {
+    sessionBound,
+    organizationId,
+    storedAt,
+    // The record was written by an earlier process: a recovery, not a choice
+    // someone made in this one.
+    arrival: 'restored',
+  });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -521,16 +561,13 @@ export function captureLaunchDeepLink(): void {
   // fallback of an unusable session capture would replace the restored screen
   // with it. `redirectSystemPath` applies the same rule to a warm arrival.
   if (resume && opensDestination(resume.href)) {
-    // An app-scheme launch URL is the shape the Android system-search tap
-    // delivers; flag it so the exact `system-search` route for that tap may
-    // replace this lossy web-table mapping. An `https://` link is never flagged.
-    // An app-scheme URL that names a family the phone's search indexes is a
-    // search result's identifier, so it is session-bound: it must not open for
-    // the account that signs in after the one that indexed it.
     launchCapturedHref = resumeDeepLinkHref(resume);
     setPendingDeepLink(launchCapturedHref, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
       sessionBound: isSystemSearchFamilyLink(url),
+      // The OS launched this process with the URL: a replayed Intent, not a
+      // gesture someone made in this process.
+      arrival: 'restored',
     });
     return;
   }
@@ -542,6 +579,9 @@ export function captureLaunchDeepLink(): void {
     launchCapturedAppRoute = true;
     setPendingDeepLink(appRoute, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+      // Same as the resume capture: a launch URL is the OS replaying the
+      // Intent, not a screen chosen in this process.
+      arrival: 'restored',
     });
   }
 }
@@ -570,6 +610,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
+  pendingArrival = 'live';
   launchCapturedHref = null;
   launchCapturedAppRoute = false;
   getLinkingURLForTests = null;
@@ -577,7 +618,6 @@ export function _resetDeepLinkLaunchForTests(): void {
   currentDeepLinkUserId = null;
   deepLinkUserSettled = false;
   deferredSystemSearchHref = null;
-  // eslint-disable-next-line prefer-await-to-then -- reset the chain to the empty sentinel
   pendingDeepLinkWriteChain = Promise.resolve();
 }
 

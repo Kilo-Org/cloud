@@ -4,7 +4,11 @@ import { Platform, Pressable, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text, TextClassContext } from '@/components/ui/text';
-import { COMPACT_BUTTON_HIT_SLOP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_BUTTON_FRAME_CLASS,
+  COMPACT_BUTTON_HIT_SLOP,
+  ICON_TARGET_BOX_CLASS,
+} from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -54,7 +58,7 @@ const buttonVariants = cva(
         // 48dp minimum. The glyph keeps its own size and the box centres it.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
-        sm: 'min-h-[36px] rounded-md px-3 py-1.5',
+        sm: COMPACT_BUTTON_FRAME_CLASS,
         lg: 'min-h-[44px] rounded-md px-6 py-2',
         action: 'min-h-[48px] px-4 py-2',
         icon: ICON_TARGET_BOX_CLASS,
@@ -260,8 +264,6 @@ function Button({
   // its original children untouched. The fixed `icon` size has no label to
   // replace, so it draws the indicator inline instead.
   const usesBusyLayout = loading !== undefined && size !== 'icon';
-  // The children sit one level deeper in that layout, so their spacing moves
-  // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
   const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
   const busyMark = (

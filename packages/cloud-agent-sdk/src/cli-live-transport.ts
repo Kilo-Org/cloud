@@ -43,11 +43,22 @@ import {
   type UserWebCliEvent,
   type UserWebConnection,
 } from './user-web-connection';
+import {
+  CLI_SNAPSHOT_BUFFER_MAX_EVENTS,
+  CLI_SNAPSHOT_REPLAY_DEADLINE_MS,
+  SNAPSHOT_READ_BASE_DELAY_MS,
+  SNAPSHOT_READ_MAX_RETRIES,
+} from './limits';
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
-  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchSnapshot?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options?: { signal?: AbortSignal }
+      ) => Promise<SessionSnapshot>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
@@ -55,12 +66,18 @@ type CliLiveTransportConfig = {
    * `loadOlderMessages`. The first page that applies additionally fires
    * `onInitialPageLoaded` so the manager can record the cursor.
    *
+   * The transport aborts `signal` once it stops gating live delivery on the
+   * read (deadline, teardown, or a full event buffer); a provider that ignores
+   * it still has its late result dropped.
+   *
    * `null` represents an access-not-found outcome (worker returns 404).
    */
-  fetchSnapshotPage?: (
-    kiloSessionId: KiloSessionId,
-    options: { cursor?: string }
-  ) => Promise<SessionSnapshotPageOutcome | null>;
+  fetchSnapshotPage?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options: { cursor?: string; signal?: AbortSignal }
+      ) => Promise<SessionSnapshotPageOutcome | null>)
+    | undefined;
   /**
    * Called once per attach with the first successful page that applies — the
    * connect() read, a reconnect catch-up that supersedes it, or the delayed
@@ -129,6 +146,23 @@ type DiscoveryRequest = {
   ownerConnectionId: string;
   isCurrent: () => boolean;
   settle: () => void;
+};
+
+/**
+ * One in-flight snapshot read that gates live delivery. It settles exactly
+ * once — by page, failure, the replay deadline, buffer overflow, or teardown —
+ * and anything that lands later is dropped.
+ */
+type SnapshotRead = {
+  controller: AbortController;
+  timer: ReturnType<typeof setTimeout> | undefined;
+  /** Pending backoff before the next attempt of a retryable failure. */
+  retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Attempts already retried in this episode. */
+  retries: number;
+  settled: boolean;
+  /** Settle a stalled read: abort it, then release the buffer as retryable. */
+  fail: () => void;
 };
 
 /**
@@ -290,9 +324,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function publishCommands(commands: SlashCommandInfo[]): void {
-      // Deep copy the array, every command object, and every hints array
-      // so the event payload, the internal cache, and every subsequent
-      // state callback each hold an independent snapshot.
       const snapshotted = deepCopyCommands(commands);
       lastValidCommands = snapshotted;
       sink.onServiceEvent({
@@ -412,12 +443,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             // publishing an empty `idle` catalog that would stick.
             const hasModel = parsed.data.providers.some(provider => provider.models.length > 0);
             if (!hasModel) {
-              // The CLI may still be warming up its provider registry.
-              // Surface it as an error and self-heal under the budget instead
-              // of publishing an empty `idle` catalog that would stick.
               publishRemoteModelState({
                 ownerConnectionId: expectedOwnerConnectionId,
                 protocol: 'v1',
+                ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
                 refresh: 'error',
                 error: EMPTY_REMOTE_MODEL_CATALOG_ERROR,
               });
@@ -760,10 +789,30 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
         let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
         let snapshotReplayGeneration = 0;
-        // One page per attach seeds the manager. Whichever page applies first
-        // wins — the connect() read, a reconnect catch-up, or a delayed resync
-        // — so a slower read cannot reset an already-recorded cursor.
+        // The read that currently gates live delivery, if any.
+        let snapshotRead: SnapshotRead | null = null;
         let initialPageRecorded = false;
+
+        // Mark one attempt settled and clear its deadline. Returns false when
+        // it had already settled, so every settle path is a no-op after the
+        // first.
+        const settleSnapshotRead = (read: SnapshotRead): boolean => {
+          if (read.settled) return false;
+          read.settled = true;
+          clearTimeout(read.timer);
+          read.timer = undefined;
+          clearTimeout(read.retryTimer);
+          read.retryTimer = undefined;
+          if (snapshotRead === read) snapshotRead = null;
+          return true;
+        };
+
+        // Stop gating on the current read without reporting it: a newer replay
+        // superseded it, or the transport is going away.
+        const cancelSnapshotRead = (): void => {
+          const read = snapshotRead;
+          if (read !== null && settleSnapshotRead(read)) read.controller.abort();
+        };
 
         const drainBufferedCliEvents = (): void => {
           const events = bufferedCliEvents;
@@ -777,6 +826,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const replayCurrentSnapshot = (reportError: boolean): void => {
           snapshotReplayGeneration += 1;
           const expectedSnapshotReplayGeneration = snapshotReplayGeneration;
+          cancelSnapshotRead();
           if (bufferedCliEvents !== null) {
             bufferedEventsFromSupersededSnapshot.push(...bufferedCliEvents);
           }
@@ -789,22 +839,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             return;
           }
 
-          const onPage = (page: SessionSnapshotPage): void => {
-            if (
-              expectedGeneration !== generation ||
-              expectedSnapshotReplayGeneration !== snapshotReplayGeneration
-            ) {
-              return;
-            }
-            if (!initialPageRecorded) {
-              initialPageRecorded = true;
-              config.onInitialPageLoaded?.(page);
-            }
-            bufferedEventsFromSupersededSnapshot = [];
-            replaySnapshotPage(sink, page);
-            drainBufferedCliEvents();
-          };
-          const onError = (error: unknown, failure?: SessionSnapshotFailure): void => {
+          // Failure delivery shared by every unsuccessful settle of the
+          // episode: a rejected read, the deadline, or a full event buffer.
+          const releaseBufferedEvents = (
+            error: unknown,
+            failure?: SessionSnapshotFailure
+          ): void => {
             if (
               expectedGeneration !== generation ||
               expectedSnapshotReplayGeneration !== snapshotReplayGeneration
@@ -823,27 +863,126 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             drainBufferedCliEvents();
           };
 
-          if (config.fetchSnapshotPage) {
-            void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
-              if (page && page.kind === 'success') {
-                onPage(page);
-                return;
-              }
-              if (page === null) {
-                onError(new Error('Session not found'));
-                return;
-              }
-              const failure = sessionSnapshotFailureMessage(page.kind);
-              onError(new Error(failure.message), failure);
-            }, onError);
-            return;
-          }
+          const isCurrent = (): boolean =>
+            expectedGeneration === generation &&
+            expectedSnapshotReplayGeneration === snapshotReplayGeneration;
 
-          if (config.fetchSnapshot) {
-            void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
-              onPage(snapshotPageFromSnapshot(snapshot));
-            }, onError);
-          }
+          // End the episode: the read settles once and the failure is reported
+          // once, however many attempts it took.
+          const endEpisode = (error: unknown, failure?: SessionSnapshotFailure): void => {
+            if (settleSnapshotRead(read)) releaseBufferedEvents(error, failure);
+          };
+
+          const read: SnapshotRead = {
+            controller: new AbortController(),
+            timer: undefined,
+            retryTimer: undefined,
+            retries: 0,
+            settled: false,
+            fail: () => {
+              if (read.settled) return;
+              read.controller.abort();
+              const failure = sessionSnapshotFailureMessage('retryable_failure');
+              endEpisode(new Error(failure.message), failure);
+            },
+          };
+          snapshotRead = read;
+
+          // One attempt: its own controller and deadline, so the next attempt
+          // starts un-aborted and gets the full deadline again.
+          const attemptRead = (): void => {
+            const controller = new AbortController();
+            read.controller = controller;
+            read.timer = setTimeout(read.fail, CLI_SNAPSHOT_REPLAY_DEADLINE_MS);
+            let attemptSettled = false;
+            const settleAttempt = (): boolean => {
+              if (attemptSettled) return false;
+              attemptSettled = true;
+              clearTimeout(read.timer);
+              read.timer = undefined;
+              return true;
+            };
+
+            const settleFailure = (
+              error: unknown,
+              failure: SessionSnapshotFailure | undefined,
+              retryable: boolean
+            ): void => {
+              if (!settleAttempt()) return;
+              if (!isCurrent()) {
+                // A newer replay already took over the buffer; stop this one
+                // without releasing anything.
+                settleSnapshotRead(read);
+                return;
+              }
+              // The deadline or a full buffer may have ended the episode while
+              // this attempt was in flight; it must not schedule a retry then.
+              if (read.settled) return;
+              if (retryable && read.retries < SNAPSHOT_READ_MAX_RETRIES) {
+                const retry = read.retries;
+                read.retries += 1;
+                // The buffer keeps gating live delivery across the backoff, so
+                // a newer event cannot overtake what the retried page replays.
+                read.retryTimer = setTimeout(
+                  () => {
+                    read.retryTimer = undefined;
+                    if (read.settled || !isCurrent()) return;
+                    attemptRead();
+                  },
+                  SNAPSHOT_READ_BASE_DELAY_MS * 2 ** retry
+                );
+                return;
+              }
+              endEpisode(error, failure);
+            };
+
+            const onPage = (page: SessionSnapshotPage): void => {
+              if (!settleAttempt()) return;
+              if (!settleSnapshotRead(read)) return;
+              if (!isCurrent()) return;
+              if (!initialPageRecorded) {
+                initialPageRecorded = true;
+                config.onInitialPageLoaded?.(page);
+              }
+              bufferedEventsFromSupersededSnapshot = [];
+              replaySnapshotPage(sink, page);
+              drainBufferedCliEvents();
+            };
+            const onRejection = (error: unknown): void => {
+              settleFailure(error, undefined, true);
+            };
+
+            if (config.fetchSnapshotPage) {
+              void config
+                .fetchSnapshotPage(config.kiloSessionId, { signal: controller.signal })
+                .then(page => {
+                  if (page && page.kind === 'success') {
+                    onPage(page);
+                    return;
+                  }
+                  if (page === null) {
+                    settleFailure(new Error('Session not found'), undefined, false);
+                    return;
+                  }
+                  const failure = sessionSnapshotFailureMessage(page.kind);
+                  settleFailure(
+                    new Error(failure.message),
+                    failure,
+                    page.kind === 'retryable_failure'
+                  );
+                }, onRejection);
+              return;
+            }
+
+            if (config.fetchSnapshot) {
+              void config
+                .fetchSnapshot(config.kiloSessionId, { signal: controller.signal })
+                .then(snapshot => {
+                  onPage(snapshotPageFromSnapshot(snapshot));
+                }, onRejection);
+            }
+          };
+          attemptRead();
         };
 
         replayCurrentSnapshot(true);
@@ -855,8 +994,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               normalized.type === 'session.created' ||
               normalized.type === 'session.updated');
           if (shouldBufferForSnapshot && bufferedCliEvents !== null) {
-            bufferedCliEvents.push(msg);
-            return;
+            if (bufferedCliEvents.length < CLI_SNAPSHOT_BUFFER_MAX_EVENTS - 1) {
+              bufferedCliEvents.push(msg);
+              return;
+            }
+            // Pushing would reach the cap, so the read is stalled: release the
+            // buffer through the read's failure path and deliver this event
+            // live, after it.
+            snapshotRead?.fail();
           }
           handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
         });
@@ -891,6 +1036,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         cleanup = () => {
           if (released) return;
           released = true;
+          cancelSnapshotRead();
           if (resyncTimer) clearTimeout(resyncTimer);
           offCli();
           offSystem();

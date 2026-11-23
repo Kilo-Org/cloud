@@ -3,6 +3,7 @@ export type {
   ProfileOwner,
   ProfileOwnerType,
   ProfileDatabase,
+  ProfileTransaction,
   RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
@@ -54,29 +55,48 @@ export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils
 export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
+  insertProfileRow,
   updateProfile,
   deleteProfile,
   listProfiles,
   getProfile,
   getProfileOverview,
   setDefaultProfile,
+  applyDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
   getEffectiveDefaultProfileId,
 } from './profile-service';
 
+// Composite profile creation (profile + vars + commands + default in one transaction)
+export {
+  createProfileWithContent,
+  type ProfileCreateInput,
+  type ProfileCreateVar,
+} from './profile-create-service';
+
 // Var CRUD
 export {
   MAX_PROFILE_VARS,
+  encryptProfileSecret,
+  profileVarColumns,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
+  type ProfileNetworkSecretPolicy,
   type VarForSession,
 } from './profile-vars-service';
 
 // Command CRUD
-export { setCommands, listCommands, getCommandsForSession } from './profile-commands-service';
+export {
+  MAX_PROFILE_COMMANDS,
+  MAX_PROFILE_COMMAND_LENGTH,
+  writableCommands,
+  setCommands,
+  listCommands,
+  getCommandsForSession,
+} from './profile-commands-service';
 
 // MCP server CRUD + session helpers
 export {
@@ -150,6 +170,7 @@ export {
   updateAgent,
   deleteAgent,
   getAgentsForSession,
+  type SessionAgents,
   type AgentCreateInput,
   type AgentUpdateInput,
   type AgentForSession,
@@ -331,3 +352,84 @@ export {
   type EnvironmentSessionResolution,
   type EnvironmentTransaction,
 } from './environment-service';
+
+// Repository environment setup runs
+export {
+  ENVIRONMENT_SETUP_LIMITS,
+  OPEN_SETUP_RUN_STATUSES,
+  AGENT_WRITABLE_SETUP_RUN_STATUSES,
+  ENVIRONMENT_SETUP_STATUS_REASONS,
+  HIGH_PRIVILEGE_SECRET_PATTERNS,
+  isHighPrivilegeSecretKey,
+  isOpenSetupRunStatus,
+  isResumableSetupRunStatus,
+  isAgentWritableSetupRunStatus,
+  pendingRequestCount,
+  isRestrictedEgress,
+  mergeRequiredHosts,
+  evaluateCompletionGate,
+  type EnvironmentSetupCheck,
+  type EnvironmentSetupNetworkRequest,
+  type EnvironmentSetupPendingVerification,
+  type EnvironmentSetupPreviousConfiguration,
+  type EnvironmentSetupRunStatus,
+  type EnvironmentSetupSecretRequest,
+  type EnvironmentSetupTargetSettings,
+  type EnvironmentSetupVerification,
+  type EnvironmentSetupCompletionGateInput,
+  type EnvironmentSetupCompletionGateResult,
+} from './environment-setup-contracts';
+
+// Environment setup run domain service
+export {
+  createSetupRunWithDraft,
+  attachSetupSession,
+  cancelUnstartedSetupRun,
+  failSetupRunByAgent,
+  completeSetupRun,
+  getSetupRun,
+  getSetupRunBySession,
+  listSetupRunsForEnvironment,
+  updateDraftByAgent,
+  addSecretRequests,
+  resolveSecretRequests,
+  addNetworkRequests,
+  resolveNetworkRequests,
+  reserveVerification,
+  attachVerificationChild,
+  releaseVerification,
+  recordVerification,
+  getAgentWritableSetupRun,
+  publishSetupRun,
+  revertSetupRun,
+  cancelSetupRun,
+  resumeSetupRun,
+  loadSetupRunForSession,
+  cleanupSetupRuns,
+  type AddNetworkRequestsInput,
+  type AddSecretRequestsInput,
+  type AttachSetupSessionInput,
+  type AttachVerificationChildInput,
+  type CancelSetupRunInput,
+  type CleanupSetupRunsResult,
+  type CreateSetupRunWithDraftInput,
+  type CreateSetupRunWithDraftResult,
+  type EnvironmentSetupStatusReason,
+  type FailSetupRunInput,
+  type LoadSetupRunForSessionInput,
+  type PublishSetupRunInput,
+  type PublishSetupRunMode,
+  type PublishSetupRunResult,
+  type RecordVerificationInput,
+  type ReleaseVerificationInput,
+  type ReserveVerificationInput,
+  type ReserveVerificationResult,
+  type ResolveNetworkRequestsInput,
+  type ResolveSecretRequestsInput,
+  type ResolveSecretRequestsResult,
+  type ResumeSetupRunInput,
+  type RevertSetupRunInput,
+  type SetupNetworkRequestInput,
+  type SetupSecretRequestInput,
+  type UpdateDraftByAgentInput,
+} from './environment-setup-service';

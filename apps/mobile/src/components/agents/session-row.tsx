@@ -14,8 +14,10 @@ import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
@@ -171,10 +173,14 @@ export function StoredSessionRow({
     isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
 
   const revision = useSessionAttentionRevision();
+  const hydration = useSessionAttentionHydration();
   const raiseId = session.status_updated_at ?? session.status ?? null;
+  // The ack store answers "not acked" for every raise while it loads, so the
+  // row holds its badge until the phase settles instead of drawing one that a
+  // restored ack would take away.
   const needsInput = shouldShowNeedsInput({
     status: session.status,
-    raiseId,
+    hydration,
     isAcked: isAttentionAcked(session.session_id, { raiseId, status: session.status }),
   });
   useEffect(() => {
@@ -192,6 +198,8 @@ export function StoredSessionRow({
       live,
       statusKind,
       needsInput,
+      status: session.status,
+      statusUpdatedAt: session.status_updated_at,
       totalCostMicrodollars: session.total_cost_microdollars,
       onCopySessionId: () => {
         // Load the clipboard/action module at press time: the mounted row test
@@ -241,13 +249,15 @@ export function StoredSessionRow({
   const spokenMeta = isScheduled ? scheduledWake : storedSpokenMeta;
 
   // Provenance subtitle: list rows show "branch · #N", card rows keep the
-  // branch-only subtitle. The spoken label mirrors this: branch text plus
-  // the "pull request N" phrase, with the PR phrase only on the list variant.
+  // branch-only subtitle. The branch decodes once, and the spoken label reuses
+  // that value (branch text plus the "pull request N" phrase, with the PR
+  // phrase only on the list variant).
+  const branchLabel = sessionBranchLabel(session.git_branch);
   const subtitle =
     variant === 'card'
-      ? session.git_branch
+      ? branchLabel
       : composeSessionProvenanceSubtitle({
-          branch: session.git_branch,
+          branchLabel,
           prNumber: session.associatedPr?.number,
         });
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
@@ -300,7 +310,7 @@ export function StoredSessionRow({
         statusKind: isScheduled ? 'scheduled' : null,
         badge: agentLabel,
         meta: spokenMeta,
-        subtitle: session.git_branch,
+        subtitle: branchLabel,
         prNumber: spokenPrNumber,
         platform: a11yPlatform,
       })}

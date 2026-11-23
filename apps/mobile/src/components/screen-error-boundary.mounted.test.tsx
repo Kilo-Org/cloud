@@ -40,6 +40,12 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// A no-history Back hands off through the push-then-retire hook (a literal
+// `router.replace` crashes Android Fabric); the assertion below
+// pins the destination it is handed.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: router.replace }),
+}));
 
 function mount(props: { error: Error; retry: () => Promise<void> }) {
   const client = new QueryClient({

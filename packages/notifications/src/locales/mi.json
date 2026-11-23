@@ -7,6 +7,7 @@
       "spendAlert": "Me aro ki tō whakapaunga",
       "securityFinding": "Me aro ki tētahi kitenga haumaru",
       "securityUpdate": "He whakahoutanga tā tētahi whakamātautau haumaru",
+      "agentBriefing": "Kua reri tō pūrongo mahi a te māngai",
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "He kitenga haumaru hōu ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Tino kino",
+      "high": "Teitei",
+      "medium": "Waenga",
+      "low": "Iti"
     },
     "securityFindingSlaWarning": {
       "title": "Te whakatūpato SLA"

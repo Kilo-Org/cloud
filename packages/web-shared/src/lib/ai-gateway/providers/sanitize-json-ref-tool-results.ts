@@ -1,35 +1,21 @@
+import {
+  CLIENT_SCHEMA_MAX_DEPTH,
+  CLIENT_SCHEMA_NODE_BUDGET,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
-import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
- * Tool payloads are client-supplied, so a traversal of one needs a fixed bound: the same node
- * budget as the cache-control traversal in the OpenRouter request helpers. A payload over either
- * budget is left unchanged rather than partially rewritten.
- */
-export const JSON_REF_NODE_BUDGET = CACHE_CONTROL_NODE_BUDGET;
-
-/**
- * The depth bound every walk over client content uses; asserted equal to
- * `PROMPT_WALK_MAX_DEPTH`.
- */
-export const JSON_REF_MAX_DEPTH = 64;
-
-/**
  * Renames `$ref` properties to `_ref` in place and reports whether anything would change.
- * The walk is iterative with a node and a depth budget, and it renames only after it has
- * finished inside both budgets, so an over-budget payload is returned untouched.
+ * The walk is iterative and bounded by the shared client-schema node and depth budgets, and it
+ * renames only after it has finished inside both, so an over-budget payload is returned untouched.
  */
 function renameJsonRefProperties(value: unknown): boolean {
   const pending: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
   const refOwners: Array<Record<string, unknown>> = [];
   let visited = 0;
-  while (pending.length > 0) {
-    if (visited >= JSON_REF_NODE_BUDGET) {
-      return false;
-    }
-    const frame = pending.pop();
-    if (frame === undefined) {
+  for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
+    if (visited >= CLIENT_SCHEMA_NODE_BUDGET) {
       return false;
     }
     visited += 1;
@@ -45,10 +31,10 @@ function renameJsonRefProperties(value: unknown): boolean {
     } else {
       continue;
     }
-    if (children.length > 0 && frame.depth >= JSON_REF_MAX_DEPTH) {
+    if (children.length > 0 && frame.depth >= CLIENT_SCHEMA_MAX_DEPTH) {
       return false;
     }
-    if (visited + pending.length + children.length > JSON_REF_NODE_BUDGET) {
+    if (visited + pending.length + children.length > CLIENT_SCHEMA_NODE_BUDGET) {
       return false;
     }
     for (const child of children) {

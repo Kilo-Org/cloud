@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +22,12 @@ import {
   KILO_ACTIVITY_MESSAGE_LIMIT,
   DrainSessionError,
   isKiloServerUnreachableError,
+  forgetSessionObligations,
+  readSessionObligations,
+  rememberSessionObligations,
+  SessionRulesetError,
+  SessionRulesetNotAppliedError,
+  SessionRulesetUnverifiedError,
   type WrapperKiloClient,
 } from './kilo-api';
 
@@ -860,6 +876,1619 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     }
   );
+
+  describe('ensureSession rebinding', () => {
+    const temporaryDirectories: string[] = [];
+
+    afterEach(() => {
+      for (const directory of temporaryDirectories.splice(0)) {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    function temporaryDirectory(prefix: string): string {
+      const directory = mkdtempSync(join(tmpdir(), prefix));
+      temporaryDirectories.push(directory);
+      return directory;
+    }
+
+    // The SDK maps `query_directory` onto the `directory` query parameter and
+    // `body_directory` onto the `directory` body field, so the wire request is
+    // what the wrapper's argument turns into.
+    type EnsureSessionRecord = {
+      id: string;
+      slug?: string;
+      directory: string;
+      title?: string;
+      workspaceID?: string;
+      parentID?: string;
+      share?: { url: string } | null;
+      summary?: {
+        additions: number;
+        deletions: number;
+        files: number;
+        diffs?: Array<Record<string, unknown>>;
+      };
+      revert?: { messageID: string; partID?: string; snapshot?: string; diff?: string };
+      permission?: unknown;
+      metadata?: Record<string, unknown>;
+      time?: { created: number; updated: number; compacting?: number; archived?: number };
+    };
+
+    type EnsureSessionImport = {
+      queryDirectory: string | null;
+      body: {
+        id?: string;
+        force?: boolean;
+        directory?: string;
+        projectID?: string;
+        slug?: string;
+        title?: string;
+        workspaceID?: string;
+        parentID?: string;
+        shareURL?: string;
+        summary?: EnsureSessionRecord['summary'];
+        revert?: EnsureSessionRecord['revert'];
+        timeCreated?: number;
+        timeUpdated?: number;
+        timeCompacting?: number;
+        timeArchived?: number;
+      };
+    };
+
+    type EnsureSessionUpdate = {
+      queryDirectory: string | null;
+      body: {
+        permission?: EnsureSessionRecord['permission'];
+        metadata?: EnsureSessionRecord['metadata'];
+      };
+    };
+
+    function startEnsureSessionStub(
+      sessionId: string,
+      record?: EnsureSessionRecord,
+      options: {
+        failUpdates?: number;
+        updateStatus?: number;
+        metadataUpdateStatus?: number;
+        getFailures?: number;
+        onImport?: () => void;
+        onPermissionUpdate?: () => void;
+      } = {}
+    ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
+      const imports: EnsureSessionImport[] = [];
+      const updates: EnsureSessionUpdate[] = [];
+      let updatesToFail = options.failUpdates ?? 0;
+      let getsToFail = options.getFailures ?? 0;
+      // The native import replaces the row, cannot carry a ruleset or metadata,
+      // and the update appends rules instead of replacing them while replacing
+      // metadata wholesale.
+      let storedPermission = record?.permission;
+      let storedMetadata = record?.metadata;
+      const server = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === '/project/current') {
+            return Response.json({
+              id: 'proj',
+              worktree: url.searchParams.get('directory'),
+              vcs: 'git',
+              time: { created: 1, updated: 1 },
+              sandboxes: [],
+            });
+          }
+          if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+            if (getsToFail > 0) {
+              getsToFail -= 1;
+              return Response.json({ error: { message: 'get unavailable' } }, { status: 500 });
+            }
+            return record
+              ? Response.json({
+                  ...record,
+                  permission: storedPermission,
+                  metadata: storedMetadata,
+                })
+              : Response.json(
+                  { name: 'NotFoundError', data: { message: `Session not found: ${sessionId}` } },
+                  { status: 404 }
+                );
+          }
+          if (request.method === 'PATCH' && url.pathname === `/session/${sessionId}`) {
+            const body = (await request.json()) as EnsureSessionUpdate['body'];
+            updates.push({ queryDirectory: url.searchParams.get('directory'), body });
+            if (body.permission !== undefined) options.onPermissionUpdate?.();
+            if (body.metadata !== undefined && options.metadataUpdateStatus !== undefined) {
+              return Response.json(
+                { error: { message: `update answered ${options.metadataUpdateStatus}` } },
+                { status: options.metadataUpdateStatus }
+              );
+            }
+            if (options.updateStatus !== undefined) {
+              return Response.json(
+                { error: { message: `update answered ${options.updateStatus}` } },
+                { status: options.updateStatus }
+              );
+            }
+            if (updatesToFail > 0) {
+              updatesToFail -= 1;
+              return Response.json({ error: { message: 'update unavailable' } }, { status: 503 });
+            }
+            const applied = Array.isArray(body.permission) ? body.permission : [];
+            storedPermission = [
+              ...(Array.isArray(storedPermission) ? storedPermission : []),
+              ...applied,
+            ];
+            if (body.metadata !== undefined) storedMetadata = body.metadata;
+            return Response.json({ ...record, id: sessionId });
+          }
+          if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
+            const body = (await request.json()) as EnsureSessionImport['body'];
+            imports.push({ queryDirectory: url.searchParams.get('directory'), body });
+            storedPermission = undefined;
+            storedMetadata = undefined;
+            options.onImport?.();
+            return Response.json({ ok: true, id: body.id });
+          }
+          return new Response(null, { status: 404 });
+        },
+      });
+      startedServers.push(server);
+      return { url: server.url.toString(), imports, updates };
+    }
+
+    it('returns without importing when the record already belongs to this directory', async () => {
+      const sessionId = 'ses_record_same_directory';
+      const directory = temporaryDirectory('kilo-api-same-directory-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory,
+        title: 'keep this title',
+        workspaceID: 'wrk_same',
+        parentID: 'ses_same_parent',
+        share: { url: 'https://share.example/ses_same' },
+        summary: { additions: 3, deletions: 1, files: 2 },
+        revert: { messageID: 'msg_same_revert' },
+        permission: [{ permission: 'bash', pattern: 'git push*', action: 'allow' }],
+        time: { created: 1, updated: 2, compacting: 3, archived: 4 },
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(0);
+      expect(stub.updates).toHaveLength(0);
+    });
+
+    it('rebinds a record held by another directory with a forced import', async () => {
+      const sessionId = 'ses_record_other_directory';
+      const directory = temporaryDirectory('kilo-api-rebind-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-rebind-other-');
+      const created = 1_700_000_000_000;
+      // The native record carries the wider shapes too: its summary may hold
+      // file diffs and its revert a patch diff. The import stores and serves
+      // both, so a re-point passes them through rather than dropping them.
+      const summary = {
+        additions: 7,
+        deletions: 2,
+        files: 3,
+        diffs: [{ file: 'a.txt', additions: 7, deletions: 2, status: 'modified' }],
+      };
+      const revert = {
+        messageID: 'msg_revert',
+        partID: 'prt_revert',
+        snapshot: 'snap_revert',
+        diff: 'diff --git a/a.txt b/a.txt',
+      };
+      const permission = [{ permission: 'bash', pattern: 'git push*', action: 'allow' }];
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        title: 'keep this title',
+        workspaceID: 'wrk_carried',
+        parentID: 'ses_carried_parent',
+        share: { url: 'https://share.example/ses_carried' },
+        summary,
+        revert,
+        permission,
+        time: { created, updated: created + 1, compacting: created + 2, archived: created + 3 },
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.queryDirectory).toBe(directory);
+      // The re-point carries every field the record already holds.
+      expect(parameters.body).toMatchObject({
+        id: sessionId,
+        directory,
+        force: true,
+        title: 'keep this title',
+        workspaceID: 'wrk_carried',
+        parentID: 'ses_carried_parent',
+        shareURL: 'https://share.example/ses_carried',
+        summary,
+        revert,
+        timeCreated: created,
+        timeUpdated: created + 1,
+        timeCompacting: created + 2,
+        timeArchived: created + 3,
+      });
+    });
+
+    it('carries the record slug when the import re-points it', async () => {
+      const sessionId = 'ses_record_with_original_slug';
+      const directory = temporaryDirectory('kilo-api-slug-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-slug-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        slug: 'ses_original_slug',
+        directory: otherDirectory,
+        share: { url: 'https://share.example/ses_original_slug' },
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.body.slug).toBe('ses_original_slug');
+      expect(parameters.body.shareURL).toBe('https://share.example/ses_original_slug');
+    });
+
+    it('names the import after the session when the record carries no slug', async () => {
+      const sessionId = 'ses_record_without_slug';
+      const directory = temporaryDirectory('kilo-api-absent-slug-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-absent-slug-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.imports[0]?.body.slug).toBe(sessionId.slice(0, 24));
+    });
+
+    it('imports a record whose share is null without a share URL', async () => {
+      const sessionId = 'ses_record_null_share';
+      const directory = temporaryDirectory('kilo-api-null-share-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-null-share-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        share: null,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.body.force).toBe(true);
+      expect(parameters.body).not.toHaveProperty('shareURL');
+    });
+
+    it('applies a record ruleset through the update endpoint', async () => {
+      const sessionId = 'ses_record_permission';
+      const directory = temporaryDirectory('kilo-api-permission-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.updates).toHaveLength(1);
+      expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('retries a ruleset application that fails once, then applies it', async () => {
+      const sessionId = 'ses_record_permission_retry';
+      const directory = temporaryDirectory('kilo-api-permission-retry-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-retry-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 1 }
+      );
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.updates).toHaveLength(2);
+      expect(stub.updates[1]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('restores the metadata a re-point drops, alongside the ruleset', async () => {
+      const sessionId = 'ses_record_metadata';
+      const directory = temporaryDirectory('kilo-api-metadata-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-other-');
+      const metadata = { 'kilo.goal': { text: 'ship the fix', updatedAt: 5 } };
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        metadata,
+        permission,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      // The import cannot carry metadata, so it is restored after the import.
+      // It goes before the ruleset so a refused ruleset cannot drop it: the
+      // next prepare settles that marker without calling ensureSession again.
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.updates).toEqual([
+        { queryDirectory: directory, body: { metadata } },
+        { queryDirectory: directory, body: { permission } },
+      ]);
+    });
+
+    it('still restores the metadata when the ruleset cannot be applied', async () => {
+      const sessionId = 'ses_record_metadata_with_stuck_ruleset';
+      const directory = temporaryDirectory('kilo-api-metadata-stuck-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-stuck-other-');
+      const metadata = { 'kilo.goal': { text: 'survive a stuck ruleset', updatedAt: 7 } };
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, metadata, permission },
+        { updateStatus: 503 }
+      );
+
+      const outcome = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch(error => error);
+      // The ruleset failure is still the route's failure.
+      expect(outcome).toBeInstanceOf(Error);
+      // The metadata went back before the ruleset attempts, so a later prepare
+      // finds it on the record even though the ruleset still fails.
+      expect(stub.updates.filter(update => update.body.metadata !== undefined)).toEqual([
+        { queryDirectory: directory, body: { metadata } },
+      ]);
+    });
+
+    it('keeps the route successful when the metadata restore fails', async () => {
+      const sessionId = 'ses_record_metadata_failure';
+      const directory = temporaryDirectory('kilo-api-metadata-failure-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-failure-other-');
+      const metadata = { 'kilo.goal': { text: 'keep the goal', updatedAt: 6 } };
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, metadata },
+        { metadataUpdateStatus: 500 }
+      );
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      // The import has already committed the record, so a failed restore is
+      // skipped instead of failing the route.
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.imports[0]?.body).toMatchObject({ id: sessionId, directory, force: true });
+      expect(stub.updates).toEqual([{ queryDirectory: directory, body: { metadata } }]);
+    });
+
+    it('keeps the owed ruleset marker across a fresh process', async () => {
+      const sessionId = 'ses_record_permission_durable';
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        // A new process shares only the filesystem, not module memory.
+        const script = `
+          import { readSessionObligations } from ${JSON.stringify(new URL('./kilo-api.ts', import.meta.url).href)};
+          const owed = await readSessionObligations(${JSON.stringify(sessionId)});
+          console.log(JSON.stringify(owed ?? null));
+        `;
+        const proc = Bun.spawn([process.execPath, '--eval', script], {
+          stdout: 'pipe',
+          stderr: 'pipe',
+          env: process.env,
+        });
+        const output = await new Response(proc.stdout).text();
+        expect(await proc.exited).toBe(0);
+        expect(JSON.parse(output.trim())).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+      expect(await readSessionObligations(sessionId)).toBeUndefined();
+    });
+
+    it('applies the owed ruleset on the next call instead of reusing an incomplete record', async () => {
+      const sessionId = 'ses_record_permission_owed';
+      const directory = temporaryDirectory('kilo-api-permission-owed-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-owed-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const failing = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+      const first = await createClient(failing.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+      expect(first).toBeInstanceOf(SessionRulesetNotAppliedError);
+
+      // The next call sees the record already at the route directory. Its
+      // ruleset was never applied, so it must apply the owed ruleset rather
+      // than treat the record as complete.
+      const healthy = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory,
+      });
+      await createClient(healthy.url).ensureSession(sessionId, directory);
+
+      expect(healthy.imports).toHaveLength(0);
+      expect(healthy.updates).toHaveLength(1);
+      expect(healthy.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('clears the marker without an update when the record already carries the ruleset', async () => {
+      const sessionId = 'ses_record_permission_stored';
+      const directory = temporaryDirectory('kilo-api-permission-stored-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission,
+        });
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.imports).toHaveLength(0);
+        expect(stub.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('updates a record that lacks the ruleset and clears the marker', async () => {
+      const sessionId = 'ses_record_permission_missing';
+      const directory = temporaryDirectory('kilo-api-permission-missing-');
+      const permission = [{ permission: 'bash', pattern: 'git push*', action: 'allow' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.updates).toHaveLength(1);
+        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('settles without an update when the record already carries the ruleset', async () => {
+      const sessionId = 'ses_record_permission_settle_stored';
+      const directory = temporaryDirectory('kilo-api-permission-settle-stored-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission,
+        });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(stub.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('settles a record that lacks the ruleset and clears the marker', async () => {
+      const sessionId = 'ses_record_permission_settle_missing';
+      const directory = temporaryDirectory('kilo-api-permission-settle-missing-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(stub.updates).toHaveLength(1);
+        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('fails the settle retryably when the permission update cannot be applied', async () => {
+      const sessionId = 'ses_record_permission_settle_refused';
+      const directory = temporaryDirectory('kilo-api-permission-settle-refused-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory },
+          { updateStatus: 503 }
+        );
+
+        const error = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect(stub.updates).toHaveLength(1);
+        // The marker is intact, so a retried step reads it and applies again.
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('keeps the marker when the settle finds no record under the route directory', async () => {
+      const sessionId = 'ses_record_permission_settle_absent';
+      const directory = temporaryDirectory('kilo-api-permission-settle-absent-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, undefined, { updateStatus: 404 });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        // There is nothing to apply to, so the create path keeps the obligation.
+        expect(stub.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('keeps the marker when the record belongs to another directory', async () => {
+      const sessionId = 'ses_record_permission_settle_foreign';
+      const directory = temporaryDirectory('kilo-api-permission-settle-foreign-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-settle-foreign-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        // The record still names the other directory and carries the rules, but
+        // it is not this route's record, so the obligation is not yet met.
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          permission,
+        });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(stub.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('fails the settle when the route record permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_settle_invalid';
+      const directory = temporaryDirectory('kilo-api-permission-settle-invalid-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        // The record names this directory, so it is this route's session; its
+        // permission cannot be compared, so no update may be sent against it.
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission: { edit: 'allow' },
+        });
+
+        const error = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+        // The record is left unchanged, so the obligation is still owed.
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('fails instead of updating a route record whose permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_apply_invalid';
+      const directory = temporaryDirectory('kilo-api-permission-apply-invalid-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission: { edit: 'allow' },
+        });
+
+        const error = await createClient(stub.url)
+          .ensureSession(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+        expect(stub.imports).toHaveLength(0);
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('applies the marker ruleset when the create path finds no record', async () => {
+      const sessionId = 'ses_record_permission_marker_create';
+      const directory = temporaryDirectory('kilo-api-permission-marker-create-');
+      const permission = [{ permission: 'bash', pattern: 'git push*', action: 'allow' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId);
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.imports).toHaveLength(1);
+        expect(stub.updates).toHaveLength(1);
+        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it.skipIf(process.getuid?.() === 0)(
+      'keeps the route successful when the marker cannot be cleared',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_stuck';
+        const directory = temporaryDirectory('kilo-api-permission-stuck-target-');
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const home = temporaryDirectory('kilo-api-permission-stuck-home-');
+        // Outstanding markers live under $HOME, so the test owns their directory.
+        const rulesets = join(home, '.kilo-control', 'rulesets');
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let readOnly = false;
+        try {
+          await rememberSessionObligations(sessionId, { permission });
+          const stub = startEnsureSessionStub(sessionId, undefined, {
+            onImport: () => {
+              chmodSync(rulesets, 0o500);
+              readOnly = true;
+            },
+          });
+
+          // The row is committed before the marker becomes undeletable; the apply
+          // itself succeeded, so the surviving marker is not a failure.
+          await createClient(stub.url).ensureSession(sessionId, directory);
+
+          expect(stub.imports).toHaveLength(1);
+          expect(stub.updates).toHaveLength(1);
+          expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+          expect(await readSessionObligations(sessionId)).toEqual({ permission });
+        } finally {
+          if (readOnly) chmodSync(rulesets, 0o700);
+          await forgetSessionObligations(sessionId).catch(() => undefined);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
+      }
+    );
+
+    it('does not rewrite an existing marker before the import', async () => {
+      const sessionId = 'ses_record_permission_marker_kept';
+      const directory = temporaryDirectory('kilo-api-permission-durable-target-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const home = temporaryDirectory('kilo-api-permission-durable-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let readOnly = false;
+      try {
+        await rememberSessionObligations(sessionId, { permission });
+        chmodSync(rulesets, 0o500);
+        readOnly = true;
+        const stub = startEnsureSessionStub(sessionId);
+
+        // The obligation is already durable, so a directory that refuses the
+        // marker write must not fail the route before the import.
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.imports).toHaveLength(1);
+        expect(stub.updates).toHaveLength(1);
+        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+      } finally {
+        if (readOnly) chmodSync(rulesets, 0o700);
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('imports a record that carries the marked ruleset in a directory that refuses writes', async () => {
+      const sessionId = 'ses_record_permission_marker_covered';
+      const directory = temporaryDirectory('kilo-api-permission-covered-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-covered-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const home = temporaryDirectory('kilo-api-permission-covered-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let readOnly = false;
+      try {
+        // The marker already holds exactly what the record carries, so the
+        // obligation is durable and the write would only repeat it.
+        await rememberSessionObligations(sessionId, { permission });
+        chmodSync(rulesets, 0o500);
+        readOnly = true;
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          permission,
+        });
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.imports).toHaveLength(1);
+        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+      } finally {
+        if (readOnly) chmodSync(rulesets, 0o700);
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('keeps the marker readable when the ruleset cannot be applied', async () => {
+      const sessionId = 'ses_record_permission_marker_fatal';
+      const directory = temporaryDirectory('kilo-api-permission-marker-fatal-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(sessionId, undefined, { failUpdates: 5 });
+
+        const error = await createClient(stub.url)
+          .ensureSession(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(3);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('reports the caller abort instead of a permanent ruleset failure', async () => {
+      const sessionId = 'ses_record_permission_apply_aborted';
+      const directory = temporaryDirectory('kilo-api-permission-abort-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-abort-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const controller = new AbortController();
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        {
+          // The step budget aborts with this reason while the permission
+          // update is in flight, which is the only abort this signal sees.
+          onPermissionUpdate: () => controller.abort(new Error('kilo_session timed out')),
+        }
+      );
+      try {
+        const error = await createClient(stub.url)
+          .ensureSession(sessionId, directory, controller.signal)
+          .catch((error: unknown) => error);
+
+        // An interruption is not a ruleset failure: the step keeps its own
+        // classification and retry budget, so it must not carry the permanent one.
+        expect(error).not.toBeInstanceOf(SessionRulesetError);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('kilo_session timed out');
+        // The obligation is durable, so the next prepare applies it.
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('reports a settle abort with the abort reason and keeps the marker', async () => {
+      const sessionId = 'ses_record_permission_settle_aborted';
+      const directory = temporaryDirectory('kilo-api-settle-abort-target-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const controller = new AbortController();
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory },
+          {
+            // The step budget aborts while the permission update is in flight.
+            onPermissionUpdate: () => controller.abort(new Error('kilo_session timed out')),
+          }
+        );
+
+        const error = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory, controller.signal)
+          .catch((error: unknown) => error);
+
+        // An interrupted step keeps its own classification and retry budget
+        // instead of a ruleset failure that nothing would retry.
+        expect(error).not.toBeInstanceOf(SessionRulesetError);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('kilo_session timed out');
+        // The marker is intact, so the next prepare applies it.
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('applies the record ruleset only when the marker holds a rule it lacks', async () => {
+      const sessionId = 'ses_record_permission_supersedes_marker';
+      const directory = temporaryDirectory('kilo-api-supersede-target-');
+      // The record carries one rule; the marker also names a rule the record
+      // never carried, as a marker kept after a failed apply would.
+      const recordRules = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const extraRule = { permission: 'bash', pattern: 'git push*', action: 'allow' as const };
+      await rememberSessionObligations(sessionId, {
+        permission: [...recordRules, extraRule],
+      });
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission: recordRules,
+        });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        // The record already holds its own set, so nothing is sent, and the
+        // marker's extra rule is never turned into a grant.
+        expect(stub.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('never sends a marker rule the record lacks after a failed apply', async () => {
+      const sessionId = 'ses_record_permission_supersede_failed_apply';
+      const directory = temporaryDirectory('kilo-api-supersede-failed-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-supersede-failed-other-');
+      const recordRules = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const extraRule = { permission: 'bash', pattern: 'git push*', action: 'allow' as const };
+      await rememberSessionObligations(sessionId, {
+        permission: [...recordRules, extraRule],
+      });
+      try {
+        // The apply fails, so the marker survives the first attempt. The import
+        // committed the re-pointed row, which carries no permission of its own.
+        const failing = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory: otherDirectory, permission: recordRules },
+          { failUpdates: 5 }
+        );
+        const first = await createClient(failing.url)
+          .ensureSession(sessionId, directory)
+          .catch((error: unknown) => error);
+        expect(first).toBeInstanceOf(SessionRulesetNotAppliedError);
+
+        // The next prepare finds a route-owned record with no permission, so
+        // the marker is the only rules left. Only the rules the record itself
+        // carried may be applied: the marker's extra rule must never become a
+        // grant the record never held.
+        const healthy = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+        });
+        await createClient(healthy.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(healthy.updates).toEqual([
+          { queryDirectory: directory, body: { permission: recordRules } },
+        ]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('tightens a marker directory another user could write', async () => {
+      const sessionId = 'ses_record_permission_marker_directory_mode';
+      const home = temporaryDirectory('kilo-api-marker-mode-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let widened = false;
+      try {
+        // A directory an earlier run left plantable must not stay that way.
+        mkdirSync(rulesets, { recursive: true });
+        chmodSync(rulesets, 0o755);
+        widened = true;
+
+        await rememberSessionObligations(sessionId, { permission });
+
+        expect(statSync(rulesets).mode & 0o777).toBe(0o700);
+        // The marker itself is readable by its owner only.
+        expect(statSync(join(rulesets, `${encodeURIComponent(sessionId)}.json`)).mode & 0o777).toBe(
+          0o600
+        );
+      } finally {
+        if (widened) chmodSync(rulesets, 0o700);
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('fails retryably and removes nothing when HOME is unset', async () => {
+      const sessionId = 'ses_record_permission_marker_without_home';
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      // The shared store is the one place a fallback path would have gone, so a
+      // marker already planted there is what a clear must not touch.
+      const control = join(tmpdir(), '.kilo-control');
+      const shared = join(control, 'rulesets');
+      const planted = join(shared, `${encodeURIComponent(sessionId)}.json`);
+      const plantedContents = JSON.stringify({ permission });
+      const preexisting = existsSync(control);
+      const originalHome = process.env.HOME;
+      try {
+        // Planting is the test's own setup, not a step to skip: without the
+        // marker the assertions below would pass while proving nothing, so a
+        // store that cannot be created fails the test loudly instead.
+        mkdirSync(shared, { recursive: true, mode: 0o700 });
+        writeFileSync(planted, plantedContents, { mode: 0o600 });
+      } catch (error) {
+        if (!preexisting) rmSync(control, { recursive: true, force: true });
+        throw new Error(
+          `Could not plant the shared marker ${planted}, so the removal check cannot run: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+      delete process.env.HOME;
+      try {
+        // A marker derived from a shared directory could be planted by another
+        // process, so without a home the path is unnameable and the step may
+        // retry once HOME is back.
+        const remembered = await rememberSessionObligations(sessionId, { permission }).catch(
+          (error: unknown) => error
+        );
+        expect(remembered).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect((remembered as SessionRulesetUnverifiedError).retryable).toBe(true);
+
+        const read = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(read).toBeInstanceOf(SessionRulesetUnverifiedError);
+
+        // Nothing could have been written, so nothing is removed and no path is
+        // derived from a shared directory: the planted marker is still there,
+        // byte for byte.
+        await forgetSessionObligations(sessionId);
+        expect(existsSync(planted)).toBe(true);
+        expect(readFileSync(planted, 'utf8')).toBe(plantedContents);
+      } finally {
+        // Only the planted marker is removed, and only a store this test
+        // created is taken with it: another run's files are left alone.
+        rmSync(planted, { force: true });
+        if (!preexisting) rmSync(control, { recursive: true, force: true });
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('names the marker path and the parse cause of a malformed marker', async () => {
+      const sessionId = 'ses_record_permission_marker_cause';
+      const home = temporaryDirectory('kilo-api-marker-cause-home-');
+      const marker = join(
+        home,
+        '.kilo-control',
+        'rulesets',
+        `${encodeURIComponent(sessionId)}.json`
+      );
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        mkdirSync(join(home, '.kilo-control', 'rulesets'), { recursive: true });
+
+        // A bare array is not the obligation shape, so the parse rejects it as a
+        // whole and the message says so.
+        writeFileSync(marker, '[{"permission":"edit"}]');
+        const shape = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(shape).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect((shape as Error).message).toContain(marker);
+        expect((shape as Error).message).toContain('is not a ruleset:');
+        expect((shape as Error).message).toContain('expected object, received array');
+
+        // The obligation shape with a permission that is not a ruleset takes the
+        // other branch, and its message names that cause.
+        writeFileSync(marker, '{"permission":[{"permission":"edit"}]}');
+        const permission = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(permission).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect((permission as Error).message).toContain(marker);
+        expect((permission as Error).message).toContain('its permission is not a ruleset');
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('keeps a failed metadata restore and settles it on the next prepare', async () => {
+      const sessionId = 'ses_record_metadata_durable';
+      const directory = temporaryDirectory('kilo-api-metadata-durable-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-durable-other-');
+      const metadata = { 'kilo.goal': { text: 'keep me across a retry', updatedAt: 9 } };
+      try {
+        // The first route loses the restore: the import commits the record and
+        // the update refuses, which must not fail the route.
+        const failing = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory: otherDirectory, metadata },
+          { metadataUpdateStatus: 500 }
+        );
+        await createClient(failing.url).ensureSession(sessionId, directory);
+        expect(failing.imports).toHaveLength(1);
+        // The obligation survives instead of being lost for good.
+        expect(await readSessionObligations(sessionId)).toEqual({ metadata });
+
+        // The next prepare finds a record that carries its own metadata, which
+        // may be newer than the copy the marker holds and reads back normalized
+        // by the server. The record's value wins, so nothing is sent, and the
+        // obligation is dropped because the record already satisfies it.
+        const newer = { 'kilo.goal': { text: 'a goal written later', status: 'paused' } };
+        const carried = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          metadata: newer,
+        });
+        await createClient(carried.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(carried.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+
+        // The same obligation against a record the import left empty is the one
+        // the wrapper still supplies, and it is dropped once it is back.
+        await rememberSessionObligations(sessionId, { metadata });
+        const empty = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(empty.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(empty.updates).toEqual([{ queryDirectory: directory, body: { metadata } }]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('keeps the metadata a re-pointed record carries instead of the stale marker copy', async () => {
+      const sessionId = 'ses_record_foreign_metadata';
+      const directory = temporaryDirectory('kilo-api-foreign-metadata-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-foreign-metadata-other-');
+      const home = temporaryDirectory('kilo-api-foreign-metadata-home-');
+      const older = { 'kilo.goal': { text: 'a goal the record already replaced', updatedAt: 1 } };
+      const newer = { 'kilo.goal': { text: 'the goal the record carries now', updatedAt: 2 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        await rememberSessionObligations(sessionId, { metadata: older });
+
+        // The record still names another directory, so this route has nothing to
+        // apply to, and the marker keeps every obligation. Its metadata must not
+        // stay the older copy: the import the restore runs clears the column, so
+        // this read is the last one that can see the newer goal.
+        const foreign = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          metadata: newer,
+        });
+        await createClient(foreign.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(foreign.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ metadata: newer });
+
+        // The import has now re-pointed the record here and dropped the column.
+        // The settle that follows restores what the record itself carried, not
+        // the stale goal the marker held before the re-point.
+        const repointed = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(repointed.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(repointed.updates).toEqual([
+          { queryDirectory: directory, body: { metadata: newer } },
+        ]);
+        expect(
+          [...foreign.updates, ...repointed.updates].some(
+            update => JSON.stringify(update.body.metadata) === JSON.stringify(older)
+          )
+        ).toBe(false);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('keeps a re-pointed record metadata even when the marker owes only a ruleset', async () => {
+      const sessionId = 'ses_record_foreign_metadata_rules_only';
+      const directory = temporaryDirectory('kilo-api-foreign-rules-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-foreign-rules-other-');
+      const home = temporaryDirectory('kilo-api-foreign-rules-home-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const goal = { 'kilo.goal': { text: 'the goal the record carries now', updatedAt: 2 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        // The marker owes rules and no metadata, which is what an earlier failed
+        // apply leaves behind.
+        await rememberSessionObligations(sessionId, { permission });
+
+        const foreign = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          metadata: goal,
+        });
+        await createClient(foreign.url).settleOutstandingRuleset(sessionId, directory);
+
+        // The goal is taken while the read can still see it; the rules stay owed.
+        expect(foreign.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission, metadata: goal });
+
+        // The import re-points the record here and drops both columns.
+        const repointed = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(repointed.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(repointed.updates).toEqual([
+          { queryDirectory: directory, body: { metadata: goal } },
+          { queryDirectory: directory, body: { permission } },
+        ]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('narrows a superseded marker before the import commits the row', async () => {
+      const sessionId = 'ses_record_permission_supersede_before_import';
+      const directory = temporaryDirectory('kilo-api-supersede-import-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-supersede-import-other-');
+      const home = temporaryDirectory('kilo-api-supersede-import-home-');
+      const marker = join(
+        home,
+        '.kilo-control',
+        'rulesets',
+        `${encodeURIComponent(sessionId)}.json`
+      );
+      const recordRules = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const extraRule = { permission: 'bash', pattern: 'git push*', action: 'allow' as const };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      // The import clears the record's permission, so the marker is the only
+      // state a later prepare can read. Reading it from inside the import shows
+      // the durable state a crash at that point would leave behind.
+      let markerAtImport: unknown;
+      try {
+        await rememberSessionObligations(sessionId, {
+          permission: [...recordRules, extraRule],
+        });
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory: otherDirectory, permission: recordRules },
+          { onImport: () => (markerAtImport = JSON.parse(readFileSync(marker, 'utf8'))) }
+        );
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        // The record's own set is what went to the server and is all the marker
+        // still names, so the superseded rule is not left behind.
+        expect(markerAtImport).toEqual({ permission: recordRules });
+        expect(stub.updates).toEqual([
+          { queryDirectory: directory, body: { permission: recordRules } },
+        ]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('rewrites a stale metadata copy without dropping the permission it owes', async () => {
+      const sessionId = 'ses_record_metadata_supersede';
+      const directory = temporaryDirectory('kilo-api-metadata-supersede-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-supersede-other-');
+      const home = temporaryDirectory('kilo-api-metadata-supersede-home-');
+      const marker = join(
+        home,
+        '.kilo-control',
+        'rulesets',
+        `${encodeURIComponent(sessionId)}.json`
+      );
+      const owedRules = [{ permission: 'bash', pattern: 'git push*', action: 'allow' as const }];
+      const olderMetadata = { 'kilo.goal': { text: 'the goal at import time', updatedAt: 6 } };
+      const newerMetadata = { 'kilo.goal': { text: 'a goal written later', updatedAt: 40 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let markerAtImport: unknown;
+      try {
+        await rememberSessionObligations(sessionId, {
+          permission: owedRules,
+          metadata: olderMetadata,
+        });
+        // The record carries no permission of its own and a newer goal than the
+        // marker kept, so the metadata half alone makes the copy stale.
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory: otherDirectory, metadata: newerMetadata },
+          { onImport: () => (markerAtImport = JSON.parse(readFileSync(marker, 'utf8'))) }
+        );
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        // The stale goal is replaced by the record's own, and the rules the
+        // record never carried are still owed because the marker held them.
+        expect(markerAtImport).toEqual({
+          permission: owedRules,
+          metadata: newerMetadata,
+        });
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('reads a marker written as a bare ruleset array by an earlier build', async () => {
+      const sessionId = 'ses_record_permission_marker_legacy';
+      const home = temporaryDirectory('kilo-api-marker-legacy-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        mkdirSync(rulesets, { recursive: true });
+        writeFileSync(
+          join(rulesets, `${encodeURIComponent(sessionId)}.json`),
+          JSON.stringify(permission)
+        );
+
+        // The shape this branch shipped still names the rules it owes, so the
+        // settle applies them instead of reading the marker as malformed.
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('keeps a marker metadata obligation a re-pointed record cannot carry', async () => {
+      const sessionId = 'ses_record_metadata_marker_kept';
+      const directory = temporaryDirectory('kilo-api-metadata-marker-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-marker-other-');
+      // The marker holds the goal an earlier import dropped; the record this
+      // route re-points carries none, so only this route can put it back.
+      const metadata = { 'kilo.goal': { text: 'survive a second import', updatedAt: 4 } };
+      await rememberSessionObligations(sessionId, { metadata });
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+        });
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        expect(stub.imports).toHaveLength(1);
+        expect(stub.updates).toEqual([{ queryDirectory: directory, body: { metadata } }]);
+        // The restore succeeded, so nothing is left owed.
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('fails the route when a marker is present but is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_marker_not_ruleset';
+      const directory = temporaryDirectory('kilo-api-permission-malformed-target-');
+      const home = temporaryDirectory('kilo-api-permission-malformed-home-');
+      // Outstanding markers live under $HOME, so the test owns their directory.
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      const stub = startEnsureSessionStub(sessionId);
+      try {
+        mkdirSync(rulesets, { recursive: true });
+        // A list whose elements are not rules: the shape a bare array check
+        // accepts, and the one that would otherwise be applied as grants.
+        writeFileSync(
+          join(rulesets, `${encodeURIComponent(sessionId)}.json`),
+          '[{"permission":"edit"}]'
+        );
+
+        // Present but not a ruleset is still owed: reading it as nothing owed
+        // would drop the rules the record never got.
+        const readError = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(readError).toBeInstanceOf(SessionRulesetNotAppliedError);
+
+        const settleError = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+        expect(settleError).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('fails the route when a marker is not JSON at all', async () => {
+      const sessionId = 'ses_record_permission_marker_not_json';
+      const home = temporaryDirectory('kilo-api-permission-not-json-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        mkdirSync(rulesets, { recursive: true });
+        writeFileSync(join(rulesets, `${encodeURIComponent(sessionId)}.json`), 'not json');
+
+        const error = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it.skipIf(process.getuid?.() === 0)(
+      'fails retryably when the marker exists but cannot be read',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_unreadable';
+        const home = temporaryDirectory('kilo-api-permission-unreadable-home-');
+        const marker = join(
+          home,
+          '.kilo-control',
+          'rulesets',
+          `${encodeURIComponent(sessionId)}.json`
+        );
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let locked = false;
+        try {
+          await rememberSessionObligations(sessionId, { permission });
+          // A file mode of 0000 makes the read itself fail, while the bytes
+          // stay in place for the next attempt to read.
+          chmodSync(marker, 0o000);
+          locked = true;
+
+          const error = await readSessionObligations(sessionId).catch((error: unknown) => error);
+
+          // The marker may be readable on the retry, so the step may run again.
+          expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+          expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+          expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
+        } finally {
+          if (locked) chmodSync(marker, 0o600);
+          await forgetSessionObligations(sessionId).catch(() => undefined);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
+      }
+    );
+
+    it.skipIf(process.getuid?.() === 0)(
+      'fails retryably when the marker cannot be written before the import',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_unwritable';
+        const home = temporaryDirectory('kilo-api-permission-unwritable-home-');
+        const control = join(home, '.kilo-control');
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let readOnly = false;
+        try {
+          mkdirSync(control, { recursive: true });
+          chmodSync(control, 0o500);
+          readOnly = true;
+
+          const error = await rememberSessionObligations(sessionId, { permission }).catch(
+            (error: unknown) => error
+          );
+
+          // The marker goes down before the import, so no record is committed and
+          // a retried step can store the marker and import.
+          expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+          expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+          expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
+        } finally {
+          if (readOnly) chmodSync(control, 0o700);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
+      }
+    );
+
+    it('fails the settle retryably and sends no update when the session read cannot answer', async () => {
+      const sessionId = 'ses_record_permission_get_unverified';
+      const directory = temporaryDirectory('kilo-api-permission-get-unverified-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberSessionObligations(sessionId, { permission });
+      try {
+        const failing = startEnsureSessionStub(sessionId, undefined, { getFailures: 1 });
+
+        const error = await createClient(failing.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        // A read that cannot answer must not report "the record lacks these
+        // rules": the update appends, so a second copy would stay.
+        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+        expect(failing.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission });
+
+        // The retry reads the record again and applies the rules exactly once.
+        const healthy = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(healthy.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(healthy.updates).toEqual([{ queryDirectory: directory, body: { permission } }]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId);
+      }
+    });
+
+    it('fails instead of importing when the record permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_not_ruleset';
+      const directory = temporaryDirectory('kilo-api-record-not-ruleset-');
+      const otherDirectory = temporaryDirectory('kilo-api-record-not-ruleset-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission: [{ nope: true }],
+      });
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect(stub.imports).toHaveLength(0);
+      expect(stub.updates).toHaveLength(0);
+    });
+
+    it('reports a ruleset application that keeps failing', async () => {
+      const sessionId = 'ses_record_permission_failing';
+      const directory = temporaryDirectory('kilo-api-permission-fail-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-fail-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+      await forgetSessionObligations(sessionId);
+
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect((error as Error).message).toContain('Session ruleset not applied');
+      expect(stub.updates).toHaveLength(3);
+    });
+
+    it('marks a failed ruleset application as not worth retrying', async () => {
+      const sessionId = 'ses_record_permission_final';
+      const directory = temporaryDirectory('kilo-api-permission-final-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-final-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+      await forgetSessionObligations(sessionId);
+
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect((error as SessionRulesetNotAppliedError).retryable).toBe(false);
+      expect((error as SessionRulesetNotAppliedError).sessionId).toBe(sessionId);
+    });
+
+    it('fails instead of applying a record permission that is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_map';
+      const directory = temporaryDirectory('kilo-api-permission-map-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-map-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission: { bash: 'deny' },
+      });
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+
+      // The record carries permission data that cannot be applied as rules, so
+      // the route fails instead of importing without them.
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect(stub.imports).toHaveLength(0);
+      expect(stub.updates).toHaveLength(0);
+    });
+
+    it('imports an absent record without a force flag', async () => {
+      const sessionId = 'ses_record_absent';
+      const directory = temporaryDirectory('kilo-api-absent-directory-');
+      const stub = startEnsureSessionStub(sessionId);
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect('force' in parameters.body).toBe(false);
+      expect(parameters.body.id).toBe(sessionId);
+      expect(parameters.queryDirectory).toBe(directory);
+      expect(parameters.body.directory).toBe(directory);
+    });
+
+    it('treats a symlinked route directory as the record directory', async () => {
+      const sessionId = 'ses_record_symlink_directory';
+      const realDirectory = temporaryDirectory('kilo-api-real-directory-');
+      const linkPath = join(temporaryDirectory('kilo-api-link-parent-'), 'route');
+      symlinkSync(realDirectory, linkPath);
+      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory: realDirectory });
+
+      await createClient(stub.url).ensureSession(sessionId, linkPath);
+
+      expect(stub.imports).toHaveLength(0);
+    });
+
+    it('imports when the record carries no directory to match', async () => {
+      const sessionId = 'ses_record_without_directory';
+      const directory = temporaryDirectory('kilo-api-missing-directory-');
+      const imports: EnsureSessionImport[] = [];
+      const server = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === '/project/current') {
+            return Response.json({ id: 'proj', worktree: url.searchParams.get('directory') });
+          }
+          if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+            return Response.json({ id: sessionId, title: 'no directory field' });
+          }
+          if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
+            imports.push({
+              queryDirectory: url.searchParams.get('directory'),
+              body: await request.json(),
+            });
+            return Response.json({ ok: true, id: sessionId });
+          }
+          return new Response(null, { status: 404 });
+        },
+      });
+      startedServers.push(server);
+
+      await createClient(server.url.toString()).ensureSession(sessionId, directory);
+
+      expect(imports).toHaveLength(1);
+      expect(imports[0]?.body).toMatchObject({ id: sessionId, directory, force: true });
+    });
+  });
 
   it.each(
     [null, [], '', { ses_1: null }, { ses_1: {} }, { ses_1: { type: 1 } }].map(body => ({ body }))

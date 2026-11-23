@@ -151,8 +151,6 @@ function admissionBranch(state: AdmissionState): NativeAdmissionBranch {
     case 'not_attempted':
       return 'not_attempted';
     case 'missing':
-      // The gate's own `absent` value means the field was never supplied; every
-      // other reason means it was supplied and failed a shape rule.
       return state.reason === 'absent' ? 'missing' : 'malformed';
     case 'refused':
       return 'refused';

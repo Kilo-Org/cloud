@@ -268,8 +268,6 @@ function projectSelection(
     : undefined;
 
   if (selection && !matched) {
-    // The catalogue no longer lists the selected model: keep it reachable as a
-    // head row, with no variant to carry.
     const unavailable = createUnavailableOption(selection.model, gatewayModels);
     return {
       options: [unavailable, ...options],

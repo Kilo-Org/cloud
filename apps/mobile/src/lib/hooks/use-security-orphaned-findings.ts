@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
@@ -47,6 +48,7 @@ export function useDeleteFindingsByRepository(scope: string) {
   const billingAction = useBillingAction(scope);
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (repoFullName: string) =>
       isPersonalSecurityScope(scope)

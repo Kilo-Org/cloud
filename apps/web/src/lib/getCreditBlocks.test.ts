@@ -1,5 +1,9 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { getCreditBlocks } from './getCreditBlocks';
+import {
+  getCreditBlocks,
+  creditGrantReasonOf,
+  type CreditDeductionReason,
+} from './getCreditBlocks';
 
 const makeTransaction = (
   id: string,
@@ -264,5 +268,233 @@ describe('getCreditBlocks', () => {
 
     expect(result.deductions).toHaveLength(1);
     expect(result.deductions[0].purchase).toBeNull();
+  });
+
+  it('reports an expiry of a free program grant with its own expiry and reason', () => {
+    const transactions = [
+      makeTransaction('influencer-grant', 0, 1_000_000, {
+        description: 'Promotional credit for influencer',
+        credit_category: 'influencer',
+        created_at: '2023-03-03',
+        expiry_date: '2024-01-10',
+      }),
+      makeTransaction('expiry', 0, -1_000_000, {
+        description: 'Expired: Promotional credit for influencer',
+        credit_category: 'credits_expired',
+        original_transaction_id: 'influencer-grant',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(0, 0), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0]).toMatchObject({
+      id: 'expiry',
+      expiry: 'expired',
+      purchase: { id: 'influencer-grant', is_free: true, kind: 'influencer' },
+    });
+  });
+
+  it('reports a paid top-up deduction as neither an expiry nor a program grant', () => {
+    const transactions = [
+      makeTransaction('top-up', 0, 5_000_000, {
+        description: 'Top-up via stripe',
+        is_free: false,
+        credit_source: 'stripe',
+        expiry_date: '2027-06-20',
+        created_at: '2026-06-20',
+      }),
+      makeTransaction('spend', 0, -1_000_000, {
+        description: 'Deducting credits',
+        original_transaction_id: 'top-up',
+        created_at: '2026-06-21',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 5_000_000), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0]).toMatchObject({
+      id: 'spend',
+      expiry: null,
+      purchase: {
+        id: 'top-up',
+        is_free: false,
+        credit_source: 'stripe',
+        kind: 'adjustment',
+      },
+    });
+  });
+
+  it('reports a negative row that records no category as usage', () => {
+    const transactions = [
+      makeTransaction('spend', 0, -1_000_000, {
+        description: 'Deducting credits',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBe('usage');
+    expect(result.deductions[0].planName).toBeNull();
+  });
+
+  it('names the coding plan a charge came from', () => {
+    const transactions = [
+      makeTransaction('plan-charge', 0, -20_000_000, {
+        description: 'Coding plan: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:minimax-token-plan-plus:req-1',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(20_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBe('coding_plan');
+    expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
+  });
+
+  it('names the plan a coding-plan renewal renewed from its subscription', () => {
+    const transactions = [
+      makeTransaction('plan-renewal', 0, -20_000_000, {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:renewal:sub-1:2026-12-01',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(
+      transactions,
+      now,
+      makeEntity(20_000_000, 0),
+      ENTITY_ID,
+      new Map([['sub-1', 'MiniMax Token Plan Plus']])
+    );
+
+    expect(result.deductions[0].reason).toBe('coding_plan');
+    expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
+  });
+
+  it('leaves a coding-plan renewal without a resolved plan without a reason', () => {
+    const transactions = [
+      makeTransaction('plan-renewal', 0, -20_000_000, {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:renewal:sub-1:2026-12-01',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(20_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBeNull();
+    expect(result.deductions[0].planName).toBeNull();
+  });
+
+  it('reports the reason each deduction category carries', () => {
+    const cases: { creditCategory: string; reason: CreditDeductionReason | null }[] = [
+      { creditCategory: 'store-credit-refund:app_store:txn-1', reason: 'refund_app_store' },
+      { creditCategory: 'store-credit-refund:google_play:txn-2', reason: 'refund_google_play' },
+      { creditCategory: 'store-credit-refund:stripe:txn-3', reason: null },
+      { creditCategory: 'stripe-dispute-enforcement', reason: 'dispute' },
+      { creditCategory: 'admin-cancel-kilo-pass-no-refund', reason: 'admin_cancel' },
+      { creditCategory: 'manual_decrement', reason: 'admin_debit' },
+      { creditCategory: 'orb_manual_decrement', reason: 'admin_debit' },
+      { creditCategory: 'accounting_adjustment', reason: 'correction' },
+      { creditCategory: 'orb_migration_accounting_adjustment', reason: 'correction' },
+      { creditCategory: 'credits_expired', reason: null },
+    ];
+
+    for (const { creditCategory, reason } of cases) {
+      const transactions = [
+        makeTransaction('row', 0, -1_000_000, { credit_category: creditCategory }),
+      ];
+
+      const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 0), ENTITY_ID);
+
+      expect(result.deductions[0].reason).toBe(reason);
+      expect(result.deductions[0].planName).toBeNull();
+    }
+  });
+});
+
+describe('creditGrantReasonOf', () => {
+  it('maps the referral grant categories to referral', () => {
+    // `referral` is the admin Referral/Review grant, which carries no prefix.
+    expect(creditGrantReasonOf('referral')).toBe('referral');
+    expect(creditGrantReasonOf('referral-referring-bonus')).toBe('referral');
+    expect(creditGrantReasonOf('referral-redeeming-bonus')).toBe('referral');
+  });
+
+  it('maps the welcome grants, including the validation grants they replaced, to welcome', () => {
+    expect(creditGrantReasonOf('automatic-welcome-credits')).toBe('welcome');
+    expect(creditGrantReasonOf('welcome15')).toBe('welcome');
+    expect(creditGrantReasonOf('welcome20')).toBe('welcome');
+    expect(creditGrantReasonOf('stytch-validation')).toBe('welcome');
+    expect(creditGrantReasonOf('card-validation-no-stytch')).toBe('welcome');
+    expect(creditGrantReasonOf('card-validation-upgrade')).toBe('welcome');
+  });
+
+  it('maps the Pass bonus to kilo_pass', () => {
+    expect(creditGrantReasonOf('kilo-pass-bonus')).toBe('kilo_pass');
+  });
+
+  it('maps a registered member-visible promo category to promotional', () => {
+    // Retail categories whose plaintext is in source; the self-service promo
+    // codes are encrypted, so no test may name one of those.
+    expect(creditGrantReasonOf('github-promo-2025-07-03')).toBe('promotional');
+    // `obsolete` marks a grant that predates the current catalogue, not a
+    // balance correction, so it still prints as credit.
+    expect(creditGrantReasonOf('multiplier-promo')).toBe('promotional');
+  });
+
+  it('maps a standing program category to the reason it was earned by', () => {
+    expect(creditGrantReasonOf('influencer')).toBe('influencer');
+    expect(creditGrantReasonOf('usage_issue')).toBe('usage_issue');
+    expect(creditGrantReasonOf('pull_request')).toBe('pull_request');
+    expect(creditGrantReasonOf('vibeday')).toBe('vibe_day');
+    expect(creditGrantReasonOf('feedback')).toBe('feedback');
+    expect(creditGrantReasonOf('admin-bulk-grant')).toBe('admin_bulk_grant');
+    expect(creditGrantReasonOf('oss-sponsorship')).toBe('oss_sponsorship');
+    expect(creditGrantReasonOf('oss-monthly-reset')).toBe('oss_monthly_reset');
+    expect(creditGrantReasonOf('contributor-champion-credits')).toBe('contributor_champion');
+  });
+
+  it('maps ledger accounting rows to adjustment', () => {
+    expect(creditGrantReasonOf('accounting_adjustment')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_migration_accounting_adjustment')).toBe('adjustment');
+  });
+
+  it('maps refund debt restorations to adjustment', () => {
+    expect(creditGrantReasonOf('refund_debt_restored:2f6f7c1e-5b0a-4b8e-9c4d-1a2b3c4d5e6f')).toBe(
+      'adjustment'
+    );
+  });
+
+  it('maps registered balance corrections to adjustment', () => {
+    expect(creditGrantReasonOf('manual_decrement')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_manual_decrement')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_credit_expired')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_credit_voided')).toBe('adjustment');
+    expect(creditGrantReasonOf('credits_expired')).toBe('adjustment');
+    expect(creditGrantReasonOf('admin-cancel-refund-kilo-pass')).toBe('adjustment');
+    expect(creditGrantReasonOf('admin-cancel-kilo-pass-no-refund')).toBe('adjustment');
+    expect(creditGrantReasonOf('organization_custom')).toBe('adjustment');
+  });
+
+  it('maps an admin-created campaign category to promotional', () => {
+    // A campaign writes `c-<slug>` built at grant time, so it is never in the
+    // promo registry; it is still a member-visible signup bonus.
+    expect(creditGrantReasonOf('c-summer-bonus')).toBe('promotional');
+  });
+
+  it('fails closed on an unclassified category', () => {
+    // The fail-closed case: a new writer must not inflate apparent free credit.
+    expect(creditGrantReasonOf('some-future-credit')).toBe('adjustment');
+  });
+
+  it('maps a missing category to adjustment', () => {
+    expect(creditGrantReasonOf(null)).toBe('adjustment');
   });
 });

@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -146,6 +147,16 @@ export function InvoiceListScreen({
   // `isError`: a failed background refetch of page 1 also raises `isError`,
   // and the inline Retry calls `fetchNextPage()`, which can never clear it.
   const isLaterPageError = query.isFetchNextPageError;
+  const isEmptyList = entries.length === 0 && !hasMore && !isLaterPageError;
+
+  // The populated list's reduced-motion band sits above the body, never inside
+  // it: under reduced motion it reserves its own row whether or not a pull is
+  // in flight, so in flow inside the scroller it would move the first row at
+  // rest and scroll away with the rows. This column carries no gap, so under
+  // motion the band's empty box changes nothing. The skeleton and
+  // first-page-error branches carry no pull, and the empty state's own centered
+  // scroller draws its band, so this one belongs to the list branch alone.
+  const showsRefreshBand = !isLoading && !isFirstPageError && !isEmptyList;
 
   let body: ReactNode = null;
   if (isLoading) {
@@ -170,7 +181,7 @@ export function InvoiceListScreen({
         />
       </Animated.View>
     );
-  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+  } else if (isEmptyList) {
     body = (
       <EmptyState
         icon={FileText}
@@ -213,7 +224,7 @@ export function InvoiceListScreen({
         {isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('common.couldnTLoadMore')}
+              {t('common.couldNotLoadMore')}
             </Text>
             <Button
               variant="outline"
@@ -263,6 +274,7 @@ export function InvoiceListScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
       <View className="flex-1" style={sideInsetStyle}>
+        {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
         {body}
       </View>
     </View>

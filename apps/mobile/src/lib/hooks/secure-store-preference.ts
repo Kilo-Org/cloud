@@ -6,15 +6,34 @@ import {
   setAccountMetadata,
 } from '@/lib/auth/account-metadata-write';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  assertProtectedDataAvailable,
+  isProtectedDataAvailable,
+  subscribeToProtectedDataAvailable,
+  whenProtectedDataAvailableWithin,
+} from '@/lib/protected-data';
 
-function noop(): void {
-  // Placeholder until the promise executor hands over its resolve.
-}
+/**
+ * How long a read waits for the keychain before treating the value as unknown:
+ * a headless press handler or a background push cannot spend its budget on an
+ * unlock that may not come.
+ */
+const LOCKED_KEYCHAIN_WAIT_MS = 1_000;
 
 /**
  * Module-level store for a SecureStore-backed preference so every hook
  * instance (settings sheet, message list, new-session screen) shares one
  * value and one disk read. Consume via useSyncExternalStore.
+ *
+ * The read starts at construction, so a synchronous reader of `getRequested()`
+ * with no React tree — the Android widget task, the settings registry — sees
+ * the persisted value once the read settles instead of the default until some
+ * subscriber mounts. A caller can await `whenLoaded()`: it waits for the read
+ * in flight and returns when that read settles, so a caller never resolves
+ * with the default while the value is still on its way. A keychain the device
+ * holds locked past the bounded wait leaves the value unknown until the re-read
+ * at the next unlock, and a caller that asks after that unlock waits for the
+ * re-read rather than reading the default.
  *
  * The rendered value is the durable one: `set()` records a target, one write at
  * a time carries the latest target to disk, and the value the app shows moves
@@ -74,7 +93,11 @@ export function createSecureStorePreference<T>(options: {
    * cleared value back into memory and back onto disk.
    */
   let clearDeletion: Promise<boolean> | undefined = undefined;
-  let loadStarted = false;
+  /**
+   * Whether a retry is armed for the next unlock. One per store: a read that
+   * finds the keychain locked again must not stack a second subscription.
+   */
+  let retryArmed = false;
   /**
    * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
    * value. A write that started under an earlier epoch still lands (the delete
@@ -89,13 +112,17 @@ export function createSecureStorePreference<T>(options: {
    * only repaints the value.
    */
   let clearEpoch = 0;
-  let markLoaded = noop;
-  // Resolves once the disk read settles, so a caller with no React tree (the
-  // Android widget task) can await the stored value instead of reading the
-  // default.
-  const loaded = new Promise<void>(resolve => {
-    markLoaded = resolve;
-  });
+  // The read in flight, so a caller with no React tree (the Android widget
+  // task, the language apply) awaits the authoritative value instead of the
+  // default. Armed per read: a locked read settles it with the value unknown,
+  // and a re-read arms it again, so a caller that asks after an unlock waits
+  // for that read instead of reading the default.
+  let settleRead: (() => void) | undefined = undefined;
+  let readInFlight: Promise<void> | undefined = undefined;
+  /** Whether a disk read is in flight. One at a time: the read is what settles
+   *  `whenLoaded()` and `hasLoaded`, so a second attempt must not start on top
+   *  of one already running. */
+  let reading = false;
   // Callers that must observe durability (tests, the language apply) await the
   // queue draining instead of polling.
   let drainWaiters: (() => void)[] = [];
@@ -137,14 +164,31 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
+  /** Arms the settle signal for the read that is about to start. */
+  const armRead = (): void => {
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    readInFlight = promise;
+    settleRead = () => {
+      resolve(undefined);
+    };
+  };
+
+  /** Releases every `whenLoaded()` caller waiting on the read that just ended. */
+  const settleReadNow = (): void => {
+    const settle = settleRead;
+    settleRead = undefined;
+    readInFlight = undefined;
+    settle?.();
+  };
+
   /** Applies a value the disk now holds. Skipped once clear() or a merge
    *  reconcile superseded it. */
   const applyPersisted = (next: T, epoch: number) => {
     if (epoch !== writeEpoch) {
       return;
     }
-    /* Only the read settles `hasLoaded`: a write landing says what the disk now
-       holds, not that the list it was merged into has been read. */
+    /* A queued write landing does not settle `hasLoaded`: it says what the disk
+       now holds, not that the list it was merged into has been read. */
     value = next;
     emit();
   };
@@ -202,12 +246,67 @@ export function createSecureStorePreference<T>(options: {
     });
   };
 
+  /**
+   * Arms one retry for the next unlock and releases it when it fires. The retry
+   * is a subscription, not a one-shot waiter: an unlock that lands after the
+   * read gave up is still observed, so a store whose value is unknown cannot
+   * sit on a promise nothing resolves. One per store.
+   *
+   * Armed after any locked read, including one a `clear()` superseded: the value
+   * stays unknown until a read sees the disk, and every
+   * `useSyncExternalStore(…, getHasLoaded)` consumer stays in its loading state
+   * until it does. A read that starts after the clear describes what the clear
+   * left, and `load()` fences a snapshot taken before it.
+   */
+  const armRetryOnUnlock = (): void => {
+    if (retryArmed || hasLoaded) {
+      return;
+    }
+    retryArmed = true;
+    const release = subscribeToProtectedDataAvailable(() => {
+      if (!retryArmed) {
+        return;
+      }
+      retryArmed = false;
+      release();
+      // A read already running saw the same unlock and settles the store; the
+      // JS thread cannot interleave an unlock between the failed read and this
+      // subscription, so the subscription always starts from a locked state.
+      if (!reading) {
+        void load();
+      }
+    });
+  };
+
   const load = async () => {
+    if (reading) {
+      return;
+    }
+    reading = true;
+    armRead();
     // A clear() that runs after this read starts must win over the bytes it
     // returns, so the read remembers the epoch it began under.
     const loadEpoch = clearEpoch;
+    // The read starts at module evaluation, which a background push or a
+    // resumed timer can reach while iOS still holds the keychain locked. A
+    // locked keychain is not an absent value, so wait for unlock instead of
+    // latching the default for the rest of the process. While the data is
+    // available the check is synchronous, so the read still starts in the
+    // construction turn, and the wait is bounded so a headless caller settles.
+    if (!isProtectedDataAvailable()) {
+      await whenProtectedDataAvailableWithin(LOCKED_KEYCHAIN_WAIT_MS);
+    }
+    // Read after the wait: a clear() that ran meanwhile queued a delete this
+    // read must observe and await.
     const deletion = clearDeletion;
+    // Set when the keychain was still locked, so the value is unknown rather
+    // than absent and this read cannot report it as read.
+    let locked = false;
     try {
+      // The wait above is bounded, so the device may still be locked here. The
+      // read must not run against it: the refusal would leave the value
+      // unknown, which the catch below handles like any other locked attempt.
+      assertProtectedDataAvailable();
       if (deletion && !(await deletion)) {
         // The delete a clear() queued never landed, so the disk still holds the
         // snapshot that clear removed. The clear wins: drop it.
@@ -238,15 +337,30 @@ export function createSecureStorePreference<T>(options: {
         void drainWrites();
       }
     } catch {
-      // Keep the default on read failure — this runs on mount, before the
-      // user has done anything, so there's nothing actionable to tell them.
-      // The SecureStore read path already reports the rejection once (a
-      // warning event for a real failure, a breadcrumb for a locked device's
-      // refusal), so a second record here would only duplicate it.
+      if (!isProtectedDataAvailable()) {
+        // The device stayed locked for the whole bound, or locked again before
+        // the read could land. The value is unknown, not absent: nothing may
+        // claim it loaded, but `whenLoaded()` still settles so a headless
+        // caller returns. A `clear()` that ran meanwhile owns the disk without
+        // stopping the retry: `load()` fences its snapshot with the epoch it
+        // began under, so the re-read describes what the clear left.
+        locked = true;
+        armRetryOnUnlock();
+      }
+      // Keep the default on a read failure — this runs at construction, before
+      // the user has done anything, so there's nothing actionable to tell them.
+      // The SecureStore read path already reports that rejection once: a second
+      // record here would only duplicate it.
     } finally {
-      loadSettled = true;
-      hasLoaded = true;
-      markLoaded();
+      if (!locked) {
+        // Only a read that saw the disk settles the store: an unknown value is
+        // still described by the re-read at unlock, and a write that fails
+        // meanwhile must let that read report what is stored.
+        loadSettled = true;
+        hasLoaded = true;
+      }
+      reading = false;
+      settleReadNow();
       emit();
     }
   };
@@ -267,26 +381,23 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
-  const preload = () => {
-    if (!loadStarted) {
-      loadStarted = true;
-      void load();
-    }
-  };
+  // The read starts here, at construction, so a synchronous reader with no
+  // React tree (the Android widget task, the settings registry) sees the
+  // persisted value once the read settles instead of the default until some
+  // subscriber mounts.
+  void load();
 
   return {
-    /** Start the disk read without registering a listener (module-scope warm-up). */
-    preload,
-    /** Start the disk read and await it. For callers outside a React tree. */
+    /**
+     * Awaits the read in flight, so a caller returns only once the store knows
+     * what the disk holds. With no read in flight it returns at once: a lock
+     * that outlasts the bounded wait leaves the value unknown, not absent, and a
+     * headless caller must still return.
+     */
     whenLoaded: async () => {
-      preload();
-      await loaded;
+      await readInFlight;
     },
     subscribe: (listener: () => void) => {
-      if (!loadStarted) {
-        loadStarted = true;
-        void load();
-      }
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
@@ -399,10 +510,10 @@ export function createSecureStorePreference<T>(options: {
       // A clear before the initial load resolves must still win, even with
       // mergeOnLoad set.
       cleared = true;
-      // Recorded before emit() and before clear() returns: a listener that
-      // starts the read from the emit, or a caller that starts it right after
-      // the clear, must wait for the delete instead of reading the snapshot
-      // this clear removed. remove() never rejects, so holding it is safe.
+      // Recorded before emit() and before clear() returns, so a read waits for
+      // the delete instead of reading the snapshot this clear removed: until
+      // the delete lands, the disk still holds it.
+      // remove() never rejects, so holding it is safe.
       clearDeletion = remove();
       emit();
       releaseDrainWaiters();

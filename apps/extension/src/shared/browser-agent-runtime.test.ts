@@ -26,6 +26,7 @@ import {
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
 } from './browser-agent-checks';
+import type { BrowserGrant } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
 import { createDownloadHold } from './browser-download-hold';
@@ -850,6 +851,698 @@ describe('agent browser calls', () => {
     expect(approved.kind).toBe('result');
     const { cancelled } = downloads;
     expect(cancelled).toStrictEqual([41]);
+  });
+
+  it('guards the file a payment-form submit starts, and keeps it once that file is approved', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { filename: 'report.txt', id: 51, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { filename: 'report.txt', id: 52, url: `${MAIN_ORIGIN}/report.txt` };
+    const suggested: number[] = [];
+
+    // The click target is a submit control inside a form that holds a payment field: the step is sensitive.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        // A click is a press and a release; the press is the event that starts the file. The gate refuses the first
+        // Call before the tool runs, so the first press is the approved retry's.
+        if (params?.['type'] === 'mousePressed') {
+          const file = suggested.length === 0 ? first : second;
+
+          hold.handle({ id: file.id, referrer: dashboard, url: file.url }, () => {
+            suggested.push(file.id);
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    // The form's approval lets the submit run; the file it starts keeps the ordinary download rule.
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(suggested).toStrictEqual([51]);
+
+    // The download approval that refusal issues names the one file it buys, so that file is kept and nothing else.
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    expect(suggested).toStrictEqual([51, 52]);
+  });
+
+  it('redeems a file approval when the retried step is no longer sensitive', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { filename: 'report.txt', id: 51, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { filename: 'report.txt', id: 52, url: `${MAIN_ORIGIN}/report.txt` };
+    const suggested: number[] = [];
+
+    // The submit inside a form that holds a payment field is a sensitive step: the gate refuses the first call.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        // A click is a press and a release; the press is the event that starts the file.
+        if (params?.['type'] === 'mousePressed') {
+          const file = suggested.length === 0 ? first : second;
+
+          hold.handle({ id: file.id, referrer: dashboard, url: file.url }, () => {
+            suggested.push(file.id);
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval lets the submit run; the file it starts is stopped and gets an approval of its own.
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(suggested).toStrictEqual([51]);
+
+    // The page now answers as an ordinary submit, so the gate classifies no step for the retry: the file's approval
+    // Is still the one that was issued for this call, and it buys the file it named.
+    cdp.setProbe({ fields: [], paymentFormSubmit: false });
+
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    // The retried file was kept, not cancelled again, and the human was not asked a second time.
+    expect(downloads.cancelled).toStrictEqual([51]);
+    expect(suggested).toStrictEqual([51, 52]);
+  });
+
+  it('keeps a download approval to the tab it was issued for', async () => {
+    // A granted `downloads` permission and no hold is the legacy tier: a call no approval covers runs one guard.
+    const downloads = createFakeDownloads();
+    const otherTab = TAB_ID + 6;
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // Both tabs are the session's, so the same call may be sent on either.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: otherTab });
+
+    /** The presses that reached the page, and the file each one started. */
+    const started: number[] = [];
+    let nextFileId = 61;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': (params, target) => {
+        // A click is a press and a release; the press is the event that starts the file.
+        if (params?.['type'] === 'mousePressed') {
+          const id = nextFileId;
+
+          nextFileId += 1;
+          started.push(id);
+          // The file starts on the tab the call drives, and its refusal names no url.
+          downloads.emit({ id, tabId: target?.tabId ?? TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (tabId: number, sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId,
+        toolName: 'browser_click',
+      });
+
+    // The first click starts one file, and the guard stops it before it is saved.
+    const refused = await click(TAB_ID, []);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([[61], [61]]);
+
+    // The approval that refusal issued buys the file on the tab it answered for: the repeat is accepted there.
+    const approved = await click(TAB_ID, [expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    expect([started, downloads.cancelled]).toStrictEqual([[61, 62], [61]]);
+
+    // Another click on that tab starts a further file: its refusal issues an approval of its own.
+    const otherRefusal = await click(TAB_ID, []);
+
+    expect(otherRefusal).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([
+      [61, 62, 63],
+      [61, 63],
+    ]);
+
+    // The same call on another tab is a new step, so that approval does not carry over and its file is stopped.
+    const otherToken = expectStepToken(otherRefusal);
+    const otherTabRepeat = await click(otherTab, [otherToken]);
+
+    expect(otherTabRepeat).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect([started, downloads.cancelled]).toStrictEqual([
+      [61, 62, 63, 64],
+      [61, 63, 64],
+    ]);
+    // Nothing was kept: the stopped files were interrupted, so the downloads folder holds none of them.
+    expect(downloads.removed).toStrictEqual([]);
+    // The refusal asks for the other tab's own approval, never the one the call presented.
+    expect(expectStepToken(otherTabRepeat)).not.toBe(otherToken);
+  });
+
+  it('redeems a download approval on the tab it was issued for', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const otherTab = TAB_ID + 6;
+
+    // Both tabs are the session's, so the same call and the same arguments may be sent on either.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: otherTab });
+
+    /** Whether the pay frame's field is sensitive: the retry is driven with an ordinary field presentation. */
+    let sensitive = true;
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** The presses that reached the page and the tab each drove: a refused call never runs the tool. */
+    const started: { readonly id: number; readonly tabId: number }[] = [];
+    let nextFileId = 71;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': (params, target) => {
+        // A drag is one press and one release: only the press can start the file. A refused call never ran the tool.
+        if (params?.['type'] === 'mousePressed') {
+          const id = nextFileId;
+          const tabId = target?.tabId ?? TAB_ID;
+
+          nextFileId += 1;
+          started.push({ id, tabId });
+          downloads.emit({ id, tabId, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(sensitive && backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    // A ref belongs to the caller and the tab it was read on, so each tab needs its own snapshot of `e2` and `e31`.
+    for (const tabId of [TAB_ID, otherTab]) {
+      // eslint-disable-next-line no-await-in-loop -- one tab's snapshot per call, in order
+      const snapshot = await runtime.runTool({
+        agent: { authorized: grants },
+        arguments: {},
+        caller: agent(),
+        tabId,
+        toolName: 'browser_snapshot',
+      });
+
+      expect(snapshot.kind).toBe('result');
+    }
+
+    const drag = (tabId: number, presented: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...presented] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId,
+        toolName: 'browser_drag',
+      });
+
+    /** One tab's refusal of the step, then of the file its approved repeat starts. */
+    const refuseFile = async (tabId: number): Promise<string> => {
+      // The sensitive element is in the pay frame while the call's first target is in the tab's own document.
+      const refusedStep = await drag(tabId, []);
+
+      expect(refusedStep).toMatchObject({
+        items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+        kind: 'needs_permission',
+      });
+
+      // The step's approval lets the drag run; the file it starts keeps the ordinary download rule.
+      const refusedFile = await drag(tabId, [expectStepToken(refusedStep)]);
+
+      expect(refusedFile).toMatchObject({
+        afterAction: true,
+        items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+        kind: 'needs_permission',
+      });
+
+      return expectStepToken(refusedFile);
+    };
+
+    // Each tab's refusal issues an approval of its own.
+    const firstToken = await refuseFile(TAB_ID);
+    const secondToken = await refuseFile(otherTab);
+
+    expect(secondToken).not.toBe(firstToken);
+    expect(started).toStrictEqual([
+      { id: 71, tabId: TAB_ID },
+      { id: 72, tabId: otherTab },
+    ]);
+    expect(downloads.cancelled).toStrictEqual([71, 72]);
+
+    // The pay frame answers as an ordinary field, so this repeat names no element of its own and is answered by the
+    // Record filed for the first tab.
+    sensitive = false;
+
+    const approved = await drag(TAB_ID, [firstToken]);
+
+    // The repeated drag keeps the one file that approval bought, and nothing was stopped again.
+    expect(started).toStrictEqual([
+      { id: 71, tabId: TAB_ID },
+      { id: 72, tabId: otherTab },
+      { id: 73, tabId: TAB_ID },
+    ]);
+    expect(downloads.cancelled).toStrictEqual([71, 72]);
+    expect(downloads.removed).toStrictEqual([]);
+    expect(JSON.stringify(expectResult(approved).result)).toContain('report.txt');
+  });
+
+  it('gives the file a step-approved submit starts its own approval', async () => {
+    // A granted `downloads` permission and no hold is the legacy tier.
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // A submit inside a form that holds a payment field: the gate refuses the first call before the tool runs.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    // The submit runs on the step approval, and the file it starts takes an approval of its own.
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // The guard cancelled the file through chrome.downloads and named it.
+    expect(downloads.cancelled).toStrictEqual([61]);
+    expect(expectStepToken(refused)).toBeDefined();
+  });
+
+  it('runs one guard on the retry a step approval covers', async () => {
+    // A granted `downloads` permission and no hold means the item guard is this browser's one guard.
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let presses = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          presses += 1;
+
+          // The approved repeat is the press that starts the file: the refused call never ran the tool.
+          if (presses === 1) {
+            downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const consent = 'https://github.com';
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'act' as const, origin: consent }],
+          sensitive: [...sensitive],
+        },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // A consent page is a sensitive step with no element, so its token binds no element either.
+    cdp.setFrameUrl(`${consent}/login/oauth/authorize?client_id=fixture`);
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', reason: SENSITIVE_REASON.oauthConsent }],
+      kind: 'needs_permission',
+    });
+
+    // The same origin answers as an ordinary page, so the gate classifies no step for the retry.
+    cdp.setFrameUrl(`${consent}/settings`);
+    const retried = await click([expectStepToken(sensitiveRefusal)]);
+
+    // A step approval buys the step. The retry still runs one guard, so the file it starts is stopped and named.
+    expect(retried).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([61]);
+  });
+
+  it('redeems a file approval a cross-frame sensitive step issued on its retry', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** The presses that reached the page: the refused call never runs the tool. */
+    let presses = 0;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': params => {
+        // A drag is one press and one release: only the press can start the file. The approved retry is the second
+        // Press, because the refused call never ran the tool.
+        if (params?.['type'] === 'mousePressed') {
+          presses += 1;
+          downloads.emit({
+            id: 70 + presses,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/report.txt`,
+          });
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    // The refs the drag targets: `e2` in the tab's own document, `e31` in the pay frame.
+    const snapshot = await runtime.runTool({
+      agent: { authorized: grants },
+      arguments: {},
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_snapshot',
+    });
+
+    expect(snapshot.kind).toBe('result');
+
+    const drag = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...sensitive] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drag',
+      });
+
+    // The sensitive element is in the pay frame while the call's first target is in the tab's own document.
+    const refusedStep = await drag([]);
+
+    expect(refusedStep).toMatchObject({
+      items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval lets the drag run; the file it starts keeps the ordinary download rule.
+    const refusedFile = await drag([expectStepToken(refusedStep)]);
+
+    // The refusal still names the call's own origin.
+    expect(refusedFile).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([71]);
+
+    // The file approval is bound to the origin the gate classified, so the retry redeems it instead of asking again.
+    const retried = await drag([expectStepToken(refusedFile)]);
+
+    // The approval bought the one file the refusal named: that file is kept, and nothing else was stopped.
+    expect(downloads.cancelled).toStrictEqual([71]);
+    expect(JSON.stringify(expectResult(retried).result)).toContain('report.txt');
+  });
+
+  it('fails the response of a file a payment-form submit starts when the downloads permission is withheld', async () => {
+    // No downloads API and no hold: the response that would become a file is the one guard this browser has.
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+    let commands = 0;
+    let paused = 0;
+
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        commands += 1;
+
+        if (commands % 2 === 0) {
+          paused += 1;
+          cdp.emit('Fetch.requestPaused', {
+            requestId: `sensitive-${String(paused)}`,
+            responseHeaders: [
+              { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+              { name: 'Content-Type', value: 'text/plain' },
+            ],
+            responseStatusCode: 200,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    // The response that would become the file is failed before any byte lands.
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'sensitive-1']]);
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // The refusal names the file, so the model reports one instead of a saved file nobody mentioned.
+    expect(
+      refused.kind === 'needs_permission' && !refused.result.ok ? refused.result.error : ''
+    ).toContain('report.txt');
+    // No approval is offered where none could be spent: without `downloads`, no guard can honour a token.
+    expect(refused.kind === 'needs_permission' ? refused.stepToken : 'unexpected').toBeUndefined();
   });
 
   it('keeps only the approved file when the approved call starts a second download', async () => {
@@ -1681,6 +2374,70 @@ describe('agent browser calls', () => {
     expect([cdp.downloadsDenied(), cdp.downloadsRestored()]).toStrictEqual([1, 1]);
   });
 
+  it('runs one download guard on the retry an upload approval covers', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let dropping = false;
+
+    cdp.setHandlers({
+      // The file this call starts is created while its own command runs.
+      'Input.dispatchDragEvent': () => {
+        if (dropping) {
+          dropping = false;
+          downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+    });
+
+    const drop = (sensitive: readonly string[], args: Record<string, unknown>) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: args,
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drop',
+      });
+
+    const refused = await drop([], { paths: ['/tmp/receipt.pdf'], target: '#zone' });
+
+    expect(refused).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.fileUpload }],
+      kind: 'needs_permission',
+    });
+    expect(cdp.downloadsDenied()).toBe(0);
+
+    // The retry runs one download guard, so the file it starts is stopped and named.
+    dropping = true;
+    const guarded = await drop([expectStepToken(refused)], {
+      paths: ['/tmp/receipt.pdf'],
+      target: '#zone',
+    });
+
+    expect(guarded).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([61]);
+  });
+
+  it('runs a drop that carries page data under the ordinary act rule', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    const dropped = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { data: { 'text/plain': 'x' }, target: '#zone' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_drop',
+    });
+
+    expect(dropped.kind).toBe('result');
+    expect(cdp.downloadsDenied()).toBe(1);
+  });
+
   it('cancels the download whose referrer is this tab\u2019s page', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
@@ -2231,6 +2988,239 @@ describe('agent browser calls', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('binds a late download of a sensitive step to the element its retry will carry', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    /** Set before the retry, so the click starts the one file the reported approval buys. */
+    let replay = false;
+
+    // A submit inside a form that holds a payment field: the gate classifies this click on `#pay`.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed' && replay) {
+          replay = false;
+          hold.handle({ id: 93, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      });
+
+    const sensitiveRefusal = await click();
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    const stepToken = expectStepToken(sensitiveRefusal);
+    const approvedStep = await click([stepToken]);
+
+    expect(approvedStep.kind).toBe('result');
+
+    // The browser creates the file after the approved step answered, so no guard of its own saw it.
+    hold.handle({ id: 92, referrer: dashboard, url }, () => {});
+
+    const reported = await shot();
+    const downloadToken = expectStepToken(reported);
+
+    // The reported token binds the element the gate classified, so the repeat is the same approval, not a new ask.
+    replay = true;
+
+    const approved = await click([downloadToken]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(
+        `expected the element-bound token to redeem, got ${JSON.stringify(approved)} from ${JSON.stringify(reported)}`
+      );
+    }
+
+    // The late file was the linger's; the retry's own file is the one the reported approval bought.
+    expect(downloads.cancelled).toStrictEqual([92]);
+  });
+
+  it('redeems a late download approval on the step it was issued for', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** Set before the retry, so that one repeat starts the file its approval buys. */
+    let replay = false;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': params => {
+        // A drag is one press and one release: only the press can start the file, and only the retry's press does.
+        if (params?.['type'] === 'mousePressed' && replay) {
+          replay = false;
+          hold.handle({ id: 94, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    const drag = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...sensitive] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drag',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: grants },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      });
+
+    // The refs the drag targets: `e2` in the tab's own document, `e31` in the pay frame.
+    const snapshot = await shot();
+
+    expect(snapshot.kind).toBe('result');
+
+    const refusedStep = await drag([]);
+
+    expect(refusedStep).toMatchObject({
+      items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval runs the drag, and that run starts no file of its own.
+    const approvedStep = await drag([expectStepToken(refusedStep)]);
+
+    expect([approvedStep.kind, downloads.cancelled]).toStrictEqual(['result', []]);
+
+    // The file lands after the approved step answered, so the next call is the one that reports it.
+    hold.handle({ id: 92, referrer: dashboard, url }, () => {});
+
+    await vi.waitFor(() => {
+      expect(hold.tracked(92)?.kind).toBe('blocked');
+    });
+
+    const reported = await shot();
+    const downloadToken = expectStepToken(reported);
+
+    // The refusal names the origin of the call it answers; the approval it issues binds the origin the gate classified.
+    expect(reported).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+
+    // The approval the refusal issued redeems on the repeat, which is what its binding buys.
+    replay = true;
+
+    const retried = await drag([downloadToken]);
+
+    expect(retried.kind).toBe('result');
+
+    // The late file was the hold's; the retry's own file is the one the reported approval kept.
+    expect(downloads.cancelled).toStrictEqual([92]);
+    expect(hold.needOf('session-1')).toMatchObject({ itemId: 94, kind: 'spent' });
   });
 
   it('keeps the file an approved click starts after it answered, and guards the next identical call', async () => {
@@ -2934,6 +3924,249 @@ describe('agent browser calls', () => {
     expect(
       approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
     ).toContain('report.txt: The file was downloaded; the page did not change.');
+  });
+
+  it('answers an approved repeat with the navigation result of the tab it drove', async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    const landing = 'https://accounts.example.org/login';
+    let navigates = 0;
+    /**
+     * The opened tab's url, as the browser reports it: the step's destination until the repeat's navigation commits,
+     * then the url that navigation landed on.
+     */
+    let tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat's
+    // Navigate loads a page, so no file exists for the approval to claim and the result is the page it landed on.
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    // The repeat's navigation commits on the url it loaded, so the frame tree and the tab the browser reports both
+    // Show where the repeat settled.
+    cdp.setFrameUrl(landing);
+    tabUrl = landing;
+
+    // The repeat runs on a later instant than the file the guarded call created: a download search's window is
+    // Millisecond-granular, so the two calls only stay apart if the clock does. Only `Date` is faked, so every guard
+    // Window still runs on the real timers it waits with.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 1000);
+
+    try {
+      const approved = await openTab([expectStepToken(guarded)]);
+
+      expect(approved).toMatchObject({
+        from: MAIN_ORIGIN,
+        kind: 'origin_changed',
+        to: 'https://accounts.example.org',
+      });
+      // The repeat navigated the tab the refused step opened, not the caller's, and it opened no second tab.
+      expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+        method: 'Page.navigate',
+        params: { url },
+        tabId: newTab,
+        url,
+      });
+      expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers an approved repeat on its approved destination with the browser's refusal", async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    // The opened tab's url, as the browser reports it: the step's destination, which the repeat stays on when the
+    // Browser refuses its file instead of loading a page.
+    const tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat stays on
+    // Its approved destination, so no page changed and the browser's own limiter is what refused the file.
+    let navigates = 0;
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    const approved = await openTab([expectStepToken(guarded)]);
+
+    // The tab never left the origin the call was approved for, so the answer is the browser's download refusal with
+    // The step token a repeat needs, not a navigation result that would hide it.
+    expect(approved.kind).toBe('needs_permission');
+    expect(approved.kind === 'needs_permission' && !approved.result.ok).toBe(true);
+    expect(
+      approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+    ).toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+    expect(approved.kind === 'needs_permission' ? approved.stepToken !== undefined : false).toBe(
+      true
+    );
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
   });
 
   it('leaves a later download of the same url alone when the record for it is stale', async () => {
@@ -3724,6 +4957,10 @@ describe('agent browser calls', () => {
       readonly leases?: TabLeaseRegistry;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
+      /** Extra grants for a case about an origin the step may already open or read. */
+      readonly extraGrants?: readonly BrowserGrant[];
+      /** The url the opened tab reports, when a case's navigation lands somewhere other than the step's destination. */
+      readonly tabUrl?: () => string;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
       /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
@@ -3781,9 +5018,16 @@ describe('agent browser calls', () => {
         }
 
         // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
-        return options.unreadableTabUrl === true
-          ? { id: newTab, title: '', url: '' }
-          : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
+        if (options.unreadableTabUrl === true) {
+          return { id: newTab, title: '', url: '' };
+        }
+
+        // A case whose navigation lands elsewhere: the tab reports the url it really committed, once that has happened.
+        return {
+          id: newTab,
+          title: '',
+          url: options.tabUrl?.() ?? `${MAIN_ORIGIN}/report.txt`,
+        };
       },
       onCreated: {
         addListener: (
@@ -3923,7 +5167,12 @@ describe('agent browser calls', () => {
     const run = (caller: BrowserCaller, sensitive: readonly string[] = [], tabId = TAB_ID) =>
       harness.runtime.runTool({
         agent: {
-          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          authorized: [
+            readGrant,
+            actGrant,
+            { class: 'navigate', origin: MAIN_ORIGIN },
+            ...(options.extraGrants ?? []),
+          ],
           sensitive: [...sensitive],
         },
         arguments: { action: 'new', url },
@@ -4542,6 +5791,70 @@ describe('agent browser calls', () => {
     }
 
     expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
+  });
+
+  it('answers the opened tab for a tabs-new that settles on its approved destination', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+    const outcome = await fixture.run(agent());
+
+    // The tab the step opened is the answer, at the url the step navigated to.
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${MAIN_ORIGIN}/report.txt`,
+    });
+  });
+
+  it('reports origin_changed for a tabs-new that redirects to another origin', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+
+    // The approved destination answered with a redirect: the tab commits on another origin than the one the step was approved for.
+    fixture.cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await fixture.run(agent());
+
+    expect(outcome).toMatchObject({
+      from: MAIN_ORIGIN,
+      kind: 'origin_changed',
+      to: 'https://accounts.example.org',
+    });
+    // The step's own answer is the refusal, not a claim that the tab opened where it was asked to.
+    expect(originChangedResultOf(outcome)).toMatchObject({ ok: true });
+  });
+
+  it('completes a tabs-new redirect that lands on an origin the step may already read', async () => {
+    const landing = 'https://accounts.example.org';
+    // The tab reports the landing url only once its navigation has committed it, as a browser does.
+    let committed = `${MAIN_ORIGIN}/report.txt`;
+    const fixture = await tabsNewFixture({
+      extraGrants: [{ class: 'read', origin: landing }],
+      // The step loads a page, so no file exists for the guard to claim from the browser's history.
+      noSeededFile: true,
+      plain: true,
+      tabUrl: () => committed,
+    });
+
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        committed = `${landing}/login`;
+        fixture.cdp.setFrameUrl(committed);
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    // `postAgentNavigate` is the only judge: a landing origin the session may read is the redirect's answer, and the
+    // Tab the step opened is what the caller gets back, at the url it really committed.
+    expect(outcome.kind).toBe('result');
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${landing}/login`,
+    });
   });
 
   it('names the tab a guarded tabs-new opened when the navigation leaves a dialog open on it', async () => {

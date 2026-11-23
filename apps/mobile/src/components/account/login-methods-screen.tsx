@@ -19,6 +19,7 @@ import { RowGroup } from '@/components/ui/row-group';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
+import { joinAccessibleName } from '@/lib/a11y/accessible-name';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -81,6 +82,7 @@ function ProviderRow({
 }>) {
   const { t } = useTranslation();
   const label = providerLabel(provider);
+  const blockedReason = canUnlink ? null : t('profile.signInMethods.lastMethod');
 
   return (
     <ConfigureRow
@@ -91,8 +93,10 @@ function ProviderRow({
       trailing={renderRowTrailing({
         kind: 'action',
         label: t('profile.signInMethods.unlink'),
-        accessibilityLabel: t('profile.signInMethods.unlinkProvider', { provider: label }),
-        accessibilityHint: canUnlink ? undefined : t('profile.signInMethods.lastMethod'),
+        accessibilityLabel: joinAccessibleName([
+          t('profile.signInMethods.unlinkProvider', { provider: label }),
+          blockedReason,
+        ]),
         disabled: disabled || !canUnlink,
         onPress: onUnlink,
       })}
@@ -112,11 +116,14 @@ function ProviderRow({
  * announcement owner, so no toast repeats it.
  *
  * A one-method list states the last-method rule before any tap: the unlink
- * control is disabled and carries that sentence as its hint, and the same
- * sentence sits under the row, so the reader learns why without asking the
- * server. Because the row already says it, the status stays silent for a
- * last-method answer while the list still shows one method, and the answer's
- * refresh hands this screen the one-method list that makes the rows agree.
+ * control is disabled and carries that sentence in its accessible name, because
+ * `accessibilityHint` is only the node's tooltip on Android (see
+ * components/ui/configure-row.tsx), so the name is the only place TalkBack
+ * reads. The same sentence also sits visible under the row, so the reason is
+ * on screen as well as on the control. Because the row already says it, the
+ * status stays silent for a last-method answer while the list still shows one
+ * method, and the answer's refresh hands this screen the one-method list that
+ * makes the rows agree.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
@@ -240,6 +247,7 @@ export function LoginMethodsScreen() {
             icon={Plus}
             title={t('profile.signInMethods.linkAnother')}
             subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
+            subtitleNumberOfLines={2}
             onPress={() => {
               void openAppShellHandoff(
                 { page: 'connected-accounts' },

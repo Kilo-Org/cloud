@@ -16,6 +16,7 @@ import {
 } from '@/components/profiles/profile-commands-model';
 import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
@@ -28,6 +29,7 @@ import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -63,6 +65,11 @@ export function ProfileCommandsScreen({
     router.dismissTo(backFallback);
   }, [router, backFallback]);
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: commandsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
 
@@ -270,17 +277,7 @@ export function ProfileCommandsScreen({
   };
 
   let content: ReactNode = null;
-  if (commandsQuery.isError) {
-    content = (
-      <QueryError
-        variant="server"
-        placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void commandsQuery.refetch()}
-        isRetrying={commandsQuery.isRefetching}
-      />
-    );
-  } else if (commandsQuery.isPending) {
+  if (commandsQuery.isPending) {
     content = <CommandsSkeleton />;
   } else if (commands.length === 0) {
     content = (
@@ -325,15 +322,28 @@ export function ProfileCommandsScreen({
         backFallback={backFallback}
         onBack={leaveScreen}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {commandsQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void commandsQuery.refetch() : undefined}
+          isRetrying={commandsQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

@@ -92,8 +92,6 @@ describe('isStoredRepoSelectionGone', () => {
   });
 
   it('keeps a selection while its provider left rows unlisted, and drops it when it answered', () => {
-    // A Bitbucket workspace that needs selecting or new credentials reports the
-    // same status as "not connected" but keeps its repositories behind the fix.
     expect(
       isStoredRepoSelectionGone({
         groups: [group('bitbucket', 'connect', { rowsUnlisted: true })],
@@ -101,7 +99,6 @@ describe('isStoredRepoSelectionGone', () => {
         selectedRepo: 'bitbucket:acme/widgets',
       })
     ).toBe(false);
-    // A provider that really has nothing connected has no rows to offer.
     expect(
       isStoredRepoSelectionGone({
         groups: [group('bitbucket', 'connect')],

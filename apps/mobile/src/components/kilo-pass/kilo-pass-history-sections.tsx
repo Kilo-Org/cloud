@@ -240,7 +240,7 @@ export function KiloPassCreditHistorySection({
       )}
       {query.isFetchNextPageError && (
         <SectionError
-          message={t('common.couldnTLoadMore')}
+          message={t('common.couldNotLoadMore')}
           onRetry={
             retryable
               ? () => {
@@ -309,7 +309,7 @@ export function KiloPassBillingHistorySection({
       )}
       {query.isFetchNextPageError && (
         <SectionError
-          message={t('common.couldnTLoadMore')}
+          message={t('common.couldNotLoadMore')}
           onRetry={
             retryable
               ? () => {

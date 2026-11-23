@@ -91,6 +91,7 @@
     "draft": "मसुदा",
     "enabled": "सुरू",
     "github": "GitHub",
+    "image": "प्रतिमा",
     "imageUnavailable": "प्रतिमा उपलब्ध नाही",
     "loading": "लोड होत आहे…",
     "loadMore": "आणखी दाखवा",
@@ -122,10 +123,10 @@
     "connectProvider": "सेवा पुरवठादार जोडा",
     "contentTruncated": "काही मजकूर वगळला आहे",
     "copyLink": "लिंक कॉपी करा",
+    "couldNotLoad": "माहिती लोड करता आली नाही.",
+    "couldNotLoadMore": "आणखी माहिती लोड करता आली नाही.",
     "couldNotLoadOrganizations": "संस्थांची यादी लोड करता आली नाही.",
     "couldNotLoadSessions": "सत्रे लोड करता आली नाहीत.",
-    "couldnTLoad": "माहिती लोड करता आली नाही.",
-    "couldnTLoadMore": "आणखी माहिती लोड करता आली नाही.",
     "deviceSessions": "उपकरणांवरील सत्रे",
     "disabled": "बंद",
     "email": "ईमेल",
@@ -186,7 +187,30 @@
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
     "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
     "organizationTrialEndedBillingAtKiloAi": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही kilo.ai वर बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
-    "viewOnGitHub": "GitHub वर PR पहा"
+    "viewOnGitHub": "GitHub वर PR पहा",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "यादी आयटम {n}",
+        "nestedOrderedItem": "नेस्टेड यादी आयटम {n}"
+      },
+      "blockquote": {
+        "quote": "अवतरण",
+        "nestedQuote": "नेस्टेड अवतरण"
+      },
+      "table": {
+        "row": "ओळ {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षके",
+        "links": "लिंक",
+        "images": "प्रतिमा"
+      }
+    }
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -286,6 +310,7 @@
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",
+    "availableToSpendInOrganization": "या संस्थेत खर्च करण्यासाठी उपलब्ध",
     "signOutTitle": "साइन आउट करायचे?",
     "signOutMessage": "तुमच्या वर्कस्पेसमध्ये प्रवेश करण्यासाठी तुम्हाला पुन्हा साइन इन करावे लागेल.",
     "deleteAccountTitle": "खाते हटवायचे?",
@@ -427,6 +452,17 @@
       "location": "Vertex स्थान",
       "clientEmail": "सेवा खात्याचा ईमेल",
       "privateKey": "सेवा खात्याची खाजगी की",
+      "privateKeyBlockRequired": "BEGIN ओळीपासून END ओळीपर्यंत संपूर्ण की ब्लॉक पेस्ट करा.",
+      "privateKeyEncrypted": "हा की ब्लॉक पासफ्रेजद्वारे संरक्षित आहे. पासफ्रेज नसलेली सेवा खात्याची की पेस्ट करा.",
+      "names": {
+        "codestral": "फक्त जुने Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT वापरून साइन इन करा)",
+        "xiaomi": "Xiaomi (वापरानुसार पैसे द्या)",
+        "zai": "Z.ai (वापरानुसार पैसे द्या)",
+        "bedrockByok": "Amazon Bedrock (थेट)",
+        "vertexByok": "Google Vertex AI (थेट)"
+      },
       "modelMappings": "मॉडेल मॅपिंग",
       "modelMappingsDescription": "गेटवे मॉडेल कस्टम डिप्लॉयमेंट नावाकडे पाठवा.",
       "mappingTitle": "मॅपिंग {{number}}",
@@ -487,6 +523,7 @@
       "receiptLabel": "पावती",
       "copyReceiptId": "पावतीचा आयडी कॉपी करा",
       "appealLabel": "अपील",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "प्राप्त झाली",
       "triageOpen": "पुनरावलोकनात",
       "triageActioned": "मान्य केली",
@@ -504,7 +541,25 @@
       "nextStepInReview": "या तक्रारीचा निर्णय या स्क्रीनवर दिसेल आणि निर्णयानंतर तुम्ही अपील करू शकता.",
       "nextStepAppeal": "अपीलचा निर्णय या स्क्रीनवर दिसेल.",
       "nextStepFinal": "अपीलचा निर्णय अंतिम आहे. आता पुढील अपील दाखल करता येणार नाही.",
-      "viewReceipt": "पावती पहा"
+      "viewReceipt": "पावती पहा",
+      "targetLabel": "तक्रार केलेली बाब",
+      "reasonLabel": "तक्रारीचे कारण",
+      "targetMessage": "कृत्रिम बुद्धिमत्तेचे उत्तर",
+      "targetComment": "पुल रिक्वेस्टमधील टिप्पणी",
+      "targetUser": "व्यक्ती",
+      "reasonHarmful": "हानिकारक सामग्री",
+      "reasonIllegal": "बेकायदेशीर सामग्री",
+      "reasonHarassment": "छळवणूक",
+      "reasonSpam": "अवांछित जाहिरात",
+      "reasonOther": "इतर कारण"
+    },
+    "reportReceipts": {
+      "title": "तक्रारी",
+      "rowSubtitle": "तुम्ही दाखल केलेल्या तक्रारी आणि त्यांचे निर्णय",
+      "emptyTitle": "अद्याप तक्रारी नाहीत",
+      "emptyDescription": "तुम्ही पुल रिक्वेस्ट चर्चेतील कमेंटमधून किंवा एजंट सत्रातील AI उत्तरावरून दाखल करता त्या तक्रारी त्यांच्या निर्णयासह येथे दिसतील.",
+      "couldNotLoad": "तुमच्या तक्रारी लोड करता आल्या नाहीत",
+      "capped": "तुमच्या सर्वात अलीकडील तक्रारी दाखवत आहे."
     },
     "changelog": "नवीन बदल",
     "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
@@ -513,7 +568,10 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल व संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था",
+      "chat": "चॅट",
+      "notifications": "सूचना",
+      "integrations": "इंटिग्रेशन्स"
     }
   },
   "preferences": {
@@ -954,8 +1012,9 @@
       "checkActiveConnection": "कनेक्शन सक्रिय आहे, परंतु हा आयटम अजूनही लोड करता येत नाही.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संस्थेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संस्था जोडलेली नाही. संस्था तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
-      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "reconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
+      "bitbucketAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा.",
       "adminOnlyConnectDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
@@ -1168,6 +1227,8 @@
       "emptyTitle": "अद्याप सूचना नाहीत",
       "emptyCategoryTitle": "या श्रेणीत सूचना नाहीत",
       "emptyBody": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
+      "emptyBody_one": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
+      "emptyBody_other": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
       "capped": "सर्वात अलीकडच्या सूचना दाखवल्या जात आहेत.",
       "loadError": "सूचनांचा इतिहास लोड करता आला नाही.",
       "openFailed": "ही सूचना आता कुठेही उघडत नाही."
@@ -1178,6 +1239,7 @@
     "needsInputAction": {
       "approved": "विनंती मंजूर झाली",
       "replied": "उत्तर पाठवले",
+      "empty": "उत्तर लिहा, नंतर पाठवा.",
       "failed": "उत्तर देता आले नाही. पुन्हा प्रयत्न करण्यासाठी पुन्हा टॅप करा.",
       "unavailable": "ही विनंती आता प्रतीक्षा करत नाही."
     }
@@ -1248,6 +1310,7 @@
       "manageAccess": "प्रवेश व्यवस्थापित करा",
       "bitbucketNoRepositoriesDescription": "या Bitbucket वर्कस्पेसमध्ये कोणतीही रिपॉझिटरी उपलब्ध नाही.",
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
+      "githubNoRepositoriesDescription": "Kilo GitHub अ‍ॅपला रिपॉझिटरी वापरण्याची परवानगी आहे का ते तपासा, नंतर रिफ्रेश करा.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
       "repositoryAccess": "रिपॉझिटरीमधील प्रवेश",
@@ -1277,11 +1340,11 @@
       "couldNotGetLatest": "सध्याची माहिती मिळवता आली नाही.",
       "byline": "#{{number}} — {{author}} यांनी तयार केलेली",
       "noFindings": "कोणतेही निष्कर्ष आढळले नाहीत.",
-      "findingsUnavailable": "हे पुनरावलोकन अयशस्वी झाल्यामुळे परिणाम उपलब्ध नाहीत.",
+      "findingsUnavailable": "परिणाम उपलब्ध नाहीत.",
       "findingsInProgress": "हे पुनरावलोकन अजून सुरू आहे. ते पूर्ण झाल्यावर निष्कर्ष येथे दिसतील.",
       "findingsEndedWithoutResults": "हे पुनरावलोकन कोणतेही निष्कर्ष निर्माण होण्यापूर्वीच संपले.",
       "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
-      "reviewFailed": "पुनरावलोकन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
+      "reviewFailed": "पुनरावलोकन अयशस्वी झाले.",
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
       "started": "सुरू झाले",
@@ -1403,6 +1466,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "deniedManagedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी {{organization}} च्या मालकाला विचारा.",
+      "deniedConnectRole": "केवळ {{organization}} चे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "deniedReconnectRole": "{{organization}} च्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "managedOnWebTitle": "वेबवर व्यवस्थापित",
       "managedOnWebShort": "हे कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
       "managedOnWebRepositories": "{{organization}} साठीच्या रेपॉजिटरीज संगणकावरून वेबवर निवडा.",
@@ -1438,7 +1504,9 @@
       "githubError": "GitHub सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "gitlabAccount": "GitLab खाते",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा."
+      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा.",
+      "notConnectedTitle": "{{platform}} जोडलेले नाही",
+      "githubAdminOnlyDescription": "केवळ संस्थेचे मालक आणि प्रशासक ते जोडू शकतात."
     },
     "overview": {
       "allAreas": "सर्व क्षेत्रे",
@@ -1540,7 +1608,9 @@
       "unavailablePersonallySwitchAction": "संस्था बदला",
       "unavailableOrganizationTitle": "पुनरावलोकन मंडळ सध्या उपलब्ध नाही",
       "unavailableForOrganization": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. या संस्थेकडे सध्या तो नाही.",
-      "unavailableForOrganizationNeutral": "पुनरावलोकन मंडळ या संस्थेसाठी सध्या उपलब्ध नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "unavailablePlanCheck": "पुनरावलोकन मंडळ या संस्थेचा प्लॅन तपासू शकले नाही. पुन्हा तपासण्यासाठी पुन्हा प्रयत्न करा.",
+      "unavailableFlagRollout": "पुनरावलोकन मंडळ या संस्थेसाठी अद्याप उपलब्ध नाही. ते मिळवण्यासाठी अॅप नवीनतम आवृत्तीवर अपडेट करा.",
+      "unavailableForOrganizationMember": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. संस्थेचा मालक प्लॅन बदलू शकतो.",
       "unavailableOnBitbucket": "पुनरावलोकन मंडळ Bitbucket रिपॉझिटरीसाठी उपलब्ध नाही.",
       "noRepositories": "अद्याप कोणत्याही रिपॉझिटरी निवडल्या नाहीत. प्रथम रिपॉझिटरी सेटिंग्जमध्ये रिपॉझिटरी निवडा.",
       "specialists": "तज्ज्ञ",
@@ -2110,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रे",
       "sectionAccessibility": "{{title}}: {{displayCount}} सत्रे",
       "live": "थेट",
-      "updating": "अपडेट होत आहे"
+      "updating": "अपडेट होत आहे",
+      "retentionLimit": "सर्वात अलीकडची सत्रे दाखवली जात आहेत."
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",
@@ -2180,11 +2251,11 @@
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "emptyReadOnlyTitle": "या सत्रात संदेश नाहीत",
-      "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
       "historyUnavailable": "या सत्राची ट्रान्सक्रिप्ट वाचता येत नाही.",
+      "historyTemporarilyUnavailable": "या सत्राची ट्रान्सक्रिप्ट तात्पुरती उपलब्ध नाही.",
       "cloneFailedRetry": "या सत्राची प्रत तयार करता आली नाही. पुन्हा प्रयत्न करा.",
       "notEnoughCredits": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील काम अजून पूर्ण झालेले नाही. कृपया थोडा वेळ थांबा.",
@@ -2515,8 +2586,7 @@
       "searchPlaceholder": "रिपॉझिटरी शोधा",
       "noMatches": "जुळणारे परिणाम नाहीत",
       "noRepositories": "रिपॉझिटरी उपलब्ध नाहीत",
-      "noRepositoriesDescription": "तुमच्या खात्याशी कोणतीही रिपॉझिटरी जोडलेली नाही.",
-      "loading": "लोड होत आहे…",
+      "noRepositoriesDescription": "रिपॉझिटरी लोड करण्यासाठी GitHub किंवा GitLab खाते जोडा.",
       "accessibility": "रिपॉझिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2548,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "तपशील उपलब्ध नाहीत.",
+      "detailsUnavailableDescription": "हा घटक आता सत्रात नाही.",
       "textDisplay": "मजकूर प्रदर्शन",
       "thinking": "विचार करत आहे",
       "thought": "विचार",
@@ -2591,6 +2662,7 @@
     "filePart": {
       "loadingImage": "प्रतिमा लोड होत आहे",
       "imageUnavailableRetry": "प्रतिमा उपलब्ध नाही, ती लोड करण्याचा पुन्हा प्रयत्न करा",
+      "imageUnavailableRetryWithAlt": "प्रतिमा उपलब्ध नाही, {{alt}}, ती लोड करण्याचा पुन्हा प्रयत्न करा",
       "imagePreviewUnavailableInSession": "या सत्रात प्रतिमेचे पूर्वावलोकन उपलब्ध नाही.",
       "viewImage": "प्रतिमा पहा",
       "viewImageWithAlt": "{{alt}} ही प्रतिमा पहा",
@@ -2722,7 +2794,9 @@
       "skip": "वगळा",
       "retrySkip": "वगळण्याचा पुन्हा प्रयत्न करा",
       "submitting": "उत्तरे पाठवत आहे…",
-      "sendAnswers": "उत्तरे पाठवा"
+      "sendAnswers": "उत्तरे पाठवा",
+      "unreadableTitle": "हा प्रश्न दाखवता आला नाही",
+      "unreadableBody": "एजंट एका प्रश्नाची वाट पाहत आहे जो हे अॅप दाखवू शकत नाही. पुढे जाण्यासाठी CLI मध्येच त्याचे उत्तर द्या."
     },
     "blockingCard": {
       "questionUnavailable": "हा प्रश्न यापुढे उपलब्ध नाही.",
@@ -2749,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "उपएजंटचे सत्र लोड करता आले नाही.",
+      "historyTooLarge": "या उपएजंटचा इतिहास लोड करण्यासाठी खूप मोठा आहे.",
+      "historyUnavailable": "या उपएजंटचा इतिहास उपलब्ध नाही.",
+      "historyTemporarilyUnavailable": "या उपएजंटचा इतिहास तात्पुरती उपलब्ध नाही.",
       "failed": "उपएजंटचे सत्र अयशस्वी झाले.",
       "noMessages": "उपएजंटचे संदेश नाहीत",
       "noMessagesDescription": "उपएजंटचे हे सत्र संभाषणाची नोंद तयार न करताच पूर्ण झाले.",
@@ -3030,6 +3107,12 @@
     "retryLoadingAccount": "खाते लोड करण्याचा पुन्हा प्रयत्न करा",
     "retryLoadingPrivacy": "गोपनीयतेचे पर्याय लोड करण्याचा पुन्हा प्रयत्न करा"
   },
+  "accountBlocked": {
+    "title": "खाते अवरोधित",
+    "description": "Kilo ने हे खाते अवरोधित केले आहे, आणि पुन्हा साइन इन केल्यास ते उघडणार नाही. विनंतीनुसार मदत पथक अवरोधाचे पुनरावलोकन करू शकते.",
+    "domainDescription": "Kilo या ईमेल डोमेनवरील खात्यांना परवानगी देत नाही, आणि पुन्हा साइन इन केल्यास हे बदलणार नाही. विनंतीनुसार मदत पथक डोमेनचे पुनरावलोकन करू शकते.",
+    "contactSupport": "मदत पथकाशी संपर्क साधा"
+  },
   "addCredits": {
     "cta": "क्रेडिट जोडा",
     "billingPage": "बिलिंग पृष्ठ"
@@ -3102,8 +3185,7 @@
     "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."
   },
   "screenHeader": {
-    "openMenu": "मेनू उघडा",
-    "openMenuFor": "{{title}} साठी मेनू उघडा"
+    "openMenu": "मेनू उघडा"
   },
   "picker": {
     "optionsExpired": "पर्याय कालबाह्य झाले",
@@ -3205,7 +3287,7 @@
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "endedOn": "संपले {{date}}",
-    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
+    "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही.",
     "notAvailableTitle": "Kilo Pass ॲपमध्ये नाही",
     "noPassDescription": "या खात्याकडे Kilo Pass नाही.",
     "statusActive": "सक्रिय",
@@ -3322,6 +3404,8 @@
     "voiceTranscriptionWho": "तुमचे डिव्हाइस, तुम्ही निवडलेल्या प्रतिलेखन मॉडेलसह Kilo Gateway, किंवा ऑनलाइन ओळखीसाठी Apple किंवा Google.",
     "installAttributionPromptTitle": "इंस्टॉलचा स्रोत ओळखण्यास परवानगी द्यायची?",
     "installAttributionPromptMessage": "तुम्ही कोणत्या माध्यमातून येथे आलात हे जाणून घेण्यासाठीच Kilo Apple ची ट्रॅकिंग परवानगी वापरते. यासाठी तुमचे प्रॉम्प्ट आणि संभाषणे कधीही वापरली जात नाहीत.",
+    "installAttributionRequestFailedTitle": "ट्रॅकिंग प्रॉम्प्ट दाखवता आला नाही",
+    "installAttributionRequestFailedMessage": "Kilo ला सिस्टम प्रॉम्प्ट दाखवता आला नाही, म्हणून इंस्टॉलचा स्रोत ओळखणे बंद राहते.",
     "what": "काय",
     "why": "का",
     "who": "कोण"
@@ -3337,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "ऑडिट लॉग",
-      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो.",
+      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "कोणत्याही ऑडिट घटना नाहीत",
       "emptyDescription": "या संस्थेत केलेल्या कृती येथे दिसतात.",
       "truncated": "सर्वात अलीकडील घटना दाखवत आहे.",
@@ -3387,11 +3471,147 @@
         "guardrailUpdate": "गार्डरेल अद्यतनित केले",
         "guardrailRemove": "गार्डरेल हटवले",
         "unknown": "ऑडिट घटना"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "मोड \"{{name}}\" (ओळखकर्ता: {{slug}})",
+        "modeUpdate": "मोड \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "आपोआप राउटिंग",
+          "defaultModel": "डीफॉल्ट मॉडेल"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} ला {{role}} म्हणून जोडले",
+        "memberRemoved": "{{email}} काढले",
+        "memberParentAdded": "मूळ संस्था {{parent}} मधून {{email}} जोडले",
+        "memberParentRemoved": "मूळ संस्था {{parent}} मधून {{email}} काढले",
+        "inviteSent": "{{email}} {{role}} म्हणून",
+        "inviteRevoked": "{{email}} साठीचे आमंत्रण रद्द केले",
+        "inviteAccepted": "{{email}} स्वीकारले",
+        "groupIdentity": "गट \"{{name}}\"",
+        "groupMembers": "गट \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} गट",
+        "groupMemberGroups_one": "{{displayCount}} गट",
+        "groupMemberGroups_other": "{{displayCount}} गट",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} गट",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} गट",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} गट",
+        "groupPolicySet": "गट \"{{name}}\": {{policy}} धोरण सेट केले",
+        "groupPolicyRemoved": "गट \"{{name}}\": {{policy}} धोरण हटवले",
+        "groupDefaultPolicySet": "डीफॉल्ट {{policy}} धोरण सेट केले",
+        "groupDefaultPolicyRemoved": "डीफॉल्ट {{policy}} धोरण हटवले",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "कृत्रिम बुद्धिमत्ता गार्डरेल्स {{state}}",
+        "guardrailConfigGroup": "गट \"{{group}}\" साठी {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO डोमेन {{domain}}",
+        "ssoDomainChanged": "{{domain}} (पूर्वी {{previous}})",
+        "ssoDomainRemoved": "SSO डोमेन {{domain}} साफ केला",
+        "fundsPurchased": "{{method}} द्वारे {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} उप संस्थांना {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} उप संस्थेला {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} उप संस्थांना {{amount}}",
+        "fundsReceived": "{{parent}} कडून {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} कॉन्फिगरेशन",
+        "reviewAgentConfigStyle": "{{platform}}: शैली {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsFailed": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "इन्फरन्स प्रदेश: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "मोड \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ग्लोबल डीफॉल्ट",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "अनुमत",
+          "denied": "नाकारले",
+          "followSetting": "एक्स्टेंशन सेटिंगचे अनुसरण करते"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "प्रकल्प UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ते {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "शिफारसी डायजेस्ट {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: कोणतेही अनुमत ओरिजिन नाहीत",
+        "settingName": "{{previous}} वरून {{next}} असे नाव बदलले",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "वापरण्यापूर्वी स्कॅन सुरू",
+        "scanBeforeUseOff": "वापरण्यापूर्वी स्कॅन बंद",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "काढले: {{models}}",
+        "browserPolicyOff": "ब्राउझर वापरास अडथळा आला",
+        "browserPolicyAllow": "केवळ अनुमत ओरिजिन",
+        "browserPolicyPlaywrightOnly": "केवळ ब्राउझर वापर",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "मॉडेल बदलले: {{values}}",
+        "integrationConnected": "{{integration}} जोडले",
+        "integrationDisconnected": "{{integration}} डिस्कनेक्ट केले",
+        "integrationRefreshed": "{{integration}} रिफ्रेश केले",
+        "integrationCancelled": "{{integration}} रद्द",
+        "integrationModelUpdated": "{{integration}}: मॉडेल {{model}}",
+        "integrationKeyAdded": "{{provider}} साठी की जोडली",
+        "integrationKeyUpdated": "{{provider}} साठी की अद्यतनित केली",
+        "integrationKeyDeleted": "{{provider}} साठी की काढली",
+        "integrationKeyToggled": "{{provider}} साठी की: {{state}}",
+        "namedPolicyCreated": "{{kind}} धोरण {{id}} तयार केले",
+        "namedPolicyUpdated": "{{kind}} धोरण {{id}} अद्यतनित केले",
+        "namedPolicyDeleted": "{{kind}} धोरण {{id}} हटवले",
+        "namedPolicyLinked": "{{kind}} धोरण {{next}} जोडले",
+        "webhookTriggerUpdated": "ट्रिगर {{trigger}}",
+        "organizationRenamed": "संस्थेचे नाव {{previous}} वरून {{next}} असे बदलले",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "तुमची स्वतःची API की"
+        }
       }
     },
     "billing": {
       "title": "बिलिंग",
-      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात.",
+      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच पाहू शकतात. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "सदस्यता",
       "state": "स्थिती",
       "stateNone": "सदस्यता नाही",
@@ -3409,7 +3629,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
-      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप kilo.ai वर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"
@@ -3473,7 +3693,7 @@
       "noSeatsAvailable": "सर्व जागा वापरात आहेत. अधिक सदस्यांना आमंत्रित करण्यापूर्वी संस्थेच्या एखाद्या मालकाला जागा वाढवण्यास सांगा."
     },
     "invoices": {
-      "downloadA11y": "बिल डाउनलोड करा: {{number}}",
+      "downloadA11y": "बिल डाउनलोड करा: {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "प्रत्येक बिलिंग कालावधीत बिले आपोआप तयार होतात. तुमच्या संस्थेला बिल आकारल्यानंतर ते येथे दिसेल.",
       "emptyTitle": "बिले नाहीत",
       "invoiceFallback": "बिल",
@@ -3507,7 +3727,7 @@
       "limitLabel": "मर्यादा (प्रतिदिन USD)",
       "memberNotFound": "सदस्य सापडला नाही.",
       "noLimitPlaceholder": "मर्यादा नाही",
-      "permissionDenied": "फक्त संस्थेचा मालक किंवा अ‍ॅडमिन वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
+      "permissionDenied": "फक्त संस्थेचा मालक किंवा प्रशासक वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
       "removeLimit": "मर्यादा काढा",
       "title": "दररोजच्या वापराची मर्यादा",
       "blankError": "रक्कम द्या किंवा खालील मर्यादा काढा हे बटण वापरा.",
@@ -3553,7 +3773,6 @@
       "usageDetails": "वापराचा तपशील",
       "providersAndModels": "प्रोव्हायडर आणि मॉडेल्स",
       "groups": "गट",
-      "guardrails": "गार्डरेल्स",
       "byok": "तुमची स्वतःची की वापरा",
       "ssoAndDomain": "SSO आणि डोमेन",
       "dataCollection": "डेटा संकलन",
@@ -3568,7 +3787,7 @@
       "emptyDescription": "आधीच्या विनंत्या पाहण्यासाठी 'मागील तास' वापरा.",
       "emptyBoundDescription": "विनंत्यांच्या नोंदी इथपर्यंतच मागे उपलब्ध आहेत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
-      "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
+      "permissionDenied": "संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
       "byok": "BYOK"
     },
@@ -3591,13 +3810,14 @@
       "identifierLabel": "ओळखकर्ता",
       "identifierRequired": "ओळखकर्ता प्रविष्ट करा.",
       "identifierTaken": "हा ओळखकर्ता दुसरा मोड आधीच वापरत आहे.",
+      "identifierTooLong": "ओळखकर्ता {{max}} वर्णांपर्यंत किंवा त्यापेक्षा कमी ठेवा.",
       "nameLabel": "मोडचे नाव",
       "nameRequired": "मोडचे नाव प्रविष्ट करा.",
       "notFound": "हा मोड आता अस्तित्वात नाही.",
-      "restrictionHint": "फक्त या पॅटर्नशी जुळणाऱ्या फाइल्स संपादित करता येतील. प्रत्येक फाइलला परवानगी देण्यासाठी ते रिकामे ठेवा.",
-      "restrictionInvalid": "वैध पॅटर्न प्रविष्ट करा.",
+      "restrictionHint": "रेग्युलर एक्सप्रेशन हा मोड कोणत्या फाइल्स संपादित करू शकतो ते निवडते, उदाहरणार्थ फक्त markdown फाइल्ससाठी `\\.md$`. प्रत्येक फाइलला परवानगी देण्यासाठी ते रिकामे ठेवा.",
+      "restrictionInvalid": "वैध रेग्युलर एक्सप्रेशन प्रविष्ट करा.",
       "restrictionLabel": "निर्बंधाचे लेबल",
-      "restrictionPattern": "फाइल पॅटर्न",
+      "restrictionPattern": "फाइल निर्बंध",
       "roleLabel": "भूमिकेची व्याख्या",
       "roleRequired": "हा मोड काय करतो त्याचे वर्णन करा.",
       "tool": {
@@ -3672,7 +3892,7 @@
     "signupStepUpApple": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithApple)' वापरा.",
     "signupStepUpGoogle": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithGoogle)' वापरा.",
     "signupStepUpBack": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी मागे जा आणि '$t(login.moreSignInOptions)' वापरा.",
-    "invalidCode": "तो कोड चुकीचा आहे किंवा त्याची मुदत संपली आहे. कृपया पुन्हा प्रयत्न करा किंवा '$t(login.resendCode)' वापरा.",
+    "invalidCode": "तो कोड चुकीचा आहे किंवा त्याची मुदत संपली आहे. कृपया '$t(login.resendCode)' वापरा किंवा '$t(login.moreSignInOptions)' वापरा.",
     "codeInProgress": "तुमच्या कोडवर प्रक्रिया सुरू आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
     "tooManyAttempts": "खूप वेळा प्रयत्न झाले आहेत. कृपया नवीन कोड मागवा.",
     "invalidToken": "साइन इन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
@@ -3681,7 +3901,7 @@
     "emailDeliveryFailed": "सध्या ईमेल पाठवता येत नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
     "admissionRequired": "तुमच्या डिव्हाइसची पडताळणी करता येत नाही. दुसऱ्या डिव्हाइसवर किंवा वेबवर साइन इन करण्यासाठी '$t(login.moreSignInOptions)' वापरा.",
     "default": "काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा.",
-    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. पुन्हा प्रयत्न करा.",
     "startSignInFailed": "साइन-इन प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
     "couldNotOpenBrowser": "ब्राउझर उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
     "signInTimedOut": "साइन इन करण्याची वेळमर्यादा संपली. कृपया पुन्हा प्रयत्न करा.",
@@ -3753,6 +3973,34 @@
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
     "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "countNoun": {
+      "needsInput_one": "प्रतिसाद आवश्यक",
+      "needsInput_other": "प्रतिसाद आवश्यक",
+      "running_one": "काम सुरू आहे",
+      "running_other": "काम सुरू आहे",
+      "scheduled_one": "नियोजित",
+      "scheduled_other": "नियोजित",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} प्रतिसाद आवश्यक",
+      "needsInput_other": "{{displayCount}} प्रतिसाद आवश्यक",
+      "running_one": "{{displayCount}} काम सुरू आहे",
+      "running_other": "{{displayCount}} काम सुरू आहे",
+      "scheduled_one": "{{displayCount}} नियोजित",
+      "scheduled_other": "{{displayCount}} नियोजित",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "तपासले {{time}}",
+      "lastKnown": "शेवटची ज्ञात स्थिती · {{time}}"
+    },
+    "wake": {
+      "nextRun": "पुढील कार्यारंभ {{time}}",
+      "wasDue": "अपेक्षित होते {{time}}"
+    },
     "step": {
       "editing": "संपादन",
       "reading": "वाचन",
@@ -3809,7 +4057,10 @@
     "list": {
       "loadFailed": "चॅट इतिहास लोड करता आला नाही.",
       "new": "नवीन चॅट",
-      "deleteTitle": "ही चॅट हटवायची?"
+      "deleteTitle": "ही चॅट हटवायची?",
+      "resetNoticeTitle": "स्थानिक चॅट आणि मसुदे साफ केले",
+      "resetNoticeBody": "Kilo या डिव्हाइसवर जतन केलेला चॅट इतिहास उघडू शकले नाही. तुमच्या क्लाउड सत्रांना याचा परिणाम होत नाही.",
+      "resetNoticeDismiss": "सूचनेकडे दुर्लक्ष करा"
     },
     "rename": {
       "title": "चॅटचे नाव बदला",
@@ -3859,6 +4110,9 @@
       "fieldName": "दर्शवलेले नाव",
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
+      "fieldUrlCredentials": "URL मधून वापरकर्तानाव आणि पासवर्ड काढून टाका.",
+      "fieldUrlFragment": "URL मधील # भाग काढून टाका.",
+      "fieldUrlInsecure": "https URL प्रविष्ट करा, किंवा केवळ localhost साठी http वापरा.",
       "duplicateUrl": "हा सर्व्हर URL आधीच जतन केलेला आहे.",
       "serverNotFound": "हा सर्व्हर आता जतन केलेला नाही.",
       "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
@@ -3884,6 +4138,7 @@
       "app": {
         "label": "साधन इंटरफेस",
         "failed": "या साधनाचा इंटरफेस लोड करता आला नाही.",
+        "tooLarge": "या साधनाचा इंटरफेस {{size}} मर्यादेपेक्षा मोठा आहे.",
         "empty": "या साधनाच्या इंटरफेसमध्ये दाखवण्यासाठी काहीही नाही."
       }
     },
@@ -3951,6 +4206,8 @@
       "discoveryNoModels": "एंडपॉइंटने कोणतीही मॉडेल सूचीबद्ध केली नाही. मॉडेल स्वतः प्रविष्ट करा.",
       "connectionIncomplete": "मॉडेलने उत्तर दिले पण पूर्ण केले नाही. पुन्हा प्रयत्न करा, किंवा मॉडेल ID आणि प्रोटोकॉल तपासा.",
       "invalidInput": "बॅकएंडचे नाव, वैध हेडर आणि अद्वितीय ID व नाव असलेले किमान एक मॉडेल प्रविष्ट करा. टोकन मर्यादा धन पूर्णांक असणे आवश्यक आहे.",
+      "invalidApiKey": "API की मध्ये पाठवता न येणारा वर्ण आहे. फक्त अक्षरे, अंक आणि मानक चिन्हे वापरा, ओळी न तोडता.",
+      "invalidHeaders": "सानुकूल हेडर पाठवता येत नाही. त्याचे नाव तपासा आणि फक्त अक्षरे, अंक आणि मानक चिन्हे वापरा, ओळी न तोडता.",
       "invalidUrl": "प्रमाणीकरण तपशील, क्वेरी किंवा फ्रॅगमेंट नसलेला HTTP किंवा HTTPS API मूळ URL प्रविष्ट करा.",
       "publicHttp": "सार्वजनिक HTTP एंडपॉइंटना परवानगी नाही. HTTPS किंवा खाजगी स्थानिक एंडपॉइंट वापरा.",
       "httpApprovalRequired": "जतन करण्यापूर्वी किंवा कनेक्ट करण्यापूर्वी या स्थानिक HTTP एंडपॉइंटला मंजुरी द्या.",
@@ -3998,7 +4255,9 @@
         "space": "या मॉडेलसाठी पुरेशी मोकळी जागा नाही. जागा मोकळी करा आणि पुन्हा प्रयत्न करा.",
         "network": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
         "invalidFile": "डाउनलोड केलेली फाइल हे अ‍ॅप चालवू शकते असे मॉडेल नाही, म्हणून ती हटवली गेली.",
-        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा."
+        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा.",
+        "unreadable": "हे डिव्हाइस डाउनलोड केलेली फाइल तपासू शकले नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा.",
+        "writeFailed": "हे डिव्हाइस मॉडेल जतन करू शकले नाही. पुन्हा डाउनलोड करून पहा."
       }
     },
     "catalog": {
@@ -4083,7 +4342,15 @@
       "download": "डिव्हाइसवरील मॉडेल डाउनलोड करा",
       "downloading": "डाउनलोड होत आहे…",
       "downloadProgress": "डाउनलोड होत आहे… {{percent}}%",
-      "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा."
+      "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा.",
+      "cannotUse": "चालवता येत नाही: {{items}}.",
+      "cannotUseOptions": "भरता येत नाही: काही टूल पर्याय.",
+      "limitations": "मर्यादा",
+      "tools": {
+        "time": "वेळ",
+        "settingsList": "सेटिंग्ज दाखवा",
+        "settingsSet": "सेटिंग्ज बदला"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
@@ -4176,7 +4443,7 @@
     "personalDefaultDescription": "कोणत्याही रेपॉजिटरीमध्ये पिन केलेले प्रोफाइल नसताना स्वयं-लोड होते.",
     "organizationDefaultDescription": "वैयक्तिक डीफॉल्ट नसलेल्या सदस्यांसाठी स्वयं-लोड.",
     "setAsDefault": "डीफॉल्ट म्हणून सेट करा",
-    "saveFailed": "प्रोफाइल सेव्ह करता आले नाही",
+    "saveFailed": "प्रोफाइल सेव्ह करता आले नाही. पुन्हा प्रयत्न करा.",
     "organizationRoleRequired": "केवळ संस्थेचे मालक आणि प्रशासक संस्थेचे प्रोफाइल बदलू शकतात.",
     "deleteTitle": "प्रोफाइल हटवा",
     "deleteMessage": "हे प्रोफाइल आणि त्याची सेटिंग्ज कायमची काढून टाकते. हे पूर्ववत केले जाऊ शकत नाही.",
@@ -4262,6 +4529,7 @@
     "instructionSaveFailed": "सूचना सेव्ह करता आली नाही",
     "instructionDeleteFailed": "सूचना हटवता आली नाही",
     "instructionToggleFailed": "सूचना अद्ययावत करता आली नाही",
+    "instructionViewTitle": "सूचना फाइल",
     "instructionLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} सूचना ठेवता येतात. अजून एक जोडण्यासाठी एक हटवा.",
     "mcp": {
       "title": "MCP सर्व्हर",
@@ -4325,6 +4593,7 @@
       "promptPlaceholder": "तुम्ही एक…",
       "tools": "साधने",
       "wholeToolRule": "हा एजंट एकाच वेळी प्रत्येक साधनावर एक नियम लागू करतो: {{rule}}. हे स्विचेस केवळ वाचनासाठी आहेत.",
+      "toolRule": "साठवलेला नियम: {{rule}}",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
       "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
@@ -4431,22 +4700,48 @@
     "history": {
       "activityUnavailable": "क्रेडिट क्रियाकलाप लोड होऊ शकला नाही.",
       "appStoreReceipt": "App Store कडून पावती",
+      "deduction": {
+        "adminCancel": "प्रशासकाकडून शिल्लक बंद",
+        "adminDebit": "प्रशासकाकडून क्रेडिट वजावट",
+        "codingPlan": "कोडिंग प्लॅन: {{plan}}",
+        "correction": "शिलकीतील दुरुस्ती",
+        "dispute": "पेमेंटविषयी वाद",
+        "refundAppStore": "App Store कडून क्रेडिट्स पॅक परतावा",
+        "refundGooglePlay": "Google Play कडून क्रेडिट्स पॅक परतावा"
+      },
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
+      "expiredGrant": "कालबाह्य: {{description}}",
+      "expiredStatus": "कालबाह्य",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रोमोशनल क्रेडिट",
+        "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकाकडून क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चॅम्पियन क्रेडिट",
+        "feedback": "अभिप्रायासाठी क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजकत्वाचा मासिक रीसेट",
+        "ossSponsorship": "OSS प्रायोजकत्व क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्टसाठी क्रेडिट",
+        "usageIssue": "वापर समस्येसाठी क्रेडिट",
+        "vibeDay": "Vibe दिवस क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
-      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे."
+      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
+      "voidedGrant": "रद्द केले: {{description}}",
+      "voidedStatus": "रद्द केले"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",
@@ -4590,6 +4885,7 @@
     "contextAll": "सर्व संदर्भ",
     "dismiss": "आढाव्याकडे दुर्लक्ष करा",
     "dismissFailed": "या आढाव्याकडे अजून दुर्लक्ष करता आले नाही. ते पार्श्वभूमीवर पुन्हा प्रयत्न करत आहे.",
+    "readMarkFailed": "हा आढावा वाचला म्हणून चिन्हांकित करता आला नाही. आढावा पुन्हा लोड होईल तेव्हा ते पुन्हा प्रयत्न करेल.",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला आढावा · रिफ्रेश उपलब्ध नाही",
     "summary": "AI सारांश",
@@ -4609,16 +4905,21 @@
     "morningEnd": "आढावा उपलब्ध राहण्याची अंतिम वेळ",
     "timeHint": "आढावा कालावधी संपल्यावर Home कार्ड थेट स्थिती पुन्हा दाखवते, ऑफलाइन असतानाही.",
     "invalidSchedule": "वैध वेळ क्षेत्र आणि रिकामे नसलेला आढावा कालावधी निवडा.",
+    "scheduleEmptyNight": "आढावा कालावधी रिकामा आहे. कालावधी सुरू होण्याच्या वेळेनंतरची तयार होण्याची वेळ निवडा.",
+    "scheduleEmptyMorning": "तयार होण्याची वेळ आणि उपलब्ध राहण्याची अंतिम वेळ जुळतात. आढावा किती काळ उपलब्ध राहील ते निवडा.",
+    "scheduleFullDay": "दोन्ही कालावधी संपूर्ण दिवस व्यापतात. दिवसाचा काही भाग आढाव्याबाहेर ठेवा.",
     "notificationsHint": "प्रत्येक नियोजित आढाव्यासाठी एक सामान्य सूचना. सशुल्क AI सारांशांपासून स्वतंत्र.",
     "notificationPermission": "तुमचा आढावा मिळवण्यासाठी पुश सूचना सुरू करा.",
     "defaultModel": "Kilo चे डीफॉल्ट मॉडेल वापरा",
     "duration": "वेळ मर्यादा (मिनिटे)",
     "spendLimit": "खर्च मर्यादा (USD)",
-    "invalidSafeguards": "धनात्मक, मर्यादित वेळ आणि खर्च मर्यादा प्रविष्ट करा.",
+    "invalidSafeguards": "अनुमत श्रेणीत धन संख्या प्रविष्ट करा.",
     "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
     "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही. मॉडेल किंवा मर्यादा बदला, किंवा नंतर पुन्हा प्रयत्न करा.",
     "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
-    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनि मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure_one": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटाच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure_other": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
     "enable": "सशुल्क सारांश सुरू करा",
     "allContexts": "वैयक्तिक आणि संस्थेचे आढावे वेगळे ठेवले जातात.",
     "emptyHistory": "जतन केलेले आढावे नाहीत",
@@ -4629,8 +4930,8 @@
     "estimateSpendLimitTooLow": "हा सारांश तयार करता यावा यासाठी खर्च मर्यादा वाढवा.",
     "saved": "आढावा सेटिंग्ज जतन झाल्या.",
     "selectedSessions": "निवडलेली सत्रे",
-    "snapshotPullRequests": "निवडलेल्या सत्रांतील PRs",
-    "snapshotBlockers": "निवडलेल्या सत्रांतील अडथळे",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "अडथळे",
     "capturedAt": "{{time}} वाजता नोंदवले",
     "snapshotHint": "नियोजित सकाळच्या वेळी नोंदवलेला, सत्रांच्या नवीनतम उपलब्ध स्थितीचा शक्य तितका अचूक स्नॅपशॉट. संख्या निवडलेल्या सत्रांची माहिती दर्शवतात, रात्रभरातील संपूर्ण क्रियाकलापांची नाही.",
     "snapshotTruncated": "या स्नॅपशॉटचा आकार मर्यादित ठेवण्यासाठी काही सत्रे किंवा पुरावे वगळले आहेत.",
@@ -4661,7 +4962,7 @@
     "sourceActivity": "शीर्षकहीन क्रियाकलाप",
     "metadataFailureProvider": "प्रदाता त्रुटी",
     "metadataFailureTool": "साधन त्रुटी",
-    "metadataFailureCancelled": "रद्द",
+    "metadataStopped": "शेवटची फेरी थांबली",
     "metadataFailureOther": "अनिर्दिष्ट त्रुटी"
   },
   "systemSearch": {
@@ -4669,6 +4970,7 @@
   },
   "usage": {
     "title": "वापर",
+    "personalTitle": "वैयक्तिक खात्याचा वापर",
     "orgTitle": "संस्थेचा वापर",
     "entrySubtitle": "खर्च, विनंत्या आणि टोकन",
     "rangePicker": "कालावधी",
@@ -4682,7 +4984,8 @@
     "unavailableTitle": "वापर उपलब्ध नाही",
     "unavailableDescription": "या वर्कस्पेससाठी वापराची नोंद सुरू केलेली नाही. येथे वापर दिसणे अपेक्षित असल्यास सहाय्य विभागाशी संपर्क साधा.",
     "orgSelfNotice": "तुम्ही या संस्थेतील तुमचा स्वतःचा वापर पाहत आहात.",
-    "viewDetails": "वापराचे तपशील पहा"
+    "viewDetails": "वापराचे तपशील पहा",
+    "orgSelfEntryTitle": "तुमचा वापर"
   },
   "integrations": {
     "title": "इंटिग्रेशन्स",
@@ -4695,6 +4998,8 @@
     "connectedTo": "{{account}} शी कनेक्ट केलेले",
     "disconnected": "{{provider}} डिस्कनेक्ट झाले",
     "disconnectFailed": "{{provider}} डिस्कनेक्ट करता आले नाही",
+    "disconnectRetry": "Slack डिस्कनेक्ट झाल्याची पुष्टी करू शकले नाही. पुन्हा प्रयत्न करा.",
+    "disconnectNeedsSupport": "Kilo या कनेक्शनसाठी जतन केलेला Slack प्रवेश वाचू शकले नाही. डिस्कनेक्ट पूर्ण करण्यासाठी मदत पथकाशी संपर्क साधा.",
     "couldNotLoad": "इंटिग्रेशन्स लोड करता आली नाहीत",
     "permissionDenied": "तुम्हाला ही इंटिग्रेशन्स व्यवस्थापित करण्याची परवानगी नाही.",
     "managedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालकाला विचारा.",
@@ -4737,7 +5042,7 @@
       "new": "नवीन ट्रिगर",
       "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
-      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा।",
+      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा.",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
       "loadFailedDescription": "कनेक्शन असल्यावर पुन्हा प्रयत्न करा.",
       "detailLoadFailedTitle": "हा ट्रिगर लोड करता आला नाही",
@@ -4776,10 +5081,15 @@
       "autoCommit": "रन पूर्ण झाल्यावर बदल कमिट करा",
       "condenseOnComplete": "रन पूर्ण झाल्यावर संदर्भ संक्षिप्त करा",
       "activeTitle": "ट्रिगर सक्रिय",
+      "activeSwitchA11y": "ट्रिगर सक्रिय: {{name}}",
+      "copyLinkA11y": "{{name}} साठी लिंक कॉपी करा",
       "activeDescription": "थांबवलेले वेबहूक 404 ने उत्तर देतात.",
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",
       "saveFailedTitle": "ट्रिगर जतन करता आला नाही",
+      "nameTaken": "“{{name}}” नावाचा ट्रिगर आधीच अस्तित्वात आहे.",
+      "saveFailedRetry": "सर्व्हरपर्यंत पोहोचता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "saveFailedCheck": "फॉर्ममधील मूल्ये तपासा आणि पुन्हा प्रयत्न करा.",
       "deleteTitle": "हा ट्रिगर हटवायचा?",
       "deleteMessage": "{{name}} वरचे कॉल अयशस्वी होतील. हे पूर्ववत करता येणार नाही.",
       "deleteMessageScheduled": "{{name}} चे नियोजित रन थांबतील. हे पूर्ववत करता येणार नाही.",
@@ -5024,6 +5334,20 @@
       "eu": "युरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जपान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "प्राधान्यांचा शोध",
+    "noMatches": "जुळणारी प्राधान्ये नाहीत",
+    "emptyDescription": "प्राधान्याचे वेगळे नाव किंवा शोधशब्द वापरून पाहा.",
+    "resultsStatus": "सापडलेली प्राधान्ये: {{resultCount}}",
+    "keywords": {
+      "signOut": "बाहेर पडा|सत्र समाप्ती",
+      "appearance": "स्वरूप|रंगसंगती|गडद मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|बोटाचा ठसा",
+      "language": "भाषा|भाषांतर",
+      "notifications": "सूचना|इशारे",
+      "privacy": "विश्लेषण|मागोवा"
     }
   }
 }

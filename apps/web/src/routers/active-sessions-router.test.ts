@@ -297,6 +297,71 @@ describe('active-sessions-router', () => {
       }
     );
 
+    it('answers a 503 with a stalled body without waiting for the body read', async () => {
+      // A worker that sends the 503 status line and then never finishes the
+      // body: its `pull` never resolves, so any read of it would hang. The
+      // status alone decides the answer, so the mint must settle on that and
+      // release the body instead of spending the rest of the budget on it.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      // Reading the body takes it over through `getReader`; the release is a
+      // plain `cancel`, so the reader must never appear.
+      const getReader = jest.spyOn(stream, 'getReader');
+      const stalled = new Response(stream, { status: 503 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.createWebTicket();
+        // No timer advance at all: settling here proves the answer came from
+        // the status line, not from the budget expiring.
+        await expectMintFailure(rejection, 'SERVICE_UNAVAILABLE', 'Session ingest is unavailable');
+        // The body was never read, and it was released instead of being left
+        // checked out: `cancel` disturbs it (hence `bodyUsed`), which is what
+        // ends the transfer, and it ran exactly once.
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('answers a 502 with a stalled body as BAD_GATEWAY without reading the body', async () => {
+      // Any other non-2xx is a gateway answer, and it is decided by the status
+      // line too: the stalled body is cancelled, never read, so a retrying mint
+      // cannot pin a connection on a stuck worker.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      const getReader = jest.spyOn(stream, 'getReader');
+      const stalled = new Response(stream, { status: 502 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        await expectMintFailure(
+          caller.activeSessions.createWebTicket(),
+          'BAD_GATEWAY',
+          'Session ingest failed to mint a ticket (status 502)'
+        );
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it.each([
       ['a malformed', JSON.stringify({ ticket: '', expiresAt: 'not-a-number' })],
       ['a non-JSON', '<html>gateway</html>'],
@@ -314,6 +379,51 @@ describe('active-sessions-router', () => {
         caller.activeSessions.createWebTicket(),
         'BAD_GATEWAY',
         'Invalid ticket response from session ingest'
+      );
+    });
+
+    it('reports a 200 body that never completes as SERVICE_UNAVAILABLE', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(new ReadableStream({ start() {} }), { status: 200 }));
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.createWebTicket();
+        const failure = expectMintFailure(
+          rejection,
+          'SERVICE_UNAVAILABLE',
+          'Session ingest is unavailable'
+        );
+        await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+        await failure;
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('reports a 200 body that fails mid-transfer as SERVICE_UNAVAILABLE', async () => {
+      // The transfer is torn down after the headers (a reset connection or a
+      // premature close), so the read rejects with a stream error rather than a
+      // timeout. That is the same transport failure the fetch stage maps to
+      // SERVICE_UNAVAILABLE, not a malformed body.
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            pull() {
+              throw new Error('network error');
+            },
+          }),
+          { status: 200 }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'SERVICE_UNAVAILABLE',
+        'Session ingest is unavailable'
       );
     });
   });
@@ -464,6 +574,61 @@ describe('active-sessions-router', () => {
       });
     });
 
+    it('keeps a branch name longer than 24 characters', async () => {
+      const gitBranch = 'feature/instance-branch-with-a-long-name';
+      const instance = {
+        connectionId: 'cli-long-branch',
+        name: 'laptop-long-branch',
+        projectName: 'kilo',
+        gitBranch,
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [instance] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+
+      expect(result.instances[0].gitBranch).toBe(gitBranch);
+      expect(result).toEqual({
+        instances: [
+          {
+            connectionId: 'cli-long-branch',
+            name: 'laptop-long-branch',
+            projectName: 'kilo',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch,
+          },
+        ],
+      });
+    });
+
+    it('shortens a branch longer than the shared bound to 256 characters', async () => {
+      const longBranch = 'b'.repeat(257);
+      const instance = {
+        connectionId: 'cli-too-long-branch',
+        name: 'laptop-too-long-branch',
+        projectName: 'kilo',
+        gitBranch: longBranch,
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [instance] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+
+      expect(result.instances[0].gitBranch).toHaveLength(256);
+      expect(result.instances[0].gitBranch).toBe('b'.repeat(256));
+    });
+
     it.each([
       { kind: 'cloud' },
       { kind: null },
@@ -471,7 +636,6 @@ describe('active-sessions-router', () => {
       { startedAt: '2026-08-28T19:30:00Z' },
       { startedAt: '2026-08-28T19:30:00.1234Z' },
       { startedAt: '2026-08-28T19:30:00.123+00:00' },
-      { gitBranch: 'a'.repeat(25) },
       { gitBranch: 42 },
     ])('rejects invalid instance metadata %j instead of returning empty', async metadata => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
@@ -492,12 +656,12 @@ describe('active-sessions-router', () => {
 
       const caller = await createCallerForUser(regularUser.id);
       await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
+        code: 'BAD_GATEWAY',
         cause: expect.objectContaining({ name: 'ZodError' }),
       });
     });
 
-    it('throws a TRPCError when the upstream worker returns a non-2xx response', async () => {
+    it('throws BAD_GATEWAY when the upstream worker returns a non-2xx response', async () => {
       jest
         .spyOn(global, 'fetch')
         .mockResolvedValue(new Response('upstream failed', { status: 502 }));
@@ -509,22 +673,25 @@ describe('active-sessions-router', () => {
         await rejection;
       } catch (err) {
         if (!(err instanceof TRPCError)) throw err;
-        expect(err.code).toBe('INTERNAL_SERVER_ERROR');
-        // Mobile (later slice) uses the thrown status to render a retryable
-        // error state; verify the contract is "throws, never returns empty".
+        expect(err.code).toBe('BAD_GATEWAY');
+        // Mobile uses the thrown status to render a retryable error state;
+        // verify the contract is "throws, never returns empty".
         expect(err.message).toContain('502');
       }
     });
 
-    it('throws a TRPCError when fetch itself fails (network error)', async () => {
+    it('throws SERVICE_UNAVAILABLE when fetch itself fails (network error)', async () => {
       jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
 
       const caller = await createCallerForUser(regularUser.id);
-      const rejection = caller.activeSessions.listInstances();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
     });
 
-    it('throws a TRPCError when the worker returns an unexpected payload shape', async () => {
+    it('throws BAD_GATEWAY when the worker returns an unexpected payload shape', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ wrong: 'shape' }), {
           status: 200,
@@ -533,18 +700,190 @@ describe('active-sessions-router', () => {
       );
 
       const caller = await createCallerForUser(regularUser.id);
-      await expect(caller.activeSessions.listInstances()).rejects.toBeInstanceOf(TRPCError);
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+        message: 'Invalid instance response from session ingest',
+      });
     });
 
-    it('does NOT swallow upstream failures into {instances: []} (unlike `list`)', async () => {
-      // Sanity: `list` returns {sessions: []} on a 502; `listInstances` must not.
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }));
+    it.each([503, 504])('keeps the worker %i retryable as SERVICE_UNAVAILABLE', async status => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(new Response('upstream failed', { status }));
 
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.activeSessions.list();
-      expect(result).toEqual({ sessions: [] });
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+    });
+
+    it('answers a 503 with a stalled body without waiting for the body read', async () => {
+      // A worker that sends the 503 status line and then never finishes the
+      // body: its `pull` never resolves, so any read of it would hang. The
+      // status alone decides the answer, so the procedure must settle on that
+      // instead of spending the rest of the poll's budget on a body it will not
+      // use.
+      const cancel = jest.fn(async () => undefined);
+      const stream = new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel,
+      });
+      // Reading the body takes it over through `getReader`; the release is a
+      // plain `cancel`, so the reader must never appear.
+      const getReader = jest.spyOn(stream, 'getReader');
+      const stalled = new Response(stream, { status: 503 });
+      jest.spyOn(global, 'fetch').mockResolvedValue(stalled);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.listInstances();
+        // No timer advance at all: settling here proves the answer came from
+        // the status line, not from the budget expiring.
+        await expect(rejection).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+        // The body was never read, and it was released instead of being left
+        // checked out: `cancel` disturbs it (hence `bodyUsed`), which is what
+        // ends the transfer, and it ran exactly once.
+        expect(getReader).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(stalled.bodyUsed).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+        // Status only: the 503 log line carries no excerpt argument.
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]?.[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 503/);
+        expect(warn.mock.calls[0]?.length).toBe(1);
+      } finally {
+        jest.useRealTimers();
+        warn.mockRestore();
+      }
+    });
+
+    it('reports a body that never completes as SERVICE_UNAVAILABLE instead of hanging', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(new ReadableStream({ start() {} }), { status: 200 }));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.listInstances();
+        const assertion = expect(rejection).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+        await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+        await assertion;
+      } finally {
+        jest.useRealTimers();
+        warn.mockRestore();
+      }
+    });
+
+    it('reports a body that fails mid-transfer as SERVICE_UNAVAILABLE', async () => {
+      // The upstream sends headers and then the transfer breaks (a reset
+      // connection or a premature close). `reader.read()` rejects with a
+      // TypeError, which is the same transport failure the fetch stage maps to
+      // SERVICE_UNAVAILABLE — not a malformed body, so not BAD_GATEWAY.
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            pull() {
+              throw new Error('network error');
+            },
+          }),
+          { status: 200 }
+        )
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('logs a bounded excerpt of a non-2xx body instead of the whole payload', async () => {
+      const longRun = 'x'.repeat(500);
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: longRun }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
+
+      const logged = warn.mock.calls[0];
+      // `Response` constructed in-process carries no status text; the status
+      // alone is the report.
+      expect(logged[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 500/);
+      const excerpt = logged[1];
+      expect(typeof excerpt).toBe('string');
+      expect((excerpt as string).length).toBeLessThanOrEqual(200);
+      for (const argument of logged) {
+        expect(String(argument)).not.toContain(longRun);
+      }
+    });
+
+    it('logs a capped excerpt of a non-2xx non-JSON body', async () => {
+      // The upstream error body is unclassified text, so a JSON-only read would
+      // add no note at all for an HTML error page. The excerpt is the first 200
+      // characters of whatever the body is.
+      const longRun = 'y'.repeat(500);
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(`<html>${longRun}</html>`, {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        })
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
+
+      const logged = warn.mock.calls[0];
+      expect(logged[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 502/);
+      const excerpt = logged[1];
+      expect(typeof excerpt).toBe('string');
+      expect((excerpt as string).length).toBeLessThanOrEqual(200);
+      expect(excerpt as string).toContain('<html>');
+      for (const argument of logged) {
+        expect(String(argument)).not.toContain(longRun);
+      }
+    });
+
+    it('reports a 502 as SERVICE_UNAVAILABLE for list and BAD_GATEWAY for listInstances', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(() => Promise.resolve(new Response('bad gateway', { status: 502 })));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.activeSessions.list()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
     });
   });
 

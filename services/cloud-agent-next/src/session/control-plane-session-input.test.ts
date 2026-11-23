@@ -8,6 +8,7 @@ import {
   buildControlPlanePromptPayload,
 } from './control-plane-session-input.js';
 import { buildControlPlaneSessionRegistration } from '../control-plane/session/registration.js';
+import { controlPlaneSandboxSelectionSchema } from '../control-plane/session/sandbox-selection.js';
 
 const FULL_MODEL = 'kilo/fake-deterministic';
 const MODERN_KILO_TOKEN =
@@ -190,6 +191,54 @@ describe('buildControlPlaneCreateInput', () => {
       byoc: { ...owner, credentialId: source.credentialId },
     });
   });
+
+  it.each([false, true])(
+    'selects the Vercel egress policy that registration checks (audit %s)',
+    async egressAudit => {
+      const source = {
+        kind: 'byoc' as const,
+        userId: 'usr_1',
+        credentialId: '22222222-2222-4222-8222-222222222222',
+      };
+      const command = {
+        generatedBranch: 'kilo/eager-hub-j9o',
+        identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt' as const, prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef' as const,
+          sandboxProvider: 'vercel' as const,
+          sandboxProviderBinding: { kind: 'vercel' as const, source },
+          egressMode: 'allowlist' as const,
+          egressAllowlist: ['example.com'],
+          egressAudit,
+        },
+      };
+      const created = await buildControlPlaneCreateInput({
+        command,
+        env: {} as Env,
+        attachments: [],
+        agent: command.agent,
+      });
+      const registered = await buildControlPlaneRegisterInput({ command, env: {} as Env });
+      for (const input of [created, registered]) {
+        const selection = controlPlaneSandboxSelectionSchema.parse(input.sandboxSelection);
+        expect(selection).toMatchObject({
+          provider: 'vercel',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com'],
+          egressAudit,
+        });
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, selection).sandboxSelection
+        ).toMatchObject(selection);
+      }
+    }
+  );
 
   it.each(
     [

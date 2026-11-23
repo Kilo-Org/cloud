@@ -48,6 +48,7 @@ import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createControlPlanePreviewServices } from './preview-services.js';
 import { createPreviewForwarder } from './preview-forwarder.js';
 import { createPreviewTunnelClient, type PreviewTunnelClient } from './preview-tunnel.js';
+import { controlProxyUrl } from './proxy-url.js';
 import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
 import { readKiloCliVersion } from './runtime-versions.js';
@@ -511,6 +512,7 @@ async function main(
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
   });
+  const proxyUrl = controlProxyUrl(env, logToFile);
   delete env.SANDBOX_CONTROL_CREDENTIAL;
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
@@ -620,6 +622,7 @@ async function main(
   const connection = createControlPlaneConnection({
     url,
     credential,
+    proxyUrl,
     allocationId,
     runtimeHarness: harness.kind,
     runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
@@ -779,6 +782,7 @@ async function main(
   previewTunnelRef.current = createPreviewTunnelClient({
     url: previewTunnelUrl(url),
     credential,
+    proxyUrl,
     forwarder: createPreviewForwarder({
       refusedPorts: () => [
         ...(sandboxProvider === undefined ? [] : reservedPreviewPorts(sandboxProvider)),

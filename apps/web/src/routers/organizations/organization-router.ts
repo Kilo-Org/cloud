@@ -58,6 +58,7 @@ import {
   getCreditTransactionsForOrganizationPage,
 } from '@kilocode/web-shared/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { ORGANIZATION_CREDIT_ACTOR } from '@kilocode/db/credit-expiration';
 import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
@@ -245,6 +246,9 @@ export const organizationsRouter = createTRPCRouter({
       actor_name: user.google_user_name,
       actor_email: user.google_user_email,
       actor_id: user.id,
+      // No `details`: the row's event name already says the organization was
+      // created, and every row of this log belongs to this organization, so a
+      // detail line here would only restate it.
       message: `Organization ${org.name} created`,
     });
 
@@ -505,6 +509,11 @@ export const organizationsRouter = createTRPCRouter({
             actor_email: opts.ctx.user.google_user_email,
             actor_id: opts.ctx.user.id,
             actor_name: opts.ctx.user.google_user_name,
+            details: {
+              id: 'setting.name',
+              previous: oldName,
+              next: opts.input.name,
+            },
             message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
             tx,
           });
@@ -617,8 +626,6 @@ export const organizationsRouter = createTRPCRouter({
       where: eq(credit_transactions.organization_id, organizationId),
     });
 
-    const kilo_user_id = 'system';
-
     return getCreditBlocks(
       transactions,
       now,
@@ -627,7 +634,7 @@ export const organizationsRouter = createTRPCRouter({
         microdollars_used: org.microdollars_used,
         total_microdollars_acquired: org.total_microdollars_acquired,
       },
-      kilo_user_id
+      ORGANIZATION_CREDIT_ACTOR
     );
   }),
 

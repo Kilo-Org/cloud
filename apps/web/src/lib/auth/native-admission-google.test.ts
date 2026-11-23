@@ -3,14 +3,29 @@
  * endpoint fix (the resource path must carry the configured package name, not
  * the project number), and the cached access token with bounded provider calls.
  */
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import {
+  describe,
+  test,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  jest as jestGlobal,
+} from '@jest/globals';
 import { createHash, generateKeyPairSync } from 'node:crypto';
 import { resetAccessTokenCacheForTests, verifyPlayIntegrity } from './native-admission-google';
+
+import { captureMessage } from '@sentry/nextjs';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
+} from './native-admission-counters';
 
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME: 'com.kilocode.kiloapp',
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: '123456789',
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: '',
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS: 'test-cert-digest',
 };
@@ -18,9 +33,6 @@ const mockConfig = {
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
-  },
-  get GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER() {
-    return mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   },
   get GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
@@ -32,15 +44,98 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+}));
+
+const mockCaptureMessage = jest.mocked(captureMessage);
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
+
+// The admission aggregate flushes on wall-clock window boundaries, so the
+// clock is pinned and refusal tests force flushes at fixed 6.x million-ms
+// instants.
+const now = jestGlobal.spyOn(Date, 'now');
+now.mockReturnValue(6_000_000);
+
+/** The aggregate telemetry line the admission module writes once per window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+  intervalMs: number;
+  windowStart: string;
+  at: string;
+};
+
+/** Aggregate lines written to the warn sink so far, in emission order. */
+function aggregateLines(): AggregateLine[] {
+  return mockWarnExceptInTest.mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
+
+/** Aggregate lines carrying one metric, in emission order. */
+function metricLines(metric: string): AggregateLine[] {
+  return aggregateLines().filter(line => line.metric === metric);
+}
 
 // ── Missing credentials fail closed ───────────────────────────────────────
 
 describe('verifyPlayIntegrity without credentials', () => {
+  const configured: typeof mockConfig = { ...mockConfig };
+
+  afterEach(() => {
+    Object.assign(mockConfig, configured);
+  });
+
   test('throws so the route surfaces a retryable 5xx', async () => {
     // Missing credentials mean the verdict cannot be checked. Throwing keeps
     // this an infrastructure fault instead of a refusal of the device.
+    mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = '';
     await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
       'Google Play Integrity credentials not configured'
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledWith('google_play_integrity_missing_credentials');
+    expect(aggregateLines()).toStrictEqual([]);
+  });
+
+  test.each([undefined, '', ' , , '])(
+    'reports and throws on a %s certificate-digest allowlist',
+    async allowlist => {
+      Object.assign(mockConfig, configured);
+      // The reordered fault branch reports the credential inputs first, so the
+      // allowlist cases need their credential inputs present. The value never
+      // reaches the access-token flow: a null config throws before it runs.
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = 'unused-in-config-check';
+      if (allowlist === undefined) {
+        delete (mockConfig as Record<string, unknown>).GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS;
+      } else {
+        mockConfig.GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS = allowlist;
+      }
+
+      await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
+        'Google Play Integrity certificate allowlist not configured'
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'play_integrity_cert_digest_allowlist_missing'
+      );
+      expect(aggregateLines()).toStrictEqual([]);
+    }
+  );
+
+  test('names the credential gap when it coincides with an allowlist gap', async () => {
+    Object.assign(mockConfig, configured);
+    mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = '';
+    mockConfig.GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS = '';
+    mockCaptureMessage.mockClear();
+
+    await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
+      'Google Play Integrity credentials not configured'
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledWith('google_play_integrity_missing_credentials');
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      'play_integrity_cert_digest_allowlist_missing'
     );
   });
 });
@@ -70,6 +165,12 @@ describe('verifyPlayIntegrity decode endpoint', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     resetAccessTokenCacheForTests();
+    resetAdmissionCountersForTests();
+    // A preceding test pins the clock at a flush instant; this describe's
+    // refusal tests count from 6_000_000, so repin before every test.
+    now.mockReturnValue(6_000_000);
+    mockWarnExceptInTest.mockClear();
+    mockCaptureMessage.mockClear();
   });
 
   test('calls decodeIntegrityToken with the configured package name in the resource path', async () => {
@@ -147,7 +248,7 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
   });
 
-  test('refuses a standard request whose requestHash binds another challenge', async () => {
+  test('counts a standard request whose requestHash binds another challenge', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: 'test-access-token' }),
@@ -182,9 +283,17 @@ describe('verifyPlayIntegrity decode endpoint', () => {
         deviceIntegrity: 'meets_device_integrity',
       },
     });
+    // A client-shaped refusal is counted, never reported per event.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const mismatchLines = metricLines('play_integrity_request_hash_mismatch');
+    expect(mismatchLines).toHaveLength(1);
+    expect(mismatchLines[0]).toMatchObject({ count: 1 });
   });
 
-  test('refuses a verdict that carries no request binding', async () => {
+  test('counts a verdict that carries no request binding', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: 'test-access-token' }),
@@ -215,6 +324,13 @@ describe('verifyPlayIntegrity decode endpoint', () => {
         deviceIntegrity: 'meets_device_integrity',
       },
     });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const missing = metricLines('play_integrity_missing_request_hash');
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toMatchObject({ count: 1 });
   });
 
   test('classifies an unevaluated app without a certificate as unrecognized', async () => {
@@ -238,6 +354,7 @@ describe('verifyPlayIntegrity decode endpoint', () => {
         deviceIntegrity: 'missing',
       },
     });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
   test('surfaces an API status error without exposing the configured package name', async () => {
@@ -255,6 +372,72 @@ describe('verifyPlayIntegrity decode endpoint', () => {
       expect(message).toBe('Play Integrity API returned 500');
       expect(message).not.toContain('com.kilocode.kiloapp');
     }
+    // The provider status fault keeps its per-event report.
+    expect(mockCaptureMessage).toHaveBeenCalledWith('play_integrity_api_status: 500');
+  });
+
+  test('counts each verdict refusal on its own aggregate metric', async () => {
+    // Unrecognized app verdict.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    mockFetch.mockResolvedValueOnce(verdictWithAppVerdict('UNRECOGNIZED'));
+
+    // Insufficient device verdict.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    mockFetch.mockResolvedValueOnce(verdictWithDeviceVerdicts(['MEETS_BASIC_INTEGRITY']));
+
+    await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+    resetAccessTokenCacheForTests();
+    await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const appLines = metricLines('play_integrity_app_unrecognized');
+    expect(appLines).toHaveLength(1);
+    expect(appLines[0]).toMatchObject({ count: 1 });
+
+    const deviceLines = metricLines('play_integrity_device_verdict_insufficient');
+    expect(deviceLines).toHaveLength(1);
+    expect(deviceLines[0]).toMatchObject({ count: 1 });
+
+    expect(aggregateLines().filter(line => line.metric.startsWith('play_integrity'))).toHaveLength(
+      2
+    );
+  });
+
+  test('counts a verdict whose device-integrity array is absent or empty', async () => {
+    // Empty deviceRecognitionVerdict array: refused before the label lookup.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    mockFetch.mockResolvedValueOnce(verdictWithDeviceVerdicts([]));
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+    expect(result).toEqual({
+      ok: false,
+      error: 'DEVICE_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'empty',
+      },
+    });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = metricLines('play_integrity_device_verdict_insufficient');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('reports a certificate on a signer refusal as present, without the digest', async () => {
@@ -378,6 +561,54 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     expect(JSON.stringify(result)).not.toContain('SOME_FUTURE_LABEL');
   });
 });
+
+/**
+ * Verdict payload with a mutable appRecognitionVerdict, so tests can drive the
+ * app-recognition refusal branch without duplicating the full body.
+ */
+function verdictWithAppVerdict(appRecognitionVerdict: string) {
+  return {
+    ok: true,
+    json: async () => ({
+      tokenPayloadExternal: {
+        requestDetails: {
+          requestPackageName: 'com.kilocode.kiloapp',
+          requestHash: createHash('sha256').update('challenge-value', 'utf8').digest('base64'),
+        },
+        appIntegrity: {
+          appRecognitionVerdict,
+          certificateSha256Digest: ['test-cert-digest'],
+          packageName: 'com.kilocode.kiloapp',
+        },
+        deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+      },
+    }),
+  };
+}
+
+/**
+ * Verdict payload with mutable deviceRecognitionVerdicts, so tests can drive
+ * the device-refusal branch without duplicating the full body.
+ */
+function verdictWithDeviceVerdicts(deviceRecognitionVerdict: string[]) {
+  return {
+    ok: true,
+    json: async () => ({
+      tokenPayloadExternal: {
+        requestDetails: {
+          requestPackageName: 'com.kilocode.kiloapp',
+          requestHash: createHash('sha256').update('challenge-value', 'utf8').digest('base64'),
+        },
+        appIntegrity: {
+          appRecognitionVerdict: 'PLAY_RECOGNIZED',
+          certificateSha256Digest: ['test-cert-digest'],
+          packageName: 'com.kilocode.kiloapp',
+        },
+        deviceIntegrity: { deviceRecognitionVerdict },
+      },
+    }),
+  };
+}
 
 // ── Access token cache and request timeouts ──────────────────────────────
 
@@ -706,5 +937,83 @@ describe('verifyPlayIntegrity access token cache', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer token-2' }),
       })
     );
+  });
+
+  test('a rotated credential string takes effect on the next verification', async () => {
+    const originalKey = mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
+    const rotatedEmail = 'rotated@example.iam.gserviceaccount.com';
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+      });
+      const hash1 = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash1));
+
+      const first = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+      expect(first).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+      const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = JSON.stringify({
+        client_email: rotatedEmail,
+        private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+        token_uri: 'https://oauth2.googleapis.com/token',
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+      });
+      const hash2 = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash2));
+
+      const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+      expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+      const tokenCalls = mockFetch.mock.calls.filter(
+        ([url]) => url === 'https://oauth2.googleapis.com/token'
+      );
+      expect(tokenCalls).toHaveLength(2);
+      // The new raw string is a cache miss, so the second token request is the
+      // rotated identity's, not a replay of the first document's.
+      const body = tokenCalls[1][1].body as URLSearchParams;
+      const assertion = String(body.get('assertion'));
+      const claimSet = JSON.parse(Buffer.from(assertion.split('.')[1], 'base64url').toString()) as {
+        iss?: string;
+      };
+      expect(claimSet.iss).toBe(rotatedEmail);
+    } finally {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+    }
+  });
+
+  test('a malformed credential is not cached, so a later valid credential works', async () => {
+    const originalKey = mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
+    try {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = '{not json';
+      mockCaptureMessage.mockClear();
+
+      await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+        'Failed to obtain Play Integrity access token'
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith('google_play_integrity_auth_failure');
+
+      await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+        'Failed to obtain Play Integrity access token'
+      );
+
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-after-malformed', expires_in: 3600 }),
+      });
+      const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+      const result = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+      expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    } finally {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+    }
   });
 });

@@ -7,6 +7,7 @@
       "spendAlert": "Zure gastuak arreta behar du",
       "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
       "securityUpdate": "Segurtasun-egiaztapen batek eguneratze bat du",
+      "agentBriefing": "Zure agentearen jarduera-txostena prest dago",
       "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Aurkitutako segurtasun-arazo berria ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritikoa",
+      "high": "Altua",
+      "medium": "Ertaina",
+      "low": "Baxua"
     },
     "securityFindingSlaWarning": {
       "title": "SLA abisua"

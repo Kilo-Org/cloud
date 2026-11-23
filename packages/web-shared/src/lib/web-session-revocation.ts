@@ -12,6 +12,20 @@ export function isWebSessionCurrent(
   return (sessionPepper ?? null) === (user.web_session_pepper ?? null);
 }
 
+/**
+ * Read the account's current web-session pepper from the primary. `revokeWebSessions`
+ * commits the pepper on the primary and that write is the authoritative revocation, so a
+ * session-validity decision must not take the value from a replica that may lag behind it.
+ */
+export async function readWebSessionPepper(kiloUserId: User['id']): Promise<string | null> {
+  const [row] = await db
+    .select({ web_session_pepper: kilocode_users.web_session_pepper })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, kiloUserId))
+    .limit(1);
+  return row?.web_session_pepper ?? null;
+}
+
 export async function revokeWebSessions(
   kiloUserId: User['id'],
   fromDb: DrizzleConnection = db

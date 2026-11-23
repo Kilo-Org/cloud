@@ -327,4 +327,18 @@ describe('evaluateStepUp', () => {
     expect(statuses).toEqual(['fresh', 'required']);
     expect((await proofRow(proof.id)).consumed_at).not.toBeNull();
   });
+
+  it('reads inside a caller transaction', async () => {
+    const user = await createAdmin();
+    await insertCredential(user.id);
+    const now = new Date();
+
+    const evaluation = await db.transaction(tx =>
+      evaluateStepUp({ userId: user.id, webSessionId, actionClass: 'platform_read', now }, tx)
+    );
+
+    expect(evaluation.state.status).toBe('required');
+    expect(evaluation.proof).toBeNull();
+    expect(evaluation.passkeyCount).toBe(1);
+  });
 });

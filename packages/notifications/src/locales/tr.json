@@ -7,6 +7,7 @@
       "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
       "securityUpdate": "Bir güvenlik kontrolünde güncelleme var",
+      "agentBriefing": "Ajan raporunuz hazır",
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Yeni güvenlik bulgusu ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritik",
+      "high": "Yüksek",
+      "medium": "Orta",
+      "low": "Düşük"
     },
     "securityFindingSlaWarning": {
       "title": "SLA uyarısı"

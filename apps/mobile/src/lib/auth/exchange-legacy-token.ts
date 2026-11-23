@@ -7,6 +7,14 @@ import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { parseAuthError, parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
+import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
+
+/**
+ * One exchange outcome: the parsed body of the single state the response is in.
+ * `ok: true` holds the parsed 2xx body; `ok: false` holds the parsed refusal
+ * body, undefined when the refusal body could not be read.
+ */
+type ExchangeOutcome = { ok: true; body: unknown } | { ok: false; refusedBody: unknown };
 
 export async function exchangeLegacyToken(): Promise<{
   token: string;
@@ -55,32 +63,46 @@ export async function exchangeLegacyToken(): Promise<{
       return null;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        // The exchange route stores the request user agent on the new device
-        // session row; without this the row records the HTTP client default.
-        ...buildClientMetadataHeaders(),
-      },
-      body: JSON.stringify({ admission }),
-    });
+    // Bound the exchange at the control-plane deadline: it runs inside the
+    // cold-start bootstrap, whose loading state only clears in a `finally`, so a
+    // request that never settles would hold the app behind the spinner forever.
+    // Both bodies are read inside that deadline: a body that stalls after its
+    // headers would otherwise leave this promise pending the same way.
+    const outcome = await withDeadline(
+      CONTROL_PLANE_DEADLINE_MS,
+      async (signal): Promise<ExchangeOutcome> => {
+        const res = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            // The exchange route stores the request user agent on the new device
+            // session row; without this the row records the HTTP client default.
+            ...buildClientMetadataHeaders(),
+          },
+          body: JSON.stringify({ admission }),
+          signal,
+        });
+        if (!res.ok) {
+          return { ok: false, refusedBody: await res.json().catch(() => undefined) };
+        }
+        const body: unknown = await res.json();
+        return { ok: true, body };
+      }
+    );
 
-    if (!response.ok) {
+    if (!outcome.ok) {
       // A refusal can name a key the server does not know, for example when a
       // first exchange verified but its response was lost. Drop the stored key
       // id so the next launch attests again instead of replaying an assertion
       // the server can never accept.
-      const refused: unknown = await response.json().catch(() => undefined);
-      await clearAttestKeyOnRefusal(parseAuthError(refused)?.code);
+      await clearAttestKeyOnRefusal(parseAuthError(outcome.refusedBody)?.code);
       // One-time exchange failure: retain old token, do not set the done
       // marker. Retry on the next app launch.
       return null;
     }
 
-    const body: unknown = await response.json();
-    const parsed = parseTokenPair(body);
+    const parsed = parseTokenPair(outcome.body);
 
     if (!parsed?.refreshToken || !parsed.expiresIn) {
       return null;
@@ -108,7 +130,6 @@ export async function exchangeLegacyToken(): Promise<{
     if (!isCurrentAuthEpoch(epoch)) {
       return null;
     }
-    // Persist the marker so we never exchange again.
     await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
     if (!isCurrentAuthEpoch(epoch)) {
       await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);

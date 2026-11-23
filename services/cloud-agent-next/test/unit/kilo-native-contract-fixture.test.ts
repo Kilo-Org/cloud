@@ -109,7 +109,7 @@ const messages: KiloSdkStoredMessage[] = [
 const nextCursor = encodeKiloSdkMessagesCursor({ id: 'msg_user_1', time: 110 });
 
 function facadeFixture() {
-  const answer = vi.fn(async () => 'delivered' as const);
+  const answer = vi.fn(async () => 'sent' as const);
   const listCloudAgentRootSessions = vi.fn(async () => ({
     items: [listedSession],
     nextCursor: 'internal-list-cursor',
@@ -135,7 +135,10 @@ function facadeFixture() {
         },
       })),
     },
-    SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn(() => ({ answer })) },
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(),
+      get: vi.fn(() => ({ answer, getSessionHistorySource: vi.fn(async () => 'v1') })),
+    },
   } as unknown as Env;
   const deps = {
     resolveRootSessionForKiloSession: vi.fn(async () => ({ cloudAgentSessionId })),

@@ -991,6 +991,32 @@ describe('the recorded state', () => {
     expect(secondHold.drain('session-1')).toEqual([]);
   });
 
+  it('keeps the origin a step approval is bound to across a worker restart', async () => {
+    const storage = makeStorage({});
+    const first = makeDownloads();
+    const firstHold = startChrome(first, storage);
+    /** The step's own call ran in the tab's document; the approval it needs belongs to the element's frame. */
+    const crossFrame = { ...step, boundOrigin: 'https://pay.example' };
+
+    firstHold.tab({ ...agentTab(), step: crossFrame });
+    firstHold.arm({
+      ...armedNeed({ url: 'https://app.example/reports/q4.pdf' }),
+      step: crossFrame,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const second = makeDownloads();
+    const secondHold = startChrome(second, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The restored tab and approval carry the origin the approval was bound to, which a file approval issued now
+    // Binds, so its retry matches the binding the gate recomputes rather than the origin of the call.
+    const restored = storage.store();
+    expect(JSON.stringify(restored)).toContain('https://pay.example');
+    expect(secondHold.needOf('session-1')?.step?.boundOrigin).toBe('https://pay.example');
+  });
+
   /**
    * The defect this covers: a call registers its tab (and its approval) before the tool runs, and the host marked the
    * session as decided there. A record read still in flight was therefore skipped for that session, and the write the
@@ -1350,6 +1376,64 @@ describe('the recorded state', () => {
     ).toBe(false);
     expect(downloads.order).toEqual(['suggest']);
     expect(hold.drain('session-1')).toEqual([]);
+  });
+
+  /**
+   * A registration that arrives after the record was read: the record holds a session's facts only while the session
+   * is live, so this approval and this tab are not kept.
+   */
+  it('keeps nothing a closed session registers after the record was read', async () => {
+    const storage = makeStorage({});
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    // The record is read, so a registration lands in the mirror and in the record from here on.
+    await vi.advanceTimersByTimeAsync(0);
+
+    hold.closeSession('session-1');
+    hold.arm(armedNeed({ url: 'https://app.example/reports/q4.pdf' }));
+    hold.tab(agentTab());
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(storage.recordKeys()).toStrictEqual([]);
+    expect(hold.needOf('session-1')).toBeUndefined();
+    // Its tab is not the agent's any more, so a download there is the user's and passes untouched.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toStrictEqual(['suggest']);
+    expect(hold.drain('session-1')).toEqual([]);
+  });
+
+  /**
+   * The same rule for the writer a stop runs: a stopped file reports when its cancel and its look-up have answered, and
+   * a session that had closed by then keeps no report.
+   */
+  it('keeps a report a stop queued after the close out of the record', async () => {
+    const storage = makeStorage({});
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    hold.tab(agentTab());
+
+    // The stop's own awaits are still pending here: the cancel has been asked for, and the report is queued after the
+    // Look-up that follows it.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(true);
+
+    hold.closeSession('session-1');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The file was still stopped, and the record keeps nothing: a closed session has no entry.
+    expect(downloads.order.indexOf('cancel')).toBeLessThan(downloads.order.indexOf('suggest'));
+    expect(storage.recordKeys()).toStrictEqual([]);
   });
 });
 

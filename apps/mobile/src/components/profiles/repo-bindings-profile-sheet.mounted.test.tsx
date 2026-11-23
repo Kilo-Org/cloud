@@ -35,6 +35,11 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The selector reads the committed connectivity to separate a coded verdict
+// from a connectivity failure; this suite exercises the coded states online.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 
 /** The props `EmptyState` receives; it is a host node in this suite, so the action stays a prop. */
 type EmptyStateNode = {
@@ -87,6 +92,7 @@ describe('binding profile picker', () => {
           profiles: state === 'happy' ? [profile] : [],
           isLoading: state === 'loading',
           isError: state === 'error',
+          error: state === 'error' ? { data: { code: 'INTERNAL_SERVER_ERROR' } } : undefined,
           isRefetching: false,
           selectedProfileId: '',
           emptyDescription: 'Create a profile to reuse environment variables.',
@@ -139,6 +145,7 @@ describe('binding profile picker', () => {
         profiles: [],
         isLoading: false,
         isError: false,
+        error: undefined,
         isRefetching: false,
         selectedProfileId: '',
         emptyDescription: 'An organization owner or admin can create an organization profile.',
@@ -154,6 +161,60 @@ describe('binding profile picker', () => {
     );
     expect(empty.props.action).toBeUndefined();
     expect(nodeOfType(renderer.root, 'Button')).toBeUndefined();
+
+    unmount();
+  });
+
+  it('error: an access refusal reads as denied and offers no retry', async () => {
+    const onRetry = vi.fn<() => void>();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfilePickerSheet, {
+        profiles: [],
+        isLoading: false,
+        isError: true,
+        error: { data: { code: 'FORBIDDEN' } },
+        isRefetching: false,
+        selectedProfileId: '',
+        emptyDescription: 'Create a profile to reuse environment variables.',
+        onRetry,
+        onSelect: vi.fn<(id: string) => void>(),
+        onClose: vi.fn<() => void>(),
+      })
+    );
+
+    const props = nodeOfType(renderer.root, 'QueryError')?.props;
+    expect([props?.variant, props?.onRetry]).toEqual(['permission', undefined]);
+
+    unmount();
+  });
+
+  it('error: a server fault reads as a load failure and retries', async () => {
+    const onRetry = vi.fn<() => void>();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfilePickerSheet, {
+        profiles: [],
+        isLoading: false,
+        isError: true,
+        error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+        isRefetching: false,
+        selectedProfileId: '',
+        emptyDescription: 'Create a profile to reuse environment variables.',
+        onRetry,
+        onSelect: vi.fn<(id: string) => void>(),
+        onClose: vi.fn<() => void>(),
+      })
+    );
+
+    const props = nodeOfType(renderer.root, 'QueryError')?.props;
+    if (!props) {
+      throw new Error('the query error did not render');
+    }
+    expect(props.variant).toBe('server');
+    expect(props.title).toBe("Couldn't load profiles");
+    act(() => {
+      (props.onRetry as () => void)();
+    });
+    expect(onRetry).toHaveBeenCalledOnce();
 
     unmount();
   });

@@ -38,6 +38,10 @@ catalog:
   '@trpc/client': 11.19.0
   '@trpc/server': 11.19.0
   '@trpc/tanstack-react-query': 11.19.0
+  # The vitest transform `@ttsc/unplugin` peers the `ttsc` compiler at its own
+  # release line: the lock records `ttsc: ^0.36.4`, so both entries move
+  # together in one change.
+  '@ttsc/unplugin': 0.36.4
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
@@ -57,6 +61,9 @@ catalog:
   google-auth-library: 10.6.2
   hono: 4.13.16
   jose: 6.2.17
+  # Named by the root and apps/web manifests and by the `overrides` entry
+  # below, so the catalog pin is the one place all three readers take it from.
+  js-yaml: 4.3.2
   jsonwebtoken: 9.0.3
   # One Next release for the three apps and web-shared. web-shared must resolve
   # the same `next` instance as apps/web for request-scoped APIs, and the
@@ -68,6 +75,8 @@ catalog:
   postcss: 8.5.30
   stripe: 23.0.0
   tsx: 4.23.15
+  # The compiler `@ttsc/unplugin` above peers; it moves with that entry.
+  ttsc: 0.36.4
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
   # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
   # this entry is what `tsc`, `next build` and the bundlers load. The one tool
@@ -75,6 +84,10 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
+  # Named in both the web-shared manifest and the `overrides` block below, and
+  # the overrides note there requires one reviewed version per literal: the
+  # catalog pin is that one place, so both readers take it from here.
+  undici: 7.30.1
   # vitest 4; the `catalogs.vitest5` note below says which workspaces take
   # `catalog:vitest5` instead.
   vitest: 4.1.12
@@ -85,26 +98,55 @@ catalog:
 catalogs:
   # Active test stack: vitest 5 plus its companions at the same version. Take it
   # with `catalog:vitest5`.
-  # Two kinds of workspace still read the default `catalog:` pins at vitest 4:
-  # the suites whose config loads `cloudflareTest` from
-  # @cloudflare/vitest-pool-workers, which peers only `^4.1.0` and so cannot run
-  # vitest 5; and the excluded-feature and node-environment workspaces that have
-  # not moved, where nothing in the config needs vitest 4.
+  # Two kinds of workspace still read the default `catalog:` pins at vitest 4.
+  # The suites whose config loads `cloudflareTest` from
+  # @cloudflare/vitest-pool-workers cannot run vitest 5: that package peers only
+  # `^4.1.0`, so its pool fails at startup on 5. Its successor,
+  # @cloudflare/vitest-plugin, accepts both majors, so a suite can leave this
+  # group by loading that package and taking `catalog:vitest5`.
+  # The remaining workspaces have not been migrated yet: plain node-environment
+  # suites and the excluded-feature ones. They move to `catalog:vitest5` when
+  # their suites are migrated, and a workspace that still declares
+  # @cloudflare/vitest-pool-workers drops that dependency first, because its
+  # peer range would reject the new major. Point a workspace at vitest5 as soon
+  # as it moves, so this note stays the whole exception set.
   vitest5:
     '@vitest/coverage-v8': 5.1.0
     '@vitest/ui': 5.1.0
     vitest: 5.1.0
 
+# Minutes. A new release must be published for this window, about 4.75 days
+# (114 hours), before the workspace installs it, so a compromised or withdrawn
+# release is caught before it is adopted.
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
+  # A dlx resolution outside this workspace, such as the Vercel CLI resolving
+  # tsx through its own backend, fails the age gate with ERR_PNPM_MISSING_TIME:
+  # pnpm needs the release dates before it can match an exact version, and that
+  # path does not carry them. Exempted by name, so the script runner and those
+  # resolutions both install.
   - tsx
+  # expo-dev-client must match the version the installed Expo SDK expects in its
+  # `bundledNativeModules` map, or `expo-doctor`, which
+  # `apps/mobile/AGENTS.md` requires after a dependency change, reports the
+  # mismatch, so it moves with the SDK before the window.
   - expo-dev-client
+  # Expo publishes these together with each SDK as transitive dependencies of
+  # expo-dev-client and its launcher, so they move with it in the same install.
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
   - expo-manifests
   - expo-updates-interface
+  # Reached through expo-dev-launcher, @expo/cli, expo-router and
+  # expo-build-properties, not directly through expo-dev-client, and released
+  # with the same SDK, so it moves in that same install.
   - '@expo/schema-utils'
+  # The workspace typechecks with this native compiler preview's `tsgo` binary.
+  # Each dev build publishes its seven platform packages as optionalDependencies
+  # at that same exact version, so the set can only move together. Exempt by name
+  # rather than per version, so each bump does not have to add eight entries
+  # naming the new build.
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'
@@ -165,8 +207,6 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  # Read the catalog pin: web-shared must resolve the same `next` instance as
-  # apps/web, and one literal for three apps and the shared package is the point.
   next: 'catalog:'
   preact: 10.28.4
   adm-zip: 0.6.1
@@ -222,7 +262,7 @@ overrides:
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.7
   yaml: 2.9.1
-  undici@^7: 7.30.1
+  undici@^7: 'catalog:'
   path-to-regexp: 8.4.2
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
@@ -233,9 +273,6 @@ overrides:
   qs: 6.16.1
   smol-toml: 1.9.0
   uuid@<11.1.1: 11.1.1
-  # Nothing in the tree depends on serialize-javascript today; the spec stays for a
-  # future dependent, bounded to the reviewed major.
-  serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
   # openclaw depends on @modelcontextprotocol/sdk 1.29.0 exactly, and
   # @google/genai then peers onto that copy; lift both onto the 1.32.2 that
@@ -292,7 +329,7 @@ overrides:
   toml: 5.0.1
   '@opentelemetry/core': 2.8.0
   body-parser: 2.4.0
-  js-yaml: 4.3.2
+  js-yaml: 'catalog:'
   linkify-it: 5.0.2
   protobufjs: 7.6.5
   sharp: 0.35.5
@@ -471,6 +508,7 @@ patchedDependencies:
   # already drew, so the parent's layout effect and the collection's commit no
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
+  # The version in the key must equal the `minimumReleaseAgeExclude` entry above.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
   # NativeWind's `react-native` proxy names only the exports its wrapper components
   # need; every other export, such as the `AssetRegistry` that expo-asset reads, was

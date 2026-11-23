@@ -11,7 +11,7 @@ import {
   type RemoteMcpServerDraft,
   type StoredRemoteMcpServer,
 } from '@/lib/chat/remote-mcp-store';
-import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
+import { normalizeRemoteMcpUrl, REMOTE_MCP_URL_ERROR_KEYS } from '@/lib/chat/remote-mcp-url';
 
 import { mcpServerFormError, type McpServerFormErrors } from './mcp-settings-state';
 
@@ -299,7 +299,10 @@ export function RemoteMcpServerForm({
         label={t('modelChat.mcp.fieldUrl')}
         defaultValue={initialUrl}
         validateWhileTyping
-        reserveErrorMessages={[t('common.required'), t('modelChat.mcp.fieldUrlInvalid')]}
+        reserveErrorMessages={[
+          t('common.required'),
+          ...Object.values(REMOTE_MCP_URL_ERROR_KEYS).map(key => t(key)),
+        ]}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"

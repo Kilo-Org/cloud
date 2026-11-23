@@ -5,8 +5,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'morph-byok';
+
 export default {
-  id: 'morph-byok',
+  id,
   openrouter_inference_provider_id: 'morph',
   models_dev_id: 'morph',
   ...apiKeyUpstream({
@@ -14,7 +16,7 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('morph-byok'),
+  models: cachedDirectByokModelList(id),
   // Morph serves Chat Completions only; its model names otherwise classify as OpenAI.
   getAiSdkProvider: () => ({ aiSdkProvider: undefined }),
 } satisfies DirectByokProvider;

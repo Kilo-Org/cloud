@@ -11,6 +11,7 @@ import {
   PLAY_INTEGRITY_PROJECT_NUMBER,
 } from '@/lib/config';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
+import { reportAppAttestFailure } from '@/lib/telemetry/app-attest-events';
 
 /** Must match `DEV_SENTINEL_PAYLOAD` in the web admission module. */
 export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
@@ -24,12 +25,13 @@ export type AdmissionPayload = {
 };
 
 /**
- * Error thrown when the admission challenge could not be obtained — the
- * endpoint answers a non-ok response, the request fails (network error), the
- * request or its body outlasts `ADMISSION_CHALLENGE_TIMEOUT_MS`, or the
- * challenge body fails schema validation; `resolveAdmission` also rethrows
- * this sentinel for every provider failure. Callers map this to a retryable
- * sign-in message.
+ * Error thrown when the admission challenge could not be obtained: the
+ * endpoint answers a non-ok response, or the request or its body is aborted at
+ * the `ADMISSION_CHALLENGE_TIMEOUT_MS` deadline. Any other failure of the
+ * challenge request keeps its own error, and `getAdmission` rethrows a provider
+ * failure rather than converting it; `resolveAdmission` in
+ * `resolve-admission.ts` normalizes those errors into this sentinel. Callers
+ * map this to a retryable sign-in message.
  */
 export const ADMISSION_CHALLENGE_FAILED = 'admission_challenge_failed';
 
@@ -99,6 +101,24 @@ function isInvalidKeyError(error: unknown): boolean {
   return invalidKeyErrorSchema.safeParse(error).success;
 }
 
+const invalidInputErrorSchema = z.object({ code: z.literal('ERR_APP_INTEGRITY_INVALID_INPUT') });
+
+/**
+ * Run one native App Attest call, reporting a genuine rejection before it
+ * propagates. The rejection is unchanged for the caller.
+ */
+async function callNativeStep<T>(
+  step: 'generateKey' | 'attestKey',
+  run: () => Promise<T>
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    reportAppAttestFailure(step, error);
+    throw error;
+  }
+}
+
 /**
  * Produce an iOS App Attest payload for the challenge.
  *
@@ -110,6 +130,10 @@ function isInvalidKeyError(error: unknown): boolean {
  * An `invalidKey` rejection means the stored key id no longer resolves — the
  * app was reinstalled, or restored onto another device. Clear it and re-attest
  * once, so the device is not stuck asserting against a key that is gone.
+ *
+ * Treat `invalidInput` on a stored-key assertion the same way: the bridge
+ * hashes every challenge to 32 bytes, so retry with a fresh key once. Keep
+ * reporting `invalidInput` to distinguish it from expected `invalidKey`.
  */
 async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
   const storedKeyId = await SecureStore.getItemAsync(ATTEST_KEY_ID_KEY);
@@ -125,14 +149,25 @@ async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
       };
     } catch (error) {
       if (!isInvalidKeyError(error)) {
-        throw error;
+        reportAppAttestFailure('generateAssertion', error);
+        if (!invalidInputErrorSchema.safeParse(error).success) {
+          throw error;
+        }
       }
       await SecureStore.deleteItemAsync(ATTEST_KEY_ID_KEY);
     }
   }
 
-  const keyId = await AppIntegrity.generateKeyAsync();
-  const payload = await AppIntegrity.attestKeyAsync(keyId, challenge);
+  return attestFreshAppleKey(challenge);
+}
+
+/** Generate and attest one new Secure Enclave key, reporting a genuine failure. */
+async function attestFreshAppleKey(challenge: string): Promise<AdmissionPayload> {
+  const keyId = await callNativeStep('generateKey', () => AppIntegrity.generateKeyAsync());
+  const payload = await callNativeStep('attestKey', () =>
+    AppIntegrity.attestKeyAsync(keyId, challenge)
+  );
+
   // Store only after a successful attestation. A stored id whose attestation
   // never reached the server would assert against a key the server does not know.
   await SecureStore.setItemAsync(ATTEST_KEY_ID_KEY, keyId);

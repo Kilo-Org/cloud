@@ -10,7 +10,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -25,11 +25,13 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_BOX_CLASS, TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -72,17 +74,26 @@ function TriggerRow({
   // roles) keeps its saved state but not a control the server would refuse.
   const showsInboundUrl = trigger.activationMode === 'webhook';
   const canToggle = trigger.canEdit === true;
+  // The row hosts a switch, so the press covers the leading tile and the text
+  // only: the switch owns its own touch and its own accessible node instead of
+  // sitting inside a button. The content press needs a name of its own, and the
+  // switch and the copy control each name their trigger through a catalog
+  // string with the trigger id interpolated, so a reader hears which trigger
+  // either control acts on.
   return (
     <View>
       <ConfigureRow
         icon={Workflow}
         title={trigger.triggerId}
         subtitle={details}
-        accessibilityLabel={trigger.triggerId}
+        pressTarget="content"
+        contentAccessibilityLabel={trigger.triggerId}
         onPress={onOpen}
         trailing={renderRowTrailing({
           kind: 'switch',
-          accessibilityLabel: t('cloudAgent.triggers.activeTitle'),
+          accessibilityLabel: t('cloudAgent.triggers.activeSwitchA11y', {
+            name: trigger.triggerId,
+          }),
           value: trigger.isActive,
           onValueChange: onToggle,
           disabled: busy || !canToggle,
@@ -90,21 +101,43 @@ function TriggerRow({
       />
       {showsInboundUrl ? (
         // The inbound URL is a value of its own rather than the row's subtitle:
-        // it is copied, and a subtitle truncates it past the first line.
-        <View className="flex-row items-center gap-2 px-4 pb-3">
-          <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+        // it is copied, and a subtitle truncates it past the first line. The
+        // line itself is the copy control rather than the glyph beside it.
+        // React Native confines a touch to every ancestor view's bounds, so a
+        // control on this one-text-line row can never deliver a taller target
+        // and one that declares `hitSlop` loses it at the line's edge. The line
+        // carries the platform target on its own node — the shared
+        // `TOUCH_TARGET_CLASS` floor, which the icon box's 34 dp contribution
+        // plus `pb-3` already meets — so the target is real, the glyph keeps
+        // the place it has always had, and the URL stays closer to its own
+        // trigger row than to the next one. Sibling triggers in one scope share
+        // the URL except the trailing trigger id, so the tail, not the middle,
+        // is what tells rows apart.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('cloudAgent.triggers.copyLinkA11y', {
+            name: trigger.triggerId,
+          })}
+          onPress={() => {
+            void copyWebhookUrl(trigger.inboundUrl);
+          }}
+          className={cn(
+            'flex-row items-center gap-2 px-4 pb-3 active:opacity-70',
+            TOUCH_TARGET_CLASS
+          )}
+        >
+          <Text
+            variant="mono"
+            className="min-w-0 flex-1 text-xs"
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {trigger.inboundUrl}
           </Text>
-          <IconButton
-            accessibilityLabel={t('common.copyLink')}
-            onPress={() => {
-              void copyWebhookUrl(trigger.inboundUrl);
-            }}
-            className="-my-2"
-          >
+          <View className={cn(ICON_TARGET_BOX_CLASS, '-my-2 shrink-0')}>
             <Copy size={16} color={colors.mutedForeground} />
-          </IconButton>
-        </View>
+          </View>
+        </Pressable>
       ) : null}
     </View>
   );

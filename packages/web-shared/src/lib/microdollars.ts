@@ -1,1 +1,1 @@
-export { toMicrodollars } from '@kilocode/worker-utils/microdollars';
+export { fromMicrodollars, toMicrodollars } from '@kilocode/worker-utils/microdollars';

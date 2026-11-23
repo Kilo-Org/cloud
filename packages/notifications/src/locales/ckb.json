@@ -7,6 +7,7 @@
       "spendAlert": "خەرجەکەت پێویستی بە سەرنجە",
       "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
       "securityUpdate": "پشکنینێکی ئاسایش نوێکارییەکی هەیە",
+      "agentBriefing": "ڕاپۆرتی بریکارەکەت ئامادەیە",
       "activeAgentsGlanceable": "بریکارە چالاکەکان نوێکارییەکیان هەیە"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "زۆر مەترسیدار",
+      "high": "بەرز",
+      "medium": "مامناوەند",
+      "low": "نزم"
     },
     "securityFindingSlaWarning": {
       "title": "ئاگادارکردنەوەی SLA"

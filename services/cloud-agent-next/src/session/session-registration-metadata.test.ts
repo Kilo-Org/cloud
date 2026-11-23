@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildSessionMetadataFromRegistration } from './session-registration-metadata.js';
+import { parseSessionMetadata } from '../persistence/session-metadata.js';
 
 vi.mock('@cloudflare/containers', () => ({}));
 
@@ -324,6 +325,21 @@ describe('session registration environment metadata', () => {
     expect(metadata.workspace).not.toHaveProperty('generatedBranchName');
   });
 
+  it('persists the environment setup binding', async () => {
+    const environmentSetup = {
+      runId: '22222222-2222-4222-8222-222222222222',
+      environmentId: ENVIRONMENT_ID,
+      role: 'setup' as const,
+    };
+
+    const metadata = await build({
+      repository: { type: 'github', repo: 'acme/widgets' },
+      environmentSetup,
+    });
+
+    expect(metadata.environmentSetup).toEqual(environmentSetup);
+  });
+
   it('rejects a V2 environment on a repository that has no environment identity', async () => {
     const result = await buildSessionMetadataFromRegistration({
       generatedBranch: GENERATED_BRANCH,
@@ -335,5 +351,61 @@ describe('session registration environment metadata', () => {
     });
 
     expect(result).toMatchObject({ ok: false });
+  });
+});
+
+describe('session registration hosted repository metadata', () => {
+  const integrationId = '123e4567-e89b-42d3-a456-426614174022';
+  const registration = {
+    generatedBranch: GENERATED_BRANCH,
+    identity: { sessionId: 'workspace_hosted', userId: 'user_fixture', orgId: 'org-fixture' },
+    auth: {},
+    agent: { mode: 'code', model: 'kilo/test-model' },
+    repository: {
+      type: 'github' as const,
+      repo: 'acme/widgets',
+      githubIntegrationId: integrationId,
+      branch: 'release/1',
+    },
+    workspace: { worktreeId: 'worktree_12345678-1234-4123-8123-123456789012' as const },
+    hostedGitHubRepositories: {
+      integrationId,
+      primary: { id: 100, fullName: 'acme/widgets' },
+      additional: [
+        { id: 103, fullName: 'acme/docs' },
+        { id: 102, fullName: 'acme/api' },
+      ],
+    },
+  };
+
+  it('persists a canonical manifest for promptless registration and preserves the primary branch', async () => {
+    const result = await buildSessionMetadataFromRegistration(registration);
+    if (!result.ok) throw new Error(result.error);
+    const metadata = parseSessionMetadata(JSON.parse(JSON.stringify(result.metadata)));
+    expect(metadata.hostedGitHubRepositories?.additional.map(repository => repository.id)).toEqual([
+      102, 103,
+    ]);
+    expect(metadata.workspace).toMatchObject({
+      branchName: 'release/1',
+      generatedBranchName: GENERATED_BRANCH,
+    });
+    expect(metadata.environment).toBeUndefined();
+    expect(metadata.initialMessage).toBeUndefined();
+  });
+
+  it.each([
+    { id: 100, fullName: 'acme/api' },
+    { id: 102, fullName: 'other/Widgets' },
+    { id: 102, fullName: 'acme/.git' },
+  ])('rejects an ambiguous or unsafe checkout: $fullName', async additional => {
+    await expect(
+      buildSessionMetadataFromRegistration({
+        ...registration,
+        hostedGitHubRepositories: {
+          ...registration.hostedGitHubRepositories,
+          additional: [additional],
+        },
+      })
+    ).resolves.toMatchObject({ ok: false });
   });
 });

@@ -1,9 +1,5 @@
 import type { GatewayRequest } from './types';
-import {
-  applyThinkingToggleAndReasoningEffort,
-  enableReasoningSummaries,
-  isReasoningExplicitlyDisabled,
-} from './request-helpers';
+import { addCacheBreakpoints, enableReasoningSummaries } from './request-helpers';
 
 function responsesRequest(
   body: Partial<Extract<GatewayRequest, { kind: 'responses' }>['body']>
@@ -11,10 +7,22 @@ function responsesRequest(
   return { kind: 'responses', body: { model: 'meta/muse-spark-1.3', input: 'hello', ...body } };
 }
 
-function chatRequest(
-  body: Partial<Extract<GatewayRequest, { kind: 'chat_completions' }>['body']>
-): Extract<GatewayRequest, { kind: 'chat_completions' }> {
-  return { kind: 'chat_completions', body: { model: 'zai/glm-5', messages: [], ...body } };
+function messagesRequest(
+  content: Extract<GatewayRequest, { kind: 'messages' }>['body']['messages'][number]['content']
+): Extract<GatewayRequest, { kind: 'messages' }> {
+  return {
+    kind: 'messages',
+    body: {
+      model: 'anthropic/claude-sonnet-5.5',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content }],
+    },
+  };
+}
+
+function lastMessageContent(request: Extract<GatewayRequest, { kind: 'messages' }>) {
+  const lastMessage = request.body.messages.at(-1);
+  return Array.isArray(lastMessage?.content) ? lastMessage.content : [];
 }
 
 describe('enableReasoningSummaries', () => {
@@ -73,88 +81,68 @@ describe('enableReasoningSummaries', () => {
   });
 });
 
-describe('applyThinkingToggleAndReasoningEffort', () => {
-  test('enables thinking and keeps the reasoning effort for Chat Completions requests', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: { model: 'zai/glm-5', messages: [], reasoning: { effort: 'high' } },
-    };
+describe('addCacheBreakpoints', () => {
+  test('breaks before environment details, never on a trailing reasoning block', () => {
+    // The block before <environment_details> is a thinking block, and the content also ends on a
+    // thinking block. So the fallback must skip reasoning twice: a plain "last block" fallback
+    // would land on the trailing reasoning block instead of the environment-details text.
+    const request = messagesRequest([
+      { type: 'text', text: 'prompt' },
+      { type: 'thinking', thinking: 'reasoning', signature: 'sig' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'thinking', thinking: 'more reasoning', signature: 'sig2' },
+    ]);
 
-    applyThinkingToggleAndReasoningEffort(request);
+    addCacheBreakpoints(request);
 
-    expect(request.body).toEqual({
-      model: 'zai/glm-5',
-      messages: [],
-      thinking: { type: 'enabled' },
-      reasoning_effort: 'high',
-    });
-    expect(request.body).not.toHaveProperty('reasoning');
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
+    expect(blocks[3]).not.toHaveProperty('cache_control');
   });
 
-  test('disables thinking when the client disables it', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: { model: 'zai/glm-5', messages: [], enable_thinking: false },
-    };
+  test('breaks on the block before environment details when it is cacheable', () => {
+    const request = messagesRequest([
+      { type: 'text', text: 'hello' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'text', text: 'after' },
+    ]);
 
-    applyThinkingToggleAndReasoningEffort(request);
+    addCacheBreakpoints(request);
 
-    expect(request.body.thinking).toEqual({ type: 'disabled' });
+    const blocks = lastMessageContent(request);
+    expect(blocks[0]).toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
+    expect(blocks[2]).not.toHaveProperty('cache_control');
   });
 
-  test('disables thinking for an explicit reasoning disable', () => {
-    const request = chatRequest({ reasoning: { enabled: false } });
+  test('skips a thinking block that sits before environment details', () => {
+    const request = messagesRequest([
+      { type: 'text', text: 'hello' },
+      { type: 'thinking', thinking: 'reasoning', signature: 'sig' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+    ]);
 
-    applyThinkingToggleAndReasoningEffort(request);
+    addCacheBreakpoints(request);
 
-    expect(request.body).toEqual({
-      model: 'zai/glm-5',
-      messages: [],
-      thinking: { type: 'disabled' },
-    });
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
+    expect(blocks[1]).not.toHaveProperty('cache_control');
   });
 
-  test('disables thinking for a none reasoning effort', () => {
-    const request = chatRequest({ reasoning: { effort: 'none' } });
+  test('skips a redacted_thinking block that sits before environment details', () => {
+    const request = messagesRequest([
+      { type: 'redacted_thinking', data: 'opaque' },
+      { type: 'text', text: '<environment_details>x</environment_details>' },
+      { type: 'text', text: 'after' },
+    ]);
 
-    applyThinkingToggleAndReasoningEffort(request);
+    addCacheBreakpoints(request);
 
-    expect(request.body.thinking).toEqual({ type: 'disabled' });
-    expect(request.body.reasoning_effort).toBe('none');
-  });
-
-  test('leaves Responses and Messages requests untouched', () => {
-    const requests: GatewayRequest[] = [
-      responsesRequest({ reasoning: { effort: 'high' } }),
-      {
-        kind: 'messages',
-        body: { model: 'anthropic/claude-sonnet-5.5', max_tokens: 1024, messages: [] },
-      },
-    ];
-    const before = structuredClone(requests);
-
-    for (const request of requests) {
-      applyThinkingToggleAndReasoningEffort(request);
-    }
-
-    expect(requests).toEqual(before);
-  });
-});
-
-describe('isReasoningExplicitlyDisabled', () => {
-  const cases: [Partial<Extract<GatewayRequest, { kind: 'chat_completions' }>['body']>, boolean][] =
-    [
-      [{ reasoning: { enabled: false } }, true],
-      [{ reasoning: { enabled: false, effort: 'high' } }, true],
-      [{ reasoning: { effort: 'none' } }, true],
-      [{ reasoning_effort: 'none' }, true],
-      [{ enable_thinking: false }, true],
-      [{ thinking: { type: 'disabled' } }, true],
-      [{ reasoning: { enabled: true, effort: 'none' } }, false],
-      [{ reasoning: { effort: 'high' } }, false],
-    ];
-
-  test.each(cases)('%j is %s', (body, expected) => {
-    expect(isReasoningExplicitlyDisabled(chatRequest(body))).toBe(expected);
+    const blocks = lastMessageContent(request);
+    expect(blocks[2]).toHaveProperty('cache_control');
+    expect(blocks[0]).not.toHaveProperty('cache_control');
   });
 });

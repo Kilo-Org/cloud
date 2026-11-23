@@ -7,6 +7,7 @@
       "spendAlert": "هزینه شما نیاز به توجه دارد",
       "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
       "securityUpdate": "یک بررسی امنیتی به‌روزرسانی دارد",
+      "agentBriefing": "گزارش عامل شما آماده است",
       "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "یافته امنیتی جدید ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "بحرانی",
+      "high": "بالا",
+      "medium": "متوسط",
+      "low": "کم"
     },
     "securityFindingSlaWarning": {
       "title": "هشدار SLA"

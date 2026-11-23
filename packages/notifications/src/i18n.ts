@@ -208,17 +208,12 @@ void i18n.init({
 });
 
 /** The locale tags a push catalog is registered under: every tag the resolver can return. */
-type PushLocale = keyof typeof pushCatalogs;
+export type PushLocale = keyof typeof pushCatalogs;
 
-/** Runtime membership in `pushCatalogs`, which is also the compile-time boundary of `PushLocale`. */
 function isPushLocale(locale: string): locale is PushLocale {
   return Object.hasOwn(pushCatalogs, locale);
 }
 
-/**
- * Resolve a stored token locale to a catalog tag. Null and unsupported tags
- * fall back to English; a token with no locale is treated as English.
- */
 export function resolvePushLocale(locale: string | null | undefined): PushLocale {
   if (locale != null && isPushLocale(locale)) return locale;
   return 'en';

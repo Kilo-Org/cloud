@@ -181,8 +181,6 @@ export async function upsertRecentPr(entry: RecentPr): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
     const existing = await readRecentsForUpdate();
     if (existing === undefined) {
-      // Unreadable: leave the stored recents untouched rather than replacing
-      // them with a list built from an empty one.
       return;
     }
     const incomingKey = recentPrKey(entry);

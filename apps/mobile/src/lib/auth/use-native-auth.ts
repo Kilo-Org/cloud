@@ -88,10 +88,19 @@ async function tokenRefusalMessage(
 export type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
 /**
- * An inline refusal on the code step. `browserSignIn` marks `ADMISSION_REQUIRED`: no further
- * code can clear it, so the step offers the browser sign-in its copy names.
+ * An inline refusal on the code step. `recovery: 'options'` marks the two refusals no
+ * further code can clear — `ADMISSION_REQUIRED` and `INVALID_CODE` — so the step offers the
+ * other sign-in methods its message names. The server answers `INVALID_CODE` for an address
+ * it silently refused, so resending never delivers and only another method can proceed. A
+ * tagged refusal therefore outlives typing and every resend outcome: only Back, re-entering
+ * the step, or a pending link taking over retires it.
  */
-export type EmailCodeRefusal = { ok: false; message: string; browserSignIn?: true };
+export type EmailCodeRefusal = {
+  ok: false;
+  message: string;
+  /** A refusal no further code can clear, so the step offers the other sign-in methods. */
+  recovery?: 'options';
+};
 
 /** Outcome of an email-code verification attempt: a token, or an inline refusal. */
 type EmailCodeVerifyResult = { ok: true } | EmailCodeRefusal;
@@ -507,8 +516,11 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
           // reported dead end — the screen kept its silence while the toast
           // could land behind the keyboard or expire unnoticed.
           const message = await tokenRefusalMessage(result, googleConfigured, 'code');
-          return result.errorCode === 'ADMISSION_REQUIRED'
-            ? { ok: false, message, browserSignIn: true }
+          // The two refusals a code cannot clear: the admission gate refuses the
+          // device, and the token route answers INVALID_CODE for an address the
+          // OTP route silently refused, so a resent code never arrives either.
+          return result.errorCode === 'ADMISSION_REQUIRED' || result.errorCode === 'INVALID_CODE'
+            ? { ok: false, message, recovery: 'options' }
             : { ok: false, message };
         }
         const parsed = parseTokenPair(result.data);

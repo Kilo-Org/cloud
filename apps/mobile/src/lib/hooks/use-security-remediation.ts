@@ -12,6 +12,7 @@ import {
 import { i18n } from '@/i18n';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { type SecurityAnalysis } from '@/lib/security-agent';
@@ -74,6 +75,7 @@ export function useStartSecurityRemediation(scope: string) {
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startRemediation.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -116,6 +118,7 @@ export function useRetrySecurityRemediation(scope: string) {
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.retryRemediation.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -179,6 +182,7 @@ export function useCancelSecurityRemediation(scope: string) {
   // and report the failure through the same refusal toast as start/retry, so
   // an unrelated failure keeps its own copy and no step.
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { attemptId: string; findingId: string }) =>
       isPersonalSecurityScope(scope)

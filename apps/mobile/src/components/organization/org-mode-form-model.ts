@@ -78,6 +78,7 @@ export type OrgModeFormErrorCode =
   | 'nameRequired'
   | 'identifierRequired'
   | 'identifierInvalid'
+  | 'identifierTooLong'
   | 'identifierTaken'
   | 'roleRequired'
   | 'restrictionInvalid';
@@ -93,6 +94,16 @@ export type OrgModeFormErrors = Readonly<{
   roleDefinition?: OrgModeFormErrorCode;
   editFileRegex?: OrgModeFormErrorCode;
 }>;
+
+/**
+ * The form a save judges. A create has no stored row and derives an empty
+ * identifier from the name, so it can refuse neither an empty identifier nor a
+ * clash with itself; an update edits one stored row, which holds the identifier
+ * that a cleared field would drop.
+ */
+export type OrgModeFormTarget =
+  | Readonly<{ kind: 'create' }>
+  | Readonly<{ kind: 'update'; modeId: string }>;
 
 /** The server's mode-name bound. */
 export const ORG_MODE_NAME_MAX_LENGTH = 100;
@@ -112,24 +123,36 @@ function isValidRegExp(source: string): boolean {
 
 /**
  * What the form refuses before it reaches the server: the required strings, the
- * slug's shape, a slug another mode in this organization already holds, and a
+ * slug's shape, a slug longer than the server's bound (reported apart from the
+ * character set, so a long suggestion reads as too long rather than as invalid
+ * characters), a slug another mode in this organization already holds, and a
  * file pattern that is not a regular expression. The server repeats the bounds,
  * so this only makes the refusal local. The pattern belongs to the `edit` group,
  * so it is checked only while that group is on — the same rule
  * `orgModeConfigInput` follows when it drops the restriction with the group.
+ *
+ * A create derives an empty identifier from the name on save, so only an update
+ * can lose one: the name is the one value a create must supply. An update is
+ * judged as the row it edits, so the identifier it already holds is not a clash
+ * with itself.
  */
 export function validateOrgModeForm(
   values: OrgModeFormValues,
   existingModes: readonly { id: string; slug: string }[],
-  editingModeId?: string
+  target: OrgModeFormTarget
 ): OrgModeFormErrors {
   const name = values.name.trim();
   const slug = values.slug.trim();
+  // The row an update edits, or nothing on create: the identifier a create would
+  // derive is checked against every mode, an update's own slug is not.
+  const editingModeId = target.kind === 'update' ? target.modeId : undefined;
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
-    slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > MODE_SLUG_MAX_LENGTH) {
+    slugError = target.kind === 'update' ? 'identifierRequired' : undefined;
+  } else if (!SLUG_PATTERN.test(slug)) {
     slugError = 'identifierInvalid';
+  } else if (slug.length > MODE_SLUG_MAX_LENGTH) {
+    slugError = 'identifierTooLong';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
   }

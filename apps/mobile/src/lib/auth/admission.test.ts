@@ -14,6 +14,7 @@ import {
   hasAttestationCapability,
 } from './admission';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
+import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 /**
  * The Play Integrity provider is prepared once per module load, so each test
@@ -24,6 +25,23 @@ async function loadGetAdmission() {
   vi.resetModules();
   const fresh = await import('./admission');
   return fresh.getAdmission;
+}
+
+/**
+ * Load a fresh admission module with a telemetry sink installed in that same
+ * module graph. `vi.resetModules()` gives the fresh graph its own
+ * `error-sink` instance, so a sink installed on the test file's copy would
+ * never receive the events.
+ */
+async function loadGetAdmissionWithEvents() {
+  vi.resetModules();
+  const sink = await import('@/lib/telemetry/error-sink');
+  const events: TelemetryEvent[] = [];
+  sink.setTelemetrySink(event => {
+    events.push(event);
+  });
+  const fresh = await import('./admission');
+  return { getAdmission: fresh.getAdmission, events };
 }
 
 const config = vi.hoisted(() => ({
@@ -91,6 +109,12 @@ function setupChallengeFetch() {
 function invalidKeyError() {
   return Object.assign(new Error('Invalid key provided'), {
     code: 'ERR_APP_INTEGRITY_INVALID_KEY',
+  });
+}
+
+function invalidInputError() {
+  return Object.assign(new Error('Invalid input provided'), {
+    code: 'ERR_APP_INTEGRITY_INVALID_INPUT',
   });
 }
 
@@ -275,6 +299,185 @@ describe('getAdmission', () => {
     expect(AppIntegrity.generateKeyAsync).not.toHaveBeenCalled();
   });
 
+  it('files the invalid-input rejection, drops the stale id, and attests once', async () => {
+    const fetchSpy = setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stale');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(invalidInputError());
+
+    await expect(getAdmission()).resolves.toEqual({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'server-challenge',
+      payload: 'attestation-b64',
+      keyId: 'key-1',
+    });
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'generateAssertion',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 2,
+      },
+    ]);
+    expect(AppIntegrity.generateAssertionAsync).toHaveBeenCalledTimes(1);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledExactlyOnceWith(ATTEST_KEY_ID_KEY);
+    expect(AppIntegrity.generateKeyAsync).toHaveBeenCalledTimes(1);
+    expect(AppIntegrity.attestKeyAsync).toHaveBeenCalledExactlyOnceWith(
+      'key-1',
+      'server-challenge'
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed recovery attestation and leaves the attempt retryable', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stale');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(invalidInputError());
+    const failure = Object.assign(new Error('[ExpoAppIntegrity]: Server unavailable'), {
+      code: 'ERR_APP_INTEGRITY_SERVER_UNAVAILABLE',
+    });
+    vi.mocked(AppIntegrity.attestKeyAsync).mockRejectedValue(failure);
+
+    await expect(getAdmission()).rejects.toBe(failure);
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'generateAssertion',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 2,
+      },
+      {
+        'app_attest.step': 'attestKey',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 4,
+      },
+    ]);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  // ── App Attest step diagnostics ────────────────────────────────────────
+
+  it('reports a failed key generation by step and DeviceCheck code', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    const failure = Object.assign(new Error('[ExpoAppIntegrity]: Unknown system failure'), {
+      code: 'ERR_APP_INTEGRITY_SYSTEM_FAILURE',
+    });
+    vi.mocked(AppIntegrity.generateKeyAsync).mockRejectedValue(failure);
+
+    await expect(getAdmission()).rejects.toBe(failure);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.message).toBe('App Attest failure');
+    expect(events[0]?.tags).toEqual({
+      'app_attest.step': 'generateKey',
+      'app_attest.error_domain': 'DCErrorDomain',
+      'app_attest.error_code': 0,
+    });
+    // The rejection itself, its message and the key id stay out of the event.
+    expect(events[0]).not.toHaveProperty('error');
+    expect(JSON.stringify(events[0])).not.toContain('Unknown system failure');
+    expect(JSON.stringify(events[0])).not.toContain('key-1');
+  });
+
+  it('reports a failed attestation by step and DeviceCheck code, and stores no key', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(AppIntegrity.attestKeyAsync).mockRejectedValue(
+      Object.assign(new Error('[ExpoAppIntegrity]: Server unavailable'), {
+        code: 'ERR_APP_INTEGRITY_SERVER_UNAVAILABLE',
+      })
+    );
+
+    await expect(getAdmission()).rejects.toThrow('Server unavailable');
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'attestKey',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 4,
+      },
+    ]);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports Expo's unknown fallback under the module's own domain", async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stored');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(
+      Object.assign(new Error('[ExpoAppIntegrity]: Unknown error'), {
+        code: 'ERR_APP_INTEGRITY_UNKNOWN',
+      })
+    );
+
+    await expect(getAdmission()).rejects.toThrow('Unknown error');
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'generateAssertion',
+        'app_attest.error_domain': 'expo_app_integrity',
+        'app_attest.error_code': 'ERR_APP_INTEGRITY_UNKNOWN',
+      },
+    ]);
+  });
+
+  it('reports a failed assertion with no recognized code, keeping only the step', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stored');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(
+      new TypeError('Network request failed')
+    );
+
+    await expect(getAdmission()).rejects.toThrow('Network request failed');
+
+    expect(events.map(event => event.tags)).toEqual([{ 'app_attest.step': 'generateAssertion' }]);
+  });
+
+  it('files nothing for the expected invalid-key recovery and still re-attests', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-gone');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(invalidKeyError());
+
+    await expect(getAdmission()).resolves.toMatchObject({
+      kind: 'attestation',
+      keyId: 'key-1',
+    });
+
+    expect(events).toEqual([]);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(ATTEST_KEY_ID_KEY);
+  });
+
+  it('files nothing on a successful attestation', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+
+    await expect(getAdmission()).resolves.toMatchObject({ kind: 'attestation' });
+
+    expect(events).toEqual([]);
+  });
+
+  it('keeps Android free of App Attest events', async () => {
+    vi.mocked(Platform).OS = 'android';
+    config.playIntegrityProjectNumber = '1234567890';
+    config.nativeAdmissionDevSentinel = false;
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync).mockRejectedValue(
+      Object.assign(new Error('Play Integrity unavailable'), {
+        code: 'ERR_APP_INTEGRITY_API_NOT_AVAILABLE',
+      })
+    );
+
+    await expect(getAdmission()).rejects.toThrow('Play Integrity unavailable');
+
+    expect(events).toEqual([]);
+  });
+
   // ── Android ────────────────────────────────────────────────────────────
 
   it('binds a standard Play Integrity request to the hashed challenge', async () => {
@@ -287,7 +490,6 @@ describe('getAdmission', () => {
       payload: 'integrity-token',
     });
     expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledWith('1234567890');
-    // Standard requests bind through requestHash: base64 SHA-256 of the challenge.
     expect(digestStringAsync).toHaveBeenCalledWith(
       CryptoDigestAlgorithm.SHA256,
       'server-challenge',
@@ -303,8 +505,6 @@ describe('getAdmission', () => {
       .mockResolvedValueOnce('replacement-token');
 
     await expect(getAdmission()).resolves.toMatchObject({ payload: 'replacement-token' });
-    // The Expo module keeps the provider it prepared, so a new one is prepared
-    // rather than reusing the stale one.
     expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
     expect(AppIntegrity.requestIntegrityCheckAsync).toHaveBeenCalledTimes(2);
   });
@@ -421,8 +621,6 @@ describe('getAdmission', () => {
 
   describe('clearAttestKeyOnRefusal', () => {
     it('drops the stored key id so the next attempt re-attests', async () => {
-      // The server refuses an assertion for a key it never persisted. Without
-      // the clear, the device asserts against that key forever.
       await clearAttestKeyOnRefusal('ADMISSION_REQUIRED');
 
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(ATTEST_KEY_ID_KEY);

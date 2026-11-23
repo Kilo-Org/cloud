@@ -234,9 +234,6 @@ describe('fetchMobileSessionSnapshotPage', () => {
   });
 
   it('sends no limit so the server applies its own page default', async () => {
-    // The adapter never sets `limit`: the outbound request carries only the
-    // session id, so the server's input schema bounds the read by applying its
-    // own page default. The wire assertion below pins that omission.
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',
       history: historyPage({ nextCursor: null }),

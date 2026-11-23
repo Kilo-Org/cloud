@@ -10,9 +10,14 @@
  * closed — through `runNeedsInputInteraction` (the same mobile session manager
  * the in-app blocking card drives), and this module replaces the acted-on
  * notification with the result: the confirmation, the retryable failure with
- * the actions kept, or the unavailable body with no buttons. Only the
- * retryable failure keeps the raise's time-sensitive break-through — the
- * user's own action has been taken, so its confirmation stays quiet.
+ * the actions kept, the empty-answer body with the actions kept, or the
+ * unavailable body with no buttons. Only the retryable failure keeps the
+ * raise's time-sensitive break-through — the user's own action has been taken,
+ * so its confirmation stays quiet. Every result is posted with `sound: false`
+ * for the same reason: Android replays the attention channel's sound on every
+ * notify of an existing notification, and a reply result is posted under the
+ * acted-on identifier while an approve result replaces an app-owned
+ * notification, so both are exactly that in-place notify.
  */
 
 import { z } from 'zod';
@@ -21,6 +26,7 @@ import * as Notifications from 'expo-notifications';
 
 import {
   androidChannelIdForPushData,
+  ANSWER_DRAFT_MAX_LENGTH,
   genericPushContentForPushData,
   NEEDS_INPUT_ACTION_IDS,
   type NeedsInputActionId,
@@ -32,6 +38,8 @@ import {
 import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
+import { hasVisibleComposerText } from '@/lib/composer-text';
+import { rememberNeedsInputReplyDraft } from '@/lib/needs-input-reply-draft';
 
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
@@ -280,6 +288,7 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
+      restoreReplyDraftFromData(data);
       // An unparseable PR URL falls back to the session route: the user still
       // lands on the raise instead of nowhere.
       setPendingDeepLink(
@@ -294,6 +303,7 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
+      restoreReplyDraftFromData(data);
       setPendingDeepLink(
         notificationPathForData(data),
         'notification',
@@ -306,7 +316,6 @@ async function dispatchNeedsInputResponse(
     }
   }
 
-  // Any other identifier keeps the existing tap behaviour.
   if (data === null) {
     return false;
   }
@@ -315,6 +324,7 @@ async function dispatchNeedsInputResponse(
     return false;
   }
   Notifications.clearLastNotificationResponse();
+  restoreReplyDraftFromData(data);
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
@@ -390,14 +400,46 @@ export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOp
   return { organizationId: data.organizationId ?? null, sessionBound: true };
 }
 
-async function dismissResponseNotification(
-  response: Notifications.NotificationResponse
-): Promise<void> {
+/**
+ * Hand the answer an undelivered reply parked in the result's payload to the
+ * session's composer, so the tap opens the raise with the person's text
+ * already typed instead of losing it. Only a retryable reply carries a draft;
+ * every other result has none, and the tap changes nothing.
+ */
+export function restoreReplyDraftFromData(data: PushData): void {
+  if (data.type !== 'cloud_agent_session' || data.answerDraft === undefined) {
+    return;
+  }
+  rememberNeedsInputReplyDraft(data.cliSessionId, data.answerDraft);
+}
+
+/** Dismiss one notification, reporting a failure and never rejecting. */
+async function dismissNotificationContaining(identifier: string): Promise<void> {
   try {
-    await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+    await Notifications.dismissNotificationAsync(identifier);
   } catch (error) {
     reportActionFailure('dismiss', error);
   }
+}
+
+/**
+ * Whether the OS still shows this notification. An unreadable tray counts as
+ * not shown, which keeps the other identifier: one duplicate is better than
+ * clearing the only carrier left.
+ */
+async function isStillPresented(identifier: string): Promise<boolean> {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    return presented.some(notification => notification.request.identifier === identifier);
+  } catch {
+    return false;
+  }
+}
+
+async function dismissResponseNotification(
+  response: Notifications.NotificationResponse
+): Promise<void> {
+  await dismissNotificationContaining(response.notification.request.identifier);
 }
 
 type ResultPresentation = {
@@ -409,7 +451,8 @@ type ResultPresentation = {
   /**
    * The raise's Focus break-through, kept only while the result still needs
    * the user (the retryable failure). A confirmation of the user's own action
-   * (`ok` / `unavailable`) is ordinary progress and must not break through.
+   * (`ok` / `unavailable`) and a non-answer (`empty`) are ordinary progress and
+   * must not break through.
    */
   interruptionLevel: 'timeSensitive' | null;
 };
@@ -437,6 +480,16 @@ function resultPresentationFor(
         body: i18n.t('notifications.needsInputAction.unavailable'),
         categoryIdentifier: null,
         raiseCleared: true,
+        interruptionLevel: null,
+      };
+    }
+    case 'empty': {
+      return {
+        body: i18n.t('notifications.needsInputAction.empty'),
+        // The raise still waits for an answer, so the actions stay and the
+        // person can tap Reply again.
+        categoryIdentifier: originalCategoryIdentifier ?? null,
+        raiseCleared: false,
         interruptionLevel: null,
       };
     }
@@ -475,6 +528,39 @@ function resultTitleFor(args: {
   return args.actedOnTitle ?? i18n.t('notifications.category.agentAttentionTitle');
 }
 
+/**
+ * The payload the posted result carries.
+ *
+ * A reply that failed retryably keeps the text the person typed in the result's
+ * own payload, so a tap on that result hands the text back to the composer: the
+ * failure is the only outcome where the raise still waits for the answer, and
+ * the typed text would otherwise be lost with the tray row. The text stays out
+ * of the body — the result is visible wherever the raise was — and is capped at
+ * the length the push schema admits.
+ */
+function resumeAnswerDraft(
+  data: NeedsInputRaiseData,
+  args: { outcome: NeedsInputActionOutcome; action: NeedsInputAction; text: string | undefined }
+): NeedsInputRaiseData {
+  const { outcome, action, text } = args;
+  // The acted-on payload may already carry an earlier attempt's draft, because
+  // a retryable result is the notification the next tap reads. Only the failure
+  // of a reply that had text may carry one, so every other result drops the
+  // field instead of inheriting a stale answer.
+  const carried =
+    outcome === 'retryable' &&
+    action === 'reply' &&
+    text !== undefined &&
+    hasVisibleComposerText(text)
+      ? text.slice(0, ANSWER_DRAFT_MAX_LENGTH)
+      : undefined;
+  if (carried === undefined) {
+    const { answerDraft: _previousDraft, ...rest } = data;
+    return rest;
+  }
+  return { ...data, answerDraft: carried };
+}
+
 async function runAnswerAction(args: {
   response: Notifications.NotificationResponse;
   data: NeedsInputRaiseData;
@@ -511,7 +597,7 @@ async function runAnswerAction(args: {
   }
 
   const identities = resultIdentities(response, data);
-  await replaceNotification({
+  const posted = await replaceNotification({
     ...identities,
     title: resultTitleFor({
       previews: deps.readPreviews?.(),
@@ -519,13 +605,18 @@ async function runAnswerAction(args: {
       data,
     }),
     body: presentation.body,
-    data,
+    data: resumeAnswerDraft(data, { outcome, action, text: response.userText }),
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
-  if (identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)) {
+  if (
+    posted &&
+    identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)
+  ) {
     // The result sits under a push's identifier, which the session's plan does
-    // not name: it is recorded so the plan retires it with the raise.
+    // not name: it is recorded so the plan retires it with the raise. A post
+    // that never landed leaves nothing to retire, and recording it there would
+    // make the plan dismiss the acted-on push the failure has to keep.
     markNeedsInputReplyResult(data.cliSessionId, identities.resultIdentifier);
   }
 
@@ -548,7 +639,8 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
 }
 
 /**
- * Where the result goes, and which notification it replaces.
+ * Where the result goes, which notification it replaces, and which one must
+ * survive a failed post.
  *
  * The result is normally posted under `notificationIdentifierForSession` — the
  * identifier the next sync's plan dismisses — and the notification the user
@@ -562,16 +654,24 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  * the session's identifier is the one dismissed. iOS removes a replied
  * notification itself, and a post under its identifier is an ordinary post, so
  * both platforms take the same path.
+ *
+ * `keptIdentifier` is the notification the user tapped. It is the only carrier
+ * of the outcome when the result post fails, so it is never dismissed — though
+ * it may already be gone on iOS, where the OS removes a replied notification
+ * itself, which is why a failed post weighs the other identifier against what
+ * the OS still presents. That other identifier may go, because in the
+ * inline-reply shape it is the app-owned session raise, and leaving it on
+ * screen duplicates the session.
  */
 function resultIdentities(
   response: Notifications.NotificationResponse,
   data: NeedsInputRaiseData
-): { resultIdentifier: string; replacedIdentifier: string } {
+): { resultIdentifier: string; replacedIdentifier: string; keptIdentifier: string } {
   const actedOn = response.notification.request.identifier;
   const session = notificationIdentifierForSession(data.cliSessionId);
   return response.userText === undefined
-    ? { resultIdentifier: session, replacedIdentifier: actedOn }
-    : { resultIdentifier: actedOn, replacedIdentifier: session };
+    ? { resultIdentifier: session, replacedIdentifier: actedOn, keptIdentifier: actedOn }
+    : { resultIdentifier: actedOn, replacedIdentifier: session, keptIdentifier: actedOn };
 }
 
 /**
@@ -579,28 +679,46 @@ function resultIdentities(
  * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
  * one, so one raise never ends with two notifications.
  *
- * `interruptionLevel` is outcome-derived: the retryable failure keeps the
- * raise's time-sensitive break-through because it still needs the user; the
- * `ok` / `unavailable` confirmations are quiet.
+ * The dismissal of `replacedIdentifier` follows a post that landed. After a
+ * rejected post the acted-on notification (`keptIdentifier`) is always kept —
+ * with no result in existence it carries the outcome and, for a retryable
+ * result, the Approve/Reply actions the user retries with — and the other
+ * identifier is dismissed only while the acted-on one is still presented: iOS
+ * removes a replied notification itself, while Android keeps it, so there the
+ * acted-on push is the retry carrier and the app-owned session raise is the
+ * duplicate that goes.
+ *
+ * Resolves to whether the result post landed, so the caller records a reply
+ * result only for a notification that exists.
+ *
+ * The result is posted with `sound: false`. Android replays the attention
+ * channel's sound on every notify of a notification that already exists, and a
+ * reply result is posted under the acted-on identifier while an approve result
+ * replaces an app-owned notification — both are exactly that in-place notify,
+ * so a sound here would announce the user's own tap back to them. iOS replaces
+ * silently when the request carries no sound, which matches.
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
   replacedIdentifier: string;
+  keptIdentifier: string;
   title: string;
   body: string;
   data: NeedsInputRaiseData;
   categoryIdentifier: string | null;
   interruptionLevel: 'timeSensitive' | null;
-}): Promise<void> {
+}): Promise<boolean> {
   const {
     resultIdentifier,
     replacedIdentifier,
+    keptIdentifier,
     title,
     body,
     data,
     categoryIdentifier,
     interruptionLevel,
   } = args;
+  let posted = false;
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: resultIdentifier,
@@ -608,6 +726,7 @@ async function replaceNotification(args: {
         title,
         body,
         data,
+        sound: false,
         ...(categoryIdentifier === null ? {} : { categoryIdentifier }),
         ...(interruptionLevel === null ? {} : { interruptionLevel }),
       },
@@ -615,16 +734,30 @@ async function replaceNotification(args: {
       // routes to the shared attention channel, iOS reads it as a null trigger.
       trigger: { channelId: androidChannelIdForPushData(data) },
     });
+    posted = true;
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  if (replacedIdentifier !== resultIdentifier) {
-    try {
-      await Notifications.dismissNotificationAsync(replacedIdentifier);
-    } catch (error) {
-      reportActionFailure('dismiss', error);
+  if (posted) {
+    if (replacedIdentifier !== resultIdentifier) {
+      await dismissNotificationContaining(replacedIdentifier);
     }
+    return true;
   }
+  // No result exists. The notification the user acted on carries the outcome and,
+  // for a retryable result, the Approve/Reply actions the user retries with, so a
+  // failed post never dismisses it. The other identifier is the app-owned session
+  // raise in the inline-reply shape; it goes too only while the OS confirms the
+  // acted-on notification is still on screen. iOS removes a replied notification
+  // itself, so there the session raise is the only carrier left and stays.
+  if (
+    replacedIdentifier !== resultIdentifier &&
+    replacedIdentifier !== keptIdentifier &&
+    (await isStillPresented(keptIdentifier))
+  ) {
+    await dismissNotificationContaining(replacedIdentifier);
+  }
+  return false;
 }
 
 function reportActionFailure(

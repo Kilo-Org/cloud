@@ -148,3 +148,16 @@ export function requestingClientOfRow(row: {
     redirectOrigin: requesting_redirect_origin,
   };
 }
+
+/** The stored columns for a requesting client, all null when there is none. */
+export function requestingClientColumns(client: RequestingClient | null): {
+  requesting_client_id: string | null;
+  requesting_client_name: string | null;
+  requesting_redirect_origin: string | null;
+} {
+  return {
+    requesting_client_id: client?.clientId ?? null,
+    requesting_client_name: client?.clientName ?? null,
+    requesting_redirect_origin: client?.redirectOrigin ?? null,
+  };
+}

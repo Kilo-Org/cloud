@@ -2,6 +2,7 @@
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { ModeForm } from '@/components/organization/mode-form';
 import { type OrgMode, type OrgModeFormDraft } from '@/components/organization/org-mode-form-model';
 import { FormField } from '@/components/ui/form-field';
@@ -121,6 +122,9 @@ const identifierLabel = i18n.t('organization.modes.identifierLabel');
 const roleLabel = i18n.t('organization.modes.roleLabel');
 const identifierHint = i18n.t('organization.modes.identifierHint');
 
+/** 99 characters: 25 three-letter words joined by hyphens, twice the bound. */
+const LONG_MODE_NAME = Array.from({ length: 25 }, () => 'abc').join('-');
+
 function storedMode(id: string, name: string, slug: string): OrgMode {
   return {
     id,
@@ -226,6 +230,17 @@ function hintLines(root: ReactTestInstance): readonly string[] {
     .findAll(node => node.type === TEXT)
     .map(node => (node.props as WidgetProps).children)
     .filter(child => typeof child === 'string');
+}
+
+/** The caption the identifier block paints under the field, apart from its label. */
+function identifierCaption(root: ReactTestInstance): string | undefined {
+  return hintLines(root).find(line => line !== identifierLabel);
+}
+
+/** The identifier field's placeholder, or `undefined` while it offers none. */
+function identifierPlaceholder(root: ReactTestInstance): string | undefined {
+  const { placeholder } = fieldProps(root, identifierLabel);
+  return typeof placeholder === 'string' ? placeholder : undefined;
 }
 
 /* `renderWithProviders` returns no update path, so the modes list lives in props
@@ -419,6 +434,31 @@ describe('ModeForm refused save', () => {
 
     unmount();
   });
+
+  it('refuses a restored identifier past the bound, naming the bound', async () => {
+    // A draft written by a build whose suggestion was not clamped can hold an
+    // identifier the server refuses; Save reports the length, not the set.
+    draft.state = {
+      kind: 'ready',
+      value: restoredDraft({
+        name: 'Long',
+        slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1),
+        roleDefinition: 'Reviews every change.',
+      }),
+      save: draft.save,
+      clear: draft.clear,
+    };
+    const { renderer, unmount } = await mountCreateForm();
+
+    pressSave(renderer.root);
+
+    expect(fieldProps(renderer.root, identifierLabel).error).toBe(
+      i18n.t('organization.modes.identifierTooLong', { max: MODE_SLUG_MAX_LENGTH })
+    );
+    expect(mutations.create.mutate).not.toHaveBeenCalled();
+
+    unmount();
+  });
 });
 
 describe('ModeForm identifier hint', () => {
@@ -427,7 +467,8 @@ describe('ModeForm identifier hint', () => {
 
     changeField(renderer.root, nameLabel, 'مراجع الأمن');
 
-    expect(hintLines(renderer.root)).toContain(`mode · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBe('mode');
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
 
     unmount();
   });
@@ -437,7 +478,8 @@ describe('ModeForm identifier hint', () => {
 
     changeField(renderer.root, nameLabel, 'Security Reviewer');
 
-    expect(hintLines(renderer.root)).toContain(`security-reviewer · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBe('security-reviewer');
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
 
     unmount();
   });
@@ -447,7 +489,8 @@ describe('ModeForm identifier hint', () => {
 
     changeField(renderer.root, nameLabel, 'Revisor de Código');
 
-    expect(hintLines(renderer.root)).toContain(`revisor-de-codigo · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBe('revisor-de-codigo');
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
 
     unmount();
   });
@@ -469,14 +512,49 @@ describe('ModeForm identifier hint', () => {
     unmount();
   });
 
+  it('suggests an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+
+    const suggested = identifierPlaceholder(renderer.root) ?? '';
+    expect(suggested).not.toBe('');
+    expect(suggested.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
+
+    unmount();
+  });
+
+  it('saves a create with an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    // The slugs `existingModes` holds, spelled out: the derived slug is far from
+    // either, so the count branch never runs and the fixture stays read-only here.
+    const expected = modeSlugFromName(LONG_MODE_NAME, ['architect', 'reviewer']);
+    expect(expected.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: LONG_MODE_NAME, slug: expected, config: expect.anything() },
+      expect.anything()
+    );
+
+    unmount();
+  });
+
   it('re-derives the suggestion when the modes list arrives after the name was typed', async () => {
     const { renderer, box, unmount } = await mountCreateForm([]);
 
     changeField(renderer.root, nameLabel, 'مراجع الأمن');
-    expect(hintLines(renderer.root)).toContain(`mode · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBe('mode');
 
     box.renderWith([...existingModes, storedMode('mode-3', 'The fallback', 'mode')]);
-    expect(hintLines(renderer.root)).toContain(`mode-2 · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBe('mode-2');
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
 
     unmount();
   });
@@ -487,9 +565,8 @@ describe('ModeForm identifier hint', () => {
     changeField(renderer.root, nameLabel, 'مراجع الأمن');
     changeField(renderer.root, nameLabel, '');
 
-    const lines = hintLines(renderer.root);
-    expect(lines).toContain(identifierHint);
-    expect(lines).not.toContain(` · ${identifierHint}`);
+    expect(identifierPlaceholder(renderer.root)).toBeUndefined();
+    expect(identifierCaption(renderer.root)).toBe(identifierHint);
 
     unmount();
   });
@@ -505,6 +582,42 @@ describe('ModeForm identifier hint', () => {
     expect(mutations.create.mutate).toHaveBeenCalledOnce();
     expect(mutations.create.mutate).toHaveBeenCalledWith(
       { name: 'مراجع الأمن', slug: 'mode', config: expect.anything() },
+      expect.anything()
+    );
+
+    unmount();
+  });
+});
+
+describe('ModeForm identifier requirement', () => {
+  it('marks the identifier optional on create, which derives one', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    expect(fieldProps(renderer.root, identifierLabel).required).toBeFalsy();
+
+    unmount();
+  });
+
+  it('marks the identifier required on an update, which can lose one', async () => {
+    const { renderer, unmount } = await mountGatedForm(existingModes[0]);
+
+    expect(fieldProps(renderer.root, identifierLabel).required).toBe(true);
+
+    unmount();
+  });
+
+  it('saves a create whose identifier is empty without refusing the field', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, 'Security Reviewer');
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    expect(fieldProps(renderer.root, identifierLabel).error).toBeUndefined();
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: 'Security Reviewer', slug: 'security-reviewer', config: expect.anything() },
       expect.anything()
     );
 

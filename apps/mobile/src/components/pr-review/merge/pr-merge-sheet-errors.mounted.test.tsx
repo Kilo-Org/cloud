@@ -1,5 +1,6 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it } from 'vitest';
+import { act } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import {
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -9,6 +10,7 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
   button,
+  edit,
   hosts,
   mount,
   state,
@@ -57,6 +59,38 @@ describe('PrMergeSheet mounted errors', () => {
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
   });
+
+  it.each([{ prRef: undefined }, { prRef: gitlab }])(
+    're-enables merge on the kept draft once the notice confirms the connection',
+    async ({ prRef }) => {
+      state.merge.error = errorWithCode('revoked', 'PRECONDITION_FAILED');
+      const renderer = await mount({ prRef });
+      await edit(renderer, 'Commit title', 'Kept title');
+      expect(button(renderer, 'Merge').props.disabled).toBe(true);
+
+      const notice = hosts(renderer, 'PrReviewReconnectNotice')[0];
+      if (!notice) {
+        throw new Error('Reconnect notice missing');
+      }
+      const onConnectionRestored = notice.props.onConnectionRestored as (() => void) | undefined;
+      if (typeof onConnectionRestored !== 'function') {
+        throw new TypeError('Reconnect notice has no onConnectionRestored prop');
+      }
+      await act(() => {
+        onConnectionRestored();
+      });
+
+      // The confirmed check clears the latch and nothing else: the CTA comes
+      // back and the draft the person wrote still rides the merge input.
+      expect(button(renderer, 'Merge').props.disabled).toBe(false);
+      expect(baseProps.onDismiss).not.toHaveBeenCalled();
+      await submit(renderer);
+      expect(state.merge.mutateAsync).toHaveBeenCalledOnce();
+      expect(state.merge.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ commitTitle: 'Kept title' })
+      );
+    }
+  );
 
   it.each([
     'The merge request changed since it was loaded. Reload the merge request and try again.',

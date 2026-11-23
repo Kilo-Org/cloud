@@ -51,6 +51,7 @@ const connected: NativeSessionState = {
   pending: {
     permissions: [{ id: 'old-permission', action: 'shell', resources: [] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   },
   events: [],
@@ -129,6 +130,7 @@ describe('native session ownership', () => {
         expect(committed.pending).toEqual({
           permissions: [],
           questions: [],
+          unreadableQuestions: [],
           unreadablePermissions: [],
         });
       }

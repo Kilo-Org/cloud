@@ -1,5 +1,19 @@
 import { type Href } from 'expo-router';
 
+/**
+ * The route name the list settings sheet registers under in the `(app)` Stack.
+ * Creating a list replaces the sheet with the new list, and the list names the
+ * sheet to remove the covered form (`retire-covered-source.ts`).
+ */
+export const TODO_LIST_SETTINGS_ROUTE_NAME = 'todos/list-settings';
+
+/**
+ * The route directly beneath the list settings sheet when the Agents tab's
+ * list view opens it: the tabs navigator is a single route of the `(app)`
+ * Stack, so the create hand-off's guard beneath the form is `(tabs)`.
+ */
+export const TODO_AGENTS_TAB_ROUTE_NAME = '(tabs)';
+
 export function todoListPath(listId: string): Href {
   return `/(app)/todos/${encodeURIComponent(listId)}` as Href;
 }

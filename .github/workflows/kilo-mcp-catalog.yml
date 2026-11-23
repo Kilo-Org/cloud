@@ -97,7 +97,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|auto-routing-contracts|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
@@ -472,7 +472,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$before" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|auto-routing-contracts|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"

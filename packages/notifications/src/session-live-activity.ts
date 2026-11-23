@@ -16,7 +16,11 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE, LIVE_ACTIVITY_TIE_BREAK_LIMIT } from './push-presentation';
+import {
+  agentNotificationKindForGlanceableSnapshot,
+  LIVE_ACTIVITY_RELEVANCE,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
+} from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
@@ -43,9 +47,11 @@ export function sessionLiveActivityTitle(raw: string | null | undefined): string
  * row that does not carry the fact omits it, and the card then keeps the value
  * it already shows, because a tray rebuild carries only what the tray knows.
  * `failure` is the one such fact whose explicit `null` means something,
- * because it reports that nothing failed. `title` is read only from the row,
- * so it accepts `null` from producers that serialize an absent value and never
- * falls back to the previous build.
+ * because it reports that nothing failed. `permissionCommand` is the one fact
+ * whose carry is scoped: it answers the request the approval key names, so a
+ * row that omits it keeps the remembered command only under that same key.
+ * `title` is read only from the row, so it accepts `null` from producers that
+ * serialize an absent value and never falls back to the previous build.
  */
 export type SessionLiveActivityRow = GlanceableSessionRow & {
   id: string;
@@ -92,7 +98,9 @@ function maxCost(
  * row value for these facts; the `failure` fact below is the one exception —
  * it reports "no failure" with `null`, so its caller passes the remembered
  * kind as `previous` and an explicit `null` clears it while an absent key
- * keeps it.
+ * keeps it. A caller whose fact answers one specific request narrows what it
+ * passes as `previous` instead, so the remembered value is only eligible while
+ * that request is still the one the card shows (`permissionCommand`).
  */
 function carried<T>(value: T | undefined, previous: T | null | undefined): T | null {
   return value === undefined ? (previous ?? null) : value;
@@ -119,10 +127,7 @@ function outcomeKind(
  * start and foreground updates) and the notifications service (remote
  * updates) both use this, so the two producers cannot disagree.
  *
- * - `approvalKey` is kept only while the row waits on a permission, and
- *   `awaitingPermission` is true only when that key is present.
  * - `statusSinceFallback` is used when the row has no usable status time.
- * - `scheduledAt` is set only for the scheduled status kind.
  * - One absence policy covers every optional fact: a row that does not carry
  *   a fact omits it, and the card keeps the value it already shows. A tray row
  *   carries no step, plan, diff or outcome, so a local update must not wipe
@@ -132,12 +137,16 @@ function outcomeKind(
  * - `prOpened: false` is a stated fact, not an absent one: it reports that no
  *   pull request is open, so it does not carry the remembered outcome forward.
  *   Only a row that omits `prOpened` entirely keeps it.
- * - `failure` is the one exception to that policy. A finished row with a
+ * - `failure` is one exception to that policy. A finished row with a
  *   failure reads as the `failed` kind, which the layout draws as a stopped
  *   turn. A row that carries `failure: null` reports no failure and clears the
  *   remembered one; a row with no `failure` key at all cannot report it either
  *   way, so the remembered failure survives, which is what keeps a
  *   push-delivered `failed` card through a tray rebuild.
+ * - `permissionCommand` is the other exception: it names the request
+ *   `approvalKey` names, so the remembered command carries only while the key
+ *   is the same one it was recorded under, and a new key keeps only the
+ *   command its own row states.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */
@@ -154,7 +163,12 @@ export function buildSessionLiveActivityContentState(
   const finished = isFinishedSessionCardStatus(statusKind);
   const step = carried(row.currentStep, previous?.currentStep);
   const plan = carried(row.plan, previous?.plan);
-  const command = carried(row.permissionCommand, previous?.permissionCommand);
+  const command = carried(
+    row.permissionCommand,
+    approvalKey !== null && approvalKey === previous?.approvalKey
+      ? previous?.permissionCommand
+      : null
+  );
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
@@ -252,13 +266,15 @@ export function sessionLiveActivityRelevance(
 /**
  * The aggregate card relevance score: the needs-input band while unfollowed
  * work waits, then a newer `changedAt` (the newest agent state change) first.
+ * The band comes from `agentNotificationKindForGlanceableSnapshot`, not a local
+ * retest, so the card order and the notification kind cannot disagree.
  */
 export function aggregateLiveActivityRelevance(
   needsInput: number,
   changedAt: string | null
 ): number {
   const band =
-    needsInput > 0
+    agentNotificationKindForGlanceableSnapshot({ needsInput }) === 'needs-input'
       ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
       : LIVE_ACTIVITY_RELEVANCE.aggregate;
   return band + recencyTerm(changedAt);

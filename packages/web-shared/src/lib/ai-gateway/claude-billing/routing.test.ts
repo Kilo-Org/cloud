@@ -1,4 +1,7 @@
-jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
+jest.mock('./store', () => ({
+  ...jest.requireActual('./store'),
+  getGrantedClaudeBillingConnection: jest.fn(),
+}));
 jest.mock('./operator', () => ({
   getClaudeOperatorToken: jest.fn(),
   isClaudeOperatorConfigured: jest.fn(),
@@ -14,10 +17,16 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { getGrantedClaudeBillingConnection } from './store';
+import { getGrantedClaudeBillingConnection, type ClaudeBillingGrantedConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
-import { buildClaudeBillingProvider, checkClaudeBilling } from './routing';
+import {
+  buildClaudeBillingProvider,
+  checkClaudeBilling,
+  CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+  CLAUDE_BILLING_REQUIRED_MESSAGE,
+} from './routing';
 import { ClaudeBillingPayerStateParseError } from './payer-state';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const row: ClaudeBillingConnectionRow = {
@@ -45,8 +54,24 @@ const ORGANIZATION_ROW: ClaudeBillingConnectionRow = {
   created_by: 'connector',
 };
 
+/** A stored row whose grant gives it to the same scope, so both views agree. */
+function granted(
+  connectionRow: ClaudeBillingConnectionRow | null
+): ClaudeBillingGrantedConnection | null {
+  return connectionRow
+    ? {
+        connection: connectionRow,
+        grant: {
+          kilo_user_id: connectionRow.kilo_user_id,
+          organization_id: connectionRow.organization_id,
+          created_by: connectionRow.created_by,
+        },
+      }
+    : null;
+}
+
 beforeEach(() => {
-  jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(row);
+  jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(granted(row));
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
   jest
@@ -83,7 +108,9 @@ function organizationOwner() {
 function organizationOnly() {
   jest
     .mocked(getGrantedClaudeBillingConnection)
-    .mockImplementation(async owner => (owner.kind === 'organization' ? ORGANIZATION_ROW : null));
+    .mockImplementation(async owner =>
+      owner.kind === 'organization' ? granted(ORGANIZATION_ROW) : null
+    );
 }
 
 describe('Claude customer-billed routing', () => {
@@ -202,7 +229,7 @@ describe('Claude customer-billed routing', () => {
   it('does not serve an organization request from a personal connection', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
-      .mockImplementation(async owner => (owner.kind === 'personal' ? row : null));
+      .mockImplementation(async owner => (owner.kind === 'personal' ? granted(row) : null));
     expect(await checkClaudeBilling({ ...input(), organizationId: ORGANIZATION_ID })).toBeNull();
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledWith(
@@ -281,7 +308,9 @@ describe('Claude customer-billed routing', () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
-        owner.kind === 'organization' ? { ...ORGANIZATION_ROW, created_by: null as never } : null
+        owner.kind === 'organization'
+          ? granted({ ...ORGANIZATION_ROW, created_by: null as never })
+          : null
       );
 
     expect(await checkClaudeBilling({ ...input(), organizationId: ORGANIZATION_ID })).toMatchObject(
@@ -295,7 +324,7 @@ describe('Claude customer-billed routing', () => {
       id: 'connector',
       blocked_reason: 'soft-deleted at 2026-01-01',
     } as never);
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(row);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted(row));
 
     const result = await checkClaudeBilling(input());
 
@@ -307,13 +336,21 @@ describe('Claude customer-billed routing', () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
-        owner.kind === 'organization' ? { ...ORGANIZATION_ROW, status: 'billing_unavailable' } : row
+        owner.kind === 'organization'
+          ? granted({ ...ORGANIZATION_ROW, status: 'billing_unavailable' })
+          : granted(row)
       );
     const result = await checkClaudeBilling({
       ...input(),
       organizationId: ORGANIZATION_ID,
     });
-    expect(result).toMatchObject({ kind: 'unavailable' });
+    expect(result).toEqual({
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_REQUIRED_MESSAGE,
+    });
+    if (result?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(result.retryable).toBeUndefined();
+    expect(result.message.endsWith(`Manage the connection at ${APP_URL}/byok.`)).toBe(true);
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -330,15 +367,38 @@ describe('Claude customer-billed routing', () => {
   });
 
   it.each(['pending', 'removed'] as const)('keeps normal routing for %s owners', async status => {
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue({ ...row, status });
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted({ ...row, status }));
     expect(await checkClaudeBilling(input())).toBeNull();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
   it('never falls back when operator configuration is absent', async () => {
     jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
-    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+    const result = await checkClaudeBilling(input());
+    expect(result).toEqual({
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+      retryable: true,
+    });
+    if (result?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(result.message).not.toContain('byok');
+    expect(result.message).not.toContain('link it again');
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('tells the operator cause apart from the connection cause', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    const operatorResult = await checkClaudeBilling(input());
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockResolvedValue(granted({ ...row, status: 'billing_unavailable' }));
+    const connectionResult = await checkClaudeBilling(input());
+    if (operatorResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    if (connectionResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(operatorResult.message).not.toBe(connectionResult.message);
+    expect(connectionResult.retryable).toBeUndefined();
+    expect(operatorResult.retryable).toBe(true);
   });
 
   it('keeps a failed payer lookup retryable without selecting another payer', async () => {
@@ -358,8 +418,7 @@ describe('Claude customer-billed routing', () => {
       .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
     expect(await checkClaudeBilling(input())).toEqual({
       kind: 'unavailable',
-      message:
-        'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
+      message: `Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time. Manage the connection at ${APP_URL}/byok.`,
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -387,7 +446,7 @@ describe('Claude customer-billed routing', () => {
   it('fails locally without fetching an operator token after a terminal refusal', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
-      .mockResolvedValue({ ...row, status: 'billing_unavailable' });
+      .mockResolvedValue(granted({ ...row, status: 'billing_unavailable' }));
     expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -401,7 +460,7 @@ describe('Claude customer-billed routing', () => {
   ])('does not switch payer for the %s API', async (_name, gatewayRequest) => {
     expect(await checkClaudeBilling({ ...input(), request: gatewayRequest })).toMatchObject({
       kind: 'unavailable',
-      message: 'Use the Messages API with your Claude link.',
+      message: `Use the Messages API with your Claude link. Manage the connection at ${APP_URL}/byok.`,
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -409,5 +468,36 @@ describe('Claude customer-billed routing', () => {
   it('keeps unrelated models on their existing route', async () => {
     expect(await checkClaudeBilling({ ...input(), requestedModel: 'openai/gpt-model' })).toBeNull();
     expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
+  });
+
+  it('names the manage-connection page on every cause the customer can act on', async () => {
+    const pointer = `Manage the connection at ${APP_URL}/byok.`;
+
+    const noRequester = await checkClaudeBilling({
+      ...input(),
+      userId: null,
+      organizationId: 'organization',
+    });
+    if (noRequester?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(noRequester.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
+    const parseMismatch = await checkClaudeBilling(input());
+    if (parseMismatch?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(parseMismatch.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const readFailure = await checkClaudeBilling(input());
+    if (readFailure?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(readFailure.message).toContain(pointer);
+
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    const operatorGap = await checkClaudeBilling(input());
+    if (operatorGap?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(operatorGap.message).not.toContain(pointer);
   });
 });

@@ -7,6 +7,7 @@
       "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
       "securityUpdate": "Eine Sicherheitsprüfung hat ein Update",
+      "agentBriefing": "Ihr Agenten-Briefing ist bereit",
       "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Neuer Sicherheitsbefund ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritisch",
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
     },
     "securityFindingSlaWarning": {
       "title": "SLA-Warnung"

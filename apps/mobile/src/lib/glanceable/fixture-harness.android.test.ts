@@ -51,7 +51,13 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
 vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }));
 vi.mock('@/glanceable-android/count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+}));
+// Both platforms draw counts through the shared formatter, so the fixture
+// labels and card text keep their plain digits here.
+vi.mock('@/lib/glanceable/count-format', () => ({
   formatGlanceableCount: String,
+  glanceableDigits: () => '',
+  glanceableGroupSeparator: () => ',',
 }));
 
 // The Home widget's native refresh store and the persisted snapshot.
@@ -105,6 +111,7 @@ describe('session card fixtures on Android', () => {
 
     expect(isGlanceableFixtureHeld()).toBe(true);
     expect(androidFollow.isSessionFollowed('glanceable-fixture-0')).toBe(true);
+    expect(mocks.postSessionCard).toHaveBeenCalledTimes(1);
     expect(fixtureCards().at(-1)).toMatchObject({
       sessionId: 'glanceable-fixture-0',
       organizationId: 'org-1',
@@ -112,6 +119,23 @@ describe('session card fixtures on Android', () => {
       chronometer: true,
       openUrl: 'kiloapp:///cloud/sessions/glanceable-fixture-0',
     });
+  });
+
+  it('follow every listed row: two sessions, two cards, one each', async () => {
+    await applyFixture('session-card-android-pair');
+
+    const posted = mocks.postSessionCard.mock.calls.map(
+      ([card]) => card as Record<string, unknown>
+    );
+    expect(posted).toHaveLength(2);
+    expect(posted.map(card => card.sessionId)).toEqual([
+      'ses_01JQ8ZK4M2XW3T7YB6NCV0000',
+      'ses_01JQ8ZK4M2XW3T7YB6NCV2662',
+    ]);
+    expect(posted[0]).toMatchObject({ title: 'Migrate the billing webhooks', chronometer: true });
+    expect(posted[1]).toMatchObject({ title: 'Refactor the settle path', chronometer: true });
+    expect(androidFollow.isSessionFollowed('ses_01JQ8ZK4M2XW3T7YB6NCV0000')).toBe(true);
+    expect(androidFollow.isSessionFollowed('ses_01JQ8ZK4M2XW3T7YB6NCV2662')).toBe(true);
   });
 
   it('draw Approve for the permission fixture from the content a push would carry', async () => {

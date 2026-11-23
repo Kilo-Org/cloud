@@ -7,6 +7,7 @@
       "spendAlert": "您的支出需要关注",
       "securityFinding": "安全发现需要关注",
       "securityUpdate": "安全检查有更新",
+      "agentBriefing": "您的智能体简报已准备好",
       "activeAgentsGlanceable": "活跃智能体有更新"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "新的安全发现 ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "严重",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
     },
     "securityFindingSlaWarning": {
       "title": "SLA 警告"

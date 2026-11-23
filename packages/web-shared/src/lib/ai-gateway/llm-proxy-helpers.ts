@@ -28,6 +28,7 @@ import type {
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
+import { BENCHMARK_PROJECT_PREFIX } from '@kilocode/auto-routing-contracts';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -621,12 +622,12 @@ export function chatGptReconnectResponse(message: string) {
 /**
  * Returned when the owner's Claude billing connection cannot bill. The request
  * was refused before any upstream call, and it must not be served on another
- * payer's allowance. The owner is told what happened and what an admin can do.
+ * payer's allowance. Each caller-supplied message owns its complete text,
+ * including any manage-connection pointer.
  */
 export function claudeBillingUnavailableResponse(message: string, retryable = false) {
-  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { error: message, error_type: ProxyErrorType.byok_error, message },
     { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
   );
 }
@@ -998,10 +999,22 @@ export function extractFraudAndProjectHeaders(request: NextRequest) {
   return {
     fraudHeaders: getFraudDetectionHeaders(request.headers),
     xKiloCodeVersion: request.headers.get('X-KiloCode-Version'),
-    projectId: normalizeProjectId(request.headers.get('X-KiloCode-ProjectId')),
+    projectId: untrustedProjectId(request.headers.get('X-KiloCode-ProjectId')),
     numericKiloCodeVersion:
       getXKiloCodeVersionNumber(request.headers.get('X-KiloCode-Version')) || 0,
   };
+}
+
+/**
+ * A project id a public caller may write. The benchmark project namespace is reserved: an
+ * ordinary request must never attribute usage to a benchmark pool, so anything under the
+ * prefix is dropped here, including a malformed lookalike. Only the authenticated benchmark
+ * assignment writes one, from the signed assignment rather than a header.
+ */
+function untrustedProjectId(header: string | null): string | null {
+  const projectId = normalizeProjectId(header);
+  if (projectId?.startsWith(`${BENCHMARK_PROJECT_PREFIX} `)) return null;
+  return projectId;
 }
 
 const wrapFimSuffixIntoSystemPrompt = (() => {

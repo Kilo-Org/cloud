@@ -13,6 +13,7 @@ import {
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
 import { resolveConnectionConnector } from '../connector';
@@ -22,11 +23,29 @@ import {
   type ClaudeBillingPayerState,
 } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
+import { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
-export const CLAUDE_BILLING_REQUIRED_MESSAGE =
-  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms.';
+/**
+ * The pointer to the page that manages a Claude billing connection, appended to
+ * each message whose fix starts there. One declaration keeps every such message
+ * naming the same place.
+ */
+const MANAGE_CONNECTION_POINTER = `Manage the connection at ${APP_URL}/byok.`;
+
+/**
+ * The customer-facing message for a connection that exists but cannot bill. It
+ * owns its complete text, including the manage-connection pointer.
+ */
+export const CLAUDE_BILLING_REQUIRED_MESSAGE = `Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms. ${MANAGE_CONNECTION_POINTER}`;
+
+/**
+ * Kilo's own missing server-side operator credential. It names no customer
+ * action, because no customer action fixes it.
+ */
+export const CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE =
+  "Claude billing is temporarily unavailable on Kilo's side, so this request could not be sent. Try again later.";
 
 /**
  * Shown when the account that linked an organization's connection is gone: the
@@ -42,6 +61,13 @@ const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */
 const OAUTH_API_BETA = 'oauth-2025-04-20';
 const ANTHROPIC_MODEL_PREFIX = /^anthropic\//i;
+
+/** Billing connections serve only the Messages API. Anthropic's OpenAI-compatible endpoint ignores prompt caching and drops reasoning output. */
+const CLAUDE_BILLING_SUPPORTED_CHAT_APIS = [
+  'messages',
+] as const satisfies readonly GatewayChatApiKind[];
+
+type ClaudeBillingChatApiKind = (typeof CLAUDE_BILLING_SUPPORTED_CHAT_APIS)[number];
 
 export type ClaudeBillingRoutingInput = {
   request: GatewayRequest;
@@ -67,11 +93,11 @@ export type ClaudeBillingRoutingResult =
  * connection and never the requester's personal one. A personal request uses
  * only the personal connection.
  */
-function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[] {
-  if (!input.userId) return [];
+function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner | null {
+  if (!input.userId) return null;
   return input.organizationId
-    ? [{ kind: 'organization', organizationId: input.organizationId }]
-    : [{ kind: 'personal', kiloUserId: input.userId }];
+    ? { kind: 'organization', organizationId: input.organizationId }
+    : { kind: 'personal', kiloUserId: input.userId };
 }
 
 /**
@@ -90,11 +116,13 @@ async function connectorGone(
 }
 
 /**
- * Billing connections serve only the Messages API. Anthropic's OpenAI-compatible
- * endpoint ignores prompt caching and drops reasoning output.
+ * Whether a request takes this route: its API kind must be one the provider serves, and the guard
+ * narrows to that kind so the request transform cannot touch a request the route rejected.
  */
-function servesApiKind(kind: GatewayChatApiKind): boolean {
-  return kind === 'messages';
+function servesApiKind(
+  request: GatewayRequest
+): request is Extract<GatewayRequest, { kind: ClaudeBillingChatApiKind }> {
+  return CLAUDE_BILLING_SUPPORTED_CHAT_APIS.some(served => served === request.kind);
 }
 
 /**
@@ -128,7 +156,7 @@ export function buildClaudeBillingProvider(
   userProfileId: string
 ): Provider {
   return {
-    type: 'claude-billing',
+    type: CLAUDE_BILLING_PROVIDER_ID,
     inferenceProviderId: 'anthropic',
     claudeBillingOwner: owner,
     claudeBillingUserProfileId: userProfileId,
@@ -137,11 +165,11 @@ export function buildClaudeBillingProvider(
     disableUrlSuffix: false,
     apiKey: accessToken,
     apiKeyHeader: null,
-    supportedChatApis: ['messages'],
+    supportedChatApis: CLAUDE_BILLING_SUPPORTED_CHAT_APIS,
     responseTransforms: null,
     async transformRequest(context) {
       // Only the Messages API reaches this provider.
-      if (context.request.kind !== 'messages') return;
+      if (!servesApiKind(context.request)) return;
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
       appendAnthropicBetaHeader(context.extraHeaders, OAUTH_API_BETA);
       appendAnthropicBetaHeader(context.extraHeaders, CLAUDE_BILLING_BETA);
@@ -163,14 +191,13 @@ export function buildClaudeBillingProvider(
 export async function checkClaudeBilling(
   input: ClaudeBillingRoutingInput
 ): Promise<ClaudeBillingRoutingResult | null> {
-  const owners = ownerCandidates(input);
+  const owner = ownerCandidates(input);
   // An organization request is always scoped by its signed-in person.
-  if (owners.length === 0) {
+  if (!owner) {
     return input.organizationId
       ? {
           kind: 'unavailable',
-          message:
-            'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
+          message: `Linked billing with Claude Platform is not enabled. Remove the link to use another payment method. ${MANAGE_CONNECTION_POINTER}`,
         }
       : null;
   }
@@ -178,60 +205,52 @@ export async function checkClaudeBilling(
   const upstreamModel = await resolveClaudeBillingModel(input.requestedModel);
   if (!upstreamModel) return null;
 
-  for (const owner of owners) {
-    let connection: ClaudeBillingPayerState | null;
-    try {
-      connection = await getAuthoritativeClaudeBillingState(owner);
-    } catch (error) {
-      // A reply outside the wire contract names a release mismatch, so the
-      // refusal stays without a retry hint; other failures stay retryable.
-      if (error instanceof ClaudeBillingPayerStateParseError) {
-        return {
-          kind: 'unavailable',
-          message:
-            'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
-        };
-      }
+  let connection: ClaudeBillingPayerState | null;
+  try {
+    connection = await getAuthoritativeClaudeBillingState(owner);
+  } catch (error) {
+    if (error instanceof ClaudeBillingPayerStateParseError) {
       return {
         kind: 'unavailable',
-        message: 'We could not check your Claude link. Try again.',
-        retryable: true,
+        message: `Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time. ${MANAGE_CONNECTION_POINTER}`,
       };
     }
-    if (!connection || connection.status === ClaudeBillingConnectionStatus.Removed) continue;
-    if (connection.status === ClaudeBillingConnectionStatus.BillingUnavailable) {
-      return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
-    }
-    if (connection.status !== ClaudeBillingConnectionStatus.Connected) continue;
-    if (await connectorGone(owner, connection)) {
-      return { kind: 'reconnect', message: CLAUDE_BILLING_RECONNECT_MESSAGE };
-    }
-    if (!servesApiKind(input.request.kind)) {
-      return {
-        kind: 'unavailable',
-        message: 'Use the Messages API with your Claude link.',
-      };
-    }
-    if (!isClaudeOperatorConfigured()) {
-      return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
-    }
-
-    const accessToken = await getClaudeOperatorToken();
     return {
-      kind: 'provider',
-      provider: {
-        ...buildClaudeBillingProvider(
-          accessToken,
-          upstreamModel,
-          owner,
-          connection.user_profile_id
-        ),
-        claudeBillingConnectedAt: connection.connected_at ?? undefined,
-      },
-      userByok: null,
-      skipBalanceCheck: true,
+      kind: 'unavailable',
+      message: `We could not check your Claude link. Try again. ${MANAGE_CONNECTION_POINTER}`,
+      retryable: true,
+    };
+  }
+  if (!connection || connection.status === ClaudeBillingConnectionStatus.Removed) return null;
+  if (connection.status === ClaudeBillingConnectionStatus.BillingUnavailable) {
+    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
+  }
+  if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
+  if (await connectorGone(owner, connection)) {
+    return { kind: 'reconnect', message: CLAUDE_BILLING_RECONNECT_MESSAGE };
+  }
+  if (!servesApiKind(input.request)) {
+    return {
+      kind: 'unavailable',
+      message: `Use the Messages API with your Claude link. ${MANAGE_CONNECTION_POINTER}`,
+    };
+  }
+  if (!isClaudeOperatorConfigured()) {
+    return {
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+      retryable: true,
     };
   }
 
-  return null;
+  const accessToken = await getClaudeOperatorToken();
+  return {
+    kind: 'provider',
+    provider: {
+      ...buildClaudeBillingProvider(accessToken, upstreamModel, owner, connection.user_profile_id),
+      claudeBillingConnectedAt: connection.connected_at ?? undefined,
+    },
+    userByok: null,
+    skipBalanceCheck: true,
+  };
 }

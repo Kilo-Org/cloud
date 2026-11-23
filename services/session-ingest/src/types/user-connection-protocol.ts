@@ -1,3 +1,4 @@
+import { MAX_GIT_BRANCH_LENGTH, gitBranchValueSchema } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 // Use z.string() for session IDs (not the strict sessionIdSchema from ws-protocol)
@@ -18,7 +19,9 @@ const instanceSchema = z.object({
   // until all supported metadata-free producers and attachments have retired.
   kind: z.enum(['cli', 'remote']).optional(),
   startedAt: z.string().datetime({ precision: 3 }).length(24).optional(),
-  gitBranch: z.string().max(24).optional(),
+  // A branch longer than MAX_GIT_BRANCH_LENGTH is shortened to that length, not
+  // rejected.
+  gitBranch: gitBranchValueSchema.optional(),
 });
 
 export type Instance = z.infer<typeof instanceSchema>;
@@ -47,7 +50,7 @@ export const MAX_HEARTBEAT_TITLE_LENGTH = 1024;
 export const MAX_HEARTBEAT_GIT_URL_LENGTH = 2048;
 // A per-session branch; the create-session contract caps `gitBranch` and
 // `baseBranch` at 256.
-export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = 256;
+export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = MAX_GIT_BRANCH_LENGTH;
 // A parent identifier is another session id, so it shares that bound.
 export const MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH = 256;
 // An ISO-8601 timestamp at millisecond precision is 24 characters; keep room
@@ -127,7 +130,7 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
           // Display metadata is shortened to its limit.
           title: boundedMetadata(MAX_HEARTBEAT_TITLE_LENGTH),
           gitUrl: boundedMetadata(MAX_HEARTBEAT_GIT_URL_LENGTH).optional(),
-          gitBranch: boundedMetadata(MAX_HEARTBEAT_GIT_BRANCH_LENGTH).optional(),
+          gitBranch: gitBranchValueSchema.optional(),
           parentSessionId: z.string().max(MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH).optional(),
           // Platform the session is running on (e.g. "darwin", "linux", "vscode").
           // Optional for backward compatibility with legacy CLIs.

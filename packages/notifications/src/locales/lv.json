@@ -7,6 +7,7 @@
       "spendAlert": "Taviem izdevumiem nepieciešama uzmanība",
       "securityFinding": "Drošības atradumam nepieciešama uzmanība",
       "securityUpdate": "Drošības pārbaudei ir atjauninājums",
+      "agentBriefing": "Tava aģenta atskaite ir gatava",
       "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Jauns drošības atradums ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritisks",
+      "high": "Augsts",
+      "medium": "Vidējs",
+      "low": "Zems"
     },
     "securityFindingSlaWarning": {
       "title": "SLA brīdinājums"

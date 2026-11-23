@@ -26,11 +26,16 @@ type ConfigureRowProps = {
   titleBadge?: ReactNode;
   subtitle?: string;
   /**
-   * Line cap for the subtitle. A subtitle that is one unbreakable token (an
-   * email address, a host name) cannot wrap on Android and is hard-clipped at
-   * the row edge with no ellipsis; `1` makes it ellipsize cleanly instead.
+   * Line cap for the subtitle, one line by default. The row's subtitle is one
+   * line of `text-xs`, and without the cap a subtitle that is one unbreakable
+   * token (an email address, a host name) cannot wrap on Android and is
+   * hard-clipped at the row edge with no ellipsis, while a long sentence grows
+   * the row past its neighbours. Pass `2` from a caller whose subtitle is a
+   * sentence the reader must finish, or `'all'` from a caller whose copy a
+   * reader must be able to finish and whose length no fixed line count can
+   * bound.
    */
-  subtitleNumberOfLines?: number;
+  subtitleNumberOfLines?: number | 'all';
   /**
    * Node rendered in the subtitle's place while the value that fills it loads.
    * The row's subtitle is one line of `text-xs`, so a placeholder of that
@@ -69,7 +74,31 @@ type ConfigureRowProps = {
    * visible text.
    */
   accessibilityLabel?: string;
+  /**
+   * Where the press lives. A row whose trailing node is a control of its own (a
+   * switch) passes `content`, so the trailing control owns its own touch and
+   * its own accessible node. The content press then needs
+   * `contentAccessibilityLabel` to stay reachable, because `RowFrame` hides a
+   * `content` press from assistive technology without it.
+   */
+  pressTarget?: 'row' | 'content';
+  /**
+   * The content press's spoken name. A `content` press is hidden from assistive
+   * technology without one, so a row that hands the press to its content names
+   * the surface that press opens.
+   */
+  contentAccessibilityLabel?: string;
+  contentAccessibilityHint?: string;
   trailing?: ReactNode;
+  /**
+   * The trailing cell must be delivered at the platform touch target in a
+   * stacked row: either a control that reaches it — through its own box or
+   * through a compact `hitSlop` — or the placeholder that reserves the same
+   * line so the row does not move when the real cell lands. A stacked frame
+   * must host it (see `rowTargetHostClass`), because a touch is delivered only
+   * inside an ancestor view; the flat frame needs nothing.
+   */
+  trailingIsTarget?: boolean;
   className?: string;
   /** Test handle for the row's own control, for native E2E scripts. */
   testID?: string;
@@ -81,7 +110,7 @@ export function ConfigureRow({
   title,
   titleBadge,
   subtitle,
-  subtitleNumberOfLines,
+  subtitleNumberOfLines = 1,
   subtitlePlaceholder,
   tone,
   hue,
@@ -90,7 +119,11 @@ export function ConfigureRow({
   onPress,
   disabled,
   accessibilityLabel,
+  pressTarget,
+  contentAccessibilityLabel,
+  contentAccessibilityHint,
   trailing,
+  trailingIsTarget,
   className,
   testID,
 }: Readonly<ConfigureRowProps>) {
@@ -104,11 +137,9 @@ export function ConfigureRow({
   // Both cases get the stacked presentation, which hands the title the row's
   // full width.
   const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
-  // A semantic tone outranks the curated destination hue, and a row carrying
-  // neither keeps the shared neutral tile. A settings list is not a list of
-  // agents: hashing each title into the agent hue ramp gave one list (Language
-  // / Trusted hosts / Device sessions) three different accents, and a title
-  // never picks a hue here.
+  // A settings list is not a list of agents: hashing each title into the agent
+  // hue ramp gave one list (Language / Trusted hosts / Device sessions) three
+  // different accents, and a title never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
   if (destructive) {
     tint = toneColor('danger');
@@ -122,7 +153,11 @@ export function ConfigureRow({
   const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
   let rowTrailing: RowTrailingSpec | undefined = undefined;
   if (trailing !== undefined) {
-    rowTrailing = { kind: 'node', node: trailing };
+    rowTrailing = {
+      kind: 'node',
+      node: trailing,
+      ...(trailingIsTarget === true ? { target: true } : {}),
+    };
   } else if (showChevron) {
     rowTrailing = { kind: 'chevron' };
   }
@@ -154,12 +189,18 @@ export function ConfigureRow({
       subtitle={
         subtitle === undefined
           ? undefined
-          : { text: subtitle, numberOfLines: subtitleNumberOfLines }
+          : {
+              text: subtitle,
+              numberOfLines: subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines,
+            }
       }
       subtitlePlaceholder={subtitlePlaceholder}
       trailing={rowTrailing}
       stack={stack}
       onPress={onPress}
+      pressTarget={pressTarget}
+      contentAccessibilityLabel={contentAccessibilityLabel}
+      contentAccessibilityHint={contentAccessibilityHint}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}

@@ -4,6 +4,7 @@ import {
   characterCut,
   sessionDisplayLine,
   sessionLiveText,
+  sessionLiveToolStep,
 } from '@kilocode/session-ingest-contracts';
 
 describe('sessionLiveText', () => {
@@ -170,9 +171,44 @@ describe('sessionLiveText', () => {
     }
   });
 
-  it('returns null for non-strings, blanks, and joiner-only text', () => {
+  it('returns null for non-strings, blanks, joiner-only text, and a limit below one', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();
     expect(sessionLiveText('\u200C\u200D', 40)).toBeNull();
+    // A limit below one has no room to draw anything, so even a real line reads null.
+    expect(sessionLiveText('a long line', 0)).toBeNull();
+    expect(sessionLiveText('a long line', -5)).toBeNull();
+    // The smallest usable limit still draws: the guard only rejects what has no room.
+    expect(sessionLiveText('abcdef', 1)).toBe('…');
+    expect(sessionLiveText('a', 1)).toBe('a');
+  });
+});
+
+describe('sessionLiveToolStep', () => {
+  it('resolves the last segment of a path with a long separator run within the step budget', () => {
+    const path = '/' + '/'.repeat(200_000) + 'file.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'file.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('resolves the last segment of a long nested path', () => {
+    const path = 'x/'.repeat(100_000) + 'index.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'index.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('ignores trailing separators on a long path', () => {
+    const path = 'x/'.repeat(100_000) + 'b.ts' + '/'.repeat(1000);
+    const started = performance.now();
+    const step = sessionLiveToolStep('list', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'searching', target: 'b.ts' });
+    expect(elapsed).toBeLessThan(2000);
   });
 });

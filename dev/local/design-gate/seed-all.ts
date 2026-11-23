@@ -110,6 +110,18 @@ export const SEED_STEPS: readonly Readonly<{
     args: email => [email],
     outputs: ['sessionId'],
   },
+  {
+    step: 'report-receipts',
+    topic: 'app:mobile-report-receipts',
+    args: email => [email],
+    outputs: [
+      'receivedReceiptId',
+      'receivedCommentReceiptId',
+      'actionedReceiptId',
+      'rejectedReceiptId',
+    ],
+    screens: ['(app)/(tabs)/(3_profile)/report-receipts'],
+  },
 ];
 
 /**

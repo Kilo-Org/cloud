@@ -14,12 +14,17 @@ import {
   type MirrorMessagePage,
   type MirrorSessionRow,
 } from '@/lib/artifacts/artifact-crawl';
-import { applyArtifactSnapshot, mirrorSessionDir } from '@/lib/artifacts/artifact-mirror';
+import {
+  applyArtifactSnapshot,
+  mirrorSessionDir,
+  readArtifactMirror,
+} from '@/lib/artifacts/artifact-mirror';
 import {
   ARTIFACT_MIRROR_MANIFEST_VERSION,
   type ArtifactMirrorManifest,
   type ArtifactMirrorSession,
   selectSessionsWithinBudget,
+  serializeArtifactMirrorManifest,
 } from '@/lib/artifacts/artifact-mirror-manifest';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -41,14 +46,21 @@ export { MIRROR_SESSION_LIMIT } from '@/lib/artifacts/artifact-crawl';
  *   the whole known session set, so a session missing from it is pruned;
  * - at most {@link MAX_SESSIONS_PER_RUN} not-fully-crawled sessions advance,
  *   one stored message page each, from the cursor persisted with the run
- *   state, so a long session converges over several runs;
+ *   state, so a long session converges over several runs. The slots go to the
+ *   sessions that waited longest, so a session that keeps changing cannot
+ *   hold one while the sessions behind it starve;
+ * - an artifact that can never arrive (a missing object, an over-cap size) is
+ *   recorded so the crawl moves past it, and a temporary failure is counted up
+ *   to {@link MAX_ARTIFACT_ATTEMPTS} before it is written off the same way;
  * - the applied snapshot is capped at {@link MIRROR_BYTE_BUDGET}; the oldest
  *   session files over budget are dropped while their folder stays.
  *
  * Runs are single-flight and gated on the persisted `lastRunAt`
  * ({@link MIRROR_SYNC_MIN_INTERVAL_MS}) unless `force` is set. Every write is
  * fenced on the auth epoch captured at entry, so a run that resolves after
- * sign-out cannot repopulate what teardown just cleared.
+ * sign-out cannot repopulate what teardown just cleared. A run that fails
+ * records its attempt time too, with the pre-run crawl state, so a failing
+ * condition is retried on the same interval instead of on every trigger.
  */
 
 /** Shortest gap between two runs unless a caller forces one. */
@@ -56,6 +68,9 @@ export const MIRROR_SYNC_MIN_INTERVAL_MS = 5 * 60 * 1000;
 
 /** Sessions advanced (one message page each) in a single run. */
 export const MAX_SESSIONS_PER_RUN = 3;
+
+/** Temporary failures one artifact gets before it is written off for this session revision. */
+export const MAX_ARTIFACT_ATTEMPTS = 3;
 
 /** Total materialized bytes the mirror keeps; oldest session files go first. */
 export const MIRROR_BYTE_BUDGET = 250 * 1024 * 1024;
@@ -73,13 +88,40 @@ const materializedArtifactSchema = z.object({
   size: z.number(),
 });
 
+/**
+ * Why an artifact never produced bytes. Two of these are facts about the
+ * artifact that no later run can change (an over-cap size, a missing object);
+ * the third is the temporary-failure budget running out, which is a fact about
+ * this session revision only.
+ */
+const terminalCauseSchema = z.enum(['attempts-exhausted', 'missing', 'too-large']);
+
+/** Causes that survive the session starting a new revision. */
+const PERMANENT_TERMINAL_CAUSES = {
+  'attempts-exhausted': false,
+  missing: true,
+  'too-large': true,
+} satisfies Record<TerminalCause, boolean>;
+
 const sessionStateSchema = z.object({
   cursor: z.string().nullable(),
   done: z.boolean(),
   /** Artifacts already materialized into the mirror, in discovery order. */
   files: z.array(materializedArtifactSchema),
+  /**
+   * Ids the crawl will not attempt again in this session revision, mapped to
+   * why. Skipping them is what lets the cursor move past a page whose artifact
+   * can never arrive.
+   */
+  terminal: z.record(z.string(), terminalCauseSchema).default({}),
+  /** Temporary failures counted against {@link MAX_ARTIFACT_ATTEMPTS}. */
+  attempts: z.record(z.string(), z.number().int().positive()).default({}),
   /** `updatedAt` of the session row this crawl state was built from. */
   updatedAt: z.string(),
+  /**
+   * When this session last got one of {@link MAX_SESSIONS_PER_RUN}'s slots.
+   */
+  lastAdvancedAt: z.number().nullable().default(null),
 });
 
 const syncStateSchema = z.object({
@@ -89,19 +131,26 @@ const syncStateSchema = z.object({
 
 type MirrorSyncSessionState = z.infer<typeof sessionStateSchema>;
 type MirrorSyncState = z.infer<typeof syncStateSchema>;
+type TerminalCause = z.infer<typeof terminalCauseSchema>;
 
 /**
  * The tRPC, filesystem, storage, and native work one run performs. Every
  * member has a production default; a caller overrides only what a test drives.
  */
 export type ArtifactMirrorSyncDeps = Partial<ArtifactCrawlDeps> & {
-  /** Applies the reconciled snapshot; the mirror's own best-effort writer. */
-  applySnapshot: (manifest: ArtifactMirrorManifest) => void;
+  /**
+   * Applies the reconciled snapshot; the mirror's own best-effort writer. Its
+   * result is the tree-repair report: whether the applied snapshot created or
+   * pruned an entry, which is a change the index bytes cannot show.
+   */
+  applySnapshot: (manifest: ArtifactMirrorManifest) => boolean;
   /** The folder for one session's files, or null with no browsable container. */
   mirrorSessionDir: (sessionId: string) => Directory | null;
   /** Tells the platform provider the tree changed. */
   notify: () => void;
   readState: (scope: string, key: string) => Promise<string | null>;
+  /** The index currently on disk, or null when there is none. */
+  readSnapshot: () => ArtifactMirrorManifest | null;
   writeState: (scope: string, key: string, value: string) => Promise<void>;
   /** Current authoritative user id, or null while signed out. */
   resolveUserId: () => string | null;
@@ -118,6 +167,10 @@ export type ArtifactMirrorSyncOptions = {
 export type ArtifactMirrorSyncOutcome =
   | { status: 'skipped'; reason: 'interval' | 'no-user' }
   | { status: 'discarded' }
+  /**
+   * The run threw. Its attempt time is still recorded (unless the fence had
+   * tripped), so the interval gate spaces the retry as it spaces a success.
+   */
   | { status: 'failed' }
   | { failed: number; files: number; sessions: number; status: 'synced' };
 
@@ -127,6 +180,7 @@ const DEFAULT_DEPS: ArtifactMirrorSyncDeps = {
   mirrorSessionDir,
   notify: notifyArtifactsChanged,
   readState: (scope, key) => encryptedKv.getItem(scope, key),
+  readSnapshot: readArtifactMirror,
   writeState: (scope, key, value) => encryptedKv.setItem(scope, key, value),
   resolveUserId: () => readCachedUserId(queryClient),
   now: () => Date.now(),
@@ -139,6 +193,8 @@ type SyncRun = {
   epoch: number;
   /** Identity of this run, used to name the staging bytes it alone owns. */
   generation: number;
+  /** The run's clock reading, stamped on each session it advances. */
+  now: number;
   states: Record<string, MirrorSyncSessionState>;
 };
 
@@ -170,7 +226,8 @@ let inFlightGeneration = 0;
 /**
  * Bring the mirror in line with the signed-in user's sessions. While a run is
  * in flight every caller gets that same promise; otherwise the run is gated on
- * the persisted `lastRunAt` unless `force`. Never rejects.
+ * the persisted `lastRunAt` unless `force`. A failed run records its attempt
+ * time, so the interval spaces retries as well as successes. Never rejects.
  */
 // eslint-disable-next-line typescript-eslint/promise-function-async -- must return the same in-flight promise to every caller
 export function syncArtifactMirror(
@@ -222,6 +279,10 @@ async function runSyncOnce(
   const scope = readCacheScope(userId);
   const key = syncStateItemKey(userId);
   const stored = parseSyncState(await deps.readState(scope, key));
+  // A failed run re-persists the pre-run crawl state, so it needs its own copy:
+  // the run's `states` share the stored `files` array and the `terminal` and
+  // `attempts` maps, and advance them in place.
+  const preRun = cloneSessions(stored.sessions);
   const now = deps.now();
   if (!options.force && isWithinMinInterval(stored.lastRunAt, now)) {
     return { status: 'skipped', reason: 'interval' };
@@ -229,68 +290,179 @@ async function runSyncOnce(
   if (!canPublish(epoch)) {
     return { status: 'discarded' };
   }
-  // Reconcile only once the run is going ahead: the probe stats the mirror, and
-  // a run the interval gate skips must not pay for that on the JS thread.
-  const page = await listSessionPage({}, deps);
-  const run: SyncRun = {
-    deps,
-    epoch,
-    generation,
-    states: nextSessionStates(page.sessions, reconcileWithDisk(stored, deps).sessions),
-  };
-  const advanced = await advanceSessions(page.sessions, run);
-  if (advanced.discarded || !canPublish(epoch)) {
-    return { status: 'discarded' };
-  }
+  // The crawl and the publication are the parts that can throw (a transport
+  // error, a refused filesystem call, a storage failure), and they sit in their
+  // own guard so a caught error still knows this run's `deps`, scope, epoch and
+  // the pre-run state. That is what lets the attempt be stamped before the
+  // interval gate would otherwise let the next trigger retry at once.
+  try {
+    // Reconcile only once the run is going ahead: the probe stats the mirror, and
+    // a run the interval gate skips must not pay for that on the JS thread.
+    const page = await listSessionPage({}, deps);
+    const run: SyncRun = {
+      deps,
+      epoch,
+      generation,
+      now,
+      states: nextSessionStates(page.sessions, reconcileWithDisk(stored, deps).sessions),
+    };
+    const advanced = await advanceSessions(page.sessions, run);
+    if (advanced.discarded || !canPublish(epoch)) {
+      return { status: 'discarded' };
+    }
 
-  const snapshot = applyByteBudget(page.sessions, run.states);
-  deps.applySnapshot({
-    version: ARTIFACT_MIRROR_MANIFEST_VERSION,
-    updatedAt: new Date(now).toISOString(),
-    sessions: snapshot,
-  });
-  await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
-  // The state write is awaited as well, so the fence is read once more before
-  // the provider is signalled: a sign-out during the write has cleared the
-  // mirror, and re-announcing it would be a stale-browser signal.
-  if (!canPublish(epoch)) {
-    return { status: 'discarded' };
+    const snapshot = applyByteBudget(page.sessions, run.states);
+    // The index already on disk, read once: comparing against it is what lets an
+    // unchanged tree keep its bytes (and its `updatedAt`) instead of being
+    // rewritten and re-announced every run.
+    const previous = deps.readSnapshot();
+    const candidate: ArtifactMirrorManifest = {
+      version: ARTIFACT_MIRROR_MANIFEST_VERSION,
+      updatedAt: new Date(now).toISOString(),
+      sessions: snapshot,
+    };
+    const changed = previous === null || !hasSameContent(previous, candidate);
+    // An unchanged tree is published with the stamp already on disk, so the
+    // serialized bytes match the document `writeManifest` finds there and its
+    // unchanged-bytes guard leaves the file untouched. The snapshot is applied
+    // either way: it is the idempotent tree writer that prunes stale entries, and
+    // skipping it would leave a pruned session's folder behind.
+    const published: ArtifactMirrorManifest =
+      previous !== null && !changed ? { ...candidate, updatedAt: previous.updatedAt } : candidate;
+    const repaired = deps.applySnapshot(published);
+    await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
+    // The state write is awaited as well, so the fence is read once more before
+    // the provider is signalled: a sign-out during the write has cleared the
+    // mirror, and re-announcing it would be a stale-browser signal.
+    if (!canPublish(epoch)) {
+      return { status: 'discarded' };
+    }
+    // The provider is told to re-query when the tree moved in any of three
+    // ways: the index differs from the document on disk (the first index, an
+    // added or dropped artifact), the run materialized bytes, or the applied
+    // snapshot repaired the tree. A tree that stayed as it was stays quiet:
+    // signalling it makes an open browser re-query a listing that cannot have
+    // changed, and the bytes-on-disk guard in `writeManifest` leaves the index
+    // untouched too.
+    //
+    // The last two are invisible in the index bytes. A run that rewrote a file
+    // counts as a change because the disk reconcile can drop a file whose
+    // bytes the device removed and the crawl then materializes it again under
+    // the same id, size and name, so the listing is unchanged while the file
+    // behind it is new. And a snapshot-only repair -- a session with no files
+    // whose folder the file browser deleted is re-created, or a crashed run's
+    // staging file is pruned -- changes the tree while the listing reads exactly
+    // the same. Both are invisible to an open browser until it re-reads, which
+    // is what the notify is for.
+    if (changed || repaired || advanced.files > 0) {
+      deps.notify();
+    }
+    return {
+      status: 'synced',
+      sessions: page.sessions.length,
+      files: advanced.files,
+      failed: advanced.failed,
+    };
+  } catch {
+    await recordFailedAttempt({ deps, epoch, key, now, preRun, scope });
+    return { status: 'failed' };
   }
-  deps.notify();
-  return {
-    status: 'synced',
-    sessions: page.sessions.length,
-    files: advanced.files,
-    failed: advanced.failed,
-  };
 }
 
 /**
- * Advance up to {@link MAX_SESSIONS_PER_RUN} sessions that are not fully
- * crawled, one stored message page each, from their saved cursors. Bounded and
- * sequential: each page's cursor is the previous advance's state, so the await
- * is deliberately serial.
+ * Whether two indexes describe the same tree, ignoring their `updatedAt`. The
+ * canonical serializer decides it so there is one comparison format: anything
+ * it does not write (a field both sides lack, key order) cannot make a run
+ * announce a change the bytes on disk would not show.
+ */
+function hasSameContent(a: ArtifactMirrorManifest, b: ArtifactMirrorManifest): boolean {
+  return (
+    serializeArtifactMirrorManifest({ ...a, updatedAt: '' }) ===
+    serializeArtifactMirrorManifest({ ...b, updatedAt: '' })
+  );
+}
+
+/** The context a failed run needs to stamp its attempt. */
+type AttemptStamp = {
+  deps: ArtifactMirrorSyncDeps;
+  epoch: number;
+  key: string;
+  now: number;
+  /** The crawl state as it was read, copied before the failed run touched it. */
+  preRun: Record<string, MirrorSyncSessionState>;
+  scope: string;
+};
+
+/**
+ * Stamp a failed run's attempt time, so the interval gate also spaces retries.
+ * A run that threw left `lastRunAt` at its previous value, and without this
+ * stamp the next foreground refresh or remount would start another full crawl at
+ * once, against the condition that just failed.
+ *
+ * Only the PRE-RUN crawl state is persisted. A run that failed partway may have
+ * advanced cursors and appended files in memory, but none of that reached the
+ * mirror, so saving it would record a cursor and a file list that describe bytes
+ * the run never published. Keeping the stored state means the next run re-reads
+ * from the cursors that were already saved.
+ *
+ * The write is fenced like every other one: a run that resolves after a sign-out
+ * must not resurrect state for a context that just ended. It also never
+ * escalates, because the caller is already reporting `failed` and a storage
+ * error here must not change that.
+ */
+async function recordFailedAttempt(attempt: AttemptStamp): Promise<void> {
+  if (!canPublish(attempt.epoch)) {
+    return;
+  }
+  try {
+    await attempt.deps.writeState(
+      attempt.scope,
+      attempt.key,
+      JSON.stringify({ lastRunAt: attempt.now, sessions: attempt.preRun })
+    );
+  } catch {
+    // Best effort: the stamp only paces the next run, and the failure it
+    // describes has already been reported.
+  }
+}
+
+/**
+ * Advance up to {@link MAX_SESSIONS_PER_RUN} not-fully-crawled sessions, one
+ * stored message page each, from their saved cursors. The budget goes to the
+ * sessions that waited longest (`lastAdvancedAt` ascending, list order breaking
+ * ties), so a session that keeps changing cannot hold a slot while the ones
+ * behind it starve. Bounded and sequential: each page's cursor is the previous
+ * advance's state, so the await is deliberately serial.
  */
 async function advanceSessions(rows: MirrorSessionRow[], run: SyncRun): Promise<AdvanceOutcome> {
   const outcome: AdvanceOutcome = { discarded: false, failed: 0, files: 0 };
-  let advanced = 0;
-  for (const row of rows) {
-    if (advanced >= MAX_SESSIONS_PER_RUN) {
-      break;
-    }
+  const candidates: { index: number; row: MirrorSessionRow; state: MirrorSyncSessionState }[] = [];
+  for (const [index, row] of rows.entries()) {
     const state = run.states[row.id];
     if (state !== undefined && !state.done) {
-      advanced += 1;
-      if (!canPublish(run.epoch)) {
-        return { ...outcome, discarded: true };
-      }
-      // eslint-disable-next-line no-await-in-loop -- sessions advance one page at a time, in list order
-      const materialized = await advanceSession(row, state, run);
-      outcome.failed += materialized.failed;
-      outcome.files += materialized.files;
-      if (materialized.discarded) {
-        return { ...outcome, discarded: true };
-      }
+      candidates.push({ index, row, state });
+    }
+  }
+  // Hermes lacks `toSorted()`; this array is the walk's own, so sorting it in
+  // place cannot reach the caller's list page.
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes lacks toSorted()
+  const waitedLongestFirst = candidates.sort(
+    (a, b) => (a.state.lastAdvancedAt ?? 0) - (b.state.lastAdvancedAt ?? 0) || a.index - b.index
+  );
+
+  for (const { row, state } of waitedLongestFirst.slice(0, MAX_SESSIONS_PER_RUN)) {
+    if (!canPublish(run.epoch)) {
+      return { ...outcome, discarded: true };
+    }
+    // Stamped before the await: an aborted run still spent this session's slot,
+    // so it must not be first in line again next run.
+    state.lastAdvancedAt = run.now;
+    // eslint-disable-next-line no-await-in-loop -- sessions advance one page at a time
+    const materialized = await advanceSession(row, state, run);
+    outcome.failed += materialized.failed;
+    outcome.files += materialized.files;
+    if (materialized.discarded) {
+      return { ...outcome, discarded: true };
     }
   }
   return outcome;
@@ -319,9 +491,15 @@ async function advanceSession(
 
 /**
  * Materialize one page's new artifacts into their session folder. An artifact
- * already in the mirror is never re-fetched, an over-cap one is dropped, and a
- * failed download holds the cursor so the same page is re-read next run and the
- * artifact retried.
+ * already in the mirror, or already written off, is never re-fetched; an
+ * over-cap one is recorded as terminal; and a temporary failure is counted
+ * against {@link MAX_ARTIFACT_ATTEMPTS}.
+ *
+ * A temporary failure under the cap holds the cursor so the same page is
+ * re-read next run and the artifact retried. A terminal artifact (a missing
+ * object, an over-cap size) and an exhausted attempt budget do not: both are
+ * recorded so the cursor advances, because holding it would re-read the page
+ * forever and spend one of {@link MAX_SESSIONS_PER_RUN}'s slots on every run.
  *
  * A page the worker returned as a retryable failure never moves the crawl state
  * either. There are no messages to materialize and no cursor the worker
@@ -330,9 +508,9 @@ async function advanceSession(
  * none of its artifacts read. The next run re-reads this page, the same bounded
  * retry a failed download gets.
  *
- * A `terminal` failure is different: the worker cannot page that stored history
- * at all (`invalid_data`, `too_large`), so it can never succeed on a later run.
- * Holding the cursor there would re-read it forever and spend one of
+ * A `terminal` page failure is different: the worker cannot page that stored
+ * history at all (`invalid_data`, `too_large`), so it can never succeed on a
+ * later run. Holding the cursor there would re-read it forever and spend one of
  * {@link MAX_SESSIONS_PER_RUN}'s slots on every run, starving the sessions
  * behind it. That session is recorded as crawled instead, with whatever was
  * already materialized, so the budget reaches the sessions that can advance.
@@ -370,9 +548,18 @@ async function materializePage(
 }
 
 /**
- * Materialize one artifact: skip what is already mirrored, honor the byte cap
- * through {@link materializeArtifact}, and report a failed download as
- * retryable so the caller holds the cursor.
+ * Materialize one artifact: skip what is already mirrored or already written
+ * off, honor the byte cap through {@link materializeArtifact}, and classify a
+ * failure into one of three outcomes.
+ *
+ * - **Skipped**: already in the mirror, or recorded in `terminal` by an earlier
+ *   run, so no network request and no staging file is made.
+ * - **Terminal**: the origin said the object is missing, or its size is over the
+ *   cap. The cause is recorded so the page cursor may advance; without that the
+ *   page would be re-read and the artifact re-probed on every run.
+ * - **Temporary**: a transport or origin moment. The attempt is counted, and
+ *   only once {@link MAX_ARTIFACT_ATTEMPTS} is spent does the artifact become
+ *   terminal (`attempts-exhausted`) instead of holding the cursor forever.
  *
  * The bytes land in a staging file named for this run and are promoted onto the
  * canonical path only once the fence still holds. A discarded run therefore
@@ -385,7 +572,7 @@ async function materializeOne(
   artifact: CrawledArtifact,
   advance: SessionAdvance
 ): Promise<ArtifactNote> {
-  if (advance.known.has(artifact.id)) {
+  if (advance.known.has(artifact.id) || advance.state.terminal[artifact.id] !== undefined) {
     return artifactNote();
   }
   if (!canPublish(advance.epoch)) {
@@ -411,14 +598,25 @@ async function materializeOne(
   }
   if (!result.ok) {
     deleteQuietly(staged.staging);
-    return result.reason === 'download-failed'
-      ? artifactNote({ failed: 1, retryable: true })
-      : artifactNote();
+    if (result.reason.kind === 'terminal') {
+      advance.state.terminal[artifact.id] = result.reason.cause;
+      return artifactNote({ failed: 1 });
+    }
+    const attempts = (advance.state.attempts[artifact.id] ?? 0) + 1;
+    advance.state.attempts[artifact.id] = attempts;
+    if (attempts >= MAX_ARTIFACT_ATTEMPTS) {
+      advance.state.terminal[artifact.id] = 'attempts-exhausted';
+      return artifactNote({ failed: 1 });
+    }
+    return artifactNote({ failed: 1, retryable: true });
   }
   if (!promote(staged.staging, staged.canonical)) {
+    // A filesystem failure says nothing about the artifact, so it is retried
+    // without counting against the budget.
     deleteQuietly(staged.staging);
     return artifactNote({ failed: 1, retryable: true });
   }
+  advance.state.attempts = withoutAttempts(advance.state.attempts, artifact.id);
   advance.state.files.push({
     id: artifact.id,
     mime: artifact.mime,
@@ -474,6 +672,25 @@ function promote(staging: File, canonical: File): boolean {
 }
 
 /**
+ * A copy of stored crawl state that a run cannot mutate. {@link nextSessionStates}
+ * carries the prior `files` array, `terminal` and `attempts` maps themselves into
+ * the new state, and the crawl pushes and records into them in place, so the
+ * pre-run state a failed run re-persists has to own every one of them.
+ */
+function cloneSessions(sessions: Record<string, MirrorSyncSessionState>) {
+  const copy: Record<string, MirrorSyncSessionState> = {};
+  for (const [sessionId, session] of Object.entries(sessions)) {
+    copy[sessionId] = {
+      ...session,
+      files: [...session.files],
+      terminal: { ...session.terminal },
+      attempts: { ...session.attempts },
+    };
+  }
+  return copy;
+}
+
+/**
  * Carry each known session's crawl state forward. A session missing from the
  * list page is dropped here and pruned by the snapshot; a session that changed
  * since its state was recorded restarts from its first page (already
@@ -486,6 +703,13 @@ function promote(staging: File, canonical: File): boolean {
  * records the already-changed value and a restart gated on `done` can no longer
  * fire. Messages added behind the saved cursor would then never be read, and
  * neither would the artifacts they carry.
+ *
+ * A restart keeps the terminal causes that are facts about the artifact (a
+ * missing object, an over-cap size) and drops `attempts-exhausted`, which is a
+ * fact about one session revision: the artifact deserves a fresh budget in the
+ * new revision, but re-probing an absent object or a known-oversized one would
+ * cost a request that cannot change its answer. The attempt counts go with the
+ * exhausted cause, so the new revision starts clean.
  */
 function nextSessionStates(
   rows: MirrorSessionRow[],
@@ -495,18 +719,53 @@ function nextSessionStates(
   for (const row of rows) {
     const prior = previous[row.id];
     if (prior === undefined) {
-      next[row.id] = { cursor: null, done: false, files: [], updatedAt: row.updatedAt };
-    } else {
-      const restart = prior.updatedAt !== row.updatedAt;
       next[row.id] = {
-        cursor: restart ? null : prior.cursor,
-        done: restart ? false : prior.done,
-        files: prior.files,
+        cursor: null,
+        done: false,
+        files: [],
+        terminal: {},
+        attempts: {},
         updatedAt: row.updatedAt,
+        lastAdvancedAt: null,
+      };
+    } else if (prior.updatedAt === row.updatedAt) {
+      next[row.id] = {
+        cursor: prior.cursor,
+        done: prior.done,
+        files: prior.files,
+        terminal: prior.terminal,
+        attempts: prior.attempts,
+        updatedAt: row.updatedAt,
+        lastAdvancedAt: prior.lastAdvancedAt,
+      };
+    } else {
+      next[row.id] = {
+        cursor: null,
+        done: false,
+        files: prior.files,
+        terminal: permanentTerminalCauses(prior.terminal),
+        attempts: {},
+        updatedAt: row.updatedAt,
+        lastAdvancedAt: prior.lastAdvancedAt,
       };
     }
   }
   return next;
+}
+
+/** The recorded causes that outlive the session revision they were found in. */
+function permanentTerminalCauses(terminal: MirrorSyncSessionState['terminal']) {
+  return Object.fromEntries(
+    Object.entries(terminal).filter(([, cause]) => PERMANENT_TERMINAL_CAUSES[cause])
+  );
+}
+
+/** The attempt counts without one artifact's entry, so a later failure starts at zero. */
+function withoutAttempts(attempts: MirrorSyncSessionState['attempts'], artifactId: string) {
+  if (attempts[artifactId] === undefined) {
+    return attempts;
+  }
+  return Object.fromEntries(Object.entries(attempts).filter(([id]) => id !== artifactId));
 }
 
 /** The snapshot the run applies, and the crawl state after the budget's eviction. */
@@ -571,6 +830,10 @@ function reconcileWithDisk(state: MirrorSyncState, deps: ArtifactMirrorSyncDeps)
  * One session's state after the disk check. A session the probe cannot read
  * keeps its stored state, so one unreadable folder never costs the other
  * sessions their reconciliation or fails the run.
+ *
+ * The lost-bytes state is a restart, so it takes {@link nextSessionStates}'s
+ * restart rule: a fresh attempt budget, while the causes that are facts about
+ * the artifact survive (an over-cap or missing object is not worth re-probing).
  */
 function reconcileSession(
   sessionId: string,
@@ -587,7 +850,15 @@ function reconcileSession(
         : session.files.filter(file => new File(directory, file.id).exists);
     return present.length === session.files.length
       ? session
-      : { cursor: null, done: false, files: present, updatedAt: session.updatedAt };
+      : {
+          cursor: null,
+          done: false,
+          files: present,
+          terminal: permanentTerminalCauses(session.terminal),
+          attempts: {},
+          updatedAt: session.updatedAt,
+          lastAdvancedAt: session.lastAdvancedAt,
+        };
   } catch {
     return session;
   }

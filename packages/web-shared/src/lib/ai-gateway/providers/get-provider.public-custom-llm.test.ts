@@ -312,20 +312,20 @@ describe('getProvider with public custom LLMs', () => {
     });
     const result = await onlyRoute(await getProvider(getProviderInput({ ...input, request })));
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    await applyProviderSpecificLogic(
-      result.provider,
+    await applyProviderSpecificLogic({
+      provider: result.provider,
       requestedModel,
-      request,
-      {},
-      result.userByok,
-      EmptyFraudDetectionHeaders,
-      caller.id,
-      organizationId ?? null,
-      null,
-      null,
-      false,
-      null
-    );
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: result.userByok,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: caller.id,
+      organizationId: organizationId ?? null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      dataRegion: null,
+    });
     return request.body;
   }
 

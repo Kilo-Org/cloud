@@ -1,3 +1,15 @@
+import type { EnvironmentSetupRunData } from './environment-setup-run-data';
+export {
+  environmentSetupRunDataSchema,
+  type EnvironmentSetupRunData,
+  type EnvironmentSetupTargetSettings,
+  type EnvironmentSetupSecretRequest,
+  type EnvironmentSetupNetworkRequest,
+  type EnvironmentSetupCheck,
+  type EnvironmentSetupPendingVerification,
+  type EnvironmentSetupVerification,
+  type EnvironmentSetupPreviousConfiguration,
+} from './environment-setup-run-data';
 import {
   pgTable,
   pgView,
@@ -150,6 +162,7 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
+  NamedOrganizationPolicyKind,
   OrganizationGuardrailConfig,
   OrganizationGuardrailSource,
   OrganizationMcpConnectDecision,
@@ -188,6 +201,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -4217,6 +4231,121 @@ export const organization_group_policy_settings = pgTable(
 export type OrganizationGroupPolicySettings =
   typeof organization_group_policy_settings.$inferSelect;
 
+export const organization_named_policies = pgTable(
+  'organization_named_policies',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    name: text().notNull(),
+    schema_version: integer().notNull(),
+    document: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_named_policies_organization',
+    }).onDelete('cascade'),
+    unique('UQ_organization_named_policies_organization_kind_id').on(
+      table.organization_id,
+      table.kind,
+      table.id
+    ),
+    uniqueIndex('UQ_organization_named_policies_organization_id_canonical_name').on(
+      table.organization_id,
+      sql`lower(btrim(${table.name}))`
+    ),
+    check(
+      'organization_named_policies_kind_check',
+      sql`${table.kind} IN ('agent_permissions', 'client_configuration')`
+    ),
+    check(
+      'organization_named_policies_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 80`
+    ),
+    check('organization_named_policies_schema_version_check', sql`${table.schema_version} >= 1`),
+    check(
+      'organization_named_policies_document_check',
+      sql`jsonb_typeof(${table.document}) = 'object'`
+    ),
+  ]
+);
+
+export const organization_default_policy_links = pgTable(
+  'organization_default_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.kind],
+      name: 'PK_organization_default_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_organization_default_policy_links_organization',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_default_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_default_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
+
+export const organization_group_policy_links = pgTable(
+  'organization_group_policy_links',
+  {
+    organization_id: uuid().notNull(),
+    group_id: uuid().notNull(),
+    kind: text().$type<NamedOrganizationPolicyKind>().notNull(),
+    policy_id: uuid().notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.organization_id, table.group_id, table.kind],
+      name: 'PK_organization_group_policy_links',
+    }),
+    foreignKey({
+      columns: [table.organization_id, table.group_id],
+      foreignColumns: [organization_groups.organization_id, organization_groups.id],
+      name: 'FK_organization_group_policy_links_group',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organization_id, table.kind, table.policy_id],
+      foreignColumns: [
+        organization_named_policies.organization_id,
+        organization_named_policies.kind,
+        organization_named_policies.id,
+      ],
+      name: 'FK_organization_group_policy_links_policy',
+    }).onDelete('no action'),
+    index('IDX_organization_group_policy_links_policy').on(
+      table.organization_id,
+      table.policy_id,
+      table.kind
+    ),
+  ]
+);
+
 export const organization_membership_removals = pgTable(
   'organization_membership_removals',
   {
@@ -4384,6 +4513,14 @@ export const organization_audit_logs = pgTable(
     actor_name: text(),
     organization_id: uuid().notNull(),
     message: text().notNull(),
+    /**
+     * The structured shape of the event, for readers that render it in their
+     * own language. `message` stays the English sentence the web client shows;
+     * this nullable column carries the same event as values, validated by
+     * `AuditDetailSchema` in `@kilocode/app-shared/organizations`. A row
+     * written before this column existed has none.
+     */
+    details: jsonb().$type<AuditDetail>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -9097,6 +9234,17 @@ export const cloud_agent_environments = pgTable(
     // where an empty list permits only the server-owned Kilo/Git baseline.
     egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
     egress_allowlist: text().array(),
+    // Draft rows are written by an environment setup run and are invisible to
+    // session matching, lists and builds until they are published.
+    is_draft: boolean().default(false).notNull(),
+    // The existing environment a draft will replace on publish; null for a new
+    // environment. Only a draft may name one.
+    draft_for_environment_id: uuid().references((): AnyPgColumn => cloud_agent_environments.id, {
+      onDelete: 'cascade',
+    }),
+    // Hosts the setup agent found that sessions need. Always included in the
+    // effective allowlist of restricted policies.
+    egress_required_hosts: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -9132,6 +9280,9 @@ export const cloud_agent_environments = pgTable(
       ),
     index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
     index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_environments_draft_for')
+      .on(table.draft_for_environment_id)
+      .concurrently(),
     check(
       'cloud_agent_environments_owner_check',
       sql`(
@@ -9194,6 +9345,10 @@ export const cloud_agent_environments = pgTable(
         (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
+    check(
+      'cloud_agent_environments_draft_target_check',
+      sql`${table.draft_for_environment_id} IS NULL OR ${table.is_draft}`
+    ),
   ]
 );
 
@@ -9231,6 +9386,93 @@ export const cloud_agent_environment_vars = pgTable(
 );
 
 export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
+
+// ============ CLOUD AGENT ENVIRONMENT SETUP RUNS ============
+// One row per attempt to work out and publish a repository environment. The
+// row owns the draft environment, the requests the agent made to the user, the
+// verification evidence, and the publish/revert state in a validated JSON payload.
+
+export const ENVIRONMENT_SETUP_RUN_STATUSES = [
+  'starting',
+  'running',
+  'needs_input',
+  'verifying',
+  'publish_conflict',
+  'failed',
+  'published',
+  'reverted',
+  'cancelled',
+] as const;
+
+export type EnvironmentSetupRunStatus = (typeof ENVIRONMENT_SETUP_RUN_STATUSES)[number];
+
+export const cloud_agent_environment_setup_runs = pgTable(
+  'cloud_agent_environment_setup_runs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text().notNull(),
+    draft_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    target_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    cloud_agent_session_id: text(),
+    status: text().$type<EnvironmentSetupRunStatus>().notNull().default('starting'),
+    data: jsonb().$type<EnvironmentSetupRunData>().notNull(),
+    verification_count: integer().notNull().default(0),
+    verification_limit: integer().notNull().default(6),
+    published_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_env_setup_runs_user_id').on(table.owned_by_user_id),
+    index('IDX_env_setup_runs_org_id').on(table.owned_by_organization_id),
+    index('IDX_env_setup_runs_target').on(table.target_environment_id),
+    index('IDX_env_setup_runs_published').on(table.published_environment_id),
+    uniqueIndex('UQ_env_setup_runs_session')
+      .on(table.cloud_agent_session_id)
+      .where(sql`${table.cloud_agent_session_id} IS NOT NULL`),
+    uniqueIndex('UQ_env_setup_runs_draft')
+      .on(table.draft_environment_id)
+      .where(sql`${table.draft_environment_id} IS NOT NULL`),
+    // At most one run per target may still change. Published, reverted and
+    // cancelled runs are historical.
+    uniqueIndex('UQ_env_setup_runs_open_target')
+      .on(table.target_environment_id)
+      .where(
+        sql`${table.target_environment_id} IS NOT NULL AND ${table.status} NOT IN ('published', 'reverted', 'cancelled')`
+      ),
+    check(
+      'env_setup_runs_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL))`
+    ),
+    check(
+      'env_setup_runs_status_check',
+      sql`${table.status} IN ('starting', 'running', 'needs_input', 'verifying', 'publish_conflict', 'failed', 'published', 'reverted', 'cancelled')`
+    ),
+    check(
+      'env_setup_runs_verification_check',
+      sql`${table.verification_count} >= 0 AND ${table.verification_limit} >= 0`
+    ),
+  ]
+);
+
+export type CloudAgentEnvironmentSetupRun = typeof cloud_agent_environment_setup_runs.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it
@@ -12705,6 +12947,11 @@ export const auto_routing_custom_routers = pgTable(
       .where(isNotNull(table.owned_by_user_id)),
     index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
     index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    // `jsonb_path_ops` serves the `@>` lookup an alias promotion uses to find every pool that
+    // holds a moved alias, which is the only use.
+    index('IDX_auto_routing_custom_routers_entries')
+      .using('gin', table.entries.op('jsonb_path_ops'))
+      .concurrently(),
     check(
       'auto_routing_custom_routers_owner_check',
       sql`(

@@ -6,6 +6,8 @@ import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferre
 import { getPersonalModelList } from '@kilocode/web-shared/lib/ai-gateway/handlers/models';
 import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { providerDisplayNames } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/provider-display-names';
+import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { loadAvailableModelsForOrganization } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { resolveOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
@@ -34,6 +36,19 @@ export const modelsRouter = createTRPCRouter({
       ...(model.retires_on ? { retires_on: model.retires_on } : {}),
     }));
   }),
+
+  /**
+   * The display name of every provider in the gateway snapshot, for a client
+   * that renders `inference_provider_ids` but cannot read the snapshot itself.
+   * The mobile app has only the model catalog, so the names are resolved here
+   * and it labels providers exactly as the web catalog page does.
+   *
+   * An absent snapshot resolves to an empty list, which a client renders as the
+   * bare provider ids, rather than failing the picker.
+   */
+  providerNames: baseProcedure
+    .output(z.array(z.object({ slug: z.string(), displayName: z.string() })))
+    .query(async () => providerDisplayNames(await getModelsByProviderSnapshot())),
 
   /**
    * The list a model picker offers: the personal catalog, or an organization's

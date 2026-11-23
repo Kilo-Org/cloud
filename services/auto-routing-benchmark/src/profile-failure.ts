@@ -5,7 +5,7 @@ import {
   type BenchmarkProfileFailureClass,
   type BenchmarkProfileStatus,
 } from '@kilocode/auto-routing-contracts';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { stripVTControlCharacters } from 'node:util';
 import { benchmarkProfiles, type BenchmarkProfileRowStatus } from './db-schema';
 
@@ -14,9 +14,11 @@ export type ProfileFailure = { failureClass: BenchmarkProfileFailureClass; reaso
 type FailureTier = 'terminal' | 'model' | 'infrastructure';
 
 /**
- * Terminal classes fail the profile permanently at once. Model classes count against the
- * model's budget. Infrastructure classes say nothing about the model and count only
- * toward the overall budget, so an outage that never clears still ends.
+ * Terminal classes fail the profile permanently at once, without any attempt history. The
+ * other tiers say what a dead lane's class should be when several chunks died (a
+ * model-class cause outranks an outage) and whether the model-specific counter advances;
+ * neither tier can make a retryable failure permanent by count. Only the proven
+ * consecutive-attempt budget does.
  */
 const FAILURE_TIER: Record<BenchmarkProfileFailureClass, FailureTier> = {
   catalog_absent: 'terminal',
@@ -37,10 +39,19 @@ const FAILURE_TIER: Record<BenchmarkProfileFailureClass, FailureTier> = {
 
 const TIER_SEVERITY: Record<FailureTier, number> = { infrastructure: 0, model: 1, terminal: 2 };
 
-/** Runs failed for a model-transient class since the last ready measurement before the failure is permanent. */
-export const PROFILE_MODEL_FAILURE_BUDGET = 3;
-/** Consecutive failed runs of any retryable class before the failure is permanent. */
-export const PROFILE_FAILURE_BUDGET = 5;
+/**
+ * Consecutive proven zero-progress failed attempts, counted across repetition counts and
+ * ending with the attempt being recorded, before the failure is permanent. `> 5`, so the
+ * sixth proven failed attempt with no newly completed valid case since the last progress or
+ * explicit re-admission is terminal. Cancelled runs, runs not attempted, copied results and
+ * operator-fenced legacy work never count (src/profile-failure-history.ts).
+ *
+ * Nothing else makes a retryable failure permanent. A row's own counter never does: only
+ * the attempt history proves a failed run, so writers with no history (a pre-paid refusal,
+ * an orphan sweep) can only leave a retryable row retryable. The failure tier still
+ * separates model from infrastructure classes for the class reported by a dead lane.
+ */
+export const PROFILE_FAILURE_BUDGET = 6;
 const RETRY_BACKOFF_MAX_HOURS = 24;
 
 export function parseFailureClass(value: string | null): BenchmarkProfileFailureClass {
@@ -65,31 +76,64 @@ export function mostSevereFailureClass(
  * Column assignments of the failed transition. Counters advance from the row's own values
  * in the same UPDATE, so concurrent writers never lose an attempt. A retryable failure
  * waits `2^(attempts-1)` hours, up to a day, before a bulk requeue may take it.
+ *
+ * `streak` is the aggregate consecutive-failure count from the attempt history, including
+ * this attempt, counted across repetition counts. A value of 0 means this run still failed
+ * but completed new valid cases, so the streak restarts. Omitted by writers that have no
+ * attempt history (a pre-paid refusal, an orphan sweep): those can never make a retryable
+ * failure permanent, because a row counter is not proof of a failed run.
  */
-export function profileFailureAssignments(failure: ProfileFailure, nowIso: string) {
+export function profileFailureAssignments(
+  failure: ProfileFailure,
+  nowIso: string,
+  streak?: number | SQL
+) {
   const recorded = {
     failure_class: failure.failureClass,
     failure_reason: failure.reason.slice(0, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH),
-    failure_attempts: sql`${benchmarkProfiles.failure_attempts} + 1`,
-    first_failed_at: sql`COALESCE(${benchmarkProfiles.first_failed_at}, ${nowIso})`,
     updated_at: nowIso,
     completed_at: nowIso,
   };
   const tier = FAILURE_TIER[failure.failureClass];
   if (tier === 'terminal') {
-    return { ...recorded, status: 'unavailable' as const, retry_after: null };
+    return {
+      ...recorded,
+      failure_attempts:
+        streak === undefined ? sql`${benchmarkProfiles.failure_attempts} + 1` : streak,
+      first_failed_at: sql`COALESCE(${benchmarkProfiles.first_failed_at}, ${nowIso})`,
+      status: 'unavailable' as const,
+      retry_after: null,
+    };
   }
   const modelIncrement = tier === 'model' ? 1 : 0;
-  const exhausted = sql`(${benchmarkProfiles.model_failure_attempts} + ${modelIncrement} >= ${PROFILE_MODEL_FAILURE_BUDGET}
-    OR ${benchmarkProfiles.failure_attempts} + 1 >= ${PROFILE_FAILURE_BUDGET})`;
+  if (streak === undefined) {
+    return {
+      ...recorded,
+      failure_attempts: sql`${benchmarkProfiles.failure_attempts} + 1`,
+      model_failure_attempts: sql`${benchmarkProfiles.model_failure_attempts} + ${modelIncrement}`,
+      first_failed_at: sql`COALESCE(${benchmarkProfiles.first_failed_at}, ${nowIso})`,
+      status: 'failed' as const,
+      retry_after: sql<string | null>`strftime('%Y-%m-%dT%H:%M:%fZ', ${nowIso},
+        '+' || MIN(${RETRY_BACKOFF_MAX_HOURS}, 1 << ${benchmarkProfiles.failure_attempts}) || ' hours')`,
+    };
+  }
+  const exhausted = sql`(${streak}) >= ${PROFILE_FAILURE_BUDGET}`;
   return {
     ...recorded,
-    model_failure_attempts: sql`${benchmarkProfiles.model_failure_attempts} + ${modelIncrement}`,
+    failure_attempts: streak,
+    model_failure_attempts:
+      typeof streak === 'number' && streak === 0
+        ? 0
+        : sql`${benchmarkProfiles.model_failure_attempts} + ${modelIncrement}`,
+    first_failed_at:
+      typeof streak === 'number' && streak === 0
+        ? nowIso
+        : sql`CASE WHEN (${streak}) > 0 THEN COALESCE(${benchmarkProfiles.first_failed_at}, ${nowIso}) ELSE ${nowIso} END`,
     status: sql<BenchmarkProfileRowStatus>`CASE WHEN ${exhausted} THEN 'unavailable' ELSE 'failed' END`,
     retry_after: sql<
       string | null
     >`CASE WHEN ${exhausted} THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', ${nowIso},
-      '+' || MIN(${RETRY_BACKOFF_MAX_HOURS}, 1 << ${benchmarkProfiles.failure_attempts}) || ' hours') END`,
+      '+' || MIN(${RETRY_BACKOFF_MAX_HOURS}, 1 << MAX(0, (${streak}) - 1)) || ' hours') END`,
   };
 }
 
@@ -119,7 +163,6 @@ export type ProfileStateRow = {
 type FailureHistory = {
   failureClass: BenchmarkProfileFailureClass;
   attempts: number;
-  modelAttempts: number;
   firstFailedAt: string;
 };
 
@@ -146,9 +189,10 @@ export type ProfileState =
 
 function permanentCause(history: FailureHistory): PermanentCause {
   if (FAILURE_TIER[history.failureClass] === 'terminal') return 'terminal_class';
-  return history.modelAttempts >= PROFILE_MODEL_FAILURE_BUDGET
-    ? 'model_budget_exhausted'
-    : 'infrastructure_budget_exhausted';
+  // Retryable classes are permanent only after the proven consecutive-failure budget, so
+  // the generic attempt budget is the honest cause. The model-specific cause remains a
+  // readable value for rows diagnosed before that rule existed; new rows never get it.
+  return 'infrastructure_budget_exhausted';
 }
 
 /** The one reader of a profile row's status and failure columns. */
@@ -159,7 +203,6 @@ export function parseProfileState(row: ProfileStateRow): ProfileState {
       ? {
           failureClass: parseFailureClass(row.failure_class),
           attempts: Math.max(row.failure_attempts, 1),
-          modelAttempts: row.model_failure_attempts,
           firstFailedAt: row.first_failed_at ?? lastFailedAt,
         }
       : null;
@@ -175,7 +218,6 @@ export function parseProfileState(row: ProfileStateRow): ProfileState {
       const failure = {
         failureClass: history?.failureClass ?? 'unknown',
         attempts: history?.attempts ?? 1,
-        modelAttempts: history?.modelAttempts ?? 0,
         firstFailedAt: history?.firstFailedAt ?? lastFailedAt,
         reason: row.failure_reason,
         lastFailedAt,

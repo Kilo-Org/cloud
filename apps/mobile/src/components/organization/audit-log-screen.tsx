@@ -5,6 +5,7 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { auditActionLabel } from '@/components/organization/audit-log-action-label';
+import { auditEntryDetail } from '@/components/organization/audit-log-detail';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { canViewOrgAuditLog } from '@/components/organization/organization-settings-rows';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -58,17 +60,20 @@ function formatAuditTime(createdAt: string): string {
 }
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
-  const { t } = useTranslation();
+  const { t, i18n: translation } = useTranslation();
   const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const eventName = auditActionLabel(t, entry.action);
-  // The server's message for the creation action is "Organization <name>
-  // created", which only restates the event name already shown above it. Every
-  // row of this log belongs to this organization, so the row shows neither that
-  // English sentence nor a name a later rename would change.
-  const showsDetail = entry.action !== 'organization.created';
+  // The detail line is built from the structured event the server stored, in
+  // the reader's language. The server's English message is never shown: it is
+  // the web client's sentence, and it carries serialized config JSON for some
+  // events. A row with no structured event — one written before the column
+  // existed, or an event this build has no sentence for — shows its event name
+  // alone rather than an English sentence.
+  const detail = auditEntryDetail(t, translation.language, entry.details);
+  const showsDetail = detail !== undefined;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each
   // keeps its own reading order. One string put the localized date inside the
@@ -101,12 +106,12 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       </Card>
     );
   }
-  // The message runs past two lines for most events, and nothing else in the
-  // app carries it, so the row itself is the detail view: it starts clamped and
-  // a press shows the whole sentence. The row cannot know whether the message
-  // fits two lines without measuring it — a clamped text reports only the lines
-  // it drew — so every event row offers the disclosure, and the reader who
-  // needs nothing more loses nothing by ignoring it.
+  // The detail runs past two lines for most events, and nothing else in the app
+  // carries it, so the row itself is the detail view: it starts clamped and a
+  // press shows the whole line. The row cannot know whether the text fits two
+  // lines without measuring it — a clamped text reports only the lines it drew —
+  // so every event row offers the disclosure, and the reader who needs nothing
+  // more loses nothing by ignoring it.
   return (
     <Pressable
       onPress={() => {
@@ -115,7 +120,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
       // the row is open.
-      accessibilityLabel={[eventName, entry.message, [actor, time].filter(Boolean).join(', ')]
+      accessibilityLabel={[eventName, detail, [actor, time].filter(Boolean).join(', ')]
         .filter(Boolean)
         .join('. ')}
       accessibilityState={{ expanded }}
@@ -131,7 +136,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
           <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
         </View>
         <Text variant="caption" numberOfLines={expanded ? undefined : 2}>
-          {entry.message}
+          {detail}
         </Text>
         {metaLine}
       </Card>
@@ -198,6 +203,17 @@ export function OrganizationAuditLogScreen() {
   // reading `isFetchNextPageError` rather than `isError` keeps a failed
   // background refetch of page one from replacing the list.
   const isLaterPageError = query.isFetchNextPageError;
+  const isEmptyList = entries.length === 0 && !hasMore && !isLaterPageError;
+
+  // The populated list's reduced-motion band sits above the scroller, never
+  // inside it. Under reduced motion it reserves its own row whether or not a
+  // pull is in flight, so in flow inside the scroll body it would move the
+  // first row at rest and scroll away with the rows; above the scroller it is a
+  // sibling in this screen's own column, which carries no gap, so under motion
+  // its empty box changes nothing. The skeleton and first-page-error branches
+  // carry no pull, and the empty state's own centered scroller draws its band,
+  // so this one belongs to the list branch alone.
+  const showsRefreshBand = !query.isPending && !isFirstPageError && !isEmptyList;
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -210,7 +226,7 @@ export function OrganizationAuditLogScreen() {
     );
   } else if (isFirstPageError) {
     body = <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
-  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+  } else if (isEmptyList) {
     body = (
       <EmptyState
         icon={ScrollText}
@@ -241,7 +257,7 @@ export function OrganizationAuditLogScreen() {
         {isLaterPageError ? (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="caption" className="text-center">
-              {t('common.couldnTLoadMore')}
+              {t('common.couldNotLoadMore')}
             </Text>
             <Button
               variant="outline"
@@ -261,6 +277,7 @@ export function OrganizationAuditLogScreen() {
     body = (
       <FlashList
         style={listStyle}
+        testID="organization-audit-log-list"
         data={entries}
         keyExtractor={item => item.id}
         renderItem={renderItem}
@@ -276,6 +293,7 @@ export function OrganizationAuditLogScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('organization.auditLog.title')} backFallback={ORGANIZATION_HUB_PATH} />
+      {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
       {body}
     </View>
   );

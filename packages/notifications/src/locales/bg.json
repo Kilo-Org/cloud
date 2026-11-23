@@ -7,6 +7,7 @@
       "spendAlert": "Разходите ви изискват внимание",
       "securityFinding": "Открит проблем със сигурността изисква внимание",
       "securityUpdate": "Проверка за сигурност има актуализация",
+      "agentBriefing": "Вашият агентски брифинг е готов",
       "activeAgentsGlanceable": "Активните агенти имат актуализация"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Нов проблем със сигурността ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Критично",
+      "high": "Високо",
+      "medium": "Средно",
+      "low": "Ниско"
     },
     "securityFindingSlaWarning": {
       "title": "SLA предупреждение"

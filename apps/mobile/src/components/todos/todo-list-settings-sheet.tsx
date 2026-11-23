@@ -19,6 +19,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
   TODO_LIST_NAME_MAX_LENGTH,
@@ -42,13 +43,17 @@ function FieldLabel({ children }: Readonly<{ children: string }>) {
 
 function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSettingsFormProps>) {
   const router = useRouter();
+  // The post-create hand-off swaps this sheet for the new list in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const headerTopInset = useFormSheetHeaderTopInset();
   const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
-  const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
+  const { models, isLoading: isLoadingModels, refetch: catalogRefetch } = useAvailableModels(scope);
 
   const nameRef = useRef(list?.name ?? '');
   const emojiRef = useRef(list?.emoji ?? '');
@@ -125,7 +130,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
         } else {
           // Replace the form sheet with the created list: Back from the list then
           // lands on the lists view the sheet was opened from.
-          router.replace(todoListPath(created.id));
+          stackSafeRouter.replace(todoListPath(created.id));
         }
       }
     } catch {
@@ -239,6 +244,9 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             variant={variant ?? ''}
             options={models}
             isLoading={isLoadingModels}
+            onRetryModels={() => {
+              void catalogRefetch();
+            }}
             acceptsVariant
             onSelect={(modelId, nextVariant) => {
               setModel(modelId);

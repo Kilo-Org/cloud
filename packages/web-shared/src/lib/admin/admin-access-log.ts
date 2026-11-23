@@ -156,9 +156,15 @@ export type AdminAccessAttribution = {
 };
 
 /**
- * Privileged-access attribution. Identity is nullable because a bearer request
- * can be refused before any user is resolved; the credential, route, and
- * outcome are still worth alerting on.
+ * Privileged-access attribution. `kiloUserId` and `email` are nullable because a
+ * bearer request can be refused before any user is resolved; the credential,
+ * route, and outcome are still worth alerting on.
+ *
+ * `adminTier` is also null when the credential resolved to a caller who is not
+ * an admin: the denial itself is the finding, and {@link adminTierFor} labels
+ * every non-super user `platform_admin`, which would put a self-contradictory
+ * role in the audit stream. A resolved non-admin still records its user id and
+ * email, so the refusal is attributable to one account.
  */
 export type PrivilegedAccessAttribution = Omit<
   AdminAccessAttribution,
@@ -205,7 +211,6 @@ export type AdminAccessEvent =
       target: string | null;
     });
 
-/** The `kind` discriminant of {@link AdminAccessEvent}. */
 export type AdminAccessKind = AdminAccessEvent['kind'];
 
 export type AdminAccessSink = (event: AdminAccessEvent) => void;
@@ -364,16 +369,18 @@ function attributionFor(user: AdminAccessUser) {
   };
 }
 
+/**
+ * Attribution for a credential that may have been refused before a user was
+ * resolved. Only the unresolved case nulls every identity field; a resolved
+ * caller always records its id and email, and gets a tier only when it carries
+ * one (see {@link PrivilegedAccessAttribution}).
+ */
 function nullableAttributionFor(user: AdminAccessUser | undefined) {
-  const adminTier = user?.is_super_admin
-    ? ('super_admin' as const)
-    : user?.is_admin
-      ? ('platform_admin' as const)
-      : null;
+  if (!user) return { kiloUserId: null, email: null, adminTier: null };
   return {
-    kiloUserId: user?.id ?? null,
-    email: user?.is_admin ? user.google_user_email : null,
-    adminTier,
+    kiloUserId: user.id,
+    email: user.google_user_email,
+    adminTier: user.is_admin ? adminTierFor(user) : null,
   };
 }
 

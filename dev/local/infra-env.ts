@@ -78,8 +78,10 @@ export function buildComposeEnv(
 }
 
 export function buildAppEnv(ports: Record<string, number>): Record<string, string> {
+  const postgresUrl = `postgres://postgres:postgres@localhost:${ports.postgres}/postgres`;
   return {
-    POSTGRES_URL: `postgres://postgres:postgres@localhost:${ports.postgres}/postgres`,
+    POSTGRES_URL: postgresUrl,
+    POSTGRES_SCRIPT_URL: postgresUrl,
     REDIS_URL: `redis://localhost:${ports.redis}`,
     UPSTASH_REDIS_REST_URL: `http://localhost:${ports['redis-http']}`,
     ...(ports['byok-kms'] === undefined

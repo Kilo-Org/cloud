@@ -91,6 +91,7 @@
     "draft": "Ноорог",
     "enabled": "Идэвхтэй",
     "github": "GitHub",
+    "image": "Зураг",
     "imageUnavailable": "Зургийг харуулах боломжгүй.",
     "loading": "Ачаалж байна…",
     "loadMore": "Цааш ачаалах",
@@ -122,10 +123,10 @@
     "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
     "contentTruncated": "Агуулгыг хэсэгчлэн харуулж байна",
     "copyLink": "Холбоосыг хуулах",
+    "couldNotLoad": "Ачаалж чадсангүй.",
+    "couldNotLoadMore": "Цааш ачаалж чадсангүй.",
     "couldNotLoadOrganizations": "Байгууллагуудыг ачаалж чадсангүй.",
     "couldNotLoadSessions": "Сессүүдийг ачаалж чадсангүй.",
-    "couldnTLoad": "Ачаалж чадсангүй.",
-    "couldnTLoadMore": "Цааш ачаалж чадсангүй.",
     "deviceSessions": "Төхөөрөмжийн сессүүд",
     "disabled": "Идэвхгүй",
     "email": "Имэйл",
@@ -181,12 +182,35 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Өөрчлөлтүүд",
-    "organizationTrialEnded": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Байгууллагын эзэн kilo.ai дээр төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу.",
+    "organizationTrialEnded": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Байгууллагын эзэмшигч kilo.ai дээр төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу.",
     "privateRepositoryA11y": "{{name}}, хувийн репозитори",
     "legalDocumentEnglishOnly": "Энэ баримт бичиг зөвхөн англи хэлээр байна.",
     "organizationTrialEndedBilling": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Та төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу.",
     "organizationTrialEndedBillingAtKiloAi": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Та kilo.ai дээр төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу.",
-    "viewOnGitHub": "PR-ыг GitHub дээр үзэх"
+    "viewOnGitHub": "PR-ыг GitHub дээр үзэх",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Жагсаалтын цэг",
+        "nestedBulletPoint": "Дотоод жагсаалтын цэг",
+        "orderedItem": "Жагсаалтын элемент {n}",
+        "nestedOrderedItem": "Дотоод жагсаалтын элемент {n}"
+      },
+      "blockquote": {
+        "quote": "Ишлэл",
+        "nestedQuote": "Дотоод ишлэл"
+      },
+      "table": {
+        "row": "Мөр {n}: {content}"
+      },
+      "math": {
+        "equation": "Математик: {latex}"
+      },
+      "rotor": {
+        "headings": "Гарчигууд",
+        "links": "Холбоосууд",
+        "images": "Зургууд"
+      }
+    }
   },
   "language": {
     "restarting": "Сонгосон хэлийг хэрэглэхийн тулд дахин ачаалж байна",
@@ -286,6 +310,7 @@
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
+    "availableToSpendInOrganization": "Энэ байгууллагад зарцуулах боломжтой",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",
@@ -427,6 +452,17 @@
       "location": "Vertex байршил",
       "clientEmail": "Service account-ийн имэйл",
       "privateKey": "Service account-ийн хувийн түлхүүр",
+      "privateKeyBlockRequired": "Түлхүүрийн блокийг бүхэлд нь, BEGIN мөрөөс END мөр хүртэл буулгана уу.",
+      "privateKeyEncrypted": "Энэ түлхүүрийн блок нууц хэллэгээр хамгаалагдсан байна. Нууц хэллэггүй Service account-ийн түлхүүр буулгана уу.",
+      "names": {
+        "codestral": "Зөвхөн хуучин Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT-ээр нэвтрэх)",
+        "xiaomi": "Xiaomi (ашигласны дагуу төлөх)",
+        "zai": "Z.ai (ашигласны дагуу төлөх)",
+        "bedrockByok": "Amazon Bedrock (шууд)",
+        "vertexByok": "Google Vertex AI (шууд)"
+      },
       "modelMappings": "Загварын харгалзуулалт",
       "modelMappingsDescription": "Gateway загварыг өөрийн deployment нэр рүү илгээх.",
       "mappingTitle": "Харгалзуулалт {{number}}",
@@ -487,13 +523,14 @@
       "receiptLabel": "Баримт",
       "copyReceiptId": "Баримтын ID хуулах",
       "appealLabel": "Давж заалдах",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Хүлээн авсан",
       "triageOpen": "Хянагдаж байна",
       "triageActioned": "Батлагдсан",
       "triageRejected": "Батлагдаагүй",
       "appealNone": "Илгээгээгүй",
-      "appealSubmitted": "Хянагдаж байна",
-      "appealAccepted": "Хүлээн авсан",
+      "appealSubmitted": "Давж заалдал хянагдаж байна",
+      "appealAccepted": "Давж заалдал хүлээн авагдсан",
       "appealRejected": "Татгалзсан",
       "appeal": "Энэ шийдвэрийг давж заалдах",
       "appealTitle": "Энэ шийдвэрийг давж заалдах уу?",
@@ -504,7 +541,25 @@
       "nextStepInReview": "Үр дүн нь энэ дэлгэц дээр харагдах бөгөөд шийдвэр гарсны дараа та давж заалдах боломжтой.",
       "nextStepAppeal": "Давж заалдлын үр дүн энэ дэлгэц дээр харагдах болно.",
       "nextStepFinal": "Давж заалдлын шийдвэр эцсийн байна. Дахин давж заалдах боломжгүй.",
-      "viewReceipt": "Баримт харах"
+      "viewReceipt": "Баримт харах",
+      "targetLabel": "Гомдол гаргасан зүйл",
+      "reasonLabel": "Гомдлын шалтгаан",
+      "targetMessage": "Хиймэл оюуны хариулт",
+      "targetComment": "Нэгтгэх хүсэлтийн сэтгэгдэл",
+      "targetUser": "Хэрэглэгч",
+      "reasonHarmful": "Хортой агуулга",
+      "reasonIllegal": "Хууль бус агуулга",
+      "reasonHarassment": "Дарамт",
+      "reasonSpam": "Спам",
+      "reasonOther": "Өөр шалтгаан"
+    },
+    "reportReceipts": {
+      "title": "Мэдэгдэл",
+      "rowSubtitle": "Таны илгээсэн мэдэгдэл ба тэдгээрийн үр дүн",
+      "emptyTitle": "Одоогоор мэдэгдэл байхгүй",
+      "emptyDescription": "Pull request-ийн хэлэлцүүлэг дэх сэтгэгдэл эсвэл агентын сесс дэх хиймэл оюуны хариултаас илгээсэн мэдэгдэл үр дүнгийнхөө хамт энд харагдана.",
+      "couldNotLoad": "Таны мэдэгдлийг ачаалж чадсангүй",
+      "capped": "Таны хамгийн сүүлийн мэдэгдлүүдийг харуулж байна."
     },
     "changelog": "Шинэ зүйлс",
     "changelogVersionPending": "{{version}} хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ.",
@@ -512,8 +567,11 @@
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
     "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
-      "signIn": "Нэвтрэх",
-      "profileOrganizations": "Профайл ба байгууллагууд"
+      "signIn": "нэвтрэх",
+      "profileOrganizations": "профайл ба байгууллагууд",
+      "chat": "чат",
+      "notifications": "мэдэгдэл",
+      "integrations": "интеграцууд"
     }
   },
   "preferences": {
@@ -954,8 +1012,9 @@
       "checkActiveConnection": "Холболт идэвхтэй боловч энэ зүйлийг ачаалж чадахгүй хэвээр байна.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
-      "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
+      "reconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
+      "bitbucketAdminOnlyDescription": "Үүнийг холбуулахын тулд байгууллагын Эзэмшигч, Админ эсвэл Төлбөрийн менежерт хандана уу.",
       "adminOnlyConnectDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
@@ -1168,6 +1227,8 @@
       "emptyTitle": "Одоогоор мэдэгдэл байхгүй",
       "emptyCategoryTitle": "Энэ ангилалд мэдэгдэл байхгүй",
       "emptyBody": "Энэ бүртгэлийн хүлээн авсан мэдэгдлүүд энд харагдана. Тэдгээрийг {{days}} хоног хадгална.",
+      "emptyBody_one": "Энэ бүртгэлийн хүлээн авсан мэдэгдлүүд энд харагдана. Тэдгээрийг {{days}} хоног хадгална.",
+      "emptyBody_other": "Энэ бүртгэлийн хүлээн авсан мэдэгдлүүд энд харагдана. Тэдгээрийг {{days}} хоног хадгална.",
       "capped": "Хамгийн сүүлийн мэдэгдлүүдийг харуулж байна.",
       "loadError": "Мэдэгдлийн түүхийг ачаалж чадсангүй.",
       "openFailed": "Энэ мэдэгдэл хаана ч нээгдэхгүй болсон."
@@ -1178,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Хүсэлтийг зөвшөөрлөө",
       "replied": "Хариултыг илгээлээ",
+      "empty": "Хариулт бичээд дараа нь илгээнэ үү.",
       "failed": "Хариу өгч чадсангүй. Дахин оролдохын тулд дахин товшино уу.",
       "unavailable": "Энэ хүсэлт хүлээхээ больсон."
     }
@@ -1248,6 +1310,7 @@
       "manageAccess": "Хандах эрхийг удирдах",
       "bitbucketNoRepositoriesDescription": "Энэ Bitbucket ажлын талбарт репозитори байхгүй байна.",
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
+      "githubNoRepositoriesDescription": "Kilo GitHub аппын кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
       "repositoryAccess": "репозиторийн хандах эрх",
@@ -1277,11 +1340,11 @@
       "couldNotGetLatest": "Сүүлийн мэдээллийг авч чадсангүй.",
       "byline": "#{{number}} · Зохиогч: {{author}}",
       "noFindings": "Асуудал илрээгүй.",
-      "findingsUnavailable": "Энэ шалгалт амжилтгүй болсон тул үр дүнг харах боломжгүй.",
+      "findingsUnavailable": "Үр дүнг харах боломжгүй.",
       "findingsInProgress": "Энэ шалгалт хараахан хийгдэж байна. Дуусах үедээ илрүүлсэн асуудлууд энд харагдана.",
       "findingsEndedWithoutResults": "Энэ шалгалт ямар ч асуудал илрүүлэлгүйгээр дууссан байна.",
       "serviceUnavailable": "Код шалгах үйлчилгээнд холбогдож чадсангүй. Үйлчилгээ ашиглах боломжтой болсон үед дахин шалгана уу.",
-      "reviewFailed": "Шалгалт амжилтгүй боллоо. Дахин оролдоно уу.",
+      "reviewFailed": "Шалгалт амжилтгүй боллоо.",
       "showMore": "Илүүг харуулах",
       "created": "Үүсгэсэн",
       "started": "Эхэлсэн",
@@ -1399,10 +1462,13 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnlyPlan": "Байгууллагын туршилтын хугацаа дууссан тул эзэн нь kilo.ai дээр төлбөрийн мэдээллээ шинэчлэх ёстой."
+      "notConnectedReadOnlyPlan": "Байгууллагын туршилтын хугацаа дууссан тул эзэмшигч нь kilo.ai дээр төлбөрийн мэдээллээ шинэчлэх ёстой."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
+      "deniedManagedByOwner": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг {{organization}}-ийн эзэмшигчээс хүснэ үү.",
+      "deniedConnectRole": "Зөвхөн {{organization}}-ийн эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "deniedReconnectRole": "Дахин холбуулахын тулд {{organization}}-ийн эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "managedOnWebTitle": "Вэб дээр удирддаг",
       "managedOnWebShort": "Энэ холболтыг компьютерээс вэб дээр удирддаг.",
       "managedOnWebRepositories": "{{organization}}-д зориулсан репозиторуудыг компьютерээс вэб дээр сонгоно уу.",
@@ -1438,7 +1504,9 @@
       "githubError": "GitHub тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
       "gitlabAccount": "GitLab бүртгэл",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу."
+      "description": "Нэгтгэх хүсэлтийг автоматаар шалгахын тулд Kilo {{label}} холбоно уу.",
+      "notConnectedTitle": "{{platform}} холбогдоогүй байна",
+      "githubAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч болон админ үүнийг холбох эрхтэй."
     },
     "overview": {
       "allAreas": "Бүх чиглэл",
@@ -1540,7 +1608,9 @@
       "unavailablePersonallySwitchAction": "Байгууллага солих",
       "unavailableOrganizationTitle": "Зөвлөлийн шалгалт одоогоор боломжгүй байна",
       "unavailableForOrganization": "Зөвлөлийн шалгалт нь идэвхтэй захиалга эсвэл туршилтын хугацаатай Enterprise төлөвлөгөө шаарддаг. Энэ байгууллагад энэ нь одоогоор байхгүй.",
-      "unavailableForOrganizationNeutral": "Зөвлөлийн шалгалт нь энэ байгууллагад одоогоор боломжгүй байна. Дараа дахин оролдоно уу.",
+      "unavailablePlanCheck": "Зөвлөлийн шалгалт энэ байгууллагын төлөвлөгөөг шалгаж чадсангүй. Дахин шалгахын тулд дахин оролдоно уу.",
+      "unavailableFlagRollout": "Зөвлөлийн шалгалт энэ байгууллагад одоохондоо боломжгүй байна. Үүнийг авахын тулд аппыг хамгийн сүүлийн хувилбарт шинэчилнэ үү.",
+      "unavailableForOrganizationMember": "Зөвлөлийн шалгалт нь идэвхтэй захиалга эсвэл туршилтын хугацаатай Enterprise төлөвлөгөө шаарддаг. Байгууллагын эзэмшигч төлөвлөгөөг өөрчилж болно.",
       "unavailableOnBitbucket": "Зөвлөлийн шалгалт Bitbucket репозиторид ашиглах боломжгүй.",
       "noRepositories": "Одоогоор репозитори сонгоогүй байна. Эхлээд репозиторийн тохиргоонд репозиториудаа сонгоно уу.",
       "specialists": "Мэргэжилтнүүд",
@@ -2110,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сесс",
       "sectionAccessibility": "{{title}}: {{displayCount}} сесс",
       "live": "ШУУД",
-      "updating": "Шинэчилж байна"
+      "updating": "Шинэчилж байна",
+      "retentionLimit": "Хамгийн сүүлийн сессүүдээ харуулж байна."
     },
     "sessionRow": {
       "deleteTitle": "Сессийг устгах уу?",
@@ -2180,11 +2251,11 @@
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
       "emptyReadOnlyTitle": "Энэ сессид мессеж байхгүй",
-      "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
       "cloningSession": "Сессийг хуулбарлаж байна",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй.",
       "historyTooLarge": "Энэ сессийн бичлэг нь ачаалахад хэт том байна.",
       "historyUnavailable": "Энэ сессийн бичлэгийг унших боломжгүй.",
+      "historyTemporarilyUnavailable": "Энэ сессийн бичлэг түр боломжгүй байна.",
       "cloneFailedRetry": "Энэ сессийг хуулбарлаж чадсангүй. Дахин оролдоно уу.",
       "notEnoughCredits": "Энэ хүсэлтэд кредит хүрэлцэхгүй байна. Кредит нэмээд дахин оролдоно уу.",
       "previousTaskFinishing": "Өмнөх даалгаврыг дуусгаж байна. Түр хүлээнэ үү.",
@@ -2515,8 +2586,7 @@
       "searchPlaceholder": "Кодын сан хайх",
       "noMatches": "Тохирох илэрц алга",
       "noRepositories": "Ашиглах боломжтой кодын сан алга",
-      "noRepositoriesDescription": "Таны бүртгэлд холбосон кодын сан алга.",
-      "loading": "Ачаалж байна…",
+      "noRepositoriesDescription": "Кодын санг ачаалахын тулд GitHub эсвэл GitLab бүртгэлээ холбоно уу.",
       "accessibility": "Кодын сан: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2548,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Дэлгэрэнгүй мэдээлэл алга.",
+      "detailsUnavailableDescription": "Энэ зүйл сессэд байхгүй болсон.",
       "textDisplay": "Текст харах хэсэг",
       "thinking": "Бодож байна",
       "thought": "Бодол",
@@ -2591,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Зургийг ачаалж байна",
       "imageUnavailableRetry": "Зургийг харах боломжгүй, дахин ачаалах",
+      "imageUnavailableRetryWithAlt": "Зургийг харах боломжгүй, {{alt}}, дахин ачаалах",
       "imagePreviewUnavailableInSession": "Энэ сессэд зургийг урьдчилан харах боломжгүй.",
       "viewImage": "Зургийг үзэх",
       "viewImageWithAlt": "{{alt}} зургийг үзэх",
@@ -2722,7 +2794,9 @@
       "skip": "Алгасах",
       "retrySkip": "Алгасахыг дахин оролдох",
       "submitting": "Илгээж байна…",
-      "sendAnswers": "Хариултуудыг илгээх"
+      "sendAnswers": "Хариултуудыг илгээх",
+      "unreadableTitle": "Энэ асуултыг харуулж чадсангүй",
+      "unreadableBody": "Агент нэг асуултыг хүлээж байгаа боловч энэ апп тухайн асуултыг харуулж чадахгүй байна. Үргэлжлүүлэхийн тулд түүнд CLI дээр хариулна уу."
     },
     "blockingCard": {
       "questionUnavailable": "Энэ асуултад хариулах боломжгүй болсон.",
@@ -2749,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Дэд агентын сессийг ачаалж чадсангүй.",
+      "historyTooLarge": "Энэ дэд агентын түүх ачаалахад хэт том байна.",
+      "historyUnavailable": "Энэ дэд агентын түүх боломжгүй байна.",
+      "historyTemporarilyUnavailable": "Энэ дэд агентын түүх түр боломжгүй байна.",
       "failed": "Дэд агентын сесс амжилтгүй боллоо.",
       "noMessages": "Дэд агентын мессеж алга",
       "noMessagesDescription": "Энэ дэд агентын сесс ярианы бичвэр үүсгэлгүй дууссан.",
@@ -2918,7 +2995,7 @@
       "windowUnavailable": "Контекстийн багтаамж тодорхойгүй",
       "tapToViewDetails": " Контекстийн дэлгэрэнгүйг харахын тулд товшино уу.",
       "costClause": ", зардал {{cost}}",
-      "loadingCostSpoken": "зардал {{cost}}.",
+      "loadingCostSpoken": "өнөөг хүртэлх зардал {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токен, багтаамж тодорхойгүй{{costClause}}.",
       "tokensUsage": "Контекст: {{window}} токеноос {{used}} токен буюу {{percentage}} ашигласан{{costClause}}.",
       "title": "Контекстийн ашиглалт",
@@ -3030,6 +3107,12 @@
     "retryLoadingAccount": "Бүртгэлийг дахин ачаалах",
     "retryLoadingPrivacy": "Нууцлалын сонголтуудыг дахин ачаалах"
   },
+  "accountBlocked": {
+    "title": "Бүртгэл хаагдсан",
+    "description": "Kilo энэ бүртгэлийг хаасан бөгөөд дахин нэвтрэх нь хаалтыг арилгахгүй. Тусламжийн баг хүсэлт гаргавал хаалтыг хянах боломжтой.",
+    "domainDescription": "Kilo энэ имэйл домэйныг хаасан бөгөөд дахин нэвтрэх нь хаалтыг арилгахгүй. Тусламжийн баг хүсэлт гаргавал домэйныг хянах боломжтой.",
+    "contactSupport": "Тусламжийн багтай холбогдох"
+  },
   "addCredits": {
     "cta": "Кредит нэмэх",
     "billingPage": "төлбөрийн хуудас"
@@ -3102,8 +3185,7 @@
     "timeoutDescription": "Хүсэлт дуусахаас өмнө хугацаа дууслаа. Дахин оролдоно уу."
   },
   "screenHeader": {
-    "openMenu": "Цэс нээх",
-    "openMenuFor": "{{title}}-ийн цэс нээх"
+    "openMenu": "Цэс нээх"
   },
   "picker": {
     "optionsExpired": "Сонголтуудын хугацаа дууссан",
@@ -3322,6 +3404,8 @@
     "voiceTranscriptionWho": "Таны төхөөрөмж, таны сонгосон транскрипцийн модельтай Kilo Gateway, эсвэл онлайн танихын тулд Apple эсвэл Google.",
     "installAttributionPromptTitle": "Суулгасан эх үүсвэрийг тодорхойлохыг зөвшөөрөх үү?",
     "installAttributionPromptMessage": "Kilo нь Apple-ийн мөрдөх зөвшөөрлийг зөвхөн таныг аль сувгаар ирснийг мэдэхэд ашигладаг. Таны заавар болон харилцан яриаг үүнд хэзээ ч ашиглахгүй.",
+    "installAttributionRequestFailedTitle": "Мөрдөх зөвшөөрлийн хүсэлтийг харуулж чадсангүй",
+    "installAttributionRequestFailedMessage": "Kilo системийн хүсэлтийг харуулж чадсангүй тул суулгасан эх үүсвэрийг тодорхойлох идэвхгүй хэвээр үлдэнэ.",
     "what": "Юу",
     "why": "Яагаад",
     "who": "Хэн"
@@ -3337,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "Аудитын бүртгэл",
-      "permissionDenied": "Аудитын бүртгэлийг зөвхөн Enterprise төлөвлөгөөтэй байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер харах боломжтой.",
+      "permissionDenied": "Аудитын бүртгэлийг зөвхөн Enterprise төлөвлөгөөтэй байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер харах боломжтой. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Аудитын үйл явдал алга",
       "emptyDescription": "Энэ байгууллагад хийгдсэн үйлдлүүд энд харагдана.",
       "truncated": "Хамгийн сүүлийн үйл явдлуудыг харуулж байна.",
@@ -3387,11 +3471,147 @@
         "guardrailUpdate": "Хамгаалалтын хязгаарлалт шинэчлэгдсэн",
         "guardrailRemove": "Хамгаалалтын хязгаарлалт хасагдсан",
         "unknown": "Аудитын үйл явдал"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Горим «{{name}}» (танигч: {{slug}})",
+        "modeUpdate": "Горим «{{name}}»: {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Автомат чиглүүлэлт",
+          "defaultModel": "Өгөгдмөл загвар"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} хаягийг {{role}} болгон нэмсэн",
+        "memberRemoved": "{{email}} хаягийг хассан",
+        "memberParentAdded": "{{parent}} эх байгууллагаас {{email}} хаягийг нэмсэн",
+        "memberParentRemoved": "{{parent}} эх байгууллагаас {{email}} хаягийг хассан",
+        "inviteSent": "{{email}} — {{role}}",
+        "inviteRevoked": "{{email}} хаягт илгээсэн урилгыг цуцалсан",
+        "inviteAccepted": "{{email}} хаягт илгээсэн урилгыг хүлээн авсан",
+        "groupIdentity": "Бүлэг «{{name}}»",
+        "groupMembers": "Бүлэг «{{name}}»: {{members}}",
+        "groupMemberGroups": "{{displayCount}} бүлэг",
+        "groupMemberGroups_one": "{{displayCount}} бүлэг",
+        "groupMemberGroups_other": "{{displayCount}} бүлэг",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} бүлэг",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} бүлэг",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} бүлэг",
+        "groupPolicySet": "Бүлэг «{{name}}»: {{policy}} бодлогыг тогтоосон",
+        "groupPolicyRemoved": "Бүлэг «{{name}}»: {{policy}} бодлогыг хассан",
+        "groupDefaultPolicySet": "Өгөгдмөл {{policy}} бодлогыг тогтоосон",
+        "groupDefaultPolicyRemoved": "Өгөгдмөл {{policy}} бодлогыг хассан",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Хиймэл оюуны хамгаалалтын хашлага {{state}}",
+        "guardrailConfigGroup": "«{{group}}» бүлэгт {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO домэйн {{domain}}",
+        "ssoDomainChanged": "{{domain}} (өмнө нь {{previous}})",
+        "ssoDomainRemoved": "SSO домэйн {{domain}}-г устгасан",
+        "fundsPurchased": "{{amount}} — {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} — {{displayCount}} охин байгууллагад",
+        "fundsDistributed_one": "{{amount}} — {{displayCount}} охин байгууллагад",
+        "fundsDistributed_other": "{{amount}} — {{displayCount}} охин байгууллагад",
+        "fundsReceived": "{{amount}} — {{parent}}-аас",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} тохиргоо",
+        "reviewAgentConfigStyle": "{{platform}}: хэв маяг {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} шинэчлэгдсэн",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} шинэчлэгдсэн",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} шинэчлэгдсэн",
+        "reviewAgentSecretsFailed": "{{displayCount}} алдаа",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} алдаа",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} алдаа",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Дүгнэлт гаргах бүс: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Горим «{{mode}}»: {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Глобал өгөгдмөл",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Зөвшөөрөгдсөн",
+          "denied": "Хориглосон",
+          "followSetting": "Өргөтгөлийн тохиргоог дагадаг"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Төсөл UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}}-д",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Зөвлөмжийн хураангуй {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: зөвшөөрөгдсөн эх сурвалж байхгүй",
+        "settingName": "{{previous}}-ээс {{next}} болж нэр өөрчлөгдсөн",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Ашиглахаас өмнө скан хийх нь идэвхтэй",
+        "scanBeforeUseOff": "Ашиглахаас өмнө скан хийх нь идэвхгүй",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Хассан: {{models}}",
+        "browserPolicyOff": "Хөтөч ашиглалт саатсан",
+        "browserPolicyAllow": "Зөвхөн зөвшөөрөгдсөн эх сурвалж",
+        "browserPolicyPlaywrightOnly": "Зөвхөн хөтөч ашиглалт",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Загварууд өөрчлөгдсөн: {{values}}",
+        "integrationConnected": "{{integration}} холбогдсон",
+        "integrationDisconnected": "{{integration}} салгагдсан",
+        "integrationRefreshed": "{{integration}} сэргээгдсэн",
+        "integrationCancelled": "{{integration}} цуцлагдсан",
+        "integrationModelUpdated": "{{integration}}: загвар {{model}}",
+        "integrationKeyAdded": "{{provider}} нийлүүлэгчийн API түлхүүр нэмэгдсэн",
+        "integrationKeyUpdated": "{{provider}} нийлүүлэгчийн API түлхүүр шинэчлэгдсэн",
+        "integrationKeyDeleted": "{{provider}} нийлүүлэгчийн API түлхүүр устгагдсан",
+        "integrationKeyToggled": "{{provider}} нийлүүлэгчийн API түлхүүр: {{state}}",
+        "namedPolicyCreated": "{{kind}} бодлого {{id}} үүсгэгдсэн",
+        "namedPolicyUpdated": "{{kind}} бодлого {{id}} шинэчлэгдсэн",
+        "namedPolicyDeleted": "{{kind}} бодлого {{id}} хасагдсан",
+        "namedPolicyLinked": "{{kind}} бодлого {{next}} холбогдсон",
+        "webhookTriggerUpdated": "Триггер {{trigger}}",
+        "organizationRenamed": "Байгууллагын нэр {{previous}}-ээс {{next}} болж өөрчлөгдсөн",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Өөрийн API түлхүүр"
+        }
       }
     },
     "billing": {
       "title": "Төлбөр тооцоо",
-      "permissionDenied": "Зөвхөн байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер төлбөр тооцоог харах боломжтой.",
+      "permissionDenied": "Зөвхөн байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер төлбөр тооцоог харах боломжтой. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Захиалга",
       "state": "Төлөв",
       "stateNone": "Захиалга байхгүй",
@@ -3409,7 +3629,7 @@
       "manageOnWeb": "Вэб дээрх төлбөр тооцооны тохиргоо",
       "changePlan": "Төлөвлөгөө өөрчлөх",
       "buySeats": "Хэрэглэгчийн эрх авах",
-      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт вэб дээр удирдагддаг.",
+      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт kilo.ai дээр удирдагддаг.",
       "setupAutoTopUp": "Автомат цэнэглэлт тохируулах",
       "manageAutoTopUp": "Автомат цэнэглэлт удирдах",
       "opensOnWeb": "Вэб дээр нээгдэнэ"
@@ -3473,7 +3693,7 @@
       "noSeatsAvailable": "Бүх суудал ашиглагдаж байна. Нэмэлт гишүүн урихаасаа өмнө байгууллагын эзэмшигчээс суудал нэмэхийг хүснэ үү."
     },
     "invoices": {
-      "downloadA11y": "{{number}} нэхэмжлэхийг татах",
+      "downloadA11y": "{{number}} нэхэмжлэхийг татах, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Төлбөрийн мөчлөг бүрт нэхэмжлэх автоматаар үүснэ. Байгууллагад тань төлбөр нэхэмжилсний дараа энд харагдана.",
       "emptyTitle": "Нэхэмжлэх алга",
       "invoiceFallback": "Нэхэмжлэх",
@@ -3553,7 +3773,6 @@
       "usageDetails": "Хэрэглээний дэлгэрэнгүй",
       "providersAndModels": "Үйлчилгээ үзүүлэгч ба загварууд",
       "groups": "Бүлгүүд",
-      "guardrails": "Хамгаалалтын хязгаарлалт",
       "byok": "Өөрийн түлхүүрээ ашиглах",
       "ssoAndDomain": "SSO ба домэйн",
       "dataCollection": "Өгөгдөл цуглуулалт",
@@ -3568,7 +3787,7 @@
       "emptyDescription": "Өмнөх цаг товчийг ашиглан өмнөх хүсэлтүүдийг харна уу.",
       "emptyBoundDescription": "Хүсэлтийн бүртгэл үүнээс өмнөх хугацааг хамардаггүй.",
       "loadError": "Хүсэлтийн бүртгэлийг ачаалж чадсангүй.",
-      "permissionDenied": "Хүсэлтийн бүртгэлийг зөвхөн байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер харах боломжтой.",
+      "permissionDenied": "Хүсэлтийн бүртгэлийг зөвхөн байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер харах боломжтой. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} оролт · {{output}} гаралт",
       "byok": "BYOK"
     },
@@ -3591,13 +3810,14 @@
       "identifierLabel": "Танигч",
       "identifierRequired": "Танигч оруулна уу.",
       "identifierTaken": "Өөр горим энэ танигчийг аль хэдийн ашиглаж байна.",
+      "identifierTooLong": "Танигчийг {{max}} тэмдэгт эсвэл түүнээс бага байлгана уу.",
       "nameLabel": "Горимын нэр",
       "nameRequired": "Горимын нэр оруулна уу.",
       "notFound": "Энэ горим байхгүй болсон.",
-      "restrictionHint": "Зөвхөн энэ загварт тохирох файлыг засах боломжтой. Бүх файлыг зөвшөөрөхийн тулд хоосон орхино уу.",
-      "restrictionInvalid": "Хүчинтэй загвар оруулна уу.",
+      "restrictionHint": "Энэ горимд засах боломжтой файлыг тогтмол илэрхийлэл (regex) сонгоно, жишээ нь `\\.md$` нь зөвхөн markdown файлд. Бүх файлыг зөвшөөрөхийн тулд хоосон орхино уу.",
+      "restrictionInvalid": "Хүчинтэй тогтмол илэрхийлэл (regex) оруулна уу.",
       "restrictionLabel": "Хязгаарлалтын шошго",
-      "restrictionPattern": "Файлын загвар",
+      "restrictionPattern": "Файлын хязгаарлалт",
       "roleLabel": "Үүргийн тодорхойлолт",
       "roleRequired": "Энэ горим юу хийдгийг тайлбарлана уу.",
       "tool": {
@@ -3672,7 +3892,7 @@
     "signupStepUpApple": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithApple)' сонголтыг ашиглана уу.",
     "signupStepUpGoogle": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithGoogle)' сонголтыг ашиглана уу.",
     "signupStepUpBack": "Бүртгэл үүсгэж дуусгахын тулд буцаад '$t(login.moreSignInOptions)' сонголтыг ашиглана уу.",
-    "invalidCode": "Энэ код буруу эсвэл хугацаа нь дууссан байна. Дахин оролдох эсвэл '$t(login.resendCode)' товчийг ашиглана уу.",
+    "invalidCode": "Энэ код буруу эсвэл хугацаа нь дууссан байна. '$t(login.resendCode)' товчийг эсвэл '$t(login.moreSignInOptions)' товчийг ашиглана уу.",
     "codeInProgress": "Таны кодыг боловсруулж байна. Хэсэг хүлээгээд дахин оролдоно уу.",
     "tooManyAttempts": "Хэт олон удаа оролдсон байна. Шинэ код хүснэ үү.",
     "invalidToken": "Нэвтрэлт амжилтгүй боллоо. Дахин оролдоно уу.",
@@ -3681,7 +3901,7 @@
     "emailDeliveryFailed": "Имэйл илгээх боломж түр хаагдсан байна. Дараа дахин оролдоно уу.",
     "admissionRequired": "Таны төхөөрөмжийг баталгаажуулах боломжгүй. Өөр төхөөрөмжөөс эсвэл вэбээр нэвтрэхийн тулд '$t(login.moreSignInOptions)' сонголтыг ашиглана уу.",
     "default": "Алдаа гарлаа. Дахин оролдоно уу.",
-    "retryableAdmission": "Энэ төхөөрөмжийг баталгаажуулж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "retryableAdmission": "Энэ төхөөрөмжийг баталгаажуулж чадсангүй. Дахин оролдоно уу.",
     "startSignInFailed": "Нэвтрэлтийг эхлүүлж чадсангүй. Дахин оролдоно уу.",
     "couldNotOpenBrowser": "Хөтчийг нээж чадсангүй. Дахин оролдоно уу.",
     "signInTimedOut": "Нэвтрэлтийн хугацаа дууссан. Дахин оролдоно уу.",
@@ -3753,6 +3973,34 @@
     "nextScheduled": "Дараагийн товлол",
     "answerNeeded": "Хариу хүлээж байна",
     "waitingToRetry": "Дахин оролдохыг хүлээж байна",
+    "countNoun": {
+      "needsInput_one": "Хариу хүлээж байна",
+      "needsInput_other": "Хариу хүлээж байна",
+      "running_one": "Ажиллаж байна",
+      "running_other": "Ажиллаж байна",
+      "scheduled_one": "Товлосон",
+      "scheduled_other": "Товлосон",
+      "idle_one": "Хүлээж байна",
+      "idle_other": "Хүлээж байна"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Хариу хүлээж байна",
+      "needsInput_other": "{{displayCount}} Хариу хүлээж байна",
+      "running_one": "{{displayCount}} Ажиллаж байна",
+      "running_other": "{{displayCount}} Ажиллаж байна",
+      "scheduled_one": "{{displayCount}} Товлосон",
+      "scheduled_other": "{{displayCount}} Товлосон",
+      "idle_one": "{{displayCount}} Хүлээж байна",
+      "idle_other": "{{displayCount}} Хүлээж байна"
+    },
+    "footer": {
+      "checked": "Шалгасан {{time}}",
+      "lastKnown": "Сүүлд мэдэгдсэн · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Дараагийн ажиллах цаг {{time}}",
+      "wasDue": "Хүлээгдэж байсан {{time}}"
+    },
     "step": {
       "editing": "Засварлах",
       "reading": "Унших",
@@ -3809,7 +4057,10 @@
     "list": {
       "loadFailed": "Чат түүхийг ачаалж чадсангүй.",
       "new": "Шинэ чат",
-      "deleteTitle": "Энэ чатыг устгах уу?"
+      "deleteTitle": "Энэ чатыг устгах уу?",
+      "resetNoticeTitle": "Төхөөрөмж дээрх чат, ноорог устгагдлаа",
+      "resetNoticeBody": "Kilo энэ төхөөрөмж дээр хадгалсан чатуудыг нээж чадсангүй. Таны үүлэн сессүүдэд нөлөөлөөгүй.",
+      "resetNoticeDismiss": "Мэдэгдлийг хасах"
     },
     "rename": {
       "title": "Чатын нэрийг өөрчлөх",
@@ -3859,6 +4110,9 @@
       "fieldName": "Харагдах нэр",
       "fieldUrl": "Серверийн URL",
       "fieldUrlInvalid": "Хүчинтэй серверийн URL оруулна уу.",
+      "fieldUrlCredentials": "URL-аас хэрэглэгчийн нэр болон нууц үгийг устгана уу.",
+      "fieldUrlFragment": "URL-аас # хэсгийг устгана уу.",
+      "fieldUrlInsecure": "https URL оруулна уу, эсвэл зөвхөн localhost-д http ашиглана уу.",
       "duplicateUrl": "Энэ серверийн URL аль хэдийн хадгалагдсан байна.",
       "serverNotFound": "Энэ сервер цаашид хадгалагдаагүй байна.",
       "enableServer": "Энэ серверийг идэвхжүүлэх: {{name}}",
@@ -3884,6 +4138,7 @@
       "app": {
         "label": "Хэрэгслийн интерфейс",
         "failed": "Энэ хэрэгслийн интерфейсийг ачаалж чадсангүй.",
+        "tooLarge": "Энэ хэрэгслийн интерфейс {{size}} хязгаараас том байна.",
         "empty": "Энэ хэрэгслийн интерфейсэд үзүүлэх зүйл байхгүй."
       }
     },
@@ -3951,6 +4206,8 @@
       "discoveryNoModels": "Холболтын цэг ямар ч загвар жагсаагаагүй. Загваруудыг гараар оруулна уу.",
       "connectionIncomplete": "Загвар хариулт өгсөн боловч дуусгаагүй. Дахин оролдоно уу, эсвэл загварын ID болон протоколыг шалгана уу.",
       "invalidInput": "Үйлчилгээний серверийн нэр, хүчинтэй толгой талбарууд болон давхцахгүй ID, нэртэй дор хаяж нэг загвар оруулна уу. Токены хязгаарууд эерэг бүхэл тоо байх ёстой.",
+      "invalidApiKey": "API түлхүүрт илгээх боломжгүй тэмдэгт орсон байна. Зөвхөн үсэг, цифр, стандарт тэмдэгт ашиглана уу; мөр таслах тэмдэгт оруулж болохгүй.",
+      "invalidHeaders": "Өөрийн нэмсэн толгой талбарыг илгээх боломжгүй. Түүний нэрийг шалгаад зөвхөн үсэг, цифр, стандарт тэмдэгт ашиглана уу; мөр таслах тэмдэгт оруулж болохгүй.",
       "invalidUrl": "Нэвтрэх мэдээлэл, асуулгын параметр эсвэл фрагментгүй HTTP эсвэл HTTPS API-ийн үндсэн хаяг оруулна уу.",
       "publicHttp": "Нийтэд нээлттэй HTTP холболтын цэгүүдийг зөвшөөрөхгүй. HTTPS эсвэл хувийн дотоод сүлжээний холболтын цэг ашиглана уу.",
       "httpApprovalRequired": "Хадгалах эсвэл холбогдохын өмнө энэ дотоод сүлжээний HTTP холболтын цэгийг зөвшөөрнө үү.",
@@ -3998,7 +4255,9 @@
         "space": "Энэ загварт хангалттай чөлөөт зай байхгүй байна. Зайг чөлөөлөөд дахин оролдоно уу.",
         "network": "Таталт дуусаагүй. Холболтоо шалгаад дахин оролдоно уу.",
         "invalidFile": "Татагдсан файл нь энэ апп ажиллуулж чадах загвар биш тул устгагдсан.",
-        "checksum": "Татагдсан файл нь нийтлэгдсэн хяналтын нийлбэртэйгээ таарахгүй байгаа тул устгагдсан. Дахин татаж үзнэ үү."
+        "checksum": "Татагдсан файл нь нийтлэгдсэн хяналтын нийлбэртэйгээ таарахгүй байгаа тул устгагдсан. Дахин татаж үзнэ үү.",
+        "unreadable": "Энэ төхөөрөмж татагдсан файлыг шалгаж чадсангүй тул устгагдсан. Дахин татаж үзнэ үү.",
+        "writeFailed": "Энэ төхөөрөмж загварыг хадгалж чадсангүй. Дахин татаж үзнэ үү."
       }
     },
     "catalog": {
@@ -4083,7 +4342,15 @@
       "download": "Төхөөрөмж дээрх загварыг татах",
       "downloading": "Татаж байна…",
       "downloadProgress": "Татаж байна… {{percent}}%",
-      "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу."
+      "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу.",
+      "cannotUse": "Ажиллуулах боломжгүй: {{items}}.",
+      "cannotUseOptions": "Бөглөх боломжгүй: зарим багажны сонголт.",
+      "limitations": "Хязгаарлалт",
+      "tools": {
+        "time": "Цаг",
+        "settingsList": "Тохиргоог харуулах",
+        "settingsSet": "Тохиргоог өөрчлөх"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
@@ -4176,7 +4443,7 @@
     "personalDefaultDescription": "Хадгалах газарт бэхлэгдсэн профайл байхгүй үед автоматаар ачаалагдана.",
     "organizationDefaultDescription": "Хувийн өгөгдмөлгүй гишүүдэд автоматаар ачаалагдсан.",
     "setAsDefault": "Өгөгдмөл болгож тохируулах",
-    "saveFailed": "Профайлыг хадгалж чадсангүй",
+    "saveFailed": "Профайлыг хадгалж чадсангүй. Дахин оролдоно уу.",
     "organizationRoleRequired": "Зөвхөн байгууллагын эзэмшигч болон админ байгууллагын профайлуудыг өөрчлөх эрхтэй.",
     "deleteTitle": "Профайлыг устгах",
     "deleteMessage": "Энэ нь профайл болон түүний тохиргоог бүрмөсөн устгана. Үүнийг буцаах боломжгүй.",
@@ -4262,6 +4529,7 @@
     "instructionSaveFailed": "Зааврыг хадгалж чадсангүй",
     "instructionDeleteFailed": "Зааврыг устгаж чадсангүй",
     "instructionToggleFailed": "Зааврыг шинэчилж чадсангүй",
+    "instructionViewTitle": "Зааврын файл",
     "instructionLimitReached": "Профайлд хамгийн ихдээ {{max}} заавар байж болно. Өөр нэмэхийн тулд нэгийг устгана уу.",
     "mcp": {
       "title": "MCP серверүүд",
@@ -4325,6 +4593,7 @@
       "promptPlaceholder": "Та бол …",
       "tools": "Багаж хэрэгсэл",
       "wholeToolRule": "Энэ агент бүх багаж хэрэгсэлд нэг дүрмийг нэгэн зэрэг хэрэглэнэ: {{rule}}. Эдгээр унтраалга нь зөвхөн уншигдах боломжтой.",
+      "toolRule": "Хадгалагдсан дүрэм: {{rule}}",
       "visibility": "Харагдах байдал",
       "visibilityPrimary": "Үндсэн — сонгогч дээр харуулав",
       "visibilitySubagent": "Дэд агент — зөвхөн бусдаас дуудах боломжтой",
@@ -4431,22 +4700,48 @@
     "history": {
       "activityUnavailable": "Кредитийн гүйлгээг ачаалж чадсангүй.",
       "appStoreReceipt": "App Store-ын баримт",
+      "deduction": {
+        "adminCancel": "Админы хаасан үлдэгдэл",
+        "adminDebit": "Админы хасан кредит",
+        "codingPlan": "Кодлох багц: {{plan}}",
+        "correction": "Үлдэгдлийн залруулга",
+        "dispute": "Төлбөрийн маргаан",
+        "refundAppStore": "App Store-оос кредит багцын буцаан олголт",
+        "refundGooglePlay": "Google Play-оос кредит багцын буцаан олголт"
+      },
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
+      "expiredGrant": "Хугацаа нь дууссан: {{description}}",
+      "expiredStatus": "Хугацаа нь дууссан",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
         "adjustment": "Залруулга",
         "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
         "deduction": "Хасалт",
         "grant": "Кредит олголт",
+        "promotionalCredits": "Урамшууллын кредит",
+        "welcomeCredits": "Тавтай морилын кредит",
         "purchase": "Худалдан авалт"
+      },
+      "program": {
+        "adminBulkGrant": "Админы кредит олголт",
+        "contributorChampion": "Хувь нэмэр оруулагчийн аваргын кредит",
+        "feedback": "Санал хүсэлтийн кредит",
+        "influencer": "Инфлюенсер кредит",
+        "ossMonthlyReset": "Нээлттэй эхийн кредитийг сар бүр шинэчлэх",
+        "ossSponsorship": "Нээлттэй эхийн ивээн тэтгэлгийн кредит",
+        "pullRequest": "Нэгтгэх хүсэлтийн кредит",
+        "usageIssue": "Хэрэглээний асуудлын кредит",
+        "vibeDay": "Vibe Day кредит"
       },
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
-      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна."
+      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна.",
+      "voidedGrant": "Хүчингүй болгосон: {{description}}",
+      "voidedStatus": "Хүчингүй болгосон"
     },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
@@ -4590,6 +4885,7 @@
     "contextAll": "Бүх контекст",
     "dismiss": "Тоймыг хасах",
     "dismissFailed": "Тоймыг одоогоор хасаж чадсангүй. Арын дэвсгэрт дахин оролдоно.",
+    "readMarkFailed": "Энэ тоймыг уншсан гэж тэмдэглэж чадсангүй. Тойм дахин ачаалагдахад дахин оролдоно.",
     "offline": "Офлайн · хадгалсан тойм",
     "cached": "Хадгалсан тойм · шинэчлэх боломжгүй",
     "summary": "AI хураангуй",
@@ -4609,28 +4905,33 @@
     "morningEnd": "Тойм авах боломжтой эцсийн цаг",
     "timeHint": "Тоймын хугацаа дуусахад Нүүр картанд шууд төлөв офлайн байсан ч сэргэнэ.",
     "invalidSchedule": "Зөв цагийн бүс болон хоосон бус тоймын хугацааг сонгоно уу.",
+    "scheduleEmptyNight": "Тоймын хугацаа хоосон байна. Бэлэн болох цагийг тоймын хугацааны эхлэлээс хойш сонгоно уу.",
+    "scheduleEmptyMorning": "Бэлэн болох цаг болон тойм авах боломжтой эцсийн цаг давхцаж байна. Тойм хэр удаан авах боломжтой байхыг сонгоно уу.",
+    "scheduleFullDay": "Хоёр хугацаа бүтэн өдрийг хамарч байна. Өдрийн нэг хэсгийг тоймоос гадуур үлдээнэ үү.",
     "notificationsHint": "Товлосон тойм бүрт нэг ерөнхий мэдэгдэл ирнэ. Төлбөртэй AI хураангуйгаас хамаарахгүй.",
     "notificationPermission": "Тоймоо авахын тулд push мэдэгдлийг идэвхжүүлнэ үү.",
     "defaultModel": "Kilo-гийн үндсэн загварыг ашиглах",
     "duration": "Цагийн хязгаар (минут)",
     "spendLimit": "Зарцуулалтын хязгаар (USD)",
-    "invalidSafeguards": "Эерэг, хязгаартай цаг болон зарцуулалтын хязгаар оруулна уу.",
+    "invalidSafeguards": "Зөвшөөрөгдсөн хүрээнд эерэг тоо оруулна уу.",
     "estimate": "Тооцоо {{estimate}} · дээд хязгаар {{maximum}}",
     "estimateUnavailable": "Эдгээр тохиргоонд төлбөрт хураангуй боломжгүй. Загварыг эсвэл хязгааруудыг өөрчлөөд, эсвэл дараа дахин оролдоно уу.",
     "confirmPaid": "{{context}}-д төлбөртэй хураангуйг идэвхжүүлэх үү?",
+    "paidDisclosure_one": "Тооцоолсноор {{estimate}}, дээд тал нь {{maximum}}, {{minutes}} минутын хязгаартай. Үүсгэлт амжилтгүй болсон ч төлбөр гарна.",
     "paidDisclosure": "Тооцоолсноор {{estimate}}, дээд тал нь {{maximum}}, {{minutes}} минутын хязгаартай. Үүсгэлт амжилтгүй болсон ч төлбөр гарна.",
+    "paidDisclosure_other": "Тооцоолсноор {{estimate}}, дээд тал нь {{maximum}}, {{minutes}} минутын хязгаартай. Үүсгэлт амжилтгүй болсон ч төлбөр гарна.",
     "enable": "Төлбөртэй хураангуйг идэвхжүүлэх",
     "allContexts": "Хувийн болон байгууллагын тоймууд тусдаа хадгалагдана.",
     "emptyHistory": "Хадгалсан тойм алга",
-    "estimatePermissionUnavailable": "Та энэ контекстийн үлдэгдлийг ашиглах эрхгүй. Идэвхжүүлэхийг байгууллагын эзнээс хүснэ үү.",
+    "estimatePermissionUnavailable": "Та энэ контекстийн үлдэгдлийг ашиглах эрхгүй. Идэвхжүүлэхийг байгууллагын эзэмшигчээс хүснэ үү.",
     "estimatePricingUnavailable": "Энэ загварын үнийн мэдээлэл байхгүй. Өөр загвар сонгоно уу.",
     "estimateBalanceUnavailable": "Төлбөрт хураангуй авахад үлдэгдэл хүрэлцэхгүй байна. Энэ контекстийн үлдэгдэлд кредит нэмнэ үү.",
     "estimateModelNotAllowed": "Энэ загварыг энэ контекст дотор ашиглах боломжгүй. Өөр загвар сонгоно уу.",
     "estimateSpendLimitTooLow": "Энэ хураангуйг зөвшөөрөхийн тулд зарцуулалтын хязгаарыг нэмэгдүүлнэ үү.",
     "saved": "Тоймын тохиргоог хадгаллаа",
     "selectedSessions": "Сонгосон сессүүд",
-    "snapshotPullRequests": "Сонгосон сессүүдийн PRs",
-    "snapshotBlockers": "Сонгосон сессүүдийн саад",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Саад",
     "capturedAt": "{{time}} хадгалсан",
     "snapshotHint": "Өглөөний товлосон цагт боломжит мэдээлэлд тулгуурлан сессийн хамгийн сүүлийн төлөвийг хадгалсан тойм. Тоонууд нь шөнийн бүх үйл ажиллагааг бус, сонгосон сессүүдийг илэрхийлнэ.",
     "snapshotTruncated": "Тоймын хэмжээг хязгаарлахын тулд зарим сесс эсвэл нотолгоог оруулаагүй.",
@@ -4661,7 +4962,7 @@
     "sourceActivity": "Гарчиггүй үйл ажиллагаа",
     "metadataFailureProvider": "үйлчилгээ үзүүлэгчийн алдаа",
     "metadataFailureTool": "хэрэгслийн алдаа",
-    "metadataFailureCancelled": "Цуцлагдсан",
+    "metadataStopped": "Сүүлийн ээлж зогссон",
     "metadataFailureOther": "тодорхойгүй алдаа"
   },
   "systemSearch": {
@@ -4669,6 +4970,7 @@
   },
   "usage": {
     "title": "Ашиглалт",
+    "personalTitle": "Хувийн ашиглалт",
     "orgTitle": "Байгууллагын ашиглалт",
     "entrySubtitle": "Зардал, хүсэлт, токен",
     "rangePicker": "Хугацааны муж",
@@ -4682,7 +4984,8 @@
     "unavailableTitle": "Ашиглалт боломжгүй",
     "unavailableDescription": "Энэ ажлын талбарт ашиглалт тохируулагдаагүй байна. Хэрэв энд ашиглалт харагдах ёстой гэж үзвэл тусламжийн багтай холбогдоно уу.",
     "orgSelfNotice": "Та энэ байгууллага дахь өөрийн ашиглалтыг харж байна.",
-    "viewDetails": "Ашиглалтын дэлгэрэнгүйг харах"
+    "viewDetails": "Ашиглалтын дэлгэрэнгүйг харах",
+    "orgSelfEntryTitle": "Таны ашиглалт"
   },
   "integrations": {
     "title": "Интеграцууд",
@@ -4695,12 +4998,14 @@
     "connectedTo": "Холбогдсон: {{account}}",
     "disconnected": "{{provider}} холболтыг салгалаа",
     "disconnectFailed": "{{provider}} холболтыг салгаж чадсангүй",
+    "disconnectRetry": "Slack холболтын салгалтыг баталгаажуулж чадсангүй. Дахин оролдоно уу.",
+    "disconnectNeedsSupport": "Kilo энэ холболтод хадгалагдсан Slack хандалтыг уншиж чадсангүй. Салгалтыг дуусгахын тулд тусламжийн багтай холбогдоно уу.",
     "couldNotLoad": "Интеграцуудыг ачаалж чадсангүй",
     "permissionDenied": "Танд эдгээр интеграцыг удирдах эрх байхгүй байна.",
     "managedByOwner": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигчээс хүснэ үү.",
     "managedByOwnerOrAdmin": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч эсвэл админаас хүснэ үү.",
     "managedByOwnerOrBilling": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч эсвэл төлбөрийн менежерээс хүснэ үү.",
-    "managedByOwnerAdminOrBilling": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч, админ эсвэл төлбөрийн менеджерээс хүснэ үү.",
+    "managedByOwnerAdminOrBilling": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерээс хүснэ үү.",
     "connectFailed": "Холболтын хуудсыг нээж чадсангүй"
   },
   "invoices": {
@@ -4776,10 +5081,15 @@
       "autoCommit": "Ажиллуулалт дуусахад өөрчлөлтийг коммитлох",
       "condenseOnComplete": "Ажиллуулалт дуусахад контекстийг нягтруулах",
       "activeTitle": "Триггер идэвхтэй",
+      "activeSwitchA11y": "Идэвхтэй триггер: {{name}}",
+      "copyLinkA11y": "{{name}} триггерийн холбоосыг хуулах",
       "activeDescription": "Түр зогссон вебхукууд 404 хариу өгнө.",
       "runAsCreator": "Миний нэрээр ажиллуулах",
       "runAsCreatorDescription": "Ажиллуулалт бүр таны бүртгэлийг ашигладаг тул нууц толгой шаардлагатай.",
       "saveFailedTitle": "Триггерийг хадгалж чадсангүй",
+      "nameTaken": "\"{{name}}\" нэртэй триггер аль хэдийн байна.",
+      "saveFailedRetry": "Серверт холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "saveFailedCheck": "Маягтын утгуудыг шалгаад дахин оролдоно уу.",
       "deleteTitle": "Энэ триггерийг устгах уу?",
       "deleteMessage": "{{name}} руу хийх дуудлагууд амжилтгүй болно. Үүнийг буцаах боломжгүй.",
       "deleteMessageScheduled": "{{name}} триггерийн товлосон ажиллуулалтууд зогсоно. Үүнийг буцаах боломжгүй.",
@@ -4849,7 +5159,7 @@
   },
   "organizationGuardrails": {
     "title": "Хиймэл оюуны хамгаалалтын хашлага",
-    "permissionDenied": "Зөвхөн байгууллагын эзэд болон администраторууд Хиймэл оюуны хамгаалалтын хашлагыг удирдаж болно. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Зөвхөн байгууллагын эзэмшигч болон админ Хиймэл оюуны хамгаалалтын хашлагыг удирдаж болно. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Хиймэл оюуны хамгаалалтын хашлага идэвхжээгүй байна",
     "unavailable": "Kilo нь байгууллагын хүсэлтээр Хиймэл оюуны хамгаалалтын хашлагыг идэвхжүүлдэг. {{supportEmail}} хаягаар холбогдоно уу, Kilo баг түүнийг танай байгууллагын хувьд асаана.",
     "contactSupport": "Тусламжийн багтай холбогдох",
@@ -4991,7 +5301,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Аж ахуйн нэгжийн боломж",
     "enterpriseOnly": "Нийлүүлэгчид болон загварууд Enterprise төлөвлөгөөнд боломжтой.",
-    "readOnly": "Зөвхөн байгууллагын эзэд болон администраторууд эдгээр тохиргоог өөрчилж болно.",
+    "readOnly": "Зөвхөн байгууллагын эзэмшигч болон админ эдгээр тохиргоог өөрчилж болно.",
     "loadError": "Нийлүүлэгчид болон загваруудыг ачаалж чадсангүй",
     "tabModels": "Загварууд",
     "tabProviders": "Нийлүүлэгчид",
@@ -5024,6 +5334,20 @@
       "eu": "Европын Холбоо",
       "au": "Австрали",
       "jp": "Япон"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Тохиргоо хайх",
+    "noMatches": "Тохирох тохиргоо олдсонгүй",
+    "emptyDescription": "Өөр тохиргооны нэр эсвэл түлхүүр үгээр хайж үзнэ үү.",
+    "resultsStatus": "Олдсон тохиргоо: {{resultCount}}",
+    "keywords": {
+      "signOut": "гарах|бүртгэлээс гарах",
+      "appearance": "загвар|өнгөний схем|бараан горим",
+      "appUnlock": "биометр|царай таних|хурууны хээ",
+      "language": "хэл|орчуулга",
+      "notifications": "мэдэгдэл|сануулга",
+      "privacy": "дүн шинжилгээ|мөрдөх|нууцлал"
     }
   }
 }

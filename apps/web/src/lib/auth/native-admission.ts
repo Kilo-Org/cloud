@@ -1,7 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { captureMessage } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
@@ -16,68 +15,30 @@ import type { AppleAttestError } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import type { PlayIntegrityDiagnostics, PlayIntegrityError } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  countAdmissionCondition,
+  reportAdmissionRefusalOnce,
+  rollAdmissionWindowIfNeeded,
+} from './native-admission-counters';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
-/**
- * Interval-aggregated counter for expected, traffic-scaled admission
- * conditions (legacy clients, malformed shapes). Emits one structured log
- * line per 60 s window carrying the count observed in that window instead of
- * one event per request, so rollout traffic cannot flood telemetry. The
- * window start is carried on each line so a burst after a traffic pause is
- * attributed to the window it was counted in.
- */
-const AGGREGATE_INTERVAL_MS = 60_000;
-const admissionCounters = new Map<string, number>();
-let admissionCountersWindowStart = 0;
-
-function flushAdmissionCounters(now: number): void {
-  if (admissionCounters.size === 0) return;
-  for (const [metric, count] of admissionCounters) {
-    warnExceptInTest(
-      JSON.stringify({
-        event: 'native_admission_aggregate',
-        metric,
-        count,
-        intervalMs: AGGREGATE_INTERVAL_MS,
-        // Window the counts were accumulated in, not the flush time.
-        windowStart: new Date(admissionCountersWindowStart).toISOString(),
-        at: new Date(now).toISOString(),
-      })
-    );
-  }
-  admissionCounters.clear();
-}
+export {
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
+  rollAdmissionWindowIfNeeded,
+} from './native-admission-counters';
 
 /**
- * Roll the window forward when it has elapsed. Called on every admission
- * check, so the window closes on any later traffic rather than only when
- * another counted condition arrives — the last window of a sparse traffic
- * pattern is not silently dropped.
+ * Counts one cross-user attested-key collision and sends the throttled
+ * per-event report. Every route that catches `KeyCollisionError` calls this:
+ * the count keeps the per-window volume, while the throttled report survives
+ * an aggregate window this instance never closes.
  */
-function rollAdmissionWindowIfNeeded(now: number): void {
-  if (now - admissionCountersWindowStart >= AGGREGATE_INTERVAL_MS) {
-    flushAdmissionCounters(now);
-    admissionCountersWindowStart = now;
-  }
-}
-
-/**
- * Count an expected, traffic-scaled admission outcome. Refusals are the normal
- * shape of hostile traffic, so they aggregate per window instead of emitting
- * one event each. Unexpected provider faults keep their per-event message.
- */
-export function countAdmissionCondition(metric: string): void {
-  const now = Date.now();
-  rollAdmissionWindowIfNeeded(now);
-  admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
-}
-
-/** Exported for tests: flush any pending counters and reset the interval. */
-export function resetAdmissionCountersForTests(): void {
-  admissionCounters.clear();
-  admissionCountersWindowStart = 0;
+export function reportAttestedKeyCollision(): void {
+  countAdmissionCondition('native_attested_key_cross_user_collision');
+  countAdmissionCondition('native_admission_refused');
+  reportAdmissionRefusalOnce('native_attested_key_cross_user_collision');
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -260,8 +221,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
 export function requireAdmissionPayload(
   body: Record<string, unknown>
 ): AdmissionPayload | undefined {
-  // Roll the telemetry window on any native auth request, so the final window
-  // of a sparse traffic pattern still flushes.
   rollAdmissionWindowIfNeeded(Date.now());
 
   const result = classifyAdmissionPayload(body['admission']);
@@ -350,11 +309,18 @@ export type AdmissionRefusalDetail = {
   android?: PlayIntegrityDiagnostics;
 };
 
+/** The one refusal code an admission verifier returns. */
+export const ADMISSION_REQUIRED = 'ADMISSION_REQUIRED' as const;
+
 /**
  * A refused admission proof. `recovery` is set only for the unknown-key case
  * above; every other refusal leaves it undefined so the wire response stays
  * exactly what it was. `detail` is for telemetry only and never serialized to
  * the client.
+ *
+ * `errorCode` stays `string` rather than the literal above: the route writes it
+ * straight into the response body, and a caller that branches on it must keep
+ * accepting a code this module did not name.
  */
 export type AdmissionRefusal = {
   ok: false;
@@ -363,21 +329,6 @@ export type AdmissionRefusal = {
   detail: AdmissionRefusalDetail;
 };
 
-/**
- * Perform full async admission verification BEFORE user settlement.
- *
- * Must be called before createOrUpdateUser in the token route so that:
- * - Failed admission never leaves a settled user.
- * - Keys are written after the user id exists (via the token route after
- *   successful settlement).
- *
- * Atomically consumes the challenge, so a caller that retries a refusal must
- * fetch a fresh challenge. On provider infrastructure errors, throws so the
- * caller can surface a 5xx.
- *
- * Returns the key data to persist after settlement, or a refusal carrying the
- * recovery hint when the client may produce a new proof.
- */
 export type VerifyAdmissionOk = {
   ok: true;
   /** Platform that verified */
@@ -398,6 +349,21 @@ export type VerifyAdmissionOk = {
   existingKeyUserId?: string;
 };
 
+/**
+ * Perform full async admission verification BEFORE user settlement.
+ *
+ * Must be called before createOrUpdateUser in the token route so that:
+ * - Failed admission never leaves a settled user.
+ * - Keys are written after the user id exists (via the token route after
+ *   successful settlement).
+ *
+ * Atomically consumes the challenge, so a caller that retries a refusal must
+ * fetch a fresh challenge. On provider infrastructure errors, throws so the
+ * caller can surface a 5xx.
+ *
+ * Returns the key data to persist after settlement, or a refusal carrying the
+ * recovery hint when the client may produce a new proof.
+ */
 export async function verifyAdmissionAsync(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | AdmissionRefusal> {
@@ -418,7 +384,7 @@ export async function verifyAdmissionAsync(
   if (!consumed) {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'challenge_unknown_or_expired',
         source: 'challenge',
@@ -482,7 +448,7 @@ async function verifyAppleAdmission(
   if (!keyId) {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'key_id_missing',
         source: 'apple',
@@ -497,10 +463,12 @@ async function verifyAppleAdmission(
     const result = await verifyAppleAttestation(payload, challenge, keyId);
 
     if (!result.ok) {
-      captureMessage(`apple_attestation_failed: ${result.error}`);
+      // The error is a fixed server-side enum, so the per-cause metric stays
+      // bounded — one metric per reason, like the Play Integrity counters.
+      countAdmissionCondition(`apple_attestation_failed:${result.error}`);
       return {
         ok: false,
-        errorCode: 'ADMISSION_REQUIRED',
+        errorCode: ADMISSION_REQUIRED,
         detail: {
           reason: ATTESTATION_REFUSAL_REASONS[result.error],
           source: 'apple',
@@ -533,10 +501,10 @@ async function verifyAppleAdmission(
     // client can drop that id and attest a new key once. No other refusal gets
     // this hint, and the assertion itself was never verified, so nothing here
     // is weakened by telling the client to re-attest.
-    captureMessage('apple_assertion_unknown_key');
+    countAdmissionCondition('apple_assertion_unknown_key');
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
       detail: {
         reason: 'assertion_key_unknown',
@@ -557,10 +525,10 @@ async function verifyAppleAdmission(
   );
 
   if (!assertionResult.ok) {
-    captureMessage(`apple_assertion_failed: ${assertionResult.error}`);
+    countAdmissionCondition(`apple_assertion_failed:${assertionResult.error}`);
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'assertion_invalid',
         source: 'apple',
@@ -589,16 +557,10 @@ async function verifyAppleAdmission(
     .returning({ key_id: native_attested_keys.key_id });
 
   if (!updatedKey) {
-    // The update matched zero rows, so the assertion is stale or replayed.
-    // Report only the asserted count: `existingKey.sign_count` is the pre-read
-    // value and may have been advanced by a concurrent assertion, so it must
-    // not be presented as the current database count.
-    captureMessage(
-      `apple_assertion_stale_or_replayed: asserted ${assertionResult.signCount} rejected`
-    );
+    countAdmissionCondition('apple_assertion_stale_or_replayed');
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'assertion_stale_or_replayed',
         source: 'apple',
@@ -641,7 +603,7 @@ async function verifyAndroidAdmission(
   if (kind !== 'assertion') {
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: 'integrity_kind_unsupported',
         source: 'play_integrity',
@@ -652,14 +614,15 @@ async function verifyAndroidAdmission(
   }
 
   // verifyPlayIntegrity throws on infrastructure faults — caller must
-  // catch and surface as 5xx.
+  // catch and surface as 5xx. Every refusal verdict it returns is counted
+  // there on its own reason metric, so the admission layer adds no second
+  // count: each counted refusal is reported exactly once.
   const result = await verifyPlayIntegrity(payload, challenge);
 
   if (!result.ok) {
-    captureMessage(`play_integrity_failed: ${result.error}`);
     return {
       ok: false,
-      errorCode: 'ADMISSION_REQUIRED',
+      errorCode: ADMISSION_REQUIRED,
       detail: {
         reason: INTEGRITY_REFUSAL_REASONS[result.error],
         source: 'play_integrity',
@@ -695,7 +658,6 @@ export async function persistAttestedKey(
   verification: VerifyAdmissionOk,
   executor: typeof db | DrizzleTransaction = db
 ): Promise<void> {
-  // Android has no persistent key tracking — skip.
   if (verification.platform === 'android') return;
 
   // A result without a key id has nothing to persist. Every verifier that
@@ -721,7 +683,9 @@ export async function persistAttestedKey(
     const inserted = await findAttestedKey(executor, keyId, verification.platform);
 
     if (!inserted || inserted.kilo_user_id !== userId) {
-      captureMessage('native_attested_key_cross_user_collision');
+      // The caller is the single reporting point: the route that catches this
+      // error counts the refusal and sends one throttled per-event report
+      // through reportAttestedKeyCollision, so reporting here would duplicate it.
       throw new KeyCollisionError();
     }
   } else if (verification.signCount !== undefined) {

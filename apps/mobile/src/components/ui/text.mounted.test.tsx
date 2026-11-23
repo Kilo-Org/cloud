@@ -247,6 +247,24 @@ describe('Text eyebrow letterspacing', () => {
     }
   });
 
+  // The mono family goes for every script it cannot draw, not only the
+  // right-to-left ones: Devanagari and Thai are joined scripts, so the fallback
+  // that draws them sets each cluster glyph by glyph. The reset holds for them
+  // in an LTR interface as well (`containsJoinedScript`); the eyebrow keeps its
+  // Latin display class there and the reset draws the tracking inert.
+  it.each([
+    ['Devanagari', 'अभी'],
+    ['Thai', 'ตอนนี้'],
+  ])('drops the mono family from a %s eyebrow in an LTR interface', (_name, label) => {
+    i18nManager.isRTL = false;
+    const node = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, label)));
+    const classes = String(node.props.className).split(' ');
+
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
+    expect(classes).toEqual(expect.arrayContaining(['text-[10px]', 'text-muted-foreground']));
+    expect(ownStyles(node)).toContainEqual({ letterSpacing: 0 });
+  });
+
   it('leaves a non-eyebrow variant untouched in either direction', () => {
     i18nManager.isRTL = true;
     const classes = hostClasses(mountTextTree(createElement(Text, null, 'Live now')));

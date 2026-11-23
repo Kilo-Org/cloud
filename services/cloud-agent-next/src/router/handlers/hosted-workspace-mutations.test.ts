@@ -87,7 +87,7 @@ const validCreate = {
   repository: { type: 'github', repo: 'Kilo-Org/cloud', branch: 'main' },
   message: { prompt: 'Start the workspace' },
   agent: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
-};
+} as const;
 
 describe('hosted workspace mutation inputs', () => {
   it('registers the new mutations on the app router', () => {
@@ -360,6 +360,201 @@ describe('createHostedWorkspace profile preflight', () => {
     expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
     expect(mocks.admitOperation).not.toHaveBeenCalled();
   });
+});
+
+describe('hosted workspace organization repositories', () => {
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+  const integrationId = '22222222-2222-4222-8222-222222222222';
+  const scope = { organizationId, integrationId, primaryRepo: 'Kilo-Org/cloud' };
+  const primary = { id: 1, fullName: scope.primaryRepo };
+  const second = { id: 2, fullName: 'Kilo-Org/second' };
+  const third = { id: 3, fullName: 'Kilo-Org/third' };
+  const { message: _message, ...emptyCreate } = validCreate;
+  const orgCreate = {
+    ...emptyCreate,
+    repository: { ...emptyCreate.repository, githubIntegrationId: integrationId },
+    options: { kilocodeOrganizationId: organizationId },
+  };
+  const list = vi.fn();
+  const resolve = vi.fn();
+  const context = {
+    userId: 'usr_test',
+    authToken: 'test-token',
+    request: new Request('https://fixture.invalid/trpc'),
+    env: {
+      GIT_TOKEN_SERVICE: {
+        listHostedWorkspaceGitHubRepositories: list,
+        resolveHostedWorkspaceGitHubRepositories: resolve,
+      },
+    },
+  } as unknown as TRPCContext;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getPgDb.mockReturnValue(sequenceDb([{ id: 'member' }], [{ worktreeId: workspaceId }]));
+    mocks.createSessionWithLedger.mockResolvedValue({ cloudAgentSessionId, kiloSessionId });
+    mocks.getBuiltinAgentSettings.mockResolvedValue({});
+    mocks.getModelContextLimits.mockResolvedValue({});
+    mocks.getWebSearchPreference.mockResolvedValue('default');
+    resolve.mockResolvedValue({ success: true, primary, additional: [third, second] });
+  });
+
+  it('returns a passive page of safe repository fields and capability version', async () => {
+    list.mockResolvedValue({
+      success: true,
+      repositories: [{ ...second, private: true, ignoredUpstreamField: 'not public' }],
+      nextPage: 3,
+    });
+    await expect(
+      appRouter.createCaller(context).listHostedWorkspaceRepositories({ ...scope, page: 2 })
+    ).resolves.toEqual({
+      hostedAdditionalRepositoriesVersion: 1,
+      repositories: [{ ...second, private: true }],
+      nextPage: 3,
+    });
+    expect(list).toHaveBeenCalledExactlyOnceWith({ ...scope, page: 2, userId: context.userId });
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('does not query the installation when organization membership was revoked', async () => {
+    mocks.getPgDb.mockReturnValue(sequenceDb([]));
+    await expect(
+      appRouter.createCaller(context).listHostedWorkspaceRepositories(scope)
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(list).not.toHaveBeenCalled();
+    await expect(
+      appRouter
+        .createCaller(context)
+        .createHostedWorkspace({ ...orgCreate, additionalRepositoryIds: [2] })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(resolve).not.toHaveBeenCalled();
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('passes the authorized sorted manifest to promptless registration with unchanged billing', async () => {
+    await expect(
+      appRouter
+        .createCaller(context)
+        .createHostedWorkspace({ ...orgCreate, additionalRepositoryIds: [3, 2] })
+    ).resolves.toEqual({ workspaceId, cloudAgentSessionId, kiloSessionId });
+    expect(resolve).toHaveBeenCalledExactlyOnceWith({
+      ...scope,
+      userId: context.userId,
+      additionalRepositoryIds: [2, 3],
+    });
+    expect(mocks.createSessionWithLedger).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        hostedGitHubRepositories: { integrationId, primary, additional: [second, third] },
+        repository: expect.objectContaining({ branch: 'main' }),
+      }),
+      expect.anything(),
+      expect.objectContaining({ billingOrigin: 'agent-manager', includeInitialMessage: false })
+    );
+    expect(mocks.loadEnvironmentForSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps an empty selection on the original organization path', async () => {
+    await expect(
+      appRouter
+        .createCaller(context)
+        .createHostedWorkspace({ ...orgCreate, additionalRepositoryIds: [] })
+    ).resolves.toEqual({ workspaceId, cloudAgentSessionId, kiloSessionId });
+    expect(resolve).not.toHaveBeenCalled();
+    expect(mocks.createSessionWithLedger.mock.calls[0]?.[0]).not.toHaveProperty(
+      'hostedGitHubRepositories'
+    );
+  });
+
+  it.each([{ ids: [0] }, { ids: [1.5] }, { ids: [2, 2] }, { ids: [2, 3, 4, 5, 6, 7] }])(
+    'rejects invalid, duplicate or unbounded IDs before repository lookup ($ids)',
+    async ({ ids }) => {
+      await expect(
+        appRouter
+          .createCaller(context)
+          .createHostedWorkspace({ ...orgCreate, additionalRepositoryIds: ids })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(resolve).not.toHaveBeenCalled();
+      expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not try to resolve a personal or unpinned selection', async () => {
+    await expect(
+      appRouter.createCaller(context).createHostedWorkspace({
+        ...emptyCreate,
+        additionalRepositoryIds: [2],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'hosted_workspace_repository_scope_required',
+    });
+    expect(resolve).not.toHaveBeenCalled();
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['access_denied', 'FORBIDDEN', 'hosted_workspace_repository_access_denied'],
+    ['repository_unavailable', 'NOT_FOUND', 'hosted_workspace_repository_unavailable'],
+    [
+      'temporarily_unavailable',
+      'SERVICE_UNAVAILABLE',
+      'hosted_workspace_repository_catalog_unavailable',
+    ],
+  ])('rejects %s without partial registration', async (reason, code, message) => {
+    resolve.mockResolvedValue({ success: false, reason });
+    await expect(
+      appRouter.createCaller(context).createHostedWorkspace({
+        ...orgCreate,
+        additionalRepositoryIds: [2],
+      })
+    ).rejects.toMatchObject({ code, message });
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the deployed broker cannot resolve the selection', async () => {
+    resolve.mockRejectedValue(new Error('internal broker detail'));
+    await expect(
+      appRouter.createCaller(context).createHostedWorkspace({
+        ...orgCreate,
+        additionalRepositoryIds: [2],
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'hosted_workspace_repository_catalog_unavailable',
+    });
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('rejects selecting the primary repository by its stable ID', async () => {
+    resolve.mockResolvedValue({ success: true, primary, additional: [primary] });
+    await expect(
+      appRouter.createCaller(context).createHostedWorkspace({
+        ...orgCreate,
+        additionalRepositoryIds: [primary.id],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'hosted_workspace_repository_duplicate',
+    });
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+  });
+
+  it.each(['Kilo-Org/CLOUD', 'Kilo-Org/.git'])(
+    'rejects an unsafe or colliding checkout directory (%s)',
+    async fullName => {
+      resolve.mockResolvedValue({ success: true, primary, additional: [{ id: 2, fullName }] });
+      await expect(
+        appRouter.createCaller(context).createHostedWorkspace({
+          ...orgCreate,
+          additionalRepositoryIds: [2],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'hosted_workspace_repository_path_conflict',
+      });
+      expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+    }
+  );
 });
 
 const RECONCILE_READY_ROW = {

@@ -3,8 +3,15 @@ import { type ComponentProps, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
-import { ROW_FRAME_CONTENT_PRESS_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ROW_FRAME_CONTENT_DP,
+  ROW_FRAME_CONTENT_PRESS_CLASS,
+  ROW_TARGET_CLASS,
+  rowTargetHostClass,
+  textActionTargetDp,
+} from '@/lib/a11y/tap-target';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
 
@@ -79,6 +86,14 @@ describe('RowFrame geometry', () => {
     expect(ROW_FRAME_CLASS.split(' ')).toEqual(
       expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3'])
     );
+  });
+
+  it('derives the row’s content band from its frame and padding', async () => {
+    // `ROW_FRAME_CONTENT_DP` is what a placeholder and an overhang cancel
+    // derive from, so it has to equal the compiled frame less the compiled
+    // padding the row renders, not a hand-counted 27.
+    const frame = await compiledLengthDp(ROW_FRAME_CLASS, 'minHeight');
+    expect(frame - 2 * (await compiledLengthDp('py-3', 'paddingBlock'))).toBe(ROW_FRAME_CONTENT_DP);
   });
 
   it('gives a static row no pressable and no interactive state', () => {
@@ -187,9 +202,6 @@ describe('RowFrame interaction', () => {
     const content = pressableOf(root);
 
     expect(classesOf(frame)).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
-    // One focus stop per row: the switch. A focusable `Pressable` keeps its
-    // native click listener, so Android exposed the label as a second,
-    // role-less clickable node, and iOS read the title and subtitle on their own.
     expect(content.props.accessible).toBe(false);
     expect(content.props.focusable).toBe(false);
     expect(content.props.importantForAccessibility).toBe('no-hide-descendants');
@@ -206,6 +218,71 @@ describe('RowFrame interaction', () => {
     // The switch is the frame's child, not a child of the content press.
     expect(content.findAllByType('Switch' as never)).toHaveLength(0);
     expect(root.findAllByType('Switch' as never)).toHaveLength(1);
+  });
+});
+
+describe('RowFrame trailing cell', () => {
+  /** The trailing cell a test passed, found by its own test handle. */
+  function trailingCell(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(node => Object.is(node.type, 'View') && node.props.testID === 'trail-cell');
+  }
+
+  const targetCell = createElement('View', { testID: 'trail-cell' });
+
+  it('hosts a target-sized trailing control at the target when stacked', async () => {
+    // Stacked, the line lays its cells out on the row's 27pt content band, and
+    // Android delivers a touch only inside every ancestor view: a plain wrapper
+    // would hand the platform target's control a 27pt delivered area while a
+    // control-size audit still read the control's own 44/48pt rect.
+    const root = renderFrame({
+      title: 'GitHub',
+      stack: true,
+      trailing: { kind: 'node', target: true, node: targetCell },
+    });
+    const host = trailingCell(root).parent as TestRenderer.ReactTestInstance;
+    const classes = classesOf(host);
+
+    expect(classes).toEqual(expect.arrayContaining(rowTargetHostClass().split(' ')));
+    expect(classes).toContain('shrink-0');
+    // The host's own box is the platform target, not the 27pt band the line
+    // lays it out on. It does not cancel the overhang: it is the ancestor the
+    // platform measures, so its layout box must be the target, not the row's
+    // 27pt band — a cancelling margin would shrink it back and reintroduce the
+    // clipping.
+    const declarations = (await compiledDimensions(host.props.className as string)) as {
+      minHeight?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { minHeight: number };
+    expect(box.minHeight).toBe(textActionTargetDp());
+    expect(classes.some(name => /^-my-|^my-/.test(name))).toBe(false);
+  });
+
+  it('keeps the plain wrapper for a stacked node that is not a target', () => {
+    // A node that is not a control takes the row's own band; a host at the
+    // target would grow the line it sits on.
+    const root = renderFrame({
+      title: 'GitHub',
+      stack: true,
+      trailing: { kind: 'node', node: targetCell },
+    });
+
+    expect(classesOf(trailingCell(root).parent as TestRenderer.ReactTestInstance)).toEqual([
+      'shrink-0',
+    ]);
+  });
+
+  it('keeps a flat frame’s trailing node a direct child with no host', () => {
+    // Flat, the control overhangs the frame's own `py-3` padding inside the
+    // row's bounds, so it needs no host; a wrapper here would add a node to
+    // every row that had none.
+    const root = renderFrame({
+      title: 'GitHub',
+      trailing: { kind: 'node', target: true, node: targetCell },
+    });
+    const row = trailingCell(root).parent as TestRenderer.ReactTestInstance;
+
+    expect(classesOf(row)).toEqual(expect.arrayContaining(ROW_FRAME_CLASS.split(' ')));
+    expect(root.findAll(node => classesOf(node).includes('shrink-0'))).toHaveLength(0);
   });
 });
 

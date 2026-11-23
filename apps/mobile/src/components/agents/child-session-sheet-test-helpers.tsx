@@ -173,11 +173,30 @@ export const readyState: ChildSessionHydrationState = {
   olderError: null,
   omittedItemCount: 0,
 };
-// A transient hydration failure: the SDK's `formatError` wording for a
-// connection drop, which the sheet classifies as retryable.
+// A transient hydration failure with no typed kind: the SDK's `formatError`
+// wording for a connection drop, which the sheet classifies as retryable.
 export const errorState: ChildSessionHydrationState = {
   status: 'error',
+  kind: null,
   message: 'Connection lost. Please retry in a moment.',
+};
+// The typed failures of the paged first-page read. A retryable failure names
+// the outage and keeps its Retry; the two terminal kinds state what cannot be
+// read and never offer one.
+export const retryableState: ChildSessionHydrationState = {
+  status: 'error',
+  kind: 'retryable_failure',
+  message: 'Session history temporarily unavailable',
+};
+export const tooLargeState: ChildSessionHydrationState = {
+  status: 'error',
+  kind: 'too_large',
+  message: 'Session history too large to load',
+};
+export const invalidDataState: ChildSessionHydrationState = {
+  status: 'error',
+  kind: 'invalid_data',
+  message: 'Session history is unavailable',
 };
 
 export type SheetProps = ComponentProps<typeof ChildSessionSheet>;

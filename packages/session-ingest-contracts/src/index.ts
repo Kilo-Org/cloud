@@ -1,4 +1,5 @@
 export * from './rpc-contract';
+export * from './git-branch';
 export * from './part-text';
 export * from './session-live-summary';
 export * from './cloud-agent-session-scope';
@@ -7,6 +8,7 @@ export * from './public-worktree-projection';
 export * from './session-share';
 export * from './message-id';
 export * from './kilo-session-id';
+export * from './token-usage';
 export * from './cloud-agent-billing';
 export * from './kilo2-conversation';
 export * from './background-activity';

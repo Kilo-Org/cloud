@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode, type ModeOption } from '@/components/agents/mode-normalize';
+import { type ModelSelectionFailure } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
 import { InputFrame } from '@/components/ui/input-frame';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -22,6 +23,8 @@ type NewSessionPromptCloneProps = {
   isLoadingModels: boolean;
   isCreating: boolean;
   onRefetchModels: () => void;
+  /** The organization-default read's failure while no model is selected, or null. */
+  modelSelectionFailure?: ModelSelectionFailure | null;
 };
 
 /**
@@ -43,6 +46,7 @@ export function NewSessionPromptClone({
   isLoadingModels,
   isCreating,
   onRefetchModels,
+  modelSelectionFailure = null,
 }: Readonly<NewSessionPromptCloneProps>) {
   const { t } = useTranslation();
   if (isModelsError && modelOptions.length === 0) {
@@ -75,6 +79,21 @@ export function NewSessionPromptClone({
         modelLockLabel={modelLockLabel}
         wrap
       />
+      {/* The full error above owns a failed catalog. This one is the model row's
+          own state: the catalog answered, the organization default did not. */}
+      {modelSelectionFailure ? (
+        <QueryError
+          placement="top"
+          compact
+          variant="server"
+          title={t('common.couldNotLoadModels')}
+          onRetry={() => {
+            modelSelectionFailure.onRetry();
+          }}
+          isRetrying={modelSelectionFailure.isRetrying}
+          className="px-3"
+        />
+      ) : null}
     </InputFrame>
   );
 }

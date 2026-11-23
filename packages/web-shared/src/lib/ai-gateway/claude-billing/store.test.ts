@@ -188,6 +188,38 @@ describe('Claude billing refusal transitions', () => {
     expect(await lastRefusalCode()).toBeNull();
   });
 
+  it('writes a refusal on the caller transaction and loses it when that transaction rolls back', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-05-01T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+    await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+
+    await expect(
+      db.transaction(async tx => {
+        await recordClaudeBillingRefusal(profileId, 'billing_error', connectedAt, tx);
+        const inTransaction = await getClaudeBillingConnection(
+          { kind: 'personal', kiloUserId: user.id },
+          tx
+        );
+        expect(inTransaction?.last_refusal_code).toBe('billing_error');
+        throw new Error('roll back the refusal');
+      })
+    ).rejects.toThrow('roll back the refusal');
+
+    const committed = await getClaudeBillingConnection({
+      kind: 'personal',
+      kiloUserId: user.id,
+    });
+    expect(committed?.last_refusal_code).toBe('permission_error');
+  });
+
   it.each([
     [403, { error: { message: 'model access denied' } }, 'permission_error', false],
     [

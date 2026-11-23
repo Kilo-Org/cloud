@@ -15,6 +15,7 @@ export {
   KiloOrganizationIdSchema,
 } from './schema-types';
 export type { AbuseClassification, GatewayApiKind, KiloOrganizationId } from './schema-types';
+export { taggedQueueMessageSchema } from './queue-envelope';
 export {
   EXA_ALLOWED_PATHS,
   EXA_MAX_COST_MICRODOLLARS_PER_CALL,
@@ -64,8 +65,6 @@ const CoreUsageSchema = z.object({
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
   abuse_classification: z.enum(ABUSE_CLASSIFICATION),
-  // The `organizations.id` column contract: any stored id passes, so a stricter
-  // check here would reject a legitimate payer. See `KiloOrganizationIdSchema`.
   organization_id: KiloOrganizationIdSchema.nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),
@@ -110,7 +109,7 @@ const UsageMetadataSchema = z.object({
   reasoning_setting: z.string().nullable().default(null),
   // Additive like reasoning_setting: older senders omit it.
   inference_region: z.string().nullable().default(null),
-  market_cost: z.number().nullable(),
+  market_cost: bigintAsNumber.nullable(),
   // Additive like reasoning_setting: older senders omit it.
   non_inference_cost: bigintAsNumber.nullable().default(null),
   is_free: z.boolean().nullable(),
@@ -140,16 +139,14 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
  * the lock hold is dominated by transatlantic round trips rather than database
  * work.
  *
- * Selected usage normally goes through the configured queue transport; the
- * production Cloudflare consumer calls the Frankfurt-local endpoint, which
- * persists idempotently by usage ID, so redelivery does not create a second
- * debit. SFO instances call that endpoint directly through
- * `recordUsageInPrimaryRegion` for unselected accounting; Frankfurt instances
- * write unselected accounting locally. Selected usage falls back to a direct
- * write only in the two pre-publication cases where nothing was sent: missing
- * or unparseable publisher configuration and failed lifetime registration. A
- * timeout or other ambiguous publication failure is not a direct-write
- * fallback, because the message may already be queued.
+ * Selected usage is normally published to the configured queue transport, and
+ * the production consumer calls the Frankfurt-local endpoint, which persists
+ * idempotently by usage ID, so a redelivery does not create a second debit. HTTP
+ * 202 means the queue accepted the event, not that a row or debit was
+ * committed. Transport selection per deployment, the SFO handoff and its
+ * fallback, the Frankfurt-local unselected write, and where a selected record
+ * may fall back to a direct write are policy, documented once in
+ * `packages/web-shared/AGENTS.md` ("AI gateway database and Redis access").
  *
  * Invariants this schema deliberately encodes:
  *
@@ -164,8 +161,11 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
  *   PostgreSQL, which has shape `2026-04-29 01:16:12.945+00` — see
  *   `packages/db/AGENTS.md` "Timestamp boundaries". Keep the strict validator so
  *   a DB-shaped timestamp can never enter this path.
- * - `cost` and the token counts are PostgreSQL `bigint` mapped to JS `number`,
- *   so they are validated as safe integers.
+ * - `core.cost`, the four core token counters, `core.cache_discount`,
+ *   `metadata.non_inference_cost`, `metadata.market_cost`, and
+ *   `prior_microdollar_usage` (which is `kilocode_users.microdollars_used`) are
+ *   PostgreSQL `bigint` mapped to JS `number`, so they are validated as safe
+ *   integers.
  *
  * NUL-byte sanitization (`stripNulBytesInPlace`) happens on the sender inside
  * `toInsertableDbUsageRecord`, before serialization. `JSON.stringify` preserves
@@ -175,7 +175,7 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
 export const UsageRecordRequestSchema = z.object({
   core: CoreUsageSchema,
   metadata: UsageMetadataSchema,
-  prior_microdollar_usage: z.number(),
+  prior_microdollar_usage: bigintAsNumber,
   posthog_distinct_id: z.string().nullable(),
   // Optional, unlike the fields above: a sender from before this field existed omits it, and that
   // must still record the billing row. Null or absent means no outbox row.
@@ -184,9 +184,14 @@ export const UsageRecordRequestSchema = z.object({
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
 
-/** The LLM body on the shared usage queue stays an untagged request for wire compatibility. */
 export type LlmUsageQueueMessage = UsageRecordRequest;
 
+/**
+ * One message on the shared usage queue. The LLM variant stays an untagged
+ * `UsageRecordRequest` for wire compatibility; every non-LLM usage message is
+ * the tagged envelope built by `taggedQueueMessageSchema`, whose `kind` marks it
+ * apart from the LLM body and whose `v` is the envelope version.
+ */
 export type UsageQueueMessage =
   | LlmUsageQueueMessage
   | EnkryptUsageQueueMessage
@@ -198,12 +203,16 @@ export type UsageQueueMessage =
  * row is persisted and its post-commit side effects ran on the first delivery.
  *
  * `not_recorded` mirrors today's local behaviour where `insertUsageRecord`
- * swallows database errors and returns `null`.
+ * swallows database errors and returns `null`, so no row was committed.
+ *
+ * The status decides the shape: a `recorded` or `duplicate` reply always carries
+ * the `result`, and a `not_recorded` reply carries a null `result`, so a caller
+ * that checks the status never needs a null check.
  */
-export const UsageRecordResponseSchema = z.object({
-  status: z.enum(['recorded', 'duplicate', 'not_recorded']),
-  result: z
-    .object({
+export const UsageRecordResponseSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.enum(['recorded', 'duplicate']),
+    result: z.object({
       // The writer echoes the inserted `microdollar_usage.id`, which is the
       // request's `core.id` (validated as a UUID above) or a generated UUID.
       usageId: z.uuid(),
@@ -212,8 +221,12 @@ export const UsageRecordResponseSchema = z.object({
       // packages/db/AGENTS.md "Timestamp boundaries".
       createdAt: z.string(),
       newMicrodollarsUsed: z.number().nullable(),
-    })
-    .nullable(),
-});
+    }),
+  }),
+  z.object({
+    status: z.literal('not_recorded'),
+    result: z.null(),
+  }),
+]);
 
 export type UsageRecordResponse = z.infer<typeof UsageRecordResponseSchema>;

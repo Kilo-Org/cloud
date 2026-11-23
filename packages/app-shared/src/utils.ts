@@ -76,7 +76,6 @@ export function timestampToIso(value: string | null | undefined): string | null 
   return at === null ? null : epochMsToIso(at);
 }
 
-/** Returns the first non-empty string, or '' when none is set. */
 export function firstNonEmpty(...values: (string | null | undefined)[]): string {
   for (const value of values) {
     if (value) {
@@ -86,8 +85,14 @@ export function firstNonEmpty(...values: (string | null | undefined)[]): string 
   return '';
 }
 
+export const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+
+export function toMicrodollars(amount: number): number {
+  return Math.round(amount * MICRODOLLARS_PER_DOLLAR);
+}
+
 export function fromMicrodollars(microdollars: number): number {
-  return microdollars / 1000000;
+  return microdollars / MICRODOLLARS_PER_DOLLAR;
 }
 
 // Every currency, USD included, is memoized by its uppercase code, so one

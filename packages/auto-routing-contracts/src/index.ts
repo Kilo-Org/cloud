@@ -8,9 +8,12 @@ import {
   VariantSchema,
 } from './reasoning';
 import {
+  CustomRouterAliasTargetsSchema,
   CustomRouterClientEntryIdSchema,
+  CustomRouterDefinitionSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
+  CustomRouterServingPinSchema,
   refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
@@ -88,6 +91,17 @@ export const MirrorPayloadSchema = z.object({
   constraints: RoutingConstraintsSchema.optional(),
   // Custom router reference (ADR 0005). Optional so an old worker or gateway still parses.
   customRouter: CustomRouterReferenceSchema.optional(),
+  // The exact saved pool the authenticated gateway resolved for this request, so the private
+  // decide path and the gateway route from one definition generation. Server-to-server only: the
+  // worker accepts it only after it re-checks owner, slug, and base router, and the public CLI
+  // route never reads it.
+  customRouterDefinition: CustomRouterDefinitionSchema.optional(),
+  // Alias id -> the concrete target the gateway's own primary snapshot stored for it, so the
+  // worker can rank and exclude the model that would actually run instead of the alias that could
+  // move. Server-to-server only, like `customRouterDefinition`; the worker narrows it to that
+  // definition's alias entries, so it can never name a model outside the pool. Optional so an
+  // older gateway still decides.
+  customRouterAliasTargets: CustomRouterAliasTargetsSchema.optional(),
   // Client entries the caller can serve; present only on the public CLI decide path.
   clientEntries: z.array(CustomRouterClientEntryIdSchema).optional(),
 });
@@ -151,23 +165,30 @@ export const AutoRoutingDecisionSchema = z
     // Custom router fields (ADR 0005). Optional so decisions from or to a not-yet-redeployed
     // worker or gateway still parse.
     entry: CustomRouterEntryRefSchema.optional(),
+    // The concrete target a pinned gateway entry dispatches instead of its pool model.
+    servingPin: CustomRouterServingPinSchema.optional(),
     stale: z.boolean().optional(),
     fallback: z.boolean().optional(),
+    // True only when a pinned alias entry served its live alias target because the pinned concrete
+    // target left the catalog. The gateway refuses a bare alias for a pinned entry without it.
+    servingFallback: z.literal(true).optional(),
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
     refineEntryModelMatch(decision, ctx);
-    if (
-      decision.fallback !== true &&
-      (decision.taskType === null ||
-        decision.subtaskType === null ||
-        decision.tableVersion === null)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['taskType'],
-        message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
-      });
+    // The three fields are independently nullable, so each omission is
+    // reported at its own path. One issue fixed to a single path would name a
+    // field that is present in the decision it rejects.
+    if (decision.fallback !== true) {
+      for (const field of ['taskType', 'subtaskType', 'tableVersion'] as const) {
+        if (decision[field] === null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [field],
+            message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
+          });
+        }
+      }
     }
   });
 
@@ -261,6 +282,8 @@ export {
   estimateRoutingTokens,
   PROMPT_WALK_MAX_DEPTH,
   type ClassifierApiKind,
+  type MediaPartModality,
+  type NormalizeOverrides,
 } from './normalize';
 
 export * from './reasoning';
@@ -270,3 +293,8 @@ export * from './routing-table';
 export * from './policy-settings';
 export * from './benchmark';
 export * from './custom-router';
+export * from './paid-benchmark';
+export * from './benchmark-inference';
+export * from './benchmark-project';
+export * from './paid-benchmark-admin';
+export * from './alias-promotion';

@@ -12,6 +12,7 @@ import { MarkdownCodeFence } from './markdown-code-fence';
 import { type MarkdownCopyCodeHandler } from './markdown-handlers';
 import { HOST_PAGE, MERMAID_VERSION, SCRIPT_FILE_NAME } from './markdown-mermaid-host';
 import { type MarkdownPalette } from './markdown-palette';
+import { darkPieThemeVariables, lightPieThemeVariables } from './mermaid-pie-theme';
 
 /**
  * Mermaid 11.12.0 (`dist/mermaid.min.js`, MIT) ships with the app as an asset,
@@ -111,12 +112,32 @@ const DiagramMessageSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('error'), source: z.string() }),
 ]);
 
+/** What the page should paint: the diagram, the theme it takes, and the card it
+ * sits on. `themeVariables` is null for a theme that takes mermaid's own. */
+type RenderState = {
+  source: string;
+  dark: boolean;
+  background: string;
+  themeVariables: Record<string, string> | null;
+};
+
 /**
  * The script the app runs in the loaded page. The diagram travels as a JSON
  * literal in a JS context (never as HTML), so its text cannot become markup.
+ *
+ * `themeVariables` is present on the wire only when a theme needs overrides: a
+ * theme that takes mermaid's own colours sends nothing, and an empty map there
+ * would say a theme override was chosen. Both of this component's themes now
+ * send their measured pie fills, so null is the contract a future theme keeps
+ * rather than a state this caller reaches.
  */
-function renderCall(source: string, dark: boolean, background: string): string {
-  return `window.kiloRenderDiagram(${JSON.stringify({ source, dark, background })});true;`;
+function renderCall(state: RenderState): string {
+  const { source, dark, background, themeVariables } = state;
+  const wire =
+    themeVariables === null
+      ? { source, dark, background }
+      : { source, dark, background, themeVariables };
+  return `window.kiloRenderDiagram(${JSON.stringify(wire)});true;`;
 }
 
 /** The page's message, or undefined when it is not one the page sends. */
@@ -180,10 +201,26 @@ export function MarkdownMermaid({
     () => ({ backgroundColor: palette.diagramSurface }),
     [palette.diagramSurface]
   );
+  // The theme overrides a diagram needs, derived once per theme rather than per
+  // injection: every redraw of a loaded page carries the map, and a fresh object
+  // each time would be pointless work for a page whose theme has not changed.
+  // Both themes state their own measured pie fills, because mermaid's own
+  // palettes put a slice near the page colour in either mode. The page still
+  // picks mermaid's `dark` or `default` theme name, so only the pie keys are
+  // overridden and every other diagram type keeps mermaid's own colours.
+  const themeVariables = useMemo(
+    () => (dark ? darkPieThemeVariables() : lightPieThemeVariables()),
+    [dark]
+  );
   // What the page should be painting. The load handler and the color effect both
   // read it, so the injection that follows a load carries the colors in effect by
   // then instead of the ones a prop had while the page was loading.
-  const wantedRender = useRef({ source, dark, background: palette.diagramSurface });
+  const wantedRender = useRef({
+    source,
+    dark,
+    background: palette.diagramSurface,
+    themeVariables,
+  });
   // The source whose diagram the loaded page is drawing, or `null` while the
   // page is loading or has failed. A color change may redraw a loaded page; a
   // source change remounts the page and its own load draws the new diagram.
@@ -202,18 +239,17 @@ export function MarkdownMermaid({
     loadedSource.current = null;
   }
   const injectWantedRender = useCallback(() => {
-    const { source: wantedSource, dark: wantedDark, background } = wantedRender.current;
-    webViewRef.current?.injectJavaScript(renderCall(wantedSource, wantedDark, background));
+    webViewRef.current?.injectJavaScript(renderCall(wantedRender.current));
   }, []);
   // Redraw into the page already loaded when the surface or the palette
   // changes, instead of reloading it: the vendored script is then read once per
   // diagram rather than once per palette change.
   useEffect(() => {
-    wantedRender.current = { source, dark, background: palette.diagramSurface };
+    wantedRender.current = { source, dark, background: palette.diagramSurface, themeVariables };
     if (loadedSource.current === source) {
       injectWantedRender();
     }
-  }, [source, dark, palette.diagramSurface, injectWantedRender]);
+  }, [source, dark, palette.diagramSurface, themeVariables, injectWantedRender]);
 
   if (failed) {
     // The fence's source is drawn on the same card as every other code fence,

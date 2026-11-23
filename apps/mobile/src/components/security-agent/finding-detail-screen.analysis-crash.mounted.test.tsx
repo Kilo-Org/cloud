@@ -88,6 +88,11 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
   useFocusEffect: focusEffect,
 }));
+// The screen hands a no-history Back through the push-then-retire hook; no case
+// here presses Back, so the hook's replace is a plain double.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
@@ -98,6 +103,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAnalysis: () => analysis,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({

@@ -24,6 +24,14 @@ import {
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
 import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
+import type {
+  SandboxEgressAdmission,
+  SandboxEgressAdmissionResult,
+} from '../../egress/egress-admission.js';
+import {
+  admitVercelEgressForward,
+  createEgressIdentityCache,
+} from '../../egress/vercel-egress-admission.js';
 import { admitScmRequest } from '../../scm-broker/admission.js';
 import {
   verifiedVercelSandboxIdentityContract,
@@ -104,6 +112,7 @@ import { RetiredSandboxProviderError } from '../../sandbox-control/retired-cloud
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
+  SandboxNetworkPolicyError,
   ProviderSnapshotCreationError,
   type ProviderAdapter,
   type ProviderAllocationIntent,
@@ -973,6 +982,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
+  private readonly egressIdentities = createEgressIdentityCache();
   private createInFlight = false;
   /**
    * The allocation whose provider launch has not returned yet. A wrapper may
@@ -1510,7 +1520,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.applyEvent({
         type: 'stop-requested',
         at: Date.now(),
-        reason: policyApplied ? 'preparation_cancelled' : 'sandbox_lost',
+        reason: policyApplied ? 'preparation_cancelled' : this.refusedPolicyStopReason(),
       });
       return { stopEpoch: stop.epoch, stopAt: stop.at };
     });
@@ -1667,7 +1677,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sharedHandleSurvives) {
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
-      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      await this.applyVercelNetworkPolicyOrStop();
     }
     const state = await this.readAllocation();
     await this.armAlarm(state);
@@ -2562,6 +2572,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...this.scmAdmissionDependencies(),
       env: this.env,
       contract: verifiedVercelSandboxIdentityContract,
+      readContext: () => this.readScmAdmissionContext(),
+    });
+  }
+
+  /** Admits one request to the sandbox egress proxy route, without the lifecycle queue. */
+  async admitEgressForward(input: SandboxEgressAdmission): Promise<SandboxEgressAdmissionResult> {
+    await this.initialized;
+    return admitVercelEgressForward(input, {
+      env: this.env,
+      contract: verifiedVercelSandboxIdentityContract,
+      pin: this.providerPin,
+      identities: this.egressIdentities,
       readContext: () => this.readScmAdmissionContext(),
     });
   }
@@ -4586,13 +4608,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Fail-closed revocation path: if the released session's alias cannot be
-   * removed from the provider policy, stop the sandbox as a platform failure.
+   * The stop reason after a refused policy update: a platform failure. The
+   * policy of a sandbox with an egress allowlist also holds the list, so that
+   * stop names the network policy.
    */
-  private async applyVercelNetworkPolicyOrStop(reason: ControlPlaneFailureReason): Promise<void> {
+  private refusedPolicyStopReason(): 'sandbox_lost' | 'network_policy_failed' {
+    return this.providerPin?.egressAllowlist === undefined
+      ? 'sandbox_lost'
+      : 'network_policy_failed';
+  }
+
+  /**
+   * Fail-closed revocation path: if the released session's alias cannot be
+   * removed from the provider policy, stop the sandbox.
+   */
+  private async applyVercelNetworkPolicyOrStop(): Promise<void> {
     if (await this.refreshVercelNetworkPolicy()) return;
     const state = await this.readAllocation();
     if (state.kind === 'stopped' || state.kind === 'stopping') return;
+    const reason = this.refusedPolicyStopReason();
     await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
   }
 
@@ -5328,7 +5362,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       const updated =
         adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
-      if (updated === grant) return { kind: 'handle', handle: finalHandle };
+      // A served handle must resolve at the facade for this fence, so a member row
+      // that already holds the string is returned only while the accepted set
+      // still carries it. A live handle keeps its own unexpired entry, so this
+      // normally returns at once; the membership test is the local guarantee that
+      // the rows, the accepted set and the adoption marker agree. Otherwise the
+      // claim continues to verification and the accepted-entry transaction below.
+      if (updated === grant) {
+        const accepted = acceptedDigests.has(await digestRuntimeProxyHandle(finalHandle));
+        if (accepted) return { kind: 'handle', handle: finalHandle };
+      }
 
       const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
       if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };
@@ -5340,7 +5383,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const match = await lookupAcceptedHandle(this.ctx.storage, finalHandle, fence, now);
         if (match === undefined || match.scopeGrantId !== scopeKey) return { kind: 'fail' };
       }
-      if (!(await this.applyCandidateGrantPolicy(updated))) return { kind: 'fail' };
+      // A grant the rows do not change needs no policy refresh: the member rows
+      // already carry the handle, and the maintenance path skips the same call
+      // for an unchanged grant so a transient provider failure cannot fail a
+      // preparation that writes no new shaping.
+      if (updated !== grant && !(await this.applyCandidateGrantPolicy(updated))) {
+        return { kind: 'fail' };
+      }
 
       const entry =
         adoptCandidate && candidate !== null && candidateDigest !== null
@@ -6043,7 +6092,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         if (
           error instanceof ByocVercelProviderError ||
-          error instanceof VercelScmContainmentError
+          error instanceof VercelScmContainmentError ||
+          error instanceof SandboxNetworkPolicyError
         ) {
           await this.failCreationRoutes(allocationId, false, error.reason);
           return;

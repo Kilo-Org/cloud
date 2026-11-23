@@ -5,6 +5,7 @@ import {
   createReadDb,
   isUSRegion,
   replicaAffinityKey,
+  requireIntegerEnv,
   selectReplicaIndex,
   selectReplicaUrls,
   shouldExitOnPoolError,
@@ -62,9 +63,15 @@ describe('drizzle', () => {
       expect(shouldExitOnPoolError('replica', 'production')).toBe(false);
     });
 
+    it('does not exit on a tagged-writer pool error outside test mode', () => {
+      // A tagged-pool idle-client error must not terminate an instance whose primary is healthy.
+      expect(shouldExitOnPoolError('tagged-writer', 'production')).toBe(false);
+    });
+
     it('never exits in test mode, so pool.end() cleanup cannot kill the runner', () => {
       expect(shouldExitOnPoolError('primary', 'test')).toBe(false);
       expect(shouldExitOnPoolError('replica', 'test')).toBe(false);
+      expect(shouldExitOnPoolError('tagged-writer', 'test')).toBe(false);
     });
   });
 
@@ -493,5 +500,43 @@ describe('drizzle', () => {
       `);
       expect(rows).toEqual([]);
     });
+  });
+});
+
+describe('requireIntegerEnv', () => {
+  it('parses a non-negative integer', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '10000')).toBe(10000);
+  });
+
+  it('accepts zero', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '0')).toBe(0);
+  });
+
+  it('tolerates surrounding spaces', () => {
+    expect(requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', ' 10000 ')).toBe(10000);
+  });
+
+  it.each(['30s', 'PT30S', '10.5', '1e4', '-5', '0x10'])(
+    'throws for the malformed value %p',
+    value => {
+      expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', value)).toThrow(
+        'Invalid required environment variable'
+      );
+      expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', value)).toThrow(
+        'POSTGRES_CONNECT_TIMEOUT'
+      );
+    }
+  );
+
+  it('throws when the variable is undefined', () => {
+    expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', undefined)).toThrow(
+      'Missing required environment variable POSTGRES_CONNECT_TIMEOUT'
+    );
+  });
+
+  it('throws when the variable is empty', () => {
+    expect(() => requireIntegerEnv('POSTGRES_CONNECT_TIMEOUT', '')).toThrow(
+      'Missing required environment variable POSTGRES_CONNECT_TIMEOUT'
+    );
   });
 });

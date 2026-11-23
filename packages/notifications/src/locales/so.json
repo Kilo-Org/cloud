@@ -7,6 +7,7 @@
       "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
       "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
       "securityUpdate": "Hubin amni ayaa leh cusboonaysiin",
+      "agentBriefing": "Warbixintaada wakiilka waa diyaar",
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Natiijo amni cusub ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Halis daran",
+      "high": "Sare",
+      "medium": "Dhexdhexaad",
+      "low": "Hoose"
     },
     "securityFindingSlaWarning": {
       "title": "Digniin SLA"

@@ -7,6 +7,7 @@
       "spendAlert": "Vaša potrošnja treba pažnju",
       "securityFinding": "Sigurnosni nalaz treba pažnju",
       "securityUpdate": "Sigurnosna provjera ima ažuriranje",
+      "agentBriefing": "Vaš izvještaj o aktivnosti agenta je spreman",
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Novi sigurnosni nalaz ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritično",
+      "high": "Visoko",
+      "medium": "Srednje",
+      "low": "Nisko"
     },
     "securityFindingSlaWarning": {
       "title": "SLA upozorenje"

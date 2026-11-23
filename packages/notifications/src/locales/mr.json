@@ -7,6 +7,7 @@
       "spendAlert": "तुमच्या खर्चाकडे लक्ष आवश्यक आहे",
       "securityFinding": "सुरक्षा निष्कर्षाकडे लक्ष आवश्यक आहे",
       "securityUpdate": "सुरक्षा तपासणीमध्ये अपडेट आहे",
+      "agentBriefing": "तुमचा एजंट आढावा तयार आहे",
       "activeAgentsGlanceable": "सक्रिय एजंट्सकडे अपडेट आहे"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "नवीन सुरक्षा निष्कर्ष ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "गंभीर",
+      "high": "उच्च",
+      "medium": "मध्यम",
+      "low": "कमी"
     },
     "securityFindingSlaWarning": {
       "title": "SLA चेतावणी"

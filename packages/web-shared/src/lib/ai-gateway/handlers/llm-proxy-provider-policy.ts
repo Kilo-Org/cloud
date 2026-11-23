@@ -14,6 +14,7 @@ import {
   paidUsageRejection,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -85,6 +86,14 @@ type ProviderPolicyInput = {
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
+  /** A benchmark measurement: Kilo's own route only, no stored key and no subscription route. */
+  managedRoutesOnly?: boolean;
+  /**
+   * Tags an authoritative pre-provider payer refusal with the Worker's reason so it can rotate
+   * to another payer. Only identity, membership and balance/allowance refusals qualify: they
+   * prove no provider call. A raw provider 402 never passes here.
+   */
+  markPayerRefusal?: (reason: 'payment_refused' | 'payer_unavailable') => NextResponseType<unknown>;
 };
 
 type ProviderPolicyResult =
@@ -208,6 +217,7 @@ export async function resolveProviderAndPolicy(
     isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
+    managedRoutesOnly: input.managedRoutesOnly,
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (getProviderResult.kind === 'chatgpt-reconnect') {
@@ -302,7 +312,12 @@ export async function resolveProviderAndPolicy(
         account: await input.balanceAndSettingsPromise,
         exempt: route.isFree || !!route.userByok || !!route.skipBalanceCheck,
       });
-      if (creditsBlocked) return await creditsBlocked();
+      if (creditsBlocked) {
+        // A benchmark payer that cannot fund this call is a trusted pre-provider refusal: the
+        // Worker may detach it and try the next payer. Ordinary requests keep the generic 402.
+        if (input.markPayerRefusal) return input.markPayerRefusal('payment_refused');
+        return await creditsBlocked();
+      }
     }
 
     // Organization model and provider policies cover catalog ids. The exemption here is
@@ -361,7 +376,12 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  const dataCollectionRejected = await dataCollectionPolicyRejection(model, request.body.provider);
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const dataCollectionModel = await resolveOpenRouterModelAlias(model);
+  const dataCollectionRejected = await dataCollectionPolicyRejection(
+    dataCollectionModel,
+    request.body.provider
+  );
   if (dataCollectionRejected) return reject(dataCollectionRejected);
 
   if (input.customLlm?.definition.public) {

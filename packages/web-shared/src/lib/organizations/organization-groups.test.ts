@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
+  ai_gateway_config,
   kilocode_users,
   organization_audit_logs,
   organization_group_memberships,
+  organization_group_policy_settings,
   organization_groups,
   organization_memberships,
   organizations,
@@ -15,16 +18,24 @@ import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/audi
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   OrganizationGroupInputSchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  type OrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
+  createOrganizationGroup,
   deleteOrganizationGroup,
   listOrganizationGroupsForManager,
   normalizeOrganizationGroupPolicy,
+  removeOrganizationGroupPolicy,
+  setDefaultOrganizationGroupPolicy,
   setOrganizationGroupMembers,
+  setOrganizationGroupPolicy,
   setOrganizationMemberGroups,
   updateOrganizationGroupDetails,
+  updateOrganizationGroupMetadata,
 } from './organization-groups';
 
 describe('organization group policies', () => {
@@ -59,6 +70,9 @@ describe('organization group policies', () => {
     ).toBe(true);
     expect(OrganizationGroupInputSchema.safeParse({ name: ' ', policies: [] }).success).toBe(false);
     expect(
+      OrganizationGroupInputSchema.safeParse({ name: '\u200B\u200B', policies: [] }).success
+    ).toBe(false);
+    expect(
       OrganizationGroupInputSchema.safeParse({ name: 'a'.repeat(81), policies: [] }).success
     ).toBe(false);
     expect(
@@ -88,6 +102,45 @@ describe('organization group policies', () => {
         provider_allow_list: ['openai'],
       },
     });
+  });
+
+  it('returns the value the write schema parsed for a selected model access policy', () => {
+    const policy = {
+      type: 'model_access' as const,
+      data: {
+        mode: 'selected' as const,
+        model_allow_list: [' openai/gpt-4o '],
+        provider_allow_list: [' openai '],
+      },
+    };
+
+    expect(normalizeOrganizationGroupPolicy(policy)).toEqual(
+      OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)
+    );
+  });
+
+  it('refuses a selected policy entry over the documented length', () => {
+    let refused: unknown = undefined;
+    try {
+      normalizeOrganizationGroupPolicy({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
+          provider_allow_list: [],
+        },
+      });
+    } catch (error) {
+      refused = error;
+    }
+
+    expect(refused).toBeInstanceOf(TRPCError);
+    if (!(refused instanceof TRPCError)) throw new Error('Expected a TRPCError refusal');
+    expect(refused.code).toBe('BAD_REQUEST');
+    expect(refused.message).toBe(
+      `A model id at index 0 ("${'m'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+    );
+    expect(refused.cause).toBeInstanceOf(z.ZodError);
   });
 });
 
@@ -487,5 +540,457 @@ describe('organization group audit messages', () => {
         )} \\(${user.id}\\)$`
       )
     );
+  });
+});
+
+describe('organization group policy revision', () => {
+  const createdOrganizationIds: string[] = [];
+  const createdUserIds: string[] = [];
+  const actor = { id: 'group-revision-admin', email: 'admin@example.com', name: 'Admin' };
+
+  afterEach(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+    }
+    for (const kiloUserId of createdUserIds) {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, kiloUserId));
+    }
+    createdOrganizationIds.length = 0;
+    createdUserIds.length = 0;
+  });
+
+  async function createOrganization(policyRevision?: number) {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Policy Revision Organization', plan: 'enterprise' })
+      .returning();
+    createdOrganizationIds.push(organization.id);
+    if (policyRevision !== undefined) {
+      await db
+        .insert(organization_group_policy_settings)
+        .values({ organization_id: organization.id, policy_revision: policyRevision });
+    }
+    return organization;
+  }
+
+  async function createGroup(organizationId: string, name: string) {
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organizationId, name })
+      .returning();
+    return group;
+  }
+
+  async function createMember(organizationId: string) {
+    const user = await insertTestUser();
+    createdUserIds.push(user.id);
+    await db
+      .insert(organization_memberships)
+      .values({ organization_id: organizationId, kilo_user_id: user.id, role: 'member' });
+    return user;
+  }
+
+  async function readSettingsRow(organizationId: string) {
+    const [settings] = await db
+      .select()
+      .from(organization_group_policy_settings)
+      .where(eq(organization_group_policy_settings.organization_id, organizationId));
+    return settings;
+  }
+
+  async function readPolicyRevision(organizationId: string) {
+    const [settings] = await db
+      .select({
+        policyRevision: organization_group_policy_settings.policy_revision,
+      })
+      .from(organization_group_policy_settings)
+      .where(eq(organization_group_policy_settings.organization_id, organizationId));
+    return settings?.policyRevision;
+  }
+
+  async function readGroupName(groupId: string) {
+    const [group] = await db
+      .select({ name: organization_groups.name })
+      .from(organization_groups)
+      .where(eq(organization_groups.id, groupId));
+    return group?.name;
+  }
+
+  async function readGroupMemberships(groupId: string) {
+    return await db
+      .select()
+      .from(organization_group_memberships)
+      .where(eq(organization_group_memberships.group_id, groupId))
+      .orderBy(organization_group_memberships.kilo_user_id);
+  }
+
+  type MembershipRow = typeof organization_group_memberships.$inferSelect;
+
+  function membershipRow(rows: MembershipRow[], kiloUserId: string) {
+    const row = rows.find(candidate => candidate.kilo_user_id === kiloUserId);
+    if (!row) throw new Error(`Missing membership row for ${kiloUserId}`);
+    return row;
+  }
+
+  async function policyAuditMessages(organizationId: string, action: AuditLogAction) {
+    const rows = await db
+      .select({
+        action: organization_audit_logs.action,
+        message: organization_audit_logs.message,
+      })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId))
+      .orderBy(organization_audit_logs.id);
+    return rows.filter(row => row.action === action).map(row => row.message);
+  }
+
+  it('leaves the policy revision alone when a metadata rename changes no policy state', async () => {
+    const organization = await createOrganization(4);
+    const group = await createGroup(organization.id, 'Alpha');
+
+    const { policyRevision } = await updateOrganizationGroupMetadata({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+      name: 'Alpha Renamed',
+      description: 'Renamed only',
+    });
+
+    expect(policyRevision).toBe(4);
+    expect(await readPolicyRevision(organization.id)).toBe(4);
+    expect(await readGroupName(group.id)).toBe('Alpha Renamed');
+  });
+
+  it('creates the policy settings row at revision 1 for a rename in an organization that has none', async () => {
+    const organization = await createOrganization();
+    const group = await createGroup(organization.id, 'Bravo');
+
+    const { policyRevision } = await updateOrganizationGroupMetadata({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+      name: 'Bravo Renamed',
+    });
+
+    expect(policyRevision).toBe(1);
+    expect(await readSettingsRow(organization.id)).toMatchObject({
+      policy_revision: 1,
+      updated_by_kilo_user_id: actor.id,
+    });
+    expect(await readGroupName(group.id)).toBe('Bravo Renamed');
+  });
+
+  it('keeps membership rows byte-identical when a details save repeats the member set', async () => {
+    const organization = await createOrganization(5);
+    const group = await createGroup(organization.id, 'Charlie');
+    const firstMember = await createMember(organization.id);
+    const secondMember = await createMember(organization.id);
+    await db.insert(organization_group_memberships).values(
+      [firstMember.id, secondMember.id].map(kiloUserId => ({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: kiloUserId,
+        assigned_by_kilo_user_id: 'seeded-by-another-admin',
+      }))
+    );
+    const before = await readGroupMemberships(group.id);
+
+    const { policyRevision } = await updateOrganizationGroupDetails({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+      name: 'Charlie Renamed',
+      userIds: [secondMember.id, firstMember.id],
+    });
+
+    expect(before.map(row => row.assigned_by_kilo_user_id)).toEqual([
+      'seeded-by-another-admin',
+      'seeded-by-another-admin',
+    ]);
+    expect(await readGroupMemberships(group.id)).toEqual(before);
+    expect(policyRevision).toBe(5);
+    expect(await readPolicyRevision(organization.id)).toBe(5);
+    expect(await readGroupName(group.id)).toBe('Charlie Renamed');
+  });
+
+  it('advances the policy revision by one and touches only the added and removed members', async () => {
+    const organization = await createOrganization(6);
+    const group = await createGroup(organization.id, 'Delta');
+    const removedMember = await createMember(organization.id);
+    const survivingMember = await createMember(organization.id);
+    const addedMember = await createMember(organization.id);
+    await db.insert(organization_group_memberships).values(
+      [removedMember.id, survivingMember.id].map(kiloUserId => ({
+        organization_id: organization.id,
+        group_id: group.id,
+        kilo_user_id: kiloUserId,
+        assigned_by_kilo_user_id: 'seeded-by-another-admin',
+      }))
+    );
+    const survivingBefore = membershipRow(await readGroupMemberships(group.id), survivingMember.id);
+
+    const { policyRevision } = await updateOrganizationGroupDetails({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+      name: 'Delta',
+      userIds: [survivingMember.id, addedMember.id],
+    });
+
+    expect(policyRevision).toBe(7);
+    expect(await readPolicyRevision(organization.id)).toBe(7);
+    const after = await readGroupMemberships(group.id);
+    expect(after).toHaveLength(2);
+    expect(membershipRow(after, survivingMember.id)).toEqual(survivingBefore);
+    expect(membershipRow(after, addedMember.id)).toMatchObject({
+      organization_id: organization.id,
+      group_id: group.id,
+      assigned_by_kilo_user_id: actor.id,
+    });
+    expect(after.some(row => row.kilo_user_id === removedMember.id)).toBe(false);
+  });
+
+  it('rewrites no membership row for an unchanged member group set and advances once for an added group', async () => {
+    const organization = await createOrganization(8);
+    const keptGroup = await createGroup(organization.id, 'Echo');
+    const extraGroup = await createGroup(organization.id, 'Foxtrot');
+    const user = await createMember(organization.id);
+    await db.insert(organization_group_memberships).values({
+      organization_id: organization.id,
+      group_id: keptGroup.id,
+      kilo_user_id: user.id,
+      assigned_by_kilo_user_id: 'seeded-by-another-admin',
+    });
+    const before = await readGroupMemberships(keptGroup.id);
+
+    const unchanged = await setOrganizationMemberGroups({
+      organizationId: organization.id,
+      actor,
+      userId: user.id,
+      groupIds: [keptGroup.id],
+    });
+
+    expect(unchanged.policyRevision).toBe(8);
+    expect(await readPolicyRevision(organization.id)).toBe(8);
+    expect(await readGroupMemberships(keptGroup.id)).toEqual(before);
+    expect(membershipRow(before, user.id).assigned_by_kilo_user_id).toBe('seeded-by-another-admin');
+
+    const added = await setOrganizationMemberGroups({
+      organizationId: organization.id,
+      actor,
+      userId: user.id,
+      groupIds: [keptGroup.id, extraGroup.id],
+    });
+
+    expect(added.policyRevision).toBe(9);
+    expect(await readPolicyRevision(organization.id)).toBe(9);
+    expect(await readGroupMemberships(keptGroup.id)).toEqual(before);
+    expect(await readGroupMemberships(extraGroup.id)).toMatchObject([
+      {
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        assigned_by_kilo_user_id: actor.id,
+      },
+    ]);
+  });
+
+  it('leaves the revision alone when removing a policy the group lacks and bumps on deletion', async () => {
+    const organization = await createOrganization(3);
+    const group = await createGroup(organization.id, 'Golf');
+
+    const removal = await removeOrganizationGroupPolicy({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+      policyType: 'model_access',
+    });
+
+    expect(removal.result).toEqual([]);
+    expect(removal.policyRevision).toBe(3);
+    expect(await readPolicyRevision(organization.id)).toBe(3);
+    const removalMessages = await policyAuditMessages(
+      organization.id,
+      'organization.group.policy.remove'
+    );
+    expect(removalMessages).toEqual([
+      `Removed model_access policy from group "Golf" (${group.id})`,
+    ]);
+    expect(removalMessages.join(' ')).not.toContain('revision');
+
+    const deletion = await deleteOrganizationGroup({
+      organizationId: organization.id,
+      groupId: group.id,
+      actor,
+    });
+
+    expect(deletion.policyRevision).toBe(4);
+    expect(await readPolicyRevision(organization.id)).toBe(4);
+  });
+
+  it('keeps the revision and omits the revision clause when a policy write repeats the stored policy', async () => {
+    const organization = await createOrganization(4);
+    const group = await createGroup(organization.id, 'Hotel');
+    const storedPolicy = {
+      type: 'agent_permissions',
+      data: {
+        schema_version: 1,
+        tools: { webfetch: 'deny', bash: 'ask' },
+        shell: { bash: { fallback: 'ask', rules: [{ pattern: 'git *', action: 'allow' }] } },
+      },
+    } satisfies OrganizationGroupPolicy;
+    const modelPolicy = {
+      type: 'model_access',
+      data: { mode: 'none' },
+    } satisfies OrganizationGroupPolicy;
+    // The stored rows hold the same content as the write below in another tool-key
+    // order and another entry order, so only a content comparison sees them as equal.
+    await db
+      .update(organization_groups)
+      .set({ policies: [storedPolicy, modelPolicy] })
+      .where(eq(organization_groups.id, group.id));
+    await db
+      .update(organization_group_policy_settings)
+      .set({ default_policies: [storedPolicy] })
+      .where(eq(organization_group_policy_settings.organization_id, organization.id));
+
+    const originalWriteSwitch = process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+    const [existingConfig] = await db
+      .select()
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1));
+    process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = 'true';
+    await db
+      .insert(ai_gateway_config)
+      .values({ config: { organization_features: { org_permission_policy: [organization.id] } } })
+      .onConflictDoUpdate({
+        target: ai_gateway_config.id,
+        set: { config: { organization_features: { org_permission_policy: [organization.id] } } },
+      });
+    try {
+      const write = {
+        type: 'agent_permissions',
+        data: {
+          schema_version: 1,
+          tools: { bash: 'ask', webfetch: 'deny' },
+          shell: { bash: { fallback: 'ask', rules: [{ pattern: 'git *', action: 'allow' }] } },
+        },
+      } satisfies OrganizationGroupPolicy;
+
+      const groupWrite = await setOrganizationGroupPolicy({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        policy: write,
+      });
+      const defaultWrite = await setDefaultOrganizationGroupPolicy({
+        organizationId: organization.id,
+        actor,
+        policy: write,
+      });
+
+      expect(groupWrite.result).toEqual([modelPolicy, write]);
+      expect(defaultWrite.result).toEqual([write]);
+      expect(groupWrite.policyRevision).toBe(4);
+      expect(defaultWrite.policyRevision).toBe(4);
+      expect(await readPolicyRevision(organization.id)).toBe(4);
+      expect(await readSettingsRow(organization.id)).toMatchObject({ policy_revision: 4 });
+
+      const groupMessages = await policyAuditMessages(
+        organization.id,
+        'organization.group.policy.set'
+      );
+      const defaultMessages = await policyAuditMessages(
+        organization.id,
+        'organization.group.default_policy.set'
+      );
+      expect(groupMessages).toEqual([
+        `Set agent_permissions policy for group "Hotel" (${group.id})`,
+      ]);
+      expect(defaultMessages).toEqual(['Set default agent_permissions group policy']);
+      expect([...groupMessages, ...defaultMessages].join(' ')).not.toContain('revision');
+    } finally {
+      if (originalWriteSwitch === undefined)
+        delete process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+      else process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = originalWriteSwitch;
+      if (existingConfig === undefined) {
+        await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      } else {
+        await db
+          .update(ai_gateway_config)
+          .set({ config: existingConfig.config })
+          .where(eq(ai_gateway_config.id, 1));
+      }
+    }
+  });
+
+  // The table's `char_length(btrim(name))` check sees the zero-width spaces in
+  // `'\u200B\u200B'` as ordinary characters, and the canonical-name index keeps
+  // them too, so only the name schema refuses a row no reader can name.
+  it('refuses a create with a name of zero-width spaces and stores no row', async () => {
+    const organization = await createOrganization();
+
+    await expect(
+      createOrganizationGroup({
+        organizationId: organization.id,
+        actor,
+        name: '\u200B\u200B',
+        policies: [],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const groups = await db
+      .select({ id: organization_groups.id })
+      .from(organization_groups)
+      .where(eq(organization_groups.organization_id, organization.id));
+    expect(groups).toEqual([]);
+  });
+
+  it('refuses a rename to a name of zero-width spaces and keeps the stored name', async () => {
+    const organization = await createOrganization();
+    const group = await createGroup(organization.id, 'India');
+
+    await expect(
+      updateOrganizationGroupMetadata({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        name: '\u200B\u200B',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await readGroupName(group.id)).toBe('India');
+  });
+
+  it('refuses a details save with a name of zero-width spaces and changes neither name nor members', async () => {
+    const organization = await createOrganization();
+    const group = await createGroup(organization.id, 'Juliett');
+    const currentMember = await createMember(organization.id);
+    const otherMember = await createMember(organization.id);
+    await db.insert(organization_group_memberships).values({
+      organization_id: organization.id,
+      group_id: group.id,
+      kilo_user_id: currentMember.id,
+    });
+
+    await expect(
+      updateOrganizationGroupDetails({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        name: '\u200B\u200B',
+        userIds: [otherMember.id],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await readGroupName(group.id)).toBe('Juliett');
+    expect((await readGroupMemberships(group.id)).map(row => row.kilo_user_id)).toEqual([
+      currentMember.id,
+    ]);
   });
 });

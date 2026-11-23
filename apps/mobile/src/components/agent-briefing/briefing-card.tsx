@@ -18,9 +18,11 @@ import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { briefingPreviewExcerpt } from '@/lib/agent-briefing-format';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, formatNumber } from '@/lib/format';
+import { useBriefingLocale } from './briefing-locale';
 
 /** One source of truth for the scorecard counts, in announced order. */
 const briefingScorecardRows = (report: BriefingReport) =>
@@ -40,13 +42,14 @@ const briefingScorecardRows = (report: BriefingReport) =>
   ] as const;
 
 export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const rows = briefingScorecardRows(report);
   return (
     <View className="gap-2">
       {rows.map(row => (
         <View key={row.labelKey} className="flex-row items-center gap-2">
-          <Text variant="figure">{formatNumber(row.amount, i18n.language)}</Text>
+          <Text variant="figure">{formatNumber(row.amount, locale)}</Text>
           <Text variant="muted" numberOfLines={1} className="min-w-0 shrink">
             {t(row.labelKey)}
           </Text>
@@ -80,7 +83,8 @@ export function BriefingCard({
   readonly report: BriefingReport;
   readonly embedded?: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const router = useRouter();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
@@ -90,23 +94,30 @@ export function BriefingCard({
       ? report.summary.text
       : t(briefingSummaryStatusKey(report.summary.status, report.summary.error));
   const hasAiPreview = report.summary.status !== 'disabled';
-  const preview = [
-    offline ? t('agentBriefing.offline') : null,
-    hasAiPreview ? aiPreview : t('agentBriefing.view'),
-    hasAiPreview ? null : formatCalendarDate(report.localDate, i18n.language),
-  ]
+  const prefix = offline ? t('agentBriefing.offline') : null;
+  const localDateLabel = hasAiPreview ? null : formatCalendarDate(report.localDate, locale);
+  const preview = [prefix, hasAiPreview ? aiPreview : t('agentBriefing.view'), localDateLabel]
     .filter(Boolean)
     .join(' · ');
-  const previewLabel = hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview;
+  // The spoken name carries the same parts as the visible line, with the AI
+  // preview bounded: a summary the row truncates visually cannot make the
+  // control's name run on for as long as the summary does.
+  const previewLabel = hasAiPreview
+    ? t('agentBriefing.viewWithPreview', {
+        preview: [prefix, briefingPreviewExcerpt(aiPreview, locale), localDateLabel]
+          .filter(Boolean)
+          .join(' · '),
+      })
+    : preview;
   const open = () => {
     router.push(`${BRIEFING_PATH}/${report.id}` as Href);
   };
   // The control's name carries the action and the three counts, in the same
   // formatted values the scorecard rows announce.
   const scorecardLabel = t('agentBriefing.scorecardLabel', {
-    sessions: formatNumber(report.scorecard.sessions, i18n.language),
-    pullRequests: formatNumber(report.scorecard.pullRequests, i18n.language),
-    blockers: formatNumber(report.scorecard.blockers, i18n.language),
+    sessions: formatNumber(report.scorecard.sessions, locale),
+    pullRequests: formatNumber(report.scorecard.pullRequests, locale),
+    blockers: formatNumber(report.scorecard.blockers, locale),
   });
   // The frame's taller layer stretches the embedded card, so no slack is left
   // below it: the divider follows the counts, and the summary row takes the

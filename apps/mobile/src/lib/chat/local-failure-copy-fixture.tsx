@@ -83,6 +83,8 @@ const GGUF_PROBLEMS = [
   'network',
   'invalidFile',
   'checksum',
+  'unreadable',
+  'writeFailed',
 ] as const satisfies readonly GgufDownloadProblem[];
 
 /** One row: the code a native module would report, and the key its row paints. */

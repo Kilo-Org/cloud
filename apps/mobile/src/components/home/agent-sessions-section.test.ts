@@ -316,6 +316,13 @@ describe('Home live section', () => {
     );
   });
 
+  it('sends the unavailable-organization recovery to the profile tab', async () => {
+    await render(settled, { ...context, isReady: false, isResolving: false, isError: false });
+    const action = node('QueryError').props.action as { props: { onPress: () => void } };
+    action.props.onPress();
+    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+  });
+
   it('opens the agents index narrowed to the tapped status', async () => {
     await render({
       ...settled,

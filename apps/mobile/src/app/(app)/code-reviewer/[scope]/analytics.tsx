@@ -26,6 +26,7 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { PERSONAL_SCOPE, reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
@@ -51,7 +52,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   // The organization's own name for the header, and the row a denial titles
   // itself with. The route already rejected the personal scope, so this read
   // always has an organization to look up.
-  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  const organizations = useOrganizationsList();
   // The name this app last showed stands in once the reader loses the
   // membership, so the denial below still names the organization it is about.
   const knownScopeName = useReviewerScopeName(scope, organizations.data);

@@ -7,6 +7,7 @@
       "spendAlert": "Inawo rẹ nilo akiyesi",
       "securityFinding": "Wiwa aabo nilo akiyesi",
       "securityUpdate": "Ayẹwo aabo ni imudojuiwọn",
+      "agentBriefing": "Ìròyìn ìṣe aṣojú sọfitiwia rẹ ti ṣetán",
       "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Wiwa aabo tuntun ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Líle jù lọ",
+      "high": "Gíga",
+      "medium": "Alábọ̀ọ́dé",
+      "low": "Kékeré"
     },
     "securityFindingSlaWarning": {
       "title": "Ikilọ SLA"

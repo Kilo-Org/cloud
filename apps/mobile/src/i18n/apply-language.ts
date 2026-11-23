@@ -56,10 +56,10 @@ function refreshLocalizedNotifications(): void {
  * Persist what the running screens hold before a relaunch they did not ask
  * for. The login screen registers its own flush only on the globe press, so a
  * device change it never asked for has to persist its typed state directly;
- * `persistLoginDrafts` refuses an uninitialized or retired attempt on its own,
- * so calling it unasked is safe. A bridge registered by another screen is
- * flushed too, because the reload discards the JS context without running
- * React cleanup.
+ * `persistLoginDrafts` refuses a retired attempt and one whose restore learned
+ * no draft of its own, so calling it unasked is safe. A bridge registered by
+ * another screen is flushed too, because the reload discards the JS context
+ * without running React cleanup.
  */
 async function flushBeforeReload(): Promise<void> {
   try {
@@ -198,10 +198,6 @@ export async function applyDeviceLanguage(
   language: SupportedLanguage
 ): Promise<ApplyLanguageOutcome> {
   if (I18nManager.isRTL !== isRtlLanguage(language)) {
-    // A device switch to an RTL language while the login screen holds typed
-    // state must persist it the way the picker's reload does: a reload
-    // discards the JS context without running React cleanup, so the login
-    // screen's unmount-time persist cannot be relied on.
     await flushBeforeReload();
     return restartForDirection(language, true);
   }

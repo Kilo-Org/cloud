@@ -93,6 +93,7 @@
     "draft": "Чарнавік",
     "enabled": "Уключана",
     "github": "GitHub",
+    "image": "Выява",
     "imageUnavailable": "Выява недаступная.",
     "loading": "Загрузка…",
     "loadMore": "Загрузіць яшчэ",
@@ -124,10 +125,10 @@
     "connectProvider": "Падключыце платформу",
     "contentTruncated": "Змест абрэзаны",
     "copyLink": "Скапіяваць спасылку",
+    "couldNotLoad": "Не атрымалася загрузіць.",
+    "couldNotLoadMore": "Не атрымалася загрузіць наступныя запісы.",
     "couldNotLoadOrganizations": "Не атрымалася загрузіць арганізацыі.",
     "couldNotLoadSessions": "Не атрымалася загрузіць сеансы.",
-    "couldnTLoad": "Не атрымалася загрузіць.",
-    "couldnTLoadMore": "Не атрымалася загрузіць наступныя запісы.",
     "deviceSessions": "Сеансы на прыладах",
     "disabled": "Адключана",
     "email": "Электронная пошта",
@@ -188,7 +189,30 @@
     "legalDocumentEnglishOnly": "Гэты дакумент даступны толькі на англійскай мове.",
     "organizationTrialEndedBilling": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Вы можаце абнавіць плацежныя даныя, а затым паспрабаваць яшчэ раз.",
     "organizationTrialEndedBillingAtKiloAi": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Вы можаце абнавіць плацежныя даныя на kilo.ai, а затым паспрабаваць яшчэ раз.",
-    "viewOnGitHub": "Прагледзець PR на GitHub"
+    "viewOnGitHub": "Прагледзець PR на GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Пункт спіса",
+        "nestedBulletPoint": "Укладзены пункт спіса",
+        "orderedItem": "Элемент спіса {n}",
+        "nestedOrderedItem": "Укладзены элемент спіса {n}"
+      },
+      "blockquote": {
+        "quote": "Цытата",
+        "nestedQuote": "Укладзеная цытата"
+      },
+      "table": {
+        "row": "Радок {n}: {content}"
+      },
+      "math": {
+        "equation": "Матэматыка: {latex}"
+      },
+      "rotor": {
+        "headings": "Загалоўкі",
+        "links": "Спасылкі",
+        "images": "Выявы"
+      }
+    }
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -288,6 +312,7 @@
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
+    "availableToSpendInOrganization": "Даступна для выдаткавання ў гэтай арганізацыі",
     "signOutTitle": "Выйсці?",
     "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў.",
     "deleteAccountTitle": "Выдаліць уліковы запіс?",
@@ -377,7 +402,7 @@
       "title": "Ключы пастаўшчыкоў",
       "rowSubtitle": "Аплата праз уласны ўліковы запіс пастаўшчыка",
       "orgDescription": "Гэтыя ключы даступныя ўсім удзельнікам арганізацыі, а аплата ідзе праз яе ўліковыя запісы пастаўшчыкоў.",
-      "viewOnly": "Змяняць ключы арганізацыі могуць толькі яе ўладальнік, адміністратар або менеджар па аплаце.",
+      "viewOnly": "Змяняць ключы арганізацыі могуць толькі яе ўладальнік, адміністратар або кіраўнік плацяжоў.",
       "description": "Запыты з гэтымі ключамі аплачваюцца праз ваш уліковы запіс пастаўшчыка, а не з балансу Kilo.",
       "managedByPlan": "Кіруецца вашым тарыфам для праграмавання",
       "enableKey": "Уключыць ключ {{provider}}",
@@ -429,6 +454,17 @@
       "location": "Размяшчэнне Vertex",
       "clientEmail": "Электронная пошта сэрвіснага ўліковага запісу",
       "privateKey": "Закрыты ключ сэрвіснага ўліковага запісу",
+      "privateKeyBlockRequired": "Устаўце ўвесь блок ключа, ад радка BEGIN да радка END.",
+      "privateKeyEncrypted": "Гэты блок ключа абаронены парольнай фразай. Устаўце ключ сэрвіснага ўліковага запісу без парольнай фразы.",
+      "names": {
+        "codestral": "Толькі састарэлы Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Увайсці праз ChatGPT)",
+        "xiaomi": "Xiaomi (аплата па меры выкарыстання)",
+        "zai": "Z.ai (аплата па меры выкарыстання)",
+        "bedrockByok": "Amazon Bedrock (напрамую)",
+        "vertexByok": "Google Vertex AI (напрамую)"
+      },
       "modelMappings": "Супастаўленні мадэляў",
       "modelMappingsDescription": "Перанакіроўвайце мадэль шлюза на ўласную назву разгортвання.",
       "mappingTitle": "Супастаўленне {{number}}",
@@ -489,6 +525,7 @@
       "receiptLabel": "Квітанцыя",
       "copyReceiptId": "Капіяваць ідэнтыфікатар квітанцыі",
       "appealLabel": "Апеляцыя",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Атрымана",
       "triageOpen": "На разглядзе",
       "triageActioned": "Задаволена",
@@ -506,7 +543,25 @@
       "nextStepInReview": "Вынік будзе паказаны на гэтым экране, і пасля рашэння вы зможаце падаць апеляцыю.",
       "nextStepAppeal": "Вынік вашай апеляцыі будзе паказаны на гэтым экране.",
       "nextStepFinal": "Рашэнне па апеляцыі канчатковае. Падаць паўторную апеляцыю нельга.",
-      "viewReceipt": "Паглядзець квітанцыю"
+      "viewReceipt": "Паглядзець квітанцыю",
+      "targetLabel": "Прадмет скаргі",
+      "reasonLabel": "Прычына скаргі",
+      "targetMessage": "Адказ ШІ",
+      "targetComment": "Каментар у запыце",
+      "targetUser": "Карыстальнік",
+      "reasonHarmful": "Шкодны змест",
+      "reasonIllegal": "Незаконны змест",
+      "reasonHarassment": "Цкаванне",
+      "reasonSpam": "Непажаданая рэклама",
+      "reasonOther": "Іншая прычына"
+    },
+    "reportReceipts": {
+      "title": "Скаргі",
+      "rowSubtitle": "Скаргі, якія вы падалі, і іх вынікі",
+      "emptyTitle": "Пакуль няма скаргаў",
+      "emptyDescription": "Скаргі, якія вы падаяце з каментара ў абмеркаванні запыту на зліццё або з адказу ШІ ў сеансе агента, з'яўляюцца тут разам з іх вынікам.",
+      "couldNotLoad": "Не ўдалося загрузіць вашыя скаргі",
+      "capped": "Паказаны вашыя апошнія скаргі."
     },
     "changelog": "Што новага",
     "changelogVersionPending": "Нататкі да версіі {{version}} прыйдуць з наступным абнаўленнем праграмы.",
@@ -514,8 +569,11 @@
     "changelogFixesIn": "Выпраўленні і паляпшэнні ў раздзелах: {{areas}}.",
     "changelogFixesPolish": "Выпраўленні і паляпшэнні ва ўсёй праграме.",
     "changelogAreas": {
-      "signIn": "Уваход",
-      "profileOrganizations": "Профіль ды арганізацыі"
+      "signIn": "уваход",
+      "profileOrganizations": "профіль ды арганізацыі",
+      "chat": "чат",
+      "notifications": "апавяшчэнні",
+      "integrations": "інтэграцыі"
     }
   },
   "preferences": {
@@ -992,8 +1050,9 @@
       "checkActiveConnection": "Падключэнне актыўнае, але гэты элемент усё яшчэ не загружаецца.",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Гэты ўліковы запіс пакуль не мае арганізацый. Запыты на зліццё ў Bitbucket можна будзе разглядаць пасля таго, як вы створыце арганізацыю або далучыцеся да яе.",
-      "gitlabReconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
+      "reconnectAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
       "bitbucketNotConnectedTitle": "Bitbucket не падключаны",
+      "bitbucketAdminOnlyDescription": "Папрасіце ўладальніка арганізацыі, адміністратара або кіраўніка плацяжоў падключыць яго.",
       "adminOnlyConnectDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для асабістага ўліковага запісу"
@@ -1222,6 +1281,10 @@
       "emptyTitle": "Пакуль няма апавяшчэнняў",
       "emptyCategoryTitle": "У гэтай катэгорыі няма апавяшчэнняў",
       "emptyBody": "Апавяшчэнні, якія атрымлівае гэты акаўнт, з'яўляюцца тут. Яны захоўваюцца {{days}} дзён.",
+      "emptyBody_one": "Апавяшчэнні, якія атрымлівае гэты акаўнт, з'яўляюцца тут. Яны захоўваюцца {{days}} дзён.",
+      "emptyBody_few": "Апавяшчэнні, якія атрымлівае гэты акаўнт, з'яўляюцца тут. Яны захоўваюцца {{days}} дзён.",
+      "emptyBody_many": "Апавяшчэнні, якія атрымлівае гэты акаўнт, з'яўляюцца тут. Яны захоўваюцца {{days}} дзён.",
+      "emptyBody_other": "Апавяшчэнні, якія атрымлівае гэты акаўнт, з'яўляюцца тут. Яны захоўваюцца {{days}} дзён.",
       "capped": "Паказваюцца самыя апошнія апавяшчэнні.",
       "loadError": "Не ўдалося загрузіць гісторыю апавяшчэнняў.",
       "openFailed": "Гэтае апавяшчэнне больш нідзе не адкрываецца."
@@ -1232,6 +1295,7 @@
     "needsInputAction": {
       "approved": "Запыт ухвалены",
       "replied": "Адказ дасланы",
+      "empty": "Напішыце адказ, а затым дашліце яго.",
       "failed": "Не ўдалося адказаць. Націсніце яшчэ раз, каб паўтарыць.",
       "unavailable": "Гэты запыт больш не чакае."
     }
@@ -1302,6 +1366,7 @@
       "manageAccess": "Кіраваць доступам",
       "bitbucketNoRepositoriesDescription": "У гэтай працоўнай прасторы Bitbucket няма даступных рэпазіторыяў.",
       "gitlabNoRepositoriesDescription": "Магчыма, вам трэба даць доступ да большай колькасці груп або праектаў на GitLab.",
+      "githubNoRepositoriesDescription": "Праверце, ці мае праграма Kilo для GitHub доступ да іх, і абнавіце спіс.",
       "installGithubApp": "Усталюйце праграму GitHub для рэпазіторыяў",
       "installGithubAppDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў, якія хочаце правяраць.",
       "repositoryAccess": "доступ да рэпазіторыяў",
@@ -1331,11 +1396,11 @@
       "couldNotGetLatest": "Не атрымалася атрымаць актуальныя даныя.",
       "byline": "#{{number}} · Аўтар: {{author}}",
       "noFindings": "Праблем не выяўлена.",
-      "findingsUnavailable": "Вынікі недаступныя, бо гэтая праверка завяршылася няўдала.",
+      "findingsUnavailable": "Вынікі недаступныя.",
       "findingsInProgress": "Гэтая праверка яшчэ працягваецца. Вынікі з’явяцца тут пасля яе завяршэння.",
       "findingsEndedWithoutResults": "Гэтая праверка завяршылася, не давесучы ніякіх вынікаў.",
       "serviceUnavailable": "Не атрымалася злучыцца з сэрвісам праверкі кода. Паўтарыце праверку, калі сэрвіс будзе даступны.",
-      "reviewFailed": "Праверка завяршылася няўдала. Калі ласка, паспрабуйце яшчэ раз.",
+      "reviewFailed": "Праверка завяршылася няўдала.",
       "showMore": "Паказаць больш",
       "created": "Створана",
       "started": "Пачата",
@@ -1457,6 +1522,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",
+      "deniedManagedByOwner": "Папрасіце ўладальніка {{organization}} змяніць падключэнне, якое вы не можаце змяніць.",
+      "deniedConnectRole": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў {{organization}} могуць яго падключыць.",
+      "deniedReconnectRole": "Папрасіце ўладальніка, адміністратара або кіраўніка плацяжоў {{organization}} падключыць яго.",
       "managedOnWebTitle": "Кіруецца ў вэб-версіі",
       "managedOnWebShort": "Гэтае падключэнне кіруецца ў вэб-версіі з камп'ютара.",
       "managedOnWebRepositories": "Выберыце рэпазіторыі для {{organization}} у вэб-версіі з камп'ютара.",
@@ -1492,7 +1560,9 @@
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
       "gitlabAccount": "уліковы запіс GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
-      "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё."
+      "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё.",
+      "notConnectedTitle": "{{platform}} не падключаны",
+      "githubAdminOnlyDescription": "Толькі ўладальнікі і адміністратары арганізацыі могуць яе падключыць."
     },
     "overview": {
       "allAreas": "Усе напрамкі",
@@ -1598,7 +1668,9 @@
       "unavailablePersonallySwitchAction": "Пераключыць арганізацыю",
       "unavailableOrganizationTitle": "Калегіяльная праверка зараз недаступная",
       "unavailableForOrganization": "Калегіяльная праверка патрабуе план Enterprise з актыўнай падпіскай або пробным перыядам. Зараз у гэтай арганізацыі яго няма.",
-      "unavailableForOrganizationNeutral": "Калегіяльная праверка зараз недаступная для гэтай арганізацыі. Паспрабуйце пазней.",
+      "unavailablePlanCheck": "Калегіяльная праверка не змагла праверыць план гэтай арганізацыі. Паўтарыце спробу, каб праверыць яшчэ раз.",
+      "unavailableFlagRollout": "Калегіяльная праверка яшчэ недаступная для гэтай арганізацыі. Абнавіце праграму да апошняй версіі, каб атрымаць яе.",
+      "unavailableForOrganizationMember": "Калегіяльная праверка патрабуе план Enterprise з актыўнай падпіскай або пробным перыядам. Уладальнік арганізацыі можа змяніць план.",
       "unavailableOnBitbucket": "Калегіяльная праверка недаступная для рэпазіторыяў Bitbucket.",
       "noRepositories": "Рэпазіторыі яшчэ не выбраны. Спачатку выберыце рэпазіторыі ў наладах рэпазіторыяў.",
       "specialists": "Спецыялісты",
@@ -2202,7 +2274,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеанса",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеанса",
       "live": "НАЖЫВА",
-      "updating": "Абнаўленне"
+      "updating": "Абнаўленне",
+      "retentionLimit": "Паказваюцца самыя апошнія сеансы."
     },
     "sessionRow": {
       "deleteTitle": "Выдаліць сеанс?",
@@ -2276,11 +2349,11 @@
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "emptyReadOnlyTitle": "У гэтым сеансе няма паведамленняў",
-      "renameAccessibility": "Перайменаваць сеанс: {{title}}",
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
       "historyTooLarge": "Транскрыпт гэтага сеанса занадта вялікі, каб загрузіць.",
       "historyUnavailable": "Транскрыпт гэтага сеанса немагчыма прачытаць.",
+      "historyTemporarilyUnavailable": "Транскрыпт гэтага сеанса часова недаступны.",
       "cloneFailedRetry": "Не ўдалося кланаваць гэты сеанс. Паспрабуйце яшчэ раз.",
       "notEnoughCredits": "Недастаткова крэдытаў для гэтага запыту. Папоўніце баланс і паспрабуйце яшчэ раз.",
       "previousTaskFinishing": "Папярэдняя задача яшчэ завяршаецца. Крыху пачакайце.",
@@ -2619,8 +2692,7 @@
       "searchPlaceholder": "Пошук рэпазіторыяў",
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
-      "noRepositoriesDescription": "Да вашага ўліковага запісу не падключаны ніводны рэпазіторый.",
-      "loading": "Загрузка…",
+      "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab.",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2652,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Падрабязнасці недаступныя.",
+      "detailsUnavailableDescription": "Гэтага элемента больш няма ў сеансе.",
       "textDisplay": "Адлюстраванне тэксту",
       "thinking": "Разважае",
       "thought": "Развагі",
@@ -2695,6 +2768,7 @@
     "filePart": {
       "loadingImage": "Загрузка выявы",
       "imageUnavailableRetry": "Выява недаступная. Паўтарыць загрузку",
+      "imageUnavailableRetryWithAlt": "Выява недаступная. {{alt}}. Паўтарыць загрузку",
       "imagePreviewUnavailableInSession": "Папярэдні прагляд выявы недаступны ў гэтым сеансе.",
       "viewImage": "Праглядзець выяву",
       "viewImageWithAlt": "Праглядзець выяву «{{alt}}»",
@@ -2826,7 +2900,9 @@
       "skip": "Прапусціць",
       "retrySkip": "Паспрабаваць прапусціць яшчэ раз",
       "submitting": "Адпраўка…",
-      "sendAnswers": "Адправіць адказы"
+      "sendAnswers": "Адправіць адказы",
+      "unreadableTitle": "Не ўдалося адлюстраваць гэтае пытанне",
+      "unreadableBody": "Агент чакае пытання, якое гэта праграма не можа паказаць. Адкажыце на пытанне ў CLI, каб працягнуць."
     },
     "blockingCard": {
       "questionUnavailable": "Гэтае пытанне больш недаступнае.",
@@ -2853,6 +2929,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Не ўдалося загрузіць сеанс падагента.",
+      "historyTooLarge": "Гісторыя гэтага падагента занадта вялікая, каб загрузіць.",
+      "historyUnavailable": "Гісторыя гэтага падагента недаступная.",
+      "historyTemporarilyUnavailable": "Гісторыя гэтага падагента часова недаступная.",
       "failed": "Сеанс падагента завяршыўся з памылкай.",
       "noMessages": "Няма паведамленняў падагента",
       "noMessagesDescription": "Гэты сеанс падагента завяршыўся без гісторыі паведамленняў.",
@@ -3030,7 +3109,7 @@
       "windowUnavailable": "Памер кантэкстнага акна невядомы",
       "tapToViewDetails": " Націсніце, каб убачыць падрабязнасці кантэксту.",
       "costClause": ", кошт {{cost}}",
-      "loadingCostSpoken": "кошт {{cost}}.",
+      "loadingCostSpoken": "кошт да гэтага часу {{cost}}.",
       "tokensWindowUnavailable": "Токенаў у кантэксце: {{used}}, памер кантэкстнага акна невядомы{{costClause}}.",
       "tokensUsage": "Токенаў у кантэксце: {{used}} з {{window}}, выкарыстана {{percentage}}{{costClause}}.",
       "title": "Выкарыстанне кантэксту",
@@ -3150,6 +3229,12 @@
     "retryLoadingAccount": "Паўтарыць загрузку ўліковага запісу",
     "retryLoadingPrivacy": "Паўтарыць загрузку налад прыватнасці"
   },
+  "accountBlocked": {
+    "title": "Акаўнт заблакаваны",
+    "description": "Kilo заблакаваў гэты акаўнт, і паўторны ўваход не здыме блакіроўку. Падтрымка можа перагледзець блакіроўку па запыце.",
+    "domainDescription": "Kilo не дазваляе акаўнтаў на гэтым дамене электроннай пошты, і паўторны ўваход не зменіць гэта. Падтрымка можа перагледзець дамен па запыце.",
+    "contactSupport": "Звярнуцца ў падтрымку"
+  },
   "addCredits": {
     "cta": "Папоўніць баланс",
     "billingPage": "старонка аплаты"
@@ -3222,8 +3307,7 @@
     "timeoutDescription": "Запыт не паспеў выканацца ў адведзены час. Паспрабуйце яшчэ раз."
   },
   "screenHeader": {
-    "openMenu": "Адкрыць меню",
-    "openMenuFor": "Адкрыць меню для {{title}}"
+    "openMenu": "Адкрыць меню"
   },
   "picker": {
     "optionsExpired": "Тэрмін дзеяння варыянтаў скончыўся",
@@ -3446,6 +3530,8 @@
     "voiceTranscriptionWho": "Ваша прылада, Kilo Gateway з абранай вамі мадэллю распазнавання або Apple ці Google для анлайн-распазнавання.",
     "installAttributionPromptTitle": "Дазволіць вызначаць крыніцу ўсталявання?",
     "installAttributionPromptMessage": "Kilo выкарыстоўвае дазвол Apple на адсочванне толькі для вызначэння канала, праз які вы прыйшлі. Вашы запыты і размовы для гэтага ніколі не выкарыстоўваюцца.",
+    "installAttributionRequestFailedTitle": "Не ўдалося паказаць запыт аб адсочванні",
+    "installAttributionRequestFailedMessage": "Kilo не змог паказаць сістэмны запыт, таму вызначэнне крыніцы ўсталявання застаецца выключаным.",
     "what": "Якія даныя",
     "why": "Навошта",
     "who": "Каму"
@@ -3461,7 +3547,7 @@
   "organization": {
     "auditLog": {
       "title": "Журнал аўдыту",
-      "permissionDenied": "Чытаць журнал аўдыту арганізацыі на плане Enterprise могуць толькі яе ўладальнік, адміністратар або менеджар па аплаце.",
+      "permissionDenied": "Чытаць журнал аўдыту арганізацыі на плане Enterprise могуць толькі яе ўладальнік, адміністратар або кіраўнік плацяжоў. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Няма падзей аўдыту",
       "emptyDescription": "Тут з'яўляюцца дзеянні, выкананыя ў гэтай арганізацыі.",
       "truncated": "Паказаны апошнія падзеі.",
@@ -3511,11 +3597,157 @@
         "guardrailUpdate": "Абмежаванне бяспекі абноўлена",
         "guardrailRemove": "Абмежаванне бяспекі выдалена",
         "unknown": "Падзея аўдыту"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Рэжым \"{{name}}\" (ідэнтыфікатар: {{slug}})",
+        "modeUpdate": "Рэжым \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Аўтаматычная маршрутызацыя",
+          "defaultModel": "Мадэль па змаўчанні"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Дададзены {{email}} як {{role}}",
+        "memberRemoved": "Выдалены {{email}}",
+        "memberParentAdded": "Дададзены {{email}} з мацярынскай арганізацыі {{parent}}",
+        "memberParentRemoved": "Выдалены {{email}} з мацярынскай арганізацыі {{parent}}",
+        "inviteSent": "{{email}} як {{role}}",
+        "inviteRevoked": "Запрашэнне для {{email}} адклікана",
+        "inviteAccepted": "Прынята {{email}}",
+        "groupIdentity": "Група \"{{name}}\"",
+        "groupMembers": "Група \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} групы",
+        "groupMemberGroups_few": "{{displayCount}} групы",
+        "groupMemberGroups_many": "{{displayCount}} груп",
+        "groupMemberGroups_one": "{{displayCount}} група",
+        "groupMemberGroups_other": "{{displayCount}} групы",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} групы",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} групы",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} груп",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} група",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} групы",
+        "groupPolicySet": "Група \"{{name}}\": зададзена палітыка {{policy}}",
+        "groupPolicyRemoved": "Група \"{{name}}\": выдалена палітыка {{policy}}",
+        "groupDefaultPolicySet": "Зададзена стандартная палітыка {{policy}}",
+        "groupDefaultPolicyRemoved": "Выдалена стандартная палітыка {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Абмежаванні бяспекі ШІ {{state}}",
+        "guardrailConfigGroup": "{{state}} для групы \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Дамен SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (быў {{previous}})",
+        "ssoDomainRemoved": "Ачышчаны дамен SSO {{domain}}",
+        "fundsPurchased": "{{amount}} праз {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} да {{displayCount}} даччынай арганізацыі",
+        "fundsDistributed_few": "{{amount}} да {{displayCount}} даччыных арганізацый",
+        "fundsDistributed_many": "{{amount}} да {{displayCount}} даччыных арганізацый",
+        "fundsDistributed_one": "{{amount}} да {{displayCount}} даччынай арганізацыі",
+        "fundsDistributed_other": "{{amount}} да {{displayCount}} даччынай арганізацыі",
+        "fundsReceived": "{{amount}} ад {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Канфігурацыя {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: стыль {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} абноўлена",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} абноўлена",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} абноўлена",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} абноўлена",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} абноўлена",
+        "reviewAgentSecretsFailed": "{{displayCount}} памылкі",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} памылкі",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} памылак",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} памылка",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} памылкі",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Рэгіён інферэнсу: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Рэжым \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Глабальнае па змаўчанні",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Дазволены",
+          "denied": "Забаронены",
+          "followSetting": "Адпавядае наладам пашырэння"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Інтэрфейс Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} для {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Дайджэст рэкамендацый {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: дазволеных крыніц няма",
+        "settingName": "Перайменавана з {{previous}} на {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Сканаванне перад выкарыстаннем уключана",
+        "scanBeforeUseOff": "Сканаванне перад выкарыстаннем адключана",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Выдалены: {{models}}",
+        "browserPolicyOff": "Выкарыстанне браўзера заблакавана",
+        "browserPolicyAllow": "Толькі дазволеныя крыніцы",
+        "browserPolicyPlaywrightOnly": "Толькі выкарыстанне браўзера",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Мадэлі зменены: {{values}}",
+        "integrationConnected": "{{integration}} падключаны",
+        "integrationDisconnected": "{{integration}} адключаны",
+        "integrationRefreshed": "{{integration}} абноўлены",
+        "integrationCancelled": "{{integration}} адменены",
+        "integrationModelUpdated": "{{integration}}: мадэль {{model}}",
+        "integrationKeyAdded": "Ключ дададзены для {{provider}}",
+        "integrationKeyUpdated": "Ключ абноўлены для {{provider}}",
+        "integrationKeyDeleted": "Ключ выдалены для {{provider}}",
+        "integrationKeyToggled": "Ключ для {{provider}}: {{state}}",
+        "namedPolicyCreated": "Створана {{kind}} палітыка {{id}}",
+        "namedPolicyUpdated": "Абноўлена {{kind}} палітыка {{id}}",
+        "namedPolicyDeleted": "Выдалена {{kind}} палітыка {{id}}",
+        "namedPolicyLinked": "Звязана {{kind}} палітыка {{next}}",
+        "webhookTriggerUpdated": "Трыгер {{trigger}}",
+        "organizationRenamed": "Арганізацыя перайменавана з {{previous}} на {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Уласны ключ API"
+        }
       }
     },
     "billing": {
       "title": "Аплата",
-      "permissionDenied": "Бачыць аплату арганізацыі могуць толькі ўладальнік, адміністратар або менеджар па аплаце.",
+      "permissionDenied": "Бачыць аплату арганізацыі могуць толькі ўладальнік, адміністратар або кіраўнік плацяжоў. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Падпіска",
       "state": "Стан",
       "stateNone": "Няма падпіскі",
@@ -3533,7 +3765,7 @@
       "manageOnWeb": "Налады аплаты ў вэб-версіі",
       "changePlan": "Змяніць план",
       "buySeats": "Купіць месцы",
-      "managedOnWeb": "План, месцы і аўтапапаўненне кіруюцца ў вэб-версіі.",
+      "managedOnWeb": "План, месцы і аўтапапаўненне кіруюцца на kilo.ai.",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
       "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"
@@ -3593,11 +3825,11 @@
       "pendingInvitation": "Гэты адрас электроннай пошты ўжо мае чакаючае запрашэнне.",
       "alreadyMember": "Гэты чалавек ужо з'яўляецца ўдзельнікам гэтай арганізацыі.",
       "seatsFull": "Усе месцы занятыя ({{used}}/{{total}}). Папрасіце ўладальніка арганізацыі дадаць месцы, перш чым запрашаць больш удзельнікаў.",
-      "seatsFullCanInviteBilling": "Усе месцы занятыя ({{used}}/{{total}}). Вы па-ранейшаму можаце запрашаць менеджараў па аплаце, якія не займаюць месца.",
+      "seatsFullCanInviteBilling": "Усе месцы занятыя ({{used}}/{{total}}). Вы па-ранейшаму можаце запрашаць кіраўнікоў плацяжоў, якія не займаюць месца.",
       "noSeatsAvailable": "Усе месцы занятыя. Папрасіце ўладальніка арганізацыі дадаць месцы, перш чым запрашаць больш удзельнікаў."
     },
     "invoices": {
-      "downloadA11y": "Спампаваць рахунак {{number}}",
+      "downloadA11y": "Спампаваць рахунак {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Рахункі ствараюцца аўтаматычна кожны разліковы перыяд і з'явяцца тут пасля выстаўлення рахунку вашай арганізацыі.",
       "emptyTitle": "Няма рахункаў",
       "invoiceFallback": "Рахунак",
@@ -3677,7 +3909,6 @@
       "usageDetails": "Падрабязнасці выкарыстання",
       "providersAndModels": "Пастаўшчыкі і мадэлі",
       "groups": "Групы",
-      "guardrails": "Абмежаванні бяспекі",
       "byok": "Уласны ключ",
       "ssoAndDomain": "SSO і дамен",
       "dataCollection": "Збор даных",
@@ -3692,7 +3923,7 @@
       "emptyDescription": "Націсніце «Папярэдняя гадзіна», каб праглядзець папярэднія запыты.",
       "emptyBoundDescription": "Больш ранніх журналаў запытаў няма.",
       "loadError": "Не ўдалося загрузіць журналы запытаў.",
-      "permissionDenied": "Чытаць журналы запытаў арганізацыі могуць толькі яе ўладальнік, адміністратар або менеджар па аплаце.",
+      "permissionDenied": "Чытаць журналы запытаў арганізацыі могуць толькі яе ўладальнік, адміністратар або кіраўнік плацяжоў. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} уваход · {{output}} выхад",
       "byok": "BYOK"
     },
@@ -3715,13 +3946,14 @@
       "identifierLabel": "Ідэнтыфікатар",
       "identifierRequired": "Увядзіце ідэнтыфікатар.",
       "identifierTaken": "Іншы рэжым ужо выкарыстоўвае гэты ідэнтыфікатар.",
+      "identifierTooLong": "Трымайце ідэнтыфікатар у межах {{max}} сімвалаў або менш.",
       "nameLabel": "Назва рэжыму",
       "nameRequired": "Увядзіце назву рэжыму.",
       "notFound": "Гэты рэжым больш не існуе.",
-      "restrictionHint": "Рэдагаваць можна толькі файлы, якія адпавядаюць гэтаму шаблону. Пакіньце поле пустым, каб дазволіць рэдагаваць усе файлы.",
-      "restrictionInvalid": "Увядзіце карэктны шаблон.",
+      "restrictionHint": "Рэгулярны выраз выбірае файлы, якія гэты рэжым можа рэдагаваць, напрыклад `\\.md$` толькі для файлаў markdown. Пакіньце поле пустым, каб дазволіць усе файлы.",
+      "restrictionInvalid": "Увядзіце карэктны рэгулярны выраз.",
       "restrictionLabel": "Метка абмежавання",
-      "restrictionPattern": "Шаблон файла",
+      "restrictionPattern": "Абмежаванне файлаў",
       "roleLabel": "Азначэнне ролі",
       "roleRequired": "Апішыце, што робіць гэты рэжым.",
       "tool": {
@@ -3800,7 +4032,7 @@
     "signupStepUpApple": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Каб завяршыць стварэнне ўліковага запісу, вярніся назад і выберы «$t(login.moreSignInOptions)».",
-    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Паспрабуй яшчэ раз або выберы «$t(login.resendCode)».",
+    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Выкарыстай «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Твой код апрацоўваецца. Крыху пачакай і паспрабуй яшчэ раз.",
     "tooManyAttempts": "Занадта шмат спроб. Запытай новы код.",
     "invalidToken": "Не атрымалася ўвайсці. Паспрабуй яшчэ раз.",
@@ -3809,7 +4041,7 @@
     "emailDeliveryFailed": "Адпраўка лістоў часова недаступная. Паспрабуй яшчэ раз пазней.",
     "admissionRequired": "Немагчыма праверыць тваю прыладу. Выберы «$t(login.moreSignInOptions)», каб увайсці з іншай прылады або на сайце.",
     "default": "Адбылася памылка. Паспрабуй яшчэ раз.",
-    "retryableAdmission": "Не атрымалася праверыць гэтую прыладу. Правер падключэнне да інтэрнэту і паспрабуй яшчэ раз.",
+    "retryableAdmission": "Не ўдалося праверыць гэтую прыладу. Паспрабуй яшчэ раз.",
     "startSignInFailed": "Не атрымалася пачаць уваход. Паспрабуй яшчэ раз.",
     "couldNotOpenBrowser": "Не атрымалася адкрыць браўзер. Паспрабуй яшчэ раз.",
     "signInTimedOut": "Час чакання ўваходу скончыўся. Паспрабуй яшчэ раз.",
@@ -3881,6 +4113,50 @@
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
     "waitingToRetry": "Чакае паўторнай спробы",
+    "countNoun": {
+      "needsInput_one": "Чакае адказу",
+      "needsInput_other": "Чакае адказу",
+      "needsInput_few": "Чакае адказу",
+      "needsInput_many": "Чакае адказу",
+      "running_one": "Працуе",
+      "running_other": "Працуе",
+      "running_few": "Працуе",
+      "running_many": "Працуе",
+      "scheduled_one": "Запланавана",
+      "scheduled_other": "Запланавана",
+      "scheduled_few": "Запланавана",
+      "scheduled_many": "Запланавана",
+      "idle_one": "Чакае",
+      "idle_other": "Чакае",
+      "idle_few": "Чакае",
+      "idle_many": "Чакае"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Чакае адказу",
+      "needsInput_other": "{{displayCount}} Чакае адказу",
+      "needsInput_few": "{{displayCount}} Чакае адказу",
+      "needsInput_many": "{{displayCount}} Чакае адказу",
+      "running_one": "{{displayCount}} Працуе",
+      "running_other": "{{displayCount}} Працуе",
+      "running_few": "{{displayCount}} Працуе",
+      "running_many": "{{displayCount}} Працуе",
+      "scheduled_one": "{{displayCount}} Запланавана",
+      "scheduled_other": "{{displayCount}} Запланавана",
+      "scheduled_few": "{{displayCount}} Запланавана",
+      "scheduled_many": "{{displayCount}} Запланавана",
+      "idle_one": "{{displayCount}} Чакае",
+      "idle_other": "{{displayCount}} Чакае",
+      "idle_few": "{{displayCount}} Чакае",
+      "idle_many": "{{displayCount}} Чакае"
+    },
+    "footer": {
+      "checked": "Праверана {{time}}",
+      "lastKnown": "Апошні вядомы стан · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Наступны запуск {{time}}",
+      "wasDue": "Чакалася {{time}}"
+    },
     "step": {
       "editing": "Рэдагаванне",
       "reading": "Чытанне",
@@ -3937,7 +4213,10 @@
     "list": {
       "loadFailed": "Не атрымалася загрузіць гісторыю чата.",
       "new": "Новы чат",
-      "deleteTitle": "Выдаліць гэты чат?"
+      "deleteTitle": "Выдаліць гэты чат?",
+      "resetNoticeTitle": "Лакальныя чаты і чарнавікі выдалены",
+      "resetNoticeBody": "Kilo не змог адкрыць чаты, захаваныя на гэтай прыладзе. Вашы сеансы ў воблаку не закрануты.",
+      "resetNoticeDismiss": "Адхіліць паведамленне"
     },
     "rename": {
       "title": "Перайменаваць чат",
@@ -3987,6 +4266,9 @@
       "fieldName": "Бачная назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Увядзіце сапраўдны URL сервера.",
+      "fieldUrlCredentials": "Выдаліце імя карыстальніка і пароль з URL.",
+      "fieldUrlFragment": "Выдаліце з URL частку з сімвалам #.",
+      "fieldUrlInsecure": "Увядзіце https-URL, а http дапушчальны толькі для localhost.",
       "duplicateUrl": "Гэты URL ужо захаваны.",
       "serverNotFound": "Гэты сервер больш не захоўваецца.",
       "enableServer": "Уключыць гэты сервер: {{name}}",
@@ -4014,6 +4296,7 @@
       "app": {
         "label": "Інтэрфейс інструмента",
         "failed": "Не ўдалося загрузіць інтэрфейс гэтага інструмента.",
+        "tooLarge": "Інтэрфейс гэтага інструмента перавышае ліміт {{size}}.",
         "empty": "Інтэрфейс гэтага інструмента не мае чаго паказваць."
       }
     },
@@ -4081,6 +4364,8 @@
       "discoveryNoModels": "Пункт доступу не паказаў ніводнай мадэлі. Увядзіце мадэлі ўручную.",
       "connectionIncomplete": "Мадэль адказала, але не завяршыла адказ. Паспрабуйце зноў або праверце ідэнтыфікатар мадэлі і пратакол.",
       "invalidInput": "Увядзіце назву сервернай часткі, карэктныя загалоўкі і прынамсі адну мадэль з унікальнымі ідэнтыфікатарам і назвай. Ліміты токенаў павінны быць дадатнымі цэлымі лікамі.",
+      "invalidApiKey": "Ключ API змяшчае сімвал, які немагчыма адправіць. Выкарыстоўвайце толькі літары, лічбы і стандартныя сімвалы, без пераносаў радкоў.",
+      "invalidHeaders": "Уласны загаловак немагчыма адправіць. Праверце яго назву і выкарыстоўвайце толькі літары, лічбы і стандартныя сімвалы, без пераносаў радкоў.",
       "invalidUrl": "Увядзіце каранёвы URL API з HTTP або HTTPS без уліковых даных, параметраў запыту або фрагмента.",
       "publicHttp": "Публічныя пункты доступу HTTP не дазваляюцца. Выкарыстоўвайце HTTPS або прыватны лакальны пункт доступу.",
       "httpApprovalRequired": "Дазвольце выкарыстанне гэтага лакальнага пункта доступу HTTP перад захаваннем або падключэннем.",
@@ -4128,7 +4413,9 @@
         "space": "Не хапае вольнага месца для гэтай мадэлі. Вызваліце месца і паспрабуйце зноў.",
         "network": "Спампоўванне не завяршылася. Праверце злучэнне і паспрабуйце зноў.",
         "invalidFile": "Спампаваны файл не з'яўляецца мадэллю, якую можа запусціць гэта праграма, таму ён быў выдалены.",
-        "checksum": "Спампаваны файл не адпавядае апублікаванай кантрольнай суме, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз."
+        "checksum": "Спампаваны файл не адпавядае апублікаванай кантрольнай суме, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз.",
+        "unreadable": "Гэта прылада не змагла праверыць спампаваны файл, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз.",
+        "writeFailed": "Гэта прылада не змагла захаваць мадэль. Паспрабуйце спампаваць яе яшчэ раз."
       }
     },
     "catalog": {
@@ -4213,7 +4500,15 @@
       "download": "Спампаваць мадэль на прыладу",
       "downloading": "Спампоўванне…",
       "downloadProgress": "Спампоўванне… {{percent}}%",
-      "downloadFailed": "Спампоўванне не завяршылася. Праверце злучэнне і вольнае месца, потым паспрабуйце зноў."
+      "downloadFailed": "Спампоўванне не завяршылася. Праверце злучэнне і вольнае месца, потым паспрабуйце зноў.",
+      "cannotUse": "Нельга запусціць: {{items}}.",
+      "cannotUseOptions": "Нельга запоўніць: некаторыя параметры інструмента.",
+      "limitations": "Абмежаванні",
+      "tools": {
+        "time": "Час",
+        "settingsList": "Паказаць налады",
+        "settingsSet": "Змяніць налады"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
@@ -4316,7 +4611,7 @@
     "personalDefaultDescription": "Аўтаматычна загружаецца, калі ні ў адным сховішчы няма замацаванага профілю.",
     "organizationDefaultDescription": "Аўтаматычна загружаецца для ўдзельнікаў, якія не маюць асабістых значэнняў па змаўчанні.",
     "setAsDefault": "Усталяваць па змаўчанні",
-    "saveFailed": "Не ўдалося захаваць профіль",
+    "saveFailed": "Не ўдалося захаваць профіль. Паспрабуйце зноў.",
     "organizationRoleRequired": "Толькі ўладальнікі і адміністратары арганізацыі могуць змяніць профілі арганізацыі.",
     "deleteTitle": "Выдаліць профіль",
     "deleteMessage": "Гэта назаўжды выдаляе профіль і яго налады. Гэта нельга адмяніць.",
@@ -4402,6 +4697,7 @@
     "instructionSaveFailed": "Не ўдалося захаваць інструкцыю",
     "instructionDeleteFailed": "Не ўдалося выдаліць інструкцыю",
     "instructionToggleFailed": "Не ўдалося абнавіць інструкцыю",
+    "instructionViewTitle": "Файл інструкцыі",
     "instructionLimitReached": "Профіль можа змяшчаць да {{max}} інструкцый. Выдаліце адну, каб дадаць яшчэ.",
     "mcp": {
       "title": "MCP серверы",
@@ -4467,6 +4763,7 @@
       "promptPlaceholder": "Вы…",
       "tools": "інструменты",
       "wholeToolRule": "Гэты агент прымяняе адно правіла да ўсіх інструментаў адначасова: {{rule}}. Гэтыя перамыкачы даступныя толькі для чытання.",
+      "toolRule": "Захаванае правіла: {{rule}}",
       "visibility": "Бачнасць",
       "visibilityPrimary": "Асноўны — паказваецца ў выбары",
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",
@@ -4573,22 +4870,48 @@
     "history": {
       "activityUnavailable": "Не ўдалося загрузіць крэдытную актыўнасць.",
       "appStoreReceipt": "Чэк у App Store",
+      "deduction": {
+        "adminCancel": "Баланс закрыты адміністратарам",
+        "adminDebit": "Крэдыты выдалены адміністратарам",
+        "codingPlan": "План праграмавання: {{plan}}",
+        "correction": "Карэкціроўка балансу",
+        "dispute": "Спрэчка аб плацяжы",
+        "refundAppStore": "Вяртанне набору крэдытаў з App Store",
+        "refundGooglePlay": "Вяртанне набору крэдытаў з Google Play"
+      },
       "deductionFallback": "Спісанне крэдытаў",
       "emptyDescription": "Тут будуць адлюстроўвацца пакупкі крэдытаў, чэкі і выкарыстанне.",
       "emptyTitle": "Гісторыі крэдытаў няма",
+      "expiredGrant": "Тэрмін дзеяння скончыўся: {{description}}",
+      "expiredStatus": "Тэрмін дзеяння скончыўся",
       "googlePlayReceipt": "Чэк у Google Play",
       "kind": {
         "adjustment": "Карэкціроўка",
         "balanceNeutral": "Без змены балансу",
         "deduction": "Спісанне",
         "grant": "Начысленне крэдытаў",
+        "promotionalCredits": "Прэміяльныя крэдыты",
+        "welcomeCredits": "Вітальныя крэдыты",
         "purchase": "Пакупка"
+      },
+      "program": {
+        "adminBulkGrant": "Начысленне крэдытаў адміністратарам",
+        "contributorChampion": "Крэдыт чэмпіёна сярод удзельнікаў",
+        "feedback": "Крэдыт за водгук",
+        "influencer": "Крэдыт інфлюэнсера",
+        "ossMonthlyReset": "Штомесячнае абнаўленне OSS",
+        "ossSponsorship": "Крэдыт спонсарства OSS",
+        "pullRequest": "Крэдыт за запыт на зліццё",
+        "usageIssue": "Крэдыт за праблему з выкарыстаннем",
+        "vibeDay": "Крэдыт Vibe day"
       },
       "purchaseFallback": "Пакупка крэдытаў",
       "receipt": "Чэк",
       "receiptA11y": "Адкрыць чэк: {{description}}, {{amount}}, ад {{date}}",
       "receiptUnavailable": "Чэк для гэтай пакупкі недаступны.",
-      "retentionLimit": "Паказваецца самая апошняя гісторыя крэдытаў."
+      "retentionLimit": "Паказваецца самая апошняя гісторыя крэдытаў.",
+      "voidedGrant": "Ануляваны: {{description}}",
+      "voidedStatus": "Ануляваны"
     },
     "title": "Купіць крэдыты",
     "description": "Крэдыты — гэта аднаразовая пакупка, якая дадаецца на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo. Крама спісвае сродкі з вашага рахунку, і крэдыты дадаюцца пасля пацверджання аплаты крамай.",
@@ -4740,6 +5063,7 @@
     "contextAll": "Усе кантэксты",
     "dismiss": "Адхіліць зводку",
     "dismissFailed": "Пакуль не ўдалося адхіліць гэтую зводку. Паўторная спроба адбудзецца ў фонавым рэжыме.",
+    "readMarkFailed": "Не ўдалося пазначыць гэтую зводку як прачытаную. Паўторная спроба адбудзецца пасля перазагрузкі зводкі.",
     "offline": "Па-за сеткай · захаваная зводка",
     "cached": "Захаваная зводка · абнаўленне недаступнае",
     "summary": "AI-рэзюмэ",
@@ -4759,15 +5083,22 @@
     "morningEnd": "Зводка даступная да",
     "timeHint": "Картка на галоўнай вяртае бягучы стан, калі акно зводкі заканчваецца, нават па-за сеткай.",
     "invalidSchedule": "Выберыце правільны часавы пояс і непустое акно зводкі.",
+    "scheduleEmptyNight": "Акно зводкі пустое. Выберыце час гатоўнасці пазней за пачатак акна.",
+    "scheduleEmptyMorning": "Час гатоўнасці і час, да якога зводка даступная, супадаюць. Выберыце, колькі часу зводка застанецца даступнай.",
+    "scheduleFullDay": "Два акны ахопліваюць поўны дзень. Пакіньце частку дня па-за зводкай.",
     "notificationsHint": "Адно агульнае апавяшчэнне на кожную запланаваную зводку. Не залежыць ад платных AI-рэзюмэ.",
     "notificationPermission": "Уключыце push-апавяшчэнні, каб атрымліваць вашу зводку.",
     "defaultModel": "Стандартная мадэль Kilo",
     "duration": "Ліміт часу (хвіліны)",
     "spendLimit": "Ліміт выдаткаў (USD)",
-    "invalidSafeguards": "Увядзіце дадатныя канечныя ліміты часу і выдаткаў.",
+    "invalidSafeguards": "Увядзіце дадатны лік у дазволеных межах.",
     "estimate": "Ацэнка {{estimate}} · максімум {{maximum}}",
     "estimateUnavailable": "Платнае рэзюмэ недаступна для гэтых налад. Змяніце мадэль або абмежаванні, або паўтарыце спробу пазней.",
     "confirmPaid": "Уключыць платныя рэзюмэ для {{context}}?",
+    "paidDisclosure_one": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
+    "paidDisclosure_few": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
+    "paidDisclosure_many": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
+    "paidDisclosure_other": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
     "paidDisclosure": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
     "enable": "Уключыць платныя рэзюмэ",
     "allContexts": "Асабістыя і арганізацыйныя зводкі застаюцца асобнымі.",
@@ -4779,8 +5110,8 @@
     "estimateSpendLimitTooLow": "Павялічце ліміт выдаткаў, каб дазволіць гэта рэзюмэ.",
     "saved": "Налады зводкі захаваны",
     "selectedSessions": "Выбраныя сеансы",
-    "snapshotPullRequests": "PRs у выбраных сеансах",
-    "snapshotBlockers": "Перашкоды ў выбраных сеансах",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Перашкоды",
     "capturedAt": "Зафіксавана {{time}}",
     "snapshotHint": "Здымак апошняга даступнага стану сеансаў, зафіксаваны ў запланаваны ранішні час. Даныя могуць быць няпоўнымі. Паказчыкі датычацца выбраных сеансаў, а не ўсёй актыўнасці за ноч.",
     "snapshotTruncated": "Некаторыя сеансы або доказы не ўключаны, каб абмежаваць памер гэтага здымка.",
@@ -4819,7 +5150,7 @@
     "sourceActivity": "Дзейнасць без назвы",
     "metadataFailureProvider": "памылка правайдара",
     "metadataFailureTool": "памылка інструмента",
-    "metadataFailureCancelled": "Адменена",
+    "metadataStopped": "Апошні запыт быў спынены",
     "metadataFailureOther": "неўдакладненая памылка"
   },
   "systemSearch": {
@@ -4827,6 +5158,7 @@
   },
   "usage": {
     "title": "Выкарыстанне",
+    "personalTitle": "Выкарыстанне асабістага акаўнта",
     "orgTitle": "Выкарыстанне арганізацыі",
     "entrySubtitle": "Выдаткі, запыты і токены",
     "rangePicker": "Перыяд",
@@ -4840,7 +5172,8 @@
     "unavailableTitle": "Выкарыстанне недаступнае",
     "unavailableDescription": "Выкарыстанне для гэтай працоўнай прасторы не наладжана. Звярніцеся ў службу падтрымкі, калі чакаеце ўбачыць тут звесткі пра выкарыстанне.",
     "orgSelfNotice": "Вы бачыце ўласнае выкарыстанне ў гэтай арганізацыі.",
-    "viewDetails": "Падрабязнасці выкарыстання"
+    "viewDetails": "Падрабязнасці выкарыстання",
+    "orgSelfEntryTitle": "Ваша выкарыстанне"
   },
   "integrations": {
     "title": "Інтэграцыі",
@@ -4853,6 +5186,8 @@
     "connectedTo": "Падключана да {{account}}",
     "disconnected": "Адключана: {{provider}}",
     "disconnectFailed": "Не ўдалося адключыць {{provider}}",
+    "disconnectRetry": "Не ўдалося пацвердзіць адключэнне Slack. Паспрабуйце яшчэ раз.",
+    "disconnectNeedsSupport": "Не ўдалося прачытаць захаваны доступ да Slack для гэтага падключэння. Каб завяршыць адключэнне, звярніцеся ў падтрымку.",
     "couldNotLoad": "Не ўдалося загрузіць інтэграцыі",
     "permissionDenied": "У вас няма правоў на кіраванне гэтымі інтэграцыямі.",
     "managedByOwner": "Папрасіце ўладальніка арганізацыі змяніць падключэнне, якое вы не можаце змяніць.",
@@ -4934,10 +5269,15 @@
       "autoCommit": "Фіксаваць змены пасля завяршэння запуску",
       "condenseOnComplete": "Сціскаць кантэкст пасля завяршэння запуску",
       "activeTitle": "Трыгер актыўны",
+      "activeSwitchA11y": "Актыўны трыгер: {{name}}",
+      "copyLinkA11y": "Скапіяваць спасылку: {{name}}",
       "activeDescription": "Прыпыненыя вэбхукі адказваюць кодам 404.",
       "runAsCreator": "Запускаць ад майго імя",
       "runAsCreatorDescription": "Кожны запуск выкарыстоўвае ваш уліковы запіс, таму сакрэтны загаловак абавязковы.",
       "saveFailedTitle": "Не ўдалося захаваць трыгер",
+      "nameTaken": "Трыгер з назвай «{{name}}» ужо існуе.",
+      "saveFailedRetry": "Не ўдалося звязацца з серверам. Праверце злучэнне і паспрабуйце зноў.",
+      "saveFailedCheck": "Праверце значэнні ў форме і паспрабуйце зноў.",
       "deleteTitle": "Выдаліць гэты трыгер?",
       "deleteMessage": "Выклікі да {{name}} будуць неўдалымі. Гэта нельга адмяніць.",
       "deleteMessageScheduled": "Запланаваныя запускі трыгера {{name}} спыняюцца. Гэта нельга адмяніць.",
@@ -5182,6 +5522,20 @@
       "eu": "Еўрапейскі саюз",
       "au": "Аўстралія",
       "jp": "Японія"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Пошук налад",
+    "noMatches": "Адпаведных налад не знойдзена",
+    "emptyDescription": "Паспрабуйце іншую назву налады або ключавое слова.",
+    "resultsStatus": "Знойдзена налад: {{resultCount}}",
+    "keywords": {
+      "signOut": "выйсці|выхад",
+      "appearance": "тэма|колеравая схема",
+      "appUnlock": "біяметрыя|распазнаванне твару|адбітак пальца",
+      "language": "мова|пераклад",
+      "notifications": "абвесткі|апавяшчэнні|пуш-апавяшчэнні",
+      "privacy": "аналітыка|адсочванне"
     }
   }
 }

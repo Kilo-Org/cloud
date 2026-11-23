@@ -29,6 +29,7 @@ import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallatio
 import { GitHubIdentityCard } from './GitHubIdentityCard';
 import {
   APP_RETURN_PATH,
+  INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
   INSTALLATION_UNAVAILABLE_MESSAGE,
   appReturnBasePath,
   buildAppReturnHref,
@@ -127,6 +128,8 @@ function GitHubIntegrationOutcomeToasts({
       );
     } else if (error === 'installation_unavailable') {
       toast.error(INSTALLATION_UNAVAILABLE_MESSAGE, { duration: 8000 });
+    } else if (error === 'installation_listing_too_large') {
+      toast.error(INSTALLATION_LISTING_TOO_LARGE_MESSAGE, { duration: 8000 });
     } else if (error === 'multiple_installations_disabled') {
       toast.error('This organization can currently connect only one GitHub organization.', {
         duration: 8000,

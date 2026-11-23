@@ -268,19 +268,15 @@ const store = createSecureStorePreference<StoredRemoteMcpServer[]>({
   mergeOnLoad: mergeRemoteMcpServers,
 });
 
-// Warm the disk read at module scope so a settings screen and an agent tool
-// call see the persisted list without waiting for a React mount.
-store.preload();
-
 /** The stored servers, in the order they were added. */
 export function listRemoteMcpServers(): StoredRemoteMcpServer[] {
   return store.getRequested();
 }
 
 /**
- * Adds a server and returns it. The id is derived from the name, uniquified
- * against the stored ids. A URL another server already uses is refused, because
- * two rows pointing at one endpoint is a user mistake, not two servers.
+ * Adds a server and returns it. The id comes from `resolveServerId`. A URL
+ * another server already uses is refused, because two rows pointing at one
+ * endpoint is a user mistake, not two servers.
  */
 export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcpServer {
   const current = store.getRequested();

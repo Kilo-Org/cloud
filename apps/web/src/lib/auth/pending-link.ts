@@ -61,6 +61,23 @@ function parseSecret(secret: unknown): string | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Deletes the rows no sign-in can use again: ones that lapsed more than a day
+ * ago, so a completion in flight is never cut short.
+ *
+ * This runs from the `cleanup-device-auth` cron, not from a creation. A sweep
+ * on the create path would repeat the same table-wide statement for every
+ * different-account sign-in, and a slow or failing sweep would then refuse a
+ * creation that only needed its own insert.
+ */
+export async function cleanupExpiredPendingAuthLinks(): Promise<number> {
+  const result = await db
+    .delete(pending_auth_links)
+    .where(sql`${pending_auth_links.expires_at} < NOW() - INTERVAL '1 day'`);
+
+  return result.rowCount ?? 0;
+}
+
 export async function createPendingLink(params: {
   kiloUserId: string;
   kind: PendingAuthLink['kind'];
@@ -70,11 +87,6 @@ export async function createPendingLink(params: {
 }): Promise<{ secret: string; pendingLink: PendingAuthLink }> {
   const secret = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + PENDING_LINK_TTL_MINUTES * 60 * 1000).toISOString();
-  // Rows are single-use and short-lived; drop those expired for a day so the
-  // table stays small without a separate job.
-  await db
-    .delete(pending_auth_links)
-    .where(sql`${pending_auth_links.expires_at} < NOW() - INTERVAL '1 day'`);
   const [row] = await db
     .insert(pending_auth_links)
     .values({

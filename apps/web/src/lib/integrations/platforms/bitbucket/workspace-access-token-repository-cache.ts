@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  BITBUCKET_MAX_REPOSITORY_ITEMS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
@@ -45,7 +46,7 @@ export const BitbucketWorkspaceAccessTokenRepositoryListResultSchema = z.discrim
     z
       .object({
         status: z.literal('available'),
-        repositories: z.array(BitbucketRepositorySchema),
+        repositories: z.array(BitbucketRepositorySchema).max(BITBUCKET_MAX_REPOSITORY_ITEMS),
         syncedAt: z.iso.datetime(),
       })
       .strict(),
@@ -170,7 +171,10 @@ function parseCachedRepositories(
   workspace: WorkspaceIdentity
 ): AvailableRepositoryCache | null {
   if (repositoriesValue === null || repositoriesSyncedAt === null) return null;
-  const repositories = z.array(CachedRepositorySchema).safeParse(repositoriesValue);
+  const repositories = z
+    .array(CachedRepositorySchema)
+    .max(BITBUCKET_MAX_REPOSITORY_ITEMS)
+    .safeParse(repositoriesValue);
   if (!repositories.success) return null;
 
   const projected = repositories.data.map(repository => ({

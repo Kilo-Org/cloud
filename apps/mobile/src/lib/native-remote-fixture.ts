@@ -29,7 +29,12 @@ export const nativeRemoteFixtureSummary: NativeSessionSummary = {
   createdAt: 1,
 };
 
-const emptyPending = { permissions: [], questions: [], unreadablePermissions: [] };
+const emptyPending = {
+  permissions: [],
+  questions: [],
+  unreadableQuestions: [],
+  unreadablePermissions: [],
+};
 
 function fixtureState(name: NativeRemoteFixtureName): NativeSessionState {
   if (name === 'reconnecting') {

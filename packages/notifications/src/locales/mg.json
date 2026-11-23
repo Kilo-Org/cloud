@@ -7,6 +7,7 @@
       "spendAlert": "Mila jerena ny fandaniana",
       "securityFinding": "Misy hitan'ny fiarovana mila jerena",
       "securityUpdate": "Misy fanavaozana ny fisavana fiarovana",
+      "agentBriefing": "Vonona ny tatitry ny agentanao",
       "activeAgentsGlanceable": "Misy fanavaozana ny mpandraharaha mavitrika"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Hitan'ny fiarovana vaovao ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Tena avo",
+      "high": "Avo",
+      "medium": "Antonony",
+      "low": "Ambany"
     },
     "securityFindingSlaWarning": {
       "title": "Fampitandremana SLA"

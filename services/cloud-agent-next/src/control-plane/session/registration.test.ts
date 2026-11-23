@@ -15,7 +15,7 @@ import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { parseSessionAttachMcpServers } from '../../mcp-config.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
-import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
@@ -303,10 +303,6 @@ describe('egress policy registration', () => {
 
   it.each([
     { provider: 'cloudflare' },
-    {
-      provider: 'vercel',
-      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
-    },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
   ])('restricts allowlist and audit policies to isolated containers: %j', placement => {
@@ -327,6 +323,21 @@ describe('egress policy registration', () => {
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
         .success
     ).toBe(true);
+  });
+
+  it('accepts an allowlist on an isolated Vercel sandbox, but no audit without one', () => {
+    const vercel = {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    };
+    const parses = (policy: object) =>
+      controlPlaneSandboxSelectionSchema.safeParse({ ...vercel, ...policy }).success;
+    expect(parses({ egressMode: 'allowlist' })).toBe(true);
+    expect(parses({ egressMode: 'allowlist', egressAudit: true })).toBe(true);
+    expect(parses({ egressMode: 'unrestricted' })).toBe(true);
+    expect(parses({ egressAudit: true })).toBe(false);
+    expect(parses({ egressMode: 'unrestricted', egressAudit: true })).toBe(false);
+    expect(parses({ egressMode: 'allowlist', sandboxKind: 'shared' })).toBe(false);
   });
 });
 
@@ -409,7 +420,22 @@ describe('migrated origin permissions', () => {
       const { spec } = buildControlPlaneSessionRegistration(input, selection);
       expect(spec.permission).toMatchObject({
         question: 'deny',
-        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        edit:
+          createdOnPlatform === 'security-remediation'
+            ? {
+                '*': 'allow',
+                '.git': 'deny',
+                '.git/*': 'deny',
+                '*.git': 'deny',
+                '*.git/*': 'deny',
+                '.g?t': 'deny',
+                '.g?t/*': 'deny',
+                '.g*t': 'deny',
+                '.g*t/*': 'deny',
+                '*gitconfig*': 'deny',
+                '*/.git/config*': 'deny',
+              }
+            : 'deny',
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
@@ -420,7 +446,7 @@ describe('migrated origin permissions', () => {
           ? {
               'git push': 'allow',
               'gh pr create': 'allow',
-              'git push --force': 'deny',
+              'git*push* -*': 'deny',
               curl: 'deny',
             }
           : {
@@ -1405,7 +1431,7 @@ describe('stored runtime skill projection', () => {
   it('keeps the accepted companion entries when a stored route spec is parsed', () => {
     const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
     const parsed = controlPlaneRouteSpecSchema.parse(
-      projectStoredRouteSpecSkills({ ...spec, runtimeSkills: storedSkills })
+      projectStoredRouteSpec({ ...spec, runtimeSkills: storedSkills })
     );
     expect(parsed.runtimeSkills).toEqual([
       { name: 'review', rawMarkdown: 'Review', files: { 'scripts/run.sh': 'echo ok' } },

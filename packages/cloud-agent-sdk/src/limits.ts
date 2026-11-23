@@ -30,3 +30,49 @@ export const NATIVE_SYNC_RETAINED_WORK_BYTES = 4 * 1024 * 1024;
 
 /** Retained live frames a native session keeps; model discovery shares the same frame budget. */
 export const NATIVE_SYNC_RETAINED_WORK_FRAMES = 1024;
+
+/**
+ * Retained memory a native snapshot reader may hold for settled attachment bodies, in UTF-16
+ * bytes of the base64 strings it keeps. Blobs are content addressed, so a retained body can
+ * answer any later read of the same hash; the cache evicts the oldest entries to stay inside
+ * this bound. A retained body costs about 2.67 times its raw size, so this budget holds one
+ * maximum-size blob (the service caps one at 8 MiB) with room to spare.
+ */
+export const NATIVE_SNAPSHOT_BLOB_CACHE_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Longest the CLI live transport waits for one snapshot page read before it
+ * stops gating live delivery on it. Matches the per-request deadline the native
+ * snapshot reader already applies, so a stalled store degrades the same way on
+ * both transports.
+ */
+export const CLI_SNAPSHOT_REPLAY_DEADLINE_MS = 15_000;
+
+/**
+ * Live CLI events the transport holds while one snapshot page read is
+ * outstanding. A read that lets the buffer reach this size is stalled, so the
+ * transport releases it instead of growing without bound.
+ */
+export const CLI_SNAPSHOT_BUFFER_MAX_EVENTS = 1024;
+
+// Snapshot reads run beside the live socket: a failed read costs the transcript
+// replay, never the live connection, so it is reported once and retried with a
+// short bounded backoff (500 ms, 1 s, 2 s) that stays well inside a
+// user-noticeable wait.
+export const SNAPSHOT_READ_MAX_RETRIES = 3;
+export const SNAPSHOT_READ_BASE_DELAY_MS = 500;
+
+/**
+ * Longest one native sync HTTP exchange may take, covering both the response and its body.
+ * Matches the per-request deadline the native snapshot reader applies, so a stalled store
+ * fails the same way on every path.
+ */
+export const NATIVE_SYNC_REQUEST_DEADLINE_MS = 15_000;
+
+/**
+ * Longest any one ticket mint may take end to end, covering the credential lookup and the grant
+ * exchange before the ticket POST rather than only the POST itself. Each hop has its own request
+ * deadline, yet three slow hops would still sum to a connect that outlives any of them; one total
+ * bound makes the first failure reach the reconnect backoff in a single hop's time.
+ */
+export const NATIVE_SYNC_TICKET_MINT_DEADLINE_MS = 15_000;

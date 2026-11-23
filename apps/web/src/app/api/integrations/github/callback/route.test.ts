@@ -44,6 +44,10 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import {
+  GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -1610,6 +1614,85 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
   });
 
+  test('redirects with installation_unavailable for a suspended installation and writes nothing', async () => {
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+                suspended_at: '2026-11-20T08:00:00.000Z',
+                suspended_by: { login: 'octocat' },
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('redirects with installation_unavailable for a suspended installation when the connection is app-initiated', async () => {
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+                suspended_at: '2026-11-20T08:00:00.000Z',
+                suspended_by: { login: 'octocat' },
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_unavailable');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
   test('rejects an install when admin check returns false', async () => {
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
 
@@ -1642,6 +1725,75 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+  });
+
+  test('reports the administration listing outcome at the page bound', async () => {
+    mockedAssertUserAdministersInstallation.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+        GITHUB_INSTALLATION_ADMINISTRATION_LISTING
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_listing_too_large`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+  });
+
+  test('reports the authorization listing outcome at the page bound', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubInstallationAuthorization.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: installation administration listing returned more than 100 pages',
+        GITHUB_INSTALLATION_ADMINISTRATION_LISTING
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_listing_too_large`);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+  });
+
+  test('rejects a membership read at the bound as a non-admin install', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubInstallationAuthorization.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: GitHub organization membership listing returned more than 100 pages',
+        'GitHub organization membership listing'
+      )
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
   });
 
   test('redirects with installation_already_claimed when upsert detects cross-owner claim', async () => {

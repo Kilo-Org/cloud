@@ -48,12 +48,13 @@ let phase: LoginDraftPhase = { kind: 'attempt', email: '', ssoRecovery: null };
 let legacyCleaned = false;
 
 /**
- * Whether a restoration has run in this process, and whether the person has
- * typed since. A mount that unmounts before either is uninitialized memory: it
- * must not write its blanks over the record a restart is about to restore.
+ * Whether this process holds an attempt of its own to write back: an address
+ * the person typed, a held draft a restore returned, or an invite they
+ * followed. A mount that unmounted before any of those holds nothing: writing
+ * its blanks could only replace the draft its read could not see, or the
+ * tombstone that retired the last attempt.
  */
-let restored = false;
-let edited = false;
+let writeOpen = false;
 
 /** How many times a retirement write is tried before it is reported. */
 const RETIREMENT_ATTEMPTS = 2;
@@ -72,26 +73,45 @@ function writeRecord(record: StoredLoginDraft): Promise<void> {
 }
 
 /**
- * What the record says now: `absent` only when the keychain answered that there
- * is no record. A read that failed and a value this build cannot parse are
- * `unknown`, because neither is evidence that nothing is stored.
+ * What one read of the durable record learned. `absent` only when the keychain
+ * answered that there is no record: a read that failed and a value this build
+ * cannot parse are `unknown`, because neither is evidence that nothing is
+ * stored.
  */
-async function readRecordState(): Promise<'held' | 'retired' | 'absent' | 'unknown'> {
+type RecordRead =
+  | { readonly kind: 'held'; readonly email: string; readonly ssoRecovery: SsoRecoveryDraft | null }
+  | { readonly kind: 'absent' | 'retired' | 'unknown' };
+
+async function readRecord(): Promise<RecordRead> {
   try {
     const raw = await SecureStore.getItemAsync(LOGIN_DRAFT_RECORD_KEY);
     if (raw === null) {
-      return 'absent';
+      return { kind: 'absent' };
     }
     const parsed = storedLoginDraftSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data.state : 'unknown';
+    if (!parsed.success) {
+      return { kind: 'unknown' };
+    }
+    if (parsed.data.state === 'retired') {
+      return { kind: 'retired' };
+    }
+    const ssoRecovery = parsed.data.ssoRecovery;
+    return {
+      kind: 'held',
+      email: parsed.data.email,
+      ssoRecovery:
+        ssoRecovery === undefined
+          ? null
+          : { email: ssoRecovery.email, ssoOrganizationId: ssoRecovery.ssoOrganizationId },
+    };
   } catch {
-    return 'unknown';
+    return { kind: 'unknown' };
   }
 }
 
 /** Start an attempt from what the person typed: explicit typing always reopens one. */
 export function beginLoginEmail(email: string): void {
-  edited = true;
+  writeOpen = true;
   phase = {
     kind: 'attempt',
     email,
@@ -114,6 +134,9 @@ export function holdLoginEmail(email: string): void {
  */
 export function holdSsoRecovery(recovery: SsoRecoveryDraft | null): void {
   if (recovery !== null) {
+    /* An invite the person followed is an attempt to keep, like a typed
+       address: it must survive the reload a language change performs. */
+    writeOpen = true;
     phase = {
       kind: 'attempt',
       email: phase.kind === 'attempt' ? phase.email : recovery.email,
@@ -133,12 +156,14 @@ export function holdSsoRecovery(recovery: SsoRecoveryDraft | null): void {
 /**
  * Write the drafts to disk so they survive an RTL language reload.
  *
- * A retired attempt writes nothing, and neither does an uninitialized process:
- * a mount that unmounts before its restore ran holds no attempt at all, so
- * writing it would blank the record the next mount restores.
+ * A retired attempt writes nothing, and neither does a process that never
+ * opened an attempt: a mount that unmounted before it typed, restored a held
+ * draft or took an invite holds nothing of its own, and writing its blanks
+ * could only destroy the draft its read could not see or revive the attempt a
+ * retirement ended.
  */
 export async function persistLoginDrafts(): Promise<void> {
-  if (phase.kind === 'retired' || (!restored && !edited)) {
+  if (phase.kind === 'retired' || !writeOpen) {
     return;
   }
   await writeRecord({
@@ -147,33 +172,6 @@ export async function persistLoginDrafts(): Promise<void> {
     email: phase.email,
     ...(phase.ssoRecovery === null ? {} : { ssoRecovery: phase.ssoRecovery }),
   });
-}
-
-/** The record's held values, or null when it holds none this build can read. */
-async function readRecord(): Promise<{
-  email: string;
-  ssoRecovery: SsoRecoveryDraft | null;
-} | null> {
-  try {
-    const raw = await SecureStore.getItemAsync(LOGIN_DRAFT_RECORD_KEY);
-    if (raw === null) {
-      return null;
-    }
-    const parsed = storedLoginDraftSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success || parsed.data.state !== 'held') {
-      return null;
-    }
-    const ssoRecovery = parsed.data.ssoRecovery;
-    return {
-      email: parsed.data.email,
-      ssoRecovery:
-        ssoRecovery === undefined
-          ? null
-          : { email: ssoRecovery.email, ssoOrganizationId: ssoRecovery.ssoOrganizationId },
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -211,13 +209,18 @@ export async function restoreLoginDrafts(): Promise<{
     }
     return { email: '', ssoRecovery: null };
   }
-  const held = await readRecord();
-  /* Restored only now: a mount that unmounts while this read is pending holds
-     no attempt yet, so its persist must not write the blanks it began with. */
-  restored = true;
-  /* Restoration initializes the attempt: an untyped memory that then persists
-     on unmount must write what the person was shown, not the blanks it began
-     with. */
+  const record = await readRecord();
+  /* The writer opens only for a read that learned what the screen shows: an
+     absent record has nothing to lose, and a held one is adopted below. A read
+     that failed, or a tombstone, leaves it closed — the unmount write then
+     cannot replace the draft this read could not see, or revive the attempt the
+     retirement ended. */
+  if (record.kind === 'absent' || record.kind === 'held') {
+    writeOpen = true;
+  }
+  const held = record.kind === 'held' ? record : null;
+  /* A held draft is what the screen shows next: an untyped memory that then
+     persists on unmount must write it, not the blanks it began with. */
   if (held !== null && phase.email.length === 0 && phase.ssoRecovery === null) {
     phase = { kind: 'attempt', email: held.email, ssoRecovery: held.ssoRecovery };
   }
@@ -272,18 +275,15 @@ function reportRetirementFailure(error: unknown): void {
  * usually gone before anyone could see it.
  */
 export async function retireLoginAttempt(): Promise<void> {
-  /* Memory retirement never waits on the keychain: whatever the write does, the
-     signed-out screen must not see the attempt this sign-in ended. */
   phase = { kind: 'retired' };
   try {
     /* The decision is made inside the key's chain, after any queued persist has
-       landed. Only a record the keychain says is absent costs no write: a read
-       that failed, or a value this build cannot parse, is not evidence that
-       nothing is stored, and skipping the tombstone would leave the held copy
-       for the next cold start. */
+       landed. Only a record the keychain says is absent costs no write, since
+       skipping the tombstone would leave the held copy for the next cold
+       start. */
     await chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
-      const state = await readRecordState();
-      if (!retirementPending && (state === 'absent' || state === 'retired')) {
+      const record = await readRecord();
+      if (!retirementPending && (record.kind === 'absent' || record.kind === 'retired')) {
         return;
       }
       await writeRetirementLocked(RETIREMENT_ATTEMPTS);
@@ -301,7 +301,6 @@ export async function retireLoginAttempt(): Promise<void> {
 export function _resetLoginDraftForTests(): void {
   phase = { kind: 'attempt', email: '', ssoRecovery: null };
   legacyCleaned = false;
-  restored = false;
-  edited = false;
+  writeOpen = false;
   retirementPending = false;
 }

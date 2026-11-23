@@ -17,6 +17,7 @@
     "contextAll": "All contexts",
     "dismiss": "Dismiss brief",
     "dismissFailed": "Couldn’t dismiss this brief yet. It retries in the background.",
+    "readMarkFailed": "Couldn’t mark this brief as read. It will try again when the brief reloads.",
     "offline": "Offline · saved brief",
     "cached": "Saved brief · refresh unavailable",
     "summary": "AI summary",
@@ -36,12 +37,15 @@
     "morningEnd": "Brief available until",
     "timeHint": "The Home card restores live status when the brief window ends, even offline.",
     "invalidSchedule": "Choose a valid time zone and a non-empty brief window.",
+    "scheduleEmptyNight": "The brief window is empty. Choose a ready time later than the window start.",
+    "scheduleEmptyMorning": "The ready time and the available until time match. Choose how long the brief stays available.",
+    "scheduleFullDay": "The two windows cover a full day. Leave part of the day outside the brief.",
     "notificationsHint": "One generic notification per scheduled brief. Independent of paid AI summaries.",
     "notificationPermission": "Turn on push notifications to receive your brief.",
     "defaultModel": "Use Kilo’s default model",
     "duration": "Time safeguard (minutes)",
     "spendLimit": "Spend safeguard (USD)",
-    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "invalidSafeguards": "Enter a positive limit within the allowed range.",
     "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "A paid summary is not available for these settings. Change the model or the limits, or try again later.",
     "estimatePricingUnavailable": "Pricing for this model is unavailable. Choose another model.",
@@ -49,15 +53,17 @@
     "estimateModelNotAllowed": "This model isn’t allowed in this context. Choose another model.",
     "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
     "confirmPaid": "Enable paid summaries for {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
+    "paidDisclosure_other": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "allContexts": "Personal and organization briefs stay separate.",
     "emptyHistory": "No saved briefs",
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance. Ask an organization owner to enable it.",
     "saved": "Brief settings saved",
     "selectedSessions": "Selected sessions",
-    "snapshotPullRequests": "PRs in selected sessions",
-    "snapshotBlockers": "Blockers in selected sessions",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Blockers",
     "capturedAt": "Captured {{time}}",
     "snapshotHint": "Best-effort snapshot of the latest available session state captured at the scheduled morning. Counts describe selected sessions, not complete overnight activity.",
     "snapshotTruncated": "Some sessions or evidence were left out to keep this snapshot bounded.",
@@ -88,7 +94,7 @@
     "metadataFailure": "Last turn failed: {{kind}}",
     "metadataFailureProvider": "provider error",
     "metadataFailureTool": "tool error",
-    "metadataFailureCancelled": "cancelled",
+    "metadataStopped": "Last turn was stopped",
     "metadataFailureOther": "unspecified error"
   },
   "nativeRemote": {
@@ -183,6 +189,7 @@
     "draft": "Draft",
     "enabled": "Enabled",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Image unavailable",
     "loading": "Loading…",
     "loadMore": "Load more",
@@ -214,10 +221,10 @@
     "connectProvider": "Connect a provider",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
+    "couldNotLoad": "Couldn't load",
+    "couldNotLoadMore": "Couldn't load more",
     "couldNotLoadOrganizations": "Could not load organizations",
     "couldNotLoadSessions": "Could not load sessions",
-    "couldnTLoad": "Couldn't load",
-    "couldnTLoadMore": "Couldn't load more",
     "deviceSessions": "Device sessions",
     "disabled": "Disabled",
     "agent": "Agent",
@@ -278,7 +285,30 @@
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
-    "viewOnGitHub": "View PR on GitHub"
+    "viewOnGitHub": "View PR on GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bullet point",
+        "nestedBulletPoint": "Nested bullet point",
+        "orderedItem": "List item {n}",
+        "nestedOrderedItem": "Nested list item {n}"
+      },
+      "blockquote": {
+        "quote": "Blockquote",
+        "nestedQuote": "Nested blockquote"
+      },
+      "table": {
+        "row": "Row {n}: {content}"
+      },
+      "math": {
+        "equation": "Math: {latex}"
+      },
+      "rotor": {
+        "headings": "Headings",
+        "links": "Links",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -378,6 +408,7 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
+    "availableToSpendInOrganization": "Available to spend in this organization",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -519,6 +550,17 @@
       "location": "Vertex location",
       "clientEmail": "Service account email",
       "privateKey": "Service account private key",
+      "privateKeyBlockRequired": "Paste the whole key block, from the BEGIN line to the END line.",
+      "privateKeyEncrypted": "This key block is passphrase-protected. Paste a service account key that has no passphrase.",
+      "names": {
+        "codestral": "Legacy Codestral-only",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sign in with ChatGPT)",
+        "xiaomi": "Xiaomi (pay as you go)",
+        "zai": "Z.ai (pay as you go)",
+        "bedrockByok": "Amazon Bedrock (direct)",
+        "vertexByok": "Google Vertex AI (direct)"
+      },
       "modelMappings": "Model mappings",
       "modelMappingsDescription": "Send a gateway model to a custom deployment name.",
       "mappingTitle": "Mapping {{number}}",
@@ -579,6 +621,7 @@
       "receiptLabel": "Receipt",
       "copyReceiptId": "Copy receipt ID",
       "appealLabel": "Appeal",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Received",
       "triageOpen": "In review",
       "triageActioned": "Upheld",
@@ -596,15 +639,36 @@
       "nextStepInReview": "The outcome will appear on this screen, and you can appeal after a decision.",
       "nextStepAppeal": "The appeal outcome will appear on this screen.",
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
-      "viewReceipt": "View receipt"
+      "viewReceipt": "View receipt",
+      "targetLabel": "Reported item",
+      "reasonLabel": "Reason for report",
+      "targetMessage": "AI response",
+      "targetComment": "PR comment",
+      "targetUser": "Person",
+      "reasonHarmful": "Harmful content",
+      "reasonIllegal": "Illegal content",
+      "reasonHarassment": "Harassment",
+      "reasonSpam": "Spam",
+      "reasonOther": "Another reason"
+    },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment in a pull request discussion, or from an AI response in an agent session, appear here with their outcome.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
     },
     "changelog": "What's New",
     "changelogGroupNew": "New",
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
-      "signIn": "Sign-in",
-      "profileOrganizations": "Profile & organizations"
+      "signIn": "sign-in",
+      "profileOrganizations": "profile & organizations",
+      "chat": "chat",
+      "notifications": "notifications",
+      "integrations": "integrations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
@@ -1046,8 +1110,9 @@
       "checkActiveConnection": "Connection is active, but this item still can't be loaded.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
-      "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
+      "reconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
       "bitbucketNotConnectedTitle": "Bitbucket not connected",
+      "bitbucketAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to connect it.",
       "adminOnlyConnectDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
@@ -1260,6 +1325,8 @@
       "emptyTitle": "No notifications yet",
       "emptyCategoryTitle": "No notifications in this category",
       "emptyBody": "Notifications this account receives appear here. They are kept for {{days}} days.",
+      "emptyBody_one": "Notifications this account receives appear here. They are kept for {{days}} day.",
+      "emptyBody_other": "Notifications this account receives appear here. They are kept for {{days}} days.",
       "capped": "Showing the most recent notifications.",
       "loadError": "Could not load notification history.",
       "openFailed": "This notification no longer opens anywhere."
@@ -1270,6 +1337,7 @@
     "needsInputAction": {
       "approved": "Request approved",
       "replied": "Reply sent",
+      "empty": "Add an answer, then send.",
       "failed": "Couldn't answer. Tap again to retry.",
       "unavailable": "This request is no longer waiting."
     }
@@ -1340,6 +1408,7 @@
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
+      "githubNoRepositoriesDescription": "Check repository access for the Kilo GitHub App, then refresh.",
       "installGithubApp": "Install the GitHub app",
       "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
       "repositoryAccess": "repository access",
@@ -1369,11 +1438,11 @@
       "couldNotGetLatest": "Couldn't get the latest.",
       "byline": "#{{number}} by {{author}}",
       "noFindings": "No findings",
-      "findingsUnavailable": "Results are unavailable because this review failed.",
+      "findingsUnavailable": "Results are unavailable.",
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
       "findingsEndedWithoutResults": "This review ended before it produced any findings.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
-      "reviewFailed": "The review failed. Please try again.",
+      "reviewFailed": "The review failed.",
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
@@ -1495,6 +1564,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "deniedManagedByOwner": "Ask an owner of {{organization}} to change the connection you can't edit.",
+      "deniedConnectRole": "Only owners, admins, and billing managers of {{organization}} can connect it.",
+      "deniedReconnectRole": "Ask an owner, admin, or billing manager of {{organization}} to reconnect it.",
       "managedOnWebTitle": "Managed on the web",
       "managedOnWebShort": "This connection is managed on the web from a computer.",
       "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
@@ -1530,7 +1602,9 @@
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
       "gitlabError": "Could not open GitLab setup. Please try again.",
-      "description": "Connect the Kilo {{label}} to review pull requests automatically."
+      "description": "Connect the Kilo {{label}} to review pull requests automatically.",
+      "notConnectedTitle": "{{platform}} not connected",
+      "githubAdminOnlyDescription": "Only organization owners and admins can connect it."
     },
     "overview": {
       "allAreas": "All areas",
@@ -1632,7 +1706,9 @@
       "unavailablePersonallySwitchAction": "Switch organization",
       "unavailableOrganizationTitle": "Council review is unavailable",
       "unavailableForOrganization": "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.",
-      "unavailableForOrganizationNeutral": "Council review is not available for this organization right now. Try again later.",
+      "unavailablePlanCheck": "Council review could not check this organization's plan. Retry to check again.",
+      "unavailableFlagRollout": "Council review is not available for this organization yet. Update the app to the latest version to get it.",
+      "unavailableForOrganizationMember": "Council review needs the Enterprise plan with an active subscription or trial. An organization owner can change the plan.",
       "unavailableOnBitbucket": "Council review is not available for Bitbucket repositories.",
       "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
       "specialists": "Specialists",
@@ -2202,7 +2278,8 @@
       "sectionAccessibility_one": "{{title}}, {{displayCount}} session",
       "sectionAccessibility": "{{title}}, {{displayCount}} sessions",
       "sectionAccessibility_other": "{{title}}, {{displayCount}} sessions",
-      "live": "LIVE"
+      "live": "LIVE",
+      "retentionLimit": "Showing your most recent sessions."
     },
     "sessionRow": {
       "deleteTitle": "Delete session?",
@@ -2272,11 +2349,11 @@
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "emptyReadOnlyTitle": "No messages in this session",
-      "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
       "historyUnavailable": "This session's transcript can't be read.",
+      "historyTemporarilyUnavailable": "This session's transcript is temporarily unavailable.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2619,8 +2696,7 @@
       "searchPlaceholder": "Search repositories...",
       "noMatches": "No matches",
       "noRepositories": "No repositories available",
-      "noRepositoriesDescription": "No repositories are connected to your account.",
-      "loading": "Loading...",
+      "noRepositoriesDescription": "Connect GitHub or GitLab to load repositories.",
       "accessibility": "Repository: {{label}}"
     },
     "messageDetails": {
@@ -2651,6 +2727,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Details unavailable",
+      "detailsUnavailableDescription": "This item is no longer in the session.",
       "textDisplay": "Text display",
       "thinking": "Thinking",
       "thought": "Thought",
@@ -2694,6 +2771,7 @@
     "filePart": {
       "loadingImage": "Loading image",
       "imageUnavailableRetry": "Image unavailable, retry loading",
+      "imageUnavailableRetryWithAlt": "Image unavailable, {{alt}}, retry loading",
       "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",
@@ -2833,7 +2911,9 @@
       "skip": "Skip",
       "retrySkip": "Retry skip",
       "submitting": "Submitting…",
-      "sendAnswers": "Send answers"
+      "sendAnswers": "Send answers",
+      "unreadableTitle": "This question could not be displayed",
+      "unreadableBody": "The agent is waiting on a question this app cannot show. Answer it in the CLI to continue."
     },
     "blockingCard": {
       "questionUnavailable": "This question is no longer available.",
@@ -2860,6 +2940,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Could not load subagent session",
+      "historyTooLarge": "This sub-agent's history is too large to load.",
+      "historyUnavailable": "This sub-agent's history isn't available.",
+      "historyTemporarilyUnavailable": "This sub-agent's history is temporarily unavailable.",
       "failed": "Subagent session failed",
       "noMessages": "No subagent messages",
       "noMessagesDescription": "This subagent session completed without producing a transcript.",
@@ -3122,6 +3205,12 @@
     "retryLoadingAccount": "Retry loading account",
     "retryLoadingPrivacy": "Retry loading privacy choices"
   },
+  "accountBlocked": {
+    "title": "Account blocked",
+    "description": "Kilo blocked this account, and signing in again will not clear it. Support can review the block on request.",
+    "domainDescription": "Kilo does not allow accounts on this email domain, and signing in again will not change it. Support can review the domain on request.",
+    "contactSupport": "Contact support"
+  },
   "addCredits": {
     "cta": "Add credits",
     "billingPage": "billing page"
@@ -3206,8 +3295,7 @@
     "timeoutDescription": "The request timed out before it finished. Try again."
   },
   "screenHeader": {
-    "openMenu": "Open menu",
-    "openMenuFor": "Open menu for {{title}}"
+    "openMenu": "Open menu"
   },
   "picker": {
     "optionsExpired": "Options expired",
@@ -3426,6 +3514,8 @@
     "voiceTranscriptionWho": "Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.",
     "installAttributionPromptTitle": "Allow install attribution?",
     "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
+    "installAttributionRequestFailedTitle": "Couldn't show the tracking prompt",
+    "installAttributionRequestFailedMessage": "Kilo couldn't show the system prompt, so install attribution stays off.",
     "what": "What",
     "why": "Why",
     "who": "Who"
@@ -3441,7 +3531,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No audit events",
       "emptyDescription": "Actions taken in this organization appear here.",
       "truncated": "Showing the most recent events.",
@@ -3491,11 +3581,147 @@
         "guardrailUpdate": "Guardrail updated",
         "guardrailRemove": "Guardrail removed",
         "unknown": "Audit event"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Mode \"{{name}}\" (identifier: {{slug}})",
+        "modeUpdate": "Mode \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatic routing",
+          "defaultModel": "Default model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Added {{email}} as {{role}}",
+        "memberRemoved": "Removed {{email}}",
+        "memberParentAdded": "Added {{email}} from parent organization {{parent}}",
+        "memberParentRemoved": "Removed {{email}} from parent organization {{parent}}",
+        "inviteSent": "{{email}} as {{role}}",
+        "inviteRevoked": "Revoked the invitation for {{email}}",
+        "inviteAccepted": "Accepted {{email}}",
+        "groupIdentity": "Group \"{{name}}\"",
+        "groupMembers": "Group \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} groups",
+        "groupMemberGroups_one": "{{displayCount}} group",
+        "groupMemberGroups_other": "{{displayCount}} groups",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} groups",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} group",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} groups",
+        "groupPolicySet": "Group \"{{name}}\": set the {{policy}} policy",
+        "groupPolicyRemoved": "Group \"{{name}}\": removed the {{policy}} policy",
+        "groupDefaultPolicySet": "Set the default {{policy}} policy",
+        "groupDefaultPolicyRemoved": "Removed the default {{policy}} policy",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI guardrails {{state}}",
+        "guardrailConfigGroup": "{{state}} for group \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domain {{domain}}",
+        "ssoDomainChanged": "{{domain}} (was {{previous}})",
+        "ssoDomainRemoved": "Cleared SSO domain {{domain}}",
+        "fundsPurchased": "{{amount}} by {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} to {{displayCount}} child organizations",
+        "fundsDistributed_one": "{{amount}} to {{displayCount}} child organization",
+        "fundsDistributed_other": "{{amount}} to {{displayCount}} child organizations",
+        "fundsReceived": "{{amount}} from {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} configuration",
+        "reviewAgentConfigStyle": "{{platform}}: style {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} updated",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} updated",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} updated",
+        "reviewAgentSecretsFailed": "{{displayCount}} errors",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} error",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} errors",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Inference region: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Global default",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Allowed",
+          "denied": "Denied",
+          "followSetting": "Follows the extension setting"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} to {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Recommendations digest {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: no allowed origins",
+        "settingName": "Renamed from {{previous}} to {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Scan before use on",
+        "scanBeforeUseOff": "Scan before use off",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Removed: {{models}}",
+        "browserPolicyOff": "Browser use blocked",
+        "browserPolicyAllow": "Allowed origins only",
+        "browserPolicyPlaywrightOnly": "Browser use only",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Models changed: {{values}}",
+        "integrationConnected": "{{integration}} connected",
+        "integrationDisconnected": "{{integration}} disconnected",
+        "integrationRefreshed": "{{integration}} refreshed",
+        "integrationCancelled": "{{integration}} cancelled",
+        "integrationModelUpdated": "{{integration}}: model {{model}}",
+        "integrationKeyAdded": "Key added for {{provider}}",
+        "integrationKeyUpdated": "Key updated for {{provider}}",
+        "integrationKeyDeleted": "Key removed for {{provider}}",
+        "integrationKeyToggled": "Key for {{provider}}: {{state}}",
+        "namedPolicyCreated": "Created {{kind}} policy {{id}}",
+        "namedPolicyUpdated": "Updated {{kind}} policy {{id}}",
+        "namedPolicyDeleted": "Removed {{kind}} policy {{id}}",
+        "namedPolicyLinked": "Linked {{kind}} policy {{next}}",
+        "webhookTriggerUpdated": "Trigger {{trigger}}",
+        "organizationRenamed": "Organization renamed from {{previous}} to {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Your own API key"
+        }
       }
     },
     "billing": {
       "title": "Billing",
-      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "State",
       "stateNone": "No subscription",
@@ -3513,7 +3739,7 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
-      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
+      "managedOnWeb": "The plan, seats and auto top-up are managed at kilo.ai.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"
@@ -3577,7 +3803,7 @@
       "noSeatsAvailable": "All seats are in use. Ask an organization owner to add seats before inviting more members."
     },
     "invoices": {
-      "downloadA11y": "Download invoice {{number}}",
+      "downloadA11y": "Download invoice {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
@@ -3657,7 +3883,6 @@
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
-      "guardrails": "Guardrails",
       "byok": "Bring your own key",
       "ssoAndDomain": "SSO and domain",
       "dataCollection": "Data collection",
@@ -3672,7 +3897,7 @@
       "emptyDescription": "Use Older hour to see earlier requests.",
       "emptyBoundDescription": "This is as far back as request logs go.",
       "loadError": "Couldn't load request logs.",
-      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} out",
       "byok": "BYOK"
     },
@@ -3695,13 +3920,14 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Enter an identifier.",
       "identifierTaken": "Another mode already uses this identifier.",
+      "identifierTooLong": "Keep the identifier to {{max}} characters or fewer.",
       "nameLabel": "Mode name",
       "nameRequired": "Enter a mode name.",
       "notFound": "This mode no longer exists.",
-      "restrictionHint": "Only files that match this pattern can be edited. Leave it empty to allow every file.",
-      "restrictionInvalid": "Enter a valid pattern.",
+      "restrictionHint": "A regular expression selects the files this mode may edit, for example `\\.md$` for markdown files only. Leave it empty to allow every file.",
+      "restrictionInvalid": "Enter a valid regular expression.",
       "restrictionLabel": "Restriction label",
-      "restrictionPattern": "File pattern",
+      "restrictionPattern": "File restriction",
       "roleLabel": "Role definition",
       "roleRequired": "Describe what this mode does.",
       "tool": {
@@ -3776,7 +4002,7 @@
     "signupStepUpApple": "To finish creating your account, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "To finish creating your account, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "To finish creating your account, go back and use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "That code is incorrect or expired. Try again or use '$t(login.resendCode)'.",
+    "invalidCode": "That code is incorrect or expired. Use '$t(login.resendCode)' or '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Your code is being processed. Wait a moment and try again.",
     "tooManyAttempts": "Too many attempts. Please request a new code.",
     "invalidToken": "Sign-in failed. Please try again.",
@@ -3785,7 +4011,7 @@
     "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
     "admissionRequired": "Your device can't be verified. Use '$t(login.moreSignInOptions)' to sign in on another device or through the web.",
     "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again.",
+    "retryableAdmission": "We could not verify this device. Please try again.",
     "startSignInFailed": "Failed to start sign in. Please try again.",
     "couldNotOpenBrowser": "Could not open browser. Please try again.",
     "signInTimedOut": "Sign-in timed out. Please try again.",
@@ -3845,6 +4071,34 @@
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
     "waitingToRetry": "Waiting to retry",
+    "countNoun": {
+      "needsInput_one": "Needs input",
+      "needsInput_other": "Needs input",
+      "running_one": "Working",
+      "running_other": "Working",
+      "scheduled_one": "Scheduled",
+      "scheduled_other": "Scheduled",
+      "idle_one": "Idle",
+      "idle_other": "Idle"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Needs input",
+      "needsInput_other": "{{displayCount}} Needs input",
+      "running_one": "{{displayCount}} Working",
+      "running_other": "{{displayCount}} Working",
+      "scheduled_one": "{{displayCount}} Scheduled",
+      "scheduled_other": "{{displayCount}} Scheduled",
+      "idle_one": "{{displayCount}} Idle",
+      "idle_other": "{{displayCount}} Idle"
+    },
+    "footer": {
+      "checked": "Checked {{time}}",
+      "lastKnown": "Last known · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Next run {{time}}",
+      "wasDue": "Was due {{time}}"
+    },
     "step": {
       "editing": "Editing",
       "reading": "Reading",
@@ -3901,7 +4155,10 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "deleteTitle": "Delete this chat?"
+      "deleteTitle": "Delete this chat?",
+      "resetNoticeTitle": "Local chats and drafts were cleared",
+      "resetNoticeBody": "Kilo could not open the chats saved on this device. Your cloud sessions are not affected.",
+      "resetNoticeDismiss": "Dismiss notice"
     },
     "rename": {
       "title": "Rename chat",
@@ -3975,6 +4232,8 @@
       "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
       "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
+      "invalidApiKey": "The API key contains a character that cannot be sent. Use letters, digits, and standard symbols only, with no line breaks.",
+      "invalidHeaders": "A custom header cannot be sent. Check its name and use letters, digits, and standard symbols only, with no line breaks.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
       "httpApprovalRequired": "Approve this local HTTP endpoint before saving or connecting.",
@@ -4021,7 +4280,9 @@
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
         "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
-        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again.",
+        "unreadable": "This device couldn't check the downloaded file, so it was removed. Try the download again.",
+        "writeFailed": "This device couldn't save the model. Try the download again."
       }
     },
     "catalog": {
@@ -4106,7 +4367,15 @@
       "download": "Download on-device model",
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
-      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
+      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
+      "cannotUse": "Can't run: {{items}}.",
+      "cannotUseOptions": "Can't fill in: some tool options.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Time",
+        "settingsList": "Show settings",
+        "settingsSet": "Change settings"
+      }
     },
     "webSearch": {
       "title": "Search the web",
@@ -4137,6 +4406,9 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
+      "fieldUrlCredentials": "Remove the user name and password from the address.",
+      "fieldUrlFragment": "Remove the # part of the address.",
+      "fieldUrlInsecure": "Enter an https address, or http only for localhost.",
       "duplicateUrl": "That URL is already saved.",
       "serverNotFound": "This server is no longer saved.",
       "enableServer": "Enable this server: {{name}}",
@@ -4162,6 +4434,7 @@
       "app": {
         "label": "Tool interface",
         "failed": "This tool's interface couldn't load.",
+        "tooLarge": "This tool's interface is larger than the {{size}} limit.",
         "empty": "This tool's interface has nothing to show."
       }
     },
@@ -4268,7 +4541,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile. Try again.",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",
@@ -4354,6 +4627,7 @@
     "instructionSaveFailed": "Couldn't save the instruction",
     "instructionDeleteFailed": "Couldn't delete the instruction",
     "instructionToggleFailed": "Couldn't update the instruction",
+    "instructionViewTitle": "Instruction file",
     "instructionLimitReached": "A profile can hold up to {{max}} instructions. Delete one to add another.",
     "mcp": {
       "title": "MCP servers",
@@ -4417,6 +4691,7 @@
       "promptPlaceholder": "You are a …",
       "tools": "Tools",
       "wholeToolRule": "This agent applies one rule for every tool at once: {{rule}}. These switches are read-only.",
+      "toolRule": "Stored rule: {{rule}}",
       "visibility": "Visibility",
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
@@ -4523,22 +4798,48 @@
     "history": {
       "activityUnavailable": "Couldn't load credit activity.",
       "appStoreReceipt": "Receipt from the App Store",
+      "deduction": {
+        "adminCancel": "Balance closed by an administrator",
+        "adminDebit": "Credits removed by an administrator",
+        "codingPlan": "Coding plan: {{plan}}",
+        "correction": "Balance correction",
+        "dispute": "Payment dispute",
+        "refundAppStore": "Credit pack refund from the App Store",
+        "refundGooglePlay": "Credit pack refund from Google Play"
+      },
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
+      "expiredGrant": "Expired: {{description}}",
+      "expiredStatus": "Expired",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "promotionalCredits": "Promotional credits",
+        "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
+      },
+      "program": {
+        "adminBulkGrant": "Admin credit grant",
+        "contributorChampion": "Contributor champion credit",
+        "feedback": "Feedback credit",
+        "influencer": "Influencer credit",
+        "ossMonthlyReset": "OSS sponsorship reset",
+        "ossSponsorship": "OSS sponsorship credit",
+        "pullRequest": "Pull request credit",
+        "usageIssue": "Usage issue credit",
+        "vibeDay": "Vibe day credit"
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
-      "retentionLimit": "Showing the most recent credit history."
+      "retentionLimit": "Showing the most recent credit history.",
+      "voidedGrant": "Voided: {{description}}",
+      "voidedStatus": "Voided"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
@@ -4669,6 +4970,7 @@
   },
   "usage": {
     "title": "Usage",
+    "personalTitle": "Personal usage",
     "orgTitle": "Organization usage",
     "entrySubtitle": "Spend, requests, and tokens",
     "rangePicker": "Time range",
@@ -4682,7 +4984,8 @@
     "unavailableTitle": "Usage is unavailable",
     "unavailableDescription": "Usage isn't set up for this workspace. Contact support if you expect to see usage here.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
-    "viewDetails": "View usage details"
+    "viewDetails": "View usage details",
+    "orgSelfEntryTitle": "Your usage"
   },
   "integrations": {
     "title": "Integrations",
@@ -4695,6 +4998,8 @@
     "connectedTo": "Connected to {{account}}",
     "disconnected": "{{provider}} disconnected",
     "disconnectFailed": "Could not disconnect {{provider}}",
+    "disconnectRetry": "Slack could not confirm the disconnect. Try again.",
+    "disconnectNeedsSupport": "Kilo could not read the Slack access saved for this connection. Contact support to finish disconnecting it.",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",
@@ -4776,10 +5081,15 @@
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",
       "activeTitle": "Trigger active",
+      "activeSwitchA11y": "Trigger active: {{name}}",
+      "copyLinkA11y": "Copy link for {{name}}",
       "activeDescription": "Paused webhooks answer with 404.",
       "runAsCreator": "Run as me",
       "runAsCreatorDescription": "Every run uses your account, so the secret header is required.",
       "saveFailedTitle": "Couldn't save the trigger",
+      "nameTaken": "A trigger named {{name}} already exists.",
+      "saveFailedRetry": "Couldn't reach the server. Check your connection and try again.",
+      "saveFailedCheck": "Check the values in the form and try again.",
       "deleteTitle": "Delete this trigger?",
       "deleteMessage": "Calls to {{name}} will fail. This cannot be undone.",
       "deleteMessageScheduled": "Scheduled runs of {{name}} stop. This cannot be undone.",
@@ -5024,6 +5334,20 @@
       "eu": "European Union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Search settings",
+    "noMatches": "No matching settings",
+    "emptyDescription": "Try a different setting name or keyword.",
+    "resultsStatus": "Settings found: {{resultCount}}",
+    "keywords": {
+      "signOut": "logout|log off",
+      "appearance": "theme|color scheme",
+      "appUnlock": "biometrics|face ID|fingerprint",
+      "language": "locale|translation",
+      "notifications": "alerts|push notifications",
+      "privacy": "analytics|tracking"
     }
   }
 }

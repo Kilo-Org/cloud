@@ -146,8 +146,6 @@ describe('cleanup', () => {
 
     writeSignedOutSnapshotAndEnd();
 
-    // The ask names a session and an organization of the scope that just
-    // ended, so the blank ends it in memory and on disk alike.
     expect(getWaitingAsk()).toBeNull();
     await _flushWaitingAskMirrorForTests();
     expect(askStore.size).toBe(0);
@@ -243,7 +241,6 @@ describe('cleanup', () => {
       expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
       expect(lastSnapshot(calls).status).toBe('privacy');
 
-      // A successful org list that holds the selection releases the latch.
       confirmGlanceableOrgMembership();
       rebuilt.handleSessions([{ status: 'busy' }], PUB_CTX);
       expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(2);

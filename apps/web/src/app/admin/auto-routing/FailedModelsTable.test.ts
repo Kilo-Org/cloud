@@ -88,13 +88,19 @@ describe('failed models table', () => {
     );
   });
 
-  it('marks the row being re-admitted and disables every re-admit', () => {
+  it('marks the row being re-admitted and disables every re-admit in both layouts', () => {
     const html = render(
       [permanent, retryable('2026-11-20T11:00:00.000Z')],
       JSON.stringify(['vendor/absent', 'high'])
     );
     expect(html).toContain('Re-admitting');
-    expect(html.match(/disabled=""/g)).toHaveLength(2);
+    // Each entry renders once in the wide table and once in the narrow cards, so the count
+    // is per layout: one re-admit per entry, all disabled while one is in flight.
+    const wideTable = html.slice(0, html.indexOf('md:hidden'));
+    const narrowCards = html.slice(html.indexOf('md:hidden'));
+    expect(wideTable.match(/disabled=""/g)).toHaveLength(2);
+    expect(narrowCards.match(/disabled=""/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Re-admit vendor/flaky default"');
   });
 });
 

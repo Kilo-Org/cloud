@@ -1,3 +1,4 @@
+import { MODE_SLUG_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +7,7 @@ import {
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
+  type OrgModeFormTarget,
   orgModeFormValues,
   type OrgModeFormValues,
   validateOrgModeForm,
@@ -51,53 +53,75 @@ describe('validateOrgModeForm', () => {
     { id: 'mode-1', slug: 'reviewer' },
     { id: 'mode-2', slug: 'docs' },
   ];
+  const create: OrgModeFormTarget = { kind: 'create' };
+  const updateMode1: OrgModeFormTarget = { kind: 'update', modeId: 'mode-1' };
+  const updateMode2: OrgModeFormTarget = { kind: 'update', modeId: 'mode-2' };
 
   it('accepts a complete form', () => {
-    expect(validateOrgModeForm(values({ slug: 'auditor' }), existing)).toEqual({});
+    expect(validateOrgModeForm(values({ slug: 'auditor' }), existing, create)).toEqual({});
   });
 
   it('names each missing required field', () => {
-    expect(validateOrgModeForm(values({ slug: 'auditor', name: '  ' }), existing)).toEqual({
+    expect(validateOrgModeForm(values({ slug: 'auditor', name: '  ' }), existing, create)).toEqual({
       name: 'nameRequired',
     });
-    expect(validateOrgModeForm(values({ slug: 'auditor', roleDefinition: '' }), existing)).toEqual({
+    expect(
+      validateOrgModeForm(values({ slug: 'auditor', roleDefinition: '' }), existing, create)
+    ).toEqual({
       roleDefinition: 'roleRequired',
     });
-    expect(validateOrgModeForm(values({ slug: '' }), existing)).toEqual({
+    expect(validateOrgModeForm(values({ slug: '' }), existing, updateMode1)).toEqual({
       slug: 'identifierRequired',
     });
   });
 
   it('refuses a slug outside the letters-numbers-hyphens set', () => {
-    expect(validateOrgModeForm(values({ slug: 'Reviewer' }), existing)).toEqual({
+    expect(validateOrgModeForm(values({ slug: 'Reviewer' }), existing, create)).toEqual({
       slug: 'identifierInvalid',
     });
-    expect(validateOrgModeForm(values({ slug: 'review_er' }), existing)).toEqual({
+    expect(validateOrgModeForm(values({ slug: 'review_er' }), existing, create)).toEqual({
       slug: 'identifierInvalid',
     });
-    expect(validateOrgModeForm(values({ slug: 'a'.repeat(51) }), existing)).toEqual({
-      slug: 'identifierInvalid',
-    });
+    // A character outside the set is the character-set refusal, however long the
+    // text is: the set is checked first, so this never reads as merely too long.
+    expect(
+      validateOrgModeForm(
+        values({ slug: `${'a'.repeat(MODE_SLUG_MAX_LENGTH)}A` }),
+        existing,
+        create
+      )
+    ).toEqual({ slug: 'identifierInvalid' });
+  });
+
+  it('refuses a slug past the server bound, and accepts one at it', () => {
+    expect(
+      validateOrgModeForm(values({ slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH) }), existing, create)
+    ).toEqual({});
+    expect(
+      validateOrgModeForm(values({ slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1) }), existing, create)
+    ).toEqual({ slug: 'identifierTooLong' });
   });
 
   it('refuses a slug another mode holds, and keeps the edited mode its own', () => {
-    expect(validateOrgModeForm(values({ slug: 'docs' }), existing)).toEqual({
+    expect(validateOrgModeForm(values({ slug: 'docs' }), existing, create)).toEqual({
       slug: 'identifierTaken',
     });
-    expect(validateOrgModeForm(values({ slug: 'docs' }), existing, 'mode-2')).toEqual({});
+    expect(validateOrgModeForm(values({ slug: 'docs' }), existing, updateMode2)).toEqual({});
   });
 
   it('refuses a file restriction that is not a regular expression', () => {
     expect(
       validateOrgModeForm(
         values({ slug: 'auditor', groups: ['edit'], editFileRegex: '[unclosed' }),
-        existing
+        existing,
+        create
       )
     ).toEqual({ editFileRegex: 'restrictionInvalid' });
     expect(
       validateOrgModeForm(
         values({ slug: 'auditor', groups: ['edit'], editFileRegex: '\\.md$' }),
-        existing
+        existing,
+        create
       )
     ).toEqual({});
   });
@@ -106,9 +130,30 @@ describe('validateOrgModeForm', () => {
     expect(
       validateOrgModeForm(
         values({ slug: 'auditor', groups: ['read'], editFileRegex: '[unclosed' }),
-        existing
+        existing,
+        create
       )
     ).toEqual({});
+  });
+
+  it('accepts a create whose identifier is empty when the name is present', () => {
+    expect(validateOrgModeForm(values({ name: 'Auditor', slug: '' }), existing, create)).toEqual(
+      {}
+    );
+  });
+
+  it('reports only the missing name when a create has no name and no identifier', () => {
+    // A create derives its identifier from the name, so an empty identifier is
+    // never refused: the name is the one value it must supply.
+    expect(validateOrgModeForm(values({ name: '  ', slug: '' }), existing, create)).toEqual({
+      name: 'nameRequired',
+    });
+  });
+
+  it('reports a cleared identifier on an update', () => {
+    expect(validateOrgModeForm(values({ slug: '' }), existing, updateMode1)).toEqual({
+      slug: 'identifierRequired',
+    });
   });
 });
 
@@ -138,21 +183,33 @@ describe('orgModeFormSaveValues', () => {
     const saved = orgModeFormSaveValues(values({ slug: '', name: '' }), 'create', []);
     expect(saved.slug).toBe('');
     expect(saved.name).toBe('');
-    expect(validateOrgModeForm(saved, [])).toEqual({
-      name: 'nameRequired',
-      slug: 'identifierRequired',
-    });
+    expect(validateOrgModeForm(saved, [], { kind: 'create' })).toEqual({ name: 'nameRequired' });
   });
 
   it('keeps an identifier the person typed on create', () => {
     expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create', []).slug).toBe('auditor');
   });
 
+  it('derives an identifier the form accepts from a name past the bound', () => {
+    // 99 characters: 25 three-letter words joined by hyphens. The fold is far
+    // longer than the server's bound, so the derivation must clamp it, not the
+    // form.
+    const name = Array.from({ length: 25 }, () => 'abc').join('-');
+    expect(name).toHaveLength(99);
+    const saved = orgModeFormSaveValues(values({ slug: '', name }), 'create', []);
+
+    expect(saved.slug.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(saved.slug).toMatch(/^[a-z0-9-]+$/);
+    expect(validateOrgModeForm(saved, [], { kind: 'create' })).toEqual({});
+  });
+
   it('never derives one on update, so a cleared identifier is reported missing', () => {
     const cleared = values({ slug: '' });
     const saved = orgModeFormSaveValues(cleared, 'update', []);
     expect(saved.slug).toBe('');
-    expect(validateOrgModeForm(saved, [])).toEqual({ slug: 'identifierRequired' });
+    expect(validateOrgModeForm(saved, [], { kind: 'update', modeId: 'mode-2' })).toEqual({
+      slug: 'identifierRequired',
+    });
   });
 });
 

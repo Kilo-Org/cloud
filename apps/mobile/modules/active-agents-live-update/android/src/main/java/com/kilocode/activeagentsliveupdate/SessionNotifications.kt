@@ -12,6 +12,7 @@ import android.os.Build
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -31,25 +32,22 @@ import org.json.JSONObject
  * timer. Every other card hides the system time, which draws a relative age,
  * and its text names the absolute time the JS side formats.
  *
- * The module holds exactly one notification per session, keyed by a stable id
- * derived from the session id, tagged so a session can never take another
- * session's place. SharedPreferences keeps the card's facts and the scope it was
- * followed in, so a press can answer with the right organization after the
- * process was killed, and so a restart can prune the cards that are no longer in
- * the shade.
+ * The module holds exactly one notification per session, tagged with the
+ * session id, so an update can only reach that session's card. Each action
+ * carries the session in its Intent data for the same reason, and Approve
+ * carries the ask it answers as well, so a newer ask is a different record and
+ * a post that does not land leaves the card in the shade answering the request
+ * it shows; see `SessionNotificationIdentity`. SharedPreferences keeps the
+ * card's facts and the scope it was followed in, so a press can answer with the
+ * right organization after the process was killed, and so a restart can prune
+ * the cards that are no longer in the shade.
  */
 internal object SessionNotifications {
   private const val STORE = "active_agents_session_notifications"
   private const val KEY_PREFIX = "session:"
+  /** Superseded asks of one session that a later pass still has to retire. */
+  private const val RETIRING_PREFIX = "retiring:"
   private const val CHANNEL_ID = "followed-sessions-lock-screen"
-
-  /** The notification id of one session: stable, and never the aggregate card's. */
-  private fun notificationId(sessionId: String): Int =
-    SESSION_NOTIFICATION_ID_BASE + (sessionId.hashCode() and 0xFFFF)
-
-  /** A request code unique to this session, so two cards' actions never collide. */
-  private fun requestCode(sessionId: String, offset: Int): Int =
-    (sessionId.hashCode() and 0xFFFF) * 4 + offset
 
   private fun state(context: Context) =
     context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
@@ -86,14 +84,151 @@ internal object SessionNotifications {
     }
   }
 
-  /** Cancel one session's notification and forget its stored card. */
+  /**
+   * Cancel one session's card and the records it owns, and forget it.
+   *
+   * One session has one card and one record per action it shows, and they are
+   * retired together: the notification, its quiet alarm, and the Open, Approve
+   * and Dismiss records all go with the session, so nothing of a session that is
+   * no longer followed stays behind. The card a released build posted is
+   * retired here too; see [cancelLegacy].
+   */
   fun cancel(context: Context, sessionId: String) {
-    manager(context).cancel(TAG, notificationId(sessionId))
+    // Read the card first: its own deep link and approval key are what name the
+    // Open and Approve records, and the removal below drops them.
+    val card = storedCard(context, sessionId)
+    manager(context).cancel(
+      SessionNotificationIdentity.tag(sessionId),
+      SessionNotificationIdentity.NOTIFICATION_ID
+    )
     state(context)
       .edit()
       .remove(KEY_PREFIX + sessionId)
       .commitOrReport("Cannot forget the cancelled session card")
     alarms(context).cancel(quietIntent(context, sessionId, 0))
+    cancelActions(context, sessionId, card)
+    // A superseded ask a crash left recorded is not named by the card, so the
+    // teardown retires it from its own record.
+    sweepRetiring(context, sessionId)
+    cancelLegacy(context, sessionId, card)
+  }
+
+  /** The stored card of one session, as it was posted, or null when none is stored. */
+  private fun storedCard(context: Context, sessionId: String): SessionNotificationCard? {
+    val stored = state(context).getString(KEY_PREFIX + sessionId, null) ?: return null
+    return SessionNotificationCard().apply { fillFromJson(JSONObject(stored)) }
+  }
+
+  /**
+   * Cancel the action records one stored card owns: Open on the card's deep
+   * link, Approve on its claim, and Dismiss on its session. The set is the
+   * card's own, because the builder adds the same three from the same fields —
+   * Approve only with an approval key, Open only with a deep link — so a card
+   * that shows fewer actions owns fewer records. Each is retrieved with
+   * `FLAG_NO_CREATE`, which cancels a record that exists and answers null
+   * instead of creating one when it does not.
+   *
+   * The Approve record is retired under both identities a card can have posted
+   * it under: the ask-keyed one this build builds, and the session-only one a
+   * build before it used, so no stale Approve action outlives its card.
+   */
+  private fun cancelActions(context: Context, sessionId: String, card: SessionNotificationCard?) {
+    val openUrl = card?.openUrl ?: ""
+    if (openUrl.isNotEmpty()) {
+      PendingIntent.getActivity(
+        context,
+        OPEN_REQUEST_CODE,
+        openDeepLinkIntent(context, openUrl),
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+      )?.cancel()
+    }
+    card?.approvalKey?.let { approvalKey ->
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
+    }
+    // A card posted before the Approve record carried its ask kept that record
+    // under the session alone, so the teardown retires that identity too; a
+    // record that never existed answers null. This cannot reach the aggregate
+    // card's record, which has its own request code.
+    ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, null)
+    PendingIntent.getBroadcast(
+      context,
+      DELETE_REQUEST_CODE,
+      dismissIntent(context, sessionId),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
+
+  /**
+   * Retire the card record an earlier app version posted for this session, and
+   * the records of its own actions. An update posts the card under the identity
+   * above, so the record from the version before it is retired here — from
+   * `post` as well as from `cancel` — or the same session would be drawn twice
+   * until it ends.
+   *
+   * That version gave one session one card and one record per action, and they
+   * are retired together here as they are in [cancelActions]: its Open record
+   * on the card's deep link, its Approve record on the gate activity, and its
+   * Dismiss record on the receiver, plus the notification and its quiet alarm,
+   * which are cancelled rather than retrieved. Those shapes are the ones that
+   * build produced, so nothing here builds a record it does not find.
+   */
+  private fun cancelLegacy(
+    context: Context,
+    sessionId: String,
+    card: SessionNotificationCard?
+  ) {
+    manager(context).cancel(
+      SessionNotificationIdentity.LEGACY_TAG,
+      SessionNotificationIdentity.legacyNotificationId(sessionId)
+    )
+    PendingIntent.getBroadcast(
+      context,
+      SessionNotificationIdentity.legacyRequestCode(
+        sessionId,
+        SessionNotificationIdentity.LEGACY_QUIET_OFFSET
+      ),
+      Intent(context, ActiveAgentsActionReceiver::class.java)
+        .setAction(ActiveAgentsActionReceiver.ACTION_QUIET)
+        .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.let { operation ->
+      alarms(context).cancel(operation)
+      operation.cancel()
+    }
+    val openUrl = card?.openUrl ?: ""
+    if (openUrl.isNotEmpty()) {
+      // No component on that version's Open record: the deep link alone.
+      PendingIntent.getActivity(
+        context,
+        SessionNotificationIdentity.legacyRequestCode(
+          sessionId,
+          SessionNotificationIdentity.LEGACY_OPEN_OFFSET
+        ),
+        Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).setPackage(context.packageName),
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+      )?.cancel()
+    }
+    // Its Approve record is the gate activity with no data, and its Dismiss
+    // record the receiver's dismiss action with no data.
+    PendingIntent.getActivity(
+      context,
+      SessionNotificationIdentity.legacyRequestCode(
+        sessionId,
+        SessionNotificationIdentity.LEGACY_APPROVE_OFFSET
+      ),
+      Intent(context, ActiveAgentsApprovalActivity::class.java),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+    PendingIntent.getBroadcast(
+      context,
+      SessionNotificationIdentity.legacyRequestCode(
+        sessionId,
+        SessionNotificationIdentity.LEGACY_DELETE_OFFSET
+      ),
+      Intent(context, ActiveAgentsActionReceiver::class.java)
+        .setAction(ActiveAgentsActionReceiver.ACTION_DISMISS),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
   }
 
   /**
@@ -107,12 +242,23 @@ internal object SessionNotifications {
    * still cancel it, and a restore keeps it out of the followed set and drops it
    * once the window passes. The timeout needs API 26; on API 24-25 the restore
    * after the window is what removes it.
+   *
+   * A post that does not land leaves the previous card in the shade, so it
+   * leaves that card answering the request it shows: the stored facts go back
+   * to it, and the Approve record of the newer ask this call built is dropped
+   * because nothing shows it. The superseded ask's record is retired only after
+   * the newer card is posted.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
     // One clock read for the whole post: the card drawn now and the quiet
     // alarm must agree on whether the quiet window has passed.
     val nowMs = System.currentTimeMillis()
     val timeoutMs = dismissAfterMs.coerceAtLeast(0)
+    // Snapshot what the shade holds before this post replaces it: a failed post
+    // leaves that card posted, so its stored facts must survive, and its
+    // Approve record must keep answering the ask it shows.
+    val previousJson = state(context).getString(KEY_PREFIX + card.sessionId, null)
+    val previousApprovalKey = approvalKeyOf(previousJson)
     val stored = card.toJson()
     if (timeoutMs > 0) {
       stored.put(FINISHED_UNTIL, nowMs + timeoutMs)
@@ -121,13 +267,172 @@ internal object SessionNotifications {
       .edit()
       .putString(KEY_PREFIX + card.sessionId, stored.toString())
       .commitOrReport("Cannot persist the followed session card")
-    val builder = builder(context, card.shownAt(nowMs))
-    if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
-      builder.setTimeoutAfter(timeoutMs)
+    // Retire the earlier build's records before this post builds its own, so
+    // the retirement can only act on what the earlier build left behind.
+    cancelLegacy(context, card.sessionId, card)
+    try {
+      val builder = builder(context, card.shownAt(nowMs))
+      if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
+        builder.setTimeoutAfter(timeoutMs)
+      }
+      val notification = builder.build()
+      // `notify` answers nothing, and it discards a post the app may not show
+      // instead of throwing. Read that permission and the card's channel up
+      // front: reading the posted set here would race the system's own enqueue.
+      if (!canShow(context, CHANNEL_ID)) {
+        abandonPost(context, card, previousJson, previousApprovalKey)
+        return
+      }
+      manager(context).notify(
+        SessionNotificationIdentity.tag(card.sessionId),
+        SessionNotificationIdentity.NOTIFICATION_ID,
+        notification
+      )
+    } catch (error: Throwable) {
+      abandonPost(context, card, previousJson, previousApprovalKey)
+      throw error
     }
-    manager(context).notify(TAG, notificationId(card.sessionId), builder.build())
+    // The post landed: record the superseded ask before retiring it, so a
+    // process that dies between these two steps cannot leave its record behind
+    // with nothing left to name it. The asks a crash left recorded are swept
+    // here too, except the request this card shows and the request the previous
+    // card showed: a repeat of either carries the same key, so sweeping one
+    // would leave a card in the shade answering nothing.
+    sweepRetiring(
+      context,
+      card.sessionId,
+      setOfNotNull(card.approvalKey, previousApprovalKey)
+    )
+    if (previousApprovalKey != null && previousApprovalKey != card.approvalKey) {
+      retire(context, card.sessionId, previousApprovalKey)
+    }
     scheduleQuiet(context, card, nowMs)
   }
+
+  /**
+   * The post did not land: the previous card is still in the shade, so put back
+   * the facts that describe it and drop the record of a newer ask, which no card
+   * shows. A record for the ask the surviving card shows is left alone, and no
+   * quiet moment is armed for a card that is not there.
+   */
+  private fun abandonPost(
+    context: Context,
+    card: SessionNotificationCard,
+    previousJson: String?,
+    previousApprovalKey: String?
+  ) {
+    restoreStored(context, card.sessionId, previousJson)
+    if (card.approvalKey != null && card.approvalKey != previousApprovalKey) {
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, card.sessionId, card.approvalKey)
+    }
+  }
+
+  /**
+   * Can this app show a card on `channelId`? A disabled app or a channel the user
+   * turned off discards a post without an exception, and both answers are read
+   * before the post, so nothing here races the system's own enqueue.
+   */
+  private fun canShow(context: Context, channelId: String): Boolean {
+    val manager = manager(context)
+    if (!manager.areNotificationsEnabled()) {
+      return false
+    }
+    if (Build.VERSION.SDK_INT < 26) {
+      return true
+    }
+    val channel = manager.getNotificationChannel(channelId)
+    return channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE
+  }
+
+  /**
+   * Retire one superseded ask's record, naming it in the persisted set first: a
+   * crash between the two steps then leaves the ask for the next post or teardown
+   * to sweep, instead of a record nothing names again.
+   */
+  private fun retire(context: Context, sessionId: String, approvalKey: String) {
+    updateRetiring(context, sessionId) { keys -> keys + approvalKey }
+    ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, approvalKey)
+    updateRetiring(context, sessionId) { keys -> keys - approvalKey }
+  }
+
+  /**
+   * Cancel every record a superseded ask left named for this session, except the
+   * asks `keep` names.
+   *
+   * A crash can leave an ask recorded that a card in the shade still answers: a
+   * repeat of one request carries the same key, so the card a later post shows
+   * can be the recorded ask itself. Cancelling it would leave that card's
+   * Approve action answering nothing, so the kept asks stay recorded until a
+   * teardown removes the card that shows them.
+   */
+  private fun sweepRetiring(
+    context: Context,
+    sessionId: String,
+    keep: Set<String> = emptySet()
+  ) {
+    val cancelled = retiring(context, sessionId) - keep
+    if (cancelled.isEmpty()) {
+      return
+    }
+    for (key in cancelled) {
+      ApprovalGate.cancel(context, APPROVE_REQUEST_CODE, sessionId, key)
+    }
+    updateRetiring(context, sessionId) { keys -> keys - cancelled }
+  }
+
+  /** The superseded asks of one session that a later pass still has to retire. */
+  private fun retiring(context: Context, sessionId: String): Set<String> {
+    val raw = state(context).getString(RETIRING_PREFIX + sessionId, null) ?: return emptySet()
+    return try {
+      val array = JSONArray(raw)
+      (0 until array.length()).map(array::getString).toSet()
+    } catch (error: JSONException) {
+      // A record that cannot be read names nothing to cancel; the teardown still
+      // retires the identities a card carries.
+      emptySet()
+    }
+  }
+
+  private fun updateRetiring(
+    context: Context,
+    sessionId: String,
+    change: (Set<String>) -> Set<String>
+  ) {
+    val keys = change(retiring(context, sessionId))
+    val editor = state(context).edit()
+    if (keys.isEmpty()) {
+      editor.remove(RETIRING_PREFIX + sessionId)
+    } else {
+      editor.putString(RETIRING_PREFIX + sessionId, JSONArray(keys.toList()).toString())
+    }
+    editor.commitOrReport("Cannot record the retired session ask")
+  }
+
+  /**
+   * Put back the stored card a failed post must keep describing, or forget the
+   * entry when the shade holds no card of this session to describe.
+   */
+  private fun restoreStored(context: Context, sessionId: String, previousJson: String?) {
+    val editor = state(context).edit()
+    if (previousJson == null) {
+      editor.remove(KEY_PREFIX + sessionId)
+    } else {
+      editor.putString(KEY_PREFIX + sessionId, previousJson)
+    }
+    editor.commitOrReport("Cannot restore the followed session card")
+  }
+
+  /** The ask one stored card answers, or null when it stores none or cannot be read. */
+  private fun approvalKeyOf(stored: String?): String? =
+    stored?.let {
+      try {
+        SessionNotificationCard().apply { fillFromJson(JSONObject(it)) }.approvalKey
+      } catch (error: JSONException) {
+        // An entry that cannot be read names no ask to keep, and it must not
+        // take the post down before the card is posted.
+        null
+      }
+    }
 
   /**
    * Arm the quiet moment of a Working card, or disarm it for every other card.
@@ -176,9 +481,10 @@ internal object SessionNotifications {
   private fun quietIntent(context: Context, sessionId: String, quietAtMs: Long): PendingIntent =
     PendingIntent.getBroadcast(
       context,
-      requestCode(sessionId, QUIET_OFFSET),
+      QUIET_REQUEST_CODE,
       Intent(context, ActiveAgentsActionReceiver::class.java)
         .setAction(ActiveAgentsActionReceiver.ACTION_QUIET)
+        .setData(Uri.parse(SessionNotificationIdentity.sessionData(sessionId)))
         .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
         .putExtra(ActiveAgentsActionReceiver.EXTRA_QUIET_AT, quietAtMs),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -187,12 +493,30 @@ internal object SessionNotifications {
   private fun alarms(context: Context): AlarmManager =
     context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
+  /**
+   * The Open action's intent: the card's own deep link, claimed by this app
+   * only. The builder and the cancel path both name the record through it, so
+   * the two cannot disagree on the record's identity.
+   */
+  private fun openDeepLinkIntent(context: Context, openUrl: String): Intent =
+    Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).setPackage(context.packageName)
+
+  /**
+   * The Dismiss action's intent, shared by the builder and the cancel path for
+   * the same reason as [openDeepLinkIntent].
+   */
+  private fun dismissIntent(context: Context, sessionId: String): Intent =
+    Intent(context, ActiveAgentsActionReceiver::class.java)
+      .setAction(ActiveAgentsActionReceiver.ACTION_DISMISS)
+      .setData(Uri.parse(SessionNotificationIdentity.sessionData(sessionId)))
+      .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+
   private fun builder(context: Context, card: SessionNotificationCard): Notification.Builder {
     val icon = CardStyle.icon(context)
     val openIntent = PendingIntent.getActivity(
       context,
-      requestCode(card.sessionId, OPEN_OFFSET),
-      Intent(Intent.ACTION_VIEW, Uri.parse(card.openUrl)).setPackage(context.packageName),
+      OPEN_REQUEST_CODE,
+      openDeepLinkIntent(context, card.openUrl),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
     val builder = CardBuilders.builder(context, CHANNEL_ID)
@@ -252,7 +576,7 @@ internal object SessionNotifications {
     val approvalKey = card.approvalKey ?: return deleteIntent(context, card.sessionId)
     return ApprovalGate.pendingIntent(
       context,
-      requestCode(card.sessionId, APPROVE_OFFSET),
+      APPROVE_REQUEST_CODE,
       card.sessionId,
       approvalKey
     )
@@ -267,10 +591,8 @@ internal object SessionNotifications {
   private fun deleteIntent(context: Context, sessionId: String): PendingIntent =
     PendingIntent.getBroadcast(
       context,
-      requestCode(sessionId, DELETE_OFFSET),
-      Intent(context, ActiveAgentsActionReceiver::class.java)
-        .setAction(ActiveAgentsActionReceiver.ACTION_DISMISS)
-        .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId),
+      DELETE_REQUEST_CODE,
+      dismissIntent(context, sessionId),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
@@ -279,12 +601,13 @@ internal object SessionNotifications {
 
   /** Stored beside a finished card: the epoch time its window ends. */
   private const val FINISHED_UNTIL = "finishedUntil"
-  private const val TAG = "session"
-  private const val SESSION_NOTIFICATION_ID_BASE = 20_000
-  private const val OPEN_OFFSET = 0
-  private const val APPROVE_OFFSET = 1
-  private const val DELETE_OFFSET = 2
-  private const val QUIET_OFFSET = 3
+
+  // One request code per action kind. The session is named by each Intent's
+  // data URI, so the code only has to separate the actions of one session.
+  private const val OPEN_REQUEST_CODE = 0
+  private const val APPROVE_REQUEST_CODE = 1
+  private const val DELETE_REQUEST_CODE = 2
+  private const val QUIET_REQUEST_CODE = 3
 }
 
 /** One followed session's notification, as the JS side maps it. */

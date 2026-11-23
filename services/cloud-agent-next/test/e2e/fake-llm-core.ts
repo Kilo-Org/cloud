@@ -72,6 +72,7 @@ export type Directive = {
  *   file:write:<opTag>:<path>:<contents>       literal contents; real write call
  *   file:seed:<opTag>:<path>:<bytes>:<nonce>   fake-generated fixture; real write call
  *   file:read:<opTag>:<path>                   real read call; echo the parsed result
+ *   file-read-pair:<tag>:<path1>:<path2>       read both paths in one turn; echo both results
  *
  * `opTag` is `[A-Za-z0-9_-]+` and is the attribution key: `directiveTag` returns
  * it, never the op. The scenario mints a fresh `opTag` per turn, so a reused
@@ -743,6 +744,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'write-then-gate',
       'read-edit-then-gate',
       'read-then-write',
+      'file-read-pair',
       'tool-stream',
       'question',
       'first-token',
@@ -1406,12 +1408,97 @@ function runToolScenario(
   writeToolCall(ctx, tag, kind, resolved);
 }
 
+function readToolResultBody(
+  result: ToolResult,
+  path: string
+): { ok: true; body: string } | { ok: false; message: string } {
+  const normalization = normalizeToolResult(result.content);
+  if (!normalization.ok) return normalization;
+  const normalized = normalization.result;
+  const resultPath = readResultPath(normalized);
+  if (!resultPath.ok || normalized.error || !readResultMatchesRequest(resultPath.path, path)) {
+    return { ok: false, message: 'read tool did not return file contents for the requested path' };
+  }
+  const body = stripPromptContext(readFileContents(normalized.output));
+  return body === ''
+    ? { ok: false, message: 'read tool did not return file contents' }
+    : { ok: true, body };
+}
+
+/**
+ * `bash:<tag>:<command>` — one native `bash` call carrying the caller's command
+ * verbatim, then the runtime's own verdict once the tool result comes back.
+ *
+ * The command is the rest of the trailing argument, so it may contain spaces,
+ * colons and shell punctuation; only the appended `<environment_details>` block
+ * is stripped. The tool call id is `bash_<tag>`, so a replay of the same request
+ * sees its own result instead of running the command a second time. The second
+ * turn echoes that result's text (bounded, so a huge output cannot bloat the
+ * transcript) after a `bash-result-<tag>` marker, which lets a driver read the
+ * sandbox's verdict straight out of the model transcript.
+ */
+function bashScenario(args: string[], ctx: ScenarioContext): void {
+  const parsed = /^([A-Za-z0-9_-]{1,64}):([\s\S]*)$/.exec(args[0] ?? '');
+  const command = parsed ? stripPromptContext(parsed[2]) : '';
+  if (!parsed || command === '') {
+    ctx.emit.json(400, { error: 'expected bash:<tag>:<command>' });
+    return;
+  }
+  const [, tag] = parsed;
+  if (!ctx.tools.some(advertised => advertised.name === 'bash')) {
+    ctx.emit.json(422, { error: 'bash fixture requires native bash' });
+    return;
+  }
+  const id = `bash_${tag}`;
+
+  if (hasToolResult(ctx.body, id)) {
+    const result =
+      isRecord(ctx.body) && Array.isArray(ctx.body.messages)
+        ? ctx.body.messages.find(
+            message => isRecord(message) && message.role === 'tool' && message.tool_call_id === id
+          )
+        : undefined;
+    const resultText = isRecord(result) ? toolResultContent(result.content) : '';
+    writeChunk(
+      ctx.emit,
+      makeChunk(ctx.id, ctx.model, {
+        role: 'assistant',
+        content: `bash-result-${tag}\n${resultText.slice(0, 4000)}`,
+      })
+    );
+    writeFinish(ctx.emit, ctx.id, ctx.model, 1);
+    ctx.emit.end();
+    return;
+  }
+
+  writeChunk(
+    ctx.emit,
+    makeChunk(ctx.id, ctx.model, {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id,
+          type: 'function',
+          function: {
+            name: 'bash',
+            arguments: JSON.stringify({ command, description: 'Fixture bash command' }),
+          },
+        },
+      ],
+    })
+  );
+  writeFinish(ctx.emit, ctx.id, ctx.model, 1, 'tool_calls');
+  ctx.emit.end();
+}
+
 /**
  * Scenario registry. Each handler writes SSE chunks through `ctx.emit` and is
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
  */
 export const scenarioRegistry: Record<string, ScenarioHandler> = {
   supervision: supervisionScenario,
+  bash: bashScenario,
   echo(args, ctx) {
     // Harness `echo:<token>` only takes the first identifier so kilo's
     // appended `<environment_details>` cannot leak into the transcript.
@@ -1666,6 +1753,44 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     parkGate(ctx, tag, `done-${tag}`);
   },
 
+  'file-read-pair'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:\n]+):([^:\n]+)$/
+    );
+    if (!parsed || parsed[2] === parsed[3]) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        'file-read-pair requires a tag and two distinct paths',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, firstPath, secondPath] = parsed;
+    const bodies: string[] = [];
+    for (const [index, path] of [firstPath, secondPath].entries()) {
+      const readTag = `${tag}-${index + 1}`;
+      const status = scenarioStatus(ctx.state, readTag);
+      const result =
+        status.toolCalls.read > 0
+          ? toolResults(ctx.body, readTag, ctx.state).find(
+              entry => entry.id === toolCallId(readTag, 'read')
+            )
+          : undefined;
+      if (!result) {
+        runToolScenario(ctx, readTag, 'read', { path });
+        return;
+      }
+      const read = readToolResultBody(result, path);
+      if (!read.ok) {
+        writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
+        return;
+      }
+      bodies.push(read.body.trim());
+    }
+    writeAssistantResponse(ctx, `file-read-pair:${JSON.stringify(bodies)}`);
+  },
+
   /**
    * `file:<op>:<opTag>:...` — one real tool turn per request, attributed to the
    * fresh per-turn `opTag`. `toolResults()` matches `(tag, kind)` across the
@@ -1741,38 +1866,13 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
 
-    const normalization = normalizeToolResult(toolResultContent(result.content));
-    if (!normalization.ok) {
-      writeJsonError(ctx.emit, 422, normalization.message, 'invalid_tool_result');
-      return;
-    }
-    const normalized = normalization.result;
-    const resultPath = readResultPath(normalized);
-    if (
-      !resultPath.ok ||
-      normalized.error ||
-      !readResultMatchesRequest(resultPath.path, directive.path)
-    ) {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents for the requested path',
-        'invalid_tool_result'
-      );
-      return;
-    }
-    const body = stripPromptContext(readFileContents(normalized.output));
-    if (body === '') {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents',
-        'invalid_tool_result'
-      );
+    const read = readToolResultBody(result, directive.path);
+    if (!read.ok) {
+      writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
       return;
     }
     status.fileCompleted = true;
-    writeAssistantResponse(ctx, `file-read:${directive.path}\n${body}`);
+    writeAssistantResponse(ctx, `file-read:${directive.path}\n${read.body}`);
   },
 
   'tool-stream'(args, ctx) {

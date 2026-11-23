@@ -7,6 +7,7 @@
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
+      "agentBriefing": "Rapò ajan ou pare",
       "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Nouvo rezilta sekirite ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritik",
+      "high": "Wo",
+      "medium": "Mwayen",
+      "low": "Ba"
     },
     "securityFindingSlaWarning": {
       "title": "Avètisman SLA"

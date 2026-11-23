@@ -47,6 +47,7 @@ import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
+import { usageMayAutoTopUp } from './usage-auto-topup-policy';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -870,6 +871,10 @@ function organizationUsageMutationTask(
 
 function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
   if (usage.cost <= 0) return;
+  // A benchmark case never initiates a purchase for its payer. The reserved project prefix is
+  // stripped from a caller-supplied header (`extractFraudAndProjectHeaders`), so only the
+  // authenticated benchmark assignment can produce a row under it.
+  if (!usageMayAutoTopUp(usage)) return;
   try {
     if (result.organizationUsage) {
       scheduleOrganizationUsageAutoTopUp(result.organizationUsage);

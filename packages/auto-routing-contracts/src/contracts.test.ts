@@ -36,6 +36,11 @@ import {
   resolveBenchmarkIdentity,
 } from './benchmark';
 import { POLICY_SETTING_VALUE_DEFAULTS } from './policy-settings';
+import {
+  CustomRouterAliasTargetsSchema,
+  MAX_CUSTOM_ROUTER_ENTRIES,
+  poolAliasTargets,
+} from './custom-router';
 
 describe('platform routing mode contracts', () => {
   it.each(['user', 'org'] as const)(
@@ -617,6 +622,108 @@ describe('MirrorPayloadSchema with routing constraints', () => {
   });
 });
 
+describe('custom router alias targets', () => {
+  const ALIAS = '~anthropic/latest';
+  const pool = {
+    entries: [
+      { kind: 'gateway' as const, model: ALIAS },
+      { kind: 'gateway' as const, model: 'openai/gpt-5' },
+      {
+        kind: 'client' as const,
+        provider: 'ollama',
+        model: 'qwen3:32b',
+        variants: [],
+        capabilities: {
+          contextLength: 32_000,
+          inputModalities: ['text'],
+          toolCall: true,
+          reasoning: false,
+        },
+        pricing: null,
+      },
+    ],
+  };
+
+  it('accepts a concrete target for a pool alias', () => {
+    expect(
+      CustomRouterAliasTargetsSchema.parse({ [ALIAS]: 'anthropic/claude-sonnet-4.6' })
+    ).toEqual({ [ALIAS]: 'anthropic/claude-sonnet-4.6' });
+    expect(() =>
+      CustomRouterAliasTargetsSchema.parse({ 'openai/gpt-5': 'openai/gpt-5.2' })
+    ).toThrow(/keyed by a ~ alias/);
+  });
+
+  it('refuses an alias, a virtual model, or a client candidate as a target', () => {
+    for (const target of ['~openai/latest', 'kilo-auto/efficient']) {
+      expect(() => CustomRouterAliasTargetsSchema.parse({ [ALIAS]: target })).toThrow(
+        /must name a concrete model/
+      );
+    }
+    // A client candidate is not a gateway model id at all, so the key schema rejects it first.
+    expect(() =>
+      CustomRouterAliasTargetsSchema.parse({ [ALIAS]: 'client:ollama/qwen3:32b' })
+    ).toThrow(/must not start with client:/);
+  });
+
+  it('bounds the map by the pool entry cap', () => {
+    const oversized = Object.fromEntries(
+      Array.from({ length: MAX_CUSTOM_ROUTER_ENTRIES + 1 }, (_unused, index) => [
+        `~vendor/model-${index}`,
+        'openai/gpt-5',
+      ])
+    );
+    expect(() => CustomRouterAliasTargetsSchema.parse(oversized)).toThrow(/at most 20/);
+  });
+
+  it('keeps only the pool own concrete alias targets', () => {
+    const aliasTargets = poolAliasTargets(
+      { entries: pool.entries },
+      new Map([
+        [ALIAS, 'anthropic/claude-sonnet-4.6'],
+        // Not an entry of this pool.
+        ['~openai/latest', 'openai/gpt-5.2'],
+        // An entry, but not an alias, so it stores no target.
+        ['openai/gpt-5', 'openai/gpt-5.2'],
+        // Another alias or a virtual model, so the dispatch is unproven.
+        ['~kilo/latest', 'kilo-auto/efficient'],
+      ])
+    );
+    expect([...aliasTargets]).toEqual([[ALIAS, 'anthropic/claude-sonnet-4.6']]);
+  });
+
+  it('parses the optional mirror field and still accepts a payload without it', () => {
+    const base = {
+      input: {
+        apiKind: 'chat_completions' as const,
+        requestedModel: 'kilo-auto/custom/mine',
+        systemPromptPrefix: '',
+        userPromptPrefix: 'Add a flag.',
+        latestUserPromptPrefix: null,
+        messageCount: 1,
+        hasTools: false,
+        stream: true,
+        providerHints: { provider: null, providerOptions: null },
+      },
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: 'session-1',
+      machineId: null,
+      clientRequestId: null,
+      mode: null,
+      userAgent: null,
+      bodyBytes: 100,
+      customRouter: { scope: 'user' as const, slug: 'mine' },
+    };
+    expect(MirrorPayloadSchema.parse(base).customRouterAliasTargets).toBeUndefined();
+    expect(
+      MirrorPayloadSchema.parse({
+        ...base,
+        customRouterAliasTargets: { [ALIAS]: 'anthropic/claude-sonnet-4.6' },
+      }).customRouterAliasTargets
+    ).toEqual({ [ALIAS]: 'anthropic/claude-sonnet-4.6' });
+  });
+});
+
 describe('BenchmarkModelSummarySchema variant field', () => {
   const baseSummary = {
     model: 'provider/model',
@@ -724,6 +831,32 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
     expect(AutoRoutingDecisionSchema.safeParse({ ...unclassified, fallback: false }).success).toBe(
       false
     );
+  });
+
+  it('reports each omitted field at its own path', () => {
+    const missingTableVersion = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      tableVersion: null,
+    });
+    expect(missingTableVersion.error?.issues.map(issue => issue.path)).toEqual([['tableVersion']]);
+
+    const missingSubtaskType = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      subtaskType: null,
+    });
+    expect(missingSubtaskType.error?.issues.map(issue => issue.path)).toEqual([['subtaskType']]);
+
+    const allMissing = AutoRoutingDecisionSchema.safeParse({
+      ...baseBenchmark,
+      taskType: null,
+      subtaskType: null,
+      tableVersion: null,
+    });
+    expect(allMissing.error?.issues.map(issue => issue.path)).toEqual([
+      ['taskType'],
+      ['subtaskType'],
+      ['tableVersion'],
+    ]);
   });
 });
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import type * as ModelAllowModule from '@kilocode/web-shared/lib/model-allow.server';
 
 // The snapshot cache belongs to the handler module, so every test loads its own
 // instance through `loadHandler` and starts from a cold cache. The factories
@@ -26,6 +27,9 @@ jest.mock('next/server', () => {
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb, db: {} }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: mockGetUserFromAuth }));
 jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
+  getEligibleProviderRoutes: jest.requireActual<typeof ModelAllowModule>(
+    '@kilocode/web-shared/lib/model-allow.server'
+  ).getEligibleProviderRoutes,
   isModelRestrictionExempt: jest.fn(async () => false),
   getModelInferenceProviders: jest.fn(async () => undefined),
 }));
@@ -85,8 +89,8 @@ const policy: EffectiveOrganizationModelPolicy = {
   memberGrant: {
     mode: 'selected',
     includeOrganizationBaseline: false,
-    modelAllowList: ['open/model'],
-    providerAllowList: ['alpha', 'freeonly'],
+    modelAllowList: new Set(['open/model']),
+    providerAllowList: new Set(['alpha', 'freeonly']),
   },
   policyRevision: 1,
   customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
@@ -152,7 +156,7 @@ describe('handleModelsByProviderRequest', () => {
     });
     mockResolvePolicy.mockImplementation(async () => ({
       ...policy,
-      memberGrant: { ...policy.memberGrant, providerAllowList: ['synthetic'] },
+      memberGrant: { ...policy.memberGrant, providerAllowList: new Set(['synthetic']) },
     }));
     mockGetUserFromAuth.mockResolvedValue({ user: { id: 'user-1' }, organizationId: 'org-1' });
     const { handleModelsByProviderRequest } = await loadHandler();

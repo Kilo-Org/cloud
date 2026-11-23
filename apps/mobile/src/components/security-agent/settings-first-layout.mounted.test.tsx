@@ -90,7 +90,13 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
-  useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useNavigation: () => ({
+    dispatch: vi.fn(),
+    goBack: vi.fn(),
+    // `useSettledReplace` hears the navigator's transition events; this suite's
+    // config is enabled, so the bounce never dispatches.
+    addListener: () => () => undefined,
+  }),
   useFocusEffect: (effect: () => void) => {
     useEffect(effect, [effect]);
   },
@@ -101,6 +107,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({ canManage: true }),
   useSecurityAgentConfig: () => config,
   useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -109,6 +116,10 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [],
     isLoading: false,
     isError: false,
+    // The screen's catalogue classifier asks whether the read delivered a list,
+    // which is what keeps a delivered-empty catalogue out of its loading state.
+    isFetched: true,
+    hasDeliveredData: true,
     refetch: vi.fn(),
   }),
 }));
@@ -260,7 +271,9 @@ const CASES: { name: string; Screen: ComponentType<{ scope: string }>; settled: 
         { label: i18n.t('securityAgent.analysisMode.shallow'), checked: false },
         { label: i18n.t('securityAgent.analysisMode.deep'), checked: true },
       ],
-      rows: ['vendor/triage', 'vendor/analysis', 'vendor/remediation'],
+      // Model rows name the stored slug readably: the catalogue is empty here,
+      // so each row shows the reference's last segment, never `vendor/triage`.
+      rows: ['triage', 'analysis', 'remediation'],
       inputs: [],
     },
   },

@@ -41,8 +41,6 @@ describe('buildLauncherSurfacesPayload', () => {
   });
 
   it('keeps the Needs input label when nothing waits', () => {
-    // The label names the tile's next state, so it must survive the
-    // nothing-waiting payload that drops the shortcut URL.
     const payload = buildLauncherSurfacesPayload(targets(), translate);
     expect(payload.needsInputUrl).toBeNull();
     expect(payload.needsInputLabel).toBe('t:glanceable.needsInput');
@@ -102,8 +100,6 @@ describe('createLauncherSurfacesPublisher', () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(publish).toHaveBeenCalledOnce();
 
-    // The native side dropped the surface, so the same targets must be written
-    // again rather than suppressed by the pre-clear memo.
     publisher.apply(targets(), translate);
     expect(publish).toHaveBeenCalledTimes(2);
   });
@@ -115,8 +111,6 @@ describe('createLauncherSurfacesPublisher', () => {
     publisher.apply(targets(), translate);
     expect(publish).toHaveBeenCalledOnce();
 
-    // A boundary clear runs outside any publisher. The derivation that follows
-    // it writes the list again instead of being treated as a repeat.
     noteLauncherSurfacesCleared();
 
     publisher.apply(targets(), translate);

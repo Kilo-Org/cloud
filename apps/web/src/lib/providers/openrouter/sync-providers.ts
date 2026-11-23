@@ -29,13 +29,14 @@ import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway
 import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsByProvider, ai_gateway_config } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { desc, lt, sql } from 'drizzle-orm';
+import { desc, eq, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  LatestAliasTargetsConfigSchema,
   VercelModelIdOverridesConfigSchema,
   type LatestAliasTarget,
   type VercelModelIdOverride,
@@ -43,11 +44,16 @@ import {
 import {
   applyLatestAliasTargets,
   getLatestAliasTargets,
-  latestAliasTargetsConfig,
   readLatestAliasTargets,
   updateLatestAliasTargets,
   type LatestAliasTargets,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import {
+  aliasTargetsIdentity,
+  promoteAliasTargets,
+  type AliasPromotionResult,
+} from '@/lib/providers/openrouter/sync-alias-pins';
+import { lockAliasPromotionWrite } from '@/lib/auto-routing-custom-routers';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -66,7 +72,7 @@ import { buildVercelModelIdOverrides } from '@/lib/providers/openrouter/vercel-m
 import { loadModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   fetchCustomLlmsFromDatabase,
   type CustomLlm,
@@ -158,22 +164,17 @@ export function withDisplayPricing(model: OpenRouterModel): OpenRouterModel {
   };
 }
 
-async function syncProviders(params: {
-  providers: OpenRouterProvider[];
-  openRouterModels: GatewayModelMap;
-  openRouterCatalogModels: CatalogModel[];
-  vercelModels: GatewayModelMap;
-  vercelModelIdOverrides: VercelModelIdOverrides;
-  customLlms: CustomLlm[];
-}) {
-  const {
-    providers,
-    openRouterModels,
-    openRouterCatalogModels,
-    vercelModels,
-    vercelModelIdOverrides,
-    customLlms,
-  } = params;
+/** One provider with the models its own listing returned, before any snapshot-only injection. */
+type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
+
+/**
+ * Fetches every provider's own model listing. This is the only network fan-out the sync performs,
+ * and it depends on nothing about the alias targets, so a cycle that has to render the snapshot
+ * twice fetches each provider once.
+ */
+export async function fetchProviderModelData(
+  providers: readonly OpenRouterProvider[]
+): Promise<ProviderModelData> {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -184,8 +185,7 @@ async function syncProviders(params: {
 
   console.log('Fetching models for all providers...');
 
-  // Fetch models for each provider and collect relationships
-  const providerModelData = await Promise.all(
+  return Promise.all(
     providers.map(provider =>
       limit(async () => {
         const models = await fetchModelsForProvider(provider);
@@ -202,6 +202,29 @@ async function syncProviders(params: {
       })
     )
   );
+}
+
+/**
+ * The snapshot the given alias targets produce. The injection helpers below rewrite the fan-out in
+ * place, so every call works on its own copy: a refused promotion re-renders the snapshot from the
+ * targets another run stored.
+ */
+export async function renderProviders(params: {
+  providerModelData: ProviderModelData;
+  openRouterModels: GatewayModelMap;
+  openRouterCatalogModels: OpenRouterCatalogModel[];
+  vercelModels: GatewayModelMap;
+  vercelModelIdOverrides: VercelModelIdOverrides;
+  customLlms: CustomLlm[];
+}): Promise<NormalizedOpenRouterResponse> {
+  const {
+    openRouterModels,
+    openRouterCatalogModels,
+    vercelModels,
+    vercelModelIdOverrides,
+    customLlms,
+  } = params;
+  const providerModelData = structuredClone(params.providerModelData);
   const unavailableModelIds = await getUnavailableModelIds();
   const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(
     providerModelData,
@@ -370,11 +393,12 @@ async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
 /** Read from the primary, since the stored targets carry pending switches across runs. */
 async function generateLatestAliasTargets(
   openRouterModels: GatewayModelMap,
-  openRouterCatalogModels: readonly CatalogModel[]
-): Promise<LatestAliasTarget[] | null> {
+  openRouterCatalogModels: readonly OpenRouterCatalogModel[]
+): Promise<{ previous: LatestAliasTargets; next: LatestAliasTarget[] } | null> {
   try {
-    return updateLatestAliasTargets({
-      previous: await readLatestAliasTargets(db),
+    const previous = await readLatestAliasTargets(db);
+    const next = updateLatestAliasTargets({
+      previous,
       models: openRouterModels,
       createdAtMs: new Map(
         openRouterCatalogModels
@@ -383,6 +407,7 @@ async function generateLatestAliasTargets(
       ),
       nowMs: Date.now(),
     });
+    return { previous, next };
   } catch (err) {
     console.error('[sync-providers] generating latest alias targets failed', err);
     captureException(err, { tags: { component: 'sync-providers-latest-alias-targets' } });
@@ -390,15 +415,17 @@ async function generateLatestAliasTargets(
   }
 }
 
-async function storeLatestAliasTargets(entries: LatestAliasTarget[]) {
-  const value = latestAliasTargetsConfig(entries);
-  await db
-    .insert(ai_gateway_config)
-    .values({ id: 1, latest_alias_targets: value })
-    .onConflictDoUpdate({
-      target: ai_gateway_config.id,
-      set: { latest_alias_targets: value },
-    });
+/**
+ * Refuses a snapshot too small to be a real catalog. Every render is checked, so the snapshot the
+ * sync stores is one the same guard accepted, including the snapshot a refused promotion renders.
+ */
+function assertPlausibleSnapshot(snapshot: NormalizedOpenRouterResponse) {
+  if (snapshot.total_providers < 10) {
+    throw new Error(`Suspicious: total number of providers is ${snapshot.total_providers} < 10`);
+  }
+  if (snapshot.total_models < 100) {
+    throw new Error(`Suspicious: total number of models is ${snapshot.total_models} < 100`);
+  }
 }
 
 /**
@@ -416,20 +443,44 @@ async function storeLatestAliasTargets(entries: LatestAliasTarget[]) {
  * two overlapping sync runs cannot both observe the same "previous" row
  * and emit duplicate system audit logs for the same diff. The lock is
  * released automatically on commit/rollback.
+ *
+ * `aliasTargets` are the targets the snapshot was rendered from. A later promotion can commit
+ * between that render and this write, so when given, the stored targets are compared under the
+ * same lock and a mismatch stores nothing: the snapshot must never name an alias target the
+ * database has replaced. The next sync cycle renders the newer targets.
  */
 export async function applySnapshotChangesAndAudit(params: {
   providers: NormalizedOpenRouterResponse;
+  aliasTargets?: readonly LatestAliasTarget[];
 }): Promise<{
   id: number;
   data: NormalizedOpenRouterResponse;
   previousSnapshot: NormalizedOpenRouterResponse | null;
 }> {
-  const { providers } = params;
+  const { providers, aliasTargets } = params;
 
   const { row, previousSnapshot } = await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY}))`
     );
+
+    if (aliasTargets) {
+      // A promotion takes the same key exclusively, so no promotion can commit between this
+      // comparison and the insert. The snapshot can therefore never name a target the database has
+      // already replaced.
+      await lockAliasPromotionWrite(tx);
+      const [configRow] = await tx
+        .select({ config: ai_gateway_config.latest_alias_targets })
+        .from(ai_gateway_config)
+        .where(eq(ai_gateway_config.id, 1))
+        .limit(1);
+      const stored = configRow?.config
+        ? LatestAliasTargetsConfigSchema.parse(configRow.config)
+        : null;
+      if (aliasTargetsIdentity(stored?.aliases ?? []) !== aliasTargetsIdentity(aliasTargets)) {
+        throw new Error('stored alias targets moved while the snapshot was rendered');
+      }
+    }
 
     const [previousSnapshotRow] = await tx
       .select({ data: modelsByProvider.data })
@@ -454,6 +505,31 @@ export async function applySnapshotChangesAndAudit(params: {
   }
 
   return { id: row.id, data: row.data, previousSnapshot };
+}
+
+/**
+ * The snapshot a cycle stores after its promotion attempt. A committed promotion keeps the
+ * prospective snapshot it already validated. A refused one re-renders from the targets the
+ * promotion observed under the exclusive lock, or, when it never took that lock, from the ones the
+ * primary now holds: a target can only move under that lock or the fence this cycle failed to take,
+ * so the snapshot never publishes a move no pool witnessed. `render` is the caller's fan-out-free
+ * renderer, and its result passes the same plausibility check as the prospective snapshot.
+ */
+export async function resolveSnapshot(params: {
+  prospective: NormalizedOpenRouterResponse;
+  promotion: AliasPromotionResult;
+  render: (targets: LatestAliasTargets) => Promise<NormalizedOpenRouterResponse>;
+}): Promise<{ providers: NormalizedOpenRouterResponse; aliasTargets: LatestAliasTarget[] }> {
+  if (params.promotion.written) {
+    return { providers: params.prospective, aliasTargets: [...(params.promotion.targets ?? [])] };
+  }
+  console.warn(
+    '[sync-providers] alias targets were not promoted; this cycle keeps the stored targets'
+  );
+  const targets = params.promotion.targets ?? [...(await readLatestAliasTargets(db)).values()];
+  const rendered = await params.render(new Map(targets.map(entry => [entry.alias, entry])));
+  assertPlausibleSnapshot(rendered);
+  return { providers: rendered, aliasTargets: [...targets] };
 }
 
 export async function syncAndStoreProviders() {
@@ -483,35 +559,48 @@ export async function syncAndStoreProviders() {
     openRouterModels,
     openRouterCatalog.data
   );
-  const latestAliasTargets: LatestAliasTargets = generatedLatestAliasTargets
-    ? new Map(generatedLatestAliasTargets.map(entry => [entry.alias, entry]))
+
+  const customLlms = await fetchCustomLlmsFromDatabase();
+
+  // One network fan-out per cycle. A refused promotion re-renders its snapshot from the targets
+  // another run stored, and that must not repeat hundreds of provider fetches.
+  const providerModelData = await fetchProviderModelData(openrouterProviders);
+  const buildProviders = (targets: LatestAliasTargets) =>
+    renderProviders({
+      providerModelData,
+      openRouterModels: applyLatestAliasTargets(openRouterModels, targets),
+      openRouterCatalogModels: openRouterCatalog.data,
+      vercelModels,
+      vercelModelIdOverrides,
+      customLlms,
+    });
+
+  // The prospective snapshot, validated before anything is written, so a suspicious sync leaves the
+  // stored alias targets and pins untouched.
+  const prospectiveTargets: LatestAliasTargets = generatedLatestAliasTargets
+    ? new Map(generatedLatestAliasTargets.next.map(entry => [entry.alias, entry]))
     : await getLatestAliasTargets();
+  let providers = await buildProviders(prospectiveTargets);
+  assertPlausibleSnapshot(providers);
+  let snapshotTargets: readonly LatestAliasTarget[] | null = null;
 
-  const providers = await syncProviders({
-    providers: openrouterProviders,
-    openRouterModels: applyLatestAliasTargets(openRouterModels, latestAliasTargets),
-    openRouterCatalogModels: openRouterCatalog.data,
-    vercelModels,
-    vercelModelIdOverrides,
-    customLlms: await fetchCustomLlmsFromDatabase(),
-  });
-
-  if (providers.total_providers < 10) {
-    throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);
-  }
-
-  if (providers.total_models < 100) {
-    throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
+  if (generatedLatestAliasTargets) {
+    const promotion = await promoteAliasTargets(generatedLatestAliasTargets);
+    const resolved = await resolveSnapshot({
+      prospective: providers,
+      promotion,
+      render: buildProviders,
+    });
+    providers = resolved.providers;
+    snapshotTargets = resolved.aliasTargets;
   }
 
   if (generatedVercelModelIdOverrides) {
     await storeVercelModelIdOverrides(generatedVercelModelIdOverrides);
   }
-  if (generatedLatestAliasTargets) {
-    await storeLatestAliasTargets(generatedLatestAliasTargets);
-  }
-
-  const result = await applySnapshotChangesAndAudit({ providers });
+  const result = await applySnapshotChangesAndAudit(
+    snapshotTargets ? { providers, aliasTargets: snapshotTargets } : { providers }
+  );
 
   const completed_at = await recordSyncCompleted('providers');
 

@@ -10,129 +10,17 @@ import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { lastLinkedPage } from './link-header';
 import {
+  checkGitHubPaginationBounds,
+  GitHubListingBudget,
+  withListingDeadline,
+} from './listing-budget';
+import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '../../github/runtime-authorization';
+import { assertGitHubInstallationDeletable } from './protected-installation';
 
 export type { GitHubAppType } from './app-selector';
-
-const MAX_GITHUB_PAGINATION_PAGES = 100;
-const MAX_GITHUB_PAGINATION_ITEMS = 10_000;
-
-/**
- * Cumulative response bytes one paginated read keeps across its pages. A real page of 100
- * repositories or branches is about 100 KiB, so MAX_GITHUB_PAGINATION_PAGES full pages come to
- * roughly 10 MiB; 16 MiB leaves headroom for payloads larger than that.
- */
-export const MAX_GITHUB_LISTING_BYTES = 16 * 1024 * 1024;
-
-/**
- * Total duration of one paginated read, shared by every page request. A real page answers in
- * well under a second, so the page cap is reached in seconds and this limit applies only to a
- * read far slower than a listing.
- */
-export const GITHUB_LISTING_TIMEOUT_MS = 60_000;
-
-/** User-facing copy for a listing that exceeded the server-side pagination budget. */
-export const GITHUB_LISTING_BUDGET_MESSAGE =
-  'This GitHub installation has more repositories or branches than Kilo can list. Limit its repository access and try again.';
-
-/** Raised when one paginated read passes a page, item, byte or duration bound. */
-export class GitHubListingBudgetExceededError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GitHubListingBudgetExceededError';
-  }
-}
-
-/**
- * One paginated read's budget: the response bytes it keeps across pages and the single
- * total-duration signal every page request of that read shares. A read that exceeds either
- * limit fails with an error naming the read.
- */
-class GitHubListingBudget {
-  readonly signal: AbortSignal;
-  private readonly controller = new AbortController();
-  private readonly context: string;
-  private readonly timer: NodeJS.Timeout;
-  private readonly timeoutError: GitHubListingBudgetExceededError;
-  private retainedBytes = 0;
-
-  constructor(context: string) {
-    this.context = context;
-    this.timeoutError = new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
-    );
-    this.timer = setTimeout(() => {
-      // undici rejects with the abort reason itself, and Octokit's fetch wrapper rethrows that
-      // rejection unchanged only when its name is `AbortError`; any other reason is wrapped in a
-      // RequestError 500. The reason therefore carries the typed error as its cause, and the
-      // paginating loops read it back through deadlineError().
-      const abortReason = new Error(this.timeoutError.message);
-      abortReason.name = 'AbortError';
-      Object.defineProperty(abortReason, 'cause', { value: this.timeoutError });
-      this.controller.abort(abortReason);
-    }, GITHUB_LISTING_TIMEOUT_MS);
-    this.timer.unref?.();
-    this.signal = this.controller.signal;
-  }
-
-  /**
-   * The typed deadline error. A page request aborted by the timeout reaches its caller as an
-   * `AbortError` or a wrapper around it, so a loop whose signal has fired reports this instead.
-   */
-  deadlineError(): GitHubListingBudgetExceededError {
-    return this.timeoutError;
-  }
-
-  retain(bytes: number): void {
-    this.retainedBytes += bytes;
-    if (this.retainedBytes > MAX_GITHUB_LISTING_BYTES) {
-      throw new GitHubListingBudgetExceededError(
-        `GitHub pagination limit exceeded: ${this.context} returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
-      );
-    }
-  }
-
-  dispose(): void {
-    clearTimeout(this.timer);
-  }
-}
-
-/**
- * Runs one page request and reports the budget's typed deadline error when the read ran out of
- * time: Octokit surfaces an aborted request as an `AbortError` or a wrapper around it, and only
- * the caller knows that the abort came from the budget. Any other failure is rethrown unchanged.
- */
-async function withListingDeadline<T>(
-  budget: GitHubListingBudget,
-  request: () => Promise<T>
-): Promise<T> {
-  try {
-    return await request();
-  } catch (error) {
-    if (budget.signal.aborted) throw budget.deadlineError();
-    throw error;
-  }
-}
-
-/**
- * Enforces the server-side pagination bounds for every paginating helper in this
- * adapter: pagination continues only within MAX_GITHUB_PAGINATION_PAGES pages and
- * MAX_GITHUB_PAGINATION_ITEMS items, and exceeding either bound fails with an error.
- */
-function checkGitHubPaginationBounds(page: number, itemCount: number, context: string): void {
-  if (page > MAX_GITHUB_PAGINATION_PAGES) {
-    throw new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_PAGES} pages`
-    );
-  }
-  if (itemCount > MAX_GITHUB_PAGINATION_ITEMS) {
-    throw new GitHubListingBudgetExceededError(
-      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_ITEMS} items`
-    );
-  }
-}
 
 export type GitHubInstallationRequest = {
   id: string;
@@ -177,10 +65,11 @@ export async function fetchGitHubInstallationRequests(
         }))
       );
 
+      if (data.length === 0) break;
       const isLastPage = data.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, requests.length, context);
       if (isLastPage) break;
+      page++;
     }
 
     return requests;
@@ -269,6 +158,9 @@ export async function deleteGitHubInstallation(
   installationId: string,
   appType: GitHubAppType = 'standard'
 ): Promise<void> {
+  // A local stack runs on the fixture app, and deleting its installation takes every forge fixture
+  // offline. The guard runs before the credentials are read, so no request leaves Kilo.
+  assertGitHubInstallationDeletable(installationId);
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -293,6 +185,7 @@ export async function verifyAndDeleteGitHubOrganizationInstallation(params: {
   accountId: string;
   appType: GitHubAppType;
 }): Promise<void> {
+  assertGitHubInstallationDeletable(params.installationId);
   const credentials = getGitHubAppCredentials(params.appType);
   if (!credentials.appId || !credentials.privateKey)
     throw new Error('GitHub App credentials unavailable');
@@ -386,10 +279,11 @@ async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRep
           }))
       );
 
+      if (data.repositories.length === 0) break;
       const isLastPage = data.repositories.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, repositories.length, context);
       if (isLastPage) break;
+      page++;
     }
 
     return repositories;
@@ -471,10 +365,11 @@ export async function fetchGitHubBranches(
         }))
       );
 
+      if (data.length === 0) break;
       const isLastPage = data.length < perPage;
-      if (!isLastPage) page++;
       checkGitHubPaginationBounds(page, branches.length, context);
       if (isLastPage) break;
+      page++;
     }
   } finally {
     budget.dispose();
@@ -893,32 +788,52 @@ async function scanPRIssueComments(
     per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
   };
 
-  const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
-  const comments: PRIssueComment[] = [...firstResponse.data];
+  // One walk shares one signal and deadline: every page of this scan is charged to the same
+  // total duration.
+  const budget = new GitHubListingBudget('PR issue-comment scan');
 
-  if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
-    for (let page = 2; page <= lastPage; page++) {
-      const { data } = await octokit.issues.listComments({ ...base, page });
+  try {
+    const firstResponse = await withListingDeadline(budget, () =>
+      octokit.issues.listComments({ ...base, page: 1, request: { signal: budget.signal } })
+    );
+    budget.retain(Buffer.byteLength(JSON.stringify(firstResponse.data)));
+    const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
+    const comments: PRIssueComment[] = [...firstResponse.data];
+
+    if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
+      for (let page = 2; page <= lastPage; page++) {
+        const { data } = await withListingDeadline(budget, () =>
+          octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+        );
+        budget.retain(Buffer.byteLength(JSON.stringify(data)));
+        comments.push(...data);
+      }
+      return { comments, reachedScanLimit: false };
+    }
+
+    const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
+    const headPages = Math.ceil(pagesAfterTheFirst / 2);
+    const tailPages = pagesAfterTheFirst - headPages;
+
+    for (let page = 2; page <= 1 + headPages; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
       comments.push(...data);
     }
-    return { comments, reachedScanLimit: false };
-  }
+    for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.issues.listComments({ ...base, page, request: { signal: budget.signal } })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+      comments.push(...data);
+    }
 
-  const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
-  const headPages = Math.ceil(pagesAfterTheFirst / 2);
-  const tailPages = pagesAfterTheFirst - headPages;
-
-  for (let page = 2; page <= 1 + headPages; page++) {
-    const { data } = await octokit.issues.listComments({ ...base, page });
-    comments.push(...data);
+    return { comments, reachedScanLimit: true };
+  } finally {
+    budget.dispose();
   }
-  for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
-    const { data } = await octokit.issues.listComments({ ...base, page });
-    comments.push(...data);
-  }
-
-  return { comments, reachedScanLimit: true };
 }
 
 /**
@@ -1052,41 +967,53 @@ export async function fetchPRInlineComments(
   let reachedByteLimit = false;
   let storedBodyBytes = 0;
 
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data } = await octokit.pulls.listReviewComments({
-      owner,
-      repo,
-      pull_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-      // Newest comments first, so a page or byte cap keeps the freshest
-      // duplicate-detection hints and drops the oldest ones.
-      sort: 'created',
-      direction: 'desc',
-    });
-    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
+  // One walk shares one signal and deadline: every page of this listing is charged to the same
+  // total duration.
+  const budget = new GitHubListingBudget('PR inline comment listing');
 
-    for (const c of rows) {
-      const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
-      storedBodyBytes += Buffer.byteLength(body);
-      comments.push({
-        id: c.id,
-        path: c.path,
-        line: c.line ?? null,
-        body,
-        isOutdated: c.position == null,
-        authoredByKilo: isAuthoredByApp(c, appId),
-        user: { login: c.user?.login ?? 'unknown' },
-      });
+  try {
+    for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.pulls.listReviewComments({
+          owner,
+          repo,
+          pull_number: prNumber,
+          per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+          page,
+          // Newest comments first, so a page or byte cap keeps the freshest
+          // duplicate-detection hints and drops the oldest ones.
+          sort: 'created',
+          direction: 'desc',
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+      const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
-      if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
-        reachedByteLimit = true;
-        break;
+      for (const c of rows) {
+        const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+        storedBodyBytes += Buffer.byteLength(body);
+        comments.push({
+          id: c.id,
+          path: c.path,
+          line: c.line ?? null,
+          body,
+          isOutdated: c.position == null,
+          authoredByKilo: isAuthoredByApp(c, appId),
+          user: { login: c.user?.login ?? 'unknown' },
+        });
+
+        if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
       }
-    }
 
-    if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+      if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+      reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+    }
+  } finally {
+    budget.dispose();
   }
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {

@@ -3097,7 +3097,14 @@ describe('SandboxControlV2 allocation egress policy', () => {
         { egressMode: 'allowlist' as const },
         { egressAudit: true },
         { egressMode: 'unrestricted' as const, egressAudit: true },
-      ].map(policy => ({ ...placement, policy }))
+      ]
+        // An isolated Vercel sandbox enforces an allowlist, but cannot audit without one.
+        .filter(
+          policy =>
+            placement.provider !== 'vercel' ||
+            !('egressMode' in policy && policy.egressMode === 'allowlist')
+        )
+        .map(policy => ({ ...placement, policy }))
     )
   )(
     'rejects unsupported ensure policy placement before creating an allocation: %j',

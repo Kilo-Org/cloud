@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules, promise/avoid-new -- the download fixture is a real HTTP server with a Content-Disposition route */
+/* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new -- the download fixture is a real HTTP server with a Content-Disposition route */
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import { once } from 'node:events';
@@ -26,6 +26,11 @@ import { once } from 'node:events';
 export const DOWNLOAD_PATH = '/assets/report.txt';
 export const DOWNLOAD_FILENAME = 'report.txt';
 export const DOWNLOAD_BODY = 'fixture download body\n';
+/**
+ * The route that serves the attachment once and answers every later request with a redirect to the `next` url it is
+ * given: a repeat of the same step loads a page instead of a file, and reports where that page settled.
+ */
+export const ONCE_DOWNLOAD_PATH = '/assets/once-report.txt';
 /** The held route: an attachment whose response lands only when the test says so. */
 export const LATE_DOWNLOAD_PATH = '/assets/late-report.txt';
 /** The second attachment one click starts on the `/two` page: the file no approval covers. */
@@ -34,6 +39,20 @@ export const SECOND_DOWNLOAD_FILENAME = 'second.txt';
 export const SECOND_DOWNLOAD_BODY = 'second fixture download body\n';
 /** The page whose one button starts both attachments; the guard has to decide each of them. */
 export const TWO_DOWNLOADS_PAGE_PATH = '/two';
+/**
+ * The page whose payment-form submit starts an attachment: the click is a sensitive step of its own, and the file the
+ * same gesture starts is a second one the step's approval does not buy.
+ */
+export const CARD_PAGE_PATH = '/card';
+/**
+ * An attachment-shaped control whose response is an error: the guard still has to decide the click, but the browser
+ * gets a plain error body instead of a file, so there is never an item to keep.
+ */
+export const BROKEN_DOWNLOAD_PATH = '/assets/broken-report.txt';
+/** The page whose drop zone reports the names of the files a drop handed it. */
+export const DROP_PAGE_PATH = '/drop';
+/** Where the drop page reports those names: the fixture answers 204 and records the list. */
+export const DROP_RECEIVED_PATH = '/drop-received';
 /** A page with no agent attached to it: a download started here is the user's own. */
 export const USER_PAGE_PATH = '/user';
 /** The user's own file, named apart from the agent's so a folder read says whose it is. */
@@ -48,6 +67,7 @@ const DOWNLOAD_PAGE_HTML = `<!doctype html>
     <h1>Download page</h1>
     <p>A link that hands the browser a file instead of a document.</p>
     <a href="${DOWNLOAD_PATH}">Download report</a>
+    <a href="${BROKEN_DOWNLOAD_PATH}" download>Broken report</a>
     <a id="slow-download" href="#slow">Download slow report</a>
     <button type="button">Plain button</button>
     <iframe name="slow-sink" hidden></iframe>
@@ -93,6 +113,63 @@ const TWO_DOWNLOADS_PAGE_HTML = `<!doctype html>
   </body>
 </html>`;
 
+/*
+ * A payment form whose submit starts an attachment. The click is a sensitive
+ * step — a submit control inside a form holding a card field — and it is also
+ * the gesture that starts the download.
+ *
+ * The submit's handler cancels the navigation and points a hidden frame at the
+ * file instead: the click answers at once, and the download the same gesture
+ * starts is created before the call that dispatched it returns.
+ */
+const CARD_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Payment page</title></head>
+  <body>
+    <h1>Payment page</h1>
+    <form id="pay">
+      <label for="cc">Card number</label>
+      <input id="cc" name="cc-number" autocomplete="cc-number" value="4242424242424242">
+      <button id="receipt" type="submit">Get receipt</button>
+    </form>
+    <iframe name="receipt-sink" hidden></iframe>
+    <script>
+      // Every submit needs its own url: assigning the value the frame's src already has changes nothing.
+      let receipts = 0;
+      document.querySelector('#pay').addEventListener('submit', event => {
+        event.preventDefault();
+        receipts += 1;
+        document.querySelector('iframe[name="receipt-sink"]').src = '${DOWNLOAD_PATH}?receipt=' + receipts;
+      });
+    </script>
+  </body>
+</html>`;
+
+/*
+ * A drop zone that names what it received to the fixture. The page never keeps
+ * a file: the report is the name list the browser's own `dataTransfer` held,
+ * which is how a spec proves the page got the file at all.
+ */
+const DROP_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Drop page</title></head>
+  <body>
+    <h1>Drop page</h1>
+    <div id="zone" role="region" aria-label="Drop zone" tabindex="0">Drop files here</div>
+    <script>
+      const zone = document.querySelector('#zone');
+      zone.addEventListener('dragover', event => {
+        event.preventDefault();
+      });
+      zone.addEventListener('drop', event => {
+        event.preventDefault();
+        const names = Array.from(event.dataTransfer?.files ?? []).map(file => file.name);
+        void fetch('${DROP_RECEIVED_PATH}?names=' + encodeURIComponent(names.join(',')));
+      });
+    </script>
+  </body>
+</html>`;
+
 /** A page with no agent attached: a download here is the user's own and passes through untouched. */
 const USER_PAGE_HTML = `<!doctype html>
 <html>
@@ -105,10 +182,16 @@ const USER_PAGE_HTML = `<!doctype html>
 
 export interface DownloadFixture {
   readonly close: () => Promise<void>;
+  /** How many times the attachment route answered an error: a click the guard still decided reached the fixture. */
+  readonly brokenHits: () => number;
+  /** The name lists the drop page reported, one entry per drop that reached it: the page's own record of the files. */
+  readonly dropReceived: () => readonly (readonly string[])[];
   /** How many times the attachment route served a body: a cancelled download still reaches it. */
   readonly hits: () => number;
   /** How many times the held attachment route was asked for the file. */
   readonly lateHits: () => number;
+  /** How many times the attachment that answers once was asked: the repeat's request is counted here too. */
+  readonly onceHits: () => number;
   /** Answers every held request: the browser creates the download only now, long after the click answered. */
   readonly releaseLate: () => void;
   /** How many times the second attachment of a `/two` click was served. */
@@ -123,8 +206,12 @@ export interface DownloadFixture {
 export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   let hits = 0;
   let lateHits = 0;
+  let onceHits = 0;
   let secondHits = 0;
   let userHits = 0;
+  let brokenHits = 0;
+  /** One entry per drop the page reported, in arrival order: the file names its own `dataTransfer` carried. */
+  const dropsReceived: (readonly string[])[] = [];
   /** The routes waiting for the test: answering one makes the browser create its download. */
   const held: (() => void)[] = [];
   /** Calls waiting until the held route has been asked `count` times: the file is requested but not yet answered. */
@@ -147,6 +234,30 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   const server: Server = createServer((request, response) => {
     const path = (request.url ?? '/').split('?')[0] ?? '/';
 
+    if (path === DROP_RECEIVED_PATH) {
+      // The page's report of what it received: a drop that never reached it reports nothing, which is the assertion.
+      const names = new URL(request.url ?? '/', 'http://fixture').searchParams.get('names') ?? '';
+      const reported = names === '' ? [] : names.split(',');
+
+      dropsReceived.push(reported);
+      response.writeHead(204, { 'cache-control': 'no-store' });
+      response.end();
+
+      return;
+    }
+
+    if (path === BROKEN_DOWNLOAD_PATH) {
+      brokenHits += 1;
+      // No `content-disposition`: the browser gets an error page, not a file it could ever write to the folder.
+      response.writeHead(500, {
+        'cache-control': 'no-store',
+        'content-type': 'text/plain; charset=utf-8',
+      });
+      response.end('fixture attachment failure\n');
+
+      return;
+    }
+
     if (path === USER_DOWNLOAD_PATH) {
       userHits += 1;
       response.writeHead(200, {
@@ -167,6 +278,30 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
         'content-type': 'application/octet-stream',
       });
       response.end(SECOND_DOWNLOAD_BODY);
+
+      return;
+    }
+
+    if (path === ONCE_DOWNLOAD_PATH) {
+      onceHits += 1;
+
+      // The first request is the file the step asked for; every later one is a page the browser loads instead, so a
+      // Repeat of the step loads a document and the answer describes that document.
+      const next = new URL(request.url ?? '/', 'http://127.0.0.1').searchParams.get('next');
+
+      if (onceHits > 1 && next !== null) {
+        response.writeHead(302, { 'cache-control': 'no-store', location: next });
+        response.end();
+
+        return;
+      }
+
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-disposition': `attachment; filename="${DOWNLOAD_FILENAME}"`,
+        'content-type': 'application/octet-stream',
+      });
+      response.end(DOWNLOAD_BODY);
 
       return;
     }
@@ -213,6 +348,26 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
       return;
     }
 
+    if (path === CARD_PAGE_PATH) {
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-type': 'text/html; charset=utf-8',
+      });
+      response.end(CARD_PAGE_HTML);
+
+      return;
+    }
+
+    if (path === DROP_PAGE_PATH) {
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-type': 'text/html; charset=utf-8',
+      });
+      response.end(DROP_PAGE_HTML);
+
+      return;
+    }
+
     if (path === USER_PAGE_PATH) {
       response.writeHead(200, {
         'cache-control': 'no-store',
@@ -234,13 +389,16 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   const port = typeof address === 'object' && address !== null ? address.port : 0;
 
   return {
+    brokenHits: () => brokenHits,
     close: async () => {
       server.closeAllConnections();
       server.close();
       await once(server, 'close');
     },
+    dropReceived: () => dropsReceived,
     hits: () => hits,
     lateHits: () => lateHits,
+    onceHits: () => onceHits,
     releaseLate: () => {
       for (const answer of held.splice(0)) {
         answer();

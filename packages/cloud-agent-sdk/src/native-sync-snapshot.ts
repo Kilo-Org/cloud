@@ -192,8 +192,9 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
     }
     // A message whose attachment content storage was expected to provide still displays its
     // text, reasoning and tool output; its withheld attachment is reported, never hidden.
-    // An absolute `http(s)` reference is never fetched on purpose, so it is not reported.
-    if (hasIncompleteKilo2Assets(item.message, snapshot.assetURLs))
+    // An absolute `http(s)` reference is never fetched on purpose, so it is not reported
+    // unless the snapshot declared its key unavailable.
+    if (hasIncompleteKilo2Assets(item.message, snapshot.assetURLs, unavailable))
       incompleteMessageIDs.push(item.message.id);
     messages.push(item.message);
   }

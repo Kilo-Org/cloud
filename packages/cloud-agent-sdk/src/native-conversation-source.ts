@@ -221,7 +221,7 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
   );
   const incompleteReferenced = complete.filter(item =>
-    hasIncompleteKilo2Assets(item.message, state.assetURLs)
+    hasIncompleteKilo2Assets(item.message, state.assetURLs, unavailable)
   );
   const incompleteMessageIDs = [
     ...new Set([

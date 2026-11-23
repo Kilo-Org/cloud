@@ -1,4 +1,4 @@
-import { kilo2AssetKey, readKilo2Messages } from './kilo2-source-messages';
+import { kilo2AssetKey, kilo2ToolFileId, readKilo2Messages } from './kilo2-source-messages';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
 import {
   readNativeConversation,
@@ -981,6 +981,48 @@ test('a snapshot-reported unavailable media key displays the message without a r
   expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_unavailable_media']);
   expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text']);
   expect(conversation.incompleteMessageIDs).toEqual(['msg_unavailable_media']);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain(uri);
+});
+
+test('a snapshot-reported unavailable remote key displays the message without a recovery signal', () => {
+  const uri = 'https://example.test/report.png';
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_unavailable_remote',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          { type: 'text', text: 'Retrieved the report' },
+          {
+            type: 'tool',
+            id: 'call_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: 'report.png' },
+              content: [{ type: 'file', uri, mime: 'image/png' }],
+            },
+          },
+        ],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({
+    ...state,
+    messages,
+    // The snapshot declared this absolute reference unmapped, so it is reported even
+    // though an absolute `http(s)` reference is normally never fetched on purpose.
+    unavailableAssetKeys: [
+      kilo2AssetKey(kilo2ToolFileId('msg_unavailable_remote', 1, 0), uri, 'image/png'),
+    ],
+  });
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_unavailable_remote']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
+  expect(conversation.incompleteMessageIDs).toEqual(['msg_unavailable_remote']);
   expect(conversation.recoveryGaps).toBe(0);
   expect(conversation.error).toBeUndefined();
   expect(JSON.stringify(conversation.messages)).not.toContain(uri);

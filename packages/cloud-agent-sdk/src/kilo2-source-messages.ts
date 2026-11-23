@@ -183,24 +183,28 @@ export function hasUnresolvedKilo2Assets(
 }
 
 /**
- * The incomplete-reporting gate: this message holds a reference with no authorized
- * entry, no inline bytes, and one the content store was expected to provide — a `media:`
- * or workspace-relative reference, or a snapshot-declared unmapped key. Contrast
- * `hasUnresolvedKilo2Assets`, the recovery queue: every reference in that queue is also
- * reported, while this set additionally holds references no authorization can ever bind.
+ * The incomplete-reporting gate: this message holds a reference with no authorized entry,
+ * no inline bytes, and one the content store was expected to provide — a `media:` or
+ * workspace-relative reference — plus any key the snapshot declared unavailable, even
+ * when its URI is an absolute `http(s)` one. Contrast `hasUnresolvedKilo2Assets`, the
+ * recovery queue: every reference in that queue is also reported, while this set
+ * additionally holds references no authorization can ever bind.
  *
- * An absolute `http(s)` reference is never fetched on purpose, so it is withheld from the
- * display but never reported as missing content.
+ * A bare absolute `http(s)` reference is never fetched on purpose, so it is withheld from
+ * the display but never reported as missing content unless the snapshot declared that key
+ * unavailable.
  */
 export function hasIncompleteKilo2Assets(
   message: Kilo2Message,
-  assetURLs?: Readonly<Record<string, string>>
+  assetURLs?: Readonly<Record<string, string>>,
+  unavailable?: ReadonlySet<string>
 ): boolean {
   return readKilo2FileReferences(message).some(
     file =>
       assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
       !isInlineDataUri(file.uri) &&
-      !/^https?:\/\//.test(file.uri)
+      (!/^https?:\/\//.test(file.uri) ||
+        unavailable?.has(kilo2AssetKey(file.id, file.uri, file.mime)) === true)
   );
 }
 

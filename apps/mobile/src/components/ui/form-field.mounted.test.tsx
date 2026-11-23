@@ -448,7 +448,11 @@ describe('FormField resting value preview', () => {
     // string it shows, so the resting box adds no role or hint of its own.
     expect(box.props.accessibilityRole).toBeUndefined();
     expect(box.props.accessibilityHint).toBeUndefined();
-    // A resting value can be selected and copied, as inside the native input.
+    // Android runs selection on a plain text node, so a resting value can be
+    // selected and copied there, as it could inside the native input. iOS shows
+    // an empty edit menu for that, so the preview does not rely on it: entering
+    // the field with one press gives the real input, where the value is
+    // selectable on both platforms.
     expect(text.props.selectable).toBe(true);
     // The line height lands on the painted line, not on the `View` around it.
     expect(box.props.className).not.toContain('leading-[normal]');
@@ -457,13 +461,25 @@ describe('FormField resting value preview', () => {
 
   it('enters the field on an assistive activation, and not while disabled', () => {
     const enabled = mountField({ defaultValue: longValue });
-    const handler = enabled.root.findByType('Pressable').props as {
+    const enabledHandler = enabled.root.findByType('Pressable').props as {
       onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
     };
     act(() => {
-      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+      enabledHandler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
     });
     expect(enabled.root.findAllByType('Pressable')).toHaveLength(0);
     expect(enabled.root.findByType('TextInput')).toBeDefined();
+
+    // A disabled field has nothing to enter, so the same action changes nothing:
+    // the resting box stays and no editor opens.
+    const disabled = mountField({ defaultValue: longValue, disabled: true });
+    const disabledHandler = disabled.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    };
+    act(() => {
+      disabledHandler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+    });
+    expect(disabled.root.findAllByType('Pressable')).toHaveLength(1);
+    expect(disabled.root.findAllByType('TextInput')).toHaveLength(0);
   });
 });

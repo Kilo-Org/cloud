@@ -230,9 +230,13 @@ function FormField({
               // The line height belongs on the painted line: this control is a
               // `View`, which ignores it, and the native input draws its value at
               // the same height, so the resting line keeps the box it stands in.
+              //
+              // `selectable` runs selection on Android, where a resting value can
+              // be selected and copied as it could inside the native input. On
+              // iOS it presents an empty edit menu instead, so no iOS selection
+              // is claimed or relied on there: one press enters the field, whose
+              // real input is selectable on both platforms.
               selectable
-              // The value can be selected and copied here, as it could inside the
-              // native input this rests in place of.
               // A `Text` resolves the interface direction itself (the shared
               // `Text` sets the paragraph's base direction), so the preview only
               // carries the caller's own style and an explicit `textAlign`, the

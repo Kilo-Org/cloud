@@ -2272,10 +2272,16 @@ function checkPluralCategories({ label, tag, english, translated, selectableCate
 }
 
 /**
- * The plural forms a locale declares but its language never renders: a form
- * whose category `Intl.PluralRules` does not select for this tag, i18next's own
- * zero lookup aside. Such a form is unreachable text — a translator's work that
- * ships to nobody — so the rule names one line per family and category.
+ * The plural forms no reader of this language can see: a form whose category
+ * the runtime never selects for this tag, and whose copy is identical to its
+ * family's `other` copy.
+ *
+ * Both conditions are needed before the rule names a line. The first says the
+ * runtime does not pick this form; the second says that even a runtime which
+ * does pick it renders exactly the same text, so the entry is a duplicate of
+ * copy its family already carries. A form with text of its own is left alone,
+ * because a runtime the audit does not measure may select it. `zero` is never
+ * reported: i18next consults it directly at a zero count.
  */
 function checkUnselectablePluralCategories({ label, tag, translated, selectableCategories }) {
   const problems = [];

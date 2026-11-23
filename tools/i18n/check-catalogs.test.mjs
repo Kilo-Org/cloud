@@ -285,8 +285,9 @@ test('still requires a zero form in a language that selects zero', () => {
 });
 
 test('rejects a plural category the locale can never select', () => {
-  // Japanese selects only `other`, so i18next never asks it for `_one`: the
-  // form is copy that ships to nobody.
+  // Japanese selects only `other`, so i18next never asks it for `_one`. This
+  // form repeats its family's `other` text, so removing it cannot change what
+  // a reader sees, and the rule reports it.
   const found = run({
     language: 'ja',
     translated: {
@@ -301,6 +302,24 @@ test('rejects a plural category the locale can never select', () => {
     found.join('\n'),
     /mobile\/ja: plural family "agents\.liveCount" declares a one form that ja never selects/
   );
+});
+
+test('keeps a form the locale cannot select when its copy is its own', () => {
+  // The form has text its `other` sibling does not share. A runtime that
+  // selects it would render different copy, so the rule must leave it alone:
+  // only a form that repeats its family's `other` text is provably safe to
+  // remove from the catalogs alone.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件だけです',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
 });
 
 test('admits a zero form the plural rule cannot select', () => {

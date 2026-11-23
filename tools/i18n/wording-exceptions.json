@@ -198,6 +198,7 @@
     "terms of service",
     "{{count}} open",
     "{{displaycount}} failed",
+    "{{displaycount}} of {{total}} enabled",
     "{{displaycount}} passed",
     "{{displaycount}} skipped",
     "{{loaded}} of {{total}} files loaded"
@@ -369,7 +370,8 @@
     "remediation failed",
     "review",
     "terms of service",
-    "token"
+    "token",
+    "{{displaycount}} of {{total}} enabled"
   ],
   "gu": [
     "a security finding needs attention",
@@ -584,7 +586,8 @@
     "open pull request",
     "pr opened",
     "remediation blocked",
-    "superseded"
+    "superseded",
+    "{{displaycount}} of {{total}} enabled"
   ],
   "km": [
     "cancelled",
@@ -734,7 +737,8 @@
     "remediation blocked",
     "remediation failed",
     "superseded",
-    "tokens"
+    "tokens",
+    "{{displaycount}} of {{total}} enabled"
   ],
   "mr": [
     "analysis failed",
@@ -1133,7 +1137,8 @@
     "receipt",
     "review",
     "superseded",
-    "tokens"
+    "tokens",
+    "{{displaycount}} of {{total}} enabled"
   ],
   "uk": [
     "commit",

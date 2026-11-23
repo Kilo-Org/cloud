@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ENVIRONMENT_BUILD_LOG_LINES } from '@kilocode/cloud-agent-sdk/limits';
 import { formatSnapshotTime } from './snapshot-display';
 import {
   useEnvironmentBuildLogs,
@@ -426,7 +427,7 @@ function BuildLog({
           <>
             {(logs.data?.lines[0]?.seq ?? 0) > 1 && (
               <p className="text-muted-foreground text-xs">
-                Showing the latest 500 retained log lines.
+                Showing the latest {ENVIRONMENT_BUILD_LOG_LINES} retained log lines.
               </p>
             )}
             {logs.data?.truncated && (

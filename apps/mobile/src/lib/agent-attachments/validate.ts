@@ -4,6 +4,7 @@ import {
   AGENT_ATTACHMENT_FALLBACK_EXTENSION,
   AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
+  AGENT_ATTACHMENT_MAX_MEGABYTES,
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
   AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH,
   type AgentAttachmentExtension,
@@ -11,6 +12,7 @@ import {
 } from './constants';
 import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
   'png',
@@ -215,5 +217,10 @@ const CLASSIFICATION_FAILURE_MESSAGES = {
 export function describeClassificationFailure(
   reason: 'denied' | 'empty' | 'too-large' | 'unreadable'
 ): string {
+  if (reason === 'too-large') {
+    return i18n.t(CLASSIFICATION_FAILURE_MESSAGES[reason], {
+      maxMb: formatNumber(AGENT_ATTACHMENT_MAX_MEGABYTES, i18n.language),
+    });
+  }
   return i18n.t(CLASSIFICATION_FAILURE_MESSAGES[reason]);
 }

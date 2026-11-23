@@ -1,13 +1,16 @@
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { ENVIRONMENT_BUILD_LOG_LINES } from '@kilocode/cloud-agent-sdk/limits';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type EnvironmentBuildAction } from '@/lib/cloud-environments/environment-build-copy';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -110,7 +113,9 @@ export function BuildLogSection({
                   reading as the whole build. */}
               {(lines[0]?.seq ?? 0) > 1 ? (
                 <Text className="text-xs text-muted-foreground">
-                  {t('agentChat.environment.buildLogsLatestOnly')}
+                  {t('agentChat.environment.buildLogsLatestOnly', {
+                    maxLines: formatNumber(ENVIRONMENT_BUILD_LOG_LINES, i18n.language),
+                  })}
                 </Text>
               ) : null}
               {truncated ? (

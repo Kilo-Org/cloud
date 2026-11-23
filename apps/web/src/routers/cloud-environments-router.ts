@@ -38,6 +38,7 @@ import {
   toEnvironmentRepositoryEntry,
 } from '@/lib/cloud-agent/environment-repository-input';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import { ENVIRONMENT_BUILD_LOG_LINES } from '@kilocode/cloud-agent-sdk/limits';
 import { createEnvironmentBuildClient } from '@/lib/cloud-agent-next/environment-build-client';
 import {
   assertAllocationOffered,
@@ -536,7 +537,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         environmentId: input.environmentId,
         buildId: input.buildId,
         cursor: input.cursor,
-        limit: 500,
+        limit: ENVIRONMENT_BUILD_LOG_LINES,
         ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
       });
     }),

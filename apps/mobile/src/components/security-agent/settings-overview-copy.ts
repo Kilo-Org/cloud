@@ -41,14 +41,16 @@ export function repoCountCopy(args: {
 
 /** The displaced settings rows' enabled counts, for the subtitles beside their titles. */
 export function settingsEnabledCounts(data: SecurityAgentConfig) {
+  const automationFlags = [
+    data.autoAnalysisEnabled,
+    data.autoRemediationEnabled,
+    data.autoDismissEnabled,
+  ];
+  const notificationFlags = [data.newFindingNotificationsEnabled, data.slaNotificationsEnabled];
   return {
-    automation: [
-      data.autoAnalysisEnabled,
-      data.autoRemediationEnabled,
-      data.autoDismissEnabled,
-    ].filter(Boolean).length,
-    notifications: [data.newFindingNotificationsEnabled, data.slaNotificationsEnabled].filter(
-      Boolean
-    ).length,
+    automation: automationFlags.filter(Boolean).length,
+    automationTotal: automationFlags.length,
+    notifications: notificationFlags.filter(Boolean).length,
+    notificationsTotal: notificationFlags.length,
   };
 }

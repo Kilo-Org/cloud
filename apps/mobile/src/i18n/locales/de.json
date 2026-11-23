@@ -5056,7 +5056,7 @@
       "openSession": "Sitzung anzeigen",
       "activationWebhook": "Webhook-Aufruf",
       "fieldName": "Auslösername",
-      "fieldActivation": "Ausgelöst durch",
+      "fieldActivation": "Auslöser-Typ",
       "fieldCron": "Cron-Ausdruck",
       "fieldCronHelp": "Fünf Felder: Minute, Stunde, Tag, Monat und Wochentag. Das kürzeste Intervall ist eine Minute.",
       "fieldTimezone": "Zeitzone",

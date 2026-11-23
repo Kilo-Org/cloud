@@ -262,12 +262,15 @@ export default function SessionDetailScreen() {
   ) {
     // The bottom placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
-    // The loading header reserves the loaded header's context pill (that header
+    // The loading header carries the loaded header's context pill (that header
     // passes the pill and an optional Follow control as its `inlineActions`
-    // cluster) so the swap cannot move or re-wrap the title. Copying the session
-    // link belongs to the context details sheet, which mounts with
-    // SessionDetailContent below, so this header deliberately renders no copy
-    // control while the session is unresolved.
+    // cluster) so the swap keeps one pill row and one title band. It cannot
+    // reserve a stacked pill row too: this header's own title is the short
+    // placeholder below, so its fit check never asks for one, and reserving the
+    // row anyway would leave that empty strip under every session's title.
+    // Copying the session link belongs to the context details sheet, which
+    // mounts with SessionDetailContent below, so this header deliberately
+    // renders no copy control while the session is unresolved.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader

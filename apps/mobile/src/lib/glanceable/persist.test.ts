@@ -219,8 +219,6 @@ describe('restorePersistedGlanceable', () => {
   });
 
   it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
-    // A locked keychain (expo-secure-store's default WHEN_UNLOCKED access): the
-    // record may exist but cannot be read.
     secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
 
     await restorePersistedGlanceable();
@@ -568,9 +566,6 @@ describe('mirror writes', () => {
     );
   });
 
-  // A publish is fire-and-forget, so without a chain the slow happy frame can
-  // reach SecureStore after the terminal blank that replaced it, and the next
-  // JS restart brings back a state the user already left.
   it('leaves the later blank on disk when an earlier publish is still writing', async () => {
     const gate = deferred();
     let writes = 0;
@@ -612,8 +607,6 @@ describe('mirror writes', () => {
     expect(restarted.getLocalScopeKey()).toBeNull();
   });
 
-  // One record per publish carries both facts, so a restart can never pair one
-  // publish's snapshot with another publish's scope key.
   it('restores the snapshot and the scope key of the same publish', async () => {
     const first = buildGlanceableSnapshot({
       sessions: [{ status: 'busy' }],

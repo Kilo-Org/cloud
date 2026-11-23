@@ -160,22 +160,17 @@ export type GlanceableDelivery = {
   ): Promise<{ ok: boolean; tokens: string[] }>;
 };
 
+/* eslint-disable no-empty-function -- deliberate no-op bodies */
 const noopDelivery: GlanceableDelivery = {
-  registerScopeTokens() {
-    // No-op until a token slice registers a delivery.
-  },
-  registerTokens() {
-    // No-op until a token slice registers a delivery.
-  },
-  cleanupTokens() {
-    // No-op until a token slice registers a delivery.
-  },
+  registerScopeTokens() {},
+  registerTokens() {},
+  cleanupTokens() {},
   async unregisterTokens() {
-    // No-op until a token slice registers a delivery.
     await Promise.resolve();
     return { ok: true, tokens: [] };
   },
 };
+/* eslint-enable no-empty-function */
 
 /** Activity-token registrar, set by a later token slice. No-op by default. */
 let delivery: GlanceableDelivery = noopDelivery;

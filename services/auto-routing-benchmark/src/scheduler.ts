@@ -1425,18 +1425,55 @@ export async function refundUnspentRetryAttempt(
   await db
     .batch([
       refundRetryAttemptStatement(db, input.claim.id, input.claim.token),
+      // Both starts go back to the first attempt's start, in one batch and under the guard
+      // each one already carries: a retry that never reached the model must leave the ledger
+      // start and the canonical `benchmark_case_runs.started_at` equal, because RunnerCancel's
+      // live check compares them.
       restartPaidCaseStatement(
         db,
         { ...input.execution, attemptStartedAt: input.startedAt },
         input.execution.attemptStartedAt
       ),
+      revertRetryCanonicalStartStatement(db, input),
     ])
     .catch((error: unknown) => input.onError?.(error));
+}
+
+/**
+ * Puts the canonical case-run start back to the first attempt's, for a retry that never
+ * reached the model. It carries the same guard shape as `restartPaidCaseRunStatement` — this
+ * claim's running generation, plus the ledger row it shares with — so a stale claim cannot
+ * move a row another executor owns.
+ */
+export function revertRetryCanonicalStartStatement(
+  db: D1Database,
+  input: RetryRefundInput
+): D1PreparedStatement {
+  const startedAt = new Date(input.execution.attemptStartedAt).toISOString();
+  return db
+    .prepare(
+      `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'`
+    )
+    .bind(
+      startedAt,
+      startedAt,
+      input.engineIdentity,
+      input.execution.model,
+      input.execution.variant,
+      input.execution.rep,
+      input.execution.caseId,
+      input.execution.runId,
+      input.claim.token
+    );
 }
 
 type RetryRefundInput = {
   /** The claim the retry ran under. */
   claim: { id: string; token: string };
+  /** The canonical case row's engine identity. */
+  engineIdentity: string;
   /** The case whose ledger start the retry moved. */
   execution: PaidExecutionKey & { attemptStartedAt: number };
   /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */

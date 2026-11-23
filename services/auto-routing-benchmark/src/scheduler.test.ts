@@ -1059,6 +1059,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
 
     await refundUnspentRetryAttempt(db, {
       claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
       // `execution` carries the attempt's ORIGINAL start; `startedAt` is what the retry
       // wrote. Reverting restores the original, which is what the WHERE clause matches.
       execution: { ...ledgerKey, attemptStartedAt: NOW },
@@ -1206,6 +1207,69 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
   });
 
+  it('puts both starts back to the first attempt when the retry never reached the model', async () => {
+    // The retry's restart batch succeeded, then the retry was refused (container not reached or
+    // the launch fence). The refund must restore the ledger start AND the canonical start to
+    // the first attempt's, or RunnerCancel's live check compares two different instants.
+    insertRun(sqlite, 'refunded');
+    await scheduleRunChunks(db, {
+      runId: 'refunded',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refunded-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'refunded',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('refunded', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    // The retry spends its attempt and its restart batch succeeds, moving both starts.
+    expect(
+      (await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run()).meta.changes
+    ).toBe(1);
+    const retriedAt = NOW + 1;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'refunded', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    expect(retryStarts().canonical).toEqual({ started_at: new Date(retriedAt).toISOString() });
+
+    // The retry is then refused before reaching the model.
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    expect(retryStarts()).toEqual(before);
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+  });
+
   it('moves neither start when the run ends between the consume and the restart', async () => {
     // The two restart statements carry the SAME guard, so a fence refusal cannot move only the
     // canonical row: here the consume succeeds, then the run is paused, and the batch's guard
@@ -1259,6 +1323,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     // The refusal refunds the attempt it spent; both starts were never touched.
     await refundUnspentRetryAttempt(db, {
       claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
       execution: { ...ledgerKey, attemptStartedAt: NOW },
       startedAt: NOW + 1,
     });

@@ -2357,15 +2357,20 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    const firstStartedAt =
+      vi.mocked(runDeciderCaseViaCli).mock.calls[0]?.[1].resultCallback?.execution.attemptStartedAt;
     const retryStartedAt =
       vi.mocked(runDeciderCaseViaCli).mock.calls[1]?.[1].resultCallback?.execution.attemptStartedAt;
+    expect(retryStartedAt).toBeGreaterThan(firstStartedAt ?? 0);
+    // The refund put both starts back to the first attempt's, so the graded row records that
+    // start — not the retry start that never reached the model.
     expect(savePendingDeciderOutput).toHaveBeenCalledWith(
       env.BENCH_DB,
       { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
       {
         result: first,
         retried: false,
-        attemptStartedAt: retryStartedAt,
+        attemptStartedAt: firstStartedAt,
         promptRevision: MEASUREMENT_REVISION,
       }
     );
@@ -2767,6 +2772,63 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(deferChunk).not.toHaveBeenCalled();
     expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
+  /** Makes the run a user pool whose case run is owned by another executor. */
+  async function mockAttachedGeneration(startedAt: number): Promise<void> {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, purpose: 'user', admission_marker: '2026-06-16T00:00:00.000Z' },
+    });
+    // This invocation opened no ledger row of its own; the generation is another executor's.
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(null);
+    vi.mocked(readPaidCaseRun).mockResolvedValue({
+      ...paidCaseRunRow(),
+      executor_run_id: 'other-run',
+      executor_token: 'other-executor',
+      started_at: new Date(startedAt).toISOString(),
+    });
+  }
+
+  it('waits out a healthy attached generation instead of failing it at the old 45s bound', async () => {
+    // The previous counter-bounded wait gave up after ~45 s. An attached generation stays live
+    // up to PAID_OUTPUT_WAIT_MS, so its block waits for that output instead of dying.
+    const attachedSince = Date.now();
+    await mockAttachedGeneration(attachedSince);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, claimId: 'chunk-1', claimToken: 'token-1' },
+      { delaySeconds: expect.any(Number) }
+    );
+
+    // 60 s later, still no output: past the old 45 s bound, and still a wait, not a death.
+    vi.spyOn(Date, 'now').mockReturnValue(attachedSince + 60_000);
+    await processJob(env, deciderMessage());
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).not.toHaveBeenCalled();
+  });
+
+  it('fails an attached generation only once its output deadline has passed', async () => {
+    await mockAttachedGeneration(Date.now() - PAID_OUTPUT_WAIT_MS - 1);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ failureClass: 'ambiguous_execution' })
+    );
   });
 
   it('rechecks a lost paid connection without killing the lane', async () => {

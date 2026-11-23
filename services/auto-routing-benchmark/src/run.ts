@@ -2001,7 +2001,19 @@ class ChunkClaimLostError extends Error {
  * owner is measuring it, and a second inference would be a duplicate nobody pays twice
  * for. The chunk defers and reads the fence again.
  */
-class PaidCaseAttachedError extends Error {}
+class PaidCaseAttachedError extends Error {
+  /**
+   * When the owning generation's output can no longer arrive. A healthy attached generation
+   * stays live up to `PAID_OUTPUT_WAIT_MS` from its start, so the wait must last that long —
+   * a counter-bounded wait would kill a lane the previous unbounded wait used to adopt.
+   */
+  readonly outputDeadline: number;
+
+  constructor(message: string, outputDeadline: number) {
+    super(message);
+    this.outputDeadline = outputDeadline;
+  }
+}
 
 /**
  * The case run is terminal without a usable result (a result-less failure, or a
@@ -2767,7 +2779,6 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
       }
     } else if (
-      error instanceof PaidCaseAttachedError ||
       error instanceof BenchmarkInfraUnavailableError ||
       error instanceof BenchmarkCaseNotStartedError ||
       isRetryableContainerAvailabilityError(error)
@@ -2794,6 +2805,32 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
           { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
           { delaySeconds }
         );
+      }
+    } else if (error instanceof PaidCaseAttachedError) {
+      // Another executor is measuring this generation and its output can still arrive, so the
+      // block waits for that output instead of spending a no-model re-attempt: an attached
+      // generation lives up to PAID_OUTPUT_WAIT_MS from its start. Past the deadline nothing
+      // can land, and the ambiguity path fails the lane.
+      const attachedDeadline = error.outputDeadline;
+      if (Date.now() < attachedDeadline) {
+        await env.BENCH_QUEUE.send(
+          {
+            runId: claim.run_id,
+            kind: 'decider',
+            model: claim.model,
+            claimId: id,
+            claimToken: token,
+          },
+          {
+            delaySeconds: Math.max(
+              1,
+              Math.ceil(Math.min(PAID_OUTPUT_RECHECK_MS, attachedDeadline - Date.now()) / 1000)
+            ),
+          }
+        );
+      } else {
+        await failChunk(env.BENCH_DB, id, token);
+        await recordTerminalChunk(env, claim, 'ambiguous_execution');
       }
     } else if (awaitingOutput) {
       await env.BENCH_QUEUE.send(
@@ -3154,7 +3191,7 @@ type PaidCaseStart =
   | { kind: 'started'; generation: PaidCaseGeneration }
   | { kind: 'reused' }
   | { kind: 'cancelled' }
-  | { kind: 'attached' };
+  | { kind: 'attached'; startedAt: number | null };
 
 /**
  * The case-scoped inference transport for one paid generation, or null when the worker has
@@ -3349,7 +3386,12 @@ async function beginPaidCaseGeneration(
       existing.status === 'running' &&
       (existing.executor_run_id !== execution.runId || existing.executor_token !== execution.token)
     ) {
-      return { kind: 'attached' };
+      const attachedStartedAt =
+        existing.started_at === null ? Number.NaN : Date.parse(existing.started_at);
+      return {
+        kind: 'attached',
+        startedAt: Number.isNaN(attachedStartedAt) ? null : attachedStartedAt,
+      };
     }
   }
   const claimStatements = claimPaidCaseStatements(env.BENCH_DB, {
@@ -3420,8 +3462,13 @@ async function beginPaidCaseGeneration(
       throw new PaidCaseUnavailableError(
         run.failure_reason ?? `${run.status} without a usable result`
       );
-    case 'running':
-      return { kind: 'attached' };
+    case 'running': {
+      const attachedStartedAt = run.started_at === null ? Number.NaN : Date.parse(run.started_at);
+      return {
+        kind: 'attached',
+        startedAt: Number.isNaN(attachedStartedAt) ? null : attachedStartedAt,
+      };
+    }
     default:
       // Still queued: the scheduler guard did not pass (lease, chunk or lane), so the
       // chunk defers and re-evaluates instead of failing the lane.
@@ -3641,7 +3688,12 @@ async function processDeciderJob(
           now: startedAt,
         });
         if (start.kind === 'attached') {
-          throw new PaidCaseAttachedError('A funded generation owns this case run; waiting.');
+          // Another executor owns this generation: wait as long as its output can still land,
+          // measured from the generation's own start.
+          throw new PaidCaseAttachedError(
+            'A funded generation owns this case run; waiting.',
+            (start.startedAt ?? Date.now()) + PAID_OUTPUT_WAIT_MS
+          );
         }
         if (start.kind !== 'started') {
           // No inference this pass: the case run is settled (adopt its result) or
@@ -3795,6 +3847,9 @@ async function processDeciderJob(
           }
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
+        // The first attempt's start: the retry leaves it behind, and every refund below
+        // restores both starts to it.
+        const firstAttemptStartedAt = attemptStartedAt ?? startedAt;
         startedAt = Math.max(Date.now(), startedAt + 1);
         // The retry spends the block's last automatic attempt first. `attempts` is the same
         // counter the scheduler spends on every claim and deferral, so a claim plus this retry
@@ -3837,7 +3892,8 @@ async function processDeciderJob(
         if ((restarted[0]?.meta.changes ?? 0) === 0) {
           await refundUnspentRetryAttempt(env.BENCH_DB, {
             claim: { id: claim.id, token: claim.token },
-            execution: { ...execution, attemptStartedAt },
+            engineIdentity: caseKey.engineIdentity,
+            execution: { ...execution, attemptStartedAt: firstAttemptStartedAt },
             startedAt,
             onError: error =>
               console.warn(
@@ -3932,7 +3988,8 @@ async function processDeciderJob(
           // lose an attempt to it.
           await refundUnspentRetryAttempt(env.BENCH_DB, {
             claim: { id: claim.id, token: claim.token },
-            execution: { ...execution, attemptStartedAt },
+            engineIdentity: caseKey.engineIdentity,
+            execution: { ...execution, attemptStartedAt: firstAttemptStartedAt },
             startedAt,
             onError: error =>
               console.warn(
@@ -3963,7 +4020,14 @@ async function processDeciderJob(
           }
           // Only a case the model actually answered reaches grading here: the
           // killed-before-events result was handled above.
-          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
+          // The refund put both starts back to the first attempt's, so the graded row records
+          // that start — not the retry start that never reached the model.
+          return {
+            result: first,
+            retried: false,
+            attemptStartedAt: firstAttemptStartedAt,
+            promptRevision,
+          };
         }
         addPriorAttempt(retry, first);
         return { result: retry, retried: true, attemptStartedAt: startedAt, promptRevision };
@@ -4010,7 +4074,8 @@ async function processDeciderJob(
             }
             if (!output) {
               throw new PaidCaseAttachedError(
-                'A settled case run result is not readable yet; waiting for it.'
+                'A settled case run result is not readable yet; waiting for it.',
+                Date.now() + PAID_OUTPUT_WAIT_MS
               );
             }
           }

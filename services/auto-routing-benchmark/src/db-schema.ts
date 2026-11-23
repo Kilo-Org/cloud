@@ -284,6 +284,9 @@ export const schedulerChunks = sqliteTable(
     attempts: integer('attempts').notNull().default(0),
     throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
     catalog_deferrals: integer('catalog_deferrals').notNull().default(0),
+    // Lease losses and crashes that returned this block to the queue without a billed call.
+    // User blocks bound their automatic re-attempts with it; platform blocks count attempts.
+    lease_reclaims: integer('lease_reclaims').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),

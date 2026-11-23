@@ -248,12 +248,21 @@ paid or not. A platform block may use two: the first run plus one automatic retr
 the chunk's own `attempts` column across every automatic path — the chunk deferral, the
 lease-expiry reclaim, the claim itself, and the in-process empty-output retry (which spends
 the same column before it pays). Once both are spent the block fails into the ordinary failure
-path, so only the manual "Requeue retryable" requeue admits it again. A user block gets exactly
-one: a user pool never re-runs an errored block on its own — not through a deferral, not through
-a lease reclaim, not through the throttle/catalog budgets and not in-process — so an errored
-user block also waits for the manual requeue. Waits that made no model call — a lost claim,
-another executor's generation, a launch-fence refusal or an unreachable gateway — return the
-attempt for both purposes, so only executions that reached the model are counted.
+path, so only the manual "Requeue retryable" requeue admits it again.
+
+A user block gets exactly one *billed* attempt. An errored billed attempt — the call happened
+and its generation settled without a usable result, or a failure left it ambiguous — fails the
+block into the same path, so only the manual requeue admits it again. An *unfinished* block is
+retried automatically instead, because no billed call completed: a wait that made no model call
+(a lost claim, another executor's generation, a launch-fence refusal, an unreachable gateway)
+returns its attempt, an unbilled throttle or catalog-load failure is re-admitted on its own
+budget, and an expired lease or a crash returns the block to the queue under a separate bound
+(`SCHEDULER_MAX_USER_LEASE_RECLAIMS`). The paid ledger fence — `getPaidCaseStartedAt` raising
+`AmbiguousBenchmarkExecutionError` — is what keeps those re-attempts from becoming a second
+billed call: it fires whenever a generation may have been admitted, and the ledger row is only
+cleared for a generation proven unspent. The attempt budget is a property of the block
+`(run, model, variant, rep, case set)`: re-initializing a lane never writes a second chunk for a
+block that already has one, whatever position its case now occupies.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its

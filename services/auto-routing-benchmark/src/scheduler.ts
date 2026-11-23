@@ -144,6 +144,17 @@ export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
  */
 export const SCHEDULER_MAX_USER_ATTEMPTS = 1;
 /**
+ * Automatic lease-loss re-attempts one block of a USER pool may use.
+ *
+ * A lease loss means no invocation is left to say what it spent, so this counter is the bound
+ * that keeps a block from looping: the paid ledger fence (`getPaidCaseStartedAt` raising
+ * `AmbiguousBenchmarkExecutionError`) is what stops a second billed call, and an expired lease
+ * whose invocation never opened a generation is retried without touching the user's single
+ * billed attempt. Three rides out a deploy or a container restart; a fourth lease loss fails
+ * the block into the manual requeue.
+ */
+export const SCHEDULER_MAX_USER_LEASE_RECLAIMS = 3;
+/**
  * Automatic attempts one block of a PLATFORM pool may use: the first run plus one
  * automatic retry, counted on the chunk's own `attempts` across every automatic path
  * (chunk deferral, lease reclaim and the in-process empty-output retry). Once both are
@@ -205,6 +216,7 @@ export type SchedulerClaim = {
   attempts: number;
   throttle_deferrals: number;
   catalog_deferrals: number;
+  lease_reclaims: number;
 };
 
 type SchedulerLaneHead = {
@@ -317,6 +329,19 @@ export async function scheduleRunChunks(
     ])
   );
   const statements: D1PreparedStatement[] = [];
+  // A block is `(run, model, variant, rep, case set)`. Its chunk id is its position in the
+  // lane, and a user lane's cases come from a paid-request plan that can reorder between
+  // passes, so the same block would otherwise land in a brand-new row with its attempt
+  // counters back at 0. One run-scoped read of the materialized blocks keeps the budget a
+  // property of the block: an existing block is never written again, whatever position its
+  // case now occupies, so its counters and its terminal status survive.
+  const blocks = await db
+    .prepare('SELECT model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
+    .bind(run.runId)
+    .all<{ model: string; variant: string; rep: number; case_ids: string }>();
+  const materialized = new Set(
+    blocks.results.map(row => JSON.stringify([row.model, row.variant, row.rep, row.case_ids]))
+  );
   const writeBatch = async (final: boolean): Promise<boolean> => {
     const status = await db
       .prepare('SELECT status FROM benchmark_runs WHERE id = ?')
@@ -346,6 +371,9 @@ export async function scheduleRunChunks(
       const start = resumeAt.get(laneKey) ?? 0;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;
+        const caseIds = JSON.stringify(laneCaseIds.slice(offset, offset + run.chunkSize));
+        const blockKey = JSON.stringify([entry.model, variant, rep, caseIds]);
+        if (materialized.has(blockKey)) continue;
         statements.push(
           db
             .prepare(SCHEDULER_INSERT_CHUNK_SQL)
@@ -356,7 +384,7 @@ export async function scheduleRunChunks(
               variant,
               rep,
               chunk,
-              JSON.stringify(laneCaseIds.slice(offset, offset + run.chunkSize))
+              caseIds
             )
         );
         if (statements.length < SCHEDULER_MATERIALIZE_BATCH) continue;
@@ -944,7 +972,10 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
           AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep
       ) THEN 'failed' WHEN EXISTS (
         SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status != 'running'
-      ) THEN 'completed' WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
+      ) THEN 'completed' WHEN ${chunkIsUserSql('scheduler_chunks')} THEN CASE WHEN lease_reclaims >= ${SCHEDULER_MAX_USER_LEASE_RECLAIMS} THEN 'failed' ELSE 'pending' END
+      WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
+      attempts = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN MAX(attempts - 1, 0) ELSE attempts END,
+      lease_reclaims = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN lease_reclaims + 1 ELSE lease_reclaims END,
       slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('queued', 'active') AND lease_until <= ?`)
       .bind(now),

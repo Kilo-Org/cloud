@@ -32,6 +32,7 @@ import {
   SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_USER_ATTEMPTS,
+  SCHEDULER_MAX_USER_LEASE_RECLAIMS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
   SCHEDULER_PRUNE_EXECUTIONS_SQL,
@@ -918,7 +919,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(liveChunks(sqlite)).toEqual([]);
   });
 
-  it('fails a user block on its first lease reclaim, never re-running the model', async () => {
+  it('re-attempts a user block after a lease loss without spending its billed attempt', async () => {
     insertRun(sqlite, 'user-exhausted', { purpose: 'user' });
     await scheduleRunChunks(db, {
       runId: 'user-exhausted',
@@ -929,22 +930,33 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     let now = NOW;
     const config = schedulerConfig('{"slots":1}');
-    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_ATTEMPTS; attempt++) {
-      const [claim] = await claimMany(db, config, 1, `user-attempt-${attempt}`, now);
-      if (!claim) throw new Error(`Expected user claim attempt ${attempt}`);
-      expect(claim.attempts).toBe(attempt);
+    // A lease loss leaves no invocation to report what it spent, so the block returns to the
+    // queue and its single BILLED attempt is refunded; the paid ledger fence on the next claim
+    // is what prevents a second billed call.
+    for (let reclaim = 1; reclaim <= SCHEDULER_MAX_USER_LEASE_RECLAIMS; reclaim++) {
+      const [claim] = await claimMany(db, config, 1, `user-reclaim-${reclaim}`, now);
+      if (!claim) throw new Error(`Expected user claim ${reclaim}`);
+      expect(claim.attempts).toBe(1);
       now += SCHEDULER_QUEUE_LEASE_MS;
-      const failed = await recoverChunks(db, now);
-      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_USER_ATTEMPTS ? 1 : 0);
+      expect(await recoverChunks(db, now)).toHaveLength(0);
+      expect(storedChunks(sqlite)[0]).toMatchObject({
+        status: 'pending',
+        attempts: 0,
+        lease_reclaims: reclaim,
+      });
     }
-    expect(SCHEDULER_MAX_USER_ATTEMPTS).toBe(1);
+    // The reclaim bound is what keeps a losing block from looping: one more lease loss fails it.
+    const [last] = await claimMany(db, config, 1, 'user-reclaim-last', now);
+    if (!last) throw new Error('Expected the bounded user claim');
+    now += SCHEDULER_QUEUE_LEASE_MS;
+    const failed = await recoverChunks(db, now);
+    expect(failed).toHaveLength(1);
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
-      attempts: SCHEDULER_MAX_USER_ATTEMPTS,
+      attempts: 0,
+      lease_reclaims: SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1,
     });
-    // The expired lease is a failure, not a second model call: nothing is claimable again.
     expect(await claimMany(db, config, 2, 'after-user-lease', now)).toEqual([]);
-    expect(liveChunks(sqlite)).toEqual([]);
   });
 
   it('fails a platform block on its second ordinary deferral', async () => {
@@ -1373,6 +1385,8 @@ describe('scheduler (production migrations and real SQLite)', () => {
       'SEARCH case_results USING COVERING INDEX sqlite_autoindex_case_results_1 (run_id=? AND model=? AND variant=? AND case_id=? AND rep=?)'
     );
     expect(insertPlan).not.toContain('SCAN case_results');
+    // Materialization stays one insert per row: the block guard is a run-scoped read done
+    // once per pass, not a per-row scan over the chunk table.
     expect(insertPlan).not.toContain('scheduler_chunks');
     const lanesPlan = explainPlan(sqlite, SCHEDULER_MATERIALIZED_LANES_SQL);
     expect(lanesPlan).toContain(
@@ -1902,6 +1916,62 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     expect(
       await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'replay-after', NOW + 10)
     ).toEqual([]);
+  });
+
+  it('keeps the cap when a changed plan moves a block to a different chunk id', async () => {
+    // A user lane's cases come from its paid request plan, which can reorder between
+    // initialization passes. The chunk id is the block's position in that lane, so a moved
+    // case would otherwise land in a brand-new row with `attempts` back at 0 — a fresh budget
+    // for the same block. The initializer refuses a second row for a block that already has
+    // one, so the cap stays a property of the block (run, model, variant, rep, case set).
+    insertRun(sqlite, 'moved', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    await scheduleRunChunks(db, {
+      runId: 'moved',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+    });
+    const before = storedChunks(sqlite).map(row => [row.id, row.case_ids]);
+    expect(before).toEqual([
+      [JSON.stringify(['moved', 'cap/model', '', 0, 0]), JSON.stringify(['case-a'])],
+      [JSON.stringify(['moved', 'cap/model', '', 0, 1]), JSON.stringify(['case-b'])],
+    ]);
+    const caseBChunk = storedChunks(sqlite).find(
+      row => row.case_ids === JSON.stringify(['case-b'])
+    );
+    if (!caseBChunk) throw new Error('Expected the case-b chunk');
+    // Spend the block's only attempt and fail it, exactly as an errored billed block ends.
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = 1 WHERE id = ?")
+      .run(caseBChunk.id);
+
+    // The plan now names case-b first: its block would be chunk 0, an id that already belongs
+    // to case-a, and case-a would take chunk 1. Neither may be re-created.
+    await scheduleRunChunks(db, {
+      runId: 'moved',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-b', 'case-a'],
+      chunkSize: 1,
+      laneCaseIds: new Map([
+        [JSON.stringify([block.model, block.variant, 0]), ['case-b', 'case-a']],
+      ]),
+    });
+
+    expect(
+      storedChunks(sqlite).map(row => [row.id, row.case_ids, row.status, row.attempts])
+    ).toEqual([
+      [JSON.stringify(['moved', 'cap/model', '', 0, 0]), JSON.stringify(['case-a']), 'pending', 0],
+      [JSON.stringify(['moved', 'cap/model', '', 0, 1]), JSON.stringify(['case-b']), 'failed', 1],
+    ]);
+    // The failed block is still not claimable: the carried counter is what the claim reads.
+    expect(
+      (await claimMany(db, schedulerConfig('{"slots":2}'), 2, 'after-move', NOW + 10)).map(
+        claim => claim.case_ids
+      )
+    ).toEqual([JSON.stringify(['case-a'])]);
   });
 
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {

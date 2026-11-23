@@ -79,6 +79,7 @@ const claim = {
   attempts: 2,
   throttle_deferrals: 0,
   catalog_deferrals: 0,
+  lease_reclaims: 0,
 } satisfies SchedulerClaim;
 const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,

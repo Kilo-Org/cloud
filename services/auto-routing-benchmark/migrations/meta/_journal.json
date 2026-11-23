@@ -288,6 +288,13 @@
       "when": 1795201236798,
       "tag": "0040_reclaim_generation",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1795430000000,
+      "tag": "0041_chunk_lease_reclaims",
+      "breakpoints": true
     }
   ]
 }

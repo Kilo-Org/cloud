@@ -235,6 +235,7 @@ import {
   SCHEDULER_MAX_CATALOG_DEFERRALS,
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_THROTTLE_DEFERRALS,
+  SCHEDULER_MAX_USER_ATTEMPTS,
   type SchedulerClaim,
 } from './scheduler';
 
@@ -384,6 +385,7 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     attempts: 1,
     throttle_deferrals: 0,
     catalog_deferrals: 0,
+    lease_reclaims: 0,
     ...overrides,
   };
   vi.mocked(getChunk).mockResolvedValue(claim);
@@ -2837,68 +2839,115 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     });
   }
 
-  it('never re-runs a user-pool block on a throttled provider failure', async () => {
-    // A throttle refunds a platform block's attempt and re-admits it under its own budget.
-    // A user block has exactly one model call, so the same failure is terminal: the lane
-    // records provider_unavailable and the block fails, with no deferral and no second call.
+  it.each([
+    {
+      name: 'a throttled provider failure',
+      result: { stderrTail: 'HTTP 429 rate limited' },
+      defer: 'deferThrottledChunk' as const,
+    },
+    {
+      name: 'a catalog-load failure',
+      result: { stderrTail: 'Failed to load Kilo model catalog: fetch failed' },
+      defer: 'deferCatalogChunk' as const,
+    },
+  ])(
+    're-attempts a user-pool block after an unbilled $name, within its budget',
+    async ({ result, defer }) => {
+      // These failures are only ever raised after CaseStore's native proof released the
+      // generation, so no model call completed and nothing was billed. D129's ban covers an
+      // errored BILLED attempt only, so the block is re-admitted on the deferral budget that
+      // bounds it — not on the user's single billed attempt, which the deferral refunds.
+      await mockUserRunSnapshot();
+      const claim = mockClaim();
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        exitCode: 1,
+        costUsd: 0,
+        ...result,
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+      expect(SCHEDULER_MAX_USER_ATTEMPTS).toBe(1);
+      if (defer === 'deferThrottledChunk') {
+        expect(deferThrottledChunk).toHaveBeenCalledWith(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          expect.any(Number)
+        );
+        expect(deferCatalogChunk).not.toHaveBeenCalled();
+        expect(cooldownModel).toHaveBeenCalledWith(env.BENCH_DB, claim.model, expect.any(Number));
+      } else {
+        expect(deferCatalogChunk).toHaveBeenCalledWith(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          expect.any(Number)
+        );
+        expect(deferThrottledChunk).not.toHaveBeenCalled();
+        expect(cooldownCatalog).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+      }
+      // The block is re-admitted through its own budget; it does not fail and does not spend
+      // the billed attempt.
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(failChunk).not.toHaveBeenCalled();
+      expect(recordLaneFailure).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(queueSend).toHaveBeenCalledWith(
+        { runId, kind: 'decider', model, schedulerWake: true },
+        { delaySeconds: expect.any(Number) }
+      );
+    }
+  );
+
+  it('fails a user-pool block on a billed error and never re-attempts it', async () => {
+    // The attempt was made and billed; the generation then settled without a usable result.
+    // D129 ends the block: no deferral, no second call, and only the manual requeue admits it.
     await mockUserRunSnapshot();
     const claim = mockClaim();
-    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
-      ...successfulCliResult,
-      text: '',
-      exitCode: 1,
-      costUsd: 0,
-      stderrTail: 'HTTP 429 rate limited',
+    vi.mocked(readPaidCaseRun).mockResolvedValue({
+      ...paidCaseRunRow(),
+      status: 'settled',
+      result_usable: 0,
+      failure_reason: 'provider returned an unusable answer',
     });
-    vi.mocked(deferChunk).mockResolvedValueOnce('failed');
 
     await processJob(env, deciderMessage());
 
-    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
     expect(deferThrottledChunk).not.toHaveBeenCalled();
     expect(deferCatalogChunk).not.toHaveBeenCalled();
-    // One ordinary deferral, decided by the row's own counter, and it fails the block.
-    expect(deferChunk).toHaveBeenCalledTimes(1);
-    expect(deferChunk).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      claim.id,
-      claim.token,
-      expect.any(Number)
-    );
+    expect(restartPaidCase).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, claim.id, claim.token);
     expect(recordLaneFailure).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ model, failureClass: 'provider_unavailable' })
+      expect.objectContaining({ model, failureClass: 'unknown' })
     );
     expect(upsertCaseResult).not.toHaveBeenCalled();
   });
 
-  it('never re-runs a user-pool block on a catalog-load failure', async () => {
+  it('runs a user-pool block once across a lease loss, because the ledger fence refuses a second billed call', async () => {
+    // A lease loss refunds the block's attempt, so it is re-admitted. The fence is what stops
+    // the second call: the ledger already records this generation's start, so the next
+    // invocation raises the ambiguity instead of inferring again.
     await mockUserRunSnapshot();
     const claim = mockClaim();
-    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
-      ...successfulCliResult,
-      text: '',
-      exitCode: 1,
-      costUsd: 0,
-      stderrTail: 'Failed to load Kilo model catalog: fetch failed',
-    });
-    vi.mocked(deferChunk).mockResolvedValueOnce('failed');
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - 1_000);
 
     await processJob(env, deciderMessage());
 
-    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
-    expect(deferCatalogChunk).not.toHaveBeenCalled();
-    expect(cooldownCatalog).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledTimes(1);
-    expect(deferChunk).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      claim.id,
-      claim.token,
-      expect.any(Number)
-    );
-    expect(recordLaneFailure).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({ model, failureClass: 'catalog_load' })
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    // Waiting out the delivery window: the ledger row is the durable proof of the one call.
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, claimId: claim.id, claimToken: claim.token },
+      expect.anything()
     );
     expect(upsertCaseResult).not.toHaveBeenCalled();
   });

@@ -250,6 +250,7 @@ describe('paid-benchmark review fixes (production migrations and real SQLite)', 
       attempts: 6,
       throttle_deferrals: 0,
       catalog_deferrals: 0,
+      lease_reclaims: 0,
     };
     const batch = () => [
       ...failScheduledEntryStatements(db, claim, 'model_not_found', new Date(NOW).toISOString()),
@@ -332,6 +333,7 @@ describe('paid-benchmark review fixes (production migrations and real SQLite)', 
       attempts: 6,
       throttle_deferrals: 0,
       catalog_deferrals: 0,
+      lease_reclaims: 0,
     });
     const batch = (token: string) => [
       ...failPaidCasesForUnavailablePairStatements(db, {

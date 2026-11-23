@@ -2809,7 +2809,6 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         }
       );
     } else if (
-      state?.purpose !== 'user' &&
       error instanceof BenchmarkThrottleError &&
       claim.throttle_deferrals < SCHEDULER_MAX_THROTTLE_DEFERRALS
     ) {
@@ -2821,7 +2820,6 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { delaySeconds }
       );
     } else if (
-      state?.purpose !== 'user' &&
       error instanceof BenchmarkCatalogLoadError &&
       error.category === 'catalog_load' &&
       claim.catalog_deferrals < SCHEDULER_MAX_CATALOG_DEFERRALS
@@ -2834,6 +2832,12 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { delaySeconds }
       );
     } else if (error instanceof AmbiguousBenchmarkExecutionError) {
+      await failChunk(env.BENCH_DB, id, token);
+      await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
+    } else if (error instanceof PaidCaseUnavailableError) {
+      // The generation this block owns already ended without a usable result: its case run is
+      // settled or failed, so a model call happened and nothing can improve it. D129 ends the
+      // block here for both purposes — no automatic re-run; the manual requeue admits it again.
       await failChunk(env.BENCH_DB, id, token);
       await recordTerminalChunk(env, claim, LANE_FAILURE_CLASS_BY_WAIT_REASON[reason]);
     } else {

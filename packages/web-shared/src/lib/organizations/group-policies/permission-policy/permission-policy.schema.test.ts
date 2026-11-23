@@ -109,14 +109,14 @@ function ruleAction(rules: readonly Rule[], input: string, fallback?: Action) {
   return matched?.action ?? fallback;
 }
 
-/**
- * The decision a client takes for one shell command, following the schema comment
- * at the `tools.bash` guard: both representations apply in every layer that states
- * them, the most restrictive outcome wins, and a layer that names no profile for
- * the running shell denies.
- */
 type ShellKind = keyof NonNullable<Layer['shell']>;
 
+/**
+ * The decision the schema comment at the `tools.bash` guard describes for one shell
+ * command: both representations apply in every layer that states them, the more
+ * restrictive outcome wins, and a layer that names no profile for the running shell
+ * denies.
+ */
 function decideShell(layers: readonly Layer[], kind: ShellKind, command: string) {
   let decision: Action | undefined;
   for (const layer of layers) {
@@ -144,8 +144,6 @@ function decideTool(layers: readonly Layer[], tool: string, resource?: string) {
   return decision;
 }
 
-// The mirror above is only evidence for the documented precedence when it
-// reproduces the decisions the fixtures already record.
 /** The shell a fixture expectation names, kept to the kinds a profile may hold. */
 function shellKind(kind: string) {
   if (kind === 'bash' || kind === 'powershell') return kind;
@@ -159,6 +157,8 @@ function managedLayers(fixture: unknown): readonly Layer[] {
   return MemberAgentPermissionsSchema.parse(member.policy.agent_permissions).layers;
 }
 
+// These mirrors are evidence only when they reproduce the decisions the fixtures
+// already record, so this test runs first.
 test('reproduces the recorded layered decisions before judging a new fixture', () => {
   const layers: readonly Layer[] = managedLayers(fixtures.layered);
   for (const entry of fixtures.layered_expectations.shell) {

@@ -211,7 +211,6 @@ function currentStates(): RemoteMcpServerState[] {
   );
 }
 
-/** Replaces the snapshot, the view lookup and wakes every watcher. */
 function publish(): void {
   snapshot = currentStates();
   publishRemoteMcpViews(remoteServerViewsFor(listRemoteMcpServers(), discovered));
@@ -457,9 +456,6 @@ export function forgetRemoteMcp(): void {
   publish();
 }
 
-// The list is the app's own, so a change to it — an add, an edit, a delete, an
-// enable or a disable — is what makes the discovered state stale. A server that
-// moved on loses its answer here, and every other server keeps its own.
 subscribeRemoteMcpServers(() => {
   dropStaleAnswers();
   publish();

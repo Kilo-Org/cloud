@@ -20,28 +20,22 @@ import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-a
 import { readTrpcServerMessage } from '@/lib/trpc-error';
 
 /**
- * What this panel has written into one account: the profile a completed save
- * published, and the last attempt whose response never arrived. The tag is the
- * account the payload was produced in (`null` is Personal), so a render reads a
- * payload only while its tag matches the live account: an account's row and
- * attempt are never offered to another one.
+ * The profile a completed save published, tagged with the account that received
+ * it (`null` is Personal). Only one row is held at a time, and a render reads it
+ * only while the tag names the account on screen.
  */
-type ScopedSaveRecord = Readonly<{
+type PublishedRow = Readonly<{
   scope: string | null;
-  savedProfile: ProfileSelectorProfile | null;
-  lostAttempt: UnknownSaveAttempt | null;
+  profile: ProfileSelectorProfile;
 }>;
 
 /**
- * Read in place of a record produced in another account. Only its empty payload
- * is ever read, never its tag: an organization answer must not appear in
- * Personal and a Personal one must not appear in an organization.
+ * The attempts whose response never arrived, keyed by the account the payload
+ * was produced in (`null` is Personal), so a write in one account never
+ * replaces another account's attempt and a render reads only the live account's
+ * own entry.
  */
-const NO_SAVE_RECORD: ScopedSaveRecord = {
-  scope: null,
-  savedProfile: null,
-  lostAttempt: null,
-};
+type LostAttempts = ReadonlyMap<string | null, UnknownSaveAttempt>;
 
 export type AgentProfileSaveInputs = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
@@ -70,11 +64,17 @@ export type AgentProfileSave = Readonly<{
  * create whose answer either completes the save, is refused with the server's
  * sentence, or never arrives.
  *
- * Every write into the record is an event or an async transition that carries
- * the account it was produced in, every read is derived from the live account,
- * and the committed transition to another account drops the record. A render
- * React throws away therefore drops nothing: the record still describes the
- * account that produced it, and the next committed render reads it by tag.
+ * Two states live here, and each is read only for the account it was produced
+ * in. The published row is a single row, dropped when the panel commits a move
+ * to another account: a profile saved in one account may be deleted before the
+ * panel returns to it, and holding the row would hide the account on screen's
+ * own counts until its list lands. The lost attempts are kept per account, so
+ * leaving an account neither discards the evidence about a write made there nor
+ * offers it to another account.
+ *
+ * A render React throws away therefore drops nothing: the row still carries the
+ * account that produced it, and the next committed render reads the live
+ * account's own entries.
  */
 export function useAgentProfileSave({
   organizationId,
@@ -94,11 +94,15 @@ export function useAgentProfileSave({
   // key with an organization; the rows themselves are keyed by
   // `useAgentProfileList`, which starts empty for a different account.
   const scope = organizationId ?? null;
-  const [storedRecord, setStoredRecord] = useState<ScopedSaveRecord>(() => ({
-    scope: organizationId ?? null,
-    savedProfile: null,
-    lostAttempt: null,
-  }));
+  // A completed save publishes at most one row, and only into the account that
+  // received it: the row carries its own tag, so a render for another account
+  // never reads it.
+  const [publishedRow, setPublishedRow] = useState<PublishedRow | null>(null);
+  // A lost attempt is evidence about a write made in one account, so it is kept
+  // per account rather than dropped when the panel moves: the person can leave
+  // an account, come back, and still have a retry converge on the write the
+  // unanswered response created.
+  const [lostAttempts, setLostAttempts] = useState<LostAttempts>(() => new Map());
   // Read after an `await`: a save publishes only into the account it started in.
   // Written during render rather than from a passive effect, because a save
   // settles in a microtask that can run before that effect does, and the effect
@@ -106,24 +110,25 @@ export function useAgentProfileSave({
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
 
-  // The record describes one account, so the committed transition away from that
-  // account drops it: a profile saved in A may be deleted by the time the panel
-  // returns to A, and A's lost attempt described the ids A held on that visit.
-  // Returning `previous` unchanged while the tags agree is what keeps this
-  // effect from running on its own write.
+  // The published row describes one visit to one account, so the committed
+  // transition away from that account drops it: a profile saved in A may be
+  // deleted by the time the panel returns to A, and the row would hide the
+  // account on screen's own counts until its list lands. Returning `row`
+  // unchanged while the tag names the live account is what keeps this effect
+  // from running on its own publish.
   //
-  // The read below still derives from the live tag during render, so the frame
-  // between the move and this effect reads `NO_SAVE_RECORD` on its own, and no
-  // state is written during render.
+  // A lost attempt is not dropped here: it describes the account it was made in
+  // and belongs to that account alone, so leaving and returning keeps it.
+  //
+  // The reads below still derive from the live tag during render, so the frame
+  // between the move and this effect reads no row on its own, and no state is
+  // written during render.
   useEffect(() => {
-    setStoredRecord(previous =>
-      previous.scope === scope ? previous : { scope, savedProfile: null, lostAttempt: null }
-    );
+    setPublishedRow(row => (row === null || row.scope === scope ? row : null));
   }, [scope]);
 
-  const record = storedRecord.scope === scope ? storedRecord : NO_SAVE_RECORD;
-  const savedProfile = record.savedProfile;
-  const lostAttempt = record.lostAttempt;
+  const savedProfile = publishedRow?.scope === scope ? publishedRow.profile : null;
+  const lostAttempt = lostAttempts.get(scope) ?? null;
 
   /**
    * Complete a save for `profile`, whose account is `savedUnder`. The saved
@@ -142,10 +147,10 @@ export function useAgentProfileSave({
     if (savedUnder !== scopeRef.current) {
       return;
     }
-    // Only the live account writes the one record slot. A settlement for an
-    // account the panel has left would replace the row and counts the account on
-    // screen owns, hiding its summary until the invalidated list refetch lands.
-    setStoredRecord({ scope: savedUnder, savedProfile: profile, lostAttempt: null });
+    // Only the live account publishes a row. A settlement for an account the
+    // panel has left would replace the row the account on screen owns, hiding
+    // its summary until the invalidated list refetch lands.
+    setPublishedRow({ scope: savedUnder, profile });
     // Keep resource counts current before the invalidated list refetch lands.
     onSelectProfile(profile.id);
     onManualVarsChange([]);
@@ -186,9 +191,11 @@ export function useAgentProfileSave({
     // A recorded attempt belongs to the name it submitted: a corrected name
     // drops it, so a later collision cannot be credited to the old one.
     if (lostAttempt !== null && lostAttempt.name !== name) {
-      setStoredRecord(previous =>
-        previous.scope === savedUnder ? { ...previous, lostAttempt: null } : previous
-      );
+      setLostAttempts(previous => {
+        const next = new Map(previous);
+        next.delete(savedUnder);
+        return next;
+      });
     }
     // The ids this owner scope holds before the write leaves. The diff against
     // the rows a lost attempt leaves behind is the one evidence that separates
@@ -254,15 +261,13 @@ export function useAgentProfileSave({
       }
       // No answer arrived, so this attempt may have committed: remember the
       // account it wrote into, what it submitted and what that account held
-      // before it, for a later collision. `recoverLostSave` reads the record only
-      // in that account, and the record keeps the saved row only while the tag
-      // still names it.
+      // before it, for a later collision. The entry is keyed by that account, so
+      // a settlement into an account the panel has left stays there instead of
+      // replacing another account's row or attempt.
       if (refusal === '') {
-        setStoredRecord(previous => ({
-          scope: savedUnder,
-          savedProfile: previous.scope === savedUnder ? previous.savedProfile : null,
-          lostAttempt: { scope: savedUnder, name, knownIds, content },
-        }));
+        setLostAttempts(previous =>
+          new Map(previous).set(savedUnder, { scope: savedUnder, name, knownIds, content })
+        );
       }
       return { saved: false, refusal: refusal === '' ? null : refusal };
     }

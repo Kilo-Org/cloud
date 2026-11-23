@@ -116,10 +116,15 @@ export function NewProfileScreen({
     organizationId: string | null;
     owner: ProfileOwnerChoice;
   } | null>(null);
-  // The owner follows the resolved role. Before the list answers there is no
-  // role to read, so Create waits and the screen sends no owner meanwhile. A
-  // failed background refetch keeps its list, so only a missing list is unknown.
-  const roleUnknown = isResolving || orgs === undefined;
+  // The membership answer decides the owner only for a create that can carry an
+  // organization: an active organization boundary, or a caller-requested
+  // organization owner waiting for an organization the boundary resolves to.
+  const roleDecidesOwner =
+    hasOrganizationContext(boundaryOrganizationId) || initialOwner === 'organization';
+  // The owner follows the resolved role, so Create waits while that role is
+  // unknown for a create the role decides. A failed background refetch keeps its
+  // list, so only a missing list is unknown.
+  const roleUnknown = roleDecidesOwner && (isResolving || orgs === undefined);
   const canOwnOrganization =
     !roleUnknown && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
   const pickedOwner =
@@ -127,8 +132,9 @@ export function NewProfileScreen({
   const owner: ProfileOwnerChoice = canOwnOrganization
     ? (pickedOwner ?? initialOwner ?? 'personal')
     : 'personal';
-  // Only a first read that failed leaves no answer and no retry of its own.
-  const boundaryUnread = isError && orgs === undefined;
+  // Only a first read that failed leaves no answer and no retry of its own, and
+  // the row is for the reads a create depends on.
+  const boundaryUnread = roleDecidesOwner && isError && orgs === undefined;
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };

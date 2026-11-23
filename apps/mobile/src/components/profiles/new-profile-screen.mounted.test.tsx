@@ -151,6 +151,33 @@ describe('NewProfileScreen', () => {
     unmount();
   });
 
+  it.each([
+    { read: 'resolving', isResolving: true, isError: false },
+    { read: 'failed', isResolving: false, isError: true },
+  ])(
+    'personal context: a $read membership read neither blocks the create nor asks for a retry',
+    async ({ isResolving, isError }) => {
+      boundaryState.organizationId = null;
+      boundaryState.role = undefined;
+      boundaryState.orgs = undefined;
+      boundaryState.isResolving = isResolving;
+      boundaryState.isError = isError;
+      const { renderer, unmount } = await mount();
+
+      expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+      expect(findRetryRow(renderer.root)).toBeUndefined();
+
+      typeName(renderer.root, 'Backend debugging');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+      unmount();
+    }
+  );
+
   it.each(['member', 'billing_manager'])(
     'does not offer organization ownership to a %s and still creates personal profiles',
     async role => {

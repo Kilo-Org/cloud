@@ -242,6 +242,40 @@ describe('NewProfileScreen caller request', () => {
     unmount();
   });
 
+  it('waits for the organization its caller asked for before the boundary has one', async () => {
+    boundaryState.organizationId = null;
+    boundaryState.role = undefined;
+    boundaryState.orgs = undefined;
+    boundaryState.isResolving = true;
+    const { renderer, rerender, unmount } = await mountWithRerender({
+      initialOwner: 'organization',
+      returnToCaller: true,
+    });
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(true);
+
+    typeName(renderer.root, 'Org profile');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    boundaryState.organizationId = 'org-1';
+    boundaryState.role = 'owner';
+    boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
+    boundaryState.isResolving = false;
+    rerender();
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Org profile',
+      organizationId: 'org-1',
+    });
+
+    unmount();
+  });
+
   it('a member asked for organization ownership still only creates a personal profile', async () => {
     boundaryState.role = 'member';
     const { renderer, unmount } = await mount({

@@ -116,7 +116,6 @@ describe('BYOK Router', () => {
   let organizationB: Organization;
 
   beforeAll(async () => {
-    // Create test users
     ownerUser = await insertTestUser({
       google_user_email: 'byok-owner@example.com',
       google_user_name: 'BYOK Owner',
@@ -132,11 +131,9 @@ describe('BYOK Router', () => {
       google_user_name: 'Other Org Owner',
     });
 
-    // Create test organizations
     organizationA = await createTestOrganization('BYOK Test Org A', ownerUser.id, 100000);
     organizationB = await createTestOrganization('BYOK Test Org B', otherOrgOwner.id, 100000);
 
-    // Add member to organization A
     await addUserToOrganization(organizationA.id, memberUser.id, 'member');
   });
 
@@ -147,7 +144,6 @@ describe('BYOK Router', () => {
     await db
       .delete(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.assigned_to_user_id, ownerUser.id));
-    // Clean up BYOK keys after each test
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organizationA.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organizationB.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
@@ -188,14 +184,12 @@ describe('BYOK Router', () => {
     test('should return keys for organization', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
-      // Create a key
       const created = await caller.byok.create({
         organizationId: organizationA.id,
         provider_id: 'anthropic',
         api_key: 'test-api-key-123',
       });
 
-      // List keys
       const result = await caller.byok.list({ organizationId: organizationA.id });
 
       expect(result).toHaveLength(1);
@@ -211,14 +205,12 @@ describe('BYOK Router', () => {
       const ownerCaller = await createCallerForUser(ownerUser.id);
       const memberCaller = await createCallerForUser(memberUser.id);
 
-      // Owner creates a key
       await ownerCaller.byok.create({
         organizationId: organizationA.id,
         provider_id: 'openai',
         api_key: 'test-openai-key',
       });
 
-      // Member can list keys
       const result = await memberCaller.byok.list({ organizationId: organizationA.id });
 
       expect(result).toHaveLength(1);
@@ -229,7 +221,6 @@ describe('BYOK Router', () => {
       const callerA = await createCallerForUser(ownerUser.id);
       const callerB = await createCallerForUser(otherOrgOwner.id);
 
-      // Create keys in both organizations
       await callerA.byok.create({
         organizationId: organizationA.id,
         provider_id: 'anthropic',
@@ -242,12 +233,10 @@ describe('BYOK Router', () => {
         api_key: 'key-org-b',
       });
 
-      // List keys for org A
       const resultA = await callerA.byok.list({ organizationId: organizationA.id });
       expect(resultA).toHaveLength(1);
       expect(resultA[0].provider_id).toBe('anthropic');
 
-      // List keys for org B
       const resultB = await callerB.byok.list({ organizationId: organizationB.id });
       expect(resultB).toHaveLength(1);
       expect(resultB[0].provider_id).toBe('openai');
@@ -773,7 +762,6 @@ describe('BYOK Router', () => {
         api_key: 'sk-test-key',
       });
 
-      // Check audit log
       const logs = await db
         .select()
         .from(organization_audit_logs)
@@ -1180,14 +1168,12 @@ describe('BYOK Router', () => {
     test('should update an existing BYOK key', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
-      // Create a key
       const created = await caller.byok.create({
         organizationId: organizationA.id,
         provider_id: 'anthropic',
         api_key: 'old-key',
       });
 
-      // Update the key
       const updated = await caller.byok.update({
         organizationId: organizationA.id,
         id: created.id,
@@ -1287,7 +1273,6 @@ describe('BYOK Router', () => {
       const callerA = await createCallerForUser(ownerUser.id);
       const callerB = await createCallerForUser(otherOrgOwner.id);
 
-      // Create key in org A
       const keyA = await callerA.byok.create({
         organizationId: organizationA.id,
         provider_id: 'anthropic',
@@ -1397,14 +1382,12 @@ describe('BYOK Router', () => {
       const callerA = await createCallerForUser(ownerUser.id);
       const callerB = await createCallerForUser(otherOrgOwner.id);
 
-      // Create key in org A
       const keyA = await callerA.byok.create({
         organizationId: organizationA.id,
         provider_id: 'anthropic',
         api_key: 'org-a-key',
       });
 
-      // Try to delete org A's key from org B (should fail)
       await expect(
         callerB.byok.delete({
           organizationId: organizationB.id,

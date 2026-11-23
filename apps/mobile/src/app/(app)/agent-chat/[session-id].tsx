@@ -262,12 +262,15 @@ export default function SessionDetailScreen() {
   ) {
     // The bottom placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
-    // The loading header reserves the loaded header's context pill (the loaded
-    // right cluster is that pill plus an optional PR badge) so the swap cannot
-    // re-wrap the title. Copying the session link belongs to the context
-    // details sheet, which mounts with SessionDetailContent below, so this
-    // header deliberately renders no copy control while the session is
-    // unresolved.
+    // The loading header carries the loaded header's context pill (that header
+    // passes the pill and an optional Follow control as its `inlineActions`
+    // cluster) so the swap keeps one pill row and one title band. It cannot
+    // reserve a stacked pill row too: this header's own title is the short
+    // placeholder below, so its fit check never asks for one, and reserving the
+    // row anyway would leave that empty strip under every session's title.
+    // Copying the session link belongs to the context details sheet, which
+    // mounts with SessionDetailContent below, so this header deliberately
+    // renders no copy control while the session is unresolved.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -276,7 +279,7 @@ export default function SessionDetailScreen() {
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
           onBack={sessionHeaderBack}
-          headerRight={
+          inlineActions={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
                 info={undefined}
@@ -286,7 +289,6 @@ export default function SessionDetailScreen() {
               />
             </View>
           }
-          headerRightShrinks
         />
         <SessionSkeletonMessages sessionId={sessionId} />
         {isPendingWritable ? <SessionComposerSkeleton /> : <SessionReadOnlyFooterPlaceholder />}

@@ -2397,13 +2397,14 @@ export function SessionDetailContent({
     contextInfo === undefined &&
     terminalError === null &&
     !isSessionChromePending;
-  const headerRight = (
+  const headerCluster = (
     // The pill leads and the Follow control takes the trailing edge. The pill
     // reserves the width of both readings, so a session that starts reporting
     // usage paints into that box instead of widening it, and the control after
-    // it keeps one position. The reserved box comes out of the heading beside
-    // it, which keeps its own line cap and tail ellipsis — the trade this row
-    // makes to leave the title the width up to the pill's own.
+    // it keeps one position. The cluster is the header's `inlineActions`, so it
+    // shares the title's row only while the title fits one line there; a title
+    // the cluster would cut moves the cluster onto its own start-aligned row
+    // under the title, which keeps its own line cap and tail ellipsis.
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
@@ -3041,8 +3042,7 @@ export function SessionDetailContent({
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={AGENTS_SESSIONS_HREF}
             onBack={sessionHeaderBack}
-            headerRight={headerRight}
-            headerRightShrinks
+            inlineActions={headerCluster}
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,

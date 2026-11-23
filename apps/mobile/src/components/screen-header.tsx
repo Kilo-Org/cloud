@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   type TextInstance,
+  type TextLayoutEvent,
   useWindowDimensions,
   View,
   type ViewInstance,
@@ -146,11 +147,12 @@ const MAX_TITLE_LINES = 3;
  * The two widths the title-fit check compares (see `measureTitleFit`), in dp,
  * each with the layout (`naturalKey`, `boxKey`) that reported it. The natural
  * width comes from a copy outside the row; the box width from the visible
- * title, in whichever row it sits. `cutKey` is the layout in which the title
- * was found cut beside the inline cluster. `probeKey` is the layout whose
- * first cut report is held back until that same layout measures again, and
- * `probePass` remounts the copy and the box around the title for that second
- * measurement.
+ * title, and only while the cluster shares its row — a read taken with the
+ * cluster stacked is dropped, so the record never holds a pair from two rows.
+ * `cutKey` is the layout in which the title was found cut beside the inline
+ * cluster. `probeKey` is the layout whose first cut report is held back until
+ * that same layout measures again, and `probePass` remounts the copy and the
+ * box around the title for that second measurement.
  */
 type TitleFit = {
   naturalKey: string | null;
@@ -173,16 +175,45 @@ const UNMEASURED_TITLE_FIT: TitleFit = {
 };
 
 /**
+ * The line count the visible title reported for one layout (`titleFitKey`),
+ * read from its `onTextLayout`. Only a title capped at several lines wraps: a
+ * one-line title is cut instead. A wrap moves the cluster under the title just
+ * as a cut does (see `titleOverflows`), so the count is the second signal for a
+ * deeper cap, not a replacement for the width pair.
+ */
+type TitleWrap = { key: string; count: number };
+
+/** No layout has reported yet: no key matches, and one line is not a wrap. */
+const UNMEASURED_TITLE_WRAP: TitleWrap = { key: '', count: 1 };
+
+/**
+ * How much narrower than its natural width a title's box must be to count as
+ * cut, in dp. Both widths sit on the pixel grid, so half a physical pixel is
+ * the margin for float noise on a one-line title. A title capped at several
+ * lines gets a pixel and a half instead: a line of prose that did NOT wrap can
+ * overrun its box by up to one physical pixel — that is no wrap, and it must
+ * not move the cluster.
+ */
+function titleCutTolerance(capLines: number): number {
+  return (capLines > 1 ? 1.5 : 0.5) / PixelRatio.get();
+}
+
+/**
  * Records measured widths and decides whether the title is cut beside the
- * inline cluster. The decision is re-taken while the cluster shares the row,
- * and never outside it: once the cluster has moved, the wider room the title
- * gets says nothing about the row, so reporting it neither cuts the title nor
- * moves the cluster back. It is also only ever taken from a pair measured in
- * the same layout, so a new layout's box is never compared with the width the
- * previous layout's copy reported (and a layout whose copy has not reported
- * yet decides nothing). Both widths sit on the pixel grid, so a cut title's
- * box is at least a pixel narrower than its natural width; half a pixel is the
- * margin for float noise.
+ * inline cluster. Both caps decide from the width pair, with the tolerance its
+ * depth selects (see `titleCutTolerance`); a title capped at several lines
+ * ALSO reports its line count, which moves the cluster when the title wrapped
+ * where the row still held its full width (see `TitleWrap`).
+ *
+ * Only a read taken while the cluster shares the row is recorded, and only a
+ * pair measured in the same layout decides: a new layout's box is never
+ * compared with the width the previous layout's copy reported (and a layout
+ * whose copy has not reported yet decides nothing). Once the cluster has moved,
+ * the wider room the title gets says nothing about the row, so reporting it
+ * neither cuts the title nor moves the cluster back — the record is left as it
+ * is, which is what keeps the decision monotone within a layout: `cutKey` can
+ * only be set from an in-row pair, and no in-row pair is taken again while the
+ * cluster is stacked.
  *
  * A cut takes two measurements of the same layout to count. One frame can
  * report a box a fraction of a dp too narrow while the rest of the row is
@@ -210,11 +241,21 @@ const UNMEASURED_TITLE_FIT: TitleFit = {
 function measureTitleFit(
   previous: TitleFit,
   measured: Partial<Omit<TitleFit, 'cutKey' | 'probeKey' | 'probePass'>>,
-  layout: { key: string; inRow: boolean }
+  layout: { key: string; inRow: boolean; capLines: number }
 ): TitleFit {
+  // Outside the row the title has the row's whole width, so a width read there
+  // says nothing about the row it left. Recording it would replace the box the
+  // decision compared with the wider one, and that pair fits — which would send
+  // the cluster back beside the title, narrow the box again, and repeat for as
+  // long as the row keeps laying out. A measurement taken while the cluster is
+  // stacked therefore changes nothing, which is what makes the decision
+  // monotone within a layout.
+  if (!layout.inRow) {
+    return previous;
+  }
   const next = { ...previous, ...measured };
-  if (layout.inRow && next.naturalKey === layout.key && next.boxKey === layout.key) {
-    const cut = next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get();
+  if (next.naturalKey === layout.key && next.boxKey === layout.key) {
+    const cut = next.naturalWidth - next.boxWidth >= titleCutTolerance(layout.capLines);
     if (next.probeKey === layout.key) {
       // The layout has measured twice, so this pair decides it.
       next.cutKey = cut ? layout.key : null;
@@ -677,12 +718,39 @@ export function ScreenHeader({
   // `measureTitleFit`): the row can be a fraction of a dp too narrow while the
   // cluster is still settling, and stacking on that frame would keep the
   // cluster on its own row for the rest of the layout.
+  //
+  // A title capped at several lines keeps that pre-paint decision and ALSO
+  // reports its line count: the pair is already measured on the layout's first
+  // pass, so the cluster moves before the frame paints, and the count confirms
+  // it for a title that wrapped where the box still held its own width. The
+  // pair's tolerance is a physical pixel and a half rather than half a pixel,
+  // because a line that did not wrap can overrun its box by up to one physical
+  // pixel — that is no wrap, and it must not move the cluster. Neither signal
+  // can send the cluster back to the row it left: both are read only while the
+  // cluster shares the row (see `measureTitleFit` and `onTitleTextLayout`).
+  //
+  // One cap for the Text and the reserved box: a title capped deeper than the
+  // reserve would shift the body the moment it reached the extra line. A large
+  // font scale raises the floor to two lines (see `titleNumberOfLines`).
+  const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
   const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
-  const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
+  // The cap is part of the layout: a title capped at one line is never read for
+  // a line count (see `onTitleTextLayout`), so a count taken under a deeper cap
+  // must not decide it. Keeping both in the key gives every measurement one
+  // meaning, the rule the widths already follow.
+  const titleFitKey = JSON.stringify([title, windowWidth, fontScale, titleLines]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
+  const [titleWrap, setTitleWrap] = useState<TitleWrap>(UNMEASURED_TITLE_WRAP);
   const titleNaturalRef = useRef<TextInstance>(null);
   const titleBoxRef = useRef<ViewInstance>(null);
-  const titleOverflows = measuresTitleFit && titleFit.cutKey === titleFitKey;
+  // Both readings are kept per layout, so a pair or a count from the previous
+  // layout never decides this one. The pair's cut is recorded only while the
+  // cluster shares the row (see `measureTitleFit`), which is what keeps this
+  // decision monotone: once the cluster has moved, no in-row pair is taken, so
+  // `cutKey` cannot clear, and the line count — also read only in row — can
+  // only confirm a move, never send the cluster back to wrap the title again.
+  const titleWraps = titleWrap.key === titleFitKey && titleWrap.count > 1;
+  const titleOverflows = measuresTitleFit && (titleFit.cutKey === titleFitKey || titleWraps);
   // The probe's extra pass remounts the hidden copy through this key, which
   // leaves `titleFitKey` free to keep its one-meaning-per-layout role.
   const titleProbeKey = `${titleFitKey}#${titleFit.probePass}`;
@@ -704,7 +772,7 @@ export function ScreenHeader({
           titleMinWidth,
           contentInset,
         })));
-  const titleFitLayout = { key: titleFitKey, inRow: !stackInlineActions };
+  const titleFitLayout = { key: titleFitKey, inRow: !stackInlineActions, capLines: titleLines };
   const onTitleNaturalLayout = (event: LayoutChangeEvent) => {
     const measured = { naturalKey: titleFitKey, naturalWidth: event.nativeEvent.layout.width };
     setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
@@ -712,6 +780,20 @@ export function ScreenHeader({
   const onTitleBoxLayout = (event: LayoutChangeEvent) => {
     const measured = { boxKey: titleFitKey, boxWidth: event.nativeEvent.layout.width };
     setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
+  };
+  // The visible title's line count decides a multi-line cap (see
+  // `titleWraps`). It is read only while the cluster shares the title's row,
+  // for the same reason the width pair is: on its own row the title gets the
+  // full width and re-lays out to one line, and consulting that report would
+  // return the cluster to the row, wrap the title again, and loop.
+  const onTitleTextLayout = (event: TextLayoutEvent) => {
+    if (stackInlineActions) {
+      return;
+    }
+    const report = { key: titleFitKey, count: event.nativeEvent.lines.length };
+    setTitleWrap(previous =>
+      previous.key === report.key && previous.count === report.count ? previous : report
+    );
   };
   // A layout's first decision is read synchronously, before the frame that
   // mounts it paints: the cut title and the cluster beside it otherwise
@@ -740,9 +822,13 @@ export function ScreenHeader({
     // the settled row — both before the frame paints. Without that second read
     // a row whose box reported once and then stopped would never decide.
     setTitleFit(previous =>
-      measureTitleFit(previous, measured, { key: titleFitKey, inRow: !stackInlineActions })
+      measureTitleFit(previous, measured, {
+        key: titleFitKey,
+        inRow: !stackInlineActions,
+        capLines: titleLines,
+      })
     );
-  }, [measuresTitleFit, titleFitKey, stackInlineActions, titleFit.probePass]);
+  }, [measuresTitleFit, titleFitKey, stackInlineActions, titleLines, titleFit.probePass]);
   // A caller that turns the reflow off keeps its inline controls beside the
   // title while the title fits, so on that row the title is the primary text
   // and the controls (a tab root's account picker) are secondary: they truncate
@@ -750,6 +836,23 @@ export function ScreenHeader({
   // left to give. The heading then sits on its content's basis instead of a
   // zero one (see `inlineActionsSlot`).
   const pinnedInlineActions = inlineActions && !allowInlineActionsStacking;
+
+  // The reflowed cluster of the two rows this header can paint.
+  const stackedInlineActionsRow =
+    inlineActions && stackInlineActions ? (
+      <View className="mt-2 min-w-0">{inlineActions}</View>
+    ) : null;
+  // A header that reserves title space already holds the height of the full
+  // title cap, so a stacked cluster belongs inside that band: it takes the
+  // slack the current title leaves instead of adding a row under the band. The
+  // header then keeps its height when a longer title arrives (the loading
+  // header's short placeholder and the loaded name both stay inside the same
+  // band), and the cluster sits one row gap under the title rather than under
+  // the band's unused lines. Without the reserve there is no slack to take, so
+  // the cluster keeps a full-width row of its own below the title.
+  const clusterInBand = Boolean(inlineActions) && stackInlineActions && reserveTitleSpace;
+  const stackedInlineInHeading = clusterInBand ? stackedInlineActionsRow : null;
+  const stackedInlineAfterRow = clusterInBand ? null : stackedInlineActionsRow;
 
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
@@ -814,11 +917,6 @@ export function ScreenHeader({
 
   const titleClass = size === 'large' ? SCREEN_HEADER_LARGE_TITLE_CLASS : SCREEN_HEADER_TITLE_CLASS;
 
-  // One cap for the Text and the reserved box: a title capped deeper than the
-  // reserve would shift the body the moment it reached the extra line. A large
-  // font scale raises the floor to two lines (see `titleNumberOfLines`).
-  const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
-
   // The title's touch area stays inside its own column. The free side beside
   // the heading is the row's gap to the trailing slot, and a trailing control
   // may carry a slop that reaches into that gap from the other side, so a
@@ -852,6 +950,9 @@ export function ScreenHeader({
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
+        // A one-line cap is decided by the width pair alone, so only a deeper
+        // cap needs the line count the text itself reports.
+        onTextLayout={measuresTitleFit && titleLines > 1 ? onTitleTextLayout : undefined}
       >
         {title}
       </Text>
@@ -1006,6 +1107,7 @@ export function ScreenHeader({
       {eyebrowSlot}
       {titleNode}
       {subtitleSlot}
+      {stackedInlineInHeading}
     </View>
   );
 
@@ -1252,10 +1354,6 @@ export function ScreenHeader({
         {inlineActions}
       </View>
     ) : null;
-  const stackedInlineActionsRow =
-    inlineActions && stackInlineActions ? (
-      <View className="mt-2 min-w-0">{inlineActions}</View>
-    ) : null;
   // The heading is one block on the 14dp page gutter. Inside it every line
   // starts on the title's column — 34dp of the 48dp target plus the 3.5dp
   // `ms-1` gap — which the `gutter` rule reads as the header's own column
@@ -1322,6 +1420,7 @@ export function ScreenHeader({
           {trailingLineSpacer}
         </View>
       ) : null}
+      {stackedInlineInHeading}
     </View>
   );
   // The fit check's copy (see `measuresTitleFit`): it paints nothing, takes no
@@ -1372,7 +1471,7 @@ export function ScreenHeader({
               // inside it instead of running off the edge.
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
-            {stackedInlineActionsRow}
+            {stackedInlineAfterRow}
           </>
         ) : (
           <>
@@ -1383,7 +1482,7 @@ export function ScreenHeader({
             {headerRight && stackActions ? (
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
-            {stackedInlineActionsRow}
+            {stackedInlineAfterRow}
           </>
         )}
         {titleNaturalCopy}

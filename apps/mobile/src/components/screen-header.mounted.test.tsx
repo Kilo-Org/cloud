@@ -154,6 +154,25 @@ function isHiddenTitleCopy(node: TestInstance): boolean {
   );
 }
 
+/**
+ * Whether the reflowed cluster sits in the row that also holds the reserved
+ * title band, which is what a header reserving title space does so the band's
+ * slack absorbs the row (see `clusterInBand`). A header with no reserve keeps
+ * the cluster in a row of its own below that block, and has no band to find.
+ */
+function stackedRowSharesReservedBand(renderer: TestRenderer.ReactTestRenderer): boolean {
+  const band = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className ?? '').includes('w-0 overflow-hidden')
+  )[0];
+  if (!band?.parent) {
+    throw new Error('the header renders no reserved band');
+  }
+  return band.parent.findAll(isStackedActionsRow).length === 1;
+}
+
 function findIcon(back: TestInstance, type: string): TestInstance {
   const icons = back.findAll(node => typeof node.type === 'string' && node.type === type);
   const icon = icons[0];
@@ -906,6 +925,146 @@ describe('ScreenHeader mounted', () => {
       Object.assign(layout, { width: 390, fontScale: 2 });
       const renderer = renderHeader(german);
       expect(renderer.root.findAll(isNaturalCopy)).toHaveLength(0);
+    });
+  });
+
+  describe('a multi-line title the inline cluster would squeeze', () => {
+    // A session name is prose under a 3-line cap: it wraps instead of being
+    // cut, so its own line count decides the reflow. The width pair must not:
+    // the Android gate measured this title's paragraph 0.38dp — one physical
+    // pixel at 2.625 — wider than its box on a line that did NOT wrap.
+    const session: ScreenHeaderProps = {
+      title: 'Markdown libraries fixture',
+      titleNumberOfLines: 3,
+      inlineActions: slotView(),
+    };
+    /** The gate's reading, in dp: a paragraph one physical pixel wider than its box. */
+    const overhang = { natural: 210.67, box: 210.29 };
+    const reportedLines = (renderer: TestRenderer.ReactTestRenderer, count: number) => {
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      const onTextLayout = title.props.onTextLayout;
+      if (typeof onTextLayout !== 'function') {
+        throw new TypeError('expected the title to report its line count');
+      }
+      act(() => {
+        (onTextLayout as (event: { nativeEvent: { lines: unknown[] } }) => void)({
+          nativeEvent: { lines: Array.from({ length: count }, () => ({})) },
+        });
+      });
+    };
+    /** The visible title's box and the hidden copy, as the fit check reads them. */
+    const fitTargets = (renderer: TestRenderer.ReactTestRenderer) => {
+      const box = renderer.root.findByProps({ accessibilityRole: 'header' }).parent;
+      const copy = renderer.root
+        .findAll(isHiddenTitleCopy)[0]
+        ?.findAll(node => typeof node.type === 'string' && node.props.onLayout !== undefined)[0];
+      if (!box || !copy) {
+        throw new TypeError('expected the measured title box and its hidden copy');
+      }
+      return { box, copy };
+    };
+    const reportWidth = (node: TestInstance, width: number) => {
+      const onLayout = node.props.onLayout;
+      if (typeof onLayout !== 'function') {
+        throw new TypeError('expected a layout reporter');
+      }
+      act(() => {
+        (onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width } },
+        });
+      });
+    };
+    /**
+     * Reports the overhang the way a device does: the box, the copy, then the
+     * probe's fresh box, which is the second report a suspected cut waits for.
+     */
+    const reportOverhang = (renderer: TestRenderer.ReactTestRenderer) => {
+      const first = fitTargets(renderer);
+      reportWidth(first.box, overhang.box);
+      reportWidth(first.copy, overhang.natural);
+      reportWidth(fitTargets(renderer).box, overhang.box);
+    };
+
+    it('moves the cluster under a title that reported two lines', () => {
+      const renderer = renderHeader(session);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      reportedLines(renderer, 2);
+      const stacked = renderer.root.findAll(isStackedActionsRow);
+      expect(stacked).toHaveLength(1);
+      expect(stacked[0]?.children).toHaveLength(1);
+
+      // On its own row the title gets the full width and re-lays out to one
+      // line; that report must not return the cluster to the row.
+      reportedLines(renderer, 1);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    it('keeps the cluster on the row for a one-pixel overhang of a single line', () => {
+      const renderer = renderHeader(session);
+      reportOverhang(renderer);
+      reportedLines(renderer, 1);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // The same measured pair IS a cut under a one-line cap, where the title
+      // cannot wrap: that is the signal this cap replaces, not a new threshold.
+      const oneLine = renderHeader({ ...session, titleNumberOfLines: 1 });
+      reportOverhang(oneLine);
+      expect(oneLine.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    // Compact 360x640dp window, the session screen's own header: the title's
+    // box beside the cluster is 159.24dp while the copy outside the row lays
+    // out at 210.67dp. A device keeps reporting after the decision: the box
+    // then sits in the row the cluster left and takes its full width, which is
+    // no longer the room the decision was about. Recording it there used to
+    // clear the cut, send the cluster back beside the title, and repeat until
+    // React threw `Maximum update depth exceeded` on this very screen.
+    it('settles a wrapped title in a narrow session window', () => {
+      Object.assign(layout, { width: 360, fontScale: 1 });
+      const renderer = renderHeader(session);
+      const inRowBox = 159.24;
+      const natural = 210.67;
+
+      // One device pass: the box reports the room it has, the copy its own
+      // width. The probe's confirming pass reads both again.
+      const devicePass = () => {
+        const stacked = renderer.root.findAll(isStackedActionsRow).length > 0;
+        reportWidth(fitTargets(renderer).box, stacked ? natural : inRowBox);
+        reportWidth(fitTargets(renderer).copy, natural);
+      };
+
+      for (let pass = 0; pass < 4; pass += 1) {
+        devicePass();
+      }
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    // The count arrives after the frame paints, so the first press of this row
+    // must not wait for it: a title that wraps overruns its box by far more
+    // than a physical pixel, and the measured pair alone already says so.
+    it('moves the cluster on the measured pair before any line count arrives', () => {
+      const renderer = renderHeader(session);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      const first = fitTargets(renderer);
+      reportWidth(first.box, 158.86);
+      reportWidth(first.copy, 210.67);
+      reportWidth(fitTargets(renderer).box, 158.86);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    // A header that reserves title space holds the height of the whole cap, so
+    // the reflowed cluster belongs inside that row: the band's slack absorbs the
+    // row and the cluster sits one gap under the title. Outside it, a whole band
+    // stood between the title and the cluster (48dp on the session screen).
+    it('keeps the reflowed cluster inside the reserved title band', () => {
+      Object.assign(layout, { width: 360, fontScale: 1 });
+      const reserved = renderHeader({ ...session, reserveTitleSpace: true });
+      const first = fitTargets(reserved);
+      reportWidth(first.box, 158.86);
+      reportWidth(first.copy, 210.67);
+      reportWidth(fitTargets(reserved).box, 158.86);
+      expect(reserved.root.findAll(isStackedActionsRow)).toHaveLength(1);
+      expect(stackedRowSharesReservedBand(reserved)).toBe(true);
     });
   });
 

@@ -15,7 +15,6 @@ export const DIRECT_BYOK_PROVIDER_IDS = [
   'edenai',
   'kimi-coding',
   'inceptron-byok',
-  'martian',
   'morph-byok',
   'neuralwatt',
   'nvidia-byok',

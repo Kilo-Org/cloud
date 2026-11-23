@@ -23,9 +23,18 @@ export type FakeHub = {
   close(): Promise<void>;
   connected: boolean;
   frames: FakeHubFrame[];
+  /** A form whose fields hold text already, laid out in the unnamed wrappers real pages use. */
+  formUrl: string;
+  /** A single-use page: its document loads are counted, so a second request is visible. */
+  oncePageHits(): number;
+  onceUrl: string;
   origin: string | undefined;
+  /** A plain HTML page the agent can navigate to; same loopback host as the pairing URL. */
+  pageUrl: string;
   pairingUrl(hubId: string, token: string): string;
   port: number;
+  /** A destination on this hub's origin that answers with a redirect to `target`. */
+  redirectUrl(target: string): string;
   send(frame: FakeHubFrame): void;
   setAllowedOrigin(origin: string): void;
   setPairing(input: { key: string; token: string }): void;
@@ -48,9 +57,43 @@ export const FAKE_HUB_ID = HUB_ID;
 type PairingState = {
   allowedOrigin: string | null;
   key: string | null;
+  /** Document requests the one-time page has served: a second load would mean the URL was requested twice. */
+  oncePageHits: number;
   token: string | null;
   wsUrl: string;
 };
+
+const PAIRING_PAGE_HTML = '<!doctype html><html><body>Pairing in progress…</body></html>';
+
+/** A plain page for the agent to navigate to and snapshot; no script, no secrets. */
+const AGENT_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Bridge page</title></head>
+  <body>
+    <h1>Bridge page</h1>
+    <p>The agent reached this page through the extension runtime.</p>
+    <a href="/next">Next</a>
+    <button type="button">Go</button>
+  </body>
+</html>`;
+
+const FORM_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Form page</title></head>
+  <body>
+    <main>
+      <div>
+        <h2>Contact</h2>
+        <div><label for="email">Email</label><input id="email" value="draft@example.com"></div>
+        <div><input id="work-email" type="email" aria-label="Work email" value="draft@example.com"></div>
+        <div><input id="age" type="number" aria-label="Age" value="42"></div>
+      </div>
+      <div><textarea id="notes" aria-label="Notes">draft notes</textarea></div>
+      <div><div id="bio" contenteditable="true" role="textbox" aria-label="Bio">draft bio</div></div>
+      <div><button type="button">Submit</button><div><p id="status">idle</p></div></div>
+    </main>
+  </body>
+</html>`;
 
 const startServer = async (state: PairingState): Promise<Server> => {
   const handleRequest = async (request: IncomingMessage, response: ServerResponse) => {
@@ -125,7 +168,41 @@ const startServer = async (state: PairingState): Promise<Server> => {
 
     if (url.pathname.startsWith('/__kilo_browser_pair')) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end('<!doctype html><html><body>Pairing in progress…</body></html>');
+      response.end(PAIRING_PAGE_HTML);
+
+      return;
+    }
+
+    // The page the agent drives: same loopback host, no credentials, no script.
+    if (url.pathname === '/page') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
+
+      return;
+    }
+
+    if (url.pathname === '/form') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(FORM_PAGE_HTML);
+
+      return;
+    }
+
+    // A single-use destination: the first document load is the one the agent asked for, a second one would spend it again.
+    if (url.pathname === '/once') {
+      state.oncePageHits += 1;
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
+
+      return;
+    }
+
+    // A destination that answers with a redirect to `to`, so the browser loads that address.
+    if (url.pathname === '/redirect') {
+      const target = url.searchParams.get('to') ?? '';
+
+      response.writeHead(302, { location: target });
+      response.end();
 
       return;
     }
@@ -144,7 +221,13 @@ const startServer = async (state: PairingState): Promise<Server> => {
 };
 
 export const startFakeHub = async (): Promise<FakeHub> => {
-  const state: PairingState = { allowedOrigin: null, key: null, token: null, wsUrl: '' };
+  const state: PairingState = {
+    allowedOrigin: null,
+    key: null,
+    oncePageHits: 0,
+    token: null,
+    wsUrl: '',
+  };
   const server = await startServer(state);
   const address = server.address();
   const port = typeof address === 'object' && address !== null ? address.port : 0;
@@ -156,7 +239,11 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     },
     connected: false,
     frames: [],
+    formUrl: `http://127.0.0.1:${port}/form`,
+    oncePageHits: () => state.oncePageHits,
+    onceUrl: `http://127.0.0.1:${port}/once`,
     origin: undefined,
+    pageUrl: `http://127.0.0.1:${port}/page`,
     setAllowedOrigin: () => {
       /* Rebound to the live state below. */
     },
@@ -166,6 +253,7 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     pairingUrl: (hubId, token) =>
       `http://127.0.0.1:${port}/__kilo_browser_pair#v=1&hub=${hubId}&t=${encodeURIComponent(token)}&ws=${encodeURIComponent(hub.wsUrl)}`,
     port,
+    redirectUrl: target => `http://127.0.0.1:${port}/redirect?to=${encodeURIComponent(target)}`,
     send: () => {
       /* Rebound to the socket once it opens. */
     },
@@ -198,7 +286,9 @@ export const startFakeHub = async (): Promise<FakeHub> => {
       hub.connected = true;
 
       client.on('message', (data: Buffer) => {
-        hub.frames.push(frameSchema.parse(JSON.parse(data.toString())));
+        const text = data.toString();
+
+        hub.frames.push(frameSchema.parse(JSON.parse(text)));
       });
       client.on('close', () => {
         hub.connected = false;

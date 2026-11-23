@@ -29,14 +29,24 @@ export type SessionPreviewTranscriptState = {
   /** The failed read's error; undefined before the first failure. */
   error: unknown;
   onRetry: () => void;
+  /**
+   * Where an empty transcript sits. The default `'static'` keeps the card's
+   * reserved layout, so the state cannot move the card it renders in; `'center'`
+   * is for a caller whose transcript is the whole surface below a screen header,
+   * and lets the state centre itself in the free space below that header.
+   */
+  emptyPlacement?: 'center' | 'static';
 };
 
 /**
- * The preview's transcript region: the four read states plus loading, each
- * rendered into the space the card already reserved so the swap cannot move
- * the card. There is no composer and no send/stop/queue handler — the card is
- * a viewer. The part detail host supplies the rows' press handlers, so a tool
- * row opens the read-only part detail sheet and no write path is added.
+ * The preview's transcript region: the four read states plus loading. Loading,
+ * an error and the rows render into the space the card already reserved, so a
+ * card's swap cannot move it; the empty state is the one placement the caller
+ * chooses, because a transcript that is a whole surface below a header centres
+ * it instead of pinning it to the card's reserve — see `emptyPlacement`. There
+ * is no composer and no send/stop/queue handler — the card is a viewer. The
+ * part detail host supplies the rows' press handlers, so a tool row opens the
+ * read-only part detail sheet and no write path is added.
  */
 export function SessionPreviewTranscript({
   sessionId,
@@ -45,6 +55,7 @@ export function SessionPreviewTranscript({
   isError,
   error,
   onRetry,
+  emptyPlacement = 'static',
 }: Readonly<SessionPreviewTranscriptState>) {
   const { t } = useTranslation();
   const empty = messages.length === 0;
@@ -64,6 +75,7 @@ export function SessionPreviewTranscript({
       <QueryError
         variant={trpcErrorVariant(error)}
         placement="static"
+        inset="gutter"
         className="w-full"
         onRetry={retryable ? onRetry : undefined}
       />
@@ -74,7 +86,8 @@ export function SessionPreviewTranscript({
       <EmptyState
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
-        placement="static"
+        placement={emptyPlacement}
+        inset="gutter"
         className="w-full"
       />
     );

@@ -32,6 +32,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: h.success, error: vi.fn(), warning: vi.fn() },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
@@ -45,6 +46,8 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', () => ({
+  // The context card hands this to the real hook, which the mock replaces.
+  keepPreviousData: (previous: unknown) => previous,
   useMutation: (options: Record<string, unknown>) => {
     h.mutationOptions.push(options);
     return { mutate: h.mutate, isPending: false };
@@ -149,7 +152,9 @@ describe('briefing schedule save confirmation', () => {
     const renderer = mount(createElement(ScheduleSettings, { preferences }));
     pressSave(renderer);
     expect(h.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ nightStart: '22:00', morningStart: '08:00', morningEnd: '12:00' })
+      expect.objectContaining({ nightStart: '22:00', morningStart: '08:00', morningEnd: '12:00' }),
+      // The card's own attempt settles on this call's outcome.
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) })
     );
     expect(h.success).not.toHaveBeenCalled();
     confirmSaved();

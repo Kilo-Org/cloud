@@ -19,10 +19,12 @@ const isBrowserToolCall = (toolCall: DispatchableToolCall): toolCall is BrowserT
 
 const runSafeToolCall = async (
   toolCall: DispatchableToolCall,
-  browserCaller: BrowserCaller
+  browserCaller: BrowserCaller,
+  signal: AbortSignal | undefined
 ): Promise<EvalTabResult> => {
   if (isBrowserToolCall(toolCall)) {
-    return executeKiloBrowserToolCall(toolCall, browserCaller);
+    // This runtime only ever runs safe mode's read-only set.
+    return executeKiloBrowserToolCall(toolCall, { caller: browserCaller, safeMode: true }, signal);
   }
 
   if (toolCall.name === 'web_search') {
@@ -74,6 +76,9 @@ const runSafeToolCall = async (
 };
 
 export const createSafeToolExecutor =
-  (browserCaller: BrowserCaller): ((toolCall: DispatchableToolCall) => Promise<EvalTabResult>) =>
+  (
+    browserCaller: BrowserCaller,
+    signal?: AbortSignal
+  ): ((toolCall: DispatchableToolCall) => Promise<EvalTabResult>) =>
   toolCall =>
-    runSafeToolCall(toolCall, browserCaller);
+    runSafeToolCall(toolCall, browserCaller, signal);

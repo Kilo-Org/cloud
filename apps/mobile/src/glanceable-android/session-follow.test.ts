@@ -1,5 +1,9 @@
+/* eslint-disable max-lines -- one follow-lifecycle suite: the tray carry cases share the native mock harness with the lifecycle cases. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { buildSessionLiveActivityContentState } from '@kilocode/notifications/schemas';
+
+import { i18n } from '@/i18n';
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
@@ -7,6 +11,7 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 
 import {
+  _peekFollowedContentForTests,
   _resetSessionFollowForTests,
   applySessionLiveUpdate,
   endAllSessionCards,
@@ -182,6 +187,107 @@ describe('syncFollowedSessionCards', () => {
       SESSION_FINISHED_DISMISS_MS
     );
     expect(isSessionFollowed('session-1')).toBe(false);
+  });
+
+  it('keeps the facts a push delivered when the tray row omits them', async () => {
+    followSession(RUNNING, CTX, NOW);
+    const pushed = buildSessionLiveActivityContentState(
+      {
+        ...RUNNING,
+        currentStep: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 1, total: 4, current: 'Read the tests' },
+        changes: { files: 2, added: 10, removed: 1 },
+        lastActivityAt: '2026-10-12T09:59:00.000Z',
+        startedAt: '2026-10-12T09:40:00.000Z',
+        costMicrodollars: 840_000,
+      },
+      {
+        approvalKey: null,
+        updatedAt: new Date(NOW + 30_000).toISOString(),
+        statusSinceFallback: new Date(NOW).toISOString(),
+      }
+    );
+    await applySessionLiveUpdate('update', pushed);
+    mocks.postSessionCard.mockClear();
+
+    syncFollowedSessionCards([{ id: 'session-1', status: 'busy' }], NOW + 60_000);
+
+    // The tray row's own facts draw the plan line and the cost so far, from the
+    // values the push delivered.
+    const card = lastCard();
+    expect(card.subText).toBe(i18n.t('glanceable.planProgress', { done: '1', total: '4' }));
+    expect(String(card.expandedText)).toContain('0.84');
+    // The step, the diff, the start time and the last activity never reach this
+    // card, so the followed content is where they survive the rebuild.
+    expect(_peekFollowedContentForTests('session-1')).toMatchObject({
+      currentStep: { verb: 'editing', target: 'auth.ts' },
+      plan: { done: 1, total: 4, current: 'Read the tests' },
+      changes: { files: 2, added: 10, removed: 1 },
+      lastActivityAt: '2026-10-12T09:59:00.000Z',
+      startedAt: '2026-10-12T09:40:00.000Z',
+    });
+  });
+
+  it('keeps the permission command a push delivered through a waiting tray row', async () => {
+    followSession({ ...RUNNING, status: 'permission' }, CTX, NOW);
+    const pushed = buildSessionLiveActivityContentState(
+      { ...RUNNING, status: 'permission', permissionCommand: 'pnpm test auth' },
+      {
+        approvalKey: 'a'.repeat(64),
+        updatedAt: new Date(NOW + 30_000).toISOString(),
+        statusSinceFallback: new Date(NOW).toISOString(),
+      }
+    );
+    await applySessionLiveUpdate('update', pushed);
+    mocks.postSessionCard.mockClear();
+
+    syncFollowedSessionCards([{ id: 'session-1', status: 'permission' }], NOW + 60_000);
+
+    expect(lastCard()).toMatchObject({
+      text: expect.stringContaining('pnpm test auth'),
+      approveLabel: 'Approve',
+    });
+  });
+
+  it('replaces a remembered fact the row carries', async () => {
+    followSession(RUNNING, CTX, NOW);
+    const pushed = buildSessionLiveActivityContentState(
+      {
+        ...RUNNING,
+        currentStep: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 1, total: 4, current: 'Read the tests' },
+        changes: { files: 2, added: 10, removed: 1 },
+        startedAt: '2026-10-12T09:40:00.000Z',
+      },
+      {
+        approvalKey: null,
+        updatedAt: new Date(NOW + 30_000).toISOString(),
+        statusSinceFallback: new Date(NOW).toISOString(),
+      }
+    );
+    await applySessionLiveUpdate('update', pushed);
+    mocks.postSessionCard.mockClear();
+
+    syncFollowedSessionCards(
+      [
+        {
+          id: 'session-1',
+          status: 'busy',
+          currentStep: { verb: 'running', target: 'schema.ts' },
+          plan: { done: 3, total: 4, current: 'Ship the migration' },
+        },
+      ],
+      NOW + 60_000
+    );
+
+    expect(_peekFollowedContentForTests('session-1')).toMatchObject({
+      currentStep: { verb: 'running', target: 'schema.ts' },
+      plan: { done: 3, total: 4, current: 'Ship the migration' },
+      // The facts the row omits are still the push's.
+      changes: { files: 2, added: 10, removed: 1 },
+      startedAt: '2026-10-12T09:40:00.000Z',
+    });
+    expect(lastCard().subText).toBe(i18n.t('glanceable.planProgress', { done: '3', total: '4' }));
   });
 });
 

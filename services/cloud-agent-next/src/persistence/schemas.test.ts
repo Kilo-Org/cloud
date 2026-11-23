@@ -1,16 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import {
   AttachmentsSchema,
+  EncryptedSecretEnvelopeSchema,
   MCPServerConfigSchema,
   MetadataSchema,
   modelIdSchema,
   RuntimeAgentSchema,
+  RuntimeAgentsSchema,
   RuntimeInstructionSchema,
   RuntimeInstructionsSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+  MAX_MCP_PLAINTEXT_BYTES,
+} from '../shared/prepare-session-limits.js';
 import type { MCPServerConfig } from './types.js';
 
 describe('AttachmentsSchema', () => {
@@ -398,7 +405,7 @@ describe('MetadataSchema', () => {
     [
       'runtimeAgents',
       [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review the diff' } }],
-      [{ slug: 'code', name: 'Code override', config: {} }],
+      [{ slug: 'Reviewer', name: 'Reviewer', config: {} }],
     ],
   ] as const)(
     'keeps nested and legacy-flat %s validation equivalent for representative values',
@@ -409,6 +416,39 @@ describe('MetadataSchema', () => {
       expect(MetadataSchema.safeParse({ ...legacyMetadata, [field]: invalid }).success).toBe(false);
     }
   );
+
+  it.each([
+    ['SessionProfileBundleSchema', (stored: object) => SessionProfileBundleSchema.parse(stored)],
+    ['MetadataSchema', (stored: object) => MetadataSchema.parse({ ...legacyMetadata, ...stored })],
+  ] as const)(
+    'drops a stored agent with a CLI-owned id so the bundle still loads in %s',
+    (_name, parse) => {
+      const cliOwnedAgent = { slug: 'code', name: 'Code override', config: {} };
+      const customAgent = { slug: 'reviewer', name: 'Reviewer', config: {} };
+
+      expect(parse({ runtimeAgents: [cliOwnedAgent] }).runtimeAgents).toEqual([]);
+      expect(parse({ runtimeAgents: [cliOwnedAgent, customAgent] }).runtimeAgents).toEqual([
+        customAgent,
+      ]);
+    }
+  );
+
+  it('rejects an agent with a CLI-owned id supplied on the wire', () => {
+    expect(
+      RuntimeAgentsSchema.safeParse([{ slug: 'code', name: 'Code override', config: {} }]).success
+    ).toBe(false);
+  });
+
+  it('loads a stored bundle written under an earlier slug rule', () => {
+    const parsed = SessionProfileBundleSchema.parse({
+      runtimeAgents: [
+        { slug: 'explore', name: 'Explore', config: {} },
+        { slug: 'reviewer', name: 'Reviewer', config: {} },
+      ],
+    });
+
+    expect(parsed.runtimeAgents).toEqual([{ slug: 'reviewer', name: 'Reviewer', config: {} }]);
+  });
 
   it('keeps kilo commands in nested profiles only', () => {
     const kiloCommands = [{ name: 'review', template: 'Review $ARGUMENTS' }];
@@ -1083,7 +1123,20 @@ describe('RuntimeAgentSchema', () => {
   });
 
   it('rejects built-in slugs so they cannot override the bundled agents', () => {
-    for (const slug of ['code', 'plan', 'architect', 'custom', 'orchestrator', 'ask']) {
+    for (const slug of [
+      'code',
+      'plan',
+      'architect',
+      'custom',
+      'orchestrator',
+      'ask',
+      'build',
+      'general',
+      'explore',
+      'compaction',
+      'title',
+      'summary',
+    ]) {
       const result = RuntimeAgentSchema.safeParse({ slug, name: slug, config: {} });
       expect(result.success).toBe(false);
     }
@@ -1105,5 +1158,144 @@ describe('RuntimeAgentSchema', () => {
       config: { model: 'anthropic/claude-opus', variant: 'high' },
     };
     expect(RuntimeAgentSchema.parse(agent)).toEqual(agent);
+  });
+});
+
+describe('prepareSession config caps', () => {
+  const entries = (count: number, keyLength = 3) =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [`K${index}`.padEnd(keyLength, 'x'), 'value'])
+    );
+
+  it('caps encrypted envelope strings', () => {
+    const envelope = (encryptedData: string, encryptedDEK: string) => ({
+      encryptedData,
+      encryptedDEK,
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+    });
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH))
+      ).success
+    ).toBe(true);
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH + 1), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH))
+      ).success
+    ).toBe(false);
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH + 1))
+      ).success
+    ).toBe(false);
+  });
+
+  it('caps a local server environment at 50 entries and keys at 256 characters', () => {
+    const withEnvironment = (environment: Record<string, string>) => ({
+      type: 'local' as const,
+      command: ['node'],
+      environment,
+    });
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(50))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(51))).success).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(1, 256))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(1, 257))).success).toBe(false);
+  });
+
+  it('caps remote server headers at 50 entries and keys at 256 characters', () => {
+    const withHeaders = (headers: Record<string, string>) => ({
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers,
+    });
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(50))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(51))).success).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(1, 256))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(1, 257))).success).toBe(false);
+  });
+
+  it('caps local server commands at 50 arguments of 8192 characters', () => {
+    const withCommand = (command: string[]) => ({ type: 'local' as const, command });
+    expect(
+      MCPServerConfigSchema.safeParse(withCommand(Array.from({ length: 50 }, () => 'arg'))).success
+    ).toBe(true);
+    expect(
+      MCPServerConfigSchema.safeParse(withCommand(Array.from({ length: 51 }, () => 'arg'))).success
+    ).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withCommand(['x'.repeat(8192)])).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withCommand(['x'.repeat(8193)])).success).toBe(false);
+  });
+
+  it('caps a remote server URL at 4096 characters', () => {
+    const urlOf = (length: number) => `https://example.com/${'a'.repeat(length - 20)}`;
+    const withUrl = (url: string) => ({ type: 'remote' as const, url });
+    expect(urlOf(4096)).toHaveLength(4096);
+    expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4096))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4097))).success).toBe(false);
+  });
+
+  it('rejects an empty server name and an empty environment or header key', () => {
+    const metadataWith = (mcpServers: Record<string, MCPServerConfig>) => ({
+      version: 1,
+      sessionId: 'session123',
+      orgId: 'org456',
+      userId: 'user789',
+      timestamp: Date.now(),
+      mcpServers,
+    });
+    expect(
+      MetadataSchema.safeParse(metadataWith({ '': { type: 'local', command: ['node'] } })).success
+    ).toBe(false);
+    expect(
+      MCPServerConfigSchema.safeParse({
+        type: 'local',
+        command: ['node'],
+        environment: { '': 'value' },
+      }).success
+    ).toBe(false);
+    expect(
+      MCPServerConfigSchema.safeParse({
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { '': 'value' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('caps the MCP secret plaintext at the attach-schema budget', () => {
+    const metadataWith = (mcpServers: Record<string, MCPServerConfig>) => ({
+      version: 1,
+      sessionId: 'session123',
+      orgId: 'org456',
+      userId: 'user789',
+      timestamp: Date.now(),
+      mcpServers,
+    });
+    // Values stay within their per-item cap, so only the materialized budget decides.
+    const perValue = 'x'.repeat(4096);
+    const recordWith = (count: number): Record<string, MCPServerConfig> => ({
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: count }, (_, index) => [`KEY_${index}`, perValue])
+        ),
+      },
+    });
+    expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(19))).success).toBe(true);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(21))).success).toBe(false);
+
+    // Escaped bytes count, because the attach schema measures the serialized JSON.
+    const control = String.fromCharCode(1).repeat(perValue.length);
+    const escaped = Array.from({ length: 19 }, (_, index) => [`KEY_${index}`, control]);
+    expect(
+      MetadataSchema.safeParse(
+        metadataWith({
+          local: { type: 'local', command: ['node'], environment: Object.fromEntries(escaped) },
+        })
+      ).success
+    ).toBe(false);
   });
 });

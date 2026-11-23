@@ -7,6 +7,7 @@
       "spendAlert": "إنفاقك يحتاج إلى انتباه",
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
       "securityUpdate": "فحص أمان به تحديث",
+      "agentBriefing": "تقرير الوكيل لديك جاهز",
       "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "نتيجة أمان جديدة ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "حرج",
+      "high": "عالٍ",
+      "medium": "متوسط",
+      "low": "منخفض"
     },
     "securityFindingSlaWarning": {
       "title": "تحذير SLA"

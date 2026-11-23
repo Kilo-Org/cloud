@@ -16,8 +16,14 @@ import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getGrantedClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
-import { buildClaudeBillingProvider, checkClaudeBilling } from './routing';
+import {
+  buildClaudeBillingProvider,
+  checkClaudeBilling,
+  CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+  CLAUDE_BILLING_REQUIRED_MESSAGE,
+} from './routing';
 import { ClaudeBillingPayerStateParseError } from './payer-state';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const row: ClaudeBillingConnectionRow = {
@@ -55,7 +61,7 @@ beforeEach(() => {
     .mockResolvedValue({ id: 'connector', google_user_email: 'connector@kilocode.ai' } as never);
 });
 
-function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
+function request(kind: 'messages' | 'chat_completions' = 'messages'): GatewayRequest {
   return {
     kind,
     body: {
@@ -66,9 +72,9 @@ function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
   };
 }
 
-function input(kind: 'messages' | 'chat_completions' = 'messages') {
+function input() {
   return {
-    request: request(kind),
+    request: request(),
     requestedModel: '~anthropic/latest',
     userId: 'user',
     organizationId: undefined,
@@ -168,38 +174,36 @@ describe('Claude customer-billed routing', () => {
     }
   });
 
-  it.each(['messages', 'chat_completions'] as const)(
-    'bills the profile over %s without a Kilo charge',
-    async kind => {
-      const args = input(kind);
-      const result = await checkClaudeBilling(args);
-      if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
-      expect(result.provider).toMatchObject({
-        type: 'claude-billing',
-        inferenceProviderId: 'anthropic',
-        apiUrl: 'https://api.anthropic.com/v1',
-      });
-      const headers: Record<string, string> = {};
-      await result.provider.transformRequest({
-        provider: result.provider,
-        model: args.requestedModel,
-        request: args.request,
-        extraHeaders: headers,
-        originalHeaders: {} as never,
-        userByok: null,
-        kilo_user_id: 'user',
-        organization_id: null,
-        session_id: null,
-      });
-      expect(args.request.body).toMatchObject({
-        model: 'claude-sonnet-4-6',
-        billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
-      });
-      expect(headers['anthropic-user-profile-id']).toBe('uprof_test');
-      expect(headers['anthropic-beta']).toContain('user-profiles-billing-2026-10-01');
-      expect(result.skipBalanceCheck).toBe(true);
-    }
-  );
+  it('bills the profile over the Messages API without a Kilo charge', async () => {
+    const args = input();
+    const result = await checkClaudeBilling(args);
+    if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
+    expect(result.provider).toMatchObject({
+      type: 'claude-billing',
+      inferenceProviderId: 'anthropic',
+      apiUrl: 'https://api.anthropic.com/v1',
+      supportedChatApis: ['messages'],
+    });
+    const headers: Record<string, string> = {};
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: args.requestedModel,
+      request: args.request,
+      extraHeaders: headers,
+      originalHeaders: {} as never,
+      userByok: null,
+      kilo_user_id: 'user',
+      organization_id: null,
+      session_id: null,
+    });
+    expect(args.request.body).toMatchObject({
+      model: 'claude-sonnet-4-6',
+      billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+    });
+    expect(headers['anthropic-user-profile-id']).toBe('uprof_test');
+    expect(headers['anthropic-beta']).toContain('user-profiles-billing-2026-10-01');
+    expect(result.skipBalanceCheck).toBe(true);
+  });
 
   it('does not serve an organization request from a personal connection', async () => {
     jest
@@ -315,7 +319,13 @@ describe('Claude customer-billed routing', () => {
       ...input(),
       organizationId: ORGANIZATION_ID,
     });
-    expect(result).toMatchObject({ kind: 'unavailable' });
+    expect(result).toEqual({
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_REQUIRED_MESSAGE,
+    });
+    if (result?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(result.retryable).toBeUndefined();
+    expect(result.message.endsWith(`Manage the connection at ${APP_URL}/byok.`)).toBe(true);
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -339,8 +349,31 @@ describe('Claude customer-billed routing', () => {
 
   it('never falls back when operator configuration is absent', async () => {
     jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
-    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+    const result = await checkClaudeBilling(input());
+    expect(result).toEqual({
+      kind: 'unavailable',
+      message: CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
+      retryable: true,
+    });
+    if (result?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(result.message).not.toContain('byok');
+    expect(result.message).not.toContain('link it again');
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('tells the operator cause apart from the connection cause', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    const operatorResult = await checkClaudeBilling(input());
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockResolvedValue({ ...row, status: 'billing_unavailable' });
+    const connectionResult = await checkClaudeBilling(input());
+    if (operatorResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    if (connectionResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(operatorResult.message).not.toBe(connectionResult.message);
+    expect(connectionResult.retryable).toBeUndefined();
+    expect(operatorResult.retryable).toBe(true);
   });
 
   it('keeps a failed payer lookup retryable without selecting another payer', async () => {
@@ -360,8 +393,7 @@ describe('Claude customer-billed routing', () => {
       .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
     expect(await checkClaudeBilling(input())).toEqual({
       kind: 'unavailable',
-      message:
-        'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
+      message: `Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time. Manage the connection at ${APP_URL}/byok.`,
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -394,21 +426,53 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
-  it('does not switch payer for an unsupported API shape', async () => {
-    expect(
-      await checkClaudeBilling({
-        ...input(),
-        request: {
-          kind: 'responses',
-          body: { model: 'anthropic/claude-sonnet-4.6', input: 'hello' },
-        },
-      })
-    ).toMatchObject({ kind: 'unavailable' });
+  it.each<[string, GatewayRequest]>([
+    [
+      'Responses',
+      { kind: 'responses', body: { model: 'anthropic/claude-sonnet-4.6', input: 'hello' } },
+    ],
+    ['Chat Completions', request('chat_completions')],
+  ])('does not switch payer for the %s API', async (_name, gatewayRequest) => {
+    expect(await checkClaudeBilling({ ...input(), request: gatewayRequest })).toMatchObject({
+      kind: 'unavailable',
+      message: `Use the Messages API with your Claude link. Manage the connection at ${APP_URL}/byok.`,
+    });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
   it('keeps unrelated models on their existing route', async () => {
     expect(await checkClaudeBilling({ ...input(), requestedModel: 'openai/gpt-model' })).toBeNull();
     expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
+  });
+
+  it('names the manage-connection page on every cause the customer can act on', async () => {
+    const pointer = `Manage the connection at ${APP_URL}/byok.`;
+
+    const noRequester = await checkClaudeBilling({
+      ...input(),
+      userId: null,
+      organizationId: 'organization',
+    });
+    if (noRequester?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(noRequester.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
+    const parseMismatch = await checkClaudeBilling(input());
+    if (parseMismatch?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(parseMismatch.message).toContain(pointer);
+
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const readFailure = await checkClaudeBilling(input());
+    if (readFailure?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(readFailure.message).toContain(pointer);
+
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    const operatorGap = await checkClaudeBilling(input());
+    if (operatorGap?.kind !== 'unavailable') throw new Error('Expected unavailable');
+    expect(operatorGap.message).not.toContain(pointer);
   });
 });

@@ -39,6 +39,7 @@ import {
   hasCompactableHistory,
 } from '@/src/shared/agent-context-compaction';
 import type { TurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import { TARGET_TAB_UNAVAILABLE_ABORT_REASON } from '@/src/shared/agent-llm-turn-runner-core';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import {
   captureEvent,
@@ -236,6 +237,27 @@ export const runOwesTabLease = ({
   readonly currentRunToken: number | undefined;
   readonly runToken: number;
 }): boolean => currentRunToken === undefined || currentRunToken === runToken;
+
+/**
+ * Aborts every run whose target tab left the inspectable list. The abort carries
+ * its own reason: nobody pressed Stop, so the turn must not report a Stop.
+ */
+export const abortRunsWithoutInspectableTab = ({
+  inspectableTabIds,
+  runs,
+}: {
+  readonly inspectableTabIds: ReadonlySet<number>;
+  readonly runs: Iterable<{
+    readonly abort: AbortController;
+    readonly selectedTabId: number;
+  }>;
+}): void => {
+  for (const run of runs) {
+    if (!inspectableTabIds.has(run.selectedTabId)) {
+      run.abort.abort(TARGET_TAB_UNAVAILABLE_ABORT_REASON);
+    }
+  }
+};
 
 const getSendBlockedReason = ({
   isCompacting,
@@ -550,13 +572,10 @@ export const AgentChatPanel = ({
       return;
     }
 
-    const inspectableTabIds = new Set(inspectableTabs.map(tab => tab.id));
-
-    for (const runState of runStatesRef.current.values()) {
-      if (!inspectableTabIds.has(runState.selectedTabId)) {
-        runState.abort.abort();
-      }
-    }
+    abortRunsWithoutInspectableTab({
+      inspectableTabIds: new Set(inspectableTabs.map(tab => tab.id)),
+      runs: runStatesRef.current.values(),
+    });
   }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
@@ -1004,9 +1023,15 @@ export const AgentChatPanel = ({
       selectedTabId: conversation?.selectedTabId,
     });
 
+    /*
+     * A retry is a gateway path like a first send, so it uses the same catalog
+     * admission: the conversation's stored model must be in the loaded catalog
+     * for the current identity before a turn starts.
+     */
     if (
       conversation === undefined ||
       runSelectedTabId === undefined ||
+      !isModelInCatalog(conversation.model ?? '') ||
       store.get(runningConversationIdsAtom).includes(conversationId) ||
       store.get(compactingConversationIdsAtom).includes(conversationId)
     ) {

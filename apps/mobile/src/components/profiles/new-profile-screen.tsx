@@ -18,12 +18,15 @@ import {
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
   getProfileOverviewPath,
   type ProfileManagementStack,
@@ -84,6 +87,10 @@ export function NewProfileScreen({
   organizationId?: string;
 }>) {
   const router = useRouter();
+  // The post-create hand-off swaps this form for the new profile in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const {
     organizationId: boundaryOrganizationId,
@@ -142,7 +149,7 @@ export function NewProfileScreen({
         router.back();
         return;
       }
-      router.replace(
+      stackSafeRouter.replace(
         getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
       );
     } catch (error) {
@@ -157,7 +164,7 @@ export function NewProfileScreen({
       <ScreenHeader title={t('profiles.newProfile')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -174,10 +181,10 @@ export function NewProfileScreen({
         />
 
         {canOwnOrganization ? (
-          <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
-            </Text>
+          <View className="gap-1.5">
+            <FormFieldLabel
+              label={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
+            />
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
@@ -192,7 +199,7 @@ export function NewProfileScreen({
               accessibilityLabel={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
             />
             {owner === 'organization' && org ? (
-              <Text className="text-sm text-muted-foreground">{org.organizationName}</Text>
+              <Text variant="muted">{org.organizationName}</Text>
             ) : null}
           </View>
         ) : null}

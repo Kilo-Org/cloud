@@ -13,6 +13,7 @@ import {
   pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressRowContentPress,
   pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
@@ -28,8 +29,10 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as unknown,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -57,6 +60,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -82,6 +88,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The screen hands its action to the manage slot, so the stub renders what it
   // is given: the read-only sentence replaces the button in the same subtree.
   EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
@@ -97,18 +104,24 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Server: 'Server',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The props a mocked Switch host element exposes, which the renderer keeps untyped. */
 type ToggleProps = { onValueChange: (value: boolean) => void };
+
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
 
 describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -128,12 +141,55 @@ describe('ProfileMcpScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     act(() => {
       (findOne(renderer.root, 'QueryError').props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -177,11 +233,29 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    // With nothing to open the row renders static, so the count and the command
+    // it paints stay text stops instead of being hidden for a press that does
+    // not exist.
+    const factLines = findAll(renderer.root, 'Text').filter(
+      node => node.props.children === 1 || node.props.children === 'npx @example/mcp'
+    );
+    expect(factLines).toHaveLength(2);
+    for (const line of factLines) {
+      expect(line.props.accessible).toBeUndefined();
+      expect(line.props.importantForAccessibility).toBeUndefined();
+    }
 
     unmount();
   });
@@ -202,7 +276,15 @@ describe('ProfileMcpScreen', () => {
   });
 
   it('happy: a row shows name, type and summary; the switch toggles the server', async () => {
-    h.query.data = testProfile([testServer()]);
+    h.query.data = testProfile([
+      testServer(),
+      testServer({
+        id: 'mcp-2',
+        name: 'remote-docs',
+        type: 'remote',
+        config: { url: 'https://mcp.example.com/docs' },
+      }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -226,13 +308,27 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('leaves the type out when every server has the same one', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('docs');
+    expect(texts).toContain('npx @example/mcp');
+    expect(texts).not.toContain('Local');
+
+    unmount();
+  });
+
   it('happy: the edit control opens the sheet seeded with the server', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
 
     expect(findField(renderer.root, 'Server name').props.defaultValue).toBe('docs');
     expect(findField(renderer.root, 'Command line').props.defaultValue).toBe('npx @example/mcp');
@@ -266,7 +362,7 @@ describe('ProfileMcpScreen', () => {
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
@@ -402,7 +498,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     expect(findField(renderer.root, 'Server name').props.error).toBeUndefined();
 
     changeText(renderer.root, 'Server name', 'search');
@@ -444,7 +540,7 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the switch is the row element named after the server, and the count names itself', async () => {
+  it('a11y: the switch is the row element named after the server, and the press names the count', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
@@ -460,13 +556,16 @@ describe('ProfileMcpScreen', () => {
       accessible: false,
       importantForAccessibility: 'no',
     });
-    // The counted glyphs stay decorative; the count line carries their meaning.
+    // The counted glyphs stay decorative; the content press carries their meaning.
     expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit MCP server docs, 1 secret, npx @example/mcp');
 
     unmount();
   });
 
-  it('a11y: the count names itself in the plural form', async () => {
+  it('a11y: the press names the count in the plural form', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -482,7 +581,9 @@ describe('ProfileMcpScreen', () => {
 
     const counts = findAll(renderer.root, 'Text').filter(node => node.props.children === 3);
     expect(counts).toHaveLength(1);
-    expect(counts[0]?.props.accessibilityLabel).toBe('3 secrets');
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit MCP server docs, 3 secrets, https://example.com/mcp');
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
 
     unmount();
@@ -639,12 +740,12 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     pressSheetDone(renderer.root);
     await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
 
     pressPressable(renderer.root, 'Delete MCP server docs');
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     // The test renderer exposes host props untyped; the screen passes this handler.
     const toggleProps = findOne(renderer.root, 'Switch').props as ToggleProps;
     act(() => {
@@ -860,6 +961,110 @@ describe('ProfileMcpScreen server cap', () => {
       node => node.props.children === i18n.t('profiles.mcp.saveFailed')
     );
     expect(status?.props.className).toContain('text-destructive');
+
+    unmount();
+  });
+});
+
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressEmptyAction(first.renderer);
+  changeText(first.renderer.root, 'Server name', 'portal-server');
+  changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+  first.unmount();
+}
+
+describe('ProfileMcpScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, {
+      data: testProfile(),
+      error: undefined,
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Text').filter(
+        node => node.props.children === i18n.t('profiles.organizationRoleRequired')
+      )
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const denied = await mountScreen();
+    expect(findAll(denied.renderer.root, 'SheetHeader')).toHaveLength(0);
+    denied.unmount();
+
+    permissionState.permission = 'allowed';
+    const allowed = await mountScreen();
+    expect(findAll(allowed.renderer.root, 'SheetHeader')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(findAll(resolving.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findOne(resolving.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(resolving.renderer.root, 'Server name').props.defaultValue).toBe(
+      'portal-server'
+    );
+    expect(findField(resolving.renderer.root, 'Command line').props.defaultValue).toBe(
+      'npx portal-mcp'
+    );
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    changeText(renderer.root, 'Server name', 'portal-server');
+
+    permissionState.permission = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
 
     unmount();
   });

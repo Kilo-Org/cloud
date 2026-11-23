@@ -28,9 +28,10 @@ const PART_RICH = 'prtMdLibsRich000001';
 const PART_BIG = 'prtMdLibsBig0000001';
 const PART_MERMAID = 'prtMdLibsMermaid001';
 const PART_HTML = 'prtMdLibsHtml000001';
+const PART_PROMPT = 'prtMdLibsPrompt00001';
 const PART_READ = 'prtMdLibsRead000001';
 const PART_FILE = 'prtMdLibsFile000001';
-const EXPECTED = [PART_RICH, PART_BIG, PART_MERMAID, PART_HTML, PART_READ, PART_FILE];
+const EXPECTED = [PART_PROMPT, PART_RICH, PART_BIG, PART_MERMAID, PART_HTML, PART_READ, PART_FILE];
 const MD_DOC = [
   '# Notes file',
   '',
@@ -172,6 +173,14 @@ const HTML = [
   '  </tbody>',
   '</table>',
   '',
+  // An attribute keeps this table on the HTML path, so the renderer sizes the
+  // cells itself instead of drawing a markdown table.
+  '<table border="1">',
+  '  <tr><th align="left">Term</th><th align="left">Meaning</th><th align="left">Notes</th></tr>',
+  '  <tr><td>renderer</td><td>the component that draws HTML</td><td>sizes its own cells</td></tr>',
+  '  <tr><td>container</td><td>the frame the host provides</td><td>narrower than the window</td></tr>',
+  '</table>',
+  '',
   '<details>',
   '<summary>Show the <b>details</b></summary>',
   '',
@@ -203,6 +212,21 @@ function textPart(id: string, text: string, messageID = ASSISTANT_ID): SessionIn
     data: { id, sessionID: SESSION_ID, messageID, type: 'text', text },
   };
 }
+
+/**
+ * The prompt in the user bubble. A chat bubble keeps 82 % of the row and pads
+ * its content, so this is the narrowest host the HTML renderer draws in: the
+ * attributed table here must fit inside that box rather than the window.
+ */
+const USER_PROMPT = [
+  'Sizing check: this bubble is narrower than the screen.',
+  '',
+  '<table border="1">',
+  '  <tr><th align="left">Host</th><th align="left">Box</th><th align="left">Fits</th></tr>',
+  '  <tr><td>user bubble</td><td>82% of the row, padded</td><td>the table wraps inside it</td></tr>',
+  '  <tr><td>assistant row</td><td>the row minus its gutter</td><td>the table wraps inside it</td></tr>',
+  '</table>',
+].join('\n');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -314,6 +338,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     textPart(PART_BIG, BIG),
     textPart(PART_MERMAID, MERMAID),
     textPart(PART_HTML, HTML),
+    textPart(PART_PROMPT, USER_PROMPT, USER_ID),
     buildToolPartItem({
       partId: PART_READ,
       sessionId: SESSION_ID,

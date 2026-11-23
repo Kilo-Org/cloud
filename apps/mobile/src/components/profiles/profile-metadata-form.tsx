@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import {
   ProfileDescriptionField,
@@ -86,7 +85,7 @@ export function ProfileMetadataForm({
   };
 
   return (
-    <View className="gap-4">
+    <>
       <ProfileNameField
         defaultValue={nameField.valueRef.current}
         error={nameField.error}
@@ -112,6 +111,6 @@ export function ProfileMetadataForm({
       <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
         <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
-    </View>
+    </>
   );
 }

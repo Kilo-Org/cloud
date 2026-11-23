@@ -15,9 +15,11 @@ import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelId
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
 import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
+import { AnthropicUserProfilesContent } from '@/app/admin/gateway/AnthropicUserProfilesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
+import { EnkryptCallsContent } from '@/app/admin/gateway/EnkryptCallsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -29,8 +31,10 @@ const VALID_TABS: readonly string[] = [
   'provider-order',
   'custom-pricing',
   'organization-features',
+  'anthropic-user-profiles',
   'api-request-log',
   'provider-metadata',
+  'enkrypt-calls',
 ];
 type Tab =
   | 'sync-providers'
@@ -42,8 +46,10 @@ type Tab =
   | 'provider-order'
   | 'custom-pricing'
   | 'organization-features'
+  | 'anthropic-user-profiles'
   | 'api-request-log'
-  | 'provider-metadata';
+  | 'provider-metadata'
+  | 'enkrypt-calls';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -110,11 +116,17 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="organization-features" className={tabTriggerClass}>
               Organization Features
             </TabsTrigger>
+            <TabsTrigger value="anthropic-user-profiles" className={tabTriggerClass}>
+              Anthropic profiles
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
             <TabsTrigger value="provider-metadata" className={tabTriggerClass}>
               Provider Metadata
+            </TabsTrigger>
+            <TabsTrigger value="enkrypt-calls" className={tabTriggerClass}>
+              Enkrypt Calls
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -166,6 +178,9 @@ export default function AdminGatewayPage() {
           <TabsContent value="organization-features" className="mt-4">
             <OrganizationFeaturesContent />
           </TabsContent>
+          <TabsContent value="anthropic-user-profiles" className="mt-4">
+            <AnthropicUserProfilesContent />
+          </TabsContent>
           <TabsContent
             value="api-request-log"
             className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
@@ -177,6 +192,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="provider-metadata" className="mt-4">
             <ProviderMetadataContent />
+          </TabsContent>
+          <TabsContent value="enkrypt-calls" className="mt-4">
+            <EnkryptCallsContent />
           </TabsContent>
         </Tabs>
       </div>

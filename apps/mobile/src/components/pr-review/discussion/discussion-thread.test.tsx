@@ -154,7 +154,7 @@ describe('DiscussionThread collapsed card', () => {
     expect(node.type).toBe('Pressable');
     expect(node.props.accessibilityRole).toBe('button');
     expect(node.props.accessibilityState).toEqual({ expanded: false });
-    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
+    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (Right side)');
     expect(node.props.className).toContain('active:opacity-70');
 
     renderer.unmount();
@@ -213,16 +213,14 @@ describe('DiscussionThread collapsed card', () => {
 });
 
 describe('DiscussionThread expanded card', () => {
-  it('has a plain View root with the thread a11y label', async () => {
+  it('roots the expanded card in the shared surface with the thread a11y label', async () => {
     const thread = makeThread();
     const renderer = await render(
       createElement(DiscussionThread, { ...baseProps, thread, expanded: true })
     );
-    const node = renderer.root.children[0] as TestRenderer.ReactTestInstance;
+    const card = renderer.root.children[0] as TestRenderer.ReactTestInstance;
 
-    expect(typeof node.type).toBe('string');
-    expect(node.type).toBe('View');
-    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
+    expect(card.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (Right side)');
 
     renderer.unmount();
   });
@@ -343,7 +341,7 @@ describe('DiscussionThread anchor label', () => {
     const anchorText = findNode(
       renderer.root,
       'Text',
-      p => p.children === 'src/index.ts L10 (RIGHT)'
+      p => p.children === 'src/index.ts L10 (Right side)'
     );
     expect(anchorText).toBeDefined();
     if (!anchorText) {

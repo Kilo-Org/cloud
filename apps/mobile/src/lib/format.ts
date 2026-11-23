@@ -1,6 +1,7 @@
 import {
   dateTimeFormat,
   deviceDecimalSeparator,
+  deviceUses24hourClock,
   durationFormat,
   listFormat,
   numberFormat,
@@ -36,23 +37,44 @@ export const UNMEASURED_VALUE = '—';
  * symbol (`-$5.00`, or the locale's own minus glyph). `options` pins the
  * fraction digits the surface needs, from none (`$49`) up to four below half a
  * cent.
+ *
+ * The formatter overrides `style` and `signDisplay`. Only amounts that round
+ * to a negative value display a sign.
  */
 export function formatPrefixedUsd(
   amount: number,
   locale: string,
   options: Intl.NumberFormatOptions = {}
 ): string {
-  const parts = numberFormat(locale, { ...options, style: 'decimal' }).formatToParts(amount);
-  const sign = parts
-    .filter(candidate => candidate.type === 'minusSign')
-    .map(candidate => candidate.value)
-    .join('');
-  const digits = parts
-    .filter(candidate => candidate.type !== 'minusSign')
-    .map(candidate => candidate.value)
-    .join('');
+  return prefixMoney(amount, locale, { ...options, style: 'decimal', signDisplay: 'negative' });
+}
+
+/** The prefixed figure one formatter shape writes, its sign composed in front. */
+function prefixMoney(amount: number, locale: string, options: Intl.NumberFormatOptions): string {
+  const parts = numberFormat(locale, options).formatToParts(amount);
+  let sign = '';
+  let digits = '';
+  for (const part of parts) {
+    if (part.type === 'minusSign' || part.type === 'plusSign') {
+      sign += part.value;
+    } else {
+      digits += part.value;
+    }
+  }
   return `${sign}$${digits}`;
 }
+
+/** The two-decimal shape for balances and credit entries. */
+const MONEY_OPTIONS: Intl.NumberFormatOptions = {
+  style: 'decimal',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'negative',
+};
+const LEDGER_MONEY_OPTIONS: Intl.NumberFormatOptions = {
+  ...MONEY_OPTIONS,
+  signDisplay: 'exceptZero',
+};
 
 /**
  * A balance or a spend in the shape a reader compares between screens: two
@@ -67,10 +89,12 @@ export function formatPrefixedUsd(
  * number.
  */
 export function formatPrefixedMoney(amount: number, locale: string): string {
-  return formatPrefixedUsd(amount, locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return prefixMoney(amount, locale, MONEY_OPTIONS);
+}
+
+/** Sign nonzero credit entries. The caller isolates the amount in RTL text. */
+export function formatSignedPrefixedMoney(amount: number, locale: string): string {
+  return prefixMoney(amount, locale, LEDGER_MONEY_OPTIONS).replaceAll(BIDI_MARK, '');
 }
 
 /** Amounts below this render as a zero currency value at four fraction digits (50 µ$). */
@@ -89,15 +113,26 @@ const CLOCK_TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-dig
 /**
  * Time of day in `locale` (`"2:40 AM"`), for a clock beside another.
  *
+ * The device's 12/24-hour setting wins over the language's own clock: an
+ * English phone set to a twenty-four-hour clock reads `13:45` where its
+ * language's pattern is twelve-hour. A device that reports no setting leaves the
+ * language default in place.
+ *
  * Asking for a numeric hour is not enough: a locale whose short time pattern
  * carries a padded hour pads it to two digits even then, so Gujarati reads
- * `02:40 AM` beside the `11:40 AM` that English and Arabic print. On a
- * twelve-hour clock the padded hour loses its leading zero; every other
- * character keeps the locale's own text, order and digits. A twenty-four-hour
- * clock keeps the padded hour, which is its uniform-width convention.
+ * `02:40 AM` beside the `11:40 AM` that English and Arabic print. The padded
+ * hour loses its leading zero on a twelve-hour clock; every other character
+ * keeps the locale's own text, order and digits. A twenty-four-hour clock keeps
+ * the padded hour, which is its uniform-width convention.
  */
 export function formatClockTime(date: Date, locale: string): string {
-  const formatter = dateTimeFormat(locale, CLOCK_TIME);
+  const uses24hourClock = deviceUses24hourClock();
+  const formatter = dateTimeFormat(
+    locale,
+    uses24hourClock === null
+      ? CLOCK_TIME
+      : { ...CLOCK_TIME, hourCycle: uses24hourClock ? 'h23' : 'h12' }
+  );
   const formatted = formatter.format(date);
   const parts = formatter.formatToParts(date);
   if (!parts.some(part => part.type === 'dayPeriod')) {
@@ -162,21 +197,36 @@ function durationFields(seconds: number) {
   };
 }
 
+/** The unit steps. The byte step is whole; every larger step shows two digits. */
+const FILE_SIZE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
+
 export function formatFileSize(bytes: number, locale: string): string {
-  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
   let value = bytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  let fractionDigits = 0;
+  // The step is 1000 because these are the ECMA-402 decimal unit identifiers.
+  // ECMA-402 sanctions no kibibyte, mebibyte or gibibyte identifier, so a 1024
+  // step could not keep the locale's own unit word and placement.
+  //
+  // The step is taken from the value as it will be displayed at that step, so
+  // "999,999" would print "1,000 kB" and instead takes the next unit's name: a
+  // reader never sees a figure the unit cannot hold. The last step is the top
+  // one, so a larger count keeps it.
+  while (unit < FILE_SIZE_UNITS.length - 1) {
+    if (Number(value.toFixed(fractionDigits)) < 1000) {
+      break;
+    }
+    value /= 1000;
     unit += 1;
+    fractionDigits = 2;
   }
   return formatNumber(value, locale, {
     style: 'unit',
-    unit: units[unit],
+    unit: FILE_SIZE_UNITS[unit] ?? 'terabyte',
     // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
     // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
-    unitDisplay: unit === 0 ? 'long' : 'short',
-    maximumFractionDigits: unit === 0 ? 0 : 2,
+    unitDisplay: fractionDigits === 0 ? 'long' : 'short',
+    maximumFractionDigits: fractionDigits,
   });
 }
 
@@ -185,6 +235,42 @@ export function firstGrapheme(value: string, locale: string): string {
     segmenter(locale, { granularity: 'grapheme' }).segment(value)[Symbol.iterator]().next().value
       ?.segment ?? ''
   );
+}
+
+const ELLIPSIS = '…';
+
+/**
+ * `text` as a single line of at most `maxGraphemes` user-perceived characters:
+ * whitespace runs (line breaks included) collapse to single spaces, the ends
+ * are trimmed, and a line longer than the cap is cut short at the cap with a
+ * trailing ellipsis. A line that fits keeps its characters: the ellipsis means
+ * a cut happened, never that the cap was counted in a different unit.
+ *
+ * A string no longer than the cap in code units holds no more characters than
+ * that, so the common short case never reaches the segmenter. A real cut must
+ * not split a character the reader sees as one: counted in code units it could
+ * end on half a surrogate pair, and counted in code points it would still split
+ * a family emoji or a Devanagari syllable with its vowel sign. The segmenter is
+ * iterated only as far as the cap, so a long text costs the cap rather than its
+ * own length.
+ */
+export function boundedOneLineExcerpt(text: string, maxGraphemes: number, locale: string): string {
+  const oneLine = text.replaceAll(/\s+/gu, ' ').trim();
+  if (oneLine.length <= maxGraphemes) {
+    return oneLine;
+  }
+  let cut = '';
+  let seen = 0;
+  for (const { segment } of segmenter(locale, { granularity: 'grapheme' }).segment(oneLine)) {
+    if (seen === maxGraphemes) {
+      return `${cut.trimEnd()}${ELLIPSIS}`;
+    }
+    if (seen < maxGraphemes - 1) {
+      cut += segment;
+    }
+    seen += 1;
+  }
+  return oneLine;
 }
 
 /** Characters with no bearing on a number's value but present in locale output. */

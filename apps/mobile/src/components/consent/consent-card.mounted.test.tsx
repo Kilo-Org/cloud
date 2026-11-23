@@ -1,14 +1,15 @@
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   INLINE_LINK_BOX_CLASS,
   MIN_TAP_TARGET_DP,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
-import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard, optionalIsPending } from './consent-card';
+import { type ConsentLoadStatus } from './consent-load-status';
 import { i18n } from '@/i18n';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
@@ -16,6 +17,7 @@ const mockedReadConsent = vi.hoisted(() => vi.fn());
 const mockedSetOptionalConsent = vi.hoisted(() => vi.fn());
 const mockedRevokeConsent = vi.hoisted(() => vi.fn());
 const mockedSignOut = vi.hoisted(() => vi.fn());
+const mockedConfirmRequest = vi.hoisted(() => vi.fn());
 const currentUserId = vi.hoisted(() => ({ value: 'test-user-1' as string | undefined }));
 
 vi.mock('@/lib/consent', () => ({
@@ -44,7 +46,13 @@ const mockedPush = vi.hoisted(() => vi.fn());
 const mockedBack = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
+  useRouter: () => ({ push: mockedPush, back: mockedBack }),
+}));
+// The accept hand-off goes through the push-then-retire hook that keeps Android
+// Fabric alive; its own mechanics have their own suite, so here it
+// stands in for the navigation call and the assertion stays about the route.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: mockedReplace }),
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
@@ -55,10 +63,34 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
   User: 'User',
 }));
-vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => unknown) => select({ height: 0 }),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/dialog', () => ({
+  // The real confirm presents a native sheet, which the string-typed test
+  // tree cannot host. The mock records the request instead: tests assert the
+  // card asked for the confirm and run `onConfirm` themselves, so the
+  // behaviour after the decision stays covered while the sheet itself is not
+  // (it is a native surface).
+  useConfirmDialog: () => {
+    const request = { current: null as { onConfirm: () => void } | null };
+    return {
+      confirm: (next: { onConfirm: () => void }) => {
+        mockedConfirmRequest(next);
+        request.current = next;
+      },
+      dialog: 'ConfirmDialog',
+    };
+  },
+}));
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
 }));
@@ -116,8 +148,13 @@ function countByType(root: I, type: string): number {
 }
 
 function findButton(root: I, label: string): I {
-  const buttons = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
-  const btn = buttons.find(b => (b.props.accessibilityLabel as string) === label);
+  const nodes = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      ((n.type as string) === 'Button' || (n.type as string) === 'Pressable') &&
+      (n.props.accessibilityLabel as string | undefined) === label
+  );
+  const btn = nodes[0];
   if (!btn) {
     throw new Error(`button "${label}" not found`);
   }
@@ -133,6 +170,21 @@ function texts(root: I): string[] {
         typeof n.props.children === 'string'
     )
     .map(n => n.props.children as string);
+}
+
+/**
+ * The titles the shared row primitives render. Their rows are host elements in
+ * this suite, so a title lives in the row's props rather than in a Text child.
+ */
+function rowTitles(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        typeof n.props.title === 'string'
+    )
+    .map(n => n.props.title as string);
 }
 
 function disclosureTexts(root: I): I[] {
@@ -210,7 +262,7 @@ describe('ConsentCard', () => {
 
   it('renders required rows grouped under "Required to use Kilo"', () => {
     const renderer = mountCard('onboarding');
-    const t = texts(renderer.root);
+    const t = [...texts(renderer.root), ...rowTitles(renderer.root)];
     expect(t).toContain('Required to use Kilo');
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
@@ -223,11 +275,11 @@ describe('ConsentCard', () => {
     // The feature-rollout disclosure belongs to the required group, so it is
     // visible before the user has to open the full details.
     const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ConsentRow'
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
     const featureRow = rows.find(node => (node.props.title as string) === 'Feature rollout');
     expect(featureRow).toBeDefined();
-    expect(featureRow?.props.description as string).toContain('PostHog');
+    expect(featureRow?.props.subtitle as string).toContain('PostHog');
   });
 
   it('names the brand with the header mark instead of repeating it as text', () => {
@@ -241,10 +293,14 @@ describe('ConsentCard', () => {
     expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
-  it('renders review wording in review mode', () => {
+  it('renders review wording in the screen header and revoke alone', () => {
     const renderer = mountCard('review');
+    const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
+    expect(header.props.title).toBe(i18n.t('consent.summaryTitle'));
     const t = texts(renderer.root);
-    expect(t).toContain('Data sharing preferences');
+    // The title lives in the header, so the body does not repeat it as a large
+    // title beside it.
+    expect(t).not.toContain(i18n.t('consent.summaryTitle'));
     // The optional section header is the headword alone: the toggle card's own
     // description already says the choice can be changed in Settings.
     expect(t).toContain('Optional');
@@ -252,11 +308,16 @@ describe('ConsentCard', () => {
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
 
-    // One filled action per footer: the safe way out keeps the fill, and the
-    // destructive one is outlined so it cannot compete with it.
-    const back = findButton(renderer.root, 'Back');
+    // The header carries the way back, so the footer offers the destructive
+    // action alone, outlined.
+    const back = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Button' &&
+        (n.props.accessibilityLabel as string) === 'Back'
+    );
+    expect(back).toHaveLength(0);
     const revoke = findButton(renderer.root, 'Revoke consent');
-    expect(back.props.variant ?? 'default').toBe('default');
     expect(revoke.props.variant).toBe('outline-destructive');
   });
 
@@ -374,6 +435,8 @@ describe('ConsentCard', () => {
       (btn.props.onPress as () => void)();
     });
     expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
+    // The hand-off still lands on the tabs, now through the push-then-retire hook.
+    expect(mockedReplace).toHaveBeenCalledWith('/(app)/(tabs)');
   });
 
   it('calls acceptConsent with optional value on primary action', async () => {
@@ -395,6 +458,7 @@ describe('ConsentCard', () => {
   it('shows error when acceptConsent fails and does not navigate', async () => {
     mockedAcceptConsent.mockRejectedValue(new Error('write failed'));
     const renderer = mountCard('onboarding');
+    await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
@@ -433,14 +497,98 @@ describe('ConsentCard', () => {
     // The pre-load state must not claim "off": an e3 revoke check mistook the
     // pre-load off for a completed revoke (b911 vr5, e3-toggled-off.png).
     expect(countByType(renderer.root, 'Switch')).toBe(0);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+    const placeholderRows = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholderRows).toHaveLength(1);
+    const placeholderRow = placeholderRows[0];
+    if (!placeholderRow) {
+      throw new Error('missing placeholder row');
+    }
+    // The trailing slot holds the loading bar until the consent record lands.
+    const trailing: unknown =
+      'trailing' in placeholderRow.props ? placeholderRow.props.trailing : undefined;
+    expect(
+      typeof trailing === 'object' && trailing !== null && 'type' in trailing
+        ? trailing.type
+        : undefined
+    ).toBe('Skeleton');
 
     await act(() => {
       resolveLoad?.({ mandatory: true, optional: true });
     });
     await act(flush);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    expect(countByType(renderer.root, 'Switch')).toBe(1);
     expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('gives the placeholder and the settled row one uncapped disclosure', async () => {
+    // The two branches paint the same copy, so the row cannot change height
+    // when the stored answer lands. No line count bounds that copy: a count
+    // that fits English clips the longer catalogs mid-sentence.
+    const deferred = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValue(deferred.promise);
+    const renderer = mountCard('review');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const placeholder = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholder).toHaveLength(1);
+    expect(placeholder[0]?.props.subtitleNumberOfLines).toBe('all');
+
+    await act(() => {
+      deferred.resolve({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    // The settled row paints the same copy with no cap, so the two branches
+    // reserve the same height in every language.
+    const settled = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('consent.helpImproveDescription')
+    );
+    expect(settled.length).toBeGreaterThan(0);
+    for (const node of settled) {
+      expect(node.props.numberOfLines).toBeUndefined();
+    }
+  });
+
+  it('derives the pending phase from the account and the load phase together', () => {
+    // `optionalIsPending` gates the switch placeholder: the b911 vr5 pre-load
+    // state read as a completed revoke, so any render that has an account but
+    // no stored answer must hold the placeholder. The cases cover every
+    // (account, phase) pair the card can commit, including the idle render
+    // between the account arriving and the load effect committing `loading`
+    // — a render `mountCard` cannot observe, because it flushes effects
+    // inside `act`.
+    const phases: ConsentLoadStatus[] = [
+      { status: 'idle' },
+      { status: 'loading' },
+      { status: 'ready' },
+      { status: 'failed', message: 'consent.couldNotLoadConsentSettings' },
+    ];
+    for (const hasAccount of [false, true]) {
+      for (const load of phases) {
+        const pending = optionalIsPending(hasAccount, load);
+        if (!hasAccount) {
+          // Nothing to load: the switch renders as before.
+          expect(pending).toBe(false);
+        } else {
+          // An account without a stored answer is un-loaded, whatever the
+          // phase label: only `ready` and `failed` have observed the record.
+          expect(pending).toBe(load.status === 'loading' || load.status === 'idle');
+        }
+      }
+    }
   });
 
   it('shows the switch with an error when the stored value fails to load', async () => {
@@ -453,6 +601,223 @@ describe('ConsentCard', () => {
     // The placeholder is gone: the error names the unreliability, so the
     // control is at least operable (a failed toggle reverts with its error).
     expect(singleSwitch(renderer.root)).toBeTruthy();
+  });
+
+  it('replaces the load error with the latest failure on the failed card', async () => {
+    // On a failed stored read the Retry is not the only line in the slot: a
+    // later action writes its own failure (Decline's failed sign-out here),
+    // and the hardcoded load copy would hide it while the card still claims
+    // the failure it no longer has.
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    mockedSignOut.mockRejectedValue(new Error('sign-out failed'));
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    const decline = findButton(renderer.root, i18n.t('consent.decline'));
+    await act(async () => {
+      await Promise.resolve();
+      (decline.props.onPress as () => void)();
+    });
+    await act(flush);
+    // The card asked for the destructive confirm (a native sheet on device,
+    // recorded by the mock here): the latest request's handler runs.
+    expect(mockedConfirmRequest).toHaveBeenCalledTimes(1);
+    const request = mockedConfirmRequest.mock.calls[0]?.[0] as
+      | { onConfirm: () => void }
+      | undefined;
+    await act(async () => {
+      await Promise.resolve();
+      request?.onConfirm();
+    });
+    await act(flush);
+    // The action failure now owns the copy: the load failure lives in the
+    // load union, and the newest failure wins the visible line.
+    expect(texts(renderer.root)).toContain('Could not sign out. Please try again.');
+    expect(texts(renderer.root)).not.toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    // Retry re-runs the stored read that blocks the primary, so it stays
+    // rendered for the whole failed phase, beside whichever failure the line
+    // shows.
+    const retryAfterLaterFailure = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props.accessibilityLabel as string | undefined) === i18n.t('common.retry')
+    );
+    expect(retryAfterLaterFailure).toHaveLength(1);
+    mockedSignOut.mockResolvedValue(undefined);
+  });
+
+  it('names the wait in the reserved status line while the stored read is in flight', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(texts(renderer.root)).toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    await act(() => {
+      resolveLoad?.({ mandatory: false, optional: false });
+    });
+    await act(flush);
+    expect(texts(renderer.root)).not.toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBeFalsy();
+  });
+
+  it('keeps the no-account primary operable and reports the account error on tap', async () => {
+    currentUserId.value = undefined;
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(mockedReadConsent).not.toHaveBeenCalled();
+    const btn = findButton(renderer.root, 'Accept and continue');
+    expect(btn.props.disabled).toBeFalsy();
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).toContain('Could not load your account. Please try again.');
+    expect(mockedAcceptConsent).not.toHaveBeenCalled();
+  });
+
+  it('offers Retry on the load failure and re-runs the read when pressed', async () => {
+    // The failed card renders the load error beside its Retry affordance.
+    // Pressing Retry re-runs the read for the same account and clears the
+    // failure once it answers.
+    mockedReadConsent.mockRejectedValueOnce(new Error('keychain read failed'));
+    const second = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    mockedReadConsent.mockReturnValueOnce(second.promise);
+    await act(async () => {
+      await Promise.resolve();
+      (findButton(renderer.root, i18n.t('common.retry')).props.onPress as () => void)();
+    });
+    expect(mockedReadConsent).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      second.resolve({ mandatory: false, optional: false });
+      await Promise.resolve();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).not.toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBeFalsy();
+  });
+
+  it('holds the pending status while a stalled read keeps the card waiting', async () => {
+    // The pre-bound state the finding reported: the read has not settled, so
+    // the card names the wait and keeps the primary disabled until the bound
+    // or the read settles it (the bound itself is the timeout test below).
+    const first = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValueOnce(first.promise);
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(texts(renderer.root)).toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+    // The read owns the wait: a Retry affordance is not offered while the
+    // attempt is still in flight.
+    const retryNodes = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props.accessibilityLabel as string | undefined) === i18n.t('common.retry')
+    );
+    expect(retryNodes).toHaveLength(0);
+  });
+
+  it('settles a stalled stored read as the load error at the timeout bound', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const first = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValueOnce(first.promise);
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    // The read stalls past the bound: the card settles as failed, names the
+    // failure and offers Retry instead of holding a silent disabled button.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+    expect(findButton(renderer.root, i18n.t('common.retry'))).toBeTruthy();
+
+    // A late resolve from the abandoned attempt must not publish over the
+    // failed state: the read only answers for the attempt that still owns the
+    // load, so the card keeps its failure and Retry. Real timers come back
+    // first: `flush` uses a setTimeout, which fake timers would never fire.
+    vi.useRealTimers();
+    await act(async () => {
+      first.resolve({ mandatory: true, optional: false });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+  });
+
+  it('does not accept while the stored read is unresolved', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // Defense in depth beside the disabled state: a primary press that slips
+    // past the disabled flag must not write the default over a stored decline
+    // the read has not answered.
+    await act(async () => {
+      await Promise.resolve();
+      (findButton(renderer.root, 'Accept and continue').props.onPress as () => void)();
+    });
+    await act(flush);
+    expect(mockedAcceptConsent).not.toHaveBeenCalled();
+    expect(mockedReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveLoad?.({ mandatory: false, optional: false });
+      await Promise.resolve();
+    });
+    await act(flush);
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
   });
 
   it('writes optional choice immediately without sign-out on toggle', async () => {
@@ -497,7 +862,6 @@ describe('ConsentCard', () => {
   });
 
   it('clears error when optional toggle succeeds after a prior failure', async () => {
-    // First attempt: fail.
     mockedReadConsent.mockResolvedValue({ mandatory: true, optional: false });
     mockedSetOptionalConsent.mockRejectedValueOnce(new Error('write failed'));
     const renderer = mountCard('review');
@@ -510,7 +874,6 @@ describe('ConsentCard', () => {
     await act(flush);
     expect(texts(renderer.root)).toContain('Could not save your choice. Please try again.');
 
-    // Second attempt: succeed.
     mockedSetOptionalConsent.mockResolvedValueOnce(undefined);
     await act(async () => {
       await Promise.resolve();
@@ -553,7 +916,7 @@ describe('ConsentCard', () => {
     const rows = renderer.root.findAll(
       n =>
         typeof n.type === 'string' &&
-        (n.type as string) === 'ConsentRow' &&
+        (n.type as string) === 'ConfigureRow' &&
         (n.props.title as string).includes('usage data')
     );
     expect(rows.length).toBe(1);
@@ -587,7 +950,7 @@ describe('ConsentCard', () => {
       const disclosure = requireDisclosure(root);
       expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
 
-      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Revoke consent';
       const footer = requireParent(findButton(root, primary));
       expect(disclosureTexts(footer).length).toBe(1);
     }
@@ -599,7 +962,7 @@ describe('ConsentCard', () => {
     await act(flush);
     const root = renderer.root;
     expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
-    const footer = requireParent(findButton(root, 'Back'));
+    const footer = requireParent(findButton(root, 'Revoke consent'));
     expect(disclosureTexts(footer).length).toBe(1);
     expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
   });
@@ -648,9 +1011,6 @@ describe('ConsentCard', () => {
       if (!link) {
         throw new Error('privacy link not found');
       }
-      // A real 28dp box plus the vertical slop: the control-size audit reads
-      // the node's own rect, so the 14dp text line alone was reported as too
-      // small to tap, and the slop carries the 44pt region.
       // Test renderer props are untyped; name the two reads once.
       const props = link.props as {
         className?: string;

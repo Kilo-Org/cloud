@@ -27,7 +27,7 @@ const LIGHT: Palette = {
   warn: lightColors.warn,
   good: lightColors.good,
   info: lightColors.info,
-  idle: lightColors.mutedSoft,
+  idle: lightColors.mutedForeground,
   primary: lightColors.primary,
   primaryForeground: lightColors.primaryForeground,
   secondary: lightColors.secondary,
@@ -40,7 +40,7 @@ const DARK: Palette = {
   warn: darkColors.warn,
   good: darkColors.good,
   info: darkColors.info,
-  idle: darkColors.mutedSoft,
+  idle: darkColors.mutedForeground,
   primary: darkColors.primary,
   primaryForeground: darkColors.primaryForeground,
   secondary: '#26262B',
@@ -71,6 +71,9 @@ function copyFor(props: AndroidWidgetProps): Copy {
   if (props.homeCopy !== undefined) {
     return props.homeCopy;
   }
+  // The pre-Home persisted shape only: it was written before the whole count
+  // sentence existed, so this branch has no translator and pastes the stored
+  // numeral onto its stored noun. Every fresh render goes through Home copy.
   const primary = props.countLines.find(line => line.label === props.primaryLabel);
   return {
     statusKind: primary === undefined ? 'signed_out' : 'content',
@@ -81,12 +84,19 @@ function copyFor(props: AndroidWidgetProps): Copy {
     emptyShort: props.statusLine ?? '',
     title: null,
     wake: null,
-    wakeOverdue: false,
+    wakePassed: false,
     footer: null,
     actionLine: null,
     approveFailed: '',
     headings: { recent: '', waitingForYou: '', nextScheduled: '' },
-    secondaryCounts: props.countLines.filter(line => line !== primary && line.count !== '0'),
+    secondaryCounts: props.countLines
+      .filter(line => line !== primary && line.count !== '0')
+      .map(line => ({
+        label: line.label,
+        kind: line.kind,
+        count: line.count,
+        text: `${line.count} ${line.label}`,
+      })),
     waitingAgents: [],
     scheduledAgents: [],
     accessibilityLabel: props.accessibilityLabel,

@@ -7,9 +7,11 @@ import migrations from './drizzle/migrations.js';
 import {
   cloudAgentChildSessions,
   controlPlaneMessages,
+  costBackfillState,
   eventMutationCursor,
   events,
   historyImport,
+  sessionCostTotals,
 } from './sqlite-schema.js';
 
 const tableSchema = z
@@ -24,7 +26,7 @@ const snapshotSchema = z.object({
   prevId: z.string(),
   tables: z.record(z.string(), tableSchema),
 });
-const snapshots = ['0001', '0002', '0003', '0004', '0005', '0006'].map(version =>
+const snapshots = ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008'].map(version =>
   snapshotSchema.parse(
     JSON.parse(
       readFileSync(new URL(`./drizzle/meta/${version}_snapshot.json`, import.meta.url), 'utf8')
@@ -37,12 +39,12 @@ describe('restored history migration bundle', () => {
     const baseline = snapshots[0];
     for (let index = 1; index < snapshots.length; index += 1)
       expect(snapshots[index].prevId).toBe(snapshots[index - 1].id);
-    // History migrations preserve coordinator messages; 0006 adds billing failures.
-    for (let index = 2; index < snapshots.length - 1; index += 1) {
-      expect(snapshots[index].tables.control_plane_messages).toEqual(
+    // Only the history migrations (0003–0005) must preserve the original message schema.
+    for (const snapshot of snapshots.slice(2, 5)) {
+      expect(snapshot.tables.control_plane_messages).toEqual(
         baseline.tables.control_plane_messages
       );
-      expect(snapshots[index].tables.events.columns).toEqual({
+      expect(snapshot.tables.events.columns).toEqual({
         ...baseline.tables.events.columns,
         mutation_cursor: {
           name: 'mutation_cursor',
@@ -53,7 +55,7 @@ describe('restored history migration bundle', () => {
           default: 0,
         },
       });
-      expect(snapshots[index].tables.events.indexes).toEqual({
+      expect(snapshot.tables.events.indexes).toEqual({
         ...baseline.tables.events.indexes,
         idx_events_mutation_cursor: {
           name: 'idx_events_mutation_cursor',
@@ -73,6 +75,8 @@ describe('restored history migration bundle', () => {
       eventMutationCursor,
       historyImport,
       controlPlaneMessages,
+      sessionCostTotals,
+      costBackfillState,
     ].map(getTableConfig);
     expect(Object.keys(final.tables).sort()).toEqual(tables.map(table => table.name).sort());
     for (const table of tables)
@@ -90,6 +94,8 @@ describe('restored history migration bundle', () => {
       '0004_history_hydration_stage',
       '0005_native_history_scope',
       '0006_confused_shiva',
+      '0007_session_cost_totals',
+      '0008_message_settlement',
     ]);
     expect(Object.keys(migrations.migrations)).toEqual([
       'm0000',
@@ -99,6 +105,8 @@ describe('restored history migration bundle', () => {
       'm0004',
       'm0005',
       'm0006',
+      'm0007',
+      'm0008',
     ]);
     expect(migrations.migrations.m0003).toContain('UPDATE `events` SET `mutation_cursor` = `id`');
     expect(migrations.migrations.m0003).toContain('coalesce(max(`mutation_cursor`), 0)');
@@ -128,5 +136,22 @@ describe('restored history migration bundle', () => {
     expect(migrations.migrations.m0005).toContain(
       `CREATE INDEX \`${name}\` ON \`history_import\` (\`kilo_session_id\`,\`timestamp\`,\`entity_id\`)`
     );
+  });
+
+  it('keys the durable cost total by session scope and tracks the backfill watermark', () => {
+    expect(migrations.migrations.m0007).toContain('CREATE TABLE `session_cost_totals`');
+    expect(migrations.migrations.m0007).toContain('PRIMARY KEY(`session_id`, `kilo_session_id`)');
+    expect(migrations.migrations.m0007).toContain('`total_dollars` real NOT NULL');
+    expect(migrations.migrations.m0007).toContain('CREATE TABLE `cost_backfill_state`');
+    const final = snapshots.at(-1);
+    expect(final?.tables.session_cost_totals.columns.total_dollars).toMatchObject({
+      type: 'real',
+      notNull: true,
+    });
+    expect(final?.tables.cost_backfill_state.columns.cursor).toMatchObject({
+      type: 'integer',
+      notNull: true,
+      default: 0,
+    });
   });
 });

@@ -1,5 +1,4 @@
 import type {
-  AutoRouter,
   BenchmarkPair,
   CustomRoutingTable,
   CustomRoutingTableResponse,
@@ -45,7 +44,7 @@ function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
  */
 export async function assembleCustomRoutingTable(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   entries: readonly BenchmarkPair[],
   options: {
     now?: Date;
@@ -99,6 +98,9 @@ export async function assembleCustomRoutingTable(
     readyEntries,
     summaries,
     perCaseResults,
+    // This path reads case rows for exactly these ready entries, so the deployed build saw them
+    // in this sequence; keep it as the tie order instead of sorting variant names.
+    casePairOrder: readyEntries.map(ready => ready.entry),
     complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
 

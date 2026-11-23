@@ -61,6 +61,17 @@ export const GLANCEABLE_SNAPSHOT_STATUSES = [
 
 export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
 
+/**
+ * The statuses a caller may force on a built snapshot. `happy` and `empty` are
+ * not among them: those two come from the counts alone, so a forced value
+ * could only contradict the counts and details built beside it. A caller that
+ * wants one of them omits the override.
+ */
+export type GlanceableSnapshotStatusOverride = Exclude<
+  GlanceableAgentsSnapshotStatus,
+  'happy' | 'empty'
+>;
+
 /** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
 export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
 
@@ -219,13 +230,23 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
     : null;
 }
 
+export const GLANCEABLE_TERMINAL_STATUSES = [
+  'signed_out',
+  'privacy',
+] as const satisfies readonly GlanceableAgentsSnapshotStatus[];
+
+export type GlanceableTerminalStatus = (typeof GLANCEABLE_TERMINAL_STATUSES)[number];
+
 /**
- * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. Every terminal-status decision reads this one predicate, so the data
- * payload, presentation, refresh cadence and timeline cannot disagree.
+ * The snapshot statuses that end the surface. Every terminal-status decision
+ * reads this one predicate, so the data payload, presentation, refresh cadence
+ * and timeline cannot disagree, and it narrows its caller to the terminal
+ * vocabulary so a presentation cannot label one terminal member as another.
  */
-export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
-  return status === 'signed_out' || status === 'privacy';
+export function isTerminalGlanceableStatus(
+  status: GlanceableAgentsSnapshotStatus
+): status is GlanceableTerminalStatus {
+  return (GLANCEABLE_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 /**
@@ -250,11 +271,17 @@ export function glanceableStatusKind(status: string): GlanceableStatusKind {
 }
 
 /**
- * Map session rows to the glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
- * `scheduled` → scheduled, and any other status (starting, empty, unknown,
- * completed) counts as running: a session is idle only when the agent says
- * so, and no row is dropped from the count its list row shows.
+ * The one scheduled-membership rule: the scheduled count, the soonest-wake
+ * selector, and the widget's scheduled list all read it, so no surface can
+ * disagree about which rows are scheduled. It reads `glanceableStatusKind`, so
+ * a status folded into the scheduled kind is picked up everywhere at once.
+ */
+export function isScheduledSessionRow(session: GlanceableSessionRow): boolean {
+  return glanceableStatusKind(session.status) === 'scheduled';
+}
+
+/**
+ * Map session rows to the glanceable counts.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
@@ -272,10 +299,19 @@ export function countGlanceableSessions(
 }
 
 /**
- * The number of session rows whose status is exactly `permission`. A
- * permission wait is the one needs-input kind the user can clear without
- * choosing an option, so the wrist control offers Approve only against this
- * count.
+ * The one approvable-status rule: a `permission` wait is the only needs-input
+ * kind the user can clear without choosing an option, so a `question` or
+ * `retry` row is never approvable, whatever else it carries. The `needsApproval`
+ * count, the Home widget's approving row and the server's front-permission row
+ * all read this one rule, so they cannot drift.
+ */
+export function isApprovableGlanceableStatus(status: string): boolean {
+  return status === 'permission';
+}
+
+/**
+ * The number of session rows whose status is exactly `permission`, so the
+ * wrist control offers Approve only against this count.
  *
  * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
  * `retry` needs the provider to come back, so neither is approvable.
@@ -283,7 +319,7 @@ export function countGlanceableSessions(
 export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
   let approvals = 0;
   for (const session of sessions) {
-    if (session.status === 'permission') {
+    if (isApprovableGlanceableStatus(session.status)) {
       approvals += 1;
     }
   }
@@ -331,7 +367,6 @@ function extremeTimestampRow(
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;
-  const compare = compareSessionInstant(readTimestamp, extreme);
   for (const session of sessions) {
     if (!qualifies(session)) {
       continue;
@@ -340,7 +375,7 @@ function extremeTimestampRow(
     if (at === null) {
       continue;
     }
-    if (winner !== null && compare(session, winner.session) >= 0) {
+    if (winner !== null && (extreme === 'earliest' ? at >= winner.at : at <= winner.at)) {
       continue;
     }
     winner = { at, session };
@@ -375,7 +410,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
 export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
   const soonest = extremeTimestampRow(
     sessions,
-    session => session.status === 'scheduled',
+    isScheduledSessionRow,
     session => session.scheduledAt,
     'earliest'
   );
@@ -427,7 +462,10 @@ export function buildOpaqueScopeKey(input: {
   organizationId: string | null;
 }): string {
   // Length-delimited by a NUL separator so `user=ab,org=c` and `user=a,org=bc`
-  // cannot hash to the same key.
+  // cannot hash to the same key. A missing or empty organization id is the
+  // personal scope, and `buildGlanceableSnapshot` normalizes both to null
+  // before it derives `organizationBound`, so the key and the flag cannot
+  // disagree.
   const joined = `${input.userId}\u0000${input.organizationId ?? ''}`;
   const hash = fnv1a32(joined);
   return hash.toString(16).padStart(8, '0');
@@ -442,7 +480,7 @@ export type BuildGlanceableSnapshotInput = {
   previousRevision?: number;
   accountEpoch?: number;
   /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
-  status?: GlanceableAgentsSnapshotStatus;
+  status?: GlanceableSnapshotStatusOverride;
 };
 
 /**
@@ -455,6 +493,7 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
+  const organizationId = input.organizationId || null;
   // Idle and scheduled counts: a connected agent doing nothing, or one that
   // will wake later, is still something the user wants on the Lock Screen.
   const eligible = isEligibleGlanceableWork(counts);
@@ -467,9 +506,9 @@ export function buildGlanceableSnapshot(
     revision: (input.previousRevision ?? 0) + 1,
     updatedAt,
     expiresAt: epochMsToIso(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS),
-    scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId: input.organizationId }),
+    scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId }),
     ...(input.accountEpoch === undefined ? {} : { accountEpoch: input.accountEpoch }),
-    organizationBound: typeof input.organizationId === 'string',
+    organizationBound: organizationId !== null,
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,
@@ -509,8 +548,8 @@ export function isStartableGlanceableWork(counts: GlanceableCounts): boolean {
 }
 
 /** True when every connected agent is idle: eligible work, but nothing happening. */
-export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return isEligibleGlanceableWork(snapshot) && !isStartableGlanceableWork(snapshot);
+export function isIdleOnlyGlanceableWork(counts: GlanceableCounts): boolean {
+  return isEligibleGlanceableWork(counts) && !isStartableGlanceableWork(counts);
 }
 
 /**

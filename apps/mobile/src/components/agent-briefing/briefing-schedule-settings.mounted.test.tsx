@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { formatClockTime } from '@/lib/format';
 import { act, TestRenderer } from '@/test/renderer';
 import { ScheduleSettings } from './briefing-schedule-settings';
 
@@ -10,7 +11,8 @@ vi.mock('react-native', () => ({ View: 'View', Platform: { OS: 'android' } }));
 vi.mock('@expo/ui/community/datetime-picker', () => ({ DateTimePicker: 'NativeDateTimePicker' }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, values?: Record<string, unknown>) =>
+      values === undefined ? key : `${key}:${JSON.stringify(values)}`,
     i18n: { language: 'de', resolvedLanguage: 'de' },
   }),
 }));
@@ -141,6 +143,27 @@ describe('briefing schedule time rows', () => {
 });
 
 describe('briefing schedule validation', () => {
+  it('builds the time button name from one formatted value in the active language', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    const renderer = mount();
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 22, 0));
+    const label = row(renderer, 1).props.accessibilityLabel as string;
+    // The name interpolates the same formatted clock the row shows, in the
+    // picker's own locale convention.
+    const clock = formatClockTime(new Date(2000, 0, 1, 22, 0), 'de');
+    expect(label).toBe(
+      `agentBriefing.scheduleTimeLabel:${JSON.stringify({
+        label: 'agentBriefing.nightStart',
+        time: clock,
+      })}`
+    );
+    expect(renderedTexts(renderer)).toContain(clock);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('shows the time zone error inline and sends no mutation', () => {
     const renderer = mount();
     edit(first(renderer, 'FormField'), 'Mitteleuropa/Berlin');
@@ -156,7 +179,31 @@ describe('briefing schedule validation', () => {
     });
   });
 
-  it('shows overlapping periods inline and sends no mutation', () => {
+  it('names the empty night window inline and sends no mutation', () => {
+    const renderer = mount();
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+    expect(mutate).not.toHaveBeenCalled();
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleEmptyNight');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('names the empty morning window inline and sends no mutation', () => {
+    const renderer = mount();
+    press(row(renderer, 3));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+    expect(mutate).not.toHaveBeenCalled();
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleEmptyMorning');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('names the full-day periods inline, clears the message on the next pick, and sends no mutation', () => {
     const renderer = mount();
     press(row(renderer, 1));
     choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 8, 0));
@@ -164,7 +211,11 @@ describe('briefing schedule validation', () => {
     choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 6, 0));
     press(all(renderer, 'Button').at(-1) as Node);
     expect(mutate).not.toHaveBeenCalled();
-    expect(renderedTexts(renderer)).toContain('agentBriefing.invalidSchedule');
+    expect(renderedTexts(renderer)).toContain('agentBriefing.scheduleFullDay');
+    // Its own refusal leaves the surface as soon as a picker changes a time.
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 23, 0));
+    expect(renderedTexts(renderer)).not.toContain('agentBriefing.scheduleFullDay');
     act(() => {
       renderer.unmount();
     });
@@ -173,13 +224,62 @@ describe('briefing schedule validation', () => {
   it('saves a valid schedule in the active language', () => {
     const renderer = mount();
     press(all(renderer, 'Button').at(-1) as Node);
-    expect(mutate).toHaveBeenCalledWith({
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
       timezone: 'America/Los_Angeles',
       nightStart: '23:00',
       morningStart: '08:00',
       morningEnd: '12:00',
       language: 'de',
     });
+    // The attempt settles on this call's own outcome, so the card learns the
+    // save's result from the per-call callbacks rather than a toast.
+    expect(mutate.mock.calls[0]?.[1]).toMatchObject({
+      onSuccess: expect.any(Function),
+      onError: expect.any(Function),
+    });
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reports a refused save inline and restores the stored plan on Discard', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    const renderer = mount();
+    edit(first(renderer, 'FormField'), 'Europe/Berlin');
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 22, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+
+    const callbacks = mutate.mock.calls[0]?.[1] as { onError?: () => void } | undefined;
+    const refuse = callbacks?.onError;
+    if (!refuse) {
+      throw new Error('the save did not pass its outcome callbacks');
+    }
+    act(() => {
+      refuse();
+    });
+
+    // The card says the save was refused, and keeps what the person typed:
+    // only Discard may throw that away.
+    expect(renderedTexts(renderer)).toContain('common.couldNotSaveSetting');
+    const edited = first(renderer, 'FormField').props as { defaultValue?: string };
+    expect(edited.defaultValue).toBe('Europe/Berlin');
+    expect(renderedTexts(renderer)).toContain('22:00');
+
+    const discard = all(renderer, 'Button').find(
+      node =>
+        node.findAll(child => (child.type as string) === 'Text')[0]?.props.children ===
+        'common.discard'
+    );
+    if (!discard) {
+      throw new Error('Discard is missing');
+    }
+    press(discard);
+
+    expect(renderedTexts(renderer)).not.toContain('common.couldNotSaveSetting');
+    const restored = first(renderer, 'FormField').props as { defaultValue?: string };
+    expect(restored.defaultValue).toBe('America/Los_Angeles');
+    expect(renderedTexts(renderer)).toContain('23:00');
     act(() => {
       renderer.unmount();
     });

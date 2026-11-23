@@ -16,7 +16,11 @@ import {
   type DrizzleConnection,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
-import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
+import {
+  claudeBillingOwnerMatches,
+  type ClaudeBillingOwner,
+  type ClaudeBillingOwnerColumns,
+} from './owner';
 import { specificRefusalCodesFor } from './refusal';
 
 export type { ClaudeBillingOwner } from './owner';
@@ -42,19 +46,29 @@ export type UnreferencedClaudeBillingPayer = {
   userProfileId: string;
 };
 
-export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+/**
+ * The columns of a row that belongs to an owner: a personal owner names only the
+ * person column, an organization owner only the organization column.
+ */
+function claudeBillingOwnerColumnsWhere(
+  kiloUserId: AnyPgColumn,
+  organizationId: AnyPgColumn,
+  owner: ClaudeBillingOwner
+) {
   switch (owner.kind) {
     case 'personal':
-      return and(
-        eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connections.organization_id)
-      );
+      return and(eq(kiloUserId, owner.kiloUserId), isNull(organizationId));
     case 'organization':
-      return and(
-        eq(claude_billing_connections.organization_id, owner.organizationId),
-        isNull(claude_billing_connections.kilo_user_id)
-      );
+      return and(eq(organizationId, owner.organizationId), isNull(kiloUserId));
   }
+}
+
+export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connections.kilo_user_id,
+    claude_billing_connections.organization_id,
+    owner
+  );
 }
 
 /** Rows the caller may see: their own rows, plus the organization rows of the allowed organizations. */
@@ -88,7 +102,7 @@ export async function getClaudeBillingConnection(
     .from(claude_billing_connections)
     .where(claudeBillingOwnerWhere(owner))
     .orderBy(
-      sql`${claude_billing_connections.status} = 'removed'`,
+      sql`${claude_billing_connections.status} = ${ClaudeBillingConnectionStatus.Removed}`,
       asc(claude_billing_connections.created_at)
     )
     .limit(1);
@@ -96,18 +110,11 @@ export async function getClaudeBillingConnection(
 }
 
 export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
-  switch (owner.kind) {
-    case 'personal':
-      return and(
-        eq(claude_billing_connection_grants.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connection_grants.organization_id)
-      );
-    case 'organization':
-      return and(
-        eq(claude_billing_connection_grants.organization_id, owner.organizationId),
-        isNull(claude_billing_connection_grants.kilo_user_id)
-      );
-  }
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connection_grants.kilo_user_id,
+    claude_billing_connection_grants.organization_id,
+    owner
+  );
 }
 
 /**
@@ -133,7 +140,7 @@ async function selectNextActiveGrant(
   onDb: DrizzleConnection,
   payerConnectionId: string,
   excludeOwner: ClaudeBillingOwner | null = null
-): Promise<{ kilo_user_id: string | null; organization_id: string | null } | null> {
+): Promise<ClaudeBillingOwnerColumns | null> {
   const excludeWhere = excludeOwner ? claudeBillingGrantOwnerWhere(excludeOwner) : undefined;
   const [grant] = await onDb
     .select({
@@ -156,25 +163,18 @@ async function selectNextActiveGrant(
   return grant ?? null;
 }
 
-/**
- * The owner-to-columns projection for inserts: a personal row stores the user
- * id, an organization row the organization id; neither stores both.
- */
-function ownerColumns(owner: ClaudeBillingOwner): {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-} {
+function ownerColumns(owner: ClaudeBillingOwner): ClaudeBillingOwnerColumns {
   return {
     kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
     organization_id: owner.kind === 'personal' ? null : owner.organizationId,
   };
 }
 
-async function upsertClaudeBillingGrant(
+export async function activateClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   payerConnectionId: string,
   createdBy: string,
-  onDb: DrizzleConnection
+  onDb: DrizzleConnection = db
 ): Promise<void> {
   await onDb
     .insert(claude_billing_connection_grants)
@@ -190,18 +190,14 @@ async function upsertClaudeBillingGrant(
     .where(claudeBillingGrantOwnerWhere(owner));
 }
 
-export async function activateClaudeBillingGrant(
+/**
+ * Resolves an active payer grant. A payer without any grants belongs to a
+ * release that predates grant persistence and remains available to its initial
+ * owner until a sharing or removal operation persists the initial grant.
+ */
+export async function getGrantedClaudeBillingConnection(
   owner: ClaudeBillingOwner,
-  payerConnectionId: string,
-  createdBy: string,
-  onDb: DrizzleConnection = db
-): Promise<void> {
-  await upsertClaudeBillingGrant(owner, payerConnectionId, createdBy, onDb);
-}
-
-async function findGrantedClaudeBillingConnection(
-  owner: ClaudeBillingOwner,
-  fromDb: DrizzleConnection
+  fromDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow | null> {
   const [granted] = await fromDb
     .select({
@@ -239,26 +235,11 @@ async function findGrantedClaudeBillingConnection(
 }
 
 /**
- * Resolves an active payer grant. A payer without any grants belongs to a
- * release that predates grant persistence and remains available to its initial
- * owner until a sharing or removal operation persists the initial grant.
- */
-export async function getGrantedClaudeBillingConnection(
-  owner: ClaudeBillingOwner,
-  fromDb: DrizzleConnection = db
-): Promise<ClaudeBillingConnectionRow | null> {
-  return await findGrantedClaudeBillingConnection(owner, fromDb);
-}
-
-/**
  * The owner a row or grant describes, or null for a row a retired scope wrote:
  * `member` rows name a person and an organization together, and no current
  * owner names both.
  */
-function ownerFromColumns(columns: {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-}): ClaudeBillingOwner | null {
+function ownerFromColumns(columns: ClaudeBillingOwnerColumns): ClaudeBillingOwner | null {
   if (columns.kilo_user_id && columns.organization_id) return null;
   if (columns.kilo_user_id) return { kind: 'personal', kiloUserId: columns.kilo_user_id };
   if (columns.organization_id) {
@@ -287,6 +268,25 @@ async function retireClaudeBillingConnection(
     .where(eq(claude_billing_connections.id, connectionId));
 }
 
+/**
+ * Writes the owner columns of a payer row and stamps it as changed. Both columns
+ * are always written together, so a row never keeps the scope it had.
+ */
+async function writePayerOwnerColumns(
+  onDb: DrizzleConnection,
+  connectionId: string,
+  columns: ClaudeBillingOwnerColumns
+): Promise<void> {
+  await onDb
+    .update(claude_billing_connections)
+    .set({
+      kilo_user_id: columns.kilo_user_id,
+      organization_id: columns.organization_id,
+      updated_at: sql`clock_timestamp()`,
+    })
+    .where(eq(claude_billing_connections.id, connectionId));
+}
+
 async function freeClaudeBillingOwnerColumns(
   owner: ClaudeBillingOwner,
   exceptPayerId: string | null,
@@ -308,14 +308,7 @@ async function freeClaudeBillingOwnerColumns(
   const otherGrant = await selectNextActiveGrant(onDb, occupant.id, owner);
 
   if (otherGrant) {
-    await onDb
-      .update(claude_billing_connections)
-      .set({
-        kilo_user_id: otherGrant.kilo_user_id,
-        organization_id: otherGrant.organization_id,
-        updated_at: sql`clock_timestamp()`,
-      })
-      .where(eq(claude_billing_connections.id, occupant.id));
+    await writePayerOwnerColumns(onDb, occupant.id, otherGrant);
     return;
   }
 
@@ -358,7 +351,7 @@ export async function insertClaudeBillingProfile(
       throw new Error('Claude user profile belongs to another scope');
     }
   }
-  await upsertClaudeBillingGrant(owner, row.id, createdBy, onDb);
+  await activateClaudeBillingGrant(owner, row.id, createdBy, onDb);
   return row;
 }
 
@@ -380,88 +373,90 @@ export async function shareClaudeBillingConnection(
   createdBy: string,
   onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
-  return await onDb.transaction(async tx => {
-    let source = await getGrantedClaudeBillingConnection(sourceOwner, tx);
-    if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    await lockClaudeBillingPayer(tx, source.id);
-    source = await getGrantedClaudeBillingConnection(sourceOwner, tx);
-    if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    const [payerRow] = await tx
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.id, source.id))
-      .limit(1);
-    if (!payerRow) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    if (sourceOwner.kind === 'organization' && payerRow.created_by !== createdBy) {
-      const [callerGrant] = await tx
-        .select({ id: claude_billing_connection_grants.id })
-        .from(claude_billing_connection_grants)
-        .where(
-          and(
-            eq(claude_billing_connection_grants.payer_connection_id, source.id),
-            eq(claude_billing_connection_grants.kilo_user_id, createdBy),
-            isNull(claude_billing_connection_grants.removed_at)
-          )
-        )
-        .limit(1);
-      if (!callerGrant) {
-        throw new ClaudeBillingShareError('source_forbidden');
+  return await withClaudeBillingPayerLock(
+    sourceOwner,
+    async (tx, source) => {
+      if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
+        throw new ClaudeBillingShareError('source_unavailable');
       }
-    }
-    await upsertClaudeBillingGrant(sourceOwner, source.id, source.created_by, tx);
-
-    const target = await getGrantedClaudeBillingConnection(targetOwner, tx);
-    if (
-      target &&
-      target.status !== ClaudeBillingConnectionStatus.Removed &&
-      target.status !== ClaudeBillingConnectionStatus.Pending
-    ) {
-      if (target.id === source.id && target.status === ClaudeBillingConnectionStatus.Connected) {
-        if (targetOwner.kind === 'personal') {
-          await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+      const [payerRow] = await tx
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, source.id))
+        .limit(1);
+      if (!payerRow) {
+        throw new ClaudeBillingShareError('source_unavailable');
+      }
+      if (sourceOwner.kind === 'organization' && payerRow.created_by !== createdBy) {
+        // A grant that names both a person and an organization was written by the
+        // retired member scope and is not live, so it cannot authorize a share.
+        const [callerGrant] = await tx
+          .select({ id: claude_billing_connection_grants.id })
+          .from(claude_billing_connection_grants)
+          .where(
+            and(
+              eq(claude_billing_connection_grants.payer_connection_id, source.id),
+              eq(claude_billing_connection_grants.kilo_user_id, createdBy),
+              liveClaudeBillingGrantWhere()
+            )
+          )
+          .limit(1);
+        if (!callerGrant) {
+          throw new ClaudeBillingShareError('source_forbidden');
         }
-        return target;
       }
-      throw new ClaudeBillingShareError('target_connected');
-    }
+      await activateClaudeBillingGrant(sourceOwner, source.id, source.created_by, tx);
 
-    await upsertClaudeBillingGrant(targetOwner, source.id, createdBy, tx);
-    if (
-      target &&
-      target.id !== source.id &&
-      target.status === ClaudeBillingConnectionStatus.Pending
-    ) {
-      const [otherActiveGrant] = await tx
-        .select({ id: claude_billing_connection_grants.id })
-        .from(claude_billing_connection_grants)
-        .where(
-          and(
-            eq(claude_billing_connection_grants.payer_connection_id, target.id),
-            isNull(claude_billing_connection_grants.removed_at)
-          )
-        )
-        .limit(1);
-      if (!otherActiveGrant) {
-        // A Pending row never carries the retirement columns: only the insert
-        // default writes Pending, and the approval callback sets the columns.
-        await retireClaudeBillingConnection(tx, target.id);
+      const target = await getGrantedClaudeBillingConnection(targetOwner, tx);
+      if (
+        target &&
+        target.status !== ClaudeBillingConnectionStatus.Removed &&
+        target.status !== ClaudeBillingConnectionStatus.Pending
+      ) {
+        if (target.id === source.id && target.status === ClaudeBillingConnectionStatus.Connected) {
+          if (targetOwner.kind === 'personal') {
+            await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+          }
+          return target;
+        }
+        throw new ClaudeBillingShareError('target_connected');
       }
-    }
-    if (targetOwner.kind === 'personal') {
-      await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
-    }
-    const shared = await getGrantedClaudeBillingConnection(targetOwner, tx);
-    if (!shared || shared.id !== source.id) {
-      throw new ClaudeBillingShareError('target_connected');
-    }
-    return shared;
-  });
+
+      await activateClaudeBillingGrant(targetOwner, source.id, createdBy, tx);
+      if (
+        target &&
+        target.id !== source.id &&
+        target.status === ClaudeBillingConnectionStatus.Pending
+      ) {
+        const [otherActiveGrant] = await tx
+          .select({ id: claude_billing_connection_grants.id })
+          .from(claude_billing_connection_grants)
+          .where(
+            and(
+              eq(claude_billing_connection_grants.payer_connection_id, target.id),
+              liveClaudeBillingGrantWhere()
+            )
+          )
+          .limit(1);
+        // Only a live grant keeps the pending row, the same rule
+        // `selectNextActiveGrant` applies when it picks the next owner.
+        if (!otherActiveGrant) {
+          // A Pending row never carries the retirement columns: only the insert
+          // default writes Pending, and the approval callback sets the columns.
+          await retireClaudeBillingConnection(tx, target.id);
+        }
+      }
+      if (targetOwner.kind === 'personal') {
+        await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+      }
+      const shared = await getGrantedClaudeBillingConnection(targetOwner, tx);
+      if (!shared || shared.id !== source.id) {
+        throw new ClaudeBillingShareError('target_connected');
+      }
+      return shared;
+    },
+    onDb
+  );
 }
 
 async function deletePersonalAnthropicByokKey(
@@ -482,36 +477,33 @@ async function deletePersonalAnthropicByokKey(
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
-  remaining: { kilo_user_id: string | null; organization_id: string | null }
+  remaining: ClaudeBillingOwnerColumns
 ): Promise<void> {
   const nextOwner = ownerFromColumns(remaining);
   if (nextOwner) {
     await freeClaudeBillingOwnerColumns(nextOwner, payerConnectionId, tx);
   }
-  await tx
-    .update(claude_billing_connections)
-    .set({
-      kilo_user_id: remaining.kilo_user_id,
-      organization_id: remaining.organization_id,
-      updated_at: sql`clock_timestamp()`,
-    })
-    .where(eq(claude_billing_connections.id, payerConnectionId));
+  await writePayerOwnerColumns(tx, payerConnectionId, remaining);
 }
 
 /**
  * Runs `work` while holding the payer lock that sharing and removal take, so no
- * grant on the payer changes between a read and the write that follows it. A
- * scope without a row has nothing to serialize.
+ * grant on the payer changes between a read and the write that follows it. The
+ * helper reads the scope's granted connection, locks the payer, re-reads the
+ * grant under that lock, and passes the re-read connection, or null when the
+ * scope has no row, to `work`.
  */
 export async function withClaudeBillingPayerLock<T>(
   owner: ClaudeBillingOwner,
-  work: (tx: DrizzleTransaction) => Promise<T>,
+  work: (tx: DrizzleTransaction, connection: ClaudeBillingConnectionRow | null) => Promise<T>,
   onDb: DrizzleConnection = db
 ): Promise<T> {
   return await onDb.transaction(async tx => {
-    const connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (connection) await lockClaudeBillingPayer(tx, connection.id);
-    return await work(tx);
+    let connection = await getGrantedClaudeBillingConnection(owner, tx);
+    if (!connection) return await work(tx, null);
+    await lockClaudeBillingPayer(tx, connection.id);
+    connection = await getGrantedClaudeBillingConnection(owner, tx);
+    return await work(tx, connection);
   });
 }
 
@@ -535,41 +527,41 @@ export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   onDb: DrizzleConnection = db
 ): Promise<UnreferencedClaudeBillingPayer | null> {
-  return await onDb.transaction(async tx => {
-    let connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (!connection) return null;
-    await lockClaudeBillingPayer(tx, connection.id);
-    connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (!connection) return null;
+  return await withClaudeBillingPayerLock(
+    owner,
+    async (tx, connection) => {
+      if (!connection) return null;
 
-    await upsertClaudeBillingGrant(owner, connection.id, connection.created_by, tx);
-    await tx
-      .update(claude_billing_connection_grants)
-      .set({ removed_at: new Date().toISOString() })
-      .where(claudeBillingGrantOwnerWhere(owner));
-    const remaining = await selectNextActiveGrant(tx, connection.id);
+      await activateClaudeBillingGrant(owner, connection.id, connection.created_by, tx);
+      await tx
+        .update(claude_billing_connection_grants)
+        .set({ removed_at: new Date().toISOString() })
+        .where(claudeBillingGrantOwnerWhere(owner));
+      const remaining = await selectNextActiveGrant(tx, connection.id);
 
-    if (!remaining) {
-      await retireClaudeBillingConnection(tx, connection.id);
-      return { id: connection.id, userProfileId: connection.user_profile_id };
-    }
+      if (!remaining) {
+        await retireClaudeBillingConnection(tx, connection.id);
+        return { id: connection.id, userProfileId: connection.user_profile_id };
+      }
 
-    const [payerRow] = await tx
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.id, connection.id))
-      .limit(1);
-    if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
-      await reassignPayerOwnerColumns(tx, connection.id, remaining);
+      const [payerRow] = await tx
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, connection.id))
+        .limit(1);
+      if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
+        await reassignPayerOwnerColumns(tx, connection.id, remaining);
+        return null;
+      }
+
+      await tx
+        .update(claude_billing_connections)
+        .set({ updated_at: sql`clock_timestamp()` })
+        .where(eq(claude_billing_connections.id, connection.id));
       return null;
-    }
-
-    await tx
-      .update(claude_billing_connections)
-      .set({ updated_at: sql`clock_timestamp()` })
-      .where(eq(claude_billing_connections.id, connection.id));
-    return null;
-  });
+    },
+    onDb
+  );
 }
 
 function ownerToInput(owner: ClaudeBillingOwner): ClaudeBillingOwnerInput {
@@ -789,7 +781,10 @@ export async function describeClaudeBillingSharing(
     );
   }
 
-  const shareableLinks: ClaudeBillingShareableLink[] = [];
+  const collected: Array<{
+    primary: ClaudeBillingOwner;
+    link: ClaudeBillingShareableLink;
+  }> = [];
   for (const { payer, scopes } of byPayer.values()) {
     if (payer.created_by !== userId && !scopes.some(scope => scope.kind === 'personal')) {
       continue;
@@ -797,27 +792,27 @@ export async function describeClaudeBillingSharing(
     scopes.sort((a, b) => compareScopes(a, b, targetOrganizationId, orgNames));
     const primary = scopes[0];
     if (!primary) continue;
-    shareableLinks.push({
-      payerId: payer.id,
-      source: ownerToInput(primary),
-      label: scopes.map(scope => formatScopeLabel(scope, orgNames)).join(', '),
-      connectedAt: payer.connected_at ? new Date(payer.connected_at).toISOString() : null,
+    collected.push({
+      primary,
+      link: {
+        payerId: payer.id,
+        source: ownerToInput(primary),
+        label: scopes.map(scope => formatScopeLabel(scope, orgNames)).join(', '),
+        connectedAt: payer.connected_at ? new Date(payer.connected_at).toISOString() : null,
+      },
     });
   }
 
-  shareableLinks.sort((a, b) => {
-    const aSameOrg =
-      targetOrganizationId !== undefined && a.source.organizationId === targetOrganizationId;
-    const bSameOrg =
-      targetOrganizationId !== undefined && b.source.organizationId === targetOrganizationId;
-    if (aSameOrg !== bSameOrg) return aSameOrg ? -1 : 1;
-    const aPersonal = a.source.organizationId === undefined;
-    const bPersonal = b.source.organizationId === undefined;
-    if (aPersonal !== bPersonal) return aPersonal ? -1 : 1;
-    return a.label.localeCompare(b.label);
-  });
+  collected.sort(
+    (a, b) =>
+      scopeSortRank(a.primary, targetOrganizationId) -
+        scopeSortRank(b.primary, targetOrganizationId) || a.link.label.localeCompare(b.link.label)
+  );
 
-  return { shareableLinks, sharedWith };
+  return {
+    shareableLinks: collected.map(item => item.link),
+    sharedWith,
+  };
 }
 
 /**
@@ -885,9 +880,10 @@ type ConnectedClaudeBillingConnectionChange = Partial<
 async function updateConnectedClaudeBillingConnection(
   userProfileId: string,
   connectedAt: string,
-  change: ConnectedClaudeBillingConnectionChange
+  change: ConnectedClaudeBillingConnectionChange,
+  onDb: DrizzleConnection = db
 ): Promise<void> {
-  await db
+  await onDb
     .update(claude_billing_connections)
     .set({
       ...change,
@@ -911,42 +907,60 @@ async function updateConnectedClaudeBillingConnection(
 export async function markClaudeBillingUnavailable(
   userProfileId: string,
   refusalCode: string,
-  connectedAt: string
+  connectedAt: string,
+  onDb: DrizzleConnection = db
 ): Promise<void> {
-  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
-    status: ClaudeBillingConnectionStatus.BillingUnavailable,
-    last_refusal_code: refusalCode,
-    last_refusal_at: new Date().toISOString(),
-  });
+  await updateConnectedClaudeBillingConnection(
+    userProfileId,
+    connectedAt,
+    {
+      status: ClaudeBillingConnectionStatus.BillingUnavailable,
+      last_refusal_code: refusalCode,
+      last_refusal_at: new Date().toISOString(),
+    },
+    onDb
+  );
 }
 
 /** Records a refusal that leaves the connection usable, such as a spend limit. */
 export async function recordClaudeBillingRefusal(
   userProfileId: string,
   refusalCode: string,
-  connectedAt: string
+  connectedAt: string,
+  onDb: DrizzleConnection = db
 ): Promise<void> {
   const keptCodes = specificRefusalCodesFor(refusalCode);
-  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
-    // A status-only code says only what the stored specific code already said,
-    // so the specific one stays; a specific code always replaces what it finds.
-    last_refusal_code: keptCodes.length
-      ? sql`case when ${claude_billing_connections.last_refusal_code} in (${sql.join(
-          keptCodes.map(code => sql`${code}`),
-          sql`, `
-        )}) then ${claude_billing_connections.last_refusal_code} else ${refusalCode} end`
-      : refusalCode,
-    last_refusal_at: new Date().toISOString(),
-  });
+  await updateConnectedClaudeBillingConnection(
+    userProfileId,
+    connectedAt,
+    {
+      // A status-only code says only what the stored specific code already said,
+      // so the specific one stays; a specific code always replaces what it finds.
+      last_refusal_code: keptCodes.length
+        ? sql`case when ${claude_billing_connections.last_refusal_code} in (${sql.join(
+            keptCodes.map(code => sql`${code}`),
+            sql`, `
+          )}) then ${claude_billing_connections.last_refusal_code} else ${refusalCode} end`
+        : refusalCode,
+      last_refusal_at: new Date().toISOString(),
+    },
+    onDb
+  );
 }
 
 /** A request the customer paid for succeeded, so an earlier refusal no longer applies. */
 export async function clearClaudeBillingRefusal(
   userProfileId: string,
-  connectedAt: string
+  connectedAt: string,
+  onDb: DrizzleConnection = db
 ): Promise<void> {
-  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
-    last_refusal_code: null,
-    last_refusal_at: null,
-  });
+  await updateConnectedClaudeBillingConnection(
+    userProfileId,
+    connectedAt,
+    {
+      last_refusal_code: null,
+      last_refusal_at: null,
+    },
+    onDb
+  );
 }

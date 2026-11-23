@@ -61,7 +61,7 @@ beforeEach(() => {
 afterEach(() => sqlite.close());
 
 describe('targeted benchmark refresh', () => {
-  it('invalidates only selected current pairs and leaves unavailable models failed', async () => {
+  it('invalidates only selected current pairs and fails unavailable models permanently', async () => {
     seedProfile('vendor/selected');
     seedProfile('vendor/removed');
     seedProfile('vendor/other');
@@ -87,6 +87,13 @@ describe('targeted benchmark refresh', () => {
       refreshed: [{ model: 'vendor/selected', variant: null }],
       unavailable: [{ model: 'vendor/removed', variant: null }],
       skipped: [],
+      refusals: [
+        {
+          entry: { model: 'vendor/removed', variant: null },
+          failureClass: 'catalog_absent',
+          reason: 'Model or variant is unavailable in the executable benchmark catalog.',
+        },
+      ],
     });
     expect(
       sqlite
@@ -103,7 +110,7 @@ describe('targeted benchmark refresh', () => {
       {
         model: 'vendor/removed',
         engine_identity: 'test-engine',
-        status: 'failed',
+        status: 'unavailable',
         invalidated_at: refreshedAt,
       },
       {
@@ -183,6 +190,7 @@ describe('targeted benchmark refresh', () => {
         refreshed: [],
         unavailable: [],
         skipped: [{ model: 'vendor/selected', variant: null }],
+        refusals: [],
       });
       expect(
         sqlite.prepare(`SELECT status, run_id, invalidated_at FROM benchmark_profiles`).get()
@@ -299,6 +307,211 @@ describe('targeted benchmark refresh', () => {
     });
   });
 
+  it('re-admits a permanent failure without invalidating or discarding compatible results', async () => {
+    seedProfile('vendor/selected');
+    seedCase('vendor/selected');
+    // An older stamp (before the measured run) marks a compatible result set; re-admission
+    // must keep it, so the past case stays reusable.
+    const olderInvalidation = '2025-12-31T00:00:00.000Z';
+    sqlite
+      .prepare(
+        `UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'provider_unavailable',
+          failure_attempts = 6, first_failed_at = ?, completed_at = ?, invalidated_at = ?
+         WHERE model = 'vendor/selected'`
+      )
+      .run(measuredAt, measuredAt, olderInvalidation);
+    const result = await refreshCurrentProfiles(
+      db,
+      { ...current, mode: 'refresh', entries: [{ model: 'vendor/selected', variant: null }] },
+      catalog,
+      refreshedAt
+    );
+    expect(result.refreshed).toEqual([{ model: 'vendor/selected', variant: null }]);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, failure_attempts, first_failed_at, requested_at, invalidated_at
+           FROM benchmark_profiles WHERE model = 'vendor/selected'`
+        )
+        .get()
+    ).toEqual({
+      status: 'pending',
+      failure_attempts: 0,
+      first_failed_at: null,
+      requested_at: refreshedAt,
+      invalidated_at: olderInvalidation,
+    });
+    // The reset marker commits with the re-admission and does not depend on invalidation.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT outcome, run_id, attempted_at FROM profile_attempt_history WHERE model = ?`
+        )
+        .all('vendor/selected')
+    ).toEqual([
+      {
+        outcome: 'reset',
+        run_id: `admit:${refreshedAt}:vendor/selected:`,
+        attempted_at: refreshedAt,
+      },
+    ]);
+    seedRun('later', '2026-01-04T00:00:00.000Z');
+    expect(
+      await reuseDeciderCaseResults(db, {
+        ...current,
+        runId: 'later',
+        entries: [{ model: 'vendor/selected', variant: null }],
+        minimumRevisions: {},
+      })
+    ).toBe(1);
+  });
+
+  it('clears a permanent verdict at another repetition count of this engine on re-admit', async () => {
+    seedProfile('vendor/selected');
+    // A previous config measured this pair at another repetition count and marked it
+    // permanently unavailable. Current config selects repetitions=1, so that row is not
+    // current and cannot veto today's plan — but it must not return as a veto if the
+    // repetition count changes back after an explicit re-admission.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, failure_class, failure_attempts, requested_at, updated_at, platform_requested,
+          user_requested)
+         VALUES ('efficient', 'vendor/selected', '', ?, 3, 'unavailable', 'provider_unavailable',
+          6, ?, ?, 0, 1)`
+      )
+      .run(current.engineIdentity, measuredAt, measuredAt);
+    await refreshCurrentProfiles(
+      db,
+      { ...current, mode: 'refresh', entries: [{ model: 'vendor/selected', variant: null }] },
+      catalog,
+      refreshedAt
+    );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT repetitions, status, failure_attempts, first_failed_at
+           FROM benchmark_profiles WHERE model = 'vendor/selected' ORDER BY repetitions`
+        )
+        .all()
+    ).toEqual([
+      {
+        repetitions: 1,
+        status: 'pending',
+        failure_attempts: 0,
+        first_failed_at: null,
+      },
+      {
+        repetitions: 3,
+        status: 'pending',
+        failure_attempts: 0,
+        first_failed_at: null,
+      },
+    ]);
+  });
+
+  it('leaves another router and another engine alone when re-admitting', async () => {
+    seedProfile('vendor/selected');
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, requested_at, updated_at, platform_requested, user_requested)
+         VALUES ('frontier', 'vendor/selected', '', ?, 1, 'unavailable', ?, ?, 0, 1),
+                ('efficient', 'vendor/selected', '', 'engine-old', 1, 'unavailable', ?, ?, 0, 1)`
+      )
+      .run(current.engineIdentity, measuredAt, measuredAt, measuredAt, measuredAt);
+    await refreshCurrentProfiles(
+      db,
+      { ...current, mode: 'refresh', entries: [{ model: 'vendor/selected', variant: null }] },
+      catalog,
+      refreshedAt
+    );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT router, engine_identity, status FROM benchmark_profiles
+           WHERE model = 'vendor/selected' ORDER BY router, engine_identity`
+        )
+        .all()
+    ).toEqual([
+      { router: 'efficient', engine_identity: 'engine-old', status: 'unavailable' },
+      { router: 'efficient', engine_identity: current.engineIdentity, status: 'pending' },
+      { router: 'frontier', engine_identity: current.engineIdentity, status: 'unavailable' },
+    ]);
+  });
+
+  it('repair_unavailable preserves invalidation so the repaired pair keeps its past results', async () => {
+    seedProfile('vendor/selected');
+    // The repair selector needs the recorded lookup failure; the compatible result that
+    // must stay reusable is a separate, valid case of the same pair.
+    seedCase('vendor/selected', 'Model not found: kilo/vendor/selected');
+    sqlite
+      .prepare(`INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms,
+        exit_code, rep) VALUES ('source', 'vendor/selected', '', 'case-b', 1, 10, 0, 0)`)
+      .run();
+    const seededInvalidation = '2026-01-01T12:00:00.000Z';
+    sqlite
+      .prepare('UPDATE benchmark_profiles SET invalidated_at = ? WHERE model = ?')
+      .run(seededInvalidation, 'vendor/selected');
+    const result = await refreshCurrentProfiles(
+      db,
+      {
+        ...current,
+        mode: 'repair_unavailable',
+        entries: [{ model: 'vendor/selected', variant: null }],
+      },
+      catalog,
+      refreshedAt
+    );
+    expect(result.refreshed).toEqual([{ model: 'vendor/selected', variant: null }]);
+    // The repair must neither introduce nor move an invalidation stamp.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, invalidated_at, requested_at FROM benchmark_profiles
+           WHERE model = 'vendor/selected'`
+        )
+        .get()
+    ).toEqual({
+      status: 'pending',
+      invalidated_at: seededInvalidation,
+      requested_at: refreshedAt,
+    });
+  });
+
+  it('repair_unavailable on an uninvalidated pair keeps every compatible result reusable', async () => {
+    seedProfile('vendor/selected');
+    seedCase('vendor/selected', 'Model not found: kilo/vendor/selected');
+    sqlite
+      .prepare(`INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms,
+        exit_code, rep) VALUES ('source', 'vendor/selected', '', 'case-b', 1, 10, 0, 0)`)
+      .run();
+    await refreshCurrentProfiles(
+      db,
+      {
+        ...current,
+        mode: 'repair_unavailable',
+        entries: [{ model: 'vendor/selected', variant: null }],
+      },
+      catalog,
+      refreshedAt
+    );
+    expect(
+      sqlite
+        .prepare(`SELECT status, invalidated_at FROM benchmark_profiles WHERE model = ?`)
+        .get('vendor/selected')
+    ).toEqual({ status: 'pending', invalidated_at: null });
+    seedRun('later', '2026-01-04T00:00:00.000Z');
+    expect(
+      await reuseDeciderCaseResults(db, {
+        ...current,
+        runId: 'later',
+        entries: [{ model: 'vendor/selected', variant: null }],
+        minimumRevisions: {},
+      })
+    ).toBe(1);
+  });
+
   it('preserves history but does not reuse invalidated results or pending output', async () => {
     seedProfile('vendor/selected');
     seedProfile('vendor/other');
@@ -331,8 +544,7 @@ describe('targeted benchmark refresh', () => {
         { model: 'vendor/selected', variant: null },
         { model: 'vendor/other', variant: null },
       ],
-      skipOldCaseIds: [],
-      promptRevision: 2,
+      minimumRevisions: {},
     });
     expect(
       sqlite.prepare(`SELECT model FROM case_results WHERE run_id='destination'`).all()
@@ -354,8 +566,7 @@ describe('targeted benchmark refresh', () => {
         ...current,
         runId: 'later',
         entries: [{ model: 'vendor/selected', variant: null }],
-        skipOldCaseIds: [],
-        promptRevision: 2,
+        minimumRevisions: {},
       })
     ).toBe(1);
   });

@@ -132,6 +132,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  webhook_events_v2,
   bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
@@ -209,7 +210,6 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
-import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -912,43 +912,6 @@ describe('User', () => {
 
     afterEach(() => {
       jest.restoreAllMocks();
-    });
-
-    it.each<WatchwoodSignupAssessment>([
-      {
-        status: 'assessed',
-        riskScore: 1,
-        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
-        latencyMs: 10,
-        assessedAt: 1,
-      },
-      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
-      { status: 'missing', latencyMs: 0, assessedAt: 1 },
-    ])('creates an account with a $status shadow assessment', async watchwood => {
-      const email = `watchwood-${watchwood.status}@example.com`;
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: email,
-          google_user_name: 'Shadow Signup',
-          google_user_image_url: '',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: `watchwood-${watchwood.status}`,
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
-        null,
-        { watchwood }
-      );
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.isNew).toBe(true);
-      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
-      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
-        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
-      ]);
     });
 
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
@@ -2538,6 +2501,14 @@ describe('User', () => {
         release();
         await writer;
       }
+    });
+
+    it('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser({ anthropic_user_profile_id: 'uprof_test_soft_delete' });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(await findUserById(user.id)).toMatchObject({ anthropic_user_profile_id: null });
     });
 
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
@@ -5329,6 +5300,34 @@ describe('User', () => {
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
     });
 
+    it("deletes the user's partitioned webhook events, which no foreign key cascades into", async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+      await db.insert(webhook_events_v2).values(
+        [user1.id, user2.id].map(userId => ({
+          owned_by_user_id: userId,
+          platform: 'github',
+          event_type: 'pull_request',
+          payload: { sender: { login: `login-${userId}` } },
+          headers: {},
+          event_signature: `delivery-${crypto.randomUUID()}`,
+        }))
+      );
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+      const remainingForOtherUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
+    });
+
     it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
@@ -5403,6 +5402,9 @@ describe('User', () => {
 
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
+      // A second member, so the suite can prove a row about someone else keeps
+      // that person's address when the author's account is deleted.
+      const otherUser = await insertTestUser();
       const orgId = randomUUID();
       await db.insert(organizations).values({
         id: orgId,
@@ -5418,6 +5420,56 @@ describe('User', () => {
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
         message: 'User joined org',
+        // A row whose structured detail names a member's address. The address
+        // must not survive the deletion, and the row's English message does.
+        details: { id: 'invite.accepted', email: user.google_user_email },
+      });
+
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.user.send_invite',
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        message: `Invited ${otherUser.google_user_email} as member`,
+        details: { id: 'invite.sent', email: otherUser.google_user_email, role: 'member' },
+      });
+
+      // A detail whose address sits in an array rather than a scalar field: the
+      // minimum-balance alert stores its recipients as `emails`. The deleted
+      // member's entry goes; the other member's stays.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 10,
+          emails: [user.google_user_email, otherUser.google_user_email],
+        },
+      });
+
+      // A second alert row names the deleted address alone, so scrubbing it
+      // empties the list. The key is dropped there rather than written as `[]`,
+      // because the row's sentence names the recipients and an empty list would
+      // leave it dangling.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled for one recipient',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 25,
+          emails: [user.google_user_email],
+        },
       });
 
       await softDeleteUser(user.id);
@@ -5425,12 +5477,45 @@ describe('User', () => {
       const logs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.actor_id, user.id));
-      expect(logs).toHaveLength(1);
-      expect(logs[0].actor_email).toBeNull();
-      expect(logs[0].actor_name).toBeNull();
-      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
-      expect(logs[0].message).toBe('User joined org'); // message preserved
+        .where(eq(organization_audit_logs.organization_id, orgId));
+      expect(logs).toHaveLength(4);
+      for (const log of logs.filter(entry => entry.actor_id === user.id)) {
+        expect(log.actor_email).toBeNull();
+        expect(log.actor_name).toBeNull();
+        expect(log.actor_id).toBe(user.id); // actor_id preserved for reference
+      }
+      const own = logs.find(log => log.action === 'organization.user.accept_invite');
+      expect(own?.message).toBe('User joined org'); // message preserved
+      // The structured detail keeps its event, and no longer carries the address.
+      expect(own?.details).toEqual({ id: 'invite.accepted' });
+      // A row about another member keeps that member's address: redaction is by
+      // the address a detail names, not by who authored the row.
+      const [otherSubject] = logs.filter(log => log.action === 'organization.user.send_invite');
+      expect(otherSubject.details).toEqual({
+        id: 'invite.sent',
+        email: otherUser.google_user_email,
+        role: 'member',
+      });
+      // The array field is scrubbed too, and every other detail key survives.
+      // `toEqual` is exact, so the second row's missing `emails` key is what
+      // proves the emptied list was dropped rather than written as `[]`.
+      const alerts = logs.filter(log => log.action === 'organization.settings.change');
+      expect(alerts).toHaveLength(2);
+      expect(alerts.map(entry => entry.details)).toEqual(
+        expect.arrayContaining([
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 10,
+            emails: [otherUser.google_user_email],
+          },
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 25,
+          },
+        ])
+      );
     });
 
     it('should clear organization group attribution fields', async () => {

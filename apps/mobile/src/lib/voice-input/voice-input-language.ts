@@ -1,7 +1,13 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-import { LANGUAGE_ENDONYMS, LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import {
+  LANGUAGE_ENDONYMS,
+  LANGUAGE_ENGLISH_NAMES,
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from '@/i18n/languages';
+import { languageSearchNames } from '@/i18n/language-search-names';
 import { resolveSupportedLanguageTag } from '@/i18n/resolve-language';
 
 function normalizeLocale(tag: string): string {
@@ -236,12 +242,7 @@ export async function resolveVoiceInputSessionLanguageTag(
     return resolveVoiceInputStartLanguageTag(appLanguage);
   }
 
-  // Gateway mode never fetches the device's locales: it reconciles against the
-  // static app list only.
   const deviceLocales = mode === 'device' ? await getVoiceRecognitionLocales() : null;
-  // A failed or empty device answer cannot prove the tag wrong, so it wins:
-  // discarding an explicit choice on a probe that returned nothing would
-  // silently drop the user's selection.
   if (mode === 'device' && (deviceLocales === null || deviceLocales.locales.length === 0)) {
     return storedTag;
   }
@@ -293,6 +294,21 @@ export function voiceInputLanguageDisplayName(languageTag: string): string {
 export function voiceInputLanguageEnglishName(languageTag: string): string | undefined {
   const language = resolveSupportedLanguageTag([{ languageTag }]);
   return language ? LANGUAGE_ENGLISH_NAMES[language] : undefined;
+}
+
+/**
+ * The name the UI language gives a recognition language, so the picker's
+ * search matches what the interface shows in that language (`de-DE` under a
+ * German UI → "Deutsch"). Mirrors `voiceInputLanguageEnglishName`: resolves
+ * the whole tag first, and returns `undefined` for a language the app does
+ * not ship so callers add no match term rather than the raw tag twice.
+ */
+export function voiceInputLanguageLocalizedName(
+  languageTag: string,
+  ui: SupportedLanguage
+): string | undefined {
+  const language = resolveSupportedLanguageTag([{ languageTag }]);
+  return language ? languageSearchNames(ui)[language] : undefined;
 }
 
 /**

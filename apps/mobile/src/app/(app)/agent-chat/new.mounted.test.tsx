@@ -27,6 +27,12 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => state.params,
 }));
 vi.mock('@/lib/share-payload', () => ({ clearSharePayload: state.clearSharePayload }));
+// The error screen's no-history exit goes through the push-then-retire hook (a
+// literal `router.replace` crashes Android Fabric); the assertion
+// below pins the destination it is handed.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: state.router.replace }),
+}));
 vi.mock('@sentry/react-native', () => ({
   wrapExpoRouterErrorBoundary: (boundary: unknown) => boundary,
 }));
@@ -155,7 +161,7 @@ describe('NewSessionScreen account gate', () => {
 });
 
 const AGENTS_SESSIONS_INDEX_HREF = {
-  pathname: '/(app)/(tabs)/(2_agents)/',
+  pathname: '/(app)/(tabs)/(2_agents)',
   params: {},
 } as const;
 

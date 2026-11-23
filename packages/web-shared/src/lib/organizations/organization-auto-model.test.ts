@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { Organization } from '@kilocode/db/schema';
-import type { ByokCredential } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { EnabledByokProvider } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getByokCredentials,
+  getEnabledByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
   getDirectByokCatalogModelId,
   getDirectByokModel,
@@ -12,6 +15,8 @@ import {
   modelsServedByOrganizationInferenceProviderUserByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import type { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -35,7 +40,10 @@ jest.mock(
     getProviderSlugsForModel: jest.fn(async () => new Set(['moonshotai'])),
   })
 );
-jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({ getByokCredentials: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  getByokCredentials: jest.fn(),
+  getEnabledByokProviders: jest.fn(async () => []),
+}));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
   () => ({
@@ -46,8 +54,9 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   formatDirectByokModelId: (provider: { id: string }, model: { id: string }) =>
     `${provider.id}/${model.id}`.toLowerCase(),
-  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  getDirectByokModel: jest.fn(async () => null),
   getDirectByokCatalogModelId: jest.fn(),
+  getDirectByokModelChatApis: () => ['chat_completions'],
   supportsCatalogMode: (providerId: string) => providerId === 'synthetic',
 }));
 
@@ -63,22 +72,21 @@ function policyContext(defaultPolicies: unknown[] = []) {
   return {
     organization: { id: 'org-1', plan: 'enterprise', settings: {} },
     defaultPolicies,
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
   };
 }
 
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedGetCatalogModelId = jest.mocked(getDirectByokCatalogModelId);
-const mockedGetByokCredentials = jest.mocked(getByokCredentials);
+const mockedGetEnabledByokProviders = jest.mocked(getEnabledByokProviders);
 
 function organization(settings: Organization['settings'] = {}) {
   return { id: 'org-1', plan: 'enterprise' as const, settings };
 }
 
-function credential(serveCatalogModels: boolean): ByokCredential {
-  return { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels };
+function key(serveCatalogModels: boolean): EnabledByokProvider {
+  return { providerId: 'synthetic', serveCatalogModels };
 }
 
 beforeEach(() => {
@@ -87,35 +95,102 @@ beforeEach(() => {
   mockedGetDirectByokModel.mockImplementation(async modelId =>
     modelId.startsWith('synthetic/')
       ? {
-          provider: {
-            id: 'synthetic',
-            resolveUpstream: async () => ({ supportedChatApis: ['chat_completions'] }),
-          } as never,
+          provider: { id: 'synthetic' } as never,
           model: { id: modelId.slice('synthetic/'.length) } as never,
         }
-      : { provider: null, model: null }
+      : null
   );
   jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({
     data: [{ id: 'moonshotai/kimi-k2.6' }],
   } as never);
 });
 
+describe('validateOrganizationAutoTarget catalog load client', () => {
+  const mockedCatalog = getEnhancedOpenRouterModels as unknown as jest.Mock<
+    (options: { countryCode: string | null; fromDb?: object }) => Promise<unknown>
+  >;
+
+  test('reads the catalog through the replica client the seam names', async () => {
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', {
+        read: { fromDb: replica as typeof readDb },
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });
+  });
+
+  test('keeps the primary default inside a transaction', async () => {
+    const tx = { select: jest.fn() } as never;
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', {
+        read: { tx },
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
+  });
+
+  test('keeps the catalog primary default when no options are passed', async () => {
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6')
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
+  });
+
+  test('propagates the client through a catalog-id recursion', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
+    mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
+        read: { fromDb: replica as typeof readDb },
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });
+  });
+});
+
 describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   test('keeps a bespoke target of a key outside catalog mode', async () => {
-    mockedGetByokCredentials.mockResolvedValue([credential(false)]);
+    mockedGetEnabledByokProviders.mockResolvedValue([key(false)]);
 
     await expect(
       validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6')
     ).resolves.toEqual({ kind: 'ok', modelId: 'synthetic/hf:moonshotai/kimi-k2.6' });
-    expect(mockedGetByokCredentials).toHaveBeenCalledWith(
-      expect.anything(),
-      { type: 'organization', id: 'org-1' },
-      ['synthetic']
-    );
+    expect(mockedGetEnabledByokProviders).toHaveBeenCalledWith(expect.anything(), {
+      type: 'organization',
+      id: 'org-1',
+    });
+  });
+
+  test('validates without decrypting any key', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([key(false)]);
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
+        apiKind: 'chat_completions',
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'synthetic/hf:moonshotai/kimi-k2.6' });
+    expect(jest.mocked(getByokCredentials)).not.toHaveBeenCalled();
+  });
+
+  test('rejects a target when the organization has no enabled key for its provider', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([]);
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6')
+    ).resolves.toEqual({
+      kind: 'error',
+      message:
+        "Organization Auto route target 'synthetic/hf:moonshotai/kimi-k2.6' is unavailable because this organization does not have an enabled BYOK credential for synthetic.",
+    });
   });
 
   test('resolves a bespoke target of a catalog-mode key to its catalog id', async () => {
-    mockedGetByokCredentials.mockResolvedValue([credential(true)]);
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
     mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
 
     await expect(
@@ -124,7 +199,7 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   });
 
   test('checks API support of the key before resolving the catalog id', async () => {
-    mockedGetByokCredentials.mockResolvedValue([credential(true)]);
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
     mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
 
     await expect(
@@ -139,7 +214,7 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   });
 
   test('applies the model policy to the catalog id', async () => {
-    mockedGetByokCredentials.mockResolvedValue([credential(true)]);
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
     mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
 
     await expect(
@@ -155,7 +230,7 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   });
 
   test('rejects a bespoke target without a catalog id when the key serves catalog ids', async () => {
-    mockedGetByokCredentials.mockResolvedValue([credential(true)]);
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
     mockedGetCatalogModelId.mockResolvedValue(null);
 
     await expect(

@@ -3,6 +3,7 @@ export type {
   ProfileOwner,
   ProfileOwnerType,
   ProfileDatabase,
+  ProfileTransaction,
   RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
@@ -54,29 +55,48 @@ export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils
 export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
+  insertProfileRow,
   updateProfile,
   deleteProfile,
   listProfiles,
   getProfile,
   getProfileOverview,
   setDefaultProfile,
+  applyDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
   getEffectiveDefaultProfileId,
 } from './profile-service';
 
+// Composite profile creation (profile + vars + commands + default in one transaction)
+export {
+  createProfileWithContent,
+  type ProfileCreateInput,
+  type ProfileCreateVar,
+} from './profile-create-service';
+
 // Var CRUD
 export {
   MAX_PROFILE_VARS,
+  encryptProfileSecret,
+  profileVarColumns,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
+  type ProfileNetworkSecretPolicy,
   type VarForSession,
 } from './profile-vars-service';
 
 // Command CRUD
-export { setCommands, listCommands, getCommandsForSession } from './profile-commands-service';
+export {
+  MAX_PROFILE_COMMANDS,
+  MAX_PROFILE_COMMAND_LENGTH,
+  writableCommands,
+  setCommands,
+  listCommands,
+  getCommandsForSession,
+} from './profile-commands-service';
 
 // MCP server CRUD + session helpers
 export {
@@ -150,6 +170,7 @@ export {
   updateAgent,
   deleteAgent,
   getAgentsForSession,
+  type SessionAgents,
   type AgentCreateInput,
   type AgentUpdateInput,
   type AgentForSession,

@@ -15,7 +15,11 @@ type AndroidState = {
   sizeOverride: string | undefined;
   accelerometerRotation: string;
   userRotation: string;
+  fontScale: string;
 };
+
+/** The largest font scale Android's settings offer (Android 14 and later). */
+export const ANDROID_MAX_FONT_SCALE = '2.0';
 
 export function parseAdbDevices(output: string): string[] {
   return output
@@ -75,6 +79,7 @@ export function createAndroidDevice(options: {
     sizeOverride: parseWmValue(shell('wm', 'size')).override,
     accelerometerRotation: shell('settings', 'get', 'system', 'accelerometer_rotation'),
     userRotation: shell('settings', 'get', 'system', 'user_rotation'),
+    fontScale: shell('settings', 'get', 'system', 'font_scale'),
   };
   const current: AndroidState = { ...initial };
 
@@ -98,6 +103,11 @@ export function createAndroidDevice(options: {
       current.userRotation = userRotation;
     }
   };
+  const setFontScale = (fontScale: string) => {
+    if (current.fontScale === fontScale) return;
+    putSetting('font_scale', fontScale);
+    current.fontScale = fontScale;
+  };
 
   const names = [
     shell('getprop', 'ro.product.model'),
@@ -114,6 +124,7 @@ export function createAndroidDevice(options: {
       setSize(config.compact ? compactSize(densityDpi) : initial.sizeOverride);
       if (config.landscape) setRotation('0', '1');
       else setRotation(initial.accelerometerRotation, initial.userRotation);
+      setFontScale(config.fontMax ? ANDROID_MAX_FONT_SCALE : initial.fontScale);
     },
     // The dev client's inspector does not survive a runtime reload on every
     // emulator: after a language switch the app keeps painting while the page
@@ -141,6 +152,7 @@ export function createAndroidDevice(options: {
         () => setNight(initial.night),
         () => setSize(initial.sizeOverride),
         () => setRotation(initial.accelerometerRotation, initial.userRotation),
+        () => setFontScale(initial.fontScale),
       ]) {
         try {
           step();
@@ -196,8 +208,25 @@ export function createAndroidDevice(options: {
     tap: (xPx, yPx) => {
       shell('input', 'tap', String(Math.round(xPx)), String(Math.round(yPx)));
     },
+    // The tree rules judge the accessibility-important tree, so the snapshot has
+    // to be the one a screen reader reads: a plain dump registers UiAutomation
+    // with FLAG_INCLUDE_NOT_IMPORTANT_VIEWS and so lists every subtree the app
+    // hid with `accessibilityElementsHidden`/`no-hide-descendants`, which makes a
+    // correctly covered scene (a formSheet over a screen) look present in the
+    // archive. `--compressed` drops those nodes.
     uiSnapshot: () => {
-      shell('uiautomator', 'dump', REMOTE_UI_XML);
+      // `uiautomator dump` exits 0 when it fails and writes its error to stderr,
+      // so a failed dump without this guard replays the file of the previous
+      // read: a tree of another screen, even of another revision. Delete the file
+      // first and require the dump's success line, so a failure is an
+      // infrastructure error instead of a stale tree.
+      optionalShell('rm', '-f', REMOTE_UI_XML);
+      const dumped = shell('uiautomator', 'dump', '--compressed', REMOTE_UI_XML);
+      if (!dumped.includes(`UI hierchary dumped to: ${REMOTE_UI_XML}`)) {
+        throw new InfraError(
+          `uiautomator dump wrote no tree for ${serial}; the screen may not be idle or on`
+        );
+      }
       const xml = adb(['exec-out', 'cat', REMOTE_UI_XML]).toString();
       optionalShell('rm', '-f', REMOTE_UI_XML);
       const fontScale = Number(shell('settings', 'get', 'system', 'font_scale'));

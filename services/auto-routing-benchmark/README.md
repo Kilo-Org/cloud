@@ -44,9 +44,9 @@ deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
-Both routers are custom-router bases (ADR 0005): owner profile admission, the owner queue,
-custom router tables, and client evals accept `efficient` and `frontier`.
-Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
+Both routers are custom-router bases (ADR 0005): owner request quotes, custom router tables,
+client evals, and alias pins accept `efficient` and `frontier`.
+Owner work for a base uses that base's configuration, dataset, engine identity, and request table.
 
 Client and direct-BYOK custom-router entries can explicitly link `measuredAs` to a globally
 measured platform model. Same-name variants reuse the base router's live platform measurement;
@@ -87,6 +87,11 @@ falls back to the system value. Publishing reads effective values only.
   scores single requests, so session-economics and measurement-effort knobs have no measured
   basis for a daily recomputation. The Policy tab shows each value and the reason it is fixed,
   read-only. A stored config that still carries one keeps parsing, and its value is ignored.
+- Decider repetitions are fixed per router: Efficient measures every case three times, because
+  with a few dozen cases per route one repetition lets noise decide which candidates clear the
+  accuracy floor; Frontier measures once. Registry admission, run creation, profile currency,
+  publish and client eval all read the same router value, and a profile is current only at
+  its router's count.
 
 An omitted Frontier pool uses its router-specific alias preset.
 The worker benchmarks that pool before it publishes a complete Frontier table.
@@ -109,28 +114,29 @@ One-case chunks leave room for warmup, the existing empty-output retry, and grad
 the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cost accounting,
 and CLI-reported latency remain unchanged.
 
-`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
-`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
-Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
-`shares` defaults to
+`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250` and
+`modelConcurrency: 12`. An optional `modelLimits` object overrides the model cap by exact
+model id. `shares` defaults to
 `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1,"frontier/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
 borrowed without reservations or preempting active work. Model caps span variants and runs.
-Provider identities come from the catalog's optional `inference_provider_ids`, which uses
-the existing gateway provider index. Every possible provider is conservatively counted;
-missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
-treated as serving providers. Each router has an owner queue with its own share.
+Only slots and model caps bound a claim. There is no per-provider limit: the gateway sends
+each request to one aggregator (Vercel AI Gateway, else OpenRouter), which picks one
+upstream, so the catalog's `inference_provider_ids` list says nothing about which provider a
+chunk loads. Each router has a platform share and a paid-request share.
 
-Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
-`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
-admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
-admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
-single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
-a change applies on the next completion or one-minute tick. The PUT body replaces the whole
-override set: a missing or `null` limit clears that override. Values must be integers from 1
-to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
-`modelLimits` and `providerLimits` still come only from the env config and take precedence
-over `modelConcurrency` and `providerConcurrency` for their exact identities.
+Admins can override `slots` and `modelConcurrency` at runtime, without a deploy, from the
+Scheduler card on the admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`.
+Each limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default.
+Overrides live in the single-row `scheduler_settings` D1 table; each dispatch pass reads it
+once by primary key, so a change applies on the next completion or one-minute tick. The PUT
+body replaces the whole override set: a missing or `null` limit clears that override. Values
+must be integers from 1 to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown
+key, is a 400. Until the web release after the provider-limit removal is promoted (ADR 0003,
+invariant 7), the PUT also accepts and ignores the retired `providerConcurrency` and
+`unknownProviderConcurrency`, and the response serves both as the container budget.
+`modelLimits` still comes only from the env config and takes precedence over
+`modelConcurrency` for its exact models.
 `GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
 (`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
 
@@ -166,8 +172,9 @@ held returns immediately, because the holding pass has already read that wake's
 completions. The per-minute tick is the backstop if a lease expires without a release, and
 the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
 
-A provider or model throttle records a cooldown deadline rather than stamping every
-pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+A throttle cools only its own model: other models stay claimable, because a throttle names
+no upstream. The cooldown is a deadline row rather than a stamp on every pending row, so one
+throttle event costs a bounded write instead of rewriting the backlog.
 
 Materialization writes chunks in bounded batches and checks the run's status once per batch
 rather than per row. A chunk is inserted already completed when all of its cases have
@@ -181,9 +188,17 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Starting a decider run writes the run row and returns; it reuses nothing and materializes
+nothing in the request. The first initialization pass copies every entry's compatible prior
+results before it writes any chunk, so a run's chunks exist only once its reuse is complete.
+A pass whose reuse fails writes no chunk, and the next pass repeats the reuse, which skips
+rows the run already holds. The reuse statement filters the prior runs first and then seeks
+each run's pair in `case_results`: D1 keeps no planner statistics, so the join order is
+pinned with `CROSS JOIN`.
+
 Initialization failures stay isolated to their run, so healthy runs can still dispatch.
 A run without its saved execution identity fails and releases its claimed profiles.
-Transient catalog failures leave the run eligible for another initialization attempt.
+Transient catalog or reuse failures leave the run eligible for another initialization attempt.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
@@ -193,16 +208,31 @@ count as unsettled, so a run with a dead lane still settles once its live lanes 
 runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
 sweep and the dead-letter path remain responsible for runs that settle without a train of
 completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
-completes only the runs that still hold unsettled chunks, and pruning is driven from the
-per-run scheduler markers instead of scanning the chunk, execution or run tables.
+completes only the runs that still hold unsettled chunks, the failed-lane check reads only
+running runs' failed chunks, execution and marker pruning start from the per-run scheduler
+markers, and chunk pruning walks the distinct run ids that still hold chunks, so a run that
+stopped before its marker was written is pruned too.
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
 repetition if a worker disappears after inference may have started but before an output was
-saved. The container posts every completed case to the worker before returning its HTTP
-response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
-Each callback carries the paid attempt's start time, so a stale callback cannot replace a
-newer empty-output retry.
+saved. The container posts every completed case to the worker, and `not_started` for accepted
+cases that provably did not spawn the CLI. A post the worker accepts on the first attempt
+precedes the HTTP response. If the first post fails, the container answers the HTTP request
+and keeps posting with backoff for up to about 5.5 minutes. Each callback carries the paid
+attempt's start time, so a stale callback cannot replace a newer empty-output retry.
+
+A request that never reached the container server is not a paid call. `BenchRunnerContainer`
+turns the `@cloudflare/containers` 500s that precede forwarding ("Failed to start container",
+and the runtime's "The container just exited" or "The container is not running" refusals)
+into a 503 with `errorCategory` `container_not_reached`, which takes the container-capacity
+path: the unbilled ledger row is cleared and the chunk is deferred. Other proxy failures
+("Container suddenly disconnected", a closed port connection) can follow a delivered request
+and stay ambiguous. When a retry cannot reach its container, an empty-output first attempt is
+graded as it is, while a first attempt killed before any event is cleared and deferred the same
+way. A case the ledger refuses to open because the chunk lost its lease, its lane already failed
+or its run stopped is not ambiguous either: the chunk is released (`claim_lost`) without
+recording a lane failure.
 
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease
@@ -214,10 +244,10 @@ its first event gets the same single retry as an empty completion; a timeout, a 
 events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
-It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
+It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
-container's delivery window (90 seconds) has passed since the case's latest paid call started
+container's delivery window (7 minutes) has passed since the case's latest paid call started
 (an empty-output retry restarts it in the ledger). Only then does the case count as genuinely
 ambiguous (a container hard-killed mid-flight, or a lost delivery): it fails its measurement
 lane as infrastructure uncertainty instead of inventing a score or issuing another paid call.
@@ -228,9 +258,43 @@ Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark 
 completed case results, and pending outputs remain available for compatible reuse.
 
 Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
-lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
-releases the lease. It renews the lease throughout and fails closed when draining exceeds
-its limit. It never pauses or resumes operator-controlled queues.
+lease, waits until no active chunks and no queued chunks with an unexpired queue lease remain,
+applies D1 migrations, deploys, waits for the container rollout to finish, then releases the
+lease. A queued claim whose queue lease expired cannot start, so it does not hold the drain;
+`recoverChunks` returns it to pending. It renews the lease throughout and fails closed when
+draining exceeds its limit. It never pauses or resumes operator-controlled queues.
+
+Busy dispatch takes the lease back as soon as each pass releases it, so the wrapper first writes
+a deploy intent: `scheduler_dispatch_lock` row 3 with a `deploy-intent-` token and a lease that
+ends with the wrapper's lock wait (`BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS`, 60 seconds by default).
+While that lease is unexpired, no dispatch pass takes row 1, so the wrapper takes it when the
+current pass ends, at most one dispatch lease (20 seconds) later. It retries at the poll interval
+(`BENCHMARK_DEPLOY_POLL_INTERVAL_MS`, 5 seconds), or sooner when the holder's lease ends, and
+clears the intent once it holds row 1 or gives up; a dead wrapper's intent expires with its lock
+wait. A worker deployed before this change ignores the intent: if dispatch is busy, deploy it
+under an operator pause.
+
+Each deploy records a hash of the container inputs (the `containers` configuration, each local
+image's Dockerfile, and every file in its build context, even when the Dockerfile sits outside
+that context) as the Worker version message
+`container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was
+live when the container application last changed, so a deploy whose image never reached the
+containers is not trusted. When the rolled-out hash matches, the wrapper deploys with
+`--containers-rollout none`, so running containers are not replaced. A different, missing or
+unreadable hash deploys with the configured rollout, and a failed deploy without a rollout is
+retried with it. After a rolling deploy the wrapper polls `wrangler containers info` until the
+application has no `active_rollout_id`, for at most `BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS`
+(15 minutes by default), and then releases the lease either way.
+
+When the rolled-out hash matches and every file in `migrations/` is recorded in
+`d1_migrations`, the wrapper deploys without the lease and without draining. In-flight
+invocations finish on the version that accepted them. Each `BenchRunnerContainer` keeps its old
+code until its deferred code update resets it (at most 5 minutes after the deploy); the reset
+drops the Durable Object's request to the container, but the container keeps the case running
+and posts the result to `/container/case-result`, and the chunk waits for that output. A drained
+deploy does not avoid that reset either: it lands after the lease is released, on work
+dispatched since. A pending or unreadable migration list, or an unknown hash, takes the full
+drained path.
 
 An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
 with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:
@@ -238,11 +302,74 @@ it never acquires, renews, releases or modifies it, still waits for queued and a
 drain, and verifies the same token with an unexpired lease before migrations, before the deploy,
 throughout the deploy and after it. It fails closed if the pause disappears, changes or expires,
 and logs `operator_pause_retained` without the token. Any other unexpired owner is contention.
-Resume dispatch after the deploy with:
+Resume dispatch after the deploy by releasing that exact token:
 
 ```sql
-UPDATE scheduler_dispatch_lock SET token=NULL, lease_until=0 WHERE id=1 AND token LIKE 'operator-pause-%'
+UPDATE scheduler_dispatch_lock SET token=NULL, lease_until=0 WHERE id=1 AND token = '<the held token>'
 ```
+
+Use the exact token value, not a broad `token LIKE 'operator-pause-%'` match: a pattern also
+accepts another operator's pause. The pre-deploy legacy cancel passes the same value with
+`--expect-token`.
+
+Under the hold the deploy must change no measurement: the engine identity, active measurement
+revision, case dataset, and ranking policy stay as deployed, and no step requeues a pair, consumes
+a staged measurement activation, invalidates a stored result, or republishes an unchanged routing
+table. Publish only from stored, reusable results when the desired serving set itself changed;
+never re-grade or re-run stored work as a side effect of the migration. Release only the
+operator's own pause token after the checks in "Deploy verification" pass. The ADR 0005 paid flow
+has the full choreography (`docs/adr/0005-custom-auto-routers.md`, "Paid benchmark deployment").
+
+### Deploy verification
+
+Run these checks on the release being deployed; treat an unrun check as unproved. Steps 1, 3 and 4
+are read-only; step 2 cancels legacy work under the hold before the deploy, as described there.
+
+1. Before cancellation: record the deployed engine identity and measurement revision, the count of
+   ready pairs per router, and the published routing-table versions.
+2. Under the hold: run `scripts/legacy-cancel.mjs` in the mandatory order — `--dry-run --remote`,
+   then `--apply --remote --baseline-out <path>`, then `--verify --remote --baseline <path>` as the
+   last pre-deploy gate — passing the exact held `--expect-token` and a `--min-remaining-ms` floor.
+   Deploy only on exit `0`; exit `3` is a lease-guard refusal (wrong token or too little lease
+   left), `4` means live work remained or a protected artifact moved (while still pre-migration,
+   re-apply then re-verify; after migration 0038 never re-run — use step 3), and `5` is a
+   D1/transport error. The cancel fences every unfinished legacy run and its chunks,
+   parks profile and re-measure claims, keeps a parked re-measure claim with its `run_id` so no
+   claim path (which requires `run_id IS NULL`) can take it, and preserves completed results,
+   summaries, lane records, routing artifacts and finished profile rows; a cancelled run is
+   `failed` with an operator-cancel marker, not a model failure. It cannot stop admission: only the
+   dispatch lease gates claims, so `--verify` re-reads live state rather than trusting `--apply`.
+   Verify no run is `running` and no chunk is `pending`, `queued` or `active` before enqueueing.
+   Migration 0038 creates the paid request table. Check paid requests after the deploy.
+3. After the deploy and before release: run the late read-only checks with
+   `scripts/legacy-cancel.mjs --legacy-residue --remote` — the only mode defined for the
+   post-cutover schema. It reports legacy work (a run with `benchmark_runs.admission_marker IS
+   NULL`, the same predicate the paid Worker uses) separately from paid work, is read-only, and
+   exits `4` if any legacy run is `running` or any legacy chunk is `pending`/`queued`/`active`.
+   `--dry-run`, `--apply` and `--verify` all refuse on a post-cutover database (exit `4`, no
+   writes): every table they need survives migration 0038, so on that schema they cannot tell a
+   legacy run from a run a user explicitly confirmed through the paid flow. **Never re-run the
+   legacy cancel after the deploy.** A nonzero legacy count means keep the hold and escalate;
+   canceling anything at that point is wrong. A paid request or paid run that is live while the
+   hold is retained is expected — a user click under the hold is a legitimate confirmation and is
+   never a reason to cancel. Confirm the engine identity, measurement revision, ready-pair
+   counts, and published versions are unchanged. No legacy profile can move to a runnable state
+   or start a run. For each saved pool, compare the routing-table bytes and each model row's
+   classification. An already correctly benchmarked pool must keep the same table and need no
+   quote or click.
+4. Before releasing, confirm the benchmark Worker, serving Worker, web, and gateway contain the
+   merged head. Confirm the serving Worker can read the benchmark readiness epoch through the
+   existing service binding. The deploy jobs can complete in any order. The operator hold fences
+   spend until every check passes.
+5. Release only the exact token the hold was acquired with (never a `LIKE` pattern), then confirm
+   the next dispatch pass starts no run for stored work and that a platform publish logs
+   `routing_table_publish_skipped_unchanged_desired_set` for an unchanged desired set.
+
+For a release that changes the paid flow, also rehearse the migrations against a bounded read-only
+copy of the benchmark D1 database and the needed PostgreSQL rows on a single test host, compare
+counts, artifact digests, and per-pool model classifications before and after a normal dispatch
+tick and the daily reconciliation, and delete the exact copies afterwards. Keep every report to
+counts and pass/fail: no customer data, model output, credentials, or tenant identifiers.
 
 Diagnostic events contain run, model, variant, repetition, case, chunk, slot, outcome and
 safe error categories. They never contain claim tokens, prompts, model output or raw stderr:
@@ -282,15 +409,29 @@ measurements are included in routing-table version hashes.
 - New subscriptions resolve once when admitted. Existing subscriptions check for target changes daily at 05:00 UTC.
 - Queue dispatch, publication, policy edits, and status reads use persisted targets. They do not silently retarget an existing alias.
 - An unchanged target with current measurements needs no benchmark.
-- A changed target reuses current cached measurements or enters the normal benchmark queue.
-- The previous serving target remains active until every replacement variant is ready.
-- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target.
+- A changed target uses current cached measurements. For the platform pool that can enter the
+  platform queue; an owner pool records the target and serves its pin or live alias, and only a
+  new confirmed request measures it.
+- For the platform pool, the previous serving target remains active until every replacement
+  variant is ready.
+- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target. A target that is still saved but has no ready measurement keeps serving instead of dropping out of the routing table, and the hold is logged as `benchmark_alias_serving_held`.
 - Removing an alias stops its subscription from following later updates.
-- Daily target changes do not consume the owner's request quota.
+- Daily target changes consume no admission quota and start no measurement.
 - An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
 
+The 05:00 run covers platform aliases and every owner subscription on both routers, in bounded
+work units it can resume: the platform aliases are re-resolved once, then owners are reconciled a
+keyset page at a time (`benchmark_daily_alias_sync`, one row per router). The one-minute tick
+continues an unfinished day, and a failed catalog resolution is retried on later ticks the same
+day until 30 attempts are spent. Each step of the daily branch — stale sweep, alias sync,
+registry sync, policy recomputation, drain, publish — runs in its own isolation, so one failure
+does not skip the others, and one `benchmark_daily_sync_summary` event per router carries every
+step's outcome. Per-owner failures are logged as `benchmark_subscription_daily_failed` and do not
+stop the pass.
+
 Existing benchmark subscriptions retain their persisted alias targets. Backfill known owners
-with the full model list before relying on daily coverage for historical pools.
+with the full model list before relying on daily coverage for historical pools. The snapshot is
+serving bookkeeping for an owner pool: it never admits, schedules or charges a measurement.
 Send the existing full pool to `POST /admin/profiles/subscriptions`:
 
 ```json
@@ -335,8 +476,8 @@ Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
 - Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
 
 The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
-Container callbacks are bounded by three attempts. Exhausted delivery logs contain categories,
-not credentials or result contents.
+Container callbacks are bounded by ten attempts over about 5.5 minutes. Exhausted delivery logs
+contain categories, not credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -951,119 +1092,263 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
-or query. Omission selects efficient. Owner profile and custom router endpoints accept both
-routers. The classifier-winner endpoint returns the shared winner.
+or query. Omission selects efficient. Registry, custom router and paid-request endpoints accept
+both routers. The classifier-winner endpoint returns the shared winner.
 The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 
 | Endpoint | Purpose |
 |---|---|
-| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them |
-| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
-| `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
-| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
-| `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
-| `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
-| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
-| `GET /admin/routing-table` | Latest published **platform** routing table |
+| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
+| `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `runningRunIds` lists every running run of the router, whatever the `kind`/`purpose` filter; the admin panel polls while it is non-empty and refreshes the routing table, config and registry whenever a run leaves it. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
+| `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
+| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the platform registry queue (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`; a `user` selector now retires without work, logging `benchmark_user_queue_retired`); `202` once a run row exists, with initialization left to the dispatcher |
+| `GET /admin/registry` | Queue counts, exact platform entry statuses and the failed entries of both demand flags (retryable and permanent, with class, attempts and retry window) under the current engine identity and repetitions |
+| `POST /admin/registry/requeue` | Put retryable failed registry rows whose retry window has passed back to `pending` (`{scope}`); permanent rows are skipped |
+| `POST /admin/registry/refresh` | Re-admit exact pairs (`{router, mode, entries}`), clearing their failure history; the console's per-row Re-admit uses `mode: 'refresh'` |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action, pairs?}`; `pairs` limits the plan to an explicit `[{model, variant}]` list) |
+| `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` only while its version matches the pointer `benchmark_routing_table_version_v1:<router>`. Every publish writes the pointer after its D1 write; a read that finds the pointer missing or different from D1 rewrites it. Every pointer writer re-reads D1 after its write and corrects it, and a body is cached only at the confirmed version. A publish that cannot write the pointer logs it, deletes the cached body and still flushes the gateway key, so the next read goes to D1 and repairs the pointer. The cached body expires after 10 minutes, so even a failed pointer write plus a failed body delete serves the previous table for at most that long. A location's KV edge cache can keep serving the previous pointer for up to about 60 seconds after a publish |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |
+| `POST /admin/profiles/register` | Admit pairs for a custom router's gateway models (stale history free, never-seen models quota-limited); admission alone never starts a run |
 | `POST /admin/custom-router-table` | Custom router table from platform and owner client measurements (`CustomRouterBenchmarkContextSchema`) |
 | `POST /admin/custom-router-status` | Per-variant status of every custom router entry (`CustomRouterStatusResponseSchema`) |
+| `POST /admin/custom-router-blocked-models` | Read-only add validation: the exact resolved pairs of the asked models whose registry row is permanently unavailable at the router; never admits or spends |
+| `GET /admin/paid-requests` | Paid request list with requester, statuses, per-payer billed model requests and actual spend, platform cover and its spend, pause reason; keyset paging |
+| `GET /admin/paid-requests/progress` | One paid request's case page and totals; 404 when the request does not exist |
+| `POST /admin/paid-requests/pause` | Stop one paid request: detach its payers and cancel only the case runs it alone paid; other payers keep the case |
+| `POST /admin/paid-requests/routing-table` | The pool routing table the request's quote was bound to |
+| `POST /admin/runs/:runId/cancel` | Stop one platform run: fence its unfinished case generations and stop their subprocesses; never touches a paid request |
 
-## Owner Benchmark profiles
+## Owner benchmark requests
 
-Custom routers (ADR 0005) name gateway models of either base router. When an owner saves a
-router whose entries or base router changed, the web app registers the gateway entries the
-platform key can serve with `POST /admin/profiles/register`. Each selected model
-expands through the live catalog into every supported reasoning effort, or one
-default pair when there are no reasoning controls. This worker measures exact
-model-effort pairs globally under the current engine identity and repetitions.
-Custom router tables rank every measured pair; the router, not the owner, chooses effort.
-ADR 0003 owner pools, which constrained efficient itself, were converted to custom routers
+Custom routers (ADR 0005) name gateway models of either base router. A pool save validates the
+pool and records a registry row with both demand flags off: it never registers a benchmark, never
+drains a queue, and never charges. Each selected model expands through the live catalog into every
+supported reasoning effort, or one default pair when there are no reasoning controls, and the
+worker measures exact model-effort pairs globally under the current engine identity and
+repetitions. Custom router tables rank every measured pair; the router, not the owner, chooses
+effort. ADR 0003 owner pools, which constrained efficient itself, were converted to custom routers
 with slug `efficient` at the ADR 0005 cutover.
 
-### The two registry queues
+### Registry demand and paid requests
 
 A registry row records who wants the measurement: `platform_requested` (the
-saved decider list) and `user_requested` (custom router gateway entries). Both can be set — the
-row is global, so the pair is benchmarked once and serves both.
+saved decider list) and `user_requested` (a custom router gateway entry). Both can be set — the
+row is global, so the pair is benchmarked once and serves both. Only the platform flag schedules
+automatic measurement; a `user_requested` row is serving bookkeeping that an explicit paid request
+claims.
 
-| | Platform queue | User queue |
+| | Platform queue | Paid request |
 |---|---|---|
-| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from the web custom routers API (quota-charged) |
-| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
+| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | The staged plan of an owner's confirmed request (`paid_benchmark_request_cases`) |
+| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | The owner's confirmed click; the cron only continues staging, activation and settlement |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
-| Run lifecycle | One active run per router/queue | One active owner run per router |
+| Run lifecycle | Up to 4 active runs per router/queue, one of them starting | One run per paid request, at most 4 active owner runs per router |
 
 All four shares use the same bounded chunk scheduler and borrow unused capacity.
 `benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
 runs write zero: it is not an execution reservation. Registry admission is still atomic
-per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
+per exact pair, and the per-router/purpose run lifecycle gate remains independent of slots.
+
+A platform drain starts a new run for the oldest pending entries while earlier platform
+runs of that router are still measuring, so a newly added model does not wait for the
+active run to finish. The drain skips the router while one of its runs is still starting
+(it has no `scheduler_runs` marker yet: reuse copies and chunk creation are still in
+progress), logging `benchmark_queue_drain_skipped_run_starting`, and while
+`MAX_RUNNING_RUNS_PER_QUEUE` (4) runs are active, logging
+`benchmark_queue_drain_skipped_queue_full`. The run row is inserted by one conditional
+statement that repeats both checks, so overlapping drains (the timer, a finishing run, an
+admin request) cannot start two runs that are both starting or a fifth active run: the
+refused drain hands its claimed pairs back to `pending` and logs the same skip event.
+Concurrent drains claim disjoint pairs; a drain that finds every pair claimed logs
+`benchmark_queue_drain_batch_already_claimed`.
+Runs of one router and purpose share its execution share. Within the share the scheduler
+prefers the model with the fewest live chunks, then the older run, so a small new run
+gets its first chunks as soon as its models hold fewer slots than the earlier run's
+models. Each dispatch pass finalizes every settled run it can see. Classifier runs stay one
+at a time: `POST /admin/runs` answers 409 while one is active.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
 Failed pairs do not contribute scores.
 If any taxonomy route has no measured candidate, the worker skips publication and keeps the previous table.
+A publication happens only when the desired serving set itself changed. Every publish records
+that exact membership; a deploy or an unchanged daily pass that finds the same set logs
+`routing_table_publish_skipped_unchanged_desired_set` and writes nothing. An unreadable cutover
+marker fails closed (`routing_table_publish_skipped_no_cutover`) rather than licensing a rebuild.
+Reusable stored results are enough for a publish that is otherwise due, so an unchanged pass needs
+no new inference.
 
 Rollback: removing a model from a custom router (or deleting the router) leaves the platform
 table untouched — it only ever draws on rows the platform list asks for.
 
-### Request ledger and admission
+### Requests, payers and admission
 
-The platform pays for every owner-requested measurement. Owners are never charged.
-Already ready/current or pending/running pairs are reused by every owner.
+An owner's work starts only from the pool's explicit benchmark flow. The web authorizes the saved
+pool, then forwards its immutable context to `POST /admin/custom-router-benchmark`:
 
-`POST /admin/profiles/register` admits missing, stale, or retried pairs and records
-one quota request event per newly requested model in the same D1 batch. The rolling
-quota allows 20 new models per base router per owner in 24 hours; it counts models,
-not efforts, and ready or pending models are reused without a charge. Engine-stale
-remeasurement is quota-free.
-Concurrent requests share one global pair; the first admission wins and the
-others report its status.
+| Action | Effect |
+|---|---|
+| `quote` | Reads the plan for the exact missing slots; writes only an expiring quote row. `empty` when nothing is missing. |
+| `start` | Consumes the quote (one request per quote), stages its slots in bounded D1 batches, and activates the request once every planned slot exists. Refuses an expired quote, a changed pool, an engine change, a moved alias target, or a catalog it cannot confirm; a refusal schedules nothing. |
+| `progress` | Continues staging, activates a fully staged request, settles a finished one, and returns one page of cases with a cursor. Never creates a request. |
+| `pause` | Detaches this request's payers, cancels only the case runs it was alone paying, and makes dispatch stop now. |
 
-Admission returns before the web app's router write. If that write fails, the previous
-router remains, but admitted measurements still run. Retrying reuses the same global
-profiles without charging quota twice.
+The web exposes the same four actions through the pool-owner authorization: an organization needs
+the existing billing authority to start or pause, and any member with pool access may read the
+quote, progress and table. A save, an alias scan, a subscription sync, an admin retry, or a deploy
+cannot start a request.
+
+Admission of registry rows still uses `POST /admin/profiles/register`: stale history admits free,
+a never-seen model consumes the 20-per-base-router-per-24-hours window, and the batch records its
+request events atomically. Admission alone never starts a run.
+
+**Quotes.** Cost is the pair's measured draw for that exact case, else its measured mean for the
+same input-size bucket, else its measured pair mean, else catalog prices with documented token
+assumptions (`ASSUMED_OUTPUT_TOKENS`, `ASSUMED_TOOL_OUTPUT_TOKENS`, the 20,000-token input floor).
+A long-context case never borrows a short bucket mean and is either measured or priced from the
+catalog for its own context. An unpriceable model fails the quote closed. The quote counts reused,
+platform-covered, shared and exclusive slots separately and shows the estimate plus a full-cost
+scenario (`maximumMicrodollars`, the summed per-slot estimate for the slots this request would pay
+for). That scenario is advisory only: it is not a cap, a reservation or a stop condition. Nothing is
+reserved, deducted or refunded, and the settled native amount is authoritative. When confirmed
+spend goes over the scenario, progress and the admin console disclose the overage and the request
+keeps running.
+
+**What bounds native spending.** Only the payer's own balance or organization member limit, and
+an owner pause, bound it; the benchmark keeps no cap of its own. A pre-upstream `payment_refused`
+detaches that account and the next funded account is selected for the same model request; a
+`payer_changed` or `attempt_superseded` selection is re-resolved the same way, and a
+`payer_unavailable` refusal is not rotated. A refusal that means "the outcome is not known yet"
+(`receipt_unconfirmed`, `admission_busy`, `outstanding_receipt`) is neither a payment failure nor a
+model failure: the case pauses retryably so the native receipt can land, and the model request is
+never reassigned. When no funded candidate remains the case stops without a retry (`no_payer`),
+the run fails as unfunded (`benchmark_paid_case_unfunded`), and the request needs a fresh
+confirmation; none of these advances a model-failure streak. A call that may have reached the
+provider is never reassigned, and its receipt is still recorded. A paused request needs a fresh
+explicit confirmation for the remaining slots; it never resumes the old one. A quote that expired, or whose pool, engine, case
+set, or alias target changed, is never reused: a fresh estimate is required.
+
+**Benchmark project and pending usage.** Every admitted call is booked under a reserved project
+id: `Auto-routing benchmarks / platform` for a platform-covered call, and
+`Auto-routing benchmarks / <user|org>/<pool-slug>/<routerId>` for a pool-funded call. The id names
+the pool (slug plus saved router id) and the usage row names the concrete model, so a personal or
+organization view groups spend by pool and model without exposing the owner id. Native usage can
+commit after admission returns, so a usage id whose receipt is not yet readable is reported
+`pending`: it is never treated as free, never counted as a second charge, and stays disclosed
+until the authoritative primary read returns `recorded` with the signed payer and project. A
+receipt that does not match the signed assignment is refused, not booked.
+
+**One payer per model request.** When a model request starts, the case store attaches exactly one
+payer: the sticky platform row if the platform requested the case before attachment, otherwise the
+next distinct active account in a deterministic rotation. A known pre-provider payment refusal
+detaches that account and the next funded one may be assigned to the same request; after the
+provider accepted usage (or the attempt is uncertain) nothing reassigns it. The worker never
+invents a payer: its case-inference boundary authenticates the exact case generation and refuses
+when no payer boundary is configured. A platform membership that commits before attachment covers
+the case run from then on and is never reversed; a user charge already recorded stands. Platform
+joining later covers later requests of the case, never the earlier ones. See "What bounds native
+spending" and "Benchmark project and pending usage" above for the stop conditions, the rotation and
+the receipt rules.
+
+**Case identity and one shared fence.** A case run is `(engine identity, concrete model, variant,
+repetition, case, generation)`. `benchmark_case_runs` is the only fence: its primary key plus
+`generation` decide who may measure a case, and every transition is conditioned on the executor
+run, claim token and generation, so a stale callback cannot touch a newer attempt. Platform runs,
+paid requests, and admin re-measures all claim through it, so one pair is never measured twice for
+one slot. A slot with a valid stored draw is adopted as `reused` instead of measured, and its
+pending output is reused before any paid call. A container that still finishes after a cancel or a
+failed lane posts its output to `/container/case-result`; a late output restores reusable data
+(`result_usable`) without reopening a payer or a charge.
+
+**Measurement identity is unchanged.** Paid requests use the deployed engine identity, the active
+measurement revision (still revision 3), the router's case list, and the base router's effective
+policy. They add no engine version, no case, and no ranking change, and the migration backfills no
+measurement or run: existing results keep their revision and no backfill schedules user work. A
+request whose quote names another engine identity is refused.
+
+**Pause and cancel.** A pause detaches the request's payer rows and cancels only case runs with no
+remaining voluntary payer that the platform does not cover, writing a durable cancellation intent
+for the exact running generation. Other payers keep measuring. A last-payer pause (or an admin
+cancel of a platform run) stops the runner and fences the generation; an output that still arrives
+is recovered as a reusable result without a new charge. Billed usage stands; a cancelled, failed, or
+result-less case never bills.
 
 ### Status transitions and drain
 
 ```
 pending → running → ready
-                 ↘ failed (bounded failure_reason; Retry re-admits)
+                 ↘ failed (retryable) → pending only by an admin requeue or a per-row re-admit
+                 ↘ unavailable (permanent; wire status `failed`) → pending only by a per-row re-admit
 ```
 
-- **running**: set when a decider run of either queue claims the entries at `startRun`.
+- **running**: set when a decider run claims the entries at `startRun`.
 - **ready**: set when that run completes successfully (`run_id` provenance
-  points at the measuring run).
-- **failed**: set when the run fails (enqueue, timeout sweep, etc.) — or, at
-  profile-run completion, per entry whose lane dead-lettered while the run's
-  other entries become `ready`. Only rows still pointing at that `run_id`
-  transition — a newer pending/ready row is never clobbered.
+  points at the measuring run). Clears the failure history.
+- **failed / unavailable**: set when the run fails (enqueue, timeout sweep, etc.), per
+  entry whose lane died, or per entry whose cases nearly all failed with one provider
+  rejection. Only rows still pointing at that `run_id` transition — a newer pending/ready
+  row is never clobbered.
+
+`src/profile-failure.ts` owns the failure state: `parseProfileState` is the one reader of
+the row, and `profileFailureAssignments` is the one failed transition. Each failure has a
+class; the class decides whether the failure is permanent:
+
+| Tier | Classes | Rule |
+|---|---|---|
+| Terminal | `catalog_absent`, `context_too_small`, `model_not_found`, `unsupported` | Permanent at once |
+| Model | `provider_unavailable`, `model_resolution` | Retryable; reported class only |
+| Infrastructure | `ambiguous_execution`, `container_capacity`, `catalog_load`, `grader`, `run_timed_out`, `orphaned_claim`, `run_init_failed`, `unknown` | Retryable; reported class only |
+
+The tier decides the class a dead lane reports, not the budget. Every retryable failure is
+permanent once `src/profile-failure-history.ts` proves six consecutive failed attempts with no
+newly completed valid case since the last progress or explicit re-admission: an attempt counts
+only when the run's own finalization saw its durable results and lane evidence, a copied result is
+not progress, and cancelled runs, runs that never attempted the pair, and operator-fenced legacy
+work neither count nor break the streak. A valid score of zero is progress. Attempts are counted
+across repetition counts, so changing the configured count cannot restart a streak.
+
+`unsupported`: at least 95% of an entry's measured cases failed with the same provider
+rejection (numbers ignored). Timeouts, content filters, throttles, empty output and wrong
+answers stay measurements.
+
+A retryable failure waits `2^(attempts-1)` hours, capped at a day, before
+`POST /admin/registry/requeue` takes it. Nothing re-admits a failed row automatically.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
 exact variant match the live decider engine. The platform table never uses a stale row.
 Custom router tables serve a stale row, flagged `stale`, until the current one is ready (see
 below).
 
-**Per-queue drain** (after any decider terminal state, on the admin's manual
+**Platform drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
 
-1. If that queue's run is active, leave its pending registry rows alone.
-2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first.
-3. `startRun(purpose: queue, entries: snapshot)` persists the workload, then the
-   global scheduler claims only the chunks that fit its current caps.
+1. Skip the drain when one of the router's runs is still starting (it has no `scheduler_runs`
+   marker yet) or when it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs; its pending
+   registry rows are left alone.
+2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first, and only rows
+   requested at or after the durable paid cutover marker; a row that predates it stays parked.
+3. `startRun(purpose: 'platform', entries: snapshot)` writes the run row and wakes the
+   dispatcher, which materializes the chunks; the global scheduler then claims only the
+   chunks that fit its current caps.
 
-A row wanted by both queues appears in both listings; whichever run claims it
-first flips it to `running`, so it is still measured exactly once.
+A paid request's run uses its deterministic `user-paid-<requestId>` id (`paidRunIdForRequest`,
+`startPaidRequestRun`) and measures only that request's planned slots; the platform drain never
+starts it. The run refuses to start when the request is not active or its engine identity differs
+from the live one.
+
+A row wanted by the platform list and also staged by a paid request is claimed by whichever run
+reaches it first, so it is still measured exactly once.
 
 **Scheduled handlers:**
 
-- `* * * * *` — recover expired chunk claims, sweep stale runs, and drain both queues.
+- `* * * * *` — recover expired chunk claims, sweep stale runs, continue paid-request staging and
+  settlement, and drain the platform queue.
 - `0 5 * * *` — sweep, reconcile the platform queue with each router's
-  admin-configured decider list, drain both queues, republish the
+  admin-configured decider list, drain the platform queue, republish the
   platform table (so a *removed* model leaves the live table even when nothing
   new needed measuring).
 
@@ -1106,6 +1391,336 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
+
+## Adding a model: the flow
+
+Four entry paths put a model into the benchmark registry, and only the last starts a measurement.
+All of them converge on one registry row per exact `(model, variant)` pair under the live engine
+identity and repetitions: the first two can queue platform work, the third only records a serving
+target, and the fourth measures an owner's confirmed selection.
+
+| Entry path | Who starts it | Code |
+|---|---|---|
+| Admin Policy tab → **Save config** | an admin, in the console | `apps/web/src/app/admin/api/auto-routing/benchmark-config/route.ts` → `PUT /admin/config` (`registerAdminRoutes`, `src/admin.ts`), then `syncRegistryAfterConfigSave` → `syncPlatformRegistry` (`src/run.ts`) |
+| Owner pool save or edit (gateway entries) | the router's owner, in their own console; **no measurement starts** | `apps/web/src/lib/auto-routing-custom-routers.ts` → `POST /admin/profiles/register` (`registerAdminRoutes`, `src/admin.ts`) → `registerProfiles` (`src/profiles.ts`); the add pre-check uses `POST /admin/custom-router-blocked-models` |
+| Alias target moves (e.g. `~openai/gpt-sol-latest` → a new concrete id) | nobody — the daily cron records the target; **no measurement starts** | `dailyReconcileSubscriptions` (`src/subscriptions.ts`) at `0 5 * * *`, resumed on the next ticks by `continueDailyReconcile` (`src/index.ts`) |
+| Owner pool benchmark (explicit) | the router's owner, from the pool's benchmark surface | `apps/web/src/routers/custom-router-benchmarks-router.ts` → `POST /admin/custom-router-benchmark` → `buildPaidBenchmarkPlan`, `startPaidBenchmark` (`src/paid-benchmark.ts`); the activated request's run is `startPaidRequestRun` (`src/run.ts`) |
+
+### Steps, with what is manual and what is a wait
+
+Each step names the code that performs it. **Manual** means a human click or API call;
+everything else is automatic. **Wait** is the delay the flow itself imposes.
+
+| # | Step | Manual / automatic | Wait | Code |
+|---|---|---|---|---|
+| 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `registerAdminRoutes` (PUT /admin/config), `syncRegistryAfterConfigSave` (`src/admin.ts`) |
+| 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `syncPlatformRegistry` (`src/run.ts`), `syncPlatformRegistryRows` (`src/db.ts`) |
+| 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `syncRegistryAfterConfigSave` → `publishPlatformRoutingTable` (`src/run.ts`) |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish, and a decider run reaching a terminal state drains immediately. An owner pool save drains nothing | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron); the queue must be able to start a run, i.e. none of its runs is still starting and it holds fewer than `MAX_RUNNING_RUNS_PER_QUEUE` active runs (see "Registry demand and paid requests") | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
+| 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `startRun` (`src/run.ts`), `markProfilesRunningForRun` (`src/db.ts`), `reuseDeciderCaseResults` (`src/db.ts`, in the dispatcher's initialization) |
+| 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `scheduleRunChunks` (`src/scheduler.ts`), `initializeScheduledRun` (`src/run.ts`) |
+| 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `claimScheduledChunks` (`src/scheduler.ts`), `dispatchScheduler` (`src/run.ts`) |
+| 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `beginPaidCase` (`src/scheduler.ts`), `acceptContainerCaseResult` (`src/run.ts`) |
+| 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `finalizeRunIfComplete` (`src/run.ts`) |
+| 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `markProfilesReadyForRun` (`src/db.ts`), `src/profile-failure.ts` |
+| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses while a serving pair's measurement is in flight (or it has no current-engine registry row yet); a settled failure leaves the table and is named in the publish log; an unchanged desired set publishes nothing | `publishPlatformRoutingTable`, `finalizeRunIfComplete` (`src/run.ts`) |
+| 12 | Console: runs list, per-model cost table and routing table show the result | automatic on page load / refetch | none | `apps/web/src/app/admin/auto-routing/BenchmarksSection.tsx` |
+
+### Owner pool benchmark flow
+
+The pool's benchmark surface is a read until the owner clicks; opening it never starts work.
+
+| # | Step | Manual / automatic | Effect |
+|---|---|---|---|
+| 1 | Review the estimate | **manual** (open the pool's benchmark surface) | `quote` plans only the missing slots and writes an expiring quote; `empty` means nothing is missing |
+| 2 | Start | **manual** (confirm the click) | `start` consumes the quote, stages its case rows in bounded batches, and activates the request once fully staged |
+| 3 | Run | automatic (cron + dispatch) | one run per request, narrowed to the request's planned slots; reused slots are recorded without a call |
+| 4 | Progress | automatic on poll | per-case status, billed and platform-covered model requests, spend versus the advisory estimate, and an overage warning; it keeps running past the estimate |
+| 5 | Pause | **manual** | detaches this request's payers; another payer keeps the case, and a last-payer pause stops the runner |
+| 6 | Completion | automatic | pins the confirmed alias targets whose target produced a usable result; a request with no usable result fails retryably |
+
+The estimate is advisory: it is not a hard cap and nothing stops at it. Spending stops only when
+the owner pauses or a payer cannot pay, and a model request already in flight can take the total
+over the estimate; the actual native charge is authoritative. A request whose pool, engine, case
+set, or alias target changed while staging closes and asks for a fresh estimate instead of
+measuring something the owner did not confirm.
+
+### Expected time per step
+
+Measured on the local stack with synthetic case results standing in for inference
+(`/tmp/ar-bench/flow/`, 1440 px captures) and on production since the 2026-11-20 fixes.
+
+| Step | Local stack | Production |
+|---|---|---|
+| 1–3 save (console click → 200 with `warnings: []`) | 0.4–1.1 s | same code path |
+| 1–3 save when the catalog mint fails | 0.3–0.4 s, `warnings: ["registry_sync_failed"]`, config still saved | — |
+| 4 drain | in the save response (0.6 s) for the platform queue; an owner pool save starts no run | 3–62 s measured, and no click |
+| 5 run row written | within the drain response | same |
+| 6 initialization | 22 s for 294 chunks / one lane; a 4426-chunk run took about 4 min of passes | 30–40 s before the first case on small platform runs; minutes on a 100-entry batch |
+| 7 → 8 first case started | 3 s after the run row | 13–40 s |
+| 8 first case result | 1–12 s (seeded) | 13–37 s |
+| 8 whole run | seeded instantly; not representative | p50 ≈ 38 min for 10 frontier pairs × 294 cases; ≈ 94 min for one efficient model × 576 cases × 3 reps |
+| 9–11 ready + published | 0.1 s (seeded → one dispatch tick) | 0.2–5 s after the run completes |
+
+End to end for one model through the admin path with a real measurement: allow **15 min to
+2 h** for an efficient model (576 cases × 3 reps at the current caps) and **10–50 min** for a
+frontier model, plus at most a minute of drain and a minute of initialization. Production
+before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (platform) and
+5.8 h (owner), and admit→published 46 h; after them the same measurements are 38 min
+(platform) and 56–94 min (owner), and publish lands within seconds of run completion.
+
+### What the console shows at each step
+
+- **Policy tab, right after the save**: the model row is in the decider list, and its effort
+  coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
+  that could not sync shows a destructive banner naming why (`registry_sync_failed`,
+  `routing_table_publish_failed`) plus "save again to retry now". A save whose platform drain
+  did not start a run is not an error: its `drain.skipped` says `active_run` (one of the
+  queue's runs is still starting, or it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active
+  runs), `nothing_pending` (every pair is already measured or in flight), `timeout`
+  or `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
+  picks it up (within a minute).
+- **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,
+  and the per-entry status list under the current engine identity.
+- **Benchmarks tab, runs list**: a platform or paid-request run row with its status
+  (`running` with a progress bar, then `completed` or `failed`), its total cost, cases and
+  errored count. Expand a run for a per-model table of **Accuracy, Cost / case, Total cost,
+  Cases, Errors**, and the model-id filter above it.
+- **Benchmarks tab, Failed models**: every failed pair with a `Permanent` / `Retryable` badge,
+  its class, reason, first/last failure and attempts, the next retry time, and a per-row
+  **Re-admit**.
+- **Routing table tab**: the published version, its generation time, and per route each
+  ranked pair with accuracy and average cost. A pair appears only once it is measured.
+
+### Failure states
+
+A failed entry is `failed` (retryable) or `unavailable` (permanent), classified in
+`src/profile-failure.ts` and `src/profile-failure-history.ts`:
+
+- **Permanent (terminal)**: `catalog_absent`, `context_too_small`, `model_not_found`,
+  `unsupported`. The row goes `unavailable` at once with no retry time. It stays out of the
+  routing table but does not hold the table back — a live pair that has no ready row and no
+  measurement in flight leaves the table and is named in the publish log instead.
+- **Retryable**: every other class. It stays retryable until six *proven* consecutive
+  failed attempts with no newly completed valid case. A run proves an attempt only when its
+  finalization saw the run's own durable results and lane-failure evidence: a copied result
+  is not progress, and cancelled runs, runs that never enqueued the pair and
+  operator-fenced legacy work neither count nor break the streak. A valid score of zero is
+  progress. Attempts are counted across repetition counts, so changing the configured
+  repetition count cannot restart a streak.
+- A row's own attempt counter is display/backoff only; it never makes a retryable failure
+  permanent. Writers without attempt history (a pre-paid refusal before any run, an orphan
+  sweep) leave the pair retryable. A refused or failed paid admission (no credit, a failed
+  reservation) is a payer failure, not a model attempt: it is skipped and never counts.
+  Attempts made before the attempt history existed are unknown: they keep the stored status
+  and never extend a new streak.
+- The next retry waits `2^(attempts-1)` hours, capped at 24.
+
+Recovery: **Requeue retryable** (admin, `POST /admin/registry/requeue`) puts every retryable
+row of a queue back to `pending` once its retry window has passed.
+A permanent row moves only through **Re-admit**: the console posts
+`POST /admin/registry/refresh` for that one pair with `mode: 'refresh'`, which clears its
+failure history, writes an attempt-history reset marker and puts it back to `pending` as
+soon as the catalog can run it. Re-admission never invalidates results: a `failed` or
+`unavailable` row keeps its previous `invalidated_at`, so every compatible past case stays
+reusable and a re-run pays only for what is missing. A live ready/pending row still gets the
+refresh's invalidation stamp, as before. An explicit retry pair on `POST /admin/profiles/register`
+can re-admit a retryable row, never a permanent one, and nothing re-admits a pool on its own. The
+narrower `mode: 'repair_unavailable'` (see "Unavailable
+models and targeted refresh") selects only pairs with a recorded exact model-lookup failure,
+preserves `invalidated_at` entirely, and would leave a streak-exhausted row in `skipped`.
+
+### The remaining waits, and why they stay
+
+- **No wait on the admin path.** A save that adds a model drains the platform queue in the
+  same request, so the run exists by the time the save answers — no **Run platform queue**
+  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue is
+  already starting a run or holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs, the save still
+  answers 200 with the saved config and reports why in `drain`:
+  `skipped: 'timeout' | 'failed' | 'active_run' | 'nothing_pending'`. A drain that outlives
+  the deadline is not abandoned: the save hands its promise to the request's
+  `ctx.waitUntil`, so a claim that already started a run still records it, and the
+  per-minute cron starts anything it did not reach within a minute. Nothing is lost.
+- **No wait before an owner request's run exists.** A pool save admits registry rows without
+  draining. The owner's confirmed request stages its own cases and starts its own run, so the
+  per-minute cron only continues staging, activation and settlement if the browser stopped polling.
+- **The queue's earlier runs.** A queue holds up to 4 active runs and starts one at a
+  time, so a new model gets its own run on the next drain instead of waiting behind the
+  pair batch already in flight; see "Registry demand and paid requests". Runs of one
+  `(router, queue)` share its execution share, and inside it the scheduler prefers the
+  model with the fewest live chunks, so the new run's first cases start as soon as its
+  models hold fewer slots than the earlier runs' models.
+- **Initialization at 20 s per pass.** A D1 write budget, not a policy choice: one pass
+  writes 50 chunks per batch so a big run never holds a single transaction open. A run
+  needing more passes just takes longer before its first case.
+- **The measurement itself.** Nothing removes it: it is the paid inference the benchmark
+  exists to perform.
+- **Publish waits for every serving pair.** The table is republished from the registry only
+  when every pair it serves is current or a settled failure. This is what keeps a
+  half-measured alias move from degrading the live table; it is also why one stuck pair used
+  to hold the whole table (fixed 2026-11-20: a settled failure now leaves the table instead
+  of blocking it).
+
+### Measurement revision 3: agentic probes (active)
+
+Every run records the revision it started under (`benchmark_runs.measurement_revision`),
+and every result stores the revision that measured it in `prompt_revision`, with the CLI's
+tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
+evidence is recorded at every revision. `src/measurement-revision.ts` separates two
+constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
+`ACTIVE_MEASUREMENT_REVISION` (3) is the revision every new run starts under. `startRun`,
+`insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
+the active revision. Revision 3 was activated with migration `0035_probe_activation`, which
+also decides which pairs measure it now (below); nothing else in the deploy schedules
+revision-3 work.
+
+The CLI benchmark cannot see the production problem this revision measures: a CLI case is
+one prompt to a fresh session, so a model that ends a tool-offering turn with narration
+looks like any other wrong answer, and the revision-2 tool-required cases only check that
+the final answer is right. Revision 3 asks production's question: given a session that is
+mid-task and whose last message is a tool result, does the model continue with a tool call,
+state the correct final answer, or stop?
+
+**Probe cases.** `src/datasets/probe-cases.ts` replays the recorded sessions in
+`src/datasets/probe-transcripts.ts` — the nine agentic transcripts the continuation pilot
+captured, kept as data with their verification test — and cuts each after a completed step,
+so every request's history ends on a tool result with no further user message. `PROBE_CUTS`
+is the cut set: `{transcriptId, cutAfterStep}` pairs (21 today, one per tool-result step
+end, 1-3 per transcript), so a cut can be dropped or added as a data change. Each cut
+becomes a case with the transcript's agentic route (`taskType`/`subtaskType`), the
+transcript's answer check and a `probe` field carrying the cut and the transcript; a probe
+case has no CLI prompt. Ids are `probe-<transcript-id>-step-<n>`.
+
+**Grading.** A probe reply scores 1 when it carries a tool call (the model continued the
+task) or when its text is the case's correct final answer; narration, a wrong answer or an
+empty reply scores 0. The check is exact or `json_equal`, so no judge is involved;
+`gradeProbeOutput` (src/grading.ts) implements it.
+
+**Templates.** `src/probe/family.ts` picks the family the way the pinned CLI does: the
+catalog's `opencode.prompt`, else the model id, picks the system prompt, and
+`opencode.ai_sdk_provider` picks the SDK and so the endpoint.
+`src/datasets/probe-templates.json` holds one minimal template per family captured from CLI
+7.8.27 against a local fake gateway that logs the request: `default/chat`
+(`deepseek/deepseek-v4.1-flash-1017`), `ling/chat` (`inclusionai/ling-3.1-flash`, thinking),
+`kimi/chat` (`moonshotai/kimi-k3`), `gpt/responses` (`openai/gpt-6-luna`),
+`default/responses` (`x-ai/grok-4.7`), `meta/responses` (`meta/muse-ember`) and
+`anthropic/anthropic` (`anthropic/claude-haiku-5.5`, the Messages API at
+`POST /api/gateway/v1/messages`). A template pins the endpoint, the system prompt with its
+cache breakpoints, the tool schemas, the fixed params, the static header values, how a
+reasoning variant maps to the wire, and how history is encoded; `src/datasets/probe-captures`
+keeps the captured requests and `src/probe/request.test.ts` rebuilds each of them from its
+template, minus per-call ids and timestamps. On a CLI bump, regenerate both from this
+package with Docker running and the workspace installed (needs `pnpm install` at the repo
+root):
+
+```
+pnpm exec tsx scripts/capture-probe-templates.ts --pool /tmp/efficient-pool.json
+```
+
+It starts `scripts/probe-gateway.mjs`, builds the pinned CLI into `probe-capture:7.8.27`,
+drives it through every family in the pool file and writes the fixtures, with no paid calls.
+The pool file is the live Router pool as a JSON array of
+`{ "model": string, "variant": string | null }`; `--only <family>` recaptures one family and
+merges it into `probe-templates.json`, keeping every other family and the rest of the
+bookkeeping. A model whose family has no template fails its probe lane with
+`BenchmarkProbeFamilyError` (a permanent entry failure), never with a score of 0.
+
+**Executor.** `src/probe/executor.ts` builds the request — template, the history up to the
+cut, the pair's variant and catalog entry — and POSTs it with streaming to
+`${KILO_CLI_API_URL}/api/gateway/v1/{responses|chat/completions|messages}` with the
+short-lived bot token the worker mints once per queue message and the run's org. It parses
+the SSE stream with zod into the CLI result shape (text, cost, tokens including reasoning,
+tool calls, `finalFinishReason`, exit 0) inside the same paid ledger: `beginPaidCase`,
+pending output, `recordDeciderOutput`. Cost comes from `usage.cost`; when the gateway omits
+it the executor prices the reported tokens at the run's catalog rates
+(`catalogUsageCostUsd`, src/platform-models.ts). A probe never touches the container, and
+`latency_ms` is the whole reply, from the request to the end of its stream. The error policy
+matches the CLI path: 429 and unbilled 5xx defer (throttle, no result), 400/404/422 marks the
+exact model unavailable, a request or stream that runs into `DECIDER_CLI_TIMEOUT_MS` is a
+timed-out result, a stream cut after the gateway billed for output is an ambiguous execution,
+a terminal provider error that reported usage is a billed failure with its cost and tokens,
+and a catalog read that fails after `beginPaidCase` clears the case and defers the chunk.
+
+**Route-scoped eligibility.** After activation (`ACTIVE_MEASUREMENT_REVISION >= 3`) a ready
+pair whose provenance run lacks complete probe results is ineligible on the three agentic
+routes only: the platform table drops its results for those routes and keeps every other
+route's measurement (`src/probe/eligibility.ts`). An agentic route with no eligible pair
+keeps the candidates the live table already serves instead of emptying. Measuring a pair's
+probes later, through the normal queue or an admin re-measure, makes it eligible again.
+`supp-agent-term-pwd-base` is the one revision-2 case that changes: revision 3 keeps it
+tool-required and accepts only `other`, the answer its isolated workspace produces.
+
+Revision 3 is active from the deploy that raises `ACTIVE_MEASUREMENT_REVISION` to 3.
+Migration `0035_probe_activation` is the whole activation scope, and it is what keeps the
+spend bounded:
+
+- The migration only *stages* the scope: it writes `probe_activations` rows, one per pair,
+  with the action to take. It cannot write `profile_remeasures` rows or `pending` profiles
+  directly, because a migration applies while the previous image is still serving and that
+  worker claims both without knowing the revision: the queued pairs would run at revision 2,
+  measure nothing they lack and lose their queue row, and the re-admitted rows would be
+  measured without the probes. The old worker never reads `probe_activations`; the drain of
+  the deploy that raises the revision consumes it once
+  (`applyProbeActivations`, `src/probe-activation.ts`), and it waits while the deploy holds
+  the dispatch lock so no instance of the previous image can be serving when the rows land.
+  Each staged row also names the revision its action needs (`required_revision`), and the
+  apply leaves every row staged whose revision the worker does not run.
+- The 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and need the
+  probes become `profile_remeasures` rows (23 platform pairs plus
+  `meta/muse-spark-1.2-contributor` `high`, a user-owned pair) — the rows the
+  `remeasure-prompt-transport` `request` action writes. Each run claims one row, reuses every
+  result that is still reusable and measures the 21 probe cuts plus
+  `supp-agent-term-pwd-base` per repetition, so 22 cases × 3 repetitions per pair and
+  nothing else. A pair whose provenance run already holds a revision-3 result for all 22 is
+  skipped instead, so a pair is never re-measured by this activation.
+- `meta/muse-ember` ×6 is re-admitted by the same activation: its 2026-11-11 rep-3 run lost
+  a lane and left all six rows `failed` (class `unknown`), so they had no probe measurement
+  and would stay ineligible on the agentic routes. The activation moves exactly those six
+  rows back to `pending` with the per-row Re-admit's fields (`src/profile-refresh.ts`),
+  `invalidated_at` included, and the next platform drain measures a full revision-3 run for
+  them. The re-admit's invalidation is deliberate and is what the forecast prices: results
+  measured before it are not reused (`reuseDeciderCaseResults` in `src/db.ts`), exactly as
+  for an admin Re-admit. Ember is the model this grading exists for, so it is re-admitted on
+  purpose now that narration stops are graded.
+- Every other efficient decider run the system starts on its own also runs at revision 3:
+  the per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and
+  each run completion drains again. For a pair with all of its case results stored that is
+  the same 22 cases × repetitions.
+- The pair list lives in `src/probe-activation.ts` and is mirrored in the migration; the
+  case list is the code's own `PROBE_ACTIVATION_CASE_IDS`, so the two cannot drift.
+  `src/probe-activation-sql.test.ts` fails if the migration's pairs drift from it, if
+  anything the live worker claims is visible before the activation is applied, if a
+  re-admitted row that is not a retryable failure (or that has a live chunk) moves, or if a
+  queued pair schedules a single case outside the probe set.
+- At 3 repetitions and catalog prices the 23 platform pairs cost $19.63 / $19.81 / $20.45
+  without cache (low/mid/high, $11.09 / $11.28 / $11.92 with half the input read from
+  cache), and `meta/muse-spark-1.2-contributor` `high` — the 24th queued pair — adds
+  $0.14 / $0.14 / $0.15 ($0.14 with half the input cached). The Ember re-admit adds
+  $10.22 / $10.25 / $10.32: 3 × 90 agentic cases at the measured rep-1 cost, the 1,021
+  missing non-agentic case-reps at $5.25, and its probes — a full run, because the re-admit
+  invalidates the failed run's results. Activation total $29.99 / $30.20 / $30.92,
+  $20.79 / $21.00 / $21.72 at 50 % cache.
+- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: every staged
+  row carries its `required_revision` (3), and `applyProbeActivations` skips — and leaves
+  staged — every row the worker's revision does not reach. A deploy at revision 2 therefore
+  neither queues the pairs nor re-admits the Ember rows; a later deploy that raises the
+  revision back to 3 applies whatever is still staged. An activation already applied is
+  cancelled by deleting the queued `profile_remeasures` rows, and the six Ember rows can go
+  back to `failed` with their lane failure. The new table is additive and every stored
+  result stays.
+- The platform table keeps publishing every route; only the agentic routes narrow as
+  described above.
+
+`minimumCaseRevisions(router, revision)` maps each case to the oldest result revision a run
+may reuse: 2 for the argv-affected cases, 3 for every probe case and
+`supp-agent-term-pwd-base`. Prior-case reuse and the re-measure baseline copy skip results
+below their case's minimum; the same `remeasure-prompt-transport` endpoint queues them, and
+its dry run also reports `unmeasuredResults`, the current cases a provenance run never
+measured, which the spend projection leaves out because they have no measured cost.
+
+In the container, a case that requires a tool call runs with `isolated: true`: the CLI's
+working directory (`PWD`) is a fresh temp workspace instead of the shared `/app`.
+
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base
@@ -1132,10 +1747,38 @@ entry keys the owner's CLI measures); this worker has no PostgreSQL access.
   entries become `client:<provider>/<model>` candidates priced from the entry (absent
   pricing is $0). Thresholds and ranking knobs are the base router's effective policy.
   The version includes the base router, engine identity, and each client profile's upload
-  count.
+  count. The response also carries `servingPins`, the entry keys whose pinned concrete target
+  still has a usable measurement; both serving paths dispatch that target and refuse a
+  decision that names anything else.
+- **Shared output.** A ready measurement belongs to its concrete gateway target, base router,
+  variant, engine identity, and repetitions, not to the pool that paid for it. Every pool that
+  uses that target (directly, through `measuredAs`, or through a saved serving pin) serves the same
+  row, so a new compatible result becomes available to all of them with no quote, click, request
+  row, or charge for those owners. The owner's request only paid for the slots that had no
+  reusable draw.
+- **Model availability per pool.** A row's indicators come from the shared registry and status
+  reads, so a measurement that lands is served to every pool by the next routing and status read;
+  no pool admits, confirms or pays to see it. The editor distinguishes:
+  *active* (a current or pinned measurement serves it), *benchmarking*, *paused* with its reason
+  (including that no current payer could be charged), *permanently failed*, and *alias
+  re-benchmark needed* (the pinned target left the catalog, so the live alias serves without a
+  measurement). A model with no measurement yet is simply not benchmarked, not failed. None of
+  these indicators admits a benchmark or spends. The page refreshes its own reads while work is in
+  flight; treat the exact re-read timing as implementation-defined and rely only on the shared
+  result appearing on the pool's next routing and status read.
+- **Serving pins.** A completed paid request tells the web which alias targets now have a
+  usable measurement (`POST /api/internal/auto-routing/pool-pins`). The web writes each pin
+  onto the saved pool entry, ordered by the request's confirmation time and only when the
+  pool is still the confirmed version. A pinned entry keeps serving its benchmarked target
+  when the alias moves; when that target disappears from the catalog, the live alias target
+  serves again and the status reports `servingFallback` with no new paid work. Clients cannot
+  send a pin; a write request's `servingPin` is ignored.
 - **Status** (`POST /admin/custom-router-status`): `ready`, `stale`, `pending`, `running`,
-  `failed`, or `missing` per variant. A platform pair with only older-engine rows is
-  re-admitted for free.
+  `failed`, or `missing` per variant, with the concrete `servingModel`/`resolvedModel` a
+  variant dispatches and the registry `failure` behind a `failed` status. Reading status never
+  admits a benchmark. A permanently failed pair is reported in the pool entry's `blocker`, so
+  the editor can refuse a new add and explain the exact model and variant; a saved row is
+  never removed and never re-admitted automatically.
 
 ### Client eval API
 
@@ -1151,7 +1794,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 - An upload for another engine identity returns `stale_engine_identity` (409); the CLI
   requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
-  the fixed decider repetitions constant (1) return `invalid_request`.
+  the base router's fixed decider repetitions return `invalid_request`.
 - Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
   otherwise the case's mechanical check or the System One judge grades it.
 - Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage
@@ -1252,6 +1895,22 @@ cp .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* /tmp/
 sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 ```
 
+## CLI under test
+
+`container/Dockerfile` pins the base image digest and `KILO_CLI_VERSION` (7.8.27, the version
+production ran when it was pinned). Before the pin, every image build installed
+`@kilocode/cli@latest`, so the measured CLI could change under an unchanged engine identity
+whenever the dist-tag moved.
+
+The CLI version is not part of the engine identity and runs do not record it: the image
+pin is the record. A new engine identity makes every stored measurement ineligible, so a full
+pool re-measure follows. A `KILO_CLI_VERSION` bump is therefore a measurement change that
+needs a planned, budgeted re-measure: bump `BENCHMARK_ENGINE_VERSION` in `src/run.ts` in the
+same change once that re-measure is approved.
+
+The pin does not make the image byte-for-byte reproducible: `apt-get` installs the current
+Debian packages, and file timestamps differ between uncached builds.
+
 ## Debugging container (decider) failures
 
 - Reusable `benchmark-slot:<n>` containers handle dynamically assigned chunks from any run.
@@ -1266,11 +1925,14 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, after its callback records `not_started`.
-- Every completed case is posted to the worker's `/container/case-result` route before the
-  HTTP response. A Durable Object request keeps running after its caller is canceled, so
-  `BenchRunnerContainer` relays the caller's `request.signal` (enabled by the
-  `enable_request_signal` compatibility flag) to the container request. The route accepts
+- Every completed case is posted to the worker's `/container/case-result` route, before the
+  HTTP response unless the first post fails. A Durable Object request keeps running after its
+  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled by
+  the `enable_request_signal` compatibility flag) to the container request. The route accepts
   only the exact paid-execution generation that opened the case.
+- `sleepAfter` is 10 minutes, longer than the CLI timeout plus the whole delivery schedule.
+  Outbound posts do not count as container activity, so a shorter idle timeout could send
+  SIGTERM while a delivery is pending; the server then drains it but refuses new cases.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
@@ -1294,17 +1956,21 @@ can no longer arrive.
 Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
-(model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
+(model, variant, repetition) lane has all its cases or a recorded failure, and each record
+carries the failure class of its cause.
 
 The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
 It retries finalization after a canceled completion handler without starting duplicate inference.
 
-- **Decider runs of either queue** complete per-entry: entries whose lanes all
-  finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
-  not finish…"). A requeue re-admits them — the owner's Retry (quota-charged) or
-  the admin's `POST /admin/registry/requeue` (free). One failing model never
-  discards the results of the others, which matters because each one cost real
-  money to produce.
+- **Decider runs** complete per-entry: entries whose lanes all
+  finished go `ready`; entries with a dead lane fail with the most severe class their
+  lanes recorded (terminal over model over infrastructure). The admin requeue or a
+  per-row re-admit re-admits a failed pair; a new confirmed request measures ready pairs
+  again but does not silently re-admit a failed one. One failing model never discards the
+  results of the others, which matters because each one cost real money to produce.
+- **Catalog load failures** refund the chunk's attempt and hold every dispatch for the
+  backoff, like provider throttles. After 24 catalog deferrals the chunk falls back to
+  ordinary attempts, so a catalog that never loads still ends the lane.
 - **Classifier runs** still fail fast on a dead lane: their models are not
   registry-tracked and the winner must come from one comparable set.
 - **Backstop**: the 6h stale sweep salvages legacy decider runs that never completed
@@ -1324,9 +1990,9 @@ To inspect:
   `auto-routing-benchmark-dlq`); scheduler messages contain `runId`, `model`,
   `claimId`, and `claimToken`. Inspect `scheduler_chunks` for queued/active slots,
   attempts, and lease deadlines; `run_lane_failures` records terminal lane failures.
-- **Replay**: failed entries re-admit via the owner's Retry or the admin's
-  requeue endpoint, and the next drain of their queue measures them. Entries that
-  are already `ready` are never re-measured.
+- **Replay**: failed entries re-admit via the admin's requeue or per-row re-admit, and
+  an owner's next confirmed request measures them. Entries that are already `ready` are
+  never re-measured by a retry; only an explicit re-measure does that.
 
 ## Commands
 

@@ -41,27 +41,46 @@ export function harness(
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
     readonly unreadable?: string;
+    /** A file whose first hash the device refuses and whose next one works. */
+    readonly unreadableOnce?: string;
     /** A task that refuses pause the way expo-file-system does once it is cancelled. */
     readonly refusePause?: boolean;
     /** A task whose cancel loses to a pause already under way: it reports itself paused. */
     readonly cancelRacesPause?: boolean;
+    /** A file name whose size read the OS refuses at the end of the download. */
+    readonly sizeFails?: string;
+    /** The transfer number whose open the device refuses; 1 is the first. */
+    readonly createDownloadFailsAt?: number;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
   const files = new Map<string, number>();
-  const index: { text: string | null; fails?: boolean } = { text: null };
+  const index: { text: string | null; fails?: boolean; writeFails?: boolean } = { text: null };
+  const hashed: string[] = [];
+  const refusedOnce = new Set<string>();
   const tasks: Task[] = [];
   const inspected: string[] = [];
   const released: string[] = [];
   const projectors: (string | undefined)[] = [];
   let failedMoveOnce = false;
+  let opened = 0;
 
   const storage: GgufStorage = {
     freeBytes: () => freeBytes,
     list: () => [...files.keys()],
-    size: name => files.get(name) ?? 0,
+    size: name => {
+      if (name === options.sizeFails) {
+        throw new Error('file size unavailable');
+      }
+      return files.get(name) ?? 0;
+    },
     sha256: async name => {
+      hashed.push(name);
       if (name === options.unreadable) {
+        throw new Error('read failed');
+      }
+      if (name === options.unreadableOnce && !refusedOnce.has(name)) {
+        refusedOnce.add(name);
         throw new Error('read failed');
       }
       return options.checksums?.[name] ?? (name.includes('.mmproj.') ? 'b' : 'a').repeat(64);
@@ -89,9 +108,16 @@ export function harness(
       return index.text;
     },
     writeIndex: text => {
+      if (index.writeFails === true) {
+        throw new Error('storage unavailable');
+      }
       index.text = text;
     },
     createDownload: (url, name, report) => {
+      opened += 1;
+      if (opened === options.createDownloadFailsAt) {
+        throw new Error('could not open the file');
+      }
       const progress: Progress = bytes => {
         files.set(name, bytes.bytesWritten);
         report(bytes);
@@ -126,7 +152,6 @@ export function harness(
           paused();
         },
         cancel: () => {
-          // A pause already under way answers the cancel: the task reports itself paused.
           if (options.cancelRacesPause === true) {
             current.resolve(null);
             return;
@@ -156,7 +181,7 @@ export function harness(
       released.push(fileId);
     },
   });
-  return { store, files, index, tasks, inspected, projectors, released };
+  return { store, files, index, tasks, inspected, projectors, released, hashed };
 }
 
 export const MODEL = {

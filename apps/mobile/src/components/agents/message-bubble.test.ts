@@ -1,7 +1,11 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import {
+  type PreparationAttempt,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import type * as React from 'react';
 
@@ -128,6 +132,9 @@ vi.mock('./file-part-renderer', () => ({
 }));
 vi.mock('./part-renderer', () => ({
   PartRenderer: 'PartRenderer',
+}));
+vi.mock('./preparation-group', () => ({
+  PreparationGroup: 'PreparationGroup',
 }));
 vi.mock('./tool-run-rows', () => ({
   CondensedToolRunRow: 'CondensedToolRunRow',
@@ -417,8 +424,9 @@ async function renderBubbleWithHandlers(
     onRetryMessage?: (m: StoredMessage) => void;
     addCredits?: AddCreditsDestination;
     retryAvailable?: boolean;
-    failureStatedByPreparation?: boolean;
+    failedPreparation?: PreparationAttempt;
     onCopyToComposer?: (text: string) => void;
+    composerText?: string;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
     condenseToolCalls?: boolean;
@@ -478,6 +486,18 @@ const GATEWAY_CREDITS_BODY = JSON.stringify({
   },
   error_type: 'usage_limit_exceeded',
 });
+
+/** A preparation that failed before the turn could run, as the SDK records it. */
+const FAILED_PREPARATION: PreparationAttempt = {
+  id: 'attempt-failed',
+  triggerMessageId: 'm-prep',
+  status: 'failed',
+  startedAt: 1,
+  completedAt: 2,
+  revision: 1,
+  safeError: 'sandbox_lost',
+  steps: [],
+};
 
 describe('MessageBubble failure footer', () => {
   it('wraps the failed bubble and delivery row in one measurable list item', async () => {
@@ -554,7 +574,7 @@ describe('MessageBubble failure footer', () => {
     });
 
     const userFooter = footerOf(userTree);
-    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7 items-end');
     const userFooterClasses = String(userFooter?.props.className).split(' ');
     expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'items-end']));
     // The title and the detail line end-align with the bubble's trailing edge,
@@ -575,7 +595,7 @@ describe('MessageBubble failure footer', () => {
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
-    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
+    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7');
     const assistantFooterClasses = String(assistantFooter?.props.className).split(' ');
     expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4']));
     expect(
@@ -585,7 +605,7 @@ describe('MessageBubble failure footer', () => {
     ).toEqual([]);
 
     const executionFooter = footerOf(executionTree);
-    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7');
     expect(
       classNamesIn(executionFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -618,7 +638,7 @@ describe('MessageBubble failure footer', () => {
   it('keeps the actions and drops the generic statement a preparation group already states', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-prep-failed'), {
       deliveryState: { status: 'failed', error: 'boom', reason: 'execution' },
-      failureStatedByPreparation: true,
+      failedPreparation: FAILED_PREPARATION,
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
@@ -635,10 +655,33 @@ describe('MessageBubble failure footer', () => {
     expect(footerOf(tree)).not.toBeNull();
   });
 
+  it('draws the failed preparation before the actions that recover from it', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-order'), {
+      deliveryState: { status: 'failed', error: 'boom', reason: 'execution' },
+      failedPreparation: FAILED_PREPARATION,
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    const rowChildren = (tree as { props: { children: unknown[] } }).props.children.filter(
+      (child): child is { type: unknown; props: Record<string, unknown> } =>
+        typeof child === 'object' && child !== null
+    );
+    const groupIndex = rowChildren.findIndex(child => child.type === 'PreparationGroup');
+    const footerIndex = rowChildren.findIndex(
+      child => child.props.testID === 'message-failure-footer'
+    );
+    expect(rowChildren[groupIndex]?.props.attempt).toBe(FAILED_PREPARATION);
+    expect(groupIndex).toBeGreaterThanOrEqual(0);
+    expect(footerIndex).toBeGreaterThan(groupIndex);
+    // The actions follow the group's full-width card, not the bubble's edge.
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-7');
+  });
+
   it('draws no footer when the group states the failure and no action can render', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-prep-empty'), {
       deliveryState: { status: 'failed', error: '', reason: 'execution' },
-      failureStatedByPreparation: true,
+      failedPreparation: FAILED_PREPARATION,
       retryAvailable: false,
     });
 
@@ -651,7 +694,7 @@ describe('MessageBubble failure footer', () => {
   it('keeps a classified statement on a turn whose preparation also failed', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-prep-credits'), {
       deliveryState: { status: 'failed', error: '', reason: 'credits' },
-      failureStatedByPreparation: true,
+      failedPreparation: FAILED_PREPARATION,
       addCredits: { kind: 'inApp', onPress: vi.fn<() => void>() },
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
@@ -676,7 +719,7 @@ describe('MessageBubble failure footer', () => {
     expect(findText(tree, t => t === 'Response failed')).toBe(false);
     expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
     // The send never left, so the statement sits in the bubble's own column.
-    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-7 items-end');
     const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
       throw new Error('the footer drew no Add credits action');
@@ -729,6 +772,38 @@ describe('MessageBubble failure footer', () => {
     expect(
       findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
     ).toBeNull();
+  });
+
+  it('copies the question back from a chat failure stated under the answer’s words', async () => {
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const words = assistantMessageWithText('m-partial');
+    for (const deliveryState of [
+      {
+        status: 'failed',
+        error: '',
+        reason: 'chat-response',
+        detailKey: 'modelChat.connectionLost',
+      },
+      { status: 'failed', error: '', reason: 'interrupted' },
+    ] satisfies MessageDeliveryStatement[]) {
+      // eslint-disable-next-line no-await-in-loop -- one render per ending
+      const tree = await renderBubbleWithHandlers(words, {
+        deliveryState,
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        onCopyToComposer,
+        composerText: 'tell a story',
+      });
+      const copy = findElementByType(
+        tree,
+        'Button',
+        p => p.accessibilityLabel === 'Copy to composer'
+      );
+      if (copy === null) {
+        throw new Error(`no Copy to composer under the ${deliveryState.reason} row`);
+      }
+      (copy.props.onPress as () => void)();
+    }
+    expect(onCopyToComposer.mock.calls).toEqual([['tell a story'], ['tell a story']]);
   });
 
   it('gives both recovery controls the shared state-surface target', async () => {
@@ -1765,7 +1840,7 @@ function findElementByLabel(
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
   return findElementByType(tree, 'View', p =>
-    String(p.className).startsWith('gap-2 px-4 pt-1 pb-[24px]')
+    String(p.className).startsWith('gap-2 px-4 pt-1 pb-7')
   );
 }
 

@@ -13,6 +13,14 @@ import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 import { forgetCallResults, rememberCallResult } from './remote-mcp-call-results';
+import {
+  attempts,
+  configOf,
+  type DiscoveryAttempt,
+  forgetCache,
+  observedConfigs,
+  reconcile,
+} from './remote-mcp-cache';
 import { credentialDeps, serverValue } from './remote-mcp-credentials';
 import {
   connectingOf,
@@ -51,9 +59,12 @@ import { type ChatPlace } from './scope';
  *
  * The token is never held here (see `remote-mcp-credentials.ts`). It is read from the stored server by id each
  * time the accessor is asked, so a rotated one is used rather than the one
- * captured at discovery, and a discovery is cached against the config and the
- * auth epoch — never against a token. A disabled server contributes no tool
- * and no name, and its cached tools are dropped the moment it is disabled.
+ * captured at discovery, and a discovery is cached against its own server's
+ * config — never against a token, never against the account alone. A disabled
+ * server contributes no tool and no name, and its cached tools are dropped the
+ * moment it is disabled. A change to one server invalidates that server only:
+ * the other servers keep their tools, their views and their in-flight
+ * discoveries.
  *
  * The token is never logged.
  */
@@ -85,50 +96,44 @@ const deadlineFor = (request: RemoteMcpRequest): number =>
 let snapshot: readonly RemoteMcpServerState[] = [];
 const listeners = new Set<() => void>();
 
-/** The servers whose discovery is running now, which is what `connecting` means. */
-const pending = new Set<string>();
-
-/** What has been discovered, valid for `cacheKey` only. Keyed by server id. */
+/** What has been discovered, keyed by server id and valid for that server's observed config. */
 let discovered = new Map<string, RemoteMcpDiscovery>();
 
-/** The config and account the current `discovered` map belongs to. */
-let cacheKey: string | undefined = undefined;
+/** The account and place the current `discovered` map and every recorded config belong to. */
+let scopeKey: string | undefined = undefined;
 
 /** The discovery already running for one key, so two callers do not both connect. */
 let inFlight: { readonly key: string; readonly promise: Promise<void> } | undefined = undefined;
 
 /**
- * Bumped by `forgetRemoteMcp` and by a config or account change, so a discovery
- * that outlived either cannot publish over the state that now holds.
+ * Bumped by `forgetRemoteMcp` and by an account or place change, so a discovery
+ * that outlived either cannot publish over the state that now holds. A change
+ * to one server's config does not bump it: that server's attempt is what
+ * `discover` refuses instead.
  */
 let generation = 0;
 
-/** Whether a server is still in the list and enabled, which a late answer may not assume. */
-function stillEnabled(id: string): boolean {
-  return listRemoteMcpServers().some(server => server.id === id && server.enabled);
+/** The account and place a caller belongs to, which is what a whole reset answers. */
+function scopeOf(place: ChatPlace): string {
+  return `${place.chatScope}\u0000${String(currentAuthEpoch())}`;
 }
 
-/** Which config and account a discovery belongs to. A token is never part of it. */
+/** Which pass a caller joins: the account/place and every server's config. A token is never part of it. */
 function keyFor(place: ChatPlace): string {
-  const config = listRemoteMcpServers()
-    .map(
-      server =>
-        `${server.id}\u001F${server.url}\u001F${server.auth.type}\u001F${server.enabled ? '1' : '0'}`
-    )
-    .join('\u001E');
-  return `${place.chatScope}\u0000${String(currentAuthEpoch())}\u0000${config}`;
+  const configs = listRemoteMcpServers().map(server => `${server.id}\u001F${configOf(server)}`);
+  return `${scopeOf(place)}\u0000${configs.join('\u001E')}`;
 }
 
 /** The deps one discovery runs with. */
 function depsFor(
   server: StoredRemoteMcpServer,
   timeoutMs: number,
-  started: number
+  attempt: DiscoveryAttempt
 ): RemoteMcpClientDeps {
   return {
     fetch,
     discoverTimeoutMs: timeoutMs,
-    onCallFailure: lostConnection(server, started),
+    onCallFailure: lostConnection(server, attempt),
     onCallResult: rememberCallResult,
     ...credentialDeps(server),
   };
@@ -147,19 +152,19 @@ function failureOf(server: StoredRemoteMcpServer, error: RemoteMcpError): Remote
  *
  * The answer that just stopped being true is dropped rather than covered up:
  * a discovery is served from `discovered` and the whole point of the Retry is
- * to reach the server again. A sign-out, or a server disabled while the call
- * was out, wins: its failure is not published.
+ * to reach the server again. A sign-out, or an edit to the server while the
+ * call was out, wins: its failure is not published under the config that now
+ * holds, which is a different endpoint.
  */
 function lostConnection(
   server: StoredRemoteMcpServer,
-  started: number
+  attempt: DiscoveryAttempt
 ): (error: RemoteMcpError) => void {
   return error => {
-    if (started !== generation || !stillEnabled(server.id)) {
+    if (attempt.generation !== generation || observedConfigs.get(server.id) !== attempt.config) {
       return;
     }
     discovered.set(server.id, failureOf(server, error));
-    pending.delete(server.id);
     publish();
   };
 }
@@ -168,10 +173,10 @@ function lostConnection(
 async function discover(
   server: StoredRemoteMcpServer,
   timeoutMs: number,
-  started: number
+  attempt: DiscoveryAttempt
 ): Promise<void> {
   const outcome = await Effect.runPromise(
-    remoteMcpTools(serverValue(server), depsFor(server, timeoutMs, started)).pipe(
+    remoteMcpTools(serverValue(server), depsFor(server, timeoutMs, attempt)).pipe(
       Effect.match({
         onFailure: (error: RemoteMcpError) => ({ ok: false as const, error }),
         onSuccess: (tools: readonly RemoteMcpOfferedTool[]) => ({ ok: true as const, tools }),
@@ -185,17 +190,12 @@ async function discover(
     )
   );
   /* A sign-out, or an edit to the server, between the request and the answer
-     dropped the connection or superseded it. What the old server answered must
-     not be published under the new one, and its `pending` entry must not be
-     cleared: that entry now belongs to the discovery the new key started. */
-  if (started !== generation) {
+     superseded this discovery: the row belongs to another attempt, so what this
+     one answered must not be published, and it must not be cleared either. */
+  if (attempts.get(server.id) !== attempt) {
     return;
   }
-  pending.delete(server.id);
-  if (!stillEnabled(server.id)) {
-    publish();
-    return;
-  }
+  attempts.delete(server.id);
   discovered.set(
     server.id,
     outcome.ok ? discoveryOf(server.id, outcome.tools) : failureOf(server, outcome.error)
@@ -207,11 +207,10 @@ async function discover(
 function currentStates(): RemoteMcpServerState[] {
   const states = remoteServerStates(listRemoteMcpServers(), discovered);
   return states.map(state =>
-    pending.has(state.id) && state.status === 'idle' ? connectingOf(state) : state
+    attempts.has(state.id) && state.status === 'idle' ? connectingOf(state) : state
   );
 }
 
-/** Replaces the snapshot, the view lookup and wakes every watcher. */
 function publish(): void {
   snapshot = currentStates();
   publishRemoteMcpViews(remoteServerViewsFor(listRemoteMcpServers(), discovered));
@@ -220,22 +219,14 @@ function publish(): void {
   }
 }
 
-/** Drops entries for servers that are gone or were disabled, which is a store change. */
-function reconcile(): void {
-  const enabled = new Set(
-    listRemoteMcpServers()
-      .filter(server => server.enabled)
-      .map(server => server.id)
-  );
-  for (const id of discovered.keys()) {
-    if (!enabled.has(id)) {
-      discovered.delete(id);
-    }
-  }
-  for (const id of pending) {
-    if (!enabled.has(id)) {
-      pending.delete(id);
-    }
+/**
+ * Drops what a store change made stale: the cache names each server whose config
+ * moved on, and only those answers are dropped here, so a change to one server
+ * costs the others nothing.
+ */
+function dropStaleAnswers(): void {
+  for (const id of reconcile(listRemoteMcpServers())) {
+    discovered.delete(id);
   }
 }
 
@@ -275,45 +266,47 @@ function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly Remote
  *
  * An automatic ask is answered by the pass it joins. A person's Retry is about a
  * row that has already failed, so it waits for that pass and then asks again —
- * and the recursive call checks admission again with the start that follows it
- * in the same turn, so two retries that waited on one pass cannot both start a
- * discovery for the same generation.
+ * and the recursive call checks admission again in the turn that follows it, so
+ * two retries that waited on one pass cannot both start a discovery for the same
+ * server. A server another pass is discovering is not missing: its attempt is
+ * registered before the first await, so a pass for a superseded key finds
+ * nothing to open. The scope is checked again after the wait, because an account
+ * or place change clears every attempt and only a caller of that scope may open
+ * a connection.
  */
 async function ensurePass(
+  scope: string,
   key: string,
   request: RemoteMcpRequest
 ): Promise<readonly RemoteMcpServerState[]> {
   if (inFlight?.key === key) {
     await inFlight.promise;
-    /* The config, the account or the place can change while this ask waits, and
-       a change installs its own pass under the new key. A pass started here
-       would belong to the old key yet capture the new generation, so it would
-       publish over the pass the new key is running: answer with what the state
-       holds for the new key instead. */
-    if (key !== cacheKey || request.retry !== true) {
+    if (scope !== scopeKey) {
       return snapshot;
     }
-    return ensurePass(key, request);
+    return request.retry === true ? ensurePass(scope, key, request) : snapshot;
   }
   const missing = listRemoteMcpServers()
     .filter(server => server.enabled)
-    .filter(server => !reusable(discovered.get(server.id)));
+    .filter(server => !reusable(discovered.get(server.id)))
+    .filter(server => !attempts.has(server.id));
   if (missing.length === 0) {
     return snapshot;
   }
   if (request.retry !== true && connectionRefusesWrites()) {
     return failOffline(missing);
   }
-  for (const server of missing) {
-    discovered.delete(server.id);
-    pending.add(server.id);
-  }
-  publish();
   const started = generation;
-  const discoveries: Promise<void>[] = [];
-  for (const server of missing) {
-    discoveries.push(discover(server, deadlineFor(request), started));
-  }
+  const planned = missing.map(server => {
+    const attempt = { generation: started, config: configOf(server) };
+    discovered.delete(server.id);
+    attempts.set(server.id, attempt);
+    return { server, attempt };
+  });
+  publish();
+  const discoveries = planned.map(({ server, attempt }) =>
+    discover(server, deadlineFor(request), attempt)
+  );
   const promise = (async () => {
     await Promise.all(discoveries);
   })();
@@ -342,6 +335,10 @@ async function ensurePass(
  * missing, so a running pass can never answer a Retry with its own deadline's
  * failure.
  *
+ * A change to one server's config costs the other servers nothing: their
+ * answers, views and running discoveries are the ones their own config earned.
+ * Only a change of account or place drops everything.
+ *
  * After a cold start the stored list may not have been read yet, and an empty
  * list then means "not read" rather than "none": the ask waits for it, or a
  * chat opened at launch would discover nothing. An automatic ask made while
@@ -356,20 +353,21 @@ export async function ensureRemoteMcp(
   if (!getRemoteMcpServersHasLoaded()) {
     await whenRemoteMcpServersLoaded();
   }
-  const key = keyFor(place);
-  if (key !== cacheKey) {
-    /* The config or the account changed, so a discovery started for the old one
-       is no longer the answer: bumping the generation stops it publishing its
-       server's tools over the discovery the new key now runs, and stops it
-       clearing that discovery's `pending`. */
+  const scope = scopeOf(place);
+  if (scope !== scopeKey) {
+    /* The account or the place changed, so no discovery or answer belongs to
+       this one: bumping the generation stops every discovery that outlived it
+       from publishing, and the cache starts empty for the new caller. */
     generation += 1;
-    cacheKey = key;
+    scopeKey = scope;
+    forgetCache();
     discovered = new Map();
     forgetCallResults();
-    pending.clear();
+    inFlight = undefined;
     publish();
   }
-  return ensurePass(key, request);
+  dropStaleAnswers();
+  return ensurePass(scope, keyFor(place), request);
 }
 
 /** The snapshot a screen draws: one entry per stored server, whether or not it is discovered. */
@@ -394,7 +392,10 @@ function viewSourceOf(view: RemoteMcpToolView): RemoteMcpViewSource | undefined 
   if (server === undefined || found === undefined || found.failed === true) {
     return undefined;
   }
-  const deps = depsFor(server, AUTOMATIC_TIMEOUT_MS, generation);
+  const deps = depsFor(server, AUTOMATIC_TIMEOUT_MS, {
+    generation,
+    config: configOf(server),
+  });
   return { server: serverValue(server), deps, tools: found.serverTools };
 }
 
@@ -447,19 +448,16 @@ export function subscribeRemoteMcp(listener: () => void): () => void {
  */
 export function forgetRemoteMcp(): void {
   generation += 1;
-  cacheKey = undefined;
+  scopeKey = undefined;
+  forgetCache();
   discovered = new Map();
   forgetCallResults();
-  pending.clear();
   inFlight = undefined;
   publish();
 }
 
-// The list is the app's own, so a change to it — an add, an edit, a delete, an
-// enable or a disable — is what makes the discovered state stale. A disabled
-// server's tools are dropped here, at the moment it is disabled.
 subscribeRemoteMcpServers(() => {
-  reconcile();
+  dropStaleAnswers();
   publish();
 });
 publish();

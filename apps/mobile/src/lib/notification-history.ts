@@ -1,5 +1,6 @@
 import {
-  GENERIC_PUSH_TITLE_KEY,
+  genericPushTitle,
+  localizedPushParams,
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
   pushBodyCatalogKey,
@@ -51,7 +52,12 @@ function translatedPart(
     return stored;
   }
   const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : pushTitleCatalogKey(row.i18nKey);
-  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
+  return translatePush(
+    locale,
+    key,
+    localizedPushParams(locale, row.i18nKey, row.i18nParams ?? undefined),
+    stored
+  );
 }
 
 /**
@@ -76,7 +82,7 @@ export function notificationHistoryCopy(
   const title = translatedPart(row, locale, 'title');
   const body = translatedPart(row, locale, 'body');
   const titleTemplate = translatedPart({ ...row, i18nParams: null }, locale, 'title');
-  return titleTemplate.trim() === translatePush(locale, GENERIC_PUSH_TITLE_KEY).trim()
+  return titleTemplate.trim() === genericPushTitle(locale).trim()
     ? { headline: body, detail: null }
     : { headline: title, detail: body };
 }

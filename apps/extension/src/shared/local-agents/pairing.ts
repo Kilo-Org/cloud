@@ -107,8 +107,8 @@ const parseFragment = (hash: string): Record<string, string> | null => {
   return Object.fromEntries(params);
 };
 
-/** Parses a pairing navigation URL; null for anything this extension must ignore. */
-export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | null => {
+/** The hub's pairing page on a loopback host, whatever its fragment says; null for any other URL. */
+const parsePairingPageUrl = (rawUrl: string): URL | null => {
   if (rawUrl.length > MAX_PAIRING_URL_LENGTH) {
     return null;
   }
@@ -119,11 +119,13 @@ export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | nul
     return null;
   }
 
-  if (readExplicitPort(url) === null || url.pathname !== PAIRING_PATH) {
-    return null;
-  }
+  return readExplicitPort(url) === null || url.pathname !== PAIRING_PATH ? null : url;
+};
 
-  const fields = parseFragment(url.hash);
+/** Parses a pairing navigation URL; null for anything this extension must ignore. */
+export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | null => {
+  const url = parsePairingPageUrl(rawUrl);
+  const fields = url === null ? null : parseFragment(url.hash);
 
   if (fields === null) {
     return null;
@@ -142,6 +144,17 @@ export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | nul
   }
 
   return { hubId: parsed.data.hub, token: parsed.data.t, ws };
+};
+
+/**
+ * A pairing page opened with a fragment this extension cannot read (a broken
+ * hub id, token, version or socket URL). The bare page, without a fragment, is
+ * not a pairing attempt.
+ */
+export const isBrokenPairingUrl = (rawUrl: string): boolean => {
+  const url = parsePairingPageUrl(rawUrl);
+
+  return url !== null && url.hash.length > 1 && parsePairingUrl(rawUrl) === null;
 };
 
 /**

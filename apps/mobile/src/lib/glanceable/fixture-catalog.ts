@@ -1,9 +1,10 @@
-import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
 import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
+import { TITLE_FIXTURES } from './title-fixture-catalog';
 
 /**
  * Dev-only named visual states for the glanceable surfaces. A fixture is tray
@@ -48,19 +49,26 @@ export type GlanceableFixtureRow = {
 export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
-  status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  status?: GlanceableSnapshotStatusOverride;
   /** Minutes since the last successful confirmation. */
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
+  /**
+   * The row ids the tray rows carry, positionally; an unlisted position falls
+   * back to `glanceable-fixture-${index}`.
+   */
+  sessionIds?: readonly string[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
   /**
-   * Follow one row with a session card. `approvalKey` adds the key a server
-   * push carries for a permission wait; `finish` follows the row while it
-   * works, then reports it finished; `card` applies the richer facts a server
+   * Follow rows with a session card, one card each. `approvalKey` adds the key
+   * a server push carries for a permission wait; `finish` follows the row while
+   * it works, then reports it finished; `card` applies the richer facts a server
    * push carries (the step, the plan, the diff, the outcome, the stop reason).
+   * Those three apply to a single index only: several indices follow each row as
+   * it stands, with no content and no finish.
    */
   follow?: {
-    index: number;
+    index: number | readonly number[];
     approvalKey?: boolean;
     finish?: boolean;
     card?: SessionCardFacts;
@@ -153,20 +161,16 @@ export const GLANCEABLE_FIXTURES = {
       ...many({ status: 'idle', count: 999, ago: 60 }),
     ],
   },
-  'long-title': {
-    description: 'Mixed counts with a very long newest-session title.',
+  'plural-counts': {
+    description:
+      'Count inflections: 1 needs input, 2 working, 5 idle, so every family shows its singular and plural form.',
     rows: () => [
-      { status: 'permission', ago: 17, title: 'Migrate the billing webhooks' },
-      {
-        status: 'busy',
-        ago: 1,
-        title:
-          'Refactor the authentication middleware so expired refresh tokens rotate before the websocket reconnects on flaky networks',
-      },
-      { status: 'busy', ago: 9, title: 'Write the release notes' },
-      { status: 'idle', ago: 33, title: 'Triage new issues' },
+      ...many({ status: 'permission', count: 1, ago: 12 }),
+      ...many({ status: 'busy', count: 2, ago: 4 }),
+      ...many({ status: 'idle', count: 5, ago: 40 }),
     ],
   },
+  ...TITLE_FIXTURES,
   approving: {
     description: 'Needs approval while the in-place Approve runs: the Approving line.',
     rows: APPROVAL_ROWS,

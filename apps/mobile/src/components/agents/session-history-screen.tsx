@@ -82,14 +82,18 @@ export function SessionHistoryScreen() {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     paging,
+    isRetentionLimited,
     handleRetry: retryHistory,
     handleRefetch,
+    handlePausedRetry,
     isSearching,
     search,
     projectOptions,
     contentIsError,
+    contentIsPaused,
     sections,
   } = useAgentSessionListData({
     organizationId,
@@ -215,7 +219,9 @@ export function SessionHistoryScreen() {
       ready,
       isSearching,
       searchIsPending: search.isPending,
+      searchIsPaused: search.isPaused,
       storedIsPending,
+      storedIsPaused,
     });
 
   // One permanently mounted body inside one keyboard container: the empty-state
@@ -235,6 +241,7 @@ export function SessionHistoryScreen() {
       hasFreshHistory={storedFetchedSinceMount}
       isFetchingNextPage={paging.isFetchingNextPage}
       isFetchNextPageError={paging.isFetchNextPageError}
+      isRetentionLimited={isRetentionLimited}
       onRetryNextPage={handleRetryNextPage}
       refetch={handleRefetch}
       onRetry={handleRetry}
@@ -246,6 +253,8 @@ export function SessionHistoryScreen() {
       isSearching={isSearching}
       searchQuery={searchQuery}
       isRetrying={isRetrying}
+      isPaused={contentIsPaused}
+      onRetryPaused={handlePausedRetry}
       onClearAction={handleClearAction}
       onCreateSession={handleCreateSession}
     />
@@ -274,7 +283,6 @@ export function SessionHistoryScreen() {
             onBlur={keyboard.handleInputBlur}
             defaultValue={searchDefaultValue}
             inputKey={searchInputKey}
-            compact
             inline
           />
         }

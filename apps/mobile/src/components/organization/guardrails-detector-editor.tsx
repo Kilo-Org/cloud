@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -33,6 +33,19 @@ const POLICY_FORMAT_KEYS = {
   policy_text: 'organizationGuardrails.policyFormatText',
 } satisfies Record<PolicyFormat, string>;
 
+/**
+ * Whether the children hold anything to paint. A caller that passes one
+ * conditional child per option hands this card an array, and an array of
+ * `null`s looks like content to a plain truthiness test. Every options body is
+ * an element.
+ */
+function hasBody(children: ReactNode): boolean {
+  if (Array.isArray(children)) {
+    return children.some((child: ReactNode) => hasBody(child));
+  }
+  return isValidElement(children);
+}
+
 /** One detector: its name and description, the Off / Log only / Block choice, and its options. */
 export function DetectorCard({
   label,
@@ -56,10 +69,10 @@ export function DetectorCard({
     { value: 'block' as const, label: t('codeReviewer.decision.block') },
   ];
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
+    <View className="gap-3">
       <View className="gap-1">
         <Text className="text-sm font-medium text-foreground">{label}</Text>
-        <Text className="text-xs text-muted-foreground">{description}</Text>
+        <Text variant="caption">{description}</Text>
       </View>
       <SegmentedControl
         options={options}
@@ -68,9 +81,9 @@ export function DetectorCard({
         disabled={disabled}
         accessibilityLabel={label}
       />
-      {choice === 'off' ? null : (
+      {choice !== 'off' && hasBody(children) ? (
         <View className={disabled ? 'pointer-events-none opacity-50' : undefined}>{children}</View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -106,7 +119,7 @@ export function PiiEntitiesField({
                   );
                 }}
               />
-              <Text className="max-w-44 text-xs text-muted-foreground">
+              <Text variant="caption" className="max-w-44">
                 {t(PII_ENTITY_DESCRIPTION_KEYS[entity])}
               </Text>
             </View>
@@ -152,7 +165,7 @@ export function LineListField({
         disabled={disabled}
         onChangeText={onChange}
       />
-      <Text className="text-xs text-muted-foreground">{hint}</Text>
+      <Text variant="caption">{hint}</Text>
     </View>
   );
 }
@@ -183,7 +196,7 @@ export function PolicyFormatField({
         disabled={disabled}
         accessibilityLabel={t('organizationGuardrails.policyFormat')}
       />
-      <Text className="text-xs text-muted-foreground">
+      <Text variant="caption">
         {format === 'rules'
           ? t('organizationGuardrails.policyFormatRulesDescription')
           : t('organizationGuardrails.policyFormatTextDescription')}

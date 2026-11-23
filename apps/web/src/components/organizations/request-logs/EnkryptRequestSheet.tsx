@@ -14,12 +14,13 @@ import {
 } from '@/components/ui/table';
 import { apiKindLabel } from '@/lib/api-kind-labels';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ABSENT_CELL, DetailGrid, DetailSection, ToneBadge } from './detail-primitives';
+import { ABSENT_CELL, DetailGrid, DetailSection, LabelHint, ToneBadge } from './detail-primitives';
 import {
   GUARDRAIL_LABELS,
   OUTCOMES,
   firedDetectorsLabel,
   type EnkryptRequestDetails,
+  ENKRYPT_LATENCY_HINT,
   type EnkryptUsageRow,
 } from './enkrypt-usage-labels';
 import { ABSENT, formatDurationMs, formatMicrodollarsAsUsd, formatRequestTime } from './format';
@@ -72,7 +73,7 @@ const CALL_COLUMNS = [
   { label: 'Decision' },
   { label: 'Detectors fired' },
   { label: 'Charged', numeric: true },
-  { label: 'Added latency', numeric: true },
+  { label: 'Latency', numeric: true, hint: ENKRYPT_LATENCY_HINT },
 ] as const;
 
 function CallsSection({ calls, selectedId }: { calls: EnkryptUsageRow[]; selectedId: string }) {
@@ -92,7 +93,14 @@ function CallsSection({ calls, selectedId }: { calls: EnkryptUsageRow[]; selecte
                     'numeric' in column ? 'text-right whitespace-nowrap' : 'whitespace-nowrap'
                   }
                 >
-                  {column.label}
+                  {'hint' in column ? (
+                    <span className="inline-flex items-center gap-1">
+                      {column.label}
+                      <LabelHint label={column.label} hint={column.hint} />
+                    </span>
+                  ) : (
+                    column.label
+                  )}
                 </TableHead>
               ))}
             </TableRow>

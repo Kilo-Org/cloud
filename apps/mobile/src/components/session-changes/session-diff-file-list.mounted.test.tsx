@@ -11,15 +11,23 @@ import '@/i18n';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 import { SessionDiffFileList } from './session-diff-file-list';
 
+const state = vi.hoisted(() => ({ insets: { left: 0, right: 0 } }));
+
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('@/components/pr-review/diff/diff-font-metrics', () => ({
@@ -35,10 +43,8 @@ vi.mock('@/components/pr-review/diff/diff-font-metrics', () => ({
 vi.mock('@/components/pr-review/diff/pr-diff-file-list-render', () => ({
   useDiffRenderItem: () => vi.fn(),
 }));
-vi.mock('@/lib/screen-insets', () => ({
-  useDetailScreenBottomPadding: () => 0,
-  useSideInsetStyle: () => ({}),
-}));
+// The real `@/lib/screen-insets` helpers run, so the suite asserts the shipped
+// placement rule; only the window's insets are served per test.
 vi.mock('@/lib/pr-review/diff/pr-diff-list-builder', () => ({ buildFileItems: () => [] }));
 vi.mock('@/lib/pr-review/diff/pr-diff-list-items', () => ({ itemTypeFor: () => 'file' }));
 vi.mock('@/lib/pr-review/diff/sticky-file-headers', () => ({ stickyFileHeaderIndices: () => [] }));
@@ -51,6 +57,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  state.insets = { left: 0, right: 0 };
 });
 
 function mountList(): void {
@@ -119,5 +126,45 @@ describe('SessionDiffFileList totals under an RTL interface', () => {
       expect(run.props.className).toContain('text-xs');
       expect(run.props.className).toContain('tabular-nums');
     }
+  });
+});
+
+describe('SessionDiffFileList under a landscape side inset', () => {
+  /** The list's own style: the box that holds the scroller and the sticky overlay. */
+  function listStyle(): unknown {
+    if (!renderer) {
+      throw new Error('the list did not render');
+    }
+    return renderer.root.findByType('FlashList').props.style;
+  }
+
+  /** The scroller's content container, which the sticky header overlay ignores. */
+  function listContentStyle(): Record<string, unknown> {
+    if (!renderer) {
+      throw new Error('the list did not render');
+    }
+    const style: unknown = renderer.root.findByType('FlashList').props.contentContainerStyle;
+    if (typeof style !== 'object' || style === null) {
+      throw new Error('the list paints no content container style');
+    }
+    return style as Record<string, unknown>;
+  }
+
+  it('puts the side insets on the list style, where the sticky header rows sit', () => {
+    state.insets = { left: 62, right: 62 };
+    mountList();
+
+    // A file header row is a sticky header, and FlashList paints sticky headers
+    // in an overlay beside the scroller: content-container padding never reaches
+    // those rows, so the insets have to be margins on the list itself.
+    expect(listStyle()).toEqual({ marginLeft: 62, marginRight: 62 });
+    expect(listContentStyle()).toEqual({ paddingBottom: 32 });
+  });
+
+  it('leaves no style in portrait, where the side insets are zero', () => {
+    mountList();
+
+    expect(listStyle()).toBeUndefined();
+    expect(listContentStyle()).toEqual({ paddingBottom: 32 });
   });
 });

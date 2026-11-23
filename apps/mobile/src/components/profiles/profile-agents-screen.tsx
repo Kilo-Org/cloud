@@ -4,29 +4,33 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Bot } from '@/components/ui/icons';
+import { Bot, Plus } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
   useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -50,6 +54,11 @@ export function ProfileAgentsScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileAgents(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -61,7 +70,9 @@ export function ProfileAgentsScreen({
   const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
-  // what was typed instead of dropping it.
+  // what was typed instead of dropping it. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:agents:${profileId}`;
   // A save the server refused leaves one note the sheet renders: a slug the
   // profile already uses shows under the slug field, a create past the cap
@@ -77,6 +88,8 @@ export function ProfileAgentsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -139,10 +152,11 @@ export function ProfileAgentsScreen({
   if (profileQuery.isError) {
     content = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
         isRetrying={profileQuery.isRefetching}
       />
     );
@@ -157,45 +171,45 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
-              <Text>{t('profiles.agents.add')}</Text>
-            </Button>
+            <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
       />
     );
   } else {
     content = (
-      <>
-        {rows.map((row, index) => {
-          const source = agents[index];
-          if (source === undefined) {
-            return null;
-          }
-          return (
-            <AgentRowView
-              key={source.id}
-              name={source.name}
-              visibility={row.visibility}
-              description={row.description}
-              model={row.model}
-              onEdit={
-                canManage
-                  ? guardRowPress(() => {
-                      form.startEdit(source);
-                    })
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? guardRowPress(() => {
-                      confirmDelete(source);
-                    })
-                  : undefined
-              }
-            />
-          );
-        })}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {rows.map((row, index) => {
+            const source = agents[index];
+            if (source === undefined) {
+              return null;
+            }
+            return (
+              <AgentRowView
+                key={source.id}
+                name={source.name}
+                visibility={row.visibility}
+                description={row.description}
+                model={row.model}
+                onEdit={
+                  canManage
+                    ? guardRowPress(() => {
+                        form.startEdit(source);
+                      })
+                    : undefined
+                }
+                onDelete={
+                  canManage
+                    ? guardRowPress(() => {
+                        confirmDelete(source);
+                      })
+                    : undefined
+                }
+              />
+            );
+          })}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atAgentCap ? (
             <AccessibleStatus
@@ -208,7 +222,7 @@ export function ProfileAgentsScreen({
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -222,7 +236,7 @@ export function ProfileAgentsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -230,7 +244,7 @@ export function ProfileAgentsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

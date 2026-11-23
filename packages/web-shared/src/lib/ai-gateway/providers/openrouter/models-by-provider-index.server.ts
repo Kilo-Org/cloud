@@ -32,7 +32,7 @@ type ProviderIndexCacheState = {
 
 export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
 
-type ProviderIndexLoaderOptions = {
+export type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
   fetchOpenRouterModels: () => Promise<GatewayModelMap>;
   fetchVercelModels: () => Promise<GatewayModelMap>;
@@ -93,16 +93,19 @@ export function buildModelIdToProviderSlugsIndex(
   const index = new Map<string, Set<string>>();
 
   for (const provider of getKiloRouteProviders(snapshot)) {
+    // Snapshot slugs are stored verbatim, so index the canonical slug that
+    // provider allow lists and routing ids are compared against.
+    const providerSlug = normalizeInferenceProviderId(provider.slug);
     for (const model of provider.models) {
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);
 
       if (existing) {
-        existing.add(provider.slug);
+        existing.add(providerSlug);
         continue;
       }
 
-      index.set(normalizedModelId, new Set([provider.slug]));
+      index.set(normalizedModelId, new Set([providerSlug]));
     }
   }
 
@@ -179,13 +182,21 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
   async function getProviderSlugsForModels(
     modelIds: readonly string[]
   ): Promise<ReadonlyMap<string, ReadonlySet<string>>> {
-    const [index, storedModels, vercelModels] = await Promise.all([
+    const modelIdsToResolve = [...new Set(modelIds)];
+    const [index, storedModels, vercelModels, vercelIdEntries] = await Promise.all([
       loadIndex(),
       options.fetchOpenRouterModels(),
       options.fetchVercelModels(),
+      Promise.all(
+        modelIdsToResolve.map(async (modelId): Promise<readonly [string, string]> => {
+          return [modelId, await mapModelIdToVercel(modelId)];
+        })
+      ),
     ]);
+    // Every id resolves in the batch above, so the loop body below is synchronous.
+    const vercelIdByModel: ReadonlyMap<string, string> = new Map(vercelIdEntries);
     const providersByModel = new Map<string, ReadonlySet<string>>();
-    for (const modelId of new Set(modelIds)) {
+    for (const [modelId, vercelModelId] of vercelIdByModel) {
       const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
       if (!snapshotProviderSlugs) {
         providersByModel.set(modelId, new Set());
@@ -195,7 +206,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
         snapshotProviderSlugs,
         storedModels[modelId]
       );
-      const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
+      const vercelModel = vercelModels[vercelModelId];
       const vercelProviders = new Set(
         vercelModel?.endpoints.map(endpoint =>
           normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)

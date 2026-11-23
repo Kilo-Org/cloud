@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CUSTOM_ROUTER_STATUS_PATH,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
 } from '@kilocode/auto-routing-contracts';
@@ -9,11 +10,19 @@ import type {
   ClientCustomRouterEntry,
   CustomRouterBenchmarkContext,
   CustomRoutingTable,
+  GatewayCustomRouterEntry,
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
+import {
+  assembleCustomRouterTable,
+  computeCustomRouterReadinessVersion,
+  lookupCustomRouterBlockers,
+  lookupCustomRouterStatuses,
+} from './custom-routers';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
+import { countCurrentProfilesByStatus, listCurrentPlatformProfileStatuses } from './db';
+import { saveBenchmarkConfig } from './config';
 import { app } from './index';
 
 const CONFIG: BenchmarkConfig = {
@@ -115,7 +124,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
         `INSERT INTO client_profiles (id, owner_type, owner_id, router, entry_kind, provider, model,
           variant, engine_identity, repetitions, status, results, accuracy, route_summaries,
           created_at, updated_at)
-         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 3, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         row.id,
@@ -123,7 +132,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
         row.variant ?? 'low',
         row.engine ?? ENGINE,
         row.status ?? 'ready',
-        row.results ?? DECIDER_CASES.length,
+        row.results ?? DECIDER_CASES.length * 3,
         row.accuracy,
         JSON.stringify([summary(LOCAL, row.variant ?? 'low', row.accuracy)]),
         row.updatedAt,
@@ -141,7 +150,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
       .prepare(
         `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
           run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
-         VALUES ('efficient', 'vendor/gw', '', ?, 1, ?, ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
+         VALUES ('efficient', 'vendor/gw', '', ?, 3, ?, ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
       )
       .run(row.engine, row.status, row.runId);
     if (row.runId && row.accuracy !== undefined) {
@@ -153,6 +162,23 @@ describe('custom router tables and statuses (real SQLite)', () => {
         )
         .run(row.runId, ROUTE, row.accuracy);
     }
+  }
+
+  // The run that produced a ready row, as the deployed table and the paid flow write it.
+  // `admission_marker` is the durable paid-flow proof; NULL is exactly a legacy measurement.
+  function runRow(id: string, admitted: boolean, model = 'vendor/gw') {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, completed_at,
+          min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+          admission_marker)
+         VALUES (?, 'efficient', 'decider', 'platform', 'completed', '2026-10-01', '2026-10-01',
+           0.7, 3, 0, 3, ?, ?)`
+      )
+      .run(id, ENGINE, admitted ? `marker-${id}` : null);
+    sqlite
+      .prepare(`INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)`)
+      .run(id, model);
   }
 
   const candidates = (table: CustomRoutingTable | null) =>
@@ -170,6 +196,31 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(candidates(table)).toEqual([
       { model: LOCAL, variant: 'low', accuracy: 0.9, stale: false, estimatedRequestCostUsd: 0 },
     ]);
+  });
+
+  it('reports a failing client row with a finite attempt count and its reason', async () => {
+    // A genuine failed client row round trip: client_profiles has no attempt counters, class
+    // or `unavailable` state, so the reported failure must be one concrete attempt with the
+    // row's own reason — never `undefined`/NaN on the wire.
+    clientProfile({ id: 'current', accuracy: 0.4, updatedAt: '2026-10-10' });
+    sqlite.exec(`UPDATE client_profiles SET status = 'failed',
+      failure_reason = 'Client evaluation failed on this device.'`);
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, clientOnly, source);
+    const variant = statuses.entries[0]?.variants[0];
+    expect(variant).toMatchObject({
+      status: 'failed',
+      availability: 'unbenchmarked',
+      failure: {
+        kind: 'retryable',
+        attempts: 1,
+        failureClass: 'unknown',
+        reason: 'Client evaluation failed on this device.',
+      },
+    });
+    expect(Number.isFinite(variant?.failure?.attempts)).toBe(true);
+    // The whole payload stays JSON-clean: a NaN would serialize as null.
+    expect(JSON.parse(JSON.stringify(variant))).toEqual(JSON.parse(JSON.stringify(variant)));
+    expect(JSON.stringify(variant)).not.toContain('null,"attempts"');
   });
 
   it('serves an older-engine measurement flagged stale', async () => {
@@ -192,7 +243,13 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(candidates(table)).toEqual([expect.objectContaining({ accuracy: 0.8, stale: true })]);
     const status = await lookupCustomRouterStatuses(db, CONFIG, clientOnly, source);
     expect(status.entries[0]?.variants).toEqual([
-      { variant: 'low', status: 'stale', failureReason: null, linked: false },
+      {
+        variant: 'low',
+        status: 'stale',
+        failureReason: null,
+        linked: false,
+        availability: 'stale',
+      },
     ]);
   });
 
@@ -247,6 +304,688 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(table?.version).toMatch(/^registry-/);
   });
 
+  it('ranks a pinned alias under its logical entry key and reports the target it serves', async () => {
+    const alias = '~vendor/latest';
+    const pinnedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [
+        {
+          kind: 'gateway',
+          model: alias,
+          servingPin: { model: 'vendor/gw', pinnedAt: '2026-11-20T00:00:00.000Z' },
+        },
+      ],
+      clientEvalEntryKeys: [],
+    };
+    const result = await assembleCustomRouterTable(db, CONFIG, context, pinnedSource);
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    expect(result.servingPins).toEqual({ [`gateway:${alias}`]: 'vendor/gw' });
+    expect((await lookupCustomRouterStatuses(db, CONFIG, context, pinnedSource)).entries).toEqual([
+      {
+        key: `gateway:${alias}`,
+        variants: [
+          {
+            variant: null,
+            status: 'ready',
+            failureReason: null,
+            linked: false,
+            servingModel: 'vendor/gw',
+            availability: 'ready',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('serves the live alias target with a fallback warning when the pinned target is gone', async () => {
+    const alias = '~vendor/latest';
+    const pinnedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [
+        {
+          kind: 'gateway',
+          model: alias,
+          servingPin: { model: 'vendor/gone', pinnedAt: '2026-11-20T00:00:00.000Z' },
+        },
+      ],
+      clientEvalEntryKeys: [],
+    };
+    const result = await assembleCustomRouterTable(db, CONFIG, context, pinnedSource);
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    expect(result.servingPins).toBeUndefined();
+    expect((await lookupCustomRouterStatuses(db, CONFIG, context, pinnedSource)).entries).toEqual([
+      {
+        key: `gateway:${alias}`,
+        variants: [
+          {
+            variant: null,
+            status: 'ready',
+            failureReason: null,
+            linked: false,
+            servingFallback: true,
+            availability: 'ready',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps the deployed concrete candidate for an un-pinned legacy alias, and not the alias id', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // The measurement predates the paid flow: its run has no admission marker.
+    runRow('run-legacy', false);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-legacy', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+
+    const result = await assembleCustomRouterTable(db, CONFIG, context, aliasSource);
+    // Same ranked id and measurement the deployed table published for this pool.
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', accuracy: 0.95, stale: false }),
+    ]);
+    expect(
+      Object.values(result.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).not.toContain(alias);
+    expect(result.servingPins).toBeUndefined();
+    // Reading the pool wrote no pin and no measurement row.
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'`).get()
+    ).toEqual({ n: 0 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_runs`).get()).toEqual({ n: 1 });
+  });
+
+  it('ranks an un-pinned alias under its own id only for a paid-flow measurement', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // This run carries the paid-flow admission marker, so its result is the shared paid result.
+    runRow('run-paid', true);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-paid', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+    const result = await assembleCustomRouterTable(db, CONFIG, context, aliasSource);
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    // Still no pin: the pool was never asked and never confirmed.
+    expect(result.servingPins).toBeUndefined();
+  });
+
+  it('lets a no-pin alias observer rank a target another pool just completed', async () => {
+    const alias = '~vendor/latest';
+    const sharedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/other', pricing: { prompt: '0.000001', completion: '0.000002' } },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // Pool A measures the alias target through the paid flow; pool B only has the alias, with a
+    // different default entry, and never clicks or pays.
+    runRow('run-paid', true);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-paid', accuracy: 0.95 });
+    const plan = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ownerType: 'user',
+        ownerId: 'user-b',
+        baseRouter: 'efficient',
+        entries: [
+          { kind: 'gateway', model: alias },
+          { kind: 'gateway', model: 'vendor/other' },
+        ],
+        clientEvalEntryKeys: [],
+      },
+      sharedSource
+    );
+    // The shared paid result ranks under the alias, which is B's non-default entry. The default
+    // (`vendor/other`) has no measurement, so a route that ignored the alias would fall through
+    // to an entry this table cannot rank at all.
+    expect(candidates(plan.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    expect(
+      Object.values(plan.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).not.toContain('vendor/other');
+    expect(plan.servingPins).toBeUndefined();
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_runs`).get()).toEqual({ n: 1 });
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'`).get()
+    ).toEqual({ n: 0 });
+  });
+
+  it('keeps the duplicate source ready rows in the table version but emits one candidate', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    runRow('run-legacy', false);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-legacy', accuracy: 0.95 });
+    const base = {
+      ownerType: 'user' as const,
+      ownerId: 'user-1',
+      baseRouter: 'efficient' as const,
+      clientEvalEntryKeys: [] as string[],
+    };
+    const both = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...base,
+        entries: [
+          { kind: 'gateway', model: alias },
+          { kind: 'gateway', model: 'vendor/gw' },
+        ],
+      },
+      aliasSource
+    );
+    const aliasOnly = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      { ...base, entries: [{ kind: 'gateway', model: alias }] },
+      aliasSource
+    );
+    // One emitted row, exactly as deployed published it.
+    expect(candidates(both.table)).toEqual([expect.objectContaining({ model: 'vendor/gw' })]);
+    // The deployed fingerprint counted the alias and its own concrete entry as two ready
+    // contributors, so the pool's version differs from the alias-only pool.
+    expect(both.table?.version).not.toBe(aliasOnly.table?.version);
+  });
+
+  it('reports a permanently failed resolved pair for add-time validation without writing', async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, failure_reason, failure_class,
+          failure_attempts, model_failure_attempts, first_failed_at, platform_requested, user_requested)
+         VALUES ('efficient', 'vendor/gw', '', ?, 3, 'unavailable', NULL, '2026-10-01',
+           '2026-10-01', '2026-10-01', 'does not support tools', 'unsupported', 1, 1,
+           '2026-10-01', 0, 1)`
+      )
+      .run(ENGINE);
+    const result = await lookupCustomRouterBlockers(
+      db,
+      CONFIG,
+      { router: 'efficient', models: ['vendor/gw'] },
+      source
+    );
+    expect(result.blocked).toEqual([
+      {
+        model: 'vendor/gw',
+        pair: { model: 'vendor/gw', variant: null },
+        failure: expect.objectContaining({ kind: 'permanent', failureClass: 'unsupported' }),
+      },
+    ]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 1 });
+  });
+
+  it('reports a user-only permanent pair measured at another repetition count', async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, failure_reason, failure_class,
+          failure_attempts, model_failure_attempts, first_failed_at, platform_requested, user_requested)
+         VALUES ('efficient', 'vendor/gw', '', ?, 1, 'unavailable', NULL, '2026-10-01',
+           '2026-10-01', '2026-10-01', 'context too small', 'context_too_small', 1, 0,
+           '2026-10-01', 0, 1)`
+      )
+      .run(ENGINE);
+    // `deciderRepetitions` is fixed per router (efficient 3), so the row above sits at a count no
+    // live profile uses; the lookup must still find it, and it must not need a queue flag.
+    expect(
+      await lookupCustomRouterBlockers(
+        db,
+        CONFIG,
+        { router: 'efficient', models: ['vendor/gw'] },
+        source
+      )
+    ).toEqual({
+      router: 'efficient',
+      blocked: [
+        {
+          model: 'vendor/gw',
+          pair: { model: 'vendor/gw', variant: null },
+          failure: expect.objectContaining({
+            kind: 'permanent',
+            failureClass: 'context_too_small',
+          }),
+        },
+      ],
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 1 });
+  });
+
+  it('serves one shared concrete result to two pools, pinned or not', async () => {
+    const alias = '~vendor/latest';
+    const sharedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-shared', accuracy: 0.91 });
+    const base = {
+      ownerType: 'user' as const,
+      baseRouter: 'efficient' as const,
+      clientEvalEntryKeys: [] as string[],
+    };
+    // Pool A benchmarked the alias and pinned its target; pool B has the same alias without a pin.
+    const pinned = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...base,
+        ownerId: 'user-a',
+        entries: [
+          {
+            kind: 'gateway',
+            model: alias,
+            servingPin: { model: 'vendor/gw', pinnedAt: '2026-11-20T00:00:00.000Z' },
+          },
+        ],
+      },
+      sharedSource
+    );
+    const unpinned = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      { ...base, ownerId: 'user-b', entries: [{ kind: 'gateway', model: alias }] },
+      sharedSource
+    );
+    // Both pools rank the one ready result: the measurement is global, not per owner.
+    expect(candidates(pinned.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.91 }),
+    ]);
+    // B has no pin, and this measurement predates the paid flow: it keeps the concrete candidate
+    // id the deployed table published for an un-pinned alias.
+    expect(candidates(unpinned.table)).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', accuracy: 0.91 }),
+    ]);
+    // Only the pinned pool dispatches the concrete target; the other keeps its live alias.
+    expect(pinned.servingPins).toEqual({ [`gateway:${alias}`]: 'vendor/gw' });
+    expect(unpinned.servingPins).toBeUndefined();
+  });
+
+  it('publishes a partly ready family as soon as one pair finalizes', async () => {
+    const alias = '~vendor/latest';
+    const multiVariantSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            {
+              id: 'vendor/gw',
+              opencode: {
+                variants: {
+                  low: { reasoning: { enabled: true, effort: 'low' } },
+                  high: { reasoning: { enabled: true, effort: 'high' } },
+                },
+              },
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+            },
+          ],
+        })) as typeof fetch,
+    };
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+    const empty = await computeCustomRouterReadinessVersion(
+      db,
+      CONFIG,
+      context,
+      multiVariantSource
+    );
+    // Nothing ready yet: both variants are queued or failed and neither ranks.
+    expect(
+      (await assembleCustomRouterTable(db, CONFIG, context, multiVariantSource)).table
+    ).toBeNull();
+
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
+         VALUES ('efficient', 'vendor/gw', ?, ?, 3, 'ready', ?, '2026-10-01', '2026-10-01',
+           '2026-10-01', 0, 1)`
+      )
+      .run('low', ENGINE, 'run-low');
+    sqlite
+      .prepare(
+        `INSERT INTO model_summaries (run_id, model, variant, route_key, accuracy, avg_cost_usd,
+          avg_latency_ms, p50_latency_ms, cases, errors, p95_latency_ms, timeouts)
+         VALUES ('run-low', 'vendor/gw', 'low', ?, 0.93, 0.001, 800, 800, 20, 0, 900, 0)`
+      )
+      .run(ROUTE);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, failure_class, failure_attempts,
+          platform_requested, user_requested)
+         VALUES ('efficient', 'vendor/gw', 'high', ?, 3, 'unavailable', NULL, '2026-10-01',
+           '2026-10-01', '2026-10-01', 'unsupported', 1, 0, 1)`
+      )
+      .run(ENGINE);
+
+    // X is final, Y failed: the fingerprint advanced and the ready half already routes everywhere.
+    expect(
+      await computeCustomRouterReadinessVersion(db, CONFIG, context, multiVariantSource)
+    ).not.toBe(empty);
+    const ready = await assembleCustomRouterTable(db, CONFIG, context, multiVariantSource);
+    // No pin and no admission marker: the deployed concrete candidate id is preserved.
+    expect(candidates(ready.table)).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', variant: 'low', accuracy: 0.93 }),
+    ]);
+  });
+
+  it('answers a changed saved policy on the first read without enqueueing work', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.8 });
+
+    // Only the saved policy moves: the ready contributor and every profile row stay untouched.
+    const strict: BenchmarkConfig = { ...CONFIG, minAccuracy: 0.95 };
+    const lenient: BenchmarkConfig = { ...CONFIG, minAccuracy: 0.7 };
+    const before = await assembleCustomRouterTable(db, strict, withGateway, source);
+    expect(before.table?.routes[ROUTE] ?? []).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', meetsThreshold: false }),
+    ]);
+
+    const rowsBefore = sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get();
+
+    const after = await assembleCustomRouterTable(db, lenient, withGateway, source);
+    expect(after.table?.routes[ROUTE] ?? []).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', meetsThreshold: true }),
+    ]);
+
+    // Neither read enqueued or re-measured anything: the policy change alone re-ranked the route.
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual(
+      rowsBefore
+    );
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'").get()
+    ).toEqual({ n: 0 });
+  });
+
+  it('keeps the readiness fingerprint stable while adding a non-ready profile', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
+    const before = await computeCustomRouterReadinessVersion(db, CONFIG, withGateway, source);
+    expect(await computeCustomRouterReadinessVersion(db, CONFIG, withGateway, source)).toBe(before);
+    // A request that is queued but not ready changes no ranked candidate, so dependent pools must
+    // not rebuild their tables for it.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, platform_requested, user_requested)
+         VALUES ('efficient', 'vendor/gw', 'high', ?, 3, 'pending', NULL, '2026-10-02',
+           '2026-10-02', 0, 1)`
+      )
+      .run(ENGINE);
+    expect(await computeCustomRouterReadinessVersion(db, CONFIG, withGateway, source)).toBe(before);
+    // A newly ready measurement is a new contributor, so every pool ranking that concrete target
+    // sees a new fingerprint and rebuilds without a click.
+    sqlite.exec(`UPDATE benchmark_profiles SET status = 'ready', run_id = 'run-gw-new'`);
+    expect(await computeCustomRouterReadinessVersion(db, CONFIG, withGateway, source)).not.toBe(
+      before
+    );
+  });
+
+  it('reports measurement availability independently of any billing state', async () => {
+    const ready = await lookupCustomRouterStatuses(db, CONFIG, withGateway, source);
+    expect(ready.entries[1]?.variants[0]?.availability).toBe('unbenchmarked');
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
+    const measured = await lookupCustomRouterStatuses(db, CONFIG, withGateway, source);
+    expect(measured.entries[1]?.variants[0]?.availability).toBe('ready');
+    // A retryable failure is not a billing state and stays measurable on a fresh confirmation.
+    sqlite.exec(`UPDATE benchmark_profiles SET status = 'failed', run_id = NULL,
+      failure_class = 'provider_unavailable', failure_attempts = 1`);
+    const retryable = await lookupCustomRouterStatuses(db, CONFIG, withGateway, source);
+    expect(retryable.entries[1]?.variants[0]).toMatchObject({
+      status: 'failed',
+      availability: 'unbenchmarked',
+      failure: expect.objectContaining({ kind: 'retryable' }),
+    });
+    sqlite.exec(`UPDATE benchmark_profiles SET status = 'unavailable',
+      failure_class = 'unsupported'`);
+    const permanent = await lookupCustomRouterStatuses(db, CONFIG, withGateway, source);
+    expect(permanent.entries[1]?.variants[0]).toMatchObject({
+      availability: 'permanent_failure',
+      failure: expect.objectContaining({ kind: 'permanent' }),
+    });
+  });
+
+  it('reports legacy serving provenance without adopting it as a pin', async () => {
+    const alias = '~vendor/latest';
+    const legacySource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.9 });
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot,
+          updated_at) VALUES ('efficient', 'user', 'user-1', 'rev-1', ?, '2026-10-01')`
+      )
+      .run(
+        JSON.stringify({
+          entries: [
+            {
+              model: alias,
+              pairs: [{ model: 'vendor/gw', variant: null }],
+              servingPairs: [{ model: 'vendor/gw', variant: null }],
+              resolutionError: null,
+            },
+          ],
+          previousEntries: [],
+        })
+      );
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+    const status = await lookupCustomRouterStatuses(db, CONFIG, context, legacySource);
+    // Displayed because exactly one concrete model was recorded...
+    expect(status.entries[0]).toMatchObject({
+      legacyServingTarget: 'vendor/gw',
+      legacyServingAmbiguous: false,
+    });
+    // ...but never adopted: the entry stays unpinned and keeps serving its live alias.
+    const entry = context.entries[0];
+    expect(entry.kind === 'gateway' ? entry.servingPin : null).toBeUndefined();
+    expect(
+      (await assembleCustomRouterTable(db, CONFIG, context, legacySource)).servingPins
+    ).toBeUndefined();
+  });
+
+  it('refuses to name a legacy target when the old snapshot recorded several', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot,
+          updated_at) VALUES ('efficient', 'user', 'user-1', 'rev-1', ?, '2026-10-01')`
+      )
+      .run(
+        JSON.stringify({
+          entries: [
+            {
+              model: alias,
+              pairs: [{ model: 'vendor/gw', variant: null }],
+              servingPairs: [
+                { model: 'vendor/gw', variant: null },
+                { model: 'vendor/old', variant: null },
+              ],
+              resolutionError: null,
+            },
+          ],
+          previousEntries: [],
+        })
+      );
+    const status = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      {
+        ownerType: 'user',
+        ownerId: 'user-1',
+        baseRouter: 'efficient',
+        entries: [{ kind: 'gateway', model: alias }],
+        clientEvalEntryKeys: [],
+      },
+      aliasSource
+    );
+    expect(status.entries[0]).toMatchObject({
+      legacyServingTarget: null,
+      legacyServingAmbiguous: true,
+    });
+  });
+
+  it('flags a moved alias under a served pin as needing a re-benchmark', async () => {
+    const alias = '~vendor/latest';
+    const pinnedSource = {
+      ...source,
+      // The alias now resolves to a newer target; the saved pin keeps serving the older one.
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/new' },
+            { id: 'vendor/new', pricing: { prompt: '0.000001', completion: '0.000002' } },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [
+        {
+          kind: 'gateway',
+          model: alias,
+          servingPin: { model: 'vendor/gw', pinnedAt: '2026-11-20T00:00:00.000Z' },
+        },
+      ],
+      clientEvalEntryKeys: [],
+    };
+    const status = await lookupCustomRouterStatuses(db, CONFIG, context, pinnedSource);
+    expect(status.entries[0]?.variants[0]).toMatchObject({
+      status: 'ready',
+      servingModel: 'vendor/gw',
+      availability: 'alias_rebenchmark_needed',
+    });
+    // The move changes no serving decision: the shared result of the old concrete target keeps
+    // ranking under the alias and dispatching it, and the new target is never run or billed here.
+    const { table, servingPins } = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context,
+      pinnedSource
+    );
+    expect(candidates(table)).toEqual([expect.objectContaining({ model: alias, accuracy: 0.95 })]);
+    expect(servingPins).toEqual({ [`gateway:${alias}`]: 'vendor/gw' });
+    const executed = Object.values(table?.routes ?? {}).flatMap(route =>
+      route.map(candidate => candidate.model)
+    );
+    expect(executed).not.toContain('vendor/new');
+  });
+
   it('changes the table version with each upload to the served profile', async () => {
     clientProfile({ id: 'current', accuracy: 0.9, updatedAt: '2026-10-10' });
     const before = await assembleCustomRouterTable(db, CONFIG, clientOnly, source);
@@ -255,7 +994,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(after.table?.version).not.toBe(before.table?.version);
   });
 
-  it('reports ready, stale and missing per variant and re-admits stale platform pairs', async () => {
+  it('reports ready, stale and missing per variant without admitting a run', async () => {
     clientProfile({ id: 'old', engine: OLD_ENGINE, accuracy: 0.8, updatedAt: '2026-10-01' });
     platformProfile({ engine: OLD_ENGINE, status: 'ready', runId: 'run-old', accuracy: 0.95 });
     const statuses = await lookupCustomRouterStatuses(
@@ -271,18 +1010,43 @@ describe('custom router tables and statuses (real SQLite)', () => {
       {
         key: LOCAL,
         variants: [
-          { variant: 'low', status: 'stale', failureReason: null, linked: false },
-          { variant: 'high', status: 'missing', failureReason: null, linked: false },
+          {
+            variant: 'low',
+            status: 'stale',
+            failureReason: null,
+            linked: false,
+            availability: 'stale',
+          },
+          {
+            variant: 'high',
+            status: 'missing',
+            failureReason: null,
+            linked: false,
+            availability: 'unbenchmarked',
+          },
         ],
       },
       {
         key: 'gateway:vendor/gw',
-        variants: [{ variant: null, status: 'stale', failureReason: null, linked: false }],
+        variants: [
+          {
+            variant: null,
+            status: 'stale',
+            failureReason: null,
+            linked: false,
+            availability: 'stale',
+          },
+        ],
       },
     ]);
+    // A status read never admits a measurement: only an explicit paid confirmation does.
     expect(
-      sqlite.prepare('SELECT status FROM benchmark_profiles WHERE engine_identity = ?').all(ENGINE)
-    ).toEqual([{ status: 'pending' }]);
+      sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM benchmark_profiles WHERE engine_identity = ? AND status = 'pending'"
+        )
+        .get(ENGINE)
+    ).toEqual({ n: 0 });
   });
 
   it('reuses same-name platform variants while unmatched variants retain client measurements', async () => {
@@ -306,7 +1070,15 @@ describe('custom router tables and statuses (real SQLite)', () => {
     ]);
     expect(
       (await lookupCustomRouterStatuses(db, CONFIG, linkedContext, source)).entries[0]?.variants
-    ).toEqual([{ variant: null, linked: true, status: 'ready', failureReason: null }]);
+    ).toEqual([
+      {
+        variant: null,
+        linked: true,
+        status: 'ready',
+        failureReason: null,
+        availability: 'ready',
+      },
+    ]);
   });
 
   it('reprices linked summaries exactly from token means and older summaries by price ratio', async () => {
@@ -349,7 +1121,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(table?.routes[ROUTE]?.[0]).toMatchObject({ model: LOCAL, stale: true, avgCostUsd: 0 });
     const status = await lookupCustomRouterStatuses(db, CONFIG, context, removed);
     expect(status.entries[0]?.variants).toEqual([
-      { variant: null, linked: true, status: 'stale', failureReason: null },
+      { variant: null, linked: true, status: 'stale', failureReason: null, availability: 'stale' },
     ]);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
       n: 0,
@@ -441,6 +1213,669 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(await response.json()).toEqual({
       baseRouter: 'efficient',
       models: [{ model: 'vendor/gw', variants: [null] }],
+    });
+  });
+});
+
+describe('observed serving pin (real SQLite)', () => {
+  const ALIAS = '~vendor/latest';
+  const OLD_TARGET = 'vendor/old';
+  const NEW_TARGET = 'vendor/new';
+  const OBSERVED_AT = '2026-11-20T09:00:00.000Z';
+  const CONFIRMED_AT = '2026-11-20T10:00:00.000Z';
+
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+  });
+
+  function catalog(liveTarget: string, extra: string[] = []): typeof source {
+    return {
+      ...source,
+      fetchImpl: async () =>
+        Response.json({
+          data: [
+            { id: ALIAS, alias_target: liveTarget },
+            ...[liveTarget, ...extra].map(id => ({
+              id,
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+            })),
+          ],
+        }),
+    };
+  }
+
+  function readyProfile(model: string, runId: string, admitted: boolean, accuracy = 0.95) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
+          run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
+         VALUES ('efficient', ?, '', ?, 3, 'ready', ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
+      )
+      .run(model, ENGINE, runId);
+    sqlite
+      .prepare(
+        `INSERT INTO model_summaries (run_id, model, variant, route_key, accuracy, avg_cost_usd,
+          avg_latency_ms, p50_latency_ms, cases, errors, p95_latency_ms, timeouts)
+         VALUES (?, ?, '', ?, ?, 0.001, 800, 800, 20, 0, 900, 0)`
+      )
+      .run(runId, model, ROUTE, accuracy);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, completed_at,
+          min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+          admission_marker)
+         VALUES (?, 'efficient', 'decider', 'platform', 'completed', '2026-10-01', '2026-10-01',
+           0.7, 3, 0, 3, ?, ?)`
+      )
+      .run(runId, ENGINE, admitted ? `marker-${runId}` : null);
+    sqlite
+      .prepare(`INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)`)
+      .run(runId, model);
+  }
+
+  function context(pin?: { model: string; source?: 'observed' }): CustomRouterBenchmarkContext {
+    const entry: GatewayCustomRouterEntry = { kind: 'gateway', model: ALIAS };
+    if (pin) {
+      entry.servingPin = pin.source
+        ? { model: pin.model, pinnedAt: OBSERVED_AT, source: 'observed' }
+        : { model: pin.model, pinnedAt: OBSERVED_AT, confirmedAt: CONFIRMED_AT };
+    }
+    return {
+      ownerType: 'user',
+      ownerId: 'user-b',
+      baseRouter: 'efficient',
+      entries: [entry],
+      clientEvalEntryKeys: [],
+    };
+  }
+
+  const rankedModels = (table: CustomRoutingTable | null) =>
+    Object.values(table?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model);
+
+  it('serves a promoted observation with a stale catalog that still reports its old target', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(result.table)).toEqual([ALIAS]);
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(result.table?.routes[ROUTE]).toHaveLength(1);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      status: 'ready',
+      servingModel: OLD_TARGET,
+      availability: 'ready',
+    });
+    expect(statuses.entries[0]?.variants[0]).not.toHaveProperty('servingFallback');
+  });
+
+  it('reads identically to a confirmed pin of the same target, so promotion has no dispatch gap', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true);
+    const observed = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    const confirmed = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET }),
+      catalog(OLD_TARGET)
+    );
+    expect(observed.table?.routes).toEqual(confirmed.table?.routes);
+    expect(observed.table?.version).toBe(confirmed.table?.version);
+    expect(observed.servingPins).toEqual(confirmed.servingPins);
+    expect(
+      await computeCustomRouterReadinessVersion(
+        db,
+        CONFIG,
+        context({ model: OLD_TARGET, source: 'observed' }),
+        catalog(OLD_TARGET)
+      )
+    ).toBe(await computeCustomRouterReadinessVersion(db, CONFIG, context(), catalog(OLD_TARGET)));
+  });
+
+  it('keeps the observed target ranked and warns once the catalog reports the move', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true, 0.95);
+    readyProfile(NEW_TARGET, 'run-new', true, 0.9);
+    const moved = catalog(NEW_TARGET, [OLD_TARGET]);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      moved
+    );
+    expect(
+      Object.values(result.table?.routes ?? {}).map(route =>
+        route.map(candidate => ({ model: candidate.model, accuracy: candidate.accuracy }))
+      )
+    ).toEqual([[{ model: ALIAS, accuracy: 0.95 }]]);
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(rankedModels(result.table)).not.toContain(NEW_TARGET);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      moved
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      status: 'ready',
+      servingModel: OLD_TARGET,
+      availability: 'alias_rebenchmark_needed',
+    });
+    expect(statuses.entries[0]?.variants[0]).not.toHaveProperty('servingFallback');
+  });
+
+  it('keeps a listed but unmeasured saved pin as the dispatch target', async () => {
+    const moved = catalog(NEW_TARGET, [OLD_TARGET]);
+    const pinnedContext = context({ model: OLD_TARGET });
+
+    const result = await assembleCustomRouterTable(db, CONFIG, pinnedContext, moved);
+    expect(result.table).toBeNull();
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(result.servingFallback).toBeUndefined();
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, pinnedContext, moved);
+    const variant = statuses.entries[0]?.variants[0];
+    expect(variant).toMatchObject({ status: 'missing', availability: 'unbenchmarked' });
+    expect(variant).not.toHaveProperty('servingFallback');
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_runs').get()).toEqual({ n: 0 });
+  });
+
+  it('falls back to the live target with a warning when the observed target is gone', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true, 0.95);
+    const gone = catalog(NEW_TARGET);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(result.table).toBeNull();
+    expect(result.servingPins).toBeUndefined();
+    expect(result.servingFallback).toEqual([`gateway:${ALIAS}`]);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      servingFallback: true,
+      status: 'missing',
+      availability: 'alias_rebenchmark_needed',
+    });
+
+    readyProfile(NEW_TARGET, 'run-new', true, 0.9);
+    const recovered = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(
+      Object.values(recovered.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).toEqual([ALIAS]);
+    expect(recovered.servingPins).toBeUndefined();
+    expect(recovered.servingFallback).toEqual([`gateway:${ALIAS}`]);
+    const recoveredStatuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(recoveredStatuses.entries[0]?.variants[0]).toMatchObject({
+      servingFallback: true,
+      status: 'ready',
+      availability: 'ready',
+    });
+  });
+
+  it('preserves the legacy concrete candidate and duplicate dedupe for un-pinned rows', async () => {
+    readyProfile(OLD_TARGET, 'run-legacy', false, 0.95);
+    const aliasOnly = await assembleCustomRouterTable(db, CONFIG, context(), catalog(OLD_TARGET));
+    expect(rankedModels(aliasOnly.table)).toEqual([OLD_TARGET]);
+    expect(aliasOnly.servingPins).toBeUndefined();
+
+    const duplicate = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...context(),
+        entries: [
+          { kind: 'gateway', model: ALIAS },
+          { kind: 'gateway', model: OLD_TARGET },
+        ],
+      },
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(duplicate.table)).toEqual([OLD_TARGET]);
+    expect(duplicate.servingPins).toBeUndefined();
+    expect(duplicate.table?.version).not.toBe(aliasOnly.table?.version);
+  });
+
+  it('ranks a paid observation of the same live target with the un-pinned alias version', async () => {
+    readyProfile(OLD_TARGET, 'run-paid', true, 0.95);
+    const unpinned = await assembleCustomRouterTable(db, CONFIG, context(), catalog(OLD_TARGET));
+    expect(rankedModels(unpinned.table)).toEqual([ALIAS]);
+    const promoted = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(promoted.table)).toEqual([ALIAS]);
+    expect(promoted.table?.version).toBe(unpinned.table?.version);
+  });
+});
+
+/**
+ * Only a `pending` row with a demand flag requested at or after the cutover is queue work. A
+ * bookkeeping, pre-cutover or parked row reads as not benchmarked; ready, running and failed
+ * rows keep their meaning, and a missing marker fails pending closed.
+ */
+describe('inert pending rows are not queue work (real migrated SQLite)', () => {
+  const CUTOVER = '2026-11-21T00:00:00.000Z';
+  const AFTER = '2026-11-21T06:00:00.000Z';
+  const BEFORE = '2026-11-19T00:00:00.000Z';
+  const PARKED = '1970-01-01T00:00:00.000Z';
+
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sqlite.close();
+  });
+
+  const markCutover = () =>
+    sqlite.prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)').run(CUTOVER);
+
+  /** A live paid request with one queued case for the pair, as the paid launch leaves it. */
+  function paidRequest(row: {
+    model?: string;
+    requestStatus?: 'preparing' | 'active' | 'paused' | 'completed' | 'failed';
+    caseStatus?: 'queued' | 'running' | 'reused' | 'done' | 'failed' | 'paused';
+    ownerId?: string;
+    router?: 'efficient' | 'frontier';
+  }) {
+    const requestId = `req-${Math.random().toString(36).slice(2)}`;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests (id, owner_type, owner_id, router, router_id,
+          pool_version, engine_identity, status, quote_id, estimate_microdollars,
+          maximum_microdollars, actor_user_id, context, created_at, updated_at, activated_at)
+         VALUES (?, 'user', ?, ?, 'router-id', 'v1', ?, ?, 'quote', 0, 0, 'actor', '{}',
+           '2026-11-19T00:00:00.000Z', '2026-11-19T00:00:00.000Z', '2026-11-19T00:00:00.000Z')`
+      )
+      .run(
+        requestId,
+        row.ownerId ?? 'user-inert',
+        row.router ?? 'efficient',
+        ENGINE,
+        row.requestStatus ?? 'active'
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases (request_id, engine_identity, model, variant,
+          rep, case_id, status, updated_at)
+         VALUES (?, ?, ?, '', 0, 'case-1', ?, '2026-11-19T00:00:00.000Z')`
+      )
+      .run(requestId, ENGINE, row.model ?? 'vendor/gw', row.caseStatus ?? 'queued');
+  }
+
+  function profile(row: {
+    status: string;
+    requestedAt: string;
+    platformRequested?: boolean;
+    userRequested?: boolean;
+    runId?: string | null;
+    engine?: string;
+    variant?: string;
+    model?: string;
+  }) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+          status, run_id, requested_at, updated_at, completed_at, platform_requested,
+          user_requested)
+         VALUES ('efficient', ?, ?, ?, 3, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        row.model ?? 'vendor/gw',
+        row.variant ?? '',
+        row.engine ?? ENGINE,
+        row.status,
+        row.runId ?? null,
+        row.requestedAt,
+        row.requestedAt,
+        row.status === 'ready' ? row.requestedAt : null,
+        row.platformRequested ? 1 : 0,
+        row.userRequested ? 1 : 0
+      );
+  }
+
+  const statusContext: CustomRouterBenchmarkContext = {
+    ownerType: 'user',
+    ownerId: 'user-inert',
+    baseRouter: 'efficient',
+    entries: [{ kind: 'gateway', model: 'vendor/gw' }],
+    clientEvalEntryKeys: [],
+  };
+
+  async function statusVariant() {
+    const status = await lookupCustomRouterStatuses(db, CONFIG, statusContext, source);
+    return status.entries[0]?.variants[0];
+  }
+
+  it('does not present a bookkeeping pending row as benchmarking', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('does not present a pre-cutover user-only pending row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: BEFORE, userRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('does not present a parked epoch pending row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: PARKED, platformRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it('presents a current post-cutover platform demand row as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: AFTER, platformRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('presents a current post-cutover user-only demand row as benchmarking', async () => {
+    // The union of both queues: a paid user request is real work even though the platform flag
+    // is clear, so it must not be filtered like bookkeeping.
+    markCutover();
+    profile({ status: 'pending', requestedAt: AFTER, userRequested: true });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a running row visible whatever its request time says', async () => {
+    profile({
+      status: 'running',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+      runId: 'run-live',
+    });
+    expect(await statusVariant()).toMatchObject({
+      status: 'running',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a ready measurement visible whatever its request time says', async () => {
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+      runId: 'run-ready',
+    });
+    expect(await statusVariant()).toMatchObject({ status: 'ready', availability: 'ready' });
+  });
+
+  it('keeps a settled failure visible whatever its request time says', async () => {
+    profile({
+      status: 'failed',
+      requestedAt: BEFORE,
+      userRequested: false,
+      platformRequested: false,
+    });
+    sqlite.exec(
+      `UPDATE benchmark_profiles SET failure_class = 'provider_unavailable', failure_attempts = 1`
+    );
+    expect(await statusVariant()).toMatchObject({
+      status: 'failed',
+      availability: 'unbenchmarked',
+      failure: expect.objectContaining({ kind: 'retryable' }),
+    });
+  });
+
+  it('keeps an older-engine ready measurement as stale beside an inert pending row', async () => {
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      runId: 'run-old',
+      engine: 'efficient:v0:old',
+      platformRequested: false,
+      userRequested: false,
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    expect(await statusVariant()).toMatchObject({ status: 'stale', availability: 'stale' });
+  });
+
+  it('fails closed on pending rows when the cutover marker is missing', async () => {
+    profile({ status: 'pending', requestedAt: AFTER, platformRequested: true });
+    // No `benchmark_cutover` row: a demand row cannot prove it is post-cutover work.
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+    // The read is read-only: it must not create the marker to satisfy itself.
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get()).toEqual({ n: 0 });
+  });
+
+  it('counts and lists only real demand for the admin registry', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: true,
+      model: 'vendor/eligible',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      userRequested: true,
+      model: 'vendor/user-eligible',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+      model: 'vendor/bookkeeping',
+    });
+    profile({
+      status: 'pending',
+      requestedAt: BEFORE,
+      userRequested: true,
+      model: 'vendor/legacy',
+    });
+    profile({
+      status: 'ready',
+      requestedAt: BEFORE,
+      runId: 'run-ready',
+      platformRequested: true,
+      model: 'vendor/served',
+    });
+    profile({
+      status: 'failed',
+      requestedAt: BEFORE,
+      platformRequested: true,
+      model: 'vendor/failed',
+    });
+    const current = { router: 'efficient' as const, engineIdentity: ENGINE, repetitions: 3 };
+
+    expect(await countCurrentProfilesByStatus(db, current, 'platform', CUTOVER)).toEqual([
+      { status: 'failed', count: 1 },
+      { status: 'pending', count: 1 },
+      { status: 'ready', count: 1 },
+    ]);
+    expect(await countCurrentProfilesByStatus(db, current, 'user', CUTOVER)).toEqual([
+      { status: 'pending', count: 1 },
+    ]);
+
+    const entries = await listCurrentPlatformProfileStatuses(db, current, CUTOVER);
+    expect(entries.map(row => `${row.model}:${row.status}`).sort()).toEqual([
+      'vendor/eligible:pending',
+      'vendor/failed:failed',
+      'vendor/served:ready',
+    ]);
+  });
+
+  it('serves the status API route through the same fence', async () => {
+    markCutover();
+    // The status route answers 400 without a saved router config, so seed the real one.
+    await saveBenchmarkConfig(db, CONFIG, 'test');
+    // Serve the catalog without egress; afterEach restores the global.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockImplementation(async () =>
+        Response.json({
+          data: [{ id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } }],
+        })
+      )
+    );
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    const env = {
+      BENCH_DB: db,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+      KILO_WEB_API_BASE_URL: 'https://app.test',
+    } as unknown as Env;
+    const response = await app.request(
+      `https://bench.test${CUSTOM_ROUTER_STATUS_PATH}`,
+      {
+        method: 'POST',
+        headers: { authorization: 'Bearer test-secret', 'content-type': 'application/json' },
+        body: JSON.stringify(statusContext),
+      },
+      env
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      entries: { variants: { status: string; availability?: string }[] }[];
+    };
+    expect(body.entries[0]?.variants[0]).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get()).toEqual({ n: 1 });
+  });
+
+  // The deferred explicit-paid path: `enrollPaidPairStatements` creates the row with both
+  // demand flags off, and a capped launch's release returns it to `pending` keeping its old
+  // request time. Only the durable paid request proves it is work.
+  it('presents a deferred paid request with a flag-0 pre-cutover pending row as benchmarking', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: BEFORE,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'active', caseStatus: 'queued' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('presents a preparing paid request whose case is already running as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: PARKED, userRequested: false });
+    paidRequest({ requestStatus: 'preparing', caseStatus: 'running' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a flag-0 pending row missing when the only paid request case is terminal', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'completed', caseStatus: 'done' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it("does not adopt another owner's paid request for this pair", async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'active', caseStatus: 'queued', ownerId: 'someone-else' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
     });
   });
 });

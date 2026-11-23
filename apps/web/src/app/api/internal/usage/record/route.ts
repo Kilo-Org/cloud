@@ -16,7 +16,7 @@ import {
  * Frankfurt-local sink for usage writes against the PostgreSQL primary.
  *
  * `writer_caller` comes from `x-usage-write-source`: `queue` (the usage-ingest
- * consumer), `queue_vercel` (the staging Vercel queue consumer),
+ * consumer), `queue_vercel` (the retired staging Vercel queue consumer in older deployments),
  * `region_handoff` (an SFO `kilocode-ai-gateway` handoff through
  * `recordUsageInPrimaryRegion`), or `unknown` when that header is missing or
  * any other value. Executing the write here collapses the row-lock hold on

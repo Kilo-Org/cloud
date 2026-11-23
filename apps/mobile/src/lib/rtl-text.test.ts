@@ -1,20 +1,28 @@
-import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { createElement, Fragment } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { flattenStyle } from '@/test/style-sheet-mock';
 
 import {
+  codeFieldTextStyle,
   containsJoinedScript,
+  contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
-  rtlBlockTextAlign,
+  pinsTextDirection,
+  rtlBaseMarkedChildren,
   withoutMonoFamily,
 } from './rtl-text';
 
-// `rtl-text` imports `I18nManager` for its direction helpers; the real module
-// is Flow-syntax source this node project cannot load. Hoisted so a test can
-// flip the interface direction between calls.
+// `rtl-text` imports `I18nManager` and `StyleSheet` from `react-native`; the
+// real module is Flow-syntax source this node project cannot load. Hoisted so a
+// test can flip the interface direction between calls.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
-vi.mock('react-native', () => ({ I18nManager: i18nManager }));
+vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
+  StyleSheet: { flatten: flattenStyle },
+}));
 
 // U+0870 and U+089F are the first and last characters of Arabic Extended-B,
 // the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
@@ -123,6 +131,25 @@ describe('containsJoinedScript', () => {
   );
 
   it.each([
+    ['Hindi (Devanagari)', 'अभी'],
+    ['Bengali', 'এখন'],
+    ['Punjabi (Gurmukhi)', 'ਹੁਣ'],
+    ['Gujarati', 'હવે'],
+    ['Odia', 'ବର୍ତ୍ତମାନ'],
+    ['Tamil', 'இப்போது'],
+    ['Telugu', 'ఇప్పుడు'],
+    ['Kannada', 'ಈಗ'],
+    ['Malayalam', 'ഇപ്പോൾ'],
+    ['Sinhala', 'දැන්'],
+    ['Thai', 'ตอนนี้'],
+    ['Lao', 'ດຽວນີ້'],
+    ['Myanmar', 'ယခု'],
+    ['Khmer', 'ឥឡូវនេះ'],
+  ])('reads a combining cluster script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
+
+  it.each([
     ['English', 'Preferences'],
     ['Hebrew (right-to-left, not joined)', 'הגדרות'],
     ['Greek', 'Ρυθμίσεις'],
@@ -165,7 +192,6 @@ describe('containsJoinedScript', () => {
   });
 
   it('leaves a nested element to its own run', () => {
-    // A nested Text is a separate run and applies its own letter spacing.
     expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
   });
 });
@@ -186,16 +212,122 @@ describe('withoutMonoFamily', () => {
   });
 });
 
-describe('rtlBlockTextAlign', () => {
-  // A native markdown paragraph resolves its direction from its first strong
-  // character, so an English reply would sit at the left edge of an Arabic
-  // interface while the rows around it sit on the start edge.
-  it('names the start edge in a right-to-left interface', () => {
-    expect(rtlBlockTextAlign(true)).toEqual({ textAlign: 'right' });
+describe('contentTextDirection', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
   });
 
-  it('leaves the renderer its natural alignment in a left-to-right interface', () => {
-    expect(rtlBlockTextAlign(false)).toEqual({});
+  const LTR = { direction: 'ltr', writingDirection: 'ltr' };
+  const RTL = { direction: 'rtl', writingDirection: 'rtl' };
+
+  it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
+  });
+
+  it.each([false, true])('names Arabic content right to left (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection(['  ', createElement('Text', null, 'تلوث Prototype')])).toEqual(
+      RTL
+    );
+  });
+
+  it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁', '𐠀𐠁', '𐤠𐤡', '𐦀𐦁'])(
+    'names %s content right to left',
+    text => {
+      expect(contentTextDirection(`1. ${text}`)).toEqual(RTL);
+    }
+  );
+
+  it('names Greek and Cyrillic content left to right', () => {
+    expect(contentTextDirection('Ελληνικά')).toEqual(LTR);
+    expect(contentTextDirection('Русский')).toEqual(LTR);
+  });
+
+  it('leaves copy with no letter to the interface', () => {
+    expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
+  });
+});
+
+describe('rtlBaseMarkedChildren', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
+  });
+
+  // The Bitbucket denial sentence: it opens on a Latin product name and then
+  // holds Arabic words.
+  const MIXED = 'Bitbucket غير متصل. يمكن لمالكي المؤسسة ربطه.';
+
+  it('prefixes a Latin-first label that holds Arabic copy in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren(MIXED, true)).toBe(`\u200F${MIXED}`);
+  });
+
+  it('prefixes a Latin-first label that holds Hebrew copy', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Bitbucket לא מחובר.', true)).toBe('\u200FBitbucket לא מחובר.');
+  });
+
+  it('leaves a label that already opens right to left alone', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('استكشف', true)).toBe('استكشف');
+  });
+
+  it('leaves Latin-only copy alone, so its full stop stays on the word', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Sentry.', hasRtlScript('Sentry.'))).toBe('Sentry.');
+  });
+
+  it('leaves the copy alone in a left-to-right interface', () => {
+    expect(i18nManager.isRTL).toBe(false);
+    expect(rtlBaseMarkedChildren(MIXED, true)).toBe(MIXED);
+  });
+
+  it('leaves the copy alone when the caller scanned no right-to-left script', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren(MIXED, false)).toBe(MIXED);
+  });
+
+  it('puts the mark in front of a child tree that is not one string', () => {
+    i18nManager.isRTL = true;
+    const child = createElement('Text', null, 'Kilo غير متصل');
+    expect(rtlBaseMarkedChildren(child, true)).toEqual(
+      createElement(Fragment, null, '\u200F', child)
+    );
+  });
+});
+
+describe('pinsTextDirection', () => {
+  it('reports a left-to-right pin', () => {
+    expect(pinsTextDirection({ direction: 'ltr', writingDirection: 'ltr' })).toBe(true);
+  });
+
+  it('reports a right-to-left pin', () => {
+    expect(pinsTextDirection({ direction: 'rtl', writingDirection: 'rtl' })).toBe(true);
+  });
+
+  // A caller that names only the iOS spelling has still named the direction.
+  it('reports a pin that names only the writing direction', () => {
+    expect(pinsTextDirection({ writingDirection: 'rtl' })).toBe(true);
+  });
+
+  it('reports no pin for a style that names neither', () => {
+    expect(pinsTextDirection({ textAlign: 'right', letterSpacing: 0 })).toBe(false);
+  });
+
+  it('reports no pin for a value that leaves the direction open', () => {
+    expect(pinsTextDirection({ direction: 'inherit' })).toBe(false);
+    expect(pinsTextDirection({ writingDirection: 'auto' })).toBe(false);
+  });
+
+  it('reads a pin inside a style array', () => {
+    expect(pinsTextDirection([{ letterSpacing: 0 }, [{ direction: 'ltr' }]])).toBe(true);
+    expect(pinsTextDirection([{ letterSpacing: 0 }, undefined, false])).toBe(false);
+  });
+
+  it('reports no pin for an absent or empty style', () => {
+    expect(pinsTextDirection(undefined)).toBe(false);
+    expect(pinsTextDirection({})).toBe(false);
   });
 });
 
@@ -219,5 +351,31 @@ describe('ltrValueTextStyle', () => {
       i18nManager.isRTL = false;
     }
     expect(ltrValueTextStyle().textAlign).toBeUndefined();
+  });
+});
+
+describe('codeFieldTextStyle', () => {
+  // A command keeps its left edge in a right-to-left interface, where a named
+  // value sits on the label's right edge instead.
+  it('pins a command to the left edge in both directions', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(codeFieldTextStyle().textAlign).toBe('left');
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(codeFieldTextStyle()).toMatchObject({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+      textAlign: 'left',
+    });
+  });
+
+  it('turns the family ligatures off so a flag keeps its hyphens', () => {
+    expect(codeFieldTextStyle().fontVariant).toEqual([
+      'no-common-ligatures',
+      'no-discretionary-ligatures',
+      'no-contextual',
+    ]);
   });
 });

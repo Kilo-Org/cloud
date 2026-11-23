@@ -18,6 +18,7 @@ const listState = vi.hoisted(() => ({
   isError: false,
   storedIsPending: false,
   storedIsFetching: false,
+  storedIsPaused: false,
 }));
 
 const refetchControl = vi.hoisted(() => {
@@ -71,11 +72,25 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
 }));
+// The real native module loads the RN package in Node, which the suite's
+// `react-native` mock cannot reach: a static keyboard answers instead.
+vi.mock('react-native-keyboard-controller', () => {
+  const snapshot = { height: 0, isVisible: false, progress: 0, duration: 0 };
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    useKeyboardState: (selector?: (state: typeof snapshot) => unknown) =>
+      selector ? selector(snapshot) : snapshot,
+  };
+});
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
   scheduleCacheMaintenance: (run: () => void) => {
     run();
   },
 }));
+// The empty state's geometry hook reports through `@sentry/react-native`,
+// whose real module loads react-native in Node; the reporter is stubbed here.
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   type Row = { key: string };
@@ -131,6 +146,8 @@ vi.mock('@/components/ui/icons', () => ({
   X: 'X',
   Check: 'Check',
   Bot: 'Bot',
+  Plus: 'Plus',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: Record<string, unknown>): ReactNode => createElement('Pressable', props),
@@ -170,7 +187,10 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: vi.fn(),
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-filter-button', () => ({
@@ -215,6 +235,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       activeIsError: false,
       storedIsError: listState.isError,
       storedIsPending: listState.storedIsPending,
+      storedIsPaused: listState.storedIsPaused,
       storedIsFetching: listState.storedIsFetching,
       storedFetchedSinceMount: true,
       storedLoadedPageCount: 1,
@@ -230,6 +251,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     isError: false,
     isFetching: false,
     isPending: false,
+    isPaused: false,
     hasNextPage: false,
     isFetchingNextPage: false,
     isFetchNextPageError: false,

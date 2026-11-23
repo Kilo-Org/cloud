@@ -1,10 +1,12 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { type Href, useRouter } from 'expo-router';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import {
   filterRepositoryOptions,
   type RepoOption,
@@ -12,32 +14,40 @@ import {
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
-import { Check, GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { GitBranch, Lock, Plug, SearchX, Unlock } from '@/components/ui/icons';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
-import { selectionCheckColor } from '@/lib/selection-check-color';
-import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
   repositories: readonly RepoOption[];
   isLoading: boolean;
   isError: boolean;
+  /** The failed read's error, classified by the shared selector. */
+  error: unknown;
   onRetry: () => void;
   selectedKey: string | null;
   onSelect: (repo: RepoOption) => void;
   onClose: () => void;
+  /**
+   * Where the empty state sends the reader to connect a repository service: the
+   * Connected services screen for this scope, so a person with no repository to
+   * pick is not left with an empty list and no way forward.
+   */
+  connectedServicesHref: Href;
 }>;
 
 /** Content-shaped rows in the same slot and height as a loaded repo row. */
 function RepoPickerSkeleton() {
   return (
-    <View className="gap-1 px-4">
+    <View className="gap-1">
       {[0, 1, 2, 3].map(index => (
-        <Skeleton key={index} className={cn(ROW_TARGET_CLASS, 'w-full rounded-md bg-muted-soft')} />
+        <RowSkeleton key={index} />
       ))}
     </View>
   );
@@ -57,34 +67,31 @@ function RepoOptionRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <Pressable
-      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
-      accessibilityRole="button"
-      accessibilityLabel={
+    <ChoiceRow
+      accessibleName={
         repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
       }
-      accessibilityState={{ selected: isSelected }}
+      selected={isSelected}
       onPress={onSelect}
     >
-      <View
-        className="shrink-0"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        {repo.private ? (
-          <Lock size={14} color={colors.mutedForeground} />
-        ) : (
-          <Unlock size={14} color={colors.mutedForeground} />
-        )}
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <View
+          className="shrink-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {repo.private ? (
+            <Lock size={14} color={colors.mutedForeground} />
+          ) : (
+            <Unlock size={14} color={colors.mutedForeground} />
+          )}
+        </View>
+        <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+          {repo.fullName}
+        </Text>
+        <Eyebrow>{repo.platform === 'gitlab' ? 'GL' : 'GH'}</Eyebrow>
       </View>
-      <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-        {repo.fullName}
-      </Text>
-      <Text className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {repo.platform === 'gitlab' ? 'GL' : 'GH'}
-      </Text>
-      {isSelected ? <Check size={16} color={selectionCheckColor(colors)} /> : null}
-    </Pressable>
+    </ChoiceRow>
   );
 }
 
@@ -104,17 +111,50 @@ export function RepoPickerSheet({
   repositories,
   isLoading,
   isError,
+  error,
   onRetry,
   selectedKey,
   onSelect,
   onClose,
+  connectedServicesHref,
 }: Readonly<RepoPickerSheetProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const connectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({ error, connectivity });
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
-  const visible = useMemo(
+  // The sheet presents in place and the caller unmounts it from `onClose`, so
+  // the dismissal animation needs a `visible` of its own: closing sets it false,
+  // the native sheet slides out, and the caller's close runs from the dismissal
+  // report. The sheet therefore stays mounted through that animation.
+  const [visible, setVisible] = useState(true);
+  // A navigation waits for the same report: pushing while the native sheet is
+  // still presented leaves the tap looking dead, because the push lands under a
+  // sheet the reader cannot see past (`review-memory-proposal-sheet` and
+  // `backend-settings-sheet` hand a route over this way too).
+  const afterDismissRef = useRef<Href | null>(null);
+  // `Sheet` forwards its own close edge — the finish of the close asked for
+  // here — before the finished-dismissal report, so that edge only withdraws
+  // the sheet. Clearing the queued route there would drop the navigation the
+  // press asked for; `dismissed` owns it.
+  const hide = () => {
+    setVisible(false);
+  };
+  const close = (then?: Href) => {
+    afterDismissRef.current = then ?? null;
+    hide();
+  };
+  const dismissed = () => {
+    const then = afterDismissRef.current;
+    afterDismissRef.current = null;
+    onClose();
+    if (then !== null) {
+      router.push(then);
+    }
+  };
+  const visibleRepos = useMemo(
     () => filterRepositoryOptions(repositories, deferredSearch),
     [repositories, deferredSearch]
   );
@@ -126,17 +166,22 @@ export function RepoPickerSheet({
   } else if (isError) {
     body = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={onRetry}
+        inset="gutter"
+        // This sheet lists repositories, so the read's own load-failure title
+        // names the repository list instead of the profiles one it defaults to.
+        title={readError.titleKey === null ? undefined : t('common.couldNotLoadRepositories')}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? onRetry : undefined}
       />
     );
-  } else if (visible.length === 0) {
+  } else if (visibleRepos.length === 0) {
     body = (
       <EmptyState
         placement="top"
         compact
+        inset="gutter"
         icon={isSearching ? SearchX : GitBranch}
         title={
           isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')
@@ -146,10 +191,21 @@ export function RepoPickerSheet({
             ? t('agents.sessionList.tryDifferentSearch')
             : t('agentChat.repoPicker.noRepositoriesDescription')
         }
+        action={
+          isSearching ? undefined : (
+            <StateAction
+              label={t('integrations.sectionTitle')}
+              icon={Plug}
+              onPress={() => {
+                close(connectedServicesHref);
+              }}
+            />
+          )
+        }
       />
     );
   } else {
-    body = visible.map(repo => (
+    body = visibleRepos.map(repo => (
       <RepoOptionRow
         key={repositoryOptionKey(repo)}
         repo={repo}
@@ -163,29 +219,25 @@ export function RepoPickerSheet({
   }
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={hide} onDismiss={dismissed}>
       <SheetHeader
         title={t('profiles.repoBindings.repo')}
-        onDone={onClose}
-        onCancel={onClose}
+        onDone={() => {
+          close();
+        }}
+        onCancel={() => {
+          close();
+        }}
         doneLabel={t('common.done')}
         cancelLabel={t('common.cancel')}
         topInset="ios-page-sheet"
       />
-      <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-        <Search size={18} color={colors.mutedForeground} />
-        <Input
-          placeholder={t('profiles.repoBindings.search')}
-          placeholderTextColor={colors.mutedForeground}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-          accessibilityLabel={t('profiles.repoBindings.search')}
-          className="flex-1 pl-0 pr-0 text-base text-foreground"
-          onChangeText={setSearch}
-        />
-      </View>
+      <SearchField
+        className="mx-4 my-3"
+        placeholder={t('profiles.repoBindings.search')}
+        hasText={search !== ''}
+        onChangeText={setSearch}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-4"

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
+import type Stripe from 'stripe';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
@@ -61,6 +62,7 @@ import {
   reportKiloClawCommitRetirementAnomaly,
   type KiloClawCommitEnrollmentQualification,
 } from '@/lib/kiloclaw/commit-retirement';
+import { isEndedStripeSubscriptionStatus } from '@/lib/kiloclaw/ended-stripe-subscription';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -443,6 +445,7 @@ export async function applyStripeFundedKiloClawPeriod(
     userId: string;
     metadataInstanceId?: string;
     stripeSubscriptionId: string;
+    stripeSubscriptionStatus: Stripe.Subscription.Status;
     stripePaymentId: string;
     plan: 'commit' | 'standard';
     priceVersion: KiloClawPriceVersion;
@@ -469,6 +472,9 @@ export async function applyStripeFundedKiloClawPeriod(
   } = params;
 
   const amountCents = Math.round(amountMicrodollars / 10_000);
+  const providerSubscriptionEnded = isEndedStripeSubscriptionStatus(
+    params.stripeSubscriptionStatus
+  );
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
@@ -634,7 +640,7 @@ export async function applyStripeFundedKiloClawPeriod(
       });
     }
 
-    wasSuspended = !!targetRow.suspended_at;
+    wasSuspended = !providerSubscriptionEnded && !!targetRow.suspended_at;
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
@@ -648,15 +654,17 @@ export async function applyStripeFundedKiloClawPeriod(
       checkoutConfirmedAt: params.checkoutConfirmedAt,
       switchQualification: switchQualification ?? undefined,
     });
-    requiresProviderNonRenewal ||= retirementDecision.anomalyReason !== null;
+    requiresProviderNonRenewal =
+      !providerSubscriptionEnded && retirementDecision.anomalyReason !== null;
     if (retirementDecision.anomalyReason) {
       reportKiloClawCommitRetirementAnomaly({
         reason: retirementDecision.anomalyReason,
         subscriptionId: targetRow.id,
         stripeSubscriptionId,
         stripeEventId: params.stripeEventId,
-        summary:
-          plan === 'commit'
+        summary: providerSubscriptionEnded
+          ? 'Invoice from an ended Stripe subscription failed Commit retirement checks and cannot change the subscription.'
+          : plan === 'commit'
             ? 'Paid Commit invoice is ambiguous; paid access is preserved and renewal is blocked.'
             : 'Standard invoice lacks verified explicit retirement continuation consent.',
       });
@@ -789,25 +797,34 @@ export async function applyStripeFundedKiloClawPeriod(
         .where(eq(kilocode_users.id, userId));
     }
 
-    const updateSet = {
+    applied = true;
+    // Expiry enforcement uses the canonical boundary, not an unauthorized invoice's period.
+    if (providerSubscriptionEnded && retirementDecision.anomalyReason !== null) return;
+
+    const periodSet = {
       instance_id: targetRow.instance_id,
       stripe_subscription_id: stripeSubscriptionId,
       payment_source: 'credits' as const,
-      status: 'active' as const,
       plan,
       current_period_start: periodStart,
       current_period_end: periodEnd,
       credit_renewal_at: periodEnd,
       commit_ends_at: commitEndsAt,
       ...retirementDecision.subscriptionUpdate,
-      past_due_since: null,
       auto_top_up_triggered_for_period: null,
-      ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
-      ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
         : {}),
     };
+    const updateSet = providerSubscriptionEnded
+      ? periodSet
+      : {
+          ...periodSet,
+          status: 'active' as const,
+          past_due_since: null,
+          ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+          ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
+        };
 
     const [before] = await tx
       .select()
@@ -816,14 +833,15 @@ export async function applyStripeFundedKiloClawPeriod(
       .limit(1);
 
     shouldSendSubscriptionStartedEmailForNewSettlement =
-      shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
-      (await didStripeSubscriptionCreatedRecordEligibleActivation({
-        tx,
-        subscriptionId: targetRow.id,
-        plan,
-        periodStart,
-        periodEnd,
-      }));
+      !providerSubscriptionEnded &&
+      (shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
+        (await didStripeSubscriptionCreatedRecordEligibleActivation({
+          tx,
+          subscriptionId: targetRow.id,
+          plan,
+          periodStart,
+          periodEnd,
+        })));
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set(updateSet)
@@ -839,8 +857,6 @@ export async function applyStripeFundedKiloClawPeriod(
         after,
       });
     }
-
-    applied = true;
   });
 
   if (!applied) {
@@ -914,21 +930,22 @@ export async function applyStripeFundedKiloClawPeriod(
   // expensive `kiloclaw_subscription_change_log` scan (and the subsequent
   // no-op send call) when a matching email-log row already exists.
   const shouldSendSubscriptionStartedEmail =
-    shouldSendSubscriptionStartedEmailForNewSettlement ||
-    (settlementWasDuplicate &&
-      resolvedSubscriptionId !== undefined &&
-      resolvedInstanceId !== undefined &&
-      !(await subscriptionStartedEmailAlreadyLoggedForActivation({
-        userId,
-        instanceId: resolvedInstanceId,
-        periodStart,
-      })) &&
-      (await didPriorSettlementRecordPaidActivation({
-        subscriptionId: resolvedSubscriptionId,
-        plan,
-        periodStart,
-        periodEnd,
-      })));
+    !providerSubscriptionEnded &&
+    (shouldSendSubscriptionStartedEmailForNewSettlement ||
+      (settlementWasDuplicate &&
+        resolvedSubscriptionId !== undefined &&
+        resolvedInstanceId !== undefined &&
+        !(await subscriptionStartedEmailAlreadyLoggedForActivation({
+          userId,
+          instanceId: resolvedInstanceId,
+          periodStart,
+        })) &&
+        (await didPriorSettlementRecordPaidActivation({
+          subscriptionId: resolvedSubscriptionId,
+          plan,
+          periodStart,
+          periodEnd,
+        }))));
 
   // Per KiloClaw billing spec (Stripe-Funded Credit Settlement rule 10),
   // $0 KiloClaw invoices must still run settlement and transition the row

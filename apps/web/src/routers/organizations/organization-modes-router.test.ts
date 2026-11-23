@@ -6,7 +6,8 @@ import {
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { MODE_SLUG_MAX_LENGTH } from '@kilocode/app-shared/organizations';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { User, Organization } from '@kilocode/db/schema';
 import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -300,6 +301,35 @@ describe('organization modes tRPC router', () => {
       ).rejects.toThrow();
     });
 
+    it('accepts a slug of exactly the maximum length and refuses one character more', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const freshOrg = await createTestOrganization('Slug Bound Org', owner.id, 0, {}, false);
+      const longestSlug = 'a'.repeat(MODE_SLUG_MAX_LENGTH);
+      const tooLongSlug = 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1);
+
+      const created = await caller.organizations.modes.create({
+        organizationId: freshOrg.id,
+        name: 'Longest Slug Mode',
+        slug: longestSlug,
+      });
+
+      expect(created.mode.slug).toBe(longestSlug);
+      expect(created.mode.slug).toHaveLength(MODE_SLUG_MAX_LENGTH);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: freshOrg.id,
+          name: 'Too Long Slug Mode',
+          slug: tooLongSlug,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(
+          `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`
+        ),
+      });
+    });
+
     it('should throw error for non-existent organization', async () => {
       const caller = await createCallerForUser(owner.id);
       const nonExistentId = randomUUID();
@@ -549,6 +579,28 @@ describe('organization modes tRPC router', () => {
       expect(updatedOrganization?.settings.org_auto_model?.routes['update-with-route-mode']).toBe(
         'kilo-auto/frontier'
       );
+    });
+
+    it('refuses an update slug one character past the bound with the inclusive message', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Update Slug Bound Mode',
+        slug: 'update-slug-bound',
+      });
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: testOrganization.id,
+          modeId: created.mode.id,
+          slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(
+          `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`
+        ),
+      });
     });
 
     it('should throw error for non-existent mode', async () => {

@@ -70,6 +70,23 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(10);
   });
 
+  it('keeps the workflow integration pin and organization membership when repairing a login', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+    const query = buildInstallationRefreshCandidatesQuery(
+      db,
+      { ...params, expectedIntegrationId, accessPurpose: 'workflow' },
+      'managed'
+    ).toSQL();
+
+    expect(query.sql).toContain('"platform_integrations"."id" =');
+    expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.params).toContain(expectedIntegrationId);
+    expect(query.params).toContain(params.orgId);
+    expect(query.params).not.toContain('renamed-owner');
+    expect(query.params).not.toContain('agent_only');
+  });
+
   it('uses a supplied integration ID as an exact organization authorization fence', () => {
     const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
     const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';

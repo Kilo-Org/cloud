@@ -15,6 +15,8 @@ import {
   CustomRouterEntriesSchema,
   CustomRouterErrorCodeSchema,
   CustomRouterErrorResponseSchema,
+  CustomRouterPoolPinsRequestSchema,
+  CustomRouterServingPinSchema,
   CustomRouterSummarySchema,
   GatewayCustomRouterEntrySchema,
   MAX_CLIENT_CONTEXT_LENGTH,
@@ -29,15 +31,17 @@ import {
   MeasuredAsModelIdSchema,
   RegisterClientEntryRequestSchema,
   UpdateCustomRouterRequestSchema,
+  customRouterAvailabilityWithRequest,
   customRouterCandidateModel,
   customRouterClientEntriesPath,
+  customRouterEntryDispatch,
   customRouterEntryKey,
-  customRouterEntryRef,
   customRouterModelId,
   customRouterPath,
   parseCustomRouterCandidateModel,
   parseCustomRouterModelId,
   signAutoDecision,
+  toCustomRouterEntryRef,
   verifyAutoDecision,
   type AutoDecisionPayload,
   type ClientCustomRouterEntry,
@@ -147,7 +151,7 @@ describe('custom router entry keys', () => {
   });
 
   it('strips client fields when building an entry ref', () => {
-    expect(customRouterEntryRef(clientEntry)).toEqual({
+    expect(toCustomRouterEntryRef(clientEntry)).toEqual({
       kind: 'client',
       provider: 'ollama',
       model: 'qwen3:32b',
@@ -528,6 +532,51 @@ describe('auto decision tokens', () => {
     ).resolves.toEqual({ ok: false, reason: 'malformed' });
   });
 
+  it('round trips the signed pool identity a retirement fallback needs', async () => {
+    const pinned = {
+      ...decisionPayload,
+      entryModel: 'anthropic/claude-sonnet-4',
+      servingFallback: true as const,
+      servingPinModel: 'anthropic/claude-sonnet-4.5',
+      servingFallbackTarget: 'anthropic/claude-sonnet-4.6',
+    };
+    await expect(
+      verifyAutoDecision(await signAutoDecision(pinned, DECISION_SECRET), DECISION_SECRET, 1_000)
+    ).resolves.toEqual({ ok: true, payload: pinned });
+  });
+
+  it('refuses a fallback marker without the entry, pin and target it retires', async () => {
+    const signed = (overrides: Record<string, unknown>) =>
+      signAutoDecision({ ...decisionPayload, ...overrides }, DECISION_SECRET);
+
+    await expect(signed({ servingFallback: true })).rejects.toThrow(/entryModel/);
+    await expect(
+      signed({
+        entryModel: 'anthropic/claude-sonnet-4',
+        servingFallback: true,
+      })
+    ).rejects.toThrow(/servingPinModel/);
+    await expect(
+      signed({
+        entryModel: 'anthropic/claude-sonnet-4',
+        servingFallback: true,
+        servingPinModel: 'anthropic/claude-sonnet-4.5',
+      })
+    ).rejects.toThrow(/servingFallbackTarget/);
+  });
+
+  it('refuses a fallback proof without the marker that scopes it', async () => {
+    const signed = (overrides: Record<string, unknown>) =>
+      signAutoDecision({ ...decisionPayload, ...overrides }, DECISION_SECRET);
+
+    await expect(signed({ servingPinModel: 'anthropic/claude-sonnet-4.5' })).rejects.toThrow(
+      /servingPinModel/
+    );
+    await expect(signed({ servingFallbackTarget: 'anthropic/claude-sonnet-4.6' })).rejects.toThrow(
+      /servingFallbackTarget/
+    );
+  });
+
   it('rejects a signature from another secret', async () => {
     const token = await signAutoDecision(decisionPayload, 'other-secret');
     await expect(verifyAutoDecision(token, DECISION_SECRET, 1_000)).resolves.toEqual({
@@ -629,9 +678,10 @@ describe('internal custom router context', () => {
       ...context,
       clientEvalEntryKeys: [clientKey, clientKey, 'gateway:other/model'],
     });
-    expect(result.error?.issues.map(issue => issue.path)).toEqual([
-      ['clientEvalEntryKeys', 1],
-      ['clientEvalEntryKeys', 2],
+    // The membership pass runs first, then the duplicate pass over the whole array.
+    expect(result.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
+      [['clientEvalEntryKeys', 2], 'clientEvalEntryKeys must name a pool entry'],
+      [['clientEvalEntryKeys', 1], `Duplicate client eval entry ${clientKey}`],
     ]);
   });
 
@@ -653,7 +703,7 @@ describe('internal custom router context', () => {
     expect(
       InternalClientEvalResultRequestSchema.safeParse({
         ...upload,
-        entry: customRouterEntryRef(clientEntry),
+        entry: toCustomRouterEntryRef(clientEntry),
       }).success
     ).toBe(true);
     const platformMeasured = InternalClientEvalResultRequestSchema.safeParse({
@@ -661,5 +711,144 @@ describe('internal custom router context', () => {
       entry: gatewayEntry,
     });
     expect(platformMeasured.error?.issues.map(issue => issue.path)).toEqual([['entry']]);
+  });
+});
+
+describe('custom router serving pins', () => {
+  const ALIAS = '~vendor/latest';
+  const PINNED = 'vendor/current';
+  const pin = {
+    model: PINNED,
+    pinnedAt: '2026-11-20T00:00:00.000Z',
+    requestId: '33333333-3333-4333-8333-333333333333',
+    confirmedAt: '2026-11-20T00:00:00.000Z',
+  };
+  const aliasEntry = { kind: 'gateway' as const, model: ALIAS, servingPin: pin };
+
+  it('accepts a saved pin on a read entry and refuses a virtual target', () => {
+    expect(GatewayCustomRouterEntrySchema.safeParse(aliasEntry).success).toBe(true);
+    expect(
+      GatewayCustomRouterEntrySchema.safeParse({
+        kind: 'gateway',
+        model: ALIAS,
+        servingPin: { ...pin, model: 'kilo-auto/efficient' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('ignores a client-sent pin on write so only the settlement can set one', () => {
+    const parsed = CustomRouterEntriesSchema.parse([aliasEntry]);
+    expect(parsed[0]).toMatchObject({ servingPin: pin });
+    const written = CreateCustomRouterRequestSchema.parse({
+      scope: 'user',
+      slug: 'mine',
+      name: 'Mine',
+      baseRouter: 'efficient',
+      mode: 'cost_per_accuracy',
+      entries: [aliasEntry],
+      defaultEntryKey: `gateway:${ALIAS}`,
+    });
+    expect(written.entries[0]).toEqual({ kind: 'gateway', model: ALIAS });
+  });
+
+  it('parses an observed pin and still refuses a virtual target', () => {
+    const observed = {
+      model: PINNED,
+      pinnedAt: '2026-11-20T00:00:00.000Z',
+      source: 'observed' as const,
+    };
+    const aliasWithObserved = { kind: 'gateway' as const, model: ALIAS, servingPin: observed };
+    expect(GatewayCustomRouterEntrySchema.safeParse(aliasWithObserved).success).toBe(true);
+    expect(
+      GatewayCustomRouterEntrySchema.safeParse({
+        ...aliasWithObserved,
+        servingPin: { ...observed, model: 'kilo-auto/efficient' },
+      }).success
+    ).toBe(false);
+    expect(
+      CustomRouterServingPinSchema.safeParse({ ...observed, source: 'confirmed' }).success
+    ).toBe(false);
+  });
+
+  it('accepts a decision that dispatches the pin and refuses one that does not', () => {
+    const decision = {
+      entry: { kind: 'gateway' as const, model: ALIAS },
+      model: PINNED,
+      servingPin: pin,
+      variant: null,
+      stale: false,
+      fallback: false,
+      sticky: false,
+      taskType: 'implementation',
+      subtaskType: 'feature_development',
+      tableVersion: 'v1',
+    };
+    expect(CustomRouterDecideResponseSchema.shape.decision.safeParse(decision).success).toBe(true);
+    expect(
+      CustomRouterDecideResponseSchema.shape.decision.safeParse({
+        ...decision,
+        model: 'vendor/other',
+      }).success
+    ).toBe(false);
+    expect(
+      CustomRouterDecideResponseSchema.shape.decision.safeParse({
+        ...decision,
+        servingPin: undefined,
+      }).success
+    ).toBe(false);
+  });
+
+  it('dispatches the pin only when it is usable and not denied', () => {
+    const usablePins = new Map([[`gateway:${ALIAS}`, PINNED]]);
+    expect(customRouterEntryDispatch(aliasEntry, { usablePins })).toEqual({
+      model: PINNED,
+      pinned: true,
+    });
+    expect(
+      customRouterEntryDispatch(aliasEntry, { usablePins, deniedModelIds: new Set([PINNED]) })
+    ).toBeNull();
+    expect(
+      customRouterEntryDispatch(aliasEntry, { usablePins, deniedModelIds: new Set([ALIAS]) })
+    ).toBeNull();
+    expect(customRouterEntryDispatch(aliasEntry)).toEqual({ model: ALIAS, pinned: false });
+    expect(customRouterEntryDispatch(clientEntry, { usablePins })).toEqual({
+      model: customRouterCandidateModel(clientEntry),
+      pinned: false,
+    });
+  });
+
+  it('lets a globally ready measurement win over any owner request state', () => {
+    const global = ['ready', 'stale', 'permanent_failure', 'alias_rebenchmark_needed'] as const;
+    for (const availability of global) {
+      expect(
+        customRouterAvailabilityWithRequest(availability, { status: 'paused', reason: 'no_funds' })
+      ).toBe(availability);
+    }
+    expect(customRouterAvailabilityWithRequest('unbenchmarked', { status: 'active' })).toBe(
+      'benchmarking'
+    );
+    expect(
+      customRouterAvailabilityWithRequest('unbenchmarked', { status: 'paused', reason: 'no_funds' })
+    ).toBe('paused');
+    expect(customRouterAvailabilityWithRequest('unbenchmarked', null)).toBe('unbenchmarked');
+  });
+
+  it('refuses a pin request whose target is not a concrete gateway model', () => {
+    const request = {
+      routerId: '11111111-1111-4111-8111-111111111111',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      poolVersion: 'v1',
+      requestId: '33333333-3333-4333-8333-333333333333',
+      confirmedAt: '2026-11-20T00:00:00.000Z',
+      aliases: [{ model: ALIAS, target: 'kilo-auto/custom/mine' }],
+    };
+    expect(CustomRouterPoolPinsRequestSchema.safeParse(request).success).toBe(false);
+    expect(
+      CustomRouterPoolPinsRequestSchema.safeParse({
+        ...request,
+        aliases: [{ model: ALIAS, target: PINNED }],
+      }).success
+    ).toBe(true);
   });
 });

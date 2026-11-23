@@ -19,6 +19,7 @@ import { cn, firstNonEmpty } from '@/lib/utils';
 import { type MemberRemovalFailure, removalRefusalMessage } from './member-removal-feedback';
 import { assignableMemberRoles } from './organization-role-options';
 import { OrganizationPlanRefusal } from './plan-refusal';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
 
 type MemberRowProps = {
@@ -29,6 +30,8 @@ type MemberRowProps = {
   canManageLimit: boolean;
   /** Caller's own organization role; it decides which roles the menu offers. */
   callerRole: OrgRole | undefined;
+  /** Whether the caller may change the plan; it picks the refusal's sentence. */
+  canManageBilling: boolean;
   enableUsageLimits: boolean;
   /** Organization is a sales demo, so spend may be paired with its limit. */
   isSalesDemo: boolean;
@@ -39,8 +42,6 @@ type MemberRowProps = {
   onRemovalStarted?: (memberId: string) => SurfaceAttempt<MemberRemovalFailure> | null;
   /** Retires this member's shown removal refusal; the row calls it when a newer action supersedes it. */
   onRemovalCleared?: (memberId: string) => void;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
 };
 
 const ROLE_LABEL_KEYS = {
@@ -59,13 +60,13 @@ export function MemberRow({
   canManage,
   canManageLimit,
   callerRole,
+  canManageBilling,
   enableUsageLimits,
   isSalesDemo,
   organizationId,
   removalFailure = null,
   onRemovalStarted,
   onRemovalCleared,
-  last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -82,7 +83,7 @@ export function MemberRow({
   // with it. Both name the cause and the owner's next step; the copy comes from
   // the same server mapping the hook's toast used.
   const roleChangeFailure = mutations.updateMember.isError
-    ? organizationErrorMessage(mutations.updateMember.error)
+    ? organizationErrorMessage(mutations.updateMember.error, canManageBilling, 'absent')
     : null;
   const refusalMessage = roleChangeFailure ?? removalFailure?.message ?? null;
   const [menu, setMenu] = useState<'actions' | 'role' | null>(null);
@@ -179,7 +180,10 @@ export function MemberRow({
           try {
             await mutations.removeMember.mutateAsync({ memberId: member.id });
           } catch (error) {
-            attempt.fail({ kind: 'removal-refused', message: removalRefusalMessage(error) });
+            attempt.fail({
+              kind: 'removal-refused',
+              message: removalRefusalMessage(error, canManageBilling),
+            });
             return;
           }
           // The row leaving the list is the success outcome itself: the row is
@@ -235,17 +239,12 @@ export function MemberRow({
   }
 
   const inner = (
-    <View
-      className={cn(
-        'flex-row items-center justify-between gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft'
-      )}
-    >
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {displayName}
         </Text>
-        <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="mt-0.5" numberOfLines={1}>
           {member.email}
         </Text>
       </View>
@@ -253,14 +252,14 @@ export function MemberRow({
         {/* `font-semibold`, not the medium the small chips use elsewhere: the
             Android Arabic fallback ships Regular and Bold only, so a 500 label
             paints Regular for Arabic while the Latin label gets Roboto Medium,
-            and at 11px that reads as a faded chip. 600 resolves to Noto Naskh
-            Arabic Bold, so both scripts carry the same ink. */}
+            and at the caption size that reads as a faded chip. 600 resolves to
+            Noto Naskh Arabic Bold, so both scripts carry the same ink. */}
         <View className="rounded-full bg-muted px-2 py-0.5">
-          <Text className="text-[11px] font-semibold text-muted-foreground">
+          <Text variant="caption" className="font-semibold">
             {roleLabel(member.role)}
           </Text>
         </View>
-        {spendLine !== null && <Text className="text-xs text-muted-foreground">{spendLine}</Text>}
+        {spendLine !== null && <Text variant="caption">{spendLine}</Text>}
       </View>
     </View>
   );
@@ -273,7 +272,7 @@ export function MemberRow({
   // opens the menu.
   if (actionOptions.length === 0) {
     return (
-      <View className="px-3">
+      <View>
         {inner}
         {refusal}
         {dialog}
@@ -290,13 +289,16 @@ export function MemberRow({
         accessibilityRole="button"
         // Names can repeat; the email is the row's unique fact, so a reader
         // hears it too instead of two identical rows. A member with no name
-        // already reads by the email, so nothing is appended then.
-        accessibilityLabel={
-          displayName === member.email
-            ? t('organization.members.manageA11y', { name: displayName })
-            : [t('organization.members.manageA11y', { name: displayName }), member.email].join(', ')
-        }
-        className="px-3 active:opacity-70"
+        // already reads by the email, so nothing is appended then. The limit
+        // line is the other fact the row shows that a reader cannot otherwise
+        // hear, because it sits in a caption beside the role chip, so it joins
+        // the name after the email.
+        accessibilityLabel={[
+          t('organization.members.manageA11y', { name: displayName }),
+          ...(displayName === member.email ? [] : [member.email]),
+          ...(spendLine === null ? [] : [spendLine]),
+        ].join(', ')}
+        className="active:opacity-70"
       >
         {inner}
         {refusal}

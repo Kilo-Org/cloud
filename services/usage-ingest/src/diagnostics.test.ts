@@ -17,6 +17,8 @@ function setup() {
     USAGE_INGEST_PUBLISH_SECRET: 'synthetic-publisher',
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics },
     USAGE_INGEST_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_QUEUE: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_WRITER_URL: 'https://writer.invalid/api/internal/usage/record',
     USAGE_WRITER_SECRET: 'synthetic-writer',
     USAGE_WRITER_PROTECTION_BYPASS: 'synthetic-bypass',

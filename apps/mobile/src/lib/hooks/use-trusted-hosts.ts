@@ -24,8 +24,8 @@ export function parseTrustedHosts(raw: string | null): string[] {
   }
 }
 
-// A JSON string array of host keys (lowercased hostname plus a non-default
-// port). Empty default: nothing is trusted until the user opts in.
+// A JSON string array of host keys. Empty default: nothing is trusted until the
+// user opts in.
 const store = createSecureStorePreference<string[]>({
   key: TRUSTED_HOSTS_KEY,
   defaultValue: [],
@@ -33,11 +33,6 @@ const store = createSecureStorePreference<string[]>({
   serialize: value => JSON.stringify(value),
   mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
-
-// Warm the store as soon as any trust-aware module is imported, so a host
-// trusted in a prior session skips the Alert on a cold start without waiting
-// for Preferences to mount.
-store.preload();
 
 export function useTrustedHosts() {
   const trustedHosts = useSyncExternalStore(store.subscribe, store.get);
@@ -50,9 +45,6 @@ export function isTrustedHost(host: string): boolean {
 }
 
 export function trustHost(host: string): void {
-  // Start the disk read if it has not run, so the Trust write merges with the
-  // persisted list instead of replacing it with the empty default.
-  store.preload();
   const current = store.getRequested();
   if (current.includes(host)) {
     return;

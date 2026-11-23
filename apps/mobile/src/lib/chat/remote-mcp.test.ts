@@ -18,18 +18,11 @@ import {
   world,
 } from './remote-mcp.world.test-helpers';
 
-/**
- * The stored remote MCP servers, discovered for the tools they offer.
- *
- * The store is faked, in `remote-mcp.world.test-helpers`, so the module's own
- * subscription — the thing that drops a disabled server's tools — can be driven
- * without a device.
- */
-
 beforeEach(() => {
   resetWorld();
 });
 
+/** The stored remote MCP servers, discovered for the tools they offer. */
 describe('the discovered state', () => {
   it('discovers an enabled server and exposes the tools it offers', async () => {
     const alpha = server({ id: 'alpha' });
@@ -302,8 +295,6 @@ describe('the discovered state', () => {
       stateOf(alpha, { status: 'ready', toolCount: 0, retryable: true }),
     ]);
 
-    // An empty catalog is not an answer: the next ask reconnects, and a server
-    // that has tools by then offers them.
     discovery.answer = () => Effect.succeed([tool('mcp_alpha_read')]);
     await ensureRemoteMcp(place);
 

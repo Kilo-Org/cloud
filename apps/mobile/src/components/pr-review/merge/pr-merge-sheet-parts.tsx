@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the parts module holds the skeleton and the settled form in one place, so the placeholder and the form it stands in for cannot drift apart. */
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type TextInput, View } from 'react-native';
@@ -7,11 +8,18 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -45,8 +53,11 @@ function CommitTitleField({
         onChangeText={value => {
           titleRef.current = value;
         }}
+        // `min-h-11` measured 38.9 dp at NativeWind's 14pt rem; the explicit
+        // 44 dp floor is the target it meant.
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
+          TOUCH_TARGET_CLASS,
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -116,15 +127,18 @@ function DeleteBranchToggle({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
-      <Text className="flex-1 pr-3 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
-      <Switch
-        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
+    // The body already carries the page gutter, so the row is a grouped row
+    // like every other switch row: the group draws its own surface and the
+    // primitive owns the switch's haptic and 48pt target.
+    <RowGroup>
+      <PreferenceRow
+        title={t('prReview.merge.deleteBranch')}
         value={value}
         disabled={isDisabled}
         onValueChange={onChange}
+        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
       />
-    </View>
+    </RowGroup>
   );
 }
 
@@ -142,40 +156,39 @@ export function MergeSheetFormSkeleton(props: {
   showTitle: boolean;
   showDeleteBranchToggle: boolean;
 }): ReactNode {
+  const sideInsetStyle = useSideInsetStyle();
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
-        <View className="gap-1.5">
-          <Skeleton className="h-5 w-16" />
-          {props.methodOptions.length === 0 ? (
-            <Skeleton className="h-11 rounded-md" />
-          ) : (
-            <View className="flex-row flex-wrap gap-2">
-              {props.methodOptions.map(option => (
-                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
-              ))}
-            </View>
-          )}
-        </View>
-        {props.showTitle ? (
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
           <View className="gap-1.5">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11" />
+            <Skeleton className="h-5 w-16" />
+            {props.methodOptions.length === 0 ? (
+              <Skeleton className="h-11 rounded-md" />
+            ) : (
+              <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'rounded-lg')} />
+            )}
           </View>
-        ) : null}
-        <View className="gap-1.5">
-          <Skeleton className="h-5 w-28" />
-          <Skeleton className="h-24" />
+          {props.showTitle ? (
+            <View className="gap-1.5">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className={TOUCH_TARGET_CLASS} />
+            </View>
+          ) : null}
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-24" />
+          </View>
+          {props.showDeleteBranchToggle ? (
+            <RowGroup>
+              <RowSkeleton trailing="switch" />
+            </RowGroup>
+          ) : null}
         </View>
-        {props.showDeleteBranchToggle ? (
-          <View className="rounded-lg bg-secondary px-4 py-3">
-            <Skeleton className="h-[44px]" />
-          </View>
-        ) : null}
       </View>
       <PrFormSheetFooter>
-        <Skeleton className="h-[44px]" />
-        <Skeleton className="mt-2 h-[44px]" />
+        <Skeleton className="h-11" />
+        <Skeleton className="mt-2 h-11" />
       </PrFormSheetFooter>
     </>
   );
@@ -205,6 +218,8 @@ export function MergeSheetFormBody(props: {
   onDeleteBranchChange: (next: boolean) => void;
   inlineError: string | null;
   inlineErrorKind: 'retryable' | 'non-retryable' | 'reconnect' | null;
+  /** Clears the sheet's latch once the notice's check confirms the provider. */
+  onConnectionRestored: () => void;
   submitLabel: string;
   onConfirm: () => void;
   onDismiss: () => void;
@@ -227,65 +242,69 @@ export function MergeSheetFormBody(props: {
     onDeleteBranchChange,
     inlineError,
     inlineErrorKind,
+    onConnectionRestored,
     submitLabel,
     onConfirm,
     onDismiss,
   } = props;
 
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
 
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
-        {noMethodsAllowed ? (
-          <View className="rounded-md border border-border bg-secondary p-3">
-            <AccessibleStatus
-              message={t('prReview.merge.noEnabledMethods')}
-              tone="status"
-              className="text-sm"
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          {noMethodsAllowed ? (
+            <Card className="gap-2">
+              <AccessibleStatus
+                message={t('prReview.merge.noEnabledMethods')}
+                tone="status"
+                className="text-sm"
+              />
+            </Card>
+          ) : (
+            <MethodPicker
+              methodOptions={methodOptions}
+              method={method}
+              isDisabled={isMutating}
+              onChange={onMethodChange}
             />
-          </View>
-        ) : (
-          <MethodPicker
-            methodOptions={methodOptions}
-            method={method}
+          )}
+          {showTitle ? (
+            <CommitTitleField
+              titleRef={titleRef}
+              inputRef={titleInputRef}
+              placeholder={titlePlaceholder}
+              isDisabled={isMutating}
+            />
+          ) : null}
+          <CommitMessageField
+            messageRef={messageRef}
+            inputRef={messageInputRef}
             isDisabled={isMutating}
-            onChange={onMethodChange}
+            compact={isHalfDetent}
           />
-        )}
-        {showTitle ? (
-          <CommitTitleField
-            titleRef={titleRef}
-            inputRef={titleInputRef}
-            placeholder={titlePlaceholder}
-            isDisabled={isMutating}
-          />
-        ) : null}
-        <CommitMessageField
-          messageRef={messageRef}
-          inputRef={messageInputRef}
-          isDisabled={isMutating}
-          compact={isHalfDetent}
-        />
-        {showDeleteBranchToggle ? (
-          <DeleteBranchToggle
-            value={deleteBranch}
-            onChange={onDeleteBranchChange}
-            isDisabled={isMutating}
-            hidden={isHalfDetent}
-          />
-        ) : null}
-        {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-            <Text className="text-xs text-destructive">{inlineError}</Text>
-          </View>
-        ) : null}
-        {inlineErrorKind === 'reconnect' ? (
-          <>
-            <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
-            <PrReviewReconnectNotice />
-          </>
-        ) : null}
+          {showDeleteBranchToggle ? (
+            <DeleteBranchToggle
+              value={deleteBranch}
+              onChange={onDeleteBranchChange}
+              isDisabled={isMutating}
+              hidden={isHalfDetent}
+            />
+          ) : null}
+          {inlineError && inlineErrorKind !== 'reconnect' ? (
+            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
+              <Text className="text-xs text-destructive">{inlineError}</Text>
+            </View>
+          ) : null}
+          {inlineErrorKind === 'reconnect' ? (
+            <>
+              <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
+              <PrReviewReconnectNotice onConnectionRestored={onConnectionRestored} />
+            </>
+          ) : null}
+        </View>
       </View>
 
       <PrFormSheetFooter>
@@ -306,9 +325,9 @@ export function MergeSheetFormBody(props: {
           onPress={onDismiss}
           disabled={isMutating}
           className="mt-2"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t('common.discard')}
         >
-          <Text>{t('common.cancel')}</Text>
+          <Text>{t('common.discard')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

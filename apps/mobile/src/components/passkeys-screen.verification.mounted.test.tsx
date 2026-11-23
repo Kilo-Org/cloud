@@ -80,9 +80,13 @@ describe('PasskeysScreen verification', () => {
     // There is no passkey to assert, so the code is the one working proof.
     expect(hasButtonLabel(view, VERIFY_PASSKEY)).toBe(false);
     expect(hasButtonLabel(view, VERIFY_EMAIL)).toBe(true);
-    expect(nodes(view, 'EmptyState')).toHaveLength(0);
+    // The panel sits above the same empty state, from the top of the body: the
+    // screen does not swap the state out while the proof is chosen.
+    expect(nodes(view, 'EmptyState')).toHaveLength(1);
+    expect(first(view, 'EmptyState').props.placement).toBe('top');
     await press(buttonByLabel(view, 'Cancel'));
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+    await waitFor(() => first(view, 'EmptyState').props.placement === 'center');
+    expect(nodes(view, 'EmptyState')).toHaveLength(1);
     view.unmount();
   });
 
@@ -445,6 +449,74 @@ describe('PasskeysScreen verification', () => {
     await press(buttonByLabel(view, 'Verify code'));
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     expect(list.register).toHaveBeenCalledWith({ managementAuthorization: 'auth-1' });
+    view.unmount();
+  });
+
+  it('caps the code field at the six digits a code holds', async () => {
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await press(buttonByLabel(view, VERIFY_EMAIL));
+    await waitFor(() => nodes(view, 'FormField').length === 1);
+
+    expect(first(view, 'FormField').props.maxLength).toBe(6);
+    view.unmount();
+  });
+
+  it('refuses a pasted paragraph as a code', async () => {
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await press(buttonByLabel(view, VERIFY_EMAIL));
+    await waitFor(() => nodes(view, 'FormField').length === 1);
+    const field = first(view, 'FormField');
+    await act(() => {
+      (field.props.onChangeText as (value: string) => void)('note'.repeat(700));
+    });
+
+    // Prose is not a code: the submit stays disabled, so nothing is sent.
+    expect(buttonByLabel(view, 'Verify code').props.disabled).toBe(true);
+    expect(list.authorizeCode).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('keeps the submit disabled while the field holds letters among digits', async () => {
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await press(buttonByLabel(view, VERIFY_EMAIL));
+    await waitFor(() => nodes(view, 'FormField').length === 1);
+    const field = first(view, 'FormField');
+    await act(() => {
+      (field.props.onChangeText as (value: string) => void)('12ab34');
+    });
+
+    expect(buttonByLabel(view, 'Verify code').props.disabled).toBe(true);
+    expect(list.authorizeCode).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('folds a code typed in Arabic-Indic digits to the ASCII the server expects', async () => {
+    store.rows = [];
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await press(buttonByLabel(view, VERIFY_EMAIL));
+    await waitFor(() => nodes(view, 'FormField').length === 1);
+    const field = first(view, 'FormField');
+    await act(() => {
+      (field.props.onChangeText as (value: string) => void)('٢٤٦٨١٠');
+    });
+
+    // The same code in another script's digits is a complete code, and the
+    // server is given the ASCII it issued.
+    await press(buttonByLabel(view, 'Verify code'));
+    await waitFor(() => list.authorizeCode.mock.calls.length === 1);
+    expect(list.authorizeCode.mock.calls[0]?.[0]).toMatchObject({ code: '246810' });
     view.unmount();
   });
 });

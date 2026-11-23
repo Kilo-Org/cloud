@@ -109,7 +109,7 @@ describe('single-editor secret changes', () => {
   });
   it('rejects a renamed secret marker or marker for a new key', () => {
     expect(() => buildEnvironmentVariableChanges('NEW=<unchanged>', [], ['OLD'])).toThrow(
-      'NEW has no saved secret'
+      'NEW has no saved value'
     );
   });
   it.each(['TOKEN="<unchanged>"', "TOKEN='<unchanged>'"])(

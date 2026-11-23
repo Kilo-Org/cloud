@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 
+import { resolveCatalogModelName } from './model-display-name';
 import { stripModelPrefix } from './model-id';
 
 /**
@@ -37,14 +38,15 @@ export function autoModelLabel(id: string, fallbackName: string): string {
 /**
  * The label for a stored model id from the live catalogue: the localized Auto
  * name when the id is one of Kilo's, else the catalogue's own name, else
- * `fallbackName` (the persisted name or the bare id) for a model the catalogue
- * no longer carries. Settings rows resolve names through this so a row and the
- * picker that writes it never name the same model differently.
+ * `fallbackName` — a caller's persisted display name, or the readable reference
+ * `resolveCatalogModelName` derives for a model the catalogue no longer carries.
+ * Settings rows resolve names through this so a row and the picker that writes
+ * it never name the same model differently, and copy never prints a raw id.
  */
 export function modelLabelFromCatalogue(
   models: readonly { id: string; name: string }[],
   id: string,
-  fallbackName: string = id
+  fallbackName: string = resolveCatalogModelName(id, models)
 ): string {
   return autoModelLabel(id, models.find(model => model.id === id)?.name ?? fallbackName);
 }

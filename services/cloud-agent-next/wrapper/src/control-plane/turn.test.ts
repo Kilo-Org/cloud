@@ -306,6 +306,7 @@ function createHarness(
   let clock = 0;
   let materializeCalls = 0;
   let observeDispatches = true;
+  let clientReadFailIn: number | undefined;
 
   const scheduler: TurnScheduler = {
     setInterval: () => 0 as unknown as ReturnType<typeof setInterval>,
@@ -376,6 +377,13 @@ function createHarness(
       directory: spec.directory,
       env: envs.get(key) as Record<string, string>,
       get client() {
+        if (clientReadFailIn !== undefined) {
+          if (clientReadFailIn === 0) {
+            clientReadFailIn = undefined;
+            throw new Error('Kilo runtime has not started');
+          }
+          clientReadFailIn -= 1;
+        }
         if (options.clientThrowsWhileRestarting && flags.get(key)?.restarting)
           throw new Error('Kilo runtime has not started');
         return clients.get(key)!.client;
@@ -419,6 +427,10 @@ function createHarness(
       clock += ms;
     },
     materializeCalls: () => materializeCalls,
+    /** Throw from the `.client` read after `skip` successful reads. */
+    failClientRead(skip = 0): void {
+      clientReadFailIn = skip;
+    },
     registerRoute(spec: ControlPlaneRouteSpec, withRuntime = true): void {
       if (withRuntime) ensureRuntime(spec);
       manager.registerRoute(spec);
@@ -1777,6 +1789,48 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
   });
 
+  it('reports the completion gate of the root session only', async () => {
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('session.status', {
+        sessionID: childId,
+        status: { type: 'idle' },
+        gateResult: 'fail',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    const [outcome] = outcomeFrames(h.frames);
+    expect(outcome).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+    expect(outcome).not.toHaveProperty('gateResult');
+  });
+
+  it('reports a gate the root session itself carries', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.status', {
+        sessionID: KILO_SESSION,
+        status: { type: 'idle' },
+        gateResult: 'pass',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'completed', lastMessageId: 'm1', gateResult: 'pass' },
+    ]);
+  });
+
   it('retains child routing across turns, but drops it on deletion or root release', async () => {
     const h = createHarness();
     const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -1902,7 +1956,7 @@ describe('turn resubmission', () => {
     expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
   });
 
-  it('attributes an unknown descendant to the only active turn in a shared runtime', async () => {
+  it('drops a descendant whose parent no route knows', async () => {
     const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -1920,9 +1974,69 @@ describe('turn resubmission', () => {
         DIRECTORY
       )
     );
-    const frames = h.frames.filter(frame => frame.type === 'session.events');
+    // Nothing in the runtime knows that parent, so the announcement is not an
+    // adoption: its events belong to another owner.
+    expect(h.frames.filter(frame => frame.type === 'session.events')).toHaveLength(0);
+    expect(h.logs.some(line => line.includes('child of an unknown parent'))).toBe(true);
+  });
+
+  it('relays a runtime-level event to the only turn on that runtime', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.frames.length = 0;
+
+    // No native session named: a runtime-level event has no other owner.
+    h.manager.observeKiloEvent(
+      kiloEvent('file.edited', { file: '/workspace/session/notes.txt' }, DIRECTORY)
+    );
+    await settle();
+
+    const frames = h.frames.filter(
+      frame => frame.type === 'session.events' && frame.sessionId === SESSION_ID
+    );
     expect(frames).toHaveLength(1);
-    expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
+  });
+
+  it('keeps an interaction of an unrelated native session out of the route', async () => {
+    const h = createHarness();
+    const routeA = routeSpec({ sessionId: 'workspace_a', kiloSessionId: 'ses_kilo_a' });
+    const routeB = routeSpec({ sessionId: 'workspace_b', kiloSessionId: 'ses_kilo_b' });
+    h.registerRoute(routeA);
+    h.registerRoute(routeB);
+    h.manager.submit(routeA.sessionId, promptPayload('m1'));
+    await settle();
+    h.frames.length = 0;
+
+    // A native session neither route registered and no `session.created` named.
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'permission.asked',
+        { sessionID: 'ses_foreign', id: 'perm_foreign', permission: 'bash', metadata: {} },
+        DIRECTORY
+      )
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'question.asked',
+        { sessionID: 'ses_foreign', id: 'question_foreign', questions: [] },
+        DIRECTORY
+      )
+    );
+    await settle();
+
+    expect(h.client(routeA).permissionAnswers).toHaveLength(0);
+    expect(h.client(routeB).permissionAnswers).toHaveLength(0);
+    expect(h.client(routeA).questionRejections).toHaveLength(0);
+    expect(h.client(routeB).questionRejections).toHaveLength(0);
+    expect(h.frames.filter(frame => frame.type === 'session.events')).toHaveLength(0);
+    expect(
+      h.logs.filter(line => line.includes('dropped unattributed permission.asked'))
+    ).toHaveLength(1);
+    expect(
+      h.logs.filter(line => line.includes('dropped unattributed question.asked'))
+    ).toHaveLength(1);
   });
 
   it('fails agent_restarted after real tool progress', async () => {
@@ -2763,6 +2877,51 @@ describe('turn finalization', () => {
     release?.({ wasAborted: false, success: true });
     await settle();
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed' });
+  });
+
+  it('completes a turn while the client is unavailable', async () => {
+    const h = createHarness({ nativeDrain: false, clientThrowsWhileRestarting: true });
+    h.registerRoute(routeSpec());
+    h.manager.submit(
+      SESSION_ID,
+      promptPayload('m1', { finalization: { condenseOnComplete: true } })
+    );
+    await settle();
+    h.setFlags(routeSpec(), { restarting: true, suspected: true });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: Kilo runtime has not started',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('completes a turn when the runtime client is not readable', async () => {
+    const h = createHarness({ nativeDrain: false });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.failClientRead(1);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: Kilo runtime has not started',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
   });
 
   it('fails agent_restarted when a restart interrupts a finalization follow-up', async () => {
@@ -3913,6 +4072,209 @@ describe('GitHub review publication recovery', () => {
     }
   );
 
+  it.each(['none', 'older message update', 'older text delta'] as const)(
+    'completes after assistant recovery with late activity: %s',
+    async lateActivity => {
+      const h = createHarness();
+      const spec = reviewSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+
+      const errored = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_failed',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          error: { type: 'provider.unknown', message: 'Request failed', status: 200 },
+        })
+      );
+      const recovered = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_recovered',
+          type: 'assistant',
+          time: { created: 3, completed: 4 },
+        })
+      );
+      if (!errored || !recovered) throw new Error('Expected assistant activity');
+      h.manager.observeActivity({
+        activity: { type: 'message', message: errored },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: { type: 'message', message: recovered },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: {
+          type: 'part',
+          part: {
+            sessionId: KILO_SESSION,
+            messageId: 'msg_recovered',
+            id: 'prt_publication',
+            kind: 'tool',
+            tool: {
+              callId: 'call_publication',
+              name: 'code_review_publish_review_summary',
+              status: 'completed',
+              interactive: false,
+              output: '{"verified":true,"commentId":99}',
+            },
+          },
+        },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      if (lateActivity === 'older message update') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'message',
+            message: { ...errored, time: { created: 1, completed: 5 } },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+        h.manager.observeActivity({
+          activity: {
+            type: 'part',
+            part: {
+              sessionId: KILO_SESSION,
+              messageId: errored.id,
+              id: 'prt_failed_publication',
+              kind: 'tool',
+              tool: {
+                callId: 'call_failed_publication',
+                name: 'code_review_publish_review_summary',
+                status: 'error',
+                interactive: false,
+                error: 'unverified: publication not confirmed',
+              },
+            },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      if (lateActivity === 'older text delta') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'delta',
+            sessionId: KILO_SESSION,
+            messageId: errored.id,
+            partId: 'prt_failed_text',
+            text: 'The model reached its output limit. No actionable output was produced.',
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+
+      expect(h.client(spec).prompts).toHaveLength(1);
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    }
+  );
+
+  it('still fails when the terminal assistant message carries the only error', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    const errored = kilo2MessageActivity(
+      KILO_SESSION,
+      kilo2MessageSchema.parse({
+        id: 'msg_failed',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        error: { type: 'provider.unknown', message: 'Request failed' },
+      })
+    );
+    if (!errored) throw new Error('Expected assistant activity');
+    h.manager.observeActivity({
+      activity: { type: 'message', message: errored },
+      nativeRuntimeId: 'rt',
+      runtimeKey: runtimeKey(spec),
+    });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'provider_unavailable', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps v1 finalization completing after an older completion-only error update', async () => {
+    const h = createHarness({ nativeDrain: false });
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const errored = {
+      sessionID: KILO_SESSION,
+      id: 'msg_failed',
+      role: 'assistant',
+      error: {
+        name: 'APIError',
+        data: { statusCode: 503, message: 'Assistant service is unavailable' },
+      },
+    };
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { created: 1 } } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', {
+        info: {
+          sessionID: KILO_SESSION,
+          id: 'msg_assistant',
+          role: 'assistant',
+          time: { created: 2 },
+        },
+      })
+    );
+    h.manager.observeKiloEvent(
+      publicationPart({ status: 'completed', output: '{"verified":true,"commentId":99}' })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { completed: 3 } } })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('keeps the output-limit failure when the same message is re-reported without an error', async () => {
+    const h = createHarness({ nativeDrain: false });
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(assistantMessage());
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.delta', {
+        sessionID: KILO_SESSION,
+        messageID: 'msg_assistant',
+        partID: 'text1',
+        delta: 'The model reached its output limit. No actionable output was produced.',
+      })
+    );
+    h.manager.observeKiloEvent(assistantMessage());
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'output_limit' },
+    ]);
+  });
+
   it('settles recovery only after native proof when its close precedes reconciliation', async () => {
     const h = createHarness();
     const spec = reviewSpec();
@@ -4386,6 +4748,148 @@ describe('turn route identity', () => {
     await settle();
     expect(h.client(routeSpec()).drains).toHaveLength(1);
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('settles a live turn instead of dispatching it to a replaced native session', async () => {
+    const h = createHarness();
+    const first = routeSpec({ runtimeIsolation: 'per-session' });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const client = h.client(first);
+    expect(client.prompts.map(call => call.sessionId)).toEqual([KILO_SESSION]);
+
+    // The Cloud session moves to another native session mid-turn, so the live turn
+    // settles and the next prompt uses the registration that is current.
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced' });
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+    expect(client.prompts.at(-1)?.sessionId).toBe('ses_replaced');
+  });
+
+  it('settles a live turn instead of dispatching it to a replaced checkout', async () => {
+    const h = createHarness();
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const replaced = { ...first, directory: '/workspace/moved' };
+    h.registerRoute(replaced);
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    // The turn that was live stays on its own checkout and takes nothing new; the
+    // next prompt is dispatched through the registration that is current.
+    expect(h.client(first).prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(h.client(replaced).prompts.map(call => call.messageId)).toEqual(['m2']);
+  });
+
+  it('settles a live turn when the review target it would publish to changes', async () => {
+    const h = createHarness();
+    const first = routeSpec({
+      createdOnPlatform: 'code-review',
+      githubReviewTarget: {
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+        appType: 'standard',
+        botUserId: '123',
+      },
+    });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const target = first.githubReviewTarget;
+    if (target === undefined) throw new Error('Missing review target');
+    h.registerRoute({ ...first, githubReviewTarget: { ...target, pullRequestNumber: 43 } });
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
+  });
+
+  it('keeps a live turn through a re-registration of the same binding', async () => {
+    const h = createHarness();
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.registerRoute({ ...first, attemptId: 'attempt-2' });
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('applies the current route policy to a replaced native session after a binding change', async () => {
+    const h = createHarness();
+    const first = routeSpec({ createdOnPlatform: 'code-review' });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced', createdOnPlatform: 'web' });
+    await settle();
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(
+      kiloEvent('question.asked', { sessionID: 'ses_replaced', id: 'q1', questions: [] })
+    );
+    await settle();
+    // Each route applies its own policy to the session it serves, so this question
+    // reaches the person.
+    expect(h.client(first).questionRejections).toHaveLength(0);
+    expect(eventFrames(h.frames).filter(event => event.type === 'question.asked')).toHaveLength(1);
+  });
+
+  it('stops a running finalization step when the binding moves', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const aborted = Promise.withResolvers<void>();
+    const h = createHarness({
+      runAutoCommit: async options => {
+        started.resolve();
+        const finished = Promise.withResolvers<void>();
+        options.signal?.addEventListener('abort', () => {
+          aborted.resolve();
+          finished.resolve();
+        });
+        void release.promise.then(finished.resolve);
+        await finished.promise;
+        return { success: true } as never;
+      },
+    });
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      finalization: { autoCommit: true },
+    });
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await started.promise;
+
+    // The Cloud session moves to another native session while its finalization
+    // is still running.
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced' });
+    await aborted.promise;
+    await settle();
+
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
+    release.resolve();
+    await settle();
+    // The turn's prompts stay with the registration they were accepted on.
+    expect(h.client(first).prompts.map(call => call.messageId)).toEqual(['m1']);
   });
 });
 

@@ -33,6 +33,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getPgDb } from '../../db/pg.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import {
   CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
@@ -58,6 +59,7 @@ import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from '../../session/runtime-authorization-lifetime.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -667,6 +669,7 @@ async function createDestinationRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),
@@ -752,6 +755,9 @@ function buildRegistrationInput(
     repository,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
+    ...(source.metadata.hostedGitHubRepositories
+      ? { hostedGitHubRepositories: source.metadata.hostedGitHubRepositories }
+      : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
     workspace,
     ...(continuation ? { continuation: true as const } : {}),
@@ -812,6 +818,12 @@ function assertRegisteredMetadata(
       getSandboxProviderBinding(source.metadata)
     ) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
+    !sameHostedGitHubRepositories(
+      metadata.hostedGitHubRepositories,
+      source.metadata.hostedGitHubRepositories
+    ) ||
+    (source.metadata.hostedGitHubRepositories !== undefined &&
+      workspace.generatedBranchName !== source.workspace.generatedBranchName) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     workspace.sandboxKind !== source.workspace.sandboxKind ||
     !metadata.repository ||
@@ -1484,7 +1496,21 @@ export type SiblingCreateRun = {
 export async function runSiblingCreate(
   run: SiblingCreateRun
 ): Promise<WorktreeResult | HostedWorkspaceSessionResult> {
-  const { db, ctx, source, intent, operationKey, organizationId, options } = run;
+  const { db, ctx, source, intent, operationKey, organizationId } = run;
+  const hostedGitHubRepositories = source.metadata.hostedGitHubRepositories;
+  const options =
+    hostedGitHubRepositories === undefined
+      ? run.options
+      : {
+          ...run.options,
+          fingerprint: await sha256Hex(
+            JSON.stringify({
+              fingerprint: run.options.fingerprint,
+              hostedGitHubRepositories,
+              generatedBranchName: source.workspace.generatedBranchName,
+            })
+          ),
+        };
   const preissuedRuntimeAuthorization = run.preissuedRuntimeAuthorization;
   const startedAt = Date.now();
   const admission = await admitOperation(db, {

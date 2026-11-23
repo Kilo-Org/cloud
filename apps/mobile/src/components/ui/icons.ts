@@ -3,7 +3,7 @@
 // 'lucide-react-native' directly is lint-banned.
 // The type re-export below is erased at transpile (TS `export type`), so it
 // adds no runtime import of the package barrel.
-export type { LucideIcon } from 'lucide-react-native';
+export type { LucideIcon, LucideProps } from 'lucide-react-native';
 export { default as Archive } from 'lucide-react-native/icons/archive';
 export { default as ArchiveRestore } from 'lucide-react-native/icons/archive-restore';
 export { default as AlertCircle } from 'lucide-react-native/icons/circle-alert';
@@ -38,7 +38,6 @@ export { default as Clock } from 'lucide-react-native/icons/clock';
 export { default as Clock3 } from 'lucide-react-native/icons/clock-3';
 export { default as Cloud } from 'lucide-react-native/icons/cloud';
 export { default as Code } from 'lucide-react-native/icons/code';
-export { default as Columns2 } from 'lucide-react-native/icons/columns-2';
 export { default as Copy } from 'lucide-react-native/icons/copy';
 export { default as CornerDownLeft } from 'lucide-react-native/icons/corner-down-left';
 export { default as Cpu } from 'lucide-react-native/icons/cpu';
@@ -56,6 +55,7 @@ export { default as FilePlus } from 'lucide-react-native/icons/file-plus';
 export { default as FileSearch } from 'lucide-react-native/icons/file-search';
 export { default as FileSliders } from 'lucide-react-native/icons/file-sliders';
 export { default as FileText } from 'lucide-react-native/icons/file-text';
+export { default as Flag } from 'lucide-react-native/icons/flag';
 export { default as FolderGit2 } from 'lucide-react-native/icons/folder-git-2';
 export { default as FolderOpen } from 'lucide-react-native/icons/folder-open';
 export { default as Gauge } from 'lucide-react-native/icons/gauge';
@@ -126,6 +126,7 @@ export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
 export { default as SmilePlus } from 'lucide-react-native/icons/face-slightly-smiling-plus';
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
 export { default as Square } from 'lucide-react-native/icons/square';
+export { default as SquareCheck } from 'lucide-react-native/icons/square-check';
 export { default as Star } from 'lucide-react-native/icons/star';
 export { default as Terminal } from 'lucide-react-native/icons/terminal';
 export { default as Trash2 } from 'lucide-react-native/icons/trash';

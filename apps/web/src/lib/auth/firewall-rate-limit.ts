@@ -52,6 +52,8 @@ type CheckOptions = {
   headers?: Headers | Record<string, string> | Record<string, string | string[]>;
   /** The key the firewall rule counts against. */
   rateLimitKey?: string;
+  /** Replaces the report text for a blocked answer when the caller refuses on it. */
+  blockedMessage?: string;
 };
 
 /**
@@ -61,11 +63,12 @@ type CheckOptions = {
  * report below is the signal that a rule needs to be created.
  *
  * Callers map `unavailable` to a refusal so that a branch only runs when the
- * limiter has confirmed it may proceed.
+ * limiter has confirmed it may proceed. `blockedMessage` serves callers whose
+ * refusal policy differs from the default report text.
  */
 export async function checkFirewallRateLimit(
   rateLimitId: string,
-  { source, ...options }: CheckOptions
+  { source, blockedMessage, ...options }: CheckOptions
 ): Promise<FirewallRateLimitResult> {
   const { rateLimited, error } = await checkRateLimit(rateLimitId, options);
 
@@ -79,7 +82,7 @@ export async function checkFirewallRateLimit(
     reportFirewallRateLimitIssue(
       rateLimitId,
       source,
-      `Firewall rate limit '${rateLimitId}' could not be evaluated`
+      blockedMessage ?? `Firewall rate limit '${rateLimitId}' could not be evaluated`
     );
   }
 
@@ -90,10 +93,8 @@ export async function checkFirewallRateLimit(
 }
 
 /**
- * The refusal a route returns for a limiter result: 429 when the caller exceeded
- * the rule, 503 when the limiter could not be consulted, and `null` when the
- * branch may proceed. Routes that guard a branch call this so the status codes
- * and `{ error }` bodies are written once.
+ * Routes that guard a branch call this so the status codes and `{ error }` bodies
+ * are written once.
  */
 export function firewallRateLimitRefusal(limit: FirewallRateLimitResult): NextResponse | null {
   if (limit === 'limited') {

@@ -21,7 +21,9 @@ import { useOrganization } from '@/lib/organization-context';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
+  type SessionAttentionHydration,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 
@@ -30,13 +32,19 @@ import {
  * each has waited. `waitedSinceFor` maps the server's `statusUpdatedAt` raise
  * timestamp to the sort key and reports `POSITIVE_INFINITY` for a row without
  * one, so a timestamp-less row can never outrank a row that has a real wait.
+ * A row the ack store has not hydrated is not waiting: the store answers "not
+ * acked" for every raise while it loads, so counting it would put back a
+ * shortcut the person already answered.
  */
-function selectWaitingSessions(sessions: readonly ActiveSession[]) {
+function selectWaitingSessions(
+  sessions: readonly ActiveSession[],
+  hydration: SessionAttentionHydration
+) {
   return sessions
     .filter(session =>
       shouldShowNeedsInput({
         status: session.status,
-        raiseId: session.status,
+        hydration,
         isAcked: isAttentionAcked(session.id, {
           raiseId: session.statusUpdatedAt ?? session.status,
           status: session.status,
@@ -76,6 +84,7 @@ export function LauncherSurfacesMount(): null {
     enabled: orgLoaded,
   });
   const attentionRevision = useSessionAttentionRevision();
+  const attentionHydration = useSessionAttentionHydration();
 
   // The same reconciliation the Agents tab runs, so an ack or expiry lands in
   // the shortcut's wait list on the same revision the badge uses.
@@ -88,7 +97,7 @@ export function LauncherSurfacesMount(): null {
     }
   }, [activeSessions, orgLoaded, attentionRevision]);
 
-  const waiting = selectWaitingSessions(activeSessions);
+  const waiting = selectWaitingSessions(activeSessions, attentionHydration);
 
   const lastOpenedSessionId = useSyncExternalStore(subscribeLastOpenedSession, () =>
     getLastOpenedSession(userId ?? null)
@@ -104,13 +113,31 @@ export function LauncherSurfacesMount(): null {
   // read — an empty list before the first success — from dropping the Needs
   // input shortcut the last run left; an error afterwards leaves the last
   // published payload in place, so the shortcut keeps opening what the badge
-  // last showed instead of blanking. The publisher drops repeats.
+  // last showed instead of blanking. An unhydrated ack store holds the write
+  // for the same reason: it answers "not acked" for every raise, so the derived
+  // list would drop a shortcut the person already answered. Settling re-derives
+  // and writes then. The publisher drops repeats.
   useEffect(() => {
-    if (!orgLoaded || isLoading || isError || !hasAcceptedSuccess) {
+    if (
+      !orgLoaded ||
+      isLoading ||
+      isError ||
+      !hasAcceptedSuccess ||
+      attentionHydration === 'loading'
+    ) {
       return;
     }
     publisher.apply(targets, t);
-  }, [orgLoaded, isLoading, isError, hasAcceptedSuccess, targets, t, publisher]);
+  }, [
+    orgLoaded,
+    isLoading,
+    isError,
+    hasAcceptedSuccess,
+    attentionHydration,
+    targets,
+    t,
+    publisher,
+  ]);
 
   // The iOS cold-start Quick Action enters through the same slot a notification
   // tap uses. `consumePendingLaunchUrl` clears the native slot as it reads, so a

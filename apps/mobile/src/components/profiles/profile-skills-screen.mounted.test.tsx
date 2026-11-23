@@ -38,11 +38,16 @@ function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
   return node;
 }
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as unknown,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -60,6 +65,9 @@ const permissionState = vi.hoisted(() => ({
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
@@ -70,6 +78,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -99,6 +110,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The screen hands its action to the manage slot, so the stub renders what it
   // is given: the read-only sentence replaces the button in the same subtree.
   EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
@@ -112,6 +124,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 describe('ProfileSkillsScreen', () => {
@@ -119,8 +132,10 @@ describe('ProfileSkillsScreen', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -140,12 +155,56 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     act(() => {
       (findOne(renderer.root, 'QueryError').props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -183,17 +242,35 @@ describe('ProfileSkillsScreen', () => {
 
   it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
     permissionState.permission = 'read-only';
-    h.query.data = testSkills([testSkill()]);
+    // Two source kinds, so each row paints the source under its name.
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'frontend-rules', sourceType: 'imported' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe('code-review');
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    // With nothing to open the row renders static, so the source it paints stays
+    // a text stop instead of being hidden for a press that does not exist.
+    const sourceLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.skillSourceCustom')
+    );
+    expect(sourceLine?.props.accessible).toBeUndefined();
+    expect(sourceLine?.props.importantForAccessibility).toBeUndefined();
 
     unmount();
   });
@@ -213,8 +290,11 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('happy: a row shows the name and source type; the switch toggles', async () => {
-    h.query.data = testSkills([testSkill()]);
+  it('happy: rows show the name, and the source only when the list mixes sources', async () => {
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'web-search', sourceType: 'marketplace' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -232,6 +312,11 @@ describe('ProfileSkillsScreen', () => {
       accessible: false,
       importantForAccessibility: 'no',
     });
+    // The source is painted under the name and merged into the content press,
+    // so it rides the control's spoken name instead of disappearing.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain(`Edit skill code-review, ${i18n.t('profiles.skillSourceCustom')}`);
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });
@@ -244,8 +329,29 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('leaves the source out when every row has the same one', async () => {
+    h.query.data = testSkills([testSkill(), testSkill({ id: 'skill-2', name: 'web-search' })]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('code-review');
+    expect(texts).not.toContain('Custom');
+    // Nothing else is painted under the name, so the press is named by the
+    // action alone, with no separator trailing it.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit skill code-review');
+
+    unmount();
+  });
+
   it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
-    h.query.data = testSkills([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.data = testSkills([
+      testSkill({ sourceType: 'skills-sh', rawMarkdown: '' }),
+      testSkill({ id: 'skill-2', name: 'web-search' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -746,6 +852,96 @@ describe('ProfileSkillsScreen', () => {
 
     unmount();
   });
+
+  it('hides a stored add sheet from a member and names the required role', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'StateAction')).toHaveLength(0);
+    expect(
+      findAll(second.renderer.root, 'Text').filter(node => node.props.children === ROLE_SENTENCE)
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('does not reopen the stored sheet once the denied read dropped it', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    second.unmount();
+  });
+
+  it('keeps the stored sheet while the role resolves and reopens it on its text', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'resolving';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Skill name').props.defaultValue).toBe('portal-skill');
+    expect(findField(second.renderer.root, 'Skill content').props.defaultValue).toBe(
+      'Use the portal carefully.'
+    );
+    second.unmount();
+  });
+
+  it('closes the open sheet when the role drops and keeps it closed on return', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Skill name', 'portal-skill');
+
+    permissionState.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    unmount();
+  });
 });
 
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
@@ -773,7 +969,9 @@ describe('ProfileSkillsScreen delete confirmation', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     h.query.data = testSkills([testSkill({ name: SKILL_NAME })]);
+    h.query.error = undefined;
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;

@@ -7,6 +7,8 @@
  * from here for its own use.
  */
 
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
+
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 /**
@@ -28,7 +30,12 @@ export type AgentMode = BuiltinAgentMode | (string & {});
 /** One row in the mode picker. */
 export type ModeOption = {
   value: AgentMode;
+  /**
+   * Display name. Empty means no loaded option names this mode, so the chip and
+   * the picker substitute the generic translated mode label.
+   */
   label: string;
+  /** Free text; empty means the mode has no description to show. */
   description: string;
 };
 
@@ -87,11 +94,18 @@ export function normalizeAgentMode(mode: string | null | undefined): AgentMode {
 
 /**
  * Filter profile agents to those that would surface in the chat picker:
- * not disabled, not hidden, and not subagent-only. Matches web's
- * `NewSessionPanel` filter.
+ * not disabled, not hidden, not subagent-only, and carrying an id of its own,
+ * because the profile read keeps reserved ids out of a session.
+ * Matches web's `NewSessionPanel` filter.
  */
 export function visibleProfileAgents(agents: ProfileAgent[]): ProfileAgent[] {
-  return agents.filter(a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent');
+  return agents.filter(
+    a =>
+      !a.config.disable &&
+      !a.config.hidden &&
+      a.config.mode !== 'subagent' &&
+      !isReservedAgentSlug(a.slug)
+  );
 }
 
 /** Map profile agents to picker options. */
@@ -125,6 +139,10 @@ export function dedupeCustomModeOptions(custom: ModeOption[]): ModeOption[] {
 /**
  * Append the selected slug once when it is neither a built-in nor already in
  * the custom list, so a prefill or inherited custom slug stays visible.
+ *
+ * The appended option carries the slug only as identity: no loaded option names
+ * that mode, so its label is empty and the chip and picker substitute the
+ * generic translated mode label.
  */
 export function ensureSelectedCustomOption(
   custom: ModeOption[],
@@ -133,7 +151,7 @@ export function ensureSelectedCustomOption(
   if (isBuiltinAgentMode(selected) || custom.some(o => o.value === selected)) {
     return custom;
   }
-  return [...custom, { value: selected, label: selected, description: '' }];
+  return [...custom, { value: selected, label: '', description: '' }];
 }
 
 /** Trim a possibly-null model/variant to `undefined` when empty. */

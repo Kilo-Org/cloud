@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
   bitbucketConnectionFailure,
@@ -29,21 +30,45 @@ const CREATE_WORKSPACE_TOKEN_URL =
 export function BitbucketConnectForm({
   scope,
   integrationId,
+  organizationName,
   onConnected,
+  onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
+  organizationName: string;
   onConnected: () => void;
+  /**
+   * Reports whether a dismissal would drop a draft: text in the token field
+   * that no submit has taken yet. A connect already running owns that token, so
+   * the sheet lets a Back leave without asking while it is in flight.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }>) {
   const { t } = useTranslation();
   // iOS never lets a controlled `value` hold the caret, so the token lives in a
   // ref and the state below only tracks whether submit can run.
   const tokenRef = useRef('');
   const [hasToken, setHasToken] = useState(false);
+  /** Text in the field that a submit would send: the sheet's leave-guard draft. */
+  const [holdsDraft, setHoldsDraft] = useState(false);
+  /**
+   * A connect accepted this token and the sheet is closing, so the token is no
+   * longer a draft even though the field still holds its text.
+   */
+  const [connectLanded, setConnectLanded] = useState(false);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<BitbucketFailure>();
   const connect = useConnectBitbucket(scope);
   const replaceToken = useReplaceBitbucketToken(scope);
   const submitting = feedback.status === 'pending';
+
+  // A submit takes the draft: while a connect runs, its token is already sent,
+  // so the sheet's dismissal is not dropping anything a person typed. The
+  // effect covers both edges, so a failed connect arms the guard again, and a
+  // landed one never re-arms it on the render that ends the pending phase.
+  useEffect(() => {
+    onDirtyChange?.(holdsDraft && !submitting && !connectLanded);
+  }, [connectLanded, holdsDraft, onDirtyChange, submitting]);
 
   const onSubmit = () => {
     const field = readBitbucketToken(tokenRef.current);
@@ -62,6 +87,10 @@ export function BitbucketConnectForm({
           ? connect.mutateAsync({ accessToken: field.token })
           : replaceToken.mutateAsync({ integrationId, accessToken: field.token }));
         if (attempt.owns()) {
+          // Both in one batch: the render that ends the pending phase already
+          // knows the token was accepted, so it cannot report a draft and
+          // re-arm the leave guard over the dismissal the sheet is starting.
+          setConnectLanded(true);
           attempt.abandon();
           onConnected();
         }
@@ -71,7 +100,8 @@ export function BitbucketConnectForm({
             bitbucketConnectionFailure(
               error,
               t,
-              integrationId === null ? 'first-connect' : 'replace-token'
+              integrationId === null ? 'first-connect' : 'replace-token',
+              organizationName
             )
           );
         }
@@ -80,15 +110,21 @@ export function BitbucketConnectForm({
   };
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
-  // A refused token is worth another submit once a different one is pasted; a
-  // lost role or a changed connection is not, so submit waits for a reopen.
-  const blockedByFailure = failure !== null && !repairNeedsAnotherToken(failure.kind);
+  // A refused token judged the token itself, so submit waits for a different
+  // one; only a failure that never judged it (a network or server fault) lets
+  // the same token go again. A lost role or a changed connection waits for a
+  // reopen either way.
+  const blockedByFailure = failure !== null && !allowsResubmitOfSameToken(failure.kind);
 
   return (
     <View className="gap-5">
       <View className="gap-2">
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.description')}
+          {integrationId === null
+            ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+            : t('codeReviewer.bitbucketConnect.descriptionReconnect', {
+                organization: organizationName,
+              })}
         </Text>
         <Text variant="muted" className="text-sm">
           {t('codeReviewer.bitbucketConnect.scopes')}
@@ -98,6 +134,7 @@ export function BitbucketConnectForm({
       <Button
         variant="outline"
         size="sm"
+        className={textActionTargetClass()}
         onPress={() => {
           void openExternalUrl(CREATE_WORKSPACE_TOKEN_URL, {
             label: t('common.openInBrowser'),
@@ -118,6 +155,8 @@ export function BitbucketConnectForm({
         onChangeText={value => {
           tokenRef.current = value;
           setHasToken(readBitbucketToken(value).kind === 'ready');
+          // Whitespace is what a submit would not send, so it is no draft either.
+          setHoldsDraft(value.trim().length > 0);
           // Only a failure another token can repair is what a new one answers;
           // a lost role or a connection that changed underneath keeps the submit
           // disabled until the sheet is reopened.
@@ -129,7 +168,7 @@ export function BitbucketConnectForm({
 
       {failure?.kind === 'connection-changed' ? (
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+          {t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: organizationName })}
         </Text>
       ) : null}
 
@@ -149,10 +188,13 @@ export function BitbucketConnectForm({
 }
 
 /**
- * Whether the failure leaves this form a next step: a rejected token can be
- * replaced in the field below. Neither other kind can, so an edit keeps them on
- * screen: a lost role needs the sheet reopened with one, and a connection that
- * changed underneath is managed on the page beside its message.
+ * Whether an edit in the field answers this failure: a rejected token is
+ * replaced by typing, so the sentence retires with it. `retryable` is a
+ * transport fault that judged no token, so the same token can go again and an
+ * edit is only a draft change. Neither other kind can be answered here, so an
+ * edit keeps them on screen: a lost role needs the sheet reopened with one, and
+ * a connection that changed underneath is managed on the page beside its
+ * message.
  */
 function repairNeedsAnotherToken(kind: BitbucketFailure['kind']): boolean {
   switch (kind) {
@@ -160,6 +202,29 @@ function repairNeedsAnotherToken(kind: BitbucketFailure['kind']): boolean {
     case 'retryable': {
       return true;
     }
+    case 'role-refused':
+    case 'connection-changed': {
+      return false;
+    }
+    default: {
+      return assertSurfaceFailureHandled(kind);
+    }
+  }
+}
+
+/**
+ * Whether the failure leaves the same token worth submitting again. Only a
+ * fault that never judged the token — a rate limit, a timeout, an outage, a
+ * lost connection — qualifies. A refused token was judged, so it needs a
+ * different one; a lost role or a changed connection refuses every token, so
+ * submit waits for a reopen.
+ */
+function allowsResubmitOfSameToken(kind: BitbucketFailure['kind']): boolean {
+  switch (kind) {
+    case 'retryable': {
+      return true;
+    }
+    case 'token-refused':
     case 'role-refused':
     case 'connection-changed': {
       return false;

@@ -7,7 +7,7 @@ import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 import { useOptionalManager } from './CloudAgentProvider';
 import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
-import type { QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode';
 
 export type ReadOnlyQuestionState = { isStreaming: boolean; hasActiveQuestion: boolean };
 
@@ -149,10 +149,14 @@ function QuestionToolStatusLive({
   const { status } = toolPart.state;
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
+  const unreadableQuestions = useAtomValue(manager.atoms.unreadableQuestions);
   if (status === 'pending' || status === 'running') {
     // Only treat as interrupted when the session is idle — during streaming the
     // question.asked event may not have propagated to activeQuestionAtom yet.
-    if (!activeQuestion && !isStreaming) {
+    // A request the app could not read leaves no active question, and the notice
+    // in the dock names the wait, so an error card would deny the state the
+    // notice reports.
+    if (!activeQuestion && !isStreaming && unreadableQuestions.length === 0) {
       return <QuestionInterruptedStatus toolPart={toolPart} />;
     }
     return <QuestionWaitingStatus />;

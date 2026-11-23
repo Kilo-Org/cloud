@@ -4,20 +4,144 @@ import * as z from 'zod';
 export const ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE = 'model_access';
 export const MAX_ORGANIZATION_GROUP_MODEL_IDS = 2_000;
 export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS = 500;
+export const MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH = 200;
+export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH = 64;
+export const MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES = 2 * 1024 * 1024;
+const utf8 = new TextEncoder();
 
-export const OrganizationGroupModelAccessPolicyDataSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('all') }).strict(),
-  z.object({ mode: z.literal('none') }).strict(),
-  z
+/** The byte cap the write bounds attach, as the sentence a refused write reports. */
+function serializedSizeBoundMessage(maxBytes: number): string {
+  return `Together the allow lists must serialize to at most ${maxBytes} bytes of UTF-8 JSON.`;
+}
+
+/** The noun a refusal uses for one allow-list entry, by the list's issue-path segment. */
+type AllowListNouns = { readonly singular: string; readonly plural: string };
+
+const ALLOW_LIST_NOUNS: Readonly<Record<string, AllowListNouns>> = {
+  model_allow_list: { singular: 'model id', plural: 'model ids' },
+  provider_allow_list: { singular: 'provider slug', plural: 'provider slugs' },
+};
+
+function allowListNounsIn(path: readonly PropertyKey[]): AllowListNouns | undefined {
+  for (const segment of path) {
+    const nouns = ALLOW_LIST_NOUNS[String(segment)];
+    if (nouns !== undefined) return nouns;
+  }
+  return undefined;
+}
+
+/** How many code points of a refused entry a sentence quotes before an ellipsis. */
+const ENTRY_EXCERPT_CODE_POINTS = 32;
+
+/**
+ * The clause that names the entry a rule refused: its 0-based index, which is
+ * the trailing integer of the issue path, and a short excerpt of the value set
+ * in JSON. The clause is empty when the issue names no entry, which leaves the
+ * sentence readable on its own.
+ *
+ * The excerpt is sliced by code point so a surrogate pair stays whole, and the
+ * ellipsis marks a value longer than the excerpt. `JSON.stringify` escapes the
+ * `C0` range and lone surrogates but writes `C1` as raw characters, so each
+ * remaining `Cc` code point becomes a `\u` escape. The sentence therefore holds
+ * no control character, whatever the refused entry contains.
+ */
+function allowListEntryRefusalClause(issue: {
+  readonly path?: readonly PropertyKey[] | undefined;
+  readonly input: unknown;
+}): string {
+  const index = issue.path?.at(-1);
+  if (typeof index !== 'number' || !Number.isInteger(index)) return '';
+  const value = typeof issue.input === 'string' ? issue.input : '';
+  const codePoints = Array.from(value);
+  const excerpt =
+    codePoints.slice(0, ENTRY_EXCERPT_CODE_POINTS).join('') +
+    (codePoints.length > ENTRY_EXCERPT_CODE_POINTS ? '…' : '');
+  return ` at index ${index} (${JSON.stringify(excerpt).replaceAll(
+    /\p{Cc}/gu,
+    character => `\\u${character.codePointAt(0)?.toString(16).padStart(4, '0')}`
+  )})`;
+}
+
+/**
+ * An allow-list entry. A maximum length selects the bounded write entry, whose
+ * refinements name the list they apply to; the stored reader passes no length.
+ *
+ * Each rule builds its sentence in a message function, which is where the issue
+ * still carries the entry it refused. The write entry requires well-formed text
+ * because the policy is stored in a `jsonb` column, and that column accepts only
+ * well-formed JSON text, so the rule states the requirement the storage layer
+ * has.
+ */
+const allowListEntry = (maxLength: number | undefined, nouns: AllowListNouns) => {
+  const entry = z
+    .string()
+    .trim()
+    .min(1, {
+      error: issue => `A ${nouns.singular}${allowListEntryRefusalClause(issue)} must not be empty.`,
+    });
+  if (maxLength === undefined) return entry;
+  return entry
+    .max(maxLength, {
+      error: issue =>
+        `A ${nouns.singular}${allowListEntryRefusalClause(issue)} must be at most ${maxLength} characters long.`,
+    })
+    .refine(value => !/\p{Cc}/u.test(value), {
+      error: issue =>
+        `A ${nouns.singular}${allowListEntryRefusalClause(issue)} must not contain control characters.`,
+    })
+    .refine(value => value.isWellFormed(), {
+      error: issue =>
+        `A ${nouns.singular}${allowListEntryRefusalClause(issue)} must be well-formed text.`,
+    });
+};
+
+/**
+ * The `mode` union, built once per entry bound. The stored reader passes no
+ * lengths, and the write schema passes the documented ones, so a mode added
+ * here reaches both and neither can drift from the other.
+ *
+ * Exported so a test can build the same union with its own bound values and
+ * parse through it.
+ */
+export function modelAccessPolicyData(bounds: {
+  modelIdLength?: number;
+  providerSlugLength?: number;
+  maxBytes?: number;
+}) {
+  const selected = z
     .object({
       mode: z.literal('selected'),
-      model_allow_list: z.array(z.string().trim().min(1)).max(MAX_ORGANIZATION_GROUP_MODEL_IDS),
+      model_allow_list: z
+        .array(allowListEntry(bounds.modelIdLength, ALLOW_LIST_NOUNS.model_allow_list))
+        .max(MAX_ORGANIZATION_GROUP_MODEL_IDS, {
+          error: issue =>
+            `At most ${issue.maximum} ${ALLOW_LIST_NOUNS.model_allow_list.plural} are allowed in one policy.`,
+        }),
       provider_allow_list: z
-        .array(z.string().trim().min(1))
-        .max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS),
+        .array(allowListEntry(bounds.providerSlugLength, ALLOW_LIST_NOUNS.provider_allow_list))
+        .max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS, {
+          error: issue =>
+            `At most ${issue.maximum} ${ALLOW_LIST_NOUNS.provider_allow_list.plural} are allowed in one policy.`,
+        }),
     })
-    .strict(),
-]);
+    .strict();
+  const maxBytes = bounds.maxBytes;
+  return z.discriminatedUnion('mode', [
+    z.object({ mode: z.literal('all') }).strict(),
+    z.object({ mode: z.literal('none') }).strict(),
+    maxBytes === undefined
+      ? selected
+      : selected
+          .refine(
+            data => utf8.encode(JSON.stringify(data)).length <= maxBytes,
+            serializedSizeBoundMessage(maxBytes)
+          )
+          .describe(serializedSizeBoundMessage(maxBytes)),
+  ]);
+}
+
+/** The reader for a stored policy document. */
+export const OrganizationGroupModelAccessPolicyDataSchema = modelAccessPolicyData({});
 
 export const OrganizationGroupModelAccessPolicySchema = z
   .object({
@@ -32,7 +156,7 @@ export const OrganizationGroupModelAccessPolicySchema = z
 // `never` would even satisfy `extends true`, so neither fails typecheck alone.
 type AssertTrue<T extends true> = T;
 
-export type _AssertModelAccessMatchesDb = AssertTrue<
+type _AssertModelAccessMatchesDb = AssertTrue<
   z.infer<
     typeof OrganizationGroupModelAccessPolicySchema
   > extends OrganizationGroupModelAccessPolicy
@@ -43,6 +167,38 @@ export type _AssertModelAccessMatchesDb = AssertTrue<
       : false
     : false
 >;
+
+/** The bounds a new policy document must satisfy. */
+export const OrganizationGroupModelAccessPolicyWriteDataSchema = modelAccessPolicyData({
+  modelIdLength: MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
+  providerSlugLength: MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH,
+  maxBytes: MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
+});
+
+export const OrganizationGroupModelAccessPolicyWriteSchema = z
+  .object({
+    type: z.literal(ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE),
+    data: OrganizationGroupModelAccessPolicyWriteDataSchema,
+  })
+  .strict();
+
+const INVALID_WRITE_MESSAGE = 'The organization model access policy is not valid.';
+
+/**
+ * The sentence a refused write reports. Every rule in this schema authors its
+ * sentence as the issue message, so this returns that message and keeps only
+ * the fallback for an issue that names no allow list.
+ */
+export function describeModelAccessPolicyWriteRefusal(error: z.ZodError): string {
+  for (const issue of error.issues) {
+    // The serialized size bound sits on the mode union, so it names no list.
+    if (issue.code === 'custom') return issue.message;
+    if (issue.code !== 'too_big' && issue.code !== 'too_small') continue;
+    if (allowListNounsIn(issue.path) === undefined) return INVALID_WRITE_MESSAGE;
+    return issue.message;
+  }
+  return INVALID_WRITE_MESSAGE;
+}
 
 export const DEFAULT_GROUP_MODEL_ACCESS_POLICY = {
   type: ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,

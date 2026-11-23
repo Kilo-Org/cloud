@@ -7,6 +7,7 @@
       "spendAlert": "உங்கள் செலவுக்கு கவனம் தேவை",
       "securityFinding": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை",
       "securityUpdate": "பாதுகாப்பு சரிபார்ப்பில் ஒரு புதுப்பிப்பு உள்ளது",
+      "agentBriefing": "உங்கள் முகவர் செயல்பாட்டு அறிக்கை தயாராக உள்ளது",
       "activeAgentsGlanceable": "செயலில் உள்ள முகவர்களில் ஒரு புதுப்பிப்பு உள்ளது"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "மிகக் கடுமை",
+      "high": "அதிகம்",
+      "medium": "மிதம்",
+      "low": "குறைவு"
     },
     "securityFindingSlaWarning": {
       "title": "SLA எச்சரிக்கை"

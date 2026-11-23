@@ -2,17 +2,16 @@ import 'server-only';
 
 import {
   sanitizeServiceFeeAssessmentMetadata,
-  toServiceFeeTimestamp,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
 } from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   acquireOrganizationServiceFeeExemptionLock,
-  normalizeOrganizationExemptionTimestamp,
   type ActiveOrganizationRef,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
 } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { toIsoTimestamp } from '@kilocode/web-shared/lib/service-fees/values';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   organization_service_fee_exemptions,
@@ -152,7 +151,7 @@ export function createOrganizationServiceFeeExemptionStore(
     async lockOrganization(organizationId) {
       await acquireOrganizationServiceFeeExemptionLock(
         {
-          execute: query => dbOrTx.execute(query as Parameters<ServiceFeeDbOrTx['execute']>[0]),
+          execute: query => dbOrTx.execute(query),
         },
         organizationId
       );
@@ -176,7 +175,7 @@ export function createOrganizationServiceFeeExemptionStore(
             eq(organization_service_fee_exemptions.organization_id, organizationId),
             lte(
               organization_service_fee_exemptions.created_at,
-              normalizeOrganizationExemptionTimestamp(at)
+              toIsoTimestamp(at, 'organization exemption')
             )
           )
         )
@@ -278,13 +277,13 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
     stripeCheckoutFeeLineItemId: row.stripe_checkout_fee_line_item_id,
     stripeInvoiceFeeItemId: row.stripe_invoice_fee_item_id,
     stripeInvoiceFeeLineItemId: row.stripe_invoice_fee_line_item_id,
-    eligibilityCreatedAt: toServiceFeeTimestamp(row.eligibility_created_at),
+    eligibilityCreatedAt: toIsoTimestamp(row.eligibility_created_at),
     eligibleSubtotalMinor: row.eligible_subtotal_minor,
     expectedFeeMinor: row.expected_fee_minor,
     chargedFeeMinor: row.charged_fee_minor,
     grossPaidMinor: row.gross_paid_minor,
     settledProductMinor: row.settled_product_minor,
-    settledAt: row.settled_at ? toServiceFeeTimestamp(row.settled_at) : null,
+    settledAt: row.settled_at ? toIsoTimestamp(row.settled_at) : null,
     refundedProductMinor: row.refunded_product_minor,
     refundedFeeMinor: row.refunded_fee_minor,
     refundedGrossMinor: row.refunded_gross_minor,
@@ -292,8 +291,8 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
     exemptionId: row.exemption_id,
     failureCode: row.failure_code,
     metadata: sanitizeServiceFeeAssessmentMetadata(row.metadata),
-    createdAt: toServiceFeeTimestamp(row.created_at),
-    updatedAt: toServiceFeeTimestamp(row.updated_at),
+    createdAt: toIsoTimestamp(row.created_at),
+    updatedAt: toIsoTimestamp(row.updated_at),
   };
 }
 
@@ -521,6 +520,6 @@ function toExemptionRecord(
     isExempt: row.is_exempt,
     reason: row.reason,
     changedByKiloUserId: row.changed_by_kilo_user_id,
-    createdAt: normalizeOrganizationExemptionTimestamp(row.created_at),
+    createdAt: toIsoTimestamp(row.created_at, 'organization exemption'),
   };
 }

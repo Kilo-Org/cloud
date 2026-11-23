@@ -6,10 +6,7 @@ node_modules/
 .next/
 /out/
 /build
-packages/trpc/dist/
-packages/harness-sdk/dist/
-**/wrapper/dist/
-/services/cloud-agent-next/dist/
+**/dist/
 *.tsbuildinfo
 next-env.d.ts
 
@@ -23,14 +20,10 @@ next-env.d.ts
 
 # dev tooling
 .dev-port
-/.dev-logs/
-/dev/.dev-logs/
-/dev/*/.dev-logs/
-/dev/fixtures/
-/dev/*/fixtures/
+**/.dev-logs/
+/dev/**/fixtures/
 **/dev-debug-request-logs/
-/dev/logs/
-/dev/*/logs/
+/dev/**/logs/
 
 # testing
 /coverage
@@ -104,6 +97,7 @@ supabase/.temp
 *.cyclonedx.json
 *.cyclonedx.json.gz
 *.spdx.json
+*.spdx.json.gz
 # where the release workflow writes the SBOMs and the downloaded IPA/AAB
 /apps/mobile/artifacts/
 
@@ -125,6 +119,3 @@ run-milvus-test.sh
 # Harness markers: the kwf workflow drops these in a worktree, and one
 # reached a product commit (46640f5e8e96) before it was removed by hand.
 .kwf*
-
-# Staging-only usage queue callback, created by the gateway build.
-/apps/ai-gateway/src/app/api/v1/internal/queues/usage/route.ts

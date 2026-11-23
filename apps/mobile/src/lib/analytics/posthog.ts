@@ -1,7 +1,7 @@
 import {
   type ANALYTICS_SURFACES,
   type AnalyticsEventMap,
-  redactProhibitedProperties,
+  isProhibitedPropertyKey,
 } from '@kilocode/app-shared/analytics';
 import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { type FeatureFlagKey } from '@kilocode/app-shared/feature-flags';
@@ -111,7 +111,6 @@ const readyListeners = new Set<() => void>();
 // Track every discard completion so resumePostHog can await all prior
 // work.  Each discard appends to this chain; resumePostHog captures the
 // tail at call time.  Discards that begin after resume are not waited on.
-// oxlint-disable-next-line promise/prefer-await-to-then -- seed value
 let discardChain: Promise<void> = Promise.resolve();
 
 /** True when `initPostHog` has created the client.  Layout-drain uses
@@ -232,11 +231,6 @@ export function livePostHogClient(): LivePostHogClient | null {
  * `$screen_height`. Anything outside this list needs a DEC-02 amendment.
  */
 export function initPostHog(): void {
-  // A signed-in account with a consent decision is what creates the client.
-  // Feature-flag evaluation is functional, not analytics: without optional
-  // consent the client still resolves flags (so a flag-gated surface shows the
-  // same rollout decision the web shows for this person) while every capture
-  // path stays closed.
   if (!allowsMandatory()) {
     return;
   }
@@ -249,7 +243,6 @@ export function initPostHog(): void {
   // nothing, so every flag falls back to its default — the same outcome as the
   // web, whose dev builds have no project to ask. Expo inlines `EXPO_PUBLIC_*`
   // values into the bundle, so this is read through `process.env`.
-  // oxlint-disable-next-line no-undefined -- an absent dev host is the guard
   const host = __DEV__ ? process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST : POSTHOG_HOST;
   if (!host) {
     return;
@@ -322,9 +315,16 @@ export function captureEvent(
     return;
   }
   // Redaction is a no-op for the cataloged strict-object payloads (their keys
-  // are deny-list-safe by schema); it guards the record-shaped `app_startup`
-  // payload and every uncataloged dynamic payload at runtime.
-  const safe = properties === undefined ? undefined : redactProhibitedProperties(properties);
+  // are deny-list-safe by schema); it guards the `app_startup` payload and
+  // every uncataloged dynamic payload at runtime. Filtered inline because the
+  // SDK's capture signature rejects `undefined` property values, which
+  // `redactProhibitedProperties`' `Partial` result can carry.
+  const safe =
+    properties === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(properties).filter(([key]) => !isProhibitedPropertyKey(key))
+        );
   if (__DEV__ && properties !== undefined && safe !== undefined) {
     // A silently dropped key is invisible in production, so name the drops in
     // development. `__DEV__` is React Native only; the shared package stays
@@ -439,11 +439,6 @@ export async function discardPostHog(): Promise<void> {
     c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
     c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
 
-    // Drop the live reference before any async work so concurrent code
-    // cannot capture through the stale instance. Flag listeners persist —
-    // like ready listeners, they must survive the discard so mounted
-    // useFeatureFlag subscribers receive updates when the client is
-    // re-created by a later initPostHog.
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;
@@ -477,8 +472,6 @@ export async function discardPostHog(): Promise<void> {
  * rejected before the new client is allowed to write.
  */
 export async function resumePostHog(): Promise<void> {
-  // Capture the chain tail so a discard that begins after this call does
-  // not delay the upcoming init.
   await discardChain;
   // Wait for the SDK's 100 ms persistence debounce. The sealed sink drops the
   // old client's scheduled write. Purge then removes its stale on-disk queue

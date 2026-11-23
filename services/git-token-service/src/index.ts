@@ -23,6 +23,7 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import type {
   GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
@@ -56,7 +57,6 @@ import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
-  sha256Digest,
   validateGitLabSessionCapabilityPath,
   type GitLabAuthType,
   type GitLabCapabilityCredentialSource,
@@ -80,6 +80,14 @@ import {
   type InstallationLookupFailure,
 } from './installation-lookup-service.js';
 import {
+  HOSTED_GITHUB_REQUEST_TIMEOUT_MS,
+  HostedWorkspaceGitHubRepositories,
+  type ListHostedWorkspaceGitHubRepositoriesParams,
+  type ListHostedWorkspaceGitHubRepositoriesResult,
+  type ResolveHostedWorkspaceGitHubRepositoriesParams,
+  type ResolveHostedWorkspaceGitHubRepositoriesResult,
+} from './hosted-workspace-github-repositories.js';
+import {
   GitHubSessionCapabilityCodec,
   GitHubSessionCapabilityError,
   normalizeGitHubRepository,
@@ -102,7 +110,6 @@ import {
 import {
   BitbucketSessionCapabilityCodec,
   BitbucketSessionCapabilityError,
-  bitbucketTokenDigest,
   type BitbucketSessionCapabilityFailureReason,
 } from './bitbucket-session-capability.js';
 import {
@@ -512,6 +519,7 @@ function validateBitbucketCapabilityUpstream(
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
   private installationLookupService: InstallationLookupService;
+  private hostedWorkspaceGitHubRepositories: HostedWorkspaceGitHubRepositories;
   private gitlabLookupService: GitLabLookupService;
   private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
@@ -520,6 +528,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     super(ctx, env);
     this.githubService = new GitHubTokenService(env);
     this.installationLookupService = new InstallationLookupService(env);
+    this.hostedWorkspaceGitHubRepositories = new HostedWorkspaceGitHubRepositories(
+      params => this.findHostedWorkspaceInstallationWithLoginRepair(params),
+      this.githubService
+    );
     this.gitlabLookupService = new GitLabLookupService(env);
     this.gitlabCredentialResolver = createGitLabCredentialBroker(env);
     this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
@@ -527,7 +539,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
   private async refreshGitHubInstallationLogins(
     params: GetCloudAgentAuthForRepoParams,
-    authorizationMode: 'generic' | 'managed' = 'generic'
+    authorizationMode: 'generic' | 'managed' = 'generic',
+    requestTimeoutMs?: number
   ): Promise<void> {
     const candidates = await this.installationLookupService.findRefreshCandidates(
       params,
@@ -540,7 +553,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     for (const candidate of candidates.candidates) {
       const refreshedAccountLogin = await this.githubService.refreshInstallationAccountLoginIfDue(
         candidate.installationId,
-        candidate.githubAppType
+        candidate.githubAppType,
+        requestTimeoutMs
       );
       if (
         !refreshedAccountLogin ||
@@ -610,6 +624,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return installation;
   }
 
+  private async findHostedWorkspaceInstallationWithLoginRepair(
+    params: Parameters<InstallationLookupService['findHostedWorkspaceInstallation']>[0]
+  ) {
+    const installation =
+      await this.installationLookupService.findHostedWorkspaceInstallation(params);
+    if (installation.success || installation.reason !== 'integration_mismatch') return installation;
+
+    await this.refreshGitHubInstallationLogins(
+      { ...params, accessPurpose: 'workflow' },
+      'managed',
+      HOSTED_GITHUB_REQUEST_TIMEOUT_MS
+    );
+    return this.installationLookupService.findHostedWorkspaceInstallation(params);
+  }
+
   /**
    * Get a GitHub token for a repository.
    *
@@ -677,6 +706,18 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       };
     }
     return { success: true };
+  }
+
+  async listHostedWorkspaceGitHubRepositories(
+    params: ListHostedWorkspaceGitHubRepositoriesParams
+  ): Promise<ListHostedWorkspaceGitHubRepositoriesResult> {
+    return this.hostedWorkspaceGitHubRepositories.list(params);
+  }
+
+  async resolveHostedWorkspaceGitHubRepositories(
+    params: ResolveHostedWorkspaceGitHubRepositoriesParams
+  ): Promise<ResolveHostedWorkspaceGitHubRepositoriesResult> {
+    return this.hostedWorkspaceGitHubRepositories.resolve(params);
   }
 
   async getCloudAgentAuthForRepo(
@@ -1118,7 +1159,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         workspaceSlug: subject.workspaceSlug,
         repositoryUuid: subject.repositoryUuid,
         repositoryFullName: subject.repositoryFullName,
-        tokenDigest: await bitbucketTokenDigest(subject.token),
+        tokenDigest: await sha256Hex(subject.token),
         oauthCredentialId: subject.oauthCredentialId,
         outboundContainerId: params.outboundContainerId,
       });
@@ -1178,7 +1219,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         return { success: false, reason: 'source_unavailable' };
       }
     } else {
-      const currentDigest = await bitbucketTokenDigest(subject.token);
+      const currentDigest = await sha256Hex(subject.token);
       if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
         return { success: false, reason: 'source_unavailable' };
       }
@@ -1325,7 +1366,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'source_unavailable' };
     }
     if ('tokenDigest' in claims.source) {
-      const currentTokenDigest = await sha256Digest(credential.token);
+      const currentTokenDigest = await sha256Hex(credential.token);
       if (!timingSafeEqual(currentTokenDigest, claims.source.tokenDigest)) {
         return { success: false, reason: 'source_unavailable' };
       }

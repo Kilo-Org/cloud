@@ -14,7 +14,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
   repository_access_failed:
-    'A repository of this environment could not be accessed. Check that the integration covers every repository of the environment.',
+    'A workspace repository could not be accessed. Check that the integration covers every repository, then try again.',
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable:
@@ -23,6 +23,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Container limit reached. Stop an existing container before starting another.',
   account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  network_secret_configuration_invalid:
+    'Network secret configuration is invalid. Check the variable names and allowed domains.',
   sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',

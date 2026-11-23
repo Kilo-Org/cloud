@@ -44,9 +44,18 @@ test('rewrites local endpoints in .env.local and adds a missing key', () => {
   const { content, changed, kept } = applyAppEnv(before, buildAppEnv(PORTS));
 
   assert.deepEqual(kept, []);
-  assert.deepEqual(changed.sort(), ['POSTGRES_URL', 'REDIS_URL', 'UPSTASH_REDIS_REST_URL']);
+  assert.deepEqual(changed.sort(), [
+    'POSTGRES_SCRIPT_URL',
+    'POSTGRES_URL',
+    'REDIS_URL',
+    'UPSTASH_REDIS_REST_URL',
+  ]);
   assert.match(content, /^NEXTAUTH_SECRET=keep-me$/m);
   assert.match(content, /^POSTGRES_URL=postgres:\/\/postgres:postgres@localhost:5532\/postgres$/m);
+  assert.match(
+    content,
+    /^POSTGRES_SCRIPT_URL=postgres:\/\/postgres:postgres@localhost:5532\/postgres$/m
+  );
   assert.match(content, /^REDIS_URL=redis:\/\/localhost:6479$/m);
   assert.match(content, /^UPSTASH_REDIS_REST_URL=http:\/\/localhost:8179$/m);
 });

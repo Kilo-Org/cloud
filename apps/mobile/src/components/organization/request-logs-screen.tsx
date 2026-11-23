@@ -1,47 +1,42 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { canStepOlderTo, HOUR_MS } from '@/components/organization/request-log-window';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RequestLogRow } from '@/components/organization/request-log-row';
 import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import {
-  DirectionalChevronLeft,
-  DirectionalChevronRight,
+  DirectionalArrowLeft,
+  DirectionalArrowRight,
   DirectionalLogs,
 } from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
-import {
-  formatClockTime,
-  formatDate,
-  formatNumber,
-  formatPrefixedUsd,
-  UNMEASURED_VALUE,
-} from '@/lib/format';
+import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
-import { parseTimestamp } from '@/lib/utils';
-
-/**
- * The hour the procedure lists: `organizations.requestLogs.list` answers the
- * rows created in the hour before `startTime`, so a window end is the screen's
- * paging control and one step is one hour.
- */
-const HOUR_MS = 60 * 60 * 1000;
+import {
+  classifyReadFailureKind,
+  type ReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 
 /**
  * The server caps one window at 100 rows (`REQUEST_LOGS_LIMIT`,
@@ -50,27 +45,13 @@ const HOUR_MS = 60 * 60 * 1000;
  */
 const REQUEST_LOG_LIMIT = 100;
 
-/**
- * The procedure refuses a start time more than `REQUEST_LOGS_START_TIME_MAX_AGE_DAYS`
- * (365, apps/web) before its own clock, which runs later than this screen's
- * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
- * it opens still names a start time the server accepts. Exported for the
- * mounted suite, which drives the stepper to this bound.
- */
-export const HISTORY_DAYS = 365;
-
-/** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
-export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
-  return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
-}
-
-// FlashList takes `contentContainerStyle` (no className), so the header's and
-// the skeleton's `px-6 pt-4` inset is spelled in pixels here. NativeWind's
-// native rem is 14, which makes px-6 21 dp and pt-4 14 dp; writing 24/16 (the
-// web rem) puts the cards 3 dp inside the date and the stepper above them. The
-// tab bar's own bottom padding rides on the footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
@@ -85,8 +66,7 @@ type RequestLogsBody =
   | Readonly<{ kind: 'loading' }>
   | Readonly<{ kind: 'list'; rows: readonly OrgRequestLogEntry[]; truncated: boolean }>
   | Readonly<{ kind: 'empty' }>
-  | Readonly<{ kind: 'retryable'; variant: TrpcErrorVariant }>
-  | Readonly<{ kind: 'refused'; variant: TrpcErrorVariant }>;
+  | Readonly<{ kind: 'failure'; failure: ReadFailureKind }>;
 
 function requestLogsBody(
   rows: readonly OrgRequestLogEntry[] | undefined,
@@ -100,75 +80,16 @@ function requestLogsBody(
   if (error === null || error === undefined) {
     return { kind: 'loading' };
   }
-  const variant = trpcErrorVariant(error);
-  return isRetryableTrpcError(error)
-    ? { kind: 'retryable', variant }
-    : { kind: 'refused', variant };
+  // The read settles instead of pausing (`SETTLE_WHILE_OFFLINE`), so `isPaused`
+  // is always false here. Connectivity stays `unknown` on purpose: a transport
+  // rejection carries no server answer (`servedAnswer` is false), so it is
+  // already named the connection, while a stale NetInfo report fed in here
+  // could rename a coded refusal.
+  return {
+    kind: 'failure',
+    failure: classifyReadFailureKind({ errors: [error], isPaused: false, connectivity: 'unknown' }),
+  };
 }
-
-/** The name the web table prints for a request's user, with its own fallbacks. */
-const RequestLogRow = memo(function RequestLogRow({
-  entry,
-}: Readonly<{ entry: OrgRequestLogEntry }>) {
-  const { t } = useTranslation();
-  const locale = i18n.language;
-  const created = parseTimestamp(entry.created_at);
-  const time = Number.isNaN(created.getTime())
-    ? UNMEASURED_VALUE
-    : formatClockTime(created, locale);
-  // Six fraction digits, as the web table prints a request's cost: a gateway
-  // request can cost less than a cent, and two digits would round it to zero.
-  const cost = formatPrefixedUsd(fromMicrodollars(entry.cost_microdollars), locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  });
-  const tokens = t('organization.requestLogs.tokens', {
-    input: formatNumber(entry.input_tokens, locale),
-    output: formatNumber(entry.output_tokens, locale),
-  });
-  // The web table names a request's user by name, then email, then id, and skips
-  // an empty value rather than printing a blank cell.
-  const userName =
-    [entry.user.name, entry.user.email, entry.user.id].find(Boolean) ?? UNMEASURED_VALUE;
-
-  return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <View className="flex-row items-baseline gap-3">
-        <Text className="flex-1 font-mono text-xs text-foreground" numberOfLines={1}>
-          {entry.model ?? UNMEASURED_VALUE}
-        </Text>
-        <Text className="shrink-0 text-sm font-medium tabular-nums text-foreground">{cost}</Text>
-      </View>
-      <View className="flex-row items-center gap-3">
-        <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-          {userName}
-        </Text>
-        <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
-          {entry.provider ?? UNMEASURED_VALUE}
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-2">
-        {/* One run, so the time and the token pair keep the catalog's own
-            separators: a `gap` between two `Text`s spaced the first dot
-            differently from the dot inside `in · out`. The time is isolated on
-            its own so the AM/PM marker stays beside its clock in either
-            direction. */}
-        <Text className="flex-1 text-xs tabular-nums text-muted-foreground" numberOfLines={1}>
-          {`${isolateBidiText(time)} · ${tokens}`}
-        </Text>
-        {entry.is_user_byok ? (
-          // Muted text with no box: `bg-muted` is the card's own `bg-secondary`
-          // in both themes, so a filled badge paints nothing, and its padding
-          // pulled the marker inside the right edge that cost and provider
-          // share while adding a line of height the other rows lack.
-          <Text className="shrink-0 text-xs text-muted-foreground">
-            {t('organization.requestLogs.byok')}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-});
 
 /**
  * The organization's request logs, read-only.
@@ -185,16 +106,21 @@ const RequestLogRow = memo(function RequestLogRow({
  */
 export function OrganizationRequestLogsScreen() {
   const { t } = useTranslation();
-  const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   // The window's newest end. The anchor is captured once, so "Newer" has a
   // fixed edge to return to instead of sliding with the clock.
   const [anchorMs] = useState(() => Date.now());
   const [windowEndMs, setWindowEndMs] = useState(anchorMs);
+  const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const allowed = canManageOrganizationBilling(role);
   const logs = useOrgRequestLogs(organizationId, new Date(windowEndMs).toISOString(), allowed);
   const paddingBottom = useTabBarBottomPadding();
   const body = requestLogsBody(logs.data, logs.error);
+  // The screen's own read can be pulled in place, and a failed pull is
+  // announced: the inert reduced-motion indicator cannot say it.
+  const [refreshing, onRefresh] = useManualRefresh(logs.refetch, t('common.couldNotRefresh'));
 
   // `RequestLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering.
@@ -219,7 +145,10 @@ export function OrganizationRequestLogsScreen() {
           title={t('organization.settingsOnWeb.requestLogs')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.requestLogs.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.requestLogs.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -228,12 +157,7 @@ export function OrganizationRequestLogsScreen() {
   const windowEnd = new Date(windowEndMs);
   const canStepOlder = canStepOlderTo(windowEndMs - HOUR_MS, anchorMs);
   const canStepNewer = windowEndMs < anchorMs;
-  const refreshControl = (
-    <RefreshControl
-      refreshing={logs.isFetching && !logs.isPending}
-      onRefresh={() => void logs.refetch()}
-    />
-  );
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // One body per outcome. Each outcome names its own recovery, and a refusal
   // carries none: asking again returns the same verdict.
@@ -242,36 +166,43 @@ export function OrganizationRequestLogsScreen() {
       case 'loading': {
         return <RequestLogsSkeleton />;
       }
-      case 'retryable': {
+      case 'failure': {
+        const { failure } = current;
         return (
           <QueryError
-            variant={current.variant}
-            message={t('organization.requestLogs.loadError')}
-            onRetry={() => void logs.refetch()}
+            placement="top"
+            inset="gutter"
+            variant={readFailureKindVariant(failure)}
+            // A retryable or terminal failure keeps the screen's own sentence:
+            // the shared server copy would ask for a retry the terminal state
+            // withholds, and the retryable one already points at this read. The
+            // other kinds carry the refusal, the missing item, the wait or the
+            // connection in their own words.
+            message={
+              failure === 'retryable' || failure === 'terminal'
+                ? t('organization.requestLogs.loadError')
+                : undefined
+            }
+            onRetry={readFailureKindIsRetryable(failure) ? () => void logs.refetch() : undefined}
             isRetrying={logs.isFetching}
-            refreshControl={refreshControl}
-          />
-        );
-      }
-      case 'refused': {
-        return (
-          <QueryError
-            variant={current.variant}
-            message={t('organization.requestLogs.loadError')}
-            refreshControl={refreshControl}
           />
         );
       }
       case 'empty': {
         return (
           <EmptyState
+            placement="top"
+            inset="gutter"
             icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
-            // The description points at the paging control, so it exists only
-            // while an older hour can still be reached; at the history bound
-            // the scoped title alone is the truth.
-            description={canStepOlder ? t('organization.requestLogs.emptyDescription') : undefined}
-            refreshControl={refreshControl}
+            // The description points at the paging control while an older hour
+            // can still be reached; at the history bound it names the bound
+            // instead, so the state always says why the window is empty.
+            description={
+              canStepOlder
+                ? t('organization.requestLogs.emptyDescription')
+                : t('organization.requestLogs.emptyBoundDescription')
+            }
           />
         );
       }
@@ -284,12 +215,12 @@ export function OrganizationRequestLogsScreen() {
             renderItem={renderItem}
             getItemType={() => 'requestLog'}
             ItemSeparatorComponent={RowSeparator}
-            contentContainerStyle={listContentContainerStyle}
+            ListHeaderComponent={<ListTopPad />}
             refreshControl={refreshControl}
             ListFooterComponent={
               <View className="pt-3">
                 {current.truncated ? (
-                  <Text variant="muted" className="px-6 text-center text-xs">
+                  <Text variant="caption" className="px-4 text-center">
                     {t('organization.requestLogs.truncated')}
                   </Text>
                 ) : null}
@@ -306,6 +237,16 @@ export function OrganizationRequestLogsScreen() {
     }
   };
 
+  // The empty hour and the failure body are `placement="top"` states, which
+  // render their own content and no scroller (`empty-state.tsx`), so a
+  // `refreshControl` handed to one would be dropped and a pull over it would
+  // never reach the read. They ride in a scroller instead — the list keeps its
+  // own FlashList pull and is never nested in it — and that scroller's frame
+  // applies the side insets itself, so those two bodies are not wrapped in the
+  // padded view the list and the skeleton need.
+  const bodyPulls = body.kind === 'empty' || body.kind === 'failure';
+  const bodyContent = renderBody(body);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -314,53 +255,87 @@ export function OrganizationRequestLogsScreen() {
       />
       {/* The window the rows below belong to, and the only filter the phone
           needs: the procedure answers one hour at a time, so moving the window
-          is both the time range and the paging. */}
-      <View className="gap-2 px-6 pt-4">
-        <View className="gap-0.5">
-          <Text className="text-sm font-medium text-foreground">
-            {formatDate(windowStart, i18n.language, WINDOW_DATE)}
-          </Text>
-          {/* Each time is isolated on its own, so the AM/PM marker it carries
-              stays beside its own clock, and the join is the catalog's, so a
-              right-to-left reader gets the pair in that language's order
-              instead of one reversed run. */}
-          <Text className="text-xs tabular-nums text-muted-foreground">
-            {t('common.timeRange', {
-              start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
-              end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
-            })}
-          </Text>
-        </View>
-        <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={!canStepOlder}
-            onPress={() => {
-              setWindowEndMs(current => current - HOUR_MS);
-            }}
-            accessibilityLabel={t('organization.requestLogs.older')}
-          >
-            <DirectionalChevronLeft size={16} color={colors.foreground} />
-            <Text>{t('organization.requestLogs.older')}</Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={!canStepNewer}
-            onPress={() => {
-              setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
-            }}
-            accessibilityLabel={t('organization.requestLogs.newer')}
-          >
-            <Text>{t('organization.requestLogs.newer')}</Text>
-            <DirectionalChevronRight size={16} color={colors.foreground} />
-          </Button>
+          is both the time range and the paging. The hint states the window's
+          one rule in place, and it never changes, so no row moves when a
+          window loads. */}
+      <View style={sideInsetStyle}>
+        <View className="gap-2 px-4 pt-3">
+          <View className="gap-0.5">
+            <Text className="text-sm font-medium text-foreground">
+              {formatDate(windowStart, i18n.language, WINDOW_DATE)}
+            </Text>
+            {/* Each time is isolated on its own, so the AM/PM marker it carries
+                stays beside its own clock, and the join is the catalog's, so a
+                right-to-left reader gets the pair in that language's order
+                instead of one reversed run. */}
+            <Text variant="caption" className="tabular-nums">
+              {t('common.timeRange', {
+                start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+                end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+              })}
+            </Text>
+          </View>
+          {/* A step with no further hour is still readable: it takes the muted
+              fill and ink at full strength, where the outline variant would halve
+              both into the page. */}
+          <View className="flex-row gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepOlder && 'bg-muted opacity-100')}
+              disabled={!canStepOlder}
+              onPress={() => {
+                setWindowEndMs(current => current - HOUR_MS);
+              }}
+              accessibilityLabel={t('organization.requestLogs.older')}
+            >
+              <DirectionalArrowLeft
+                size={16}
+                color={canStepOlder ? colors.foreground : mutedDisabledInk}
+              />
+              <Text className={canStepOlder ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.older')}
+              </Text>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepNewer && 'bg-muted opacity-100')}
+              disabled={!canStepNewer}
+              onPress={() => {
+                setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
+              }}
+              accessibilityLabel={t('organization.requestLogs.newer')}
+            >
+              <Text className={canStepNewer ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.newer')}
+              </Text>
+              <DirectionalArrowRight
+                size={16}
+                color={canStepNewer ? colors.foreground : mutedDisabledInk}
+              />
+            </Button>
+          </View>
         </View>
       </View>
-      {renderBody(body)}
+      {bodyPulls ? (
+        // `flex-grow` lets short content still pull: a content box only as tall
+        // as the state cannot be dragged far enough to trigger the gesture. The
+        // state draws its own gutter through `inset="gutter"`, so this body
+        // adds none.
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName="flex-grow"
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
+          {bodyContent}
+        </TabScreenScrollView>
+      ) : (
+        <View className="flex-1" style={sideInsetStyle}>
+          {bodyContent}
+        </View>
+      )}
     </View>
   );
 }

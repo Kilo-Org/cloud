@@ -3,6 +3,9 @@ import {
   toNonNullish,
   parseResultJsonWithZodSchema,
   formatIsoDateString_UsaDateOnlyFormat,
+  formatIsoDateTime_IsoOrderNoSeconds,
+  formatDate,
+  formatLargeNumber,
   isDateOnlyString,
 } from './utils';
 import * as z from 'zod';
@@ -249,6 +252,22 @@ describe('formatIsoDateString_UsaDateOnlyFormat', () => {
   });
 });
 
+describe('formatIsoDateTime_IsoOrderNoSeconds', () => {
+  it('returns em-dash for a malformed string', () => {
+    expect(formatIsoDateTime_IsoOrderNoSeconds('not-a-date')).toBe('—');
+  });
+
+  it('returns em-dash for null input', () => {
+    expect(formatIsoDateTime_IsoOrderNoSeconds(null)).toBe('—');
+  });
+
+  it('formats a local Date as YYYY-MM-DD HH:mm', () => {
+    // Local components keep the assertion independent of the runner time zone.
+    const date = new Date(2026, 3, 21, 13, 5);
+    expect(formatIsoDateTime_IsoOrderNoSeconds(date)).toBe('2026-04-21 13:05');
+  });
+});
+
 describe('requireNotNull', () => {
   it('should return the value when it is not null or undefined', () => {
     expect(toNonNullish('hello world')).toBe('hello world');
@@ -260,5 +279,30 @@ describe('requireNotNull', () => {
     expect(() => toNonNullish(undefined)).toThrow('Value must not be null or undefined');
     expect(() => toNonNullish(null, 'FOO')).toThrow('FOO');
     expect(() => toNonNullish(undefined, 'FOO')).toThrow('FOO');
+  });
+});
+
+describe('formatDate', () => {
+  it('formats a Unix timestamp in seconds as a US date', () => {
+    // Local construction keeps the assertion independent of the runner time zone.
+    const timestamp = new Date(2026, 3, 21, 13, 5).getTime() / 1000;
+    expect(formatDate(timestamp)).toBe('4/21/2026');
+  });
+});
+
+describe('formatLargeNumber', () => {
+  it('groups a count below one million', () => {
+    expect(formatLargeNumber(742318)).toBe('742,318');
+    expect(formatLargeNumber(999999)).toBe('999,999');
+  });
+
+  it('uses the pinned locale magnitude words at or above one million', () => {
+    expect(formatLargeNumber(1_811_400)).toBe('1.8 million');
+    expect(formatLargeNumber(2_500_000_000)).toBe('2.5 billion');
+  });
+
+  it('uses the short magnitude units when shortened', () => {
+    expect(formatLargeNumber(1_811_400, true)).toBe('1.8M');
+    expect(formatLargeNumber(2_500_000_000, true)).toBe('2.5B');
   });
 });

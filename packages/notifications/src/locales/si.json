@@ -2,11 +2,12 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "ඔබගේ ඒජන්ත සැසියට යාවත්කාලීනයක් ඇත",
+      "cloudAgentSession": "ඔබගේ නියෝජිත සැසියට යාවත්කාලීනයක් ඇත",
       "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
       "spendAlert": "ඔබගේ වියදමට අවධානය අවශ්‍යයි",
       "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",
       "securityUpdate": "ආරක්ෂක පරීක්ෂාවකට යාවත්කාලීනයක් ඇත",
+      "agentBriefing": "ඔබගේ ඒජන්ට් ක්‍රියාකාරකම් වාර්තාව සූදානම්",
       "activeAgentsGlanceable": "සක්‍රිය නියෝජිතයන්ට යාවත්කාලීනයක් ඇත"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "බරපතළ",
+      "high": "ඉහළ",
+      "medium": "මධ්‍යම",
+      "low": "අඩු"
     },
     "securityFindingSlaWarning": {
       "title": "SLA අනතුරු ඇඟවීම"

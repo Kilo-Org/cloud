@@ -10,6 +10,7 @@ import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { PendingLinkAuth } from '@/components/login/pending-link-auth';
 import { ProviderButtons } from '@/components/login/provider-buttons';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import {
@@ -20,7 +21,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import { pendingLinkOptions } from '@/lib/auth/pending-link';
-import { useNativeAuth } from '@/lib/auth/use-native-auth';
+import { type EmailCodeRefusal, useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import {
   beginLoginEmail,
@@ -40,6 +41,15 @@ const LEGAL_LINK_ACTIONS: readonly {
   { name: 'openTerms', labelKey: 'login.terms', document: 'terms' },
   { name: 'openPrivacy', labelKey: 'common.privacyPolicy', document: 'privacy' },
 ];
+
+/**
+ * Keeps the refusal that no further code can clear. The token route answers `INVALID_CODE` for an
+ * address the OTP route silently refused, so a resent code never arrives and typing another one
+ * cannot succeed; clearing the message on either step would leave the person with the dead end and
+ * no control naming the way out. The untagged (retryable) refusals still retire on that step.
+ */
+const survivesCodeStepRetry = (refusal: EmailCodeRefusal | undefined) =>
+  refusal?.recovery === 'options' ? refusal : undefined;
 
 export function IdleAuth({
   start,
@@ -110,14 +120,21 @@ export function IdleAuth({
   // with whatever separator the locale puts before the Terms link — a space
   // where words are space-separated, nothing in Chinese — `termsConnector`
   // carries the conjunction with its own spacing, and the suffix is the
-  // sentence's final punctuation. The link inside the sentence reads
-  // `termsInSentence`, the form the locale's consent verb governs, while
-  // `login.terms` is the noun phrase the link announces on its own.
+  // sentence's final punctuation. The link inside the sentence paints and reads
+  // `termsInSentence`, the form the locale's consent verb governs, while it
+  // announces, and the screen it opens names, `common.termsOfService` — the
+  // document's own title.
   const legalSentence =
     `${t('login.termsPrefix')}${t('login.termsInSentence')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
-  const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
+  /**
+   * The code step's last verify refusal. A refusal without a tag is retryable, so typing or a
+   * resend retires it; one tagged `recovery: 'options'` outlives both, because the dead end it
+   * reports — a silently refused address, or the admission gate — is not something another code
+   * can clear. Only Back, entering the step afresh, or a pending link taking over ends it.
+   */
+  const [verifyRefusal, setVerifyRefusal] = useState<EmailCodeRefusal | undefined>(undefined);
   // Bumps on every user step that retires a refusal (edit, resend, back), so a
   // slow refusal from an earlier attempt cannot re-appear after the user moved on.
   const verifyAttemptRef = useRef(0);
@@ -197,7 +214,7 @@ export function IdleAuth({
   useEffect(() => {
     if (pendingLinkToken) {
       verifyAttemptRef.current += 1;
-      setVerifyError(undefined);
+      setVerifyRefusal(undefined);
       setView('main');
     }
   }, [pendingLinkToken]);
@@ -234,7 +251,7 @@ export function IdleAuth({
     const ok = await requestEmailCode(email);
     if (ok) {
       verifyAttemptRef.current += 1;
-      setVerifyError(undefined);
+      setVerifyRefusal(undefined);
       setView('otp');
     }
   };
@@ -293,8 +310,17 @@ export function IdleAuth({
         busy={busy}
         // A resend that fails has no field to sit under here, and the pending-link options are off
         // screen, so the code step shows that refusal in its own slot. Without a pending link the
-        // hook toasts it instead and this stays the verify message alone.
-        error={verifyError ?? pendingLinkFailure?.message}
+        // hook toasts it instead and this stays the verify message alone. The newest refusal wins:
+        // a terminal verify refusal is kept on the step, so it must not mask a resend failure that
+        // lands after it, which would make the tap look like it did nothing.
+        error={pendingLinkFailure?.message ?? verifyRefusal?.message}
+        // The refusal's data tag decides, never the message: both refusals a code
+        // cannot clear — the admission gate and a silently refused address — show
+        // the other sign-in methods their copy names. The handler is always passed,
+        // so a missing tag only hides the control.
+        recovery={verifyRefusal?.recovery}
+        onAlternativeSignIn={() => void startBrowserAuth()}
+        alternativeSignInStarting={browserAuthStarting}
         onVerify={code => {
           const attempt = verifyAttemptRef.current;
           void (async () => {
@@ -303,31 +329,38 @@ export function IdleAuth({
             // code (clearing the message), requested a resend, or gone back.
             // Only the attempt this refusal belongs to may write its message.
             if (!outcome.ok && attempt === verifyAttemptRef.current) {
-              setVerifyError(outcome.message);
+              // The refusal is the newest word on the step, so an older resend
+              // failure must not stay in the slot ahead of it.
+              clearPendingLinkFailure();
+              setVerifyRefusal(outcome);
             }
           })();
         }}
         onCodeChange={() => {
-          // Editing the code retires the refusal message above the field and
-          // disowns any verify attempt still in flight for the old code.
+          // Editing the code retires a retryable refusal and disowns any verify
+          // attempt still in flight for the old code; the tagged one stays, since
+          // this address gets no code that typing here could make right.
           verifyAttemptRef.current += 1;
-          setVerifyError(undefined);
+          setVerifyRefusal(survivesCodeStepRetry);
           clearPendingLinkFailure();
         }}
-        onResend={() => {
+        onResend={async () => {
+          // A resend is still only a code: it cannot clear the dead end it reports
+          // for an address the OTP route silently refused, so the refusal and its
+          // options control survive a failed resend and a successful one alike.
           verifyAttemptRef.current += 1;
-          setVerifyError(undefined);
+          setVerifyRefusal(survivesCodeStepRetry);
           clearPendingLinkFailure();
-          void (async () => {
-            const ok = await requestEmailCode(otpEmail);
-            if (ok) {
-              toast.success(t('login.codeSent'));
-            }
-          })();
+          const ok = await requestEmailCode(otpEmail);
+          if (ok) {
+            toast.success(t('login.codeSent'));
+          }
+          // The code field empties only when a code was actually sent.
+          return ok;
         }}
         onBack={() => {
           verifyAttemptRef.current += 1;
-          setVerifyError(undefined);
+          setVerifyRefusal(undefined);
           clearPendingLinkFailure();
           setView('main');
         }}
@@ -337,11 +370,10 @@ export function IdleAuth({
   }
 
   const ssoBlock = ssoRecovery && (
-    <View className="gap-2 rounded-md border border-border bg-card p-3">
+    <Card>
       <Text>{t('login.organizationUsesSso')}</Text>
       <Button
         size="lg"
-        className="flex-row gap-2"
         disabled={authBusy}
         loading={browserAuthStarting}
         onPress={() => void startSsoAuth(ssoRecovery.email)}
@@ -359,7 +391,7 @@ export function IdleAuth({
       >
         <Text>{t('login.useDifferentEmail')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 
   const providerHandlers = {
@@ -486,17 +518,12 @@ export function IdleAuth({
       >
         <Button
           size="lg"
-          className="flex-row gap-2"
           disabled={authBusy}
           loading={busy === 'otp-send'}
           onPress={() => void handleSendCode(emailRef.current)}
           accessibilityLabel={t('login.continueWithEmail')}
         >
-          {/* The primary action's label takes the provider rows' 17pt label size;
-              at the button variant's 14pt the filled Continue read weaker than
-              the two outlined ways in below it. The variant keeps the weight
-              (`font-semibold`) and the brand fill. */}
-          <Text className="text-[17px]">{t('common.continue')}</Text>
+          <Text>{t('common.continue')}</Text>
         </Button>
       </View>
       {/* The sentence is one accessible element: Android's screen reader does
@@ -556,7 +583,7 @@ export function IdleAuth({
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
-          accessibilityLabel={t('login.termsInSentence')}
+          accessibilityLabel={t('common.termsOfService')}
           onPress={() => {
             openLegalDocument('terms');
           }}

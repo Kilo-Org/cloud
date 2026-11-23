@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { MAX_RUNNING_RUNS_PER_QUEUE } from './db';
 import { dispatchScheduler, type BenchmarkJobMessage } from './run';
 import {
   acquireInitializationLease,
@@ -32,39 +33,14 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      const headers = new Headers(init?.headers);
-      if (url.href === 'https://app.test/api/internal/bot-token') {
-        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
-        expect(init?.method).toBe('POST');
-        expect(headers.get('authorization')).toBe(`Bearer ${'mint-test-secret'}`);
-        expect(JSON.parse(init.body)).toEqual({
-          userId: 'scheduler-user',
-          organizationId: 'scheduler-org',
-        });
-        return Response.json({
-          token: 'scheduler-test-token',
-          expiresAt: new Date(NOW + 60 * 60_000).toISOString(),
-        });
-      }
-      if (url.href === 'https://api.test/api/organizations/scheduler-org/models') {
-        expect(headers.get('authorization')).toBe(`Bearer ${'scheduler-test-token'}`);
-        expect(headers.get('X-KiloCode-OrganizationId')).toBe('scheduler-org');
-        return Response.json({
-          data: sqlite
-            .prepare('SELECT DISTINCT model FROM run_models')
-            .all()
-            .map(row => ({
-              id: row.model,
-              supported_parameters: ['tools'],
-            })),
-        });
-      }
-      throw new Error(`Unexpected fixture request: ${url.href}`);
-    });
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('Scheduler initialization and dispatch make no network request.')
+    );
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
     setupDb = sqliteD1(sqlite);
     sent = [];
     tickStartedAt = null;
@@ -82,9 +58,6 @@ describe('scheduler initialization across dispatch ticks (production migrations 
         },
       },
       BENCHMARK_SCHEDULER_CONFIG: '{}',
-      KILO_WEB_API_BASE_URL: 'https://app.test',
-      KILO_CLI_API_URL: 'https://api.test',
-      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-test-secret' },
     } as unknown as Env;
   });
 
@@ -105,11 +78,11 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
         min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
-        benchmark_user_id, benchmark_org_id
+        benchmark_user_id, benchmark_org_id, admission_marker
       ) VALUES (?, 'efficient', 'decider', ?, 'running', ?, 0.7, 3, 0, ?, 'scheduler-init-test',
-        'scheduler-user', 'scheduler-org')
+        'scheduler-user', 'scheduler-org', ?)
     `)
-      .run(id, purpose, new Date(NOW).toISOString(), repetitions);
+      .run(id, purpose, new Date(NOW).toISOString(), repetitions, crypto.randomUUID());
     const model = sqlite.prepare(
       "INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)"
     );
@@ -131,7 +104,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     insertRun(id, 'platform', 1, 3);
     await scheduleRunChunks(setupDb, {
       runId: id,
-      entries: [{ model: `${id}/model-0`, variant: null, providers: ['deepinfra'] }],
+      entries: [{ model: `${id}/model-0`, variant: null }],
       repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -167,12 +140,12 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   }
 
   it('settles failed-lane tails without completing a run that still has runnable work', async () => {
-    insertRun('settled', 'user', 2, 1);
+    insertRun('settled', 'platform', 2, 1);
     insertRun('busy', 'platform', 1, 1);
     for (const id of ['settled', 'busy']) {
       await scheduleRunChunks(setupDb, {
         runId: id,
-        entries: [{ model: `${id}/model-0`, variant: null, providers: ['deepinfra'] }],
+        entries: [{ model: `${id}/model-0`, variant: null }],
         repetitions: 1,
         caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
         chunkSize: 1,
@@ -237,7 +210,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     'fails a run without %s and releases its profiles without blocking a sibling',
     async column => {
       insertRun('invalid', 'platform', 1, 1);
-      insertRun('healthy', 'user', 1, 1);
+      insertRun('healthy', 'platform', 1, 1);
       sqlite.prepare(`UPDATE benchmark_runs SET ${column} = NULL WHERE id = 'invalid'`).run();
       sqlite
         .prepare(`INSERT INTO benchmark_profiles (
@@ -259,39 +232,87 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     }
   );
 
-  it('contains a temporary catalog failure while initializing and dispatching a sibling', async () => {
-    insertRun('retryable', 'platform', 1, 1);
-    insertRun('healthy', 'user', 1, 1);
-    sqlite
-      .prepare("UPDATE benchmark_runs SET benchmark_user_id = 'retry-user' WHERE id = 'retryable'")
-      .run();
-    const fetcher = vi.mocked(globalThis.fetch);
-    const base = fetcher.getMockImplementation();
-    if (!base) throw new Error('Catalog fixture was not installed.');
-    fetcher.mockImplementation(async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      if (url.pathname === '/api/internal/bot-token' && typeof init?.body === 'string') {
-        const body: unknown = JSON.parse(init.body);
-        if (
-          typeof body === 'object' &&
-          body !== null &&
-          'userId' in body &&
-          body.userId === 'retry-user'
-        ) {
-          return new Response(null, { status: 503 });
-        }
-      }
-      return base(input, init);
+  it('schedules no entry of a run until every entry has reused its prior results', async () => {
+    const models = Array.from(
+      { length: 11 },
+      (_, index) => `shared/model-${String(index).padStart(2, '0')}`
+    );
+    const reusedCaseIds = DECIDER_CASES.slice(0, 3).map(benchCase => benchCase.id);
+    const run = sqlite.prepare(`
+      INSERT INTO benchmark_runs (
+        id, router, kind, purpose, status, started_at,
+        min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+        benchmark_user_id, benchmark_org_id, admission_marker
+      ) VALUES (?, 'efficient', 'decider', 'platform', ?, ?, 0.7, 3, 0, 1, 'scheduler-init-test',
+        'scheduler-user', 'scheduler-org', ?)
+    `);
+    run.run('prior', 'completed', new Date(NOW - 86400_000).toISOString(), crypto.randomUUID());
+    run.run('fresh', 'running', new Date(NOW).toISOString(), crypto.randomUUID());
+    const runModel = sqlite.prepare(
+      "INSERT INTO run_models (run_id, model, variant, enqueued) VALUES ('fresh', ?, '', 1)"
+    );
+    const priorCase = sqlite.prepare(`
+      INSERT INTO case_results (
+        run_id, model, variant, case_id, score, latency_ms, rep, timed_out, exit_code, prompt_revision
+      ) VALUES ('prior', ?, '', ?, 1, 10, 0, 0, 0, 2)
+    `);
+    for (const model of models) {
+      runModel.run(model);
+      for (const caseId of reusedCaseIds) priorCase.run(model, caseId);
+    }
+    const reusedCount = () =>
+      Number(
+        sqlite.prepare("SELECT COUNT(*) AS n FROM case_results WHERE run_id = 'fresh'").get()?.n
+      );
+    // Reuse commits ten entries per batch; the second batch fails the way D1 overload did.
+    sqlite.exec(`
+      CREATE TEMP TRIGGER reuse_overload BEFORE INSERT ON case_results
+      WHEN NEW.run_id = 'fresh' AND NEW.model = 'shared/model-10'
+      BEGIN SELECT RAISE(ABORT, 'D1 DB is overloaded'); END
+    `);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const failedPass = await tick();
+
+    expect(reusedCount()).toBe(10 * reusedCaseIds.length);
+    expect(chunkCount('fresh')).toBe(0);
+    expect(failedPass.claims.filter(claim => claim.runId === 'fresh')).toEqual([]);
+    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'fresh'").get()).toEqual({
+      status: 'running',
     });
 
-    const result = await tick();
+    sqlite.exec('DROP TRIGGER reuse_overload');
+    const claims: BenchmarkJobMessage[] = [];
+    for (let pass = 0; pass < 5 && !initialized('fresh'); pass++) {
+      claims.push(...(await tick()).claims);
+    }
 
+    expect(initialized('fresh')).toBe(true);
+    expect(reusedCount()).toBe(models.length * reusedCaseIds.length);
     expect(
-      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'retryable'").get()
-    ).toEqual({ status: 'running' });
-    expect(initialized('retryable')).toBe(false);
-    expect(initialized('healthy')).toBe(true);
-    expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
+      sqlite
+        .prepare(`
+        SELECT chunk.status FROM scheduler_chunks AS chunk
+        WHERE chunk.run_id = 'fresh' AND EXISTS (
+          SELECT 1 FROM case_results AS result
+          WHERE result.run_id = chunk.run_id AND result.model = chunk.model
+            AND result.variant = chunk.variant AND result.rep = chunk.rep
+            AND result.case_id = json_extract(chunk.case_ids, '$[0]'))
+      `)
+        .all()
+    ).toEqual(Array(models.length * reusedCaseIds.length).fill({ status: 'completed' }));
+    const claimedCaseIds = claims
+      .filter(claim => claim.runId === 'fresh')
+      .map(claim => {
+        const chunk = sqlite
+          .prepare('SELECT case_ids FROM scheduler_chunks WHERE id = ?')
+          .get(claim.claimId ?? '');
+        return String(chunk?.case_ids);
+      });
+    expect(claimedCaseIds.length).toBeGreaterThan(0);
+    for (const caseIds of claimedCaseIds) {
+      expect(reusedCaseIds.some(caseId => caseIds.includes(caseId))).toBe(false);
+    }
   });
 
   it('initializes a 100k-chunk run over bounded ticks while another run is claimed every tick', async () => {
@@ -303,7 +324,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     const maxTicks = 60;
     const minNewChunksPerTick = 1_500;
     await insertInitializedRun('steady');
-    insertRun('large', 'user', entries, repetitions);
+    insertRun('large', 'platform', entries, repetitions);
 
     let previous = 0;
     let ticks = 0;
@@ -353,7 +374,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
 
   it('claims while another pass holds the initialization lease and initializes after it expires', async () => {
     await insertInitializedRun('steady');
-    insertRun('waiting', 'user', 1, 1);
+    insertRun('waiting', 'platform', 1, 1);
     expect(await acquireInitializationLease(setupDb, 'other-pass', Date.now())).toBe(true);
 
     const held = await tick();
@@ -368,7 +389,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   });
 
   it('stops materializing a run that stops running mid-pass and in later ticks', async () => {
-    insertRun('abandoned', 'user', 8, 1);
+    insertRun('abandoned', 'platform', 8, 1);
     const stopAfter = 500;
     onD1Call = () => {
       if (chunkCount('abandoned') >= stopAfter) {
@@ -391,7 +412,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     const caseIds = DECIDER_CASES.map(benchCase => benchCase.id);
     await scheduleRunChunks(setupDb, {
       runId: 'dead-lane',
-      entries: [dead, live].map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      entries: [dead, live].map(model => ({ model, variant: null })),
       repetitions: 1,
       caseIds,
       chunkSize: 1,
@@ -431,4 +452,31 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       { model: live, status: 'ready' },
     ]);
   });
+
+  it('finalizes every settled run of the four queues at their run cap in one dispatch pass', async () => {
+    const runIds = Array.from(
+      { length: MAX_RUNNING_RUNS_PER_QUEUE * 4 },
+      (_, index) => `settled-${String(index).padStart(2, '0')}`
+    );
+    for (const runId of runIds) {
+      insertRun(runId, 'platform', 1, 1);
+      await scheduleRunChunks(setupDb, {
+        runId,
+        entries: [{ model: `${runId}/model-0`, variant: null }],
+        repetitions: 1,
+        caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+        chunkSize: 1,
+      });
+      sqlite
+        .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+          VALUES (?, ?, '', 0, 0, 0, ?)`)
+        .run(runId, `${runId}/model-0`, new Date(NOW).toISOString());
+    }
+
+    await dispatchScheduler(env);
+
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status = 'completed'").get()
+    ).toEqual({ n: runIds.length });
+  }, 30_000);
 });

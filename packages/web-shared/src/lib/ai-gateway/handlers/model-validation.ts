@@ -12,7 +12,6 @@ import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isUnreadableOrganizationError, organizationMemberCatalog } from './organization-catalog';
 
 type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };
@@ -47,14 +46,16 @@ async function validateForOrganizationMember(params: {
   modelId: string;
   countryCode: string | null;
 }) {
-  let catalog: OpenRouterModelsResponse | null;
   try {
-    catalog = await organizationMemberCatalog({
+    const catalog = await organizationMemberCatalog({
       organizationId: params.organizationId,
       kiloUserId: params.kiloUserId,
       countryCode: params.countryCode,
       endpoint: 'openrouter/models/validate',
     });
+    // The composed catalog already carries the custom routers usable in this context as
+    // their virtual model ids, so one membership test covers catalog and router ids alike.
+    return validationResult(catalog.data.some(model => model.id === params.modelId));
   } catch (error) {
     // An organization this credential can no longer read offers nothing to retry, and the
     // catalog route reports the same read as a failure rather than models, so it reads as
@@ -64,12 +65,6 @@ async function validateForOrganizationMember(params: {
     }
     throw error;
   }
-  if (!catalog) {
-    return validationResult(false);
-  }
-  // The composed catalog already carries the custom routers usable in this context as
-  // their virtual model ids, so one membership test covers catalog and router ids alike.
-  return validationResult(catalog.data.some(model => model.id === params.modelId));
 }
 
 /**

@@ -2,12 +2,13 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Sesyon ajant ou gen yon aktyalizasyon",
-      "lowBalance": "Saldo ou bezwen atansyon",
+      "cloudAgentSession": "Sesyon ajan ou gen yon aktyalizasyon",
+      "lowBalance": "Balans ou bezwen atansyon",
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
-      "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
+      "agentBriefing": "Rapò ajan ou pare",
+      "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon"
     }
   },
   "agentSession": {
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Alèt saldo ba",
-      "body": "{{organizationName}} saldo tonbe anba ${{minimumBalanceUsd}}"
+      "title": "Alèt balans ba",
+      "body": "{{organizationName}} balans tonbe anba ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Alèt depans",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Nouvo rezilta sekirite ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritik",
+      "high": "Wo",
+      "medium": "Mwayen",
+      "low": "Ba"
     },
     "securityFindingSlaWarning": {
       "title": "Avètisman SLA"

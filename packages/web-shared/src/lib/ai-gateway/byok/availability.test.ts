@@ -3,7 +3,7 @@ import type {
   GatewayModelMap,
   GatewayModelWithEndpoints,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
@@ -12,7 +12,7 @@ import {
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
-  getVercelModelsFromDatabase: jest.fn(),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(),
   isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
@@ -20,7 +20,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
 }));
 
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -38,7 +38,7 @@ import {
 const mockedGetVercelModelsMetadata = jest.mocked(getVercelModelsMetadataFromDatabase);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,
@@ -70,7 +70,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   mockedMapModelIdToVercel.mockImplementation(async modelId => modelId);
   // Gateway keys are covered in model-providers.test.ts; keep them out of these cases.
-  jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+  jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
   jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
 });
 
@@ -158,7 +158,7 @@ describe('addUserByokAvailability', () => {
     async providerId => {
       mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
       jest
-        .mocked(getVercelModelsFromDatabase)
+        .mocked(getVercelLanguageModelIdsFromDatabase)
         .mockResolvedValue(new Set(['anthropic/claude-fixture']));
       jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
       const models = [makeModel('anthropic/claude-fixture')];

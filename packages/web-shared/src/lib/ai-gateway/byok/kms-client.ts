@@ -5,7 +5,10 @@ import {
   evictCachedByokDataKey,
   getCachedByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
-import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
+import {
+  byokDataKeyBinding,
+  type ByokKmsContext,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -95,8 +98,6 @@ async function sendToKms(
   const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
-    // A retry only gets the time that is left, so the whole sequence stays inside the budget,
-    // and a slice too short to answer is not spent: the earlier error is the specific one.
     const remainingMs = deadline - Date.now();
     if (attempt > 1 && remainingMs < KMS_MIN_ATTEMPT_BUDGET_MS) throw failure;
     const timeoutMs = Math.min(KMS_REQUEST_TIMEOUT_MS, remainingMs);
@@ -196,12 +197,7 @@ export async function decryptByokEnvelope(
   const kmsRequest = sendToKms(config, `${config.url}/decrypt`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      ...context,
-      wrapped_dek: envelope.wrapped_dek,
-      kms_key_id: envelope.kms_key_id,
-      kms_key_version: envelope.kms_key_version,
-    }),
+    body: JSON.stringify(byokDataKeyBinding(envelope, context)),
   }).then(response => RetrievedDataKeySchema.parse(response));
   // Marks a failure as handled while the cache read is pending; a miss still awaits it below.
   kmsRequest.catch(() => {});

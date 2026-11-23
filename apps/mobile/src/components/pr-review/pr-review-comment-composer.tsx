@@ -8,7 +8,7 @@
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { impactHaptic, notificationHaptic } from '@/lib/haptics';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
 
@@ -26,6 +26,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
@@ -101,6 +103,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   } = props;
   const pending = usePendingReview();
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const { confirm, dialog } = useConfirmDialog();
   const createComment = useCreateReviewCommentMutation(prRef ?? { owner, repo, number });
   const isEdit = mode.kind === 'edit';
@@ -406,6 +409,31 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const primaryDisabled =
     isSubmitting || (failure !== null && BLOCKING.has(failure.kind)) || (isEdit && !hasBody);
 
+  // One row, never both: the reason is set only when Insert cannot apply, so the
+  // copy can never attach to the button, and the button renders only when there
+  // is no reason. A selected line with the keyboard still closed draws neither —
+  // Insert is available, just withheld until the sheet expands.
+  let suggestionControl: ReactNode = null;
+  if (suggestionDisabledReason !== null) {
+    suggestionControl = (
+      <Text testID="pr-comment-suggestion-unavailable" className="text-xs text-muted-foreground">
+        {suggestionDisabledReason}
+      </Text>
+    );
+  } else if (showInsertSuggestion) {
+    suggestionControl = (
+      <Button
+        variant="ghost"
+        size="sm"
+        onPress={handleInsertSuggestion}
+        accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
+        className="self-start"
+      >
+        <Text>{t('prReview.composer.insertSuggestion')}</Text>
+      </Button>
+    );
+  }
+
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
   // content so the keyboard insets the scroll body and the comment CTA stays
@@ -421,49 +449,40 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
-          <ContextPreview
-            selection={selection}
-            fallbackPath={path}
-            fallbackLineLabel={lineRangeLabel}
-            preferFallback={isEdit}
-          />
-          <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t('prReview.composer.commentBody')}
-            </Text>
-            {isEdit || draft.settled ? (
-              <CommentBodyField
-                inputRef={bodyInputRef}
-                isDisabled={isSubmitting}
-                defaultValue={bodyRef.current}
-                onChangeText={handleBodyChange}
-              />
-            ) : (
-              // Reserve the field's own box while the durable draft loads, so
-              // the footer below does not jump when the field mounts.
-              <View
-                className={
-                  keyboardVisible
-                    ? 'min-h-12 rounded-md border border-transparent'
-                    : 'min-h-14 rounded-md border border-transparent'
-                }
-              />
-            )}
-            {showInsertSuggestion ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={handleInsertSuggestion}
-                accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
-                accessibilityHint={suggestionDisabledReason ?? undefined}
-                className="self-start"
-              >
-                <Text>{t('prReview.composer.insertSuggestion')}</Text>
-              </Button>
-            ) : null}
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <ContextPreview
+              selection={selection}
+              fallbackPath={path}
+              fallbackLineLabel={lineRangeLabel}
+              preferFallback={isEdit}
+            />
+            <View className="gap-1">
+              <Text className="text-sm font-medium text-foreground">
+                {t('prReview.composer.commentBody')}
+              </Text>
+              {isEdit || draft.settled ? (
+                <CommentBodyField
+                  inputRef={bodyInputRef}
+                  isDisabled={isSubmitting}
+                  defaultValue={bodyRef.current}
+                  onChangeText={handleBodyChange}
+                />
+              ) : (
+                // Reserve the field's own box while the durable draft loads, so
+                // the footer below does not jump when the field mounts.
+                <View
+                  className={
+                    keyboardVisible
+                      ? 'min-h-12 rounded-md border border-transparent'
+                      : 'min-h-14 rounded-md border border-transparent'
+                  }
+                />
+              )}
+              {suggestionControl}
+            </View>
+            <ComposerInlineError feedback={feedback} />
           </View>
-          <ComposerInlineError feedback={feedback} />
         </View>
 
         <ComposerFooter

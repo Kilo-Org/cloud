@@ -15,6 +15,7 @@ import {
   estimateWidth,
   type Frame,
   type Ink,
+  insideBand,
   label,
   lineBox,
 } from './active-agents-widget-parts';
@@ -97,7 +98,15 @@ export function locked(
           ...lock(f, { cx: f.width / 2, cy: spec.lockY + dy, size: spec.lockSize }),
           label(f, 'status', {
             x: CARD_PAD,
-            baseline: spec.baseline + dy,
+            // A fallback font's taller box ends below the band; keep the box inside
+            // it. This label always draws two lines, whatever `lines` wraps to.
+            baseline: insideBand({
+              value,
+              size: spec.size,
+              baseline: spec.baseline + dy,
+              bottom: f.height - CARD_PAD,
+              lines: 2,
+            }),
             width: f.width - 2 * CARD_PAD,
             value,
             size: spec.size,
@@ -154,7 +163,7 @@ export function countLines(
         x: spec.x + 12,
         baseline,
         width: spec.width,
-        value: `${line.count} ${line.label}`,
+        value: line.text,
         size: 13,
       }),
     ];
@@ -179,7 +188,7 @@ function smallLines(f: Frame): Line[] {
     );
   } else if (copy.primaryKind === 'scheduled') {
     if (copy.wake !== null) {
-      lines.push({ value: copy.wake, ink: copy.wakeOverdue ? 'muted' : 'foreground' });
+      lines.push({ value: copy.wake, ink: copy.wakePassed ? 'muted' : 'foreground' });
     }
     lines.push(
       ...copy.scheduledAgents.map(agent => ({ value: agent.title, ink: 'foreground' as const }))

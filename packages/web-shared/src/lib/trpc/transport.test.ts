@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { trpcErrorFormatter } from './transport';
+import { AccountBlockedError, trpcErrorFormatter } from './transport';
 
 function format(cause: unknown) {
   const error = new TRPCError({
@@ -53,6 +53,34 @@ describe('trpcErrorFormatter support access reason', () => {
   });
 });
 
+describe('trpcErrorFormatter accountBlocked data', () => {
+  test.each(['account_blocked', 'email_domain_blocked'] as const)(
+    'surfaces a %s refusal without asking the client to sign out',
+    reason => {
+      const error = new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Account access is blocked',
+        cause: new AccountBlockedError(reason),
+      });
+
+      const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+      expect(result.data.accountBlocked).toBe(true);
+      expect(result.data.accountBlockedReason).toBe(reason);
+      expect(result.data.authRequired).toBeUndefined();
+    }
+  );
+
+  test('omits accountBlocked for an ordinary error', () => {
+    const error = new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+
+    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+    expect(result.data.accountBlocked).toBeUndefined();
+    expect(result.data.accountBlockedReason).toBeUndefined();
+  });
+});
+
 describe('trpcErrorFormatter step-up data', () => {
   test('exposes only the stable step-up contract', () => {
     const error = new TRPCError({
@@ -73,6 +101,45 @@ describe('trpcErrorFormatter step-up data', () => {
       actionClass: 'platform_read',
       purpose: 'session',
       maxAgeSeconds: 900,
+      binding: null,
+    });
+  });
+
+  test('exposes the operation binding of an operation-class refusal', () => {
+    const error = new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'MFA is required for this action',
+      cause: new StepUpRequiredError({
+        code: 'MFA_REQUIRED',
+        actionClass: 'sensitive_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+        binding: {
+          actionClass: 'sensitive_write',
+          surface: 'trpc',
+          route: 'admin.users.update',
+          method: 'mutation',
+          targetKind: 'user',
+          targetId: 'target-user',
+        },
+      }),
+    });
+
+    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+    expect(result.data.stepUp).toEqual({
+      code: 'MFA_REQUIRED',
+      actionClass: 'sensitive_write',
+      purpose: 'operation',
+      maxAgeSeconds: 300,
+      binding: {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.users.update',
+        method: 'mutation',
+        targetKind: 'user',
+        targetId: 'target-user',
+      },
     });
   });
 

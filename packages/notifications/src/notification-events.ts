@@ -28,15 +28,27 @@ export const SECURITY_LIFECYCLE_EVENTS = [
 export const securityLifecycleEventSchema = z.enum(SECURITY_LIFECYCLE_EVENTS);
 export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
 
+// The fields a security-finding event carries on every path: the visible push in
+// `push-data.ts` and the internal dispatch request in `rpc-schemas.ts` both carry
+// them. The dispatch request deliberately adds finding content the push must not
+// carry (`notificationKind`, `severity`, `repoFullName`, `title`, `ghsaId`), so
+// only this identity pair belongs here. Declared once so a rename or a changed
+// bound cannot reach one path and miss the other.
+export const securityFindingPayloadShape = {
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
+};
+
 // The payload one security-lifecycle event carries, whatever envelope transports
 // it: the visible push in `push-data.ts` and the internal dispatch request in
 // `rpc-schemas.ts` differ only by their envelope (`type` vs `kind` plus
 // `recipientUserIds`). Declared once so a field cannot be added to one path and
-// silently dropped by the other.
+// silently dropped by the other. The lifecycle kinds identify the same finding
+// as the security-finding push, so they spread its identity pair rather than
+// restating it.
 export const securityLifecyclePayloadShape = {
   event: securityLifecycleEventSchema,
-  findingId: nonEmptyStringSchema,
-  scope: nonEmptyStringSchema,
+  ...securityFindingPayloadShape,
   remediationId: nonEmptyStringSchema.optional(),
   prUrl: nonEmptyStringSchema.optional(),
 };

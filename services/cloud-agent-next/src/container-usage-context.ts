@@ -1,4 +1,5 @@
 import { computeMemberMetadata } from '@kilocode/worker-utils/compute-member';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   billingActorSchema,
   billingSubjectSchema,
@@ -259,7 +260,8 @@ export function buildSandboxBillingInput(
       ? {
           metadata: {
             origin: normalizedOrigin(metadata.identity.billingOrigin),
-            ...(metadata.workspace?.sandboxProvider === 'cloudflare-containers' &&
+            ...(metadata.workspace?.sandboxProvider !== undefined &&
+            providerSupports(metadata.workspace.sandboxProvider, 'meteredBilling') &&
             subject.type === 'org'
               ? computeMemberMetadata(actor, metadata.identity.userId)
               : {}),

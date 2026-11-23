@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, the reveal render, and the Sentry error-boundary wrap are kept together */
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local Android Live Update module's JS in the main process on both
@@ -20,6 +20,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 // font bytes. The per-weight subpaths pull only the two used `.ttf` files.
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
+import { type StartupOutcome } from '@kilocode/app-shared/analytics';
 import * as Sentry from '@sentry/react-native';
 import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
@@ -35,18 +36,22 @@ import {
   useUnstableGlobalHref,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import {
+  createLoginRedirectLatch,
+  loginRedirectDecision,
+} from '@/lib/navigation/login-redirect-latch';
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
+import { BlockedAccountSurface } from '@/components/blocked-account-surface';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { DesignGateProbe } from '@/components/design-gate-probe';
@@ -54,11 +59,27 @@ import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
+import { SettingsConfirmHost } from '@/components/settings-confirm-host';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
+import { isAppLandingSegments } from '@/lib/agent-attachments/picker-launch-restore';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
+import { useBlockedAccountFromAccountRead } from '@/lib/auth/account-blocked-read';
+import {
+  getBlockedAccountExplanation,
+  setBlockedAccountExplanation,
+  subscribeBlockedAccount,
+} from '@/lib/auth/blocked-account-state';
+import { buildBlockedAccountSupportLink } from '@/lib/auth/blocked-account-support';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { openExternalUrl } from '@/lib/external-link';
+import {
+  resolveBootstrapDecision,
+  shouldAnnounceContentReady,
+  shouldShowBootstrapLoading,
+  shouldShowBootstrapLoadingSurface,
+} from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -76,20 +97,12 @@ import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/contex
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
-import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
-import {
-  applyThemePreference,
-  preloadThemePreference,
-  useThemePreference,
-} from '@/lib/hooks/use-theme-preference';
+import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { clearDirectionAttemptAsync } from '@/i18n/direction-attempt';
 import { retryLanguageStartupDirectionAsync } from '@/i18n/startup-direction-run';
-import {
-  preloadLanguagePreference,
-  useLanguagePreference,
-} from '@/lib/hooks/use-language-preference';
+import { useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { useLanguageStartupPreparation } from '@/lib/hooks/use-language-startup-preparation';
 import {
@@ -97,12 +110,14 @@ import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
   consumePendingDeepLink,
+  getPendingDeepLinkArrival,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
   wasLaunchAppRouteCaptured,
   wasLaunchLinkHandled,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { usePendingShareIntake } from '@/lib/hooks/use-pending-share-intake';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -117,13 +132,16 @@ import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
 import { readNotificationPreviewsIfLoaded } from '@/lib/hooks/agent-push-preference';
+import {
+  isSessionDestinationHref,
+  shouldDeliverPendingDeepLink,
+} from '@/lib/pending-deep-link-delivery';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
-  resolveSupersededPendingShareId,
   SHARE_INTENT_OPTIONS,
-  shouldIngestShareIntent,
+  type ShellReadyForShareInput,
 } from '@/lib/pending-share-navigation';
 import {
   consumeLastRouteForRepair,
@@ -136,27 +154,8 @@ import {
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
 import { lastRouteHrefFrom } from '@/lib/last-route-recordable';
 import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
-import {
-  clearSharePayload,
-  discardUnstoredSharePayload,
-  normalizeShareIntent,
-  peekSharePayload,
-  persistSharePayloadsNow,
-  putSharePayload,
-  restoreSharePayloads,
-  setSharePersistUserId,
-  type ShareId,
-  type SharePayload,
-} from '@/lib/share-payload';
-import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { setSharePersistUserId } from '@/lib/share-payload';
 import { captureSystemSearchLaunch } from '@/lib/system-search-route';
-import {
-  flushDraft,
-  isStringDraft,
-  loadDraft,
-  PENDING_SHARE_ID_DRAFT_KEY,
-  saveDraft,
-} from '@/lib/persist/drafts';
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
 import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
@@ -207,9 +206,6 @@ captureLaunchDeepLink();
 // pending deep-link slot the layout already consumes.
 captureSystemSearchLaunch();
 prefetchCurrentUser();
-preloadThemePreference();
-preloadHideBalancePreference();
-preloadLanguagePreference();
 preloadStartupFonts();
 
 function RootLayoutNav({
@@ -266,7 +262,7 @@ function RootLayoutNav({
   const navigationReady = useRootNavigationReady();
   // The gated pending-deep-link consumer below switches to the tapped
   // notification's organization through this provider before it navigates.
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, retry: retryOrganization } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -275,7 +271,9 @@ function RootLayoutNav({
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    error: userIdQueryError,
     isUnreachable: userIdUnreachable,
+    isFetching: userIdFetching,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
   // A cold start that cannot reach the API has no confirmed account once the
@@ -296,6 +294,47 @@ function RootLayoutNav({
   const accountUserId = userId ?? offlineUserId ?? undefined;
   const identityLoading = userIdLoading && offlineUserId === null;
   const identityError = userIdError && offlineUserId === null;
+  const blockedAccountExplanation = useSyncExternalStore(
+    subscribeBlockedAccount,
+    getBlockedAccountExplanation
+  );
+  // The current-user read is the first authenticated call a restored account
+  // makes, so a blocked account's context-level refusal lands on it: the
+  // envelope carries `accountBlocked`, which turns the generic "could not load
+  // your account" surface into the block explanation. The same read is how the
+  // explanation leaves again: a later attempt that reaches the account clears
+  // it, and the overlay's Retry is exactly such an attempt. The hook reads the
+  // raw query error, not the derived boolean: only the error object carries
+  // the flag.
+  useBlockedAccountFromAccountRead({
+    error: userIdQueryError,
+    userId,
+    enabled: token != null,
+    fetching: userIdFetching,
+    // Every query refused while the account was blocked holds a cached
+    // failure, so the reveal would show stale error cards until each surface
+    // is retried by hand. Refetch the tree instead: a lifted block makes those
+    // reads answer. The identity read is the exception — it is the read that
+    // just answered, so invalidating it would only refetch it. The stored
+    // organization choice is not a query — its provider keeps the failed
+    // restore in its own state — so it is retried through the same call its
+    // own Retry makes.
+    onAnswered: () => {
+      const identityPath = trpc.user.getMe.pathKey()[0];
+      void queryClient.invalidateQueries({
+        predicate: query => {
+          // tRPC stores the procedure path as the key's first element.
+          const path = query.queryKey[0];
+          return !(
+            Array.isArray(path) &&
+            path.length === identityPath.length &&
+            path.every((segment, index) => segment === identityPath[index])
+          );
+        },
+      });
+      retryOrganization();
+    },
+  });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -436,101 +475,41 @@ function RootLayoutNav({
   const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
-  const {
-    hasShareIntent,
-    shareIntent,
-    resetShareIntent,
-    error: shareIntentError,
-  } = useShareIntentContext();
-  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
-  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
-  const resetShareIntentRef = useRef(resetShareIntent);
-  resetShareIntentRef.current = resetShareIntent;
-  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
-  // Mirror pendingShareId so the ingest effect can release a superseded share
-  // without reading stale state or adding the id to effect deps.
-  const pendingShareIdRef = useRef(pendingShareId);
-  pendingShareIdRef.current = pendingShareId;
-  // Bumped by the ingest arm and the gate consume so the cold-start restore can
-  // detect any live arm/consume during its async reads and skip the fill.
-  const pendingShareIdEpochRef = useRef(0);
 
-  // Flush a share staged while the account id was still loading: the ingest
-  // effect persisted nothing (userId was falsy), so once userId resolves the
-  // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. A signed-out share never reaches this branch (userId stays null),
-  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
-  // closure references an already-declared const.
-  useEffect(() => {
-    if (userId && pendingShareIdRef.current !== null) {
-      void persistSharePayloadsNow();
-      void persistShareNavigationNow();
-      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
-      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
-    }
-  }, [userId]);
-
-  // Cold-start share restore. Order matters: payloads first, then the
-  // navigation queue (deliveries point at restored payloads), then the pending
-  // id — and only when its payload still exists. A restored id with an empty
-  // map is the existing stale-share empty path, so it must not re-arm the gate.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function restoreShare() {
-      const startEpoch = pendingShareIdEpochRef.current;
-      if (!userId) {
-        return;
-      }
-      await restoreSharePayloads(userId);
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      await restoreShareNavigation(userId);
-      // `cancelled` is set by the cleanup below; the previous check narrows the
-      // fall-through path, but the variable is genuinely mutable.
-      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
-      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      if (
-        pendingId !== null &&
-        peekSharePayload(pendingId) !== null &&
-        pendingShareIdRef.current === null
-      ) {
-        // Fill only an empty slot: a live ingest that armed a newer pending id
-        // during this restore must win, so never overwrite a non-null slot.
-        setPendingShareId(pendingId);
-      }
-    }
-
-    void restoreShare();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
-  const isShellReady = isShellReadyForShare({
-    hasToken: token != null,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inForceUpdate,
-    userIdLoading: identityLoading,
-    userIdError: identityError,
-    consentCheckError: consentCheckError != null,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
-  });
+  // One memoised gate object feeds both the shell-readiness check and the
+  // bootstrap decision, so the two never restate the guards differently.
+  const shellGate = useMemo<ShellReadyForShareInput>(
+    () => ({
+      hasToken: token != null,
+      isLoading,
+      updateRequired,
+      inAuthGroup,
+      inForceUpdate,
+      userIdLoading: identityLoading,
+      userIdError: identityError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    }),
+    [
+      token,
+      isLoading,
+      updateRequired,
+      inAuthGroup,
+      inForceUpdate,
+      identityLoading,
+      identityError,
+      consentCheckError,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    ]
+  );
+  const isShellReady = isShellReadyForShare(shellGate);
+  const { pendingShareId, releasePendingShare } = usePendingShareIntake({ userId, isShellReady });
 
   useEffect(() => {
     let cancelled = false;
@@ -619,127 +598,57 @@ function RootLayoutNav({
   const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
   useScreenTracking(bootstrapSettled);
 
-  useEffect(() => {
-    if (shareIntentError) {
-      Sentry.captureException(new Error('Share intent provider error'), {
-        tags: {
-          'error.subsystem': 'share-intent',
-          'error.operation': 'read_native_payload',
-        },
-        fingerprint: ['share-intent-provider-error'],
-      });
-      toast.error(i18n.t('share.couldNotReadContent'));
-      resetShareIntentRef.current();
-    }
-  }, [shareIntentError]);
-
-  // Keyed per shareIntent identity so a newer intent cancels and supersedes
-  // an in-flight ingest. Success/failure reset for the happy path lives here
-  // (gate must never reset); the shareIntentError effect also resets on the
-  // error path. Calls go through resetShareIntentRef so the unstable context
-  // function stays out of the deps.
-  useEffect(() => {
-    // Copy the shared files only once the shell can open the gate. The
-    // provider keeps the intent across a backgrounding (SHARE_INTENT_OPTIONS)
-    // so a sign-in that leaves the app cannot drop the deferred payload.
-    if (!shouldIngestShareIntent({ hasShareIntent, isShellReady })) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const ingestShareIntent = async () => {
-      try {
-        const payload: SharePayload = await normalizeShareIntent(shareIntent);
-        if (cancelled) {
-          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
-          discardUnstoredSharePayload(payload);
-          return;
-        }
-        const shareId = putSharePayload(payload);
-        resetShareIntentRef.current();
-        // Latest-wins: a superseded pending share is released — never silently orphaned.
-        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
-        if (superseded !== null) {
-          clearSharePayload(superseded);
-        }
-        pendingShareIdEpochRef.current += 1;
-        setPendingShareId(shareId);
-        // Persist the pending id so a process death before the gate opens still
-        // restores it; skipped while the account has not resolved (signed out).
-        if (userId) {
-          saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
-          void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
-        }
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        Sentry.captureException(error, {
-          tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
-        });
-        toast.error(i18n.t('share.couldNotReadContent'));
-        resetShareIntentRef.current();
-      }
-    };
-
-    void ingestShareIntent();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasShareIntent, shareIntent, isShellReady, userId]);
-
   // Memoized because the repair effect below keys on it: a plain call would
   // hand the effect a new object identity every render and re-run it each time.
   const decision = useMemo(
     () =>
       resolveBootstrapDecision({
-        isLoading,
-        updateRequired,
-        inForceUpdate,
-        inAuthGroup,
-        hasToken: token != null,
-        userIdLoading: identityLoading,
-        userIdError: identityError,
-        consentCheckError: consentCheckError != null,
-        consentChecked,
-        needsConsent,
-        onConsentRoute,
-        onConsentReviewRoute,
+        ...shellGate,
         onLegalRoute,
         languageReloadFailed,
         restoreFailed,
       }),
-    [
-      isLoading,
-      updateRequired,
-      inForceUpdate,
-      inAuthGroup,
-      token,
-      identityLoading,
-      identityError,
-      consentCheckError,
-      consentChecked,
-      needsConsent,
-      onConsentRoute,
-      onConsentReviewRoute,
-      onLegalRoute,
-      languageReloadFailed,
-      restoreFailed,
-    ]
+    [shellGate, onLegalRoute, languageReloadFailed, restoreFailed]
   );
 
+  // The one-dispatch latch for the sign-out login redirect. The decision comes
+  // from `useSegments()`, which only updates after the router commits, so a
+  // sign-out re-emits `redirect-login` on every render while the segments still
+  // name the group being left. A second replace replaces the login route again
+  // — it unmounts and remounts, and the reader sees the destination arrive
+  // twice. The latch is released by the first decision that leaves
+  // `redirect-login`, so the next sign-out dispatches login afresh.
+  const [loginRedirectLatch] = useState(createLoginRedirectLatch);
+
   useEffect(() => {
+    // Every settled tag ends startup the same way: record the outcome once and
+    // hand the splash over to the reveal.
+    const settle = (reason: StartupOutcome) => {
+      markStartupComplete(reason);
+      setStartupFinished(true);
+    };
+    // Every redirecting tag navigates only once the root navigator accepts it.
+    const redirect = (href: Href) => {
+      if (!navigationReady) {
+        return;
+      }
+      router.replace(href);
+    };
+    // Every decision passes through the latch: it admits one login dispatch, and
+    // the decision that leaves `redirect-login` releases it for the next
+    // sign-out. Waits hold it, because the tree has settled nowhere yet.
+    const dispatchLoginRedirect = loginRedirectLatch.shouldDispatch({
+      decision: loginRedirectDecision(decision.tag),
+      navigationReady,
+    });
+
     switch (decision.tag) {
       case 'settle-language-error': {
-        markStartupComplete('language-error');
-        setStartupFinished(true);
+        settle('language-error');
         return;
       }
       case 'settle-restore-error': {
-        markStartupComplete('restore-error');
-        setStartupFinished(true);
+        settle('restore-error');
         return;
       }
       case 'wait-loading':
@@ -747,63 +656,45 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-force-update': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/force-update');
+        redirect('/force-update');
         return;
       }
       case 'settle-force-update': {
-        markStartupComplete('force-update');
-        setStartupFinished(true);
+        settle('force-update');
         return;
       }
       case 'exit-force-update': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)');
+        redirect('/(app)');
         return;
       }
       case 'settle-login': {
-        markStartupComplete('login');
-        setStartupFinished(true);
+        settle('login');
         return;
       }
       case 'redirect-login': {
-        if (!navigationReady) {
-          return;
+        if (dispatchLoginRedirect) {
+          redirect('/(auth)/login');
         }
-        router.replace('/(auth)/login');
         return;
       }
       case 'settle-user-error': {
-        markStartupComplete('user-error');
-        setStartupFinished(true);
+        settle('user-error');
         return;
       }
       case 'settle-consent-error': {
-        markStartupComplete('consent-error');
-        setStartupFinished(true);
+        settle('consent-error');
         return;
       }
       case 'settle-consent': {
-        markStartupComplete('consent');
-        setStartupFinished(true);
+        settle('consent');
         return;
       }
       case 'redirect-consent': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)/consent' as Href);
+        redirect('/(app)/consent' as Href);
         return;
       }
       case 'redirect-app': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)');
+        redirect('/(app)');
         return;
       }
       case 'settle-app': {
@@ -814,16 +705,24 @@ function RootLayoutNav({
         if (!navigationReady || !isLastRouteHydrated()) {
           return;
         }
-        markStartupComplete('app');
-        setStartupFinished(true);
+        settle('app');
         // Deep-link navigation is owned by the pendingDeepLink effect below.
         // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
         break;
       }
-      default:
-      // Unreachable: BootstrapDecisionTag is a closed union.
+      default: {
+        const exhaustiveCheck: never = decision.tag;
+        throw new Error(`Unhandled bootstrap decision: ${String(exhaustiveCheck)}`);
+      }
     }
-  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
+  }, [
+    decision,
+    navigationReady,
+    router,
+    setStartupFinished,
+    lastRouteHydratedVersion,
+    loginRedirectLatch,
+  ]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
   // after the gate effect last ran (e.g. a notification tap while signed out,
@@ -925,18 +824,61 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
+    // The arrival rides in the slot the consume below clears, so it is read
+    // first.
+    const pendingArrival = getPendingDeepLinkArrival();
+    const pending = consumePendingDeepLink();
+    if (!pending) {
+      return;
+    }
+    // A destination the app recovered for itself (a replayed launch Intent, or
+    // a record an earlier process persisted) is stale by construction and must
+    // not open over a screen the person has since reached. The consume above
+    // already cleared the slot and its persisted mirror, so a dropped
+    // destination cannot come back on a later launch.
+    //
+    // At the landing route the two recovered producers part company: only a
+    // launch into this href still opens, while a durable restart record written
+    // by an earlier process is dropped there. Same comparison as the relaunch
+    // repair above — slot and capture come from the same launch Intent.
+    const launchCaptured = wasLaunchLinkHandled();
+    if (
+      !shouldDeliverPendingDeepLink({
+        arrival: pendingArrival,
+        href: pending.href,
+        atLandingRoute: isAppLandingSegments(segments),
+        segments,
+        fromLaunchCapture: launchCaptured !== null && launchCaptured === pending.href,
+      })
+    ) {
+      return;
+    }
     // The shared step switches to the destination's organization before
     // navigating, in the same effect body with nothing awaited between: the
     // route reads the new organization on its first render instead of fetching
     // the old scope and showing an empty list. A destination with no
     // organization (Personal) leaves the selection unchanged.
-    applyConsumedPendingDeepLink(consumePendingDeepLink(), setOrganizationId, href => {
+    applyConsumedPendingDeepLink(pending, setOrganizationId, href => {
       const navigation = resolvePendingNavigation(href);
       if (navigation) {
+        // An automatically recovered session the server no longer has must
+        // leave instead of holding a dead end, the same mark the relaunch
+        // repair sets for its restore. Only the session route takes that mark.
+        if (pendingArrival === 'restored' && isSessionDestinationHref(href)) {
+          noteRestoredRouteOpen(href);
+        }
         router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
       }
     });
-  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
+  }, [
+    pendingDeepLink,
+    isShellReady,
+    navigationReady,
+    router,
+    setOrganizationId,
+    segments,
+    pathname,
+  ]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady || !navigationReady) {
@@ -956,9 +898,8 @@ function RootLayoutNav({
     } else {
       router.push(navigation.href as Href);
     }
-    pendingShareIdEpochRef.current += 1;
-    setPendingShareId(null);
-  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, router]);
+    releasePendingShare();
+  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, releasePendingShare, router]);
 
   // One `app_startup` event per launch, delegated to a drain helper so
   // tests can drive the real guard logic without mounting the full layout.
@@ -1019,38 +960,6 @@ function RootLayoutNav({
   // login screen is the deterministic entry context in both cases.
   const wrapperObscured = hidden || signingOutWindow;
 
-  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
-  // both accessibility trees. On the hidden → visible transition,
-  // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
-  // only when the wrapper has no node yet or the native call throws — no retry),
-  // deferred to the next frame so the revealed tree is measurable. Per-screen
-  // heading/first-control focus is owned by the screens themselves; the gate
-  // cannot know the active screen's heading.
-  //
-  // The transition is skipped while a bootstrap error is shown: the wrapper
-  // is unmounted then (the error screen replaces it), so "Content ready"
-  // would be a false announcement and the wrapper focus has no target. The
-  // cleanup cancels the pending frame, which React runs before any later
-  // render's frame can fire, so an interrupted reveal never focuses a stale
-  // wrapper.
-  const wrapperRef = useRef<ViewInstance>(null);
-  const wasHiddenRef = useRef(wrapperObscured);
-  useEffect(() => {
-    const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = wrapperObscured;
-    if (!wasHidden || wrapperObscured || hasBootstrapError) {
-      return undefined;
-    }
-    announceForA11y(i18n.t('bootstrap.contentReady'));
-    const frame = requestAnimationFrame(() => {
-      requestA11yFocus(wrapperRef);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [wrapperObscured, hasBootstrapError]);
-
   // The restore-error surface is settled, but a successful Retry does not
   // reveal the app immediately: the token publish, the user fetch, and the
   // consent check still run behind the loading gate, and the splash overlay
@@ -1068,11 +977,6 @@ function RootLayoutNav({
     isSigningOut,
   });
 
-  // The wait surface (or the held restore surface) covers the tree: it leaves
-  // both accessibility trees, stops taking touches, and paints nothing that
-  // would show through the opaque surface above it.
-  const obscureTree = wrapperObscured || showRestoreError;
-
   // Sign-out from either error screen below outranks the error: the failure
   // belongs to the account being revoked, and its Sign out starts the teardown
   // behind the screen, so the branch would leave the stale error (and the
@@ -1083,7 +987,96 @@ function RootLayoutNav({
   // fall-through also keeps Slot mounted for the login replace.
   const bootstrapErrorOwnsScreen = !signingOutWindow;
 
-  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
+  // A blocked account is the answer behind the failed account read (and the
+  // refresh route's `USER_BLOCKED`): the person learns why their every call
+  // refuses instead of a bare session end. It is an absolute overlay like the
+  // restore surface — never an early return — because the flag outlives the
+  // refresh-path teardown that clears the token, and the bootstrap decision
+  // that then settles (redirect-login) must be able to land in a mounted Slot.
+  //
+  // Two things dismiss it. While the session lives — the current-user read was
+  // refused, so the session is still there — the overlay's Retry re-reads the
+  // account, and an attempt that reaches it clears the explanation (a block
+  // lifted server-side needs no sign-out). The refresh route's raise has no
+  // session behind it, so no read can answer for it: the exit is then the only
+  // way out, it clears the explanation and reveals whatever the tree has
+  // settled on (login when signed out), and it is labelled Continue rather
+  // than Sign out — there is nothing left to sign out of. A new sign-in clears
+  // it too, since that is the one event that proves the block no longer
+  // applies.
+  //
+  // The raised value is the refusal reason, and it picks the actions. Contact
+  // support is the filled primary in every state: it is the only step that can
+  // change a block, and the copy says a fresh sign-in cannot. It opens a mail
+  // to the support address and leaves the explanation up. An account block
+  // keeps Retry as the outlined secondary under it; a domain refusal offers
+  // none (a re-read answers the same thing), so the exit takes that slot. The
+  // overlay only renders with a non-null reason, so the surface always
+  // receives one.
+  const blockedAccountReason =
+    blockedAccountExplanation !== null && bootstrapErrorOwnsScreen
+      ? blockedAccountExplanation
+      : null;
+  const showBlockedAccountError = blockedAccountReason !== null;
+
+  // The wait surface (or the held restore or blocked surface) covers the tree:
+  // it leaves both accessibility trees, stops taking touches, and paints
+  // nothing that would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError || showBlockedAccountError;
+
+  // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
+  // both accessibility trees. On the hidden → visible transition,
+  // `announceForA11y` is the deterministic entry context for screen-reader
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
+  //
+  // The transition is skipped while a bootstrap error is shown: the wrapper
+  // is unmounted then (the error screen replaces it), so "Content ready"
+  // would be a false announcement and the wrapper focus has no target. A
+  // full-screen overlay that owns the screen (the blocked explanation) also
+  // defers the entry announcement, because the wrapper it would focus stays
+  // hidden from both accessibility trees. The cleanup cancels the pending
+  // frame, which React runs before any later render's frame can fire, so an
+  // interrupted reveal never focuses a stale wrapper.
+  const wrapperRef = useRef<ViewInstance>(null);
+  const wasHiddenRef = useRef(wrapperObscured);
+  useEffect(() => {
+    const wasHidden = wasHiddenRef.current;
+    wasHiddenRef.current = wrapperObscured;
+    if (
+      !shouldAnnounceContentReady({
+        wasHidden,
+        wrapperObscured,
+        hasBootstrapError,
+        showBlockedAccountError,
+      })
+    ) {
+      return undefined;
+    }
+    announceForA11y(i18n.t('bootstrap.contentReady'));
+    const frame = requestAnimationFrame(() => {
+      requestA11yFocus(wrapperRef);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [wrapperObscured, hasBootstrapError, showBlockedAccountError]);
+
+  // Both early returns below are guarded on `!showBlockedAccountError`: the
+  // blocked overlay explains a "could not load your account" whose retry can
+  // never succeed (every authenticated call refuses), and a blocked read can
+  // also fail the consent check, so the consent surface must not outrank it.
+  // Each visible error surface here is an early return that unmounts Slot, and
+  // the blocked flag is raised mid-session by any procedure's blocked refusal
+  // (the query and mutation caches' `onError`), so it can arrive while the app
+  // tree is settled and in use. That is why it is an overlay and never one of
+  // these branches: an early return would unmount the tree under the person,
+  // while the overlay's Sign out actions clear the flag and let the bootstrap's
+  // settled route show again.
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -1100,7 +1093,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
@@ -1182,7 +1175,13 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
-      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
+      {shouldShowBootstrapLoadingSurface({
+        showBootstrapLoading,
+        showRestoreError,
+        showBlockedAccountError,
+      }) ? (
+        <BootstrapLoadingSurface />
+      ) : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen
@@ -1195,6 +1194,39 @@ function RootLayoutNav({
             secondaryLabel={t('common.signOut')}
             secondaryAccessibilityLabel={t('common.signOut')}
             onSecondaryPress={() => {
+              void signOut();
+            }}
+          />
+        </View>
+      ) : null}
+      {showBlockedAccountError ? (
+        <View className="absolute inset-0">
+          <BlockedAccountSurface
+            // `showBlockedAccountError` already required a non-null
+            // explanation, so the overlay never renders without a reason.
+            reason={blockedAccountReason}
+            // A live token means the session that was refused is still there,
+            // so the retry has an account to re-read. Without one the refresh
+            // route's refusal already tore the session down.
+            canRetry={token != null}
+            retrying={userIdFetching}
+            onRetry={refetchUserId}
+            onContactSupport={() => {
+              // `email` is absent precisely when the identity read was refused,
+              // which is the common blocked case: the builder omits the body
+              // then rather than naming a placeholder account.
+              const link = buildBlockedAccountSupportLink({
+                subject: t('accountBlocked.title'),
+                email,
+              });
+              void openExternalUrl(link, { label: SUPPORT_EMAIL });
+            }}
+            onSignOut={() => {
+              // The escape hatch must actually reach the login screen: the
+              // explanation outlives a refresh-path teardown, so this explicit
+              // sign-out is what clears it and reveals the route the bootstrap
+              // has already settled on (login once the token is gone).
+              setBlockedAccountExplanation(null);
               void signOut();
             }}
           />
@@ -1274,6 +1306,7 @@ function RootLayout() {
                 </StateSurface>
               </AppContentReveal>
               <AnimatedSplashOverlay />
+              <SettingsConfirmHost />
             </AppRootProviders>
           </OfflineBannerSpaceGate>
         </ThemeProvider>

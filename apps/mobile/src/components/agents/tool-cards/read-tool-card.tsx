@@ -21,13 +21,14 @@ import {
   resolveReadCodeBody,
 } from '../read-tool-markdown';
 import { getToolImageAttachments } from '../tool-card-attachments';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
+import { READ_CODE_CHARACTER_CAP } from '../mono-scroll-block-model';
 import { toolStatusLabel } from '../tool-status-label';
+import { useToolDisplay } from '../use-tool-display';
 
 // A completed code read can exceed what a detail sheet renders comfortably;
 // the cap keeps highlighting and layout bounded, and the hit shows the shared
-// Truncated marker. 50k chars matches the markdown fence cap.
-const READ_CODE_CHARACTER_CAP = 50_000;
+// Truncated marker.
 
 const readToolInputSchema = z.object({ filePath: z.string() });
 
@@ -107,7 +108,7 @@ export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

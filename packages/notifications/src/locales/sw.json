@@ -3,10 +3,11 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Kikao chako cha wakala kimepokea sasisho",
-      "lowBalance": "Usawa wako unahitaji umakini",
+      "lowBalance": "Salio lako linahitaji umakini",
       "spendAlert": "Matumizi yako yanahitaji umakini",
       "securityFinding": "Tokeo la usalama linahitaji umakini",
       "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
+      "agentBriefing": "Ripoti yako ya wakala wa programu iko tayari",
       "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
     }
   },
@@ -18,7 +19,7 @@
   "internal": {
     "lowBalance": {
       "title": "Arifa ya salio la chini",
-      "body": "Usawa wa {{organizationName}} ulishuka chini ya ${{minimumBalanceUsd}}"
+      "body": "Salio la {{organizationName}} lilishuka chini ya ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Arifa ya matumizi",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Tokeo jipya la usalama ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Hatari sana",
+      "high": "Juu",
+      "medium": "Wastani",
+      "low": "Chini"
     },
     "securityFindingSlaWarning": {
       "title": "Onyo la SLA"

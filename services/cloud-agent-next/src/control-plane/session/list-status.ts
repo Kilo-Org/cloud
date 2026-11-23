@@ -1,8 +1,12 @@
 import { decodeTime, ulid } from 'ulid';
 import { z } from 'zod';
 import {
+  isDefaultSessionTitle,
+  kilo2ConversationSourceSchema,
   publishCloudAgentSessionStatusSchema,
+  sessionTitleSchema,
   type PublishCloudAgentSessionStatusParams,
+  type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { withTimeout } from '@kilocode/worker-utils';
 import { logger } from '../../logger.js';
@@ -12,6 +16,8 @@ import type { PendingInteractions } from '../../sandbox-session/sandbox-control-
 const LIST_STATUS_KEY = 'session_list_status';
 export const LIST_STATUS_RETRY_MS = 30_000;
 export const LIST_STATUS_REFRESH_MS = 60_000;
+/** The Kilo v1 session card summary write window; a changed Kilo v2 summary refreshes at this pace. */
+export const LIST_STATUS_SUMMARY_REFRESH_MS = 10_000;
 const PUBLISH_TIMEOUT_MS = 5_000;
 
 type ListStatus = PublishCloudAgentSessionStatusParams['status'];
@@ -41,6 +47,36 @@ export function deriveSessionListStatus(input: {
   return 'idle';
 }
 
+/**
+ * Events that write the transcript: the evidence session-ingest records as a
+ * CLI's `last_activity_at`. Kilo v2 has no ingest client, so the Session DO
+ * publishes it with the list status.
+ */
+export const TRANSCRIPT_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'message.updated',
+  'message.part.updated',
+  'message.part.delta',
+  'conversation.message.updated',
+  'conversation.event',
+]);
+
+/**
+ * The name a Kilo v2 `conversation.source` gives the session `sessionId`;
+ * undefined for the source of another session, a missing title or a creation
+ * placeholder. Kilo v1 never sends this event: its CLI reports its own titles
+ * to session-ingest.
+ */
+export function nativeSessionTitle(source: unknown, sessionId: string): string | undefined {
+  const parsed = kilo2ConversationSourceSchema.safeParse(source);
+  if (
+    !parsed.success ||
+    parsed.data.session.id !== sessionId ||
+    isDefaultSessionTitle(parsed.data.session.title)
+  )
+    return undefined;
+  return sessionTitleSchema.safeParse(parsed.data.session.title).data;
+}
+
 const storedStatusSchema = z.object({
   update: publishCloudAgentSessionStatusSchema,
   dueAt: z.number().finite().nullable(),
@@ -61,21 +97,56 @@ export function createSessionListStatusOutbox(input: {
     return undefined;
   };
 
+  /**
+   * `activityAt` is the latest transcript activity the Session DO observed; it
+   * rides every snapshot and never moves back. `title` is a native rename: it
+   * forces a snapshot, and stays in newer ones until a publication delivers it,
+   * naming the snapshot that first carried it so ingest never applies a repeat
+   * of a rename it already applied. `transcript` is the session card summary
+   * and cost total of a Kilo v2 transcript; it rides every snapshot, and a
+   * changed summary refreshes at most once per summary window, the first one
+   * at once.
+   */
   function record(
     identity: Pick<
       PublishCloudAgentSessionStatusParams,
       'sessionId' | 'kiloUserId' | 'cloudAgentSessionId'
     >,
     status: ListStatus,
-    now = Date.now()
+    now = Date.now(),
+    observed: {
+      activityAt?: number;
+      title?: string;
+      transcript?: { liveSummary: SessionLiveSummary; totalCostMicrodollars: number };
+    } = {}
   ): void {
     const previous = current();
+    const recordedActivityAt =
+      previous?.update.lastActivityAt === undefined
+        ? -Infinity
+        : Date.parse(previous.update.lastActivityAt);
+    const activityAt = Math.max(observed.activityAt ?? -Infinity, recordedActivityAt);
+    const sincePrevious =
+      previous === undefined ? Infinity : now - Date.parse(previous.update.occurredAt);
+    const recordedSummary = previous?.update.liveSummary;
+    const summaryChanged =
+      observed.transcript !== undefined &&
+      JSON.stringify(observed.transcript.liveSummary) !== JSON.stringify(recordedSummary);
     // Refresh on observed activity, not a timer that would keep a silent or
-    // disconnected runtime looking fresh indefinitely.
+    // disconnected runtime looking fresh indefinitely. Busy and retry refresh on
+    // any event; other statuses on newer transcript activity, so a wait on input
+    // while subagents keep working still proves the session live.
+    const activityDue =
+      sincePrevious >= LIST_STATUS_REFRESH_MS &&
+      (status === 'busy' || status === 'retry' || activityAt > recordedActivityAt);
+    const summaryDue =
+      summaryChanged &&
+      (recordedSummary === undefined || sincePrevious >= LIST_STATUS_SUMMARY_REFRESH_MS);
     if (
+      observed.title === undefined &&
       previous?.update.status === status &&
-      ((status !== 'busy' && status !== 'retry') ||
-        now - Date.parse(previous.update.occurredAt) < LIST_STATUS_REFRESH_MS)
+      !activityDue &&
+      !summaryDue
     )
       return;
     // The ULID source cursor survives eviction and wall-clock rollback. It uses
@@ -84,12 +155,29 @@ export function createSessionListStatusOutbox(input: {
       now,
       previous === undefined ? 0 : decodeTime(previous.update.transitionId) + 1
     );
+    const transitionId = ulid(at);
+    const rename =
+      observed.title === undefined
+        ? previous?.dueAt === null
+          ? undefined
+          : previous?.update.rename
+        : { title: observed.title, transitionId };
     const snapshot = storedStatusSchema.safeParse({
       update: {
         ...identity,
         status,
         occurredAt: new Date(at).toISOString(),
-        transitionId: ulid(at),
+        transitionId,
+        ...(Number.isFinite(activityAt)
+          ? { lastActivityAt: new Date(activityAt).toISOString() }
+          : {}),
+        ...(rename === undefined ? {} : { rename }),
+        ...(observed.transcript === undefined
+          ? {}
+          : {
+              liveSummary: observed.transcript.liveSummary,
+              totalCostMicrodollars: observed.transcript.totalCostMicrodollars,
+            }),
       },
       dueAt: now,
     });

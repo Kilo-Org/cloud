@@ -7,6 +7,7 @@ import {
   sessionConfigFromFetchedSession,
   type CachedSessionSnapshotPage,
   type CloudAgentSessionId,
+  type CloudSessionSnapshotPage,
   type KiloSessionId,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudSessionMessagesPageSchema } from '@kilocode/cloud-agent-sdk/schemas';
@@ -89,7 +90,17 @@ async function readFirstPage(
       cloudAgentSessionId as CloudAgentSessionId,
       organizationId ? { organizationId } : {}
     );
-    const page = cloudSessionMessagesPageSchema.parse(wirePage);
+    if (wirePage === null || wirePage.kind !== 'success') return null;
+    // The adapter validated the wire shape; the transform can still reject a
+    // source that belongs to another session. A seed is optional, so both the
+    // rejected result and a throwing transform seed nothing.
+    let page: CloudSessionSnapshotPage | null;
+    try {
+      const parsed = cloudSessionMessagesPageSchema.safeParse(wirePage);
+      page = parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
     if (!page) return null;
     return {
       info: page.info,

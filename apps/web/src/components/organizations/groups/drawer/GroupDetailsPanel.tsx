@@ -1,6 +1,7 @@
 'use client';
 
 import type { DrawerStackHelpers } from '@/components/drawer';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -182,7 +183,7 @@ export function GroupDetailsPanel({
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              disabled={!name.trim() || isSaving}
+              disabled={!hasVisibleText(name) || isSaving}
               onClick={() =>
                 group
                   ? helpers.push({
@@ -297,7 +298,7 @@ export function GroupDetailsPanel({
         <Button variant="outline" onClick={helpers.closeAll}>
           Close
         </Button>
-        <Button disabled={!name.trim() || isSaving} onClick={() => void save()}>
+        <Button disabled={!hasVisibleText(name) || isSaving} onClick={() => void save()}>
           {isSaving ? 'Saving...' : entry.mode === 'create' ? 'Create group' : 'Save changes'}
         </Button>
       </div>

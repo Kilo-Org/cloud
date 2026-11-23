@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen: the paged list, its state scroller with the refresh band, the chip filter and the push banner share the read state */
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
@@ -12,9 +13,12 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
@@ -32,6 +36,7 @@ import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
@@ -49,7 +54,12 @@ const PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 16 } satisfies ViewStyle;
+
+/**
+ * Space under the list's last element, past the tab bar's own clearance, so the
+ * cap notice and the next-page retry sit above the band rather than against it.
+ */
+const FOOTER_BOTTOM_GAP = 32;
 
 /**
  * The pushes this account received, newest first: one row per recorded
@@ -70,6 +80,7 @@ export function NotificationHistoryScreen() {
   const now = useRelativeTimeNow();
   const queryClient = useQueryClient();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
   const [category, setCategory] = useState<NotificationHistoryFilter['category']>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -169,8 +180,10 @@ export function NotificationHistoryScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: HistoryRow }) => <HistoryRowView row={item} now={now} onOpen={openRow} />,
-    [now, openRow]
+    ({ item, index }: { item: HistoryRow; index: number }) => (
+      <HistoryRowView row={item} now={now} last={index === items.length - 1} onOpen={openRow} />
+    ),
+    [now, openRow, items.length]
   );
 
   const handleRefresh = () => {
@@ -209,7 +222,7 @@ export function NotificationHistoryScreen() {
   // The page bound, not the server, ends the list: say so.
   const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
   let footer = (
-    <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+    <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
       {capped ? (
         <Text variant="muted" className="text-center text-xs">
           {t('notifications.history.capped')}
@@ -219,7 +232,7 @@ export function NotificationHistoryScreen() {
   );
   if (query.isFetchNextPageError) {
     footer = (
-      <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+      <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
         <Button
           variant="ghost"
           onPress={() => {
@@ -231,7 +244,7 @@ export function NotificationHistoryScreen() {
       </View>
     );
   } else if (query.isFetchingNextPage) {
-    footer = <Skeleton className="mb-3 h-20 rounded-2xl" />;
+    footer = <RowSkeleton subtitle />;
   }
 
   return (
@@ -241,38 +254,46 @@ export function NotificationHistoryScreen() {
         showBackButton
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="flex-1">
+      <View className="flex-1" style={sideInsetStyle}>
         {gate.settled && gate.answered && !gate.pushEnabled ? (
-          <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">
-            <View className="flex-row items-center gap-2">
-              <BellOff size={16} color={colors.mutedForeground} />
-              <Text className="flex-1 text-sm">{t('notifications.history.bannerBody')}</Text>
-            </View>
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={() => {
-                router.push('/(app)/notifications' as Href);
-              }}
-            >
-              <Text>{t('notifications.history.bannerAction')}</Text>
-            </Button>
+          <View className="px-4 pb-3">
+            <Card>
+              <View className="flex-row items-center gap-2">
+                <BellOff size={16} color={colors.mutedForeground} />
+                <Text className="flex-1 text-sm">{t('notifications.history.bannerBody')}</Text>
+              </View>
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  router.push('/(app)/notifications' as Href);
+                }}
+              >
+                <Text>{t('notifications.history.bannerAction')}</Text>
+              </Button>
+            </Card>
           </View>
         ) : null}
 
         {bodyPending ? (
-          <View className="mx-4 mb-3 flex-row gap-2">
+          <View className="mb-3 flex-row gap-2 px-4">
             <Skeleton className="h-8 w-16 rounded-full" />
             <Skeleton className="h-8 w-24 rounded-full" />
             <Skeleton className="h-8 w-20 rounded-full" />
           </View>
         ) : (
+          // One row that scrolls sideways: every chip keeps its whole face and
+          // the row's own gutter sits at both ends, so the last chip is never
+          // clipped by the screen edge and no chip wraps onto a line of its own.
+          // A horizontal scroller grows into the column's free height unless it
+          // is told not to, which stretched every chip down to the empty state;
+          // `grow-0` keeps it one chip tall, and `mb-3` matches the skeleton row.
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             accessibilityRole="tablist"
-            className="grow-0"
-            contentContainerClassName="gap-2 px-4"
+            className="mb-3 grow-0"
+            contentContainerClassName="items-center gap-2 px-4"
           >
             {filters.map(filter => (
               <FilterChip
@@ -292,42 +313,54 @@ export function NotificationHistoryScreen() {
 
         <View className="mt-3 flex-1">
           {loading ? (
-            <View className="gap-3 px-4">
-              <Skeleton className="h-20 rounded-2xl" />
-              <Skeleton className="h-20 rounded-2xl" />
-              <Skeleton className="h-20 rounded-2xl" />
+            <View>
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
             </View>
           ) : null}
 
-          {failure ? (
-            <QueryError
-              message={t('notifications.history.loadError')}
-              onRetry={() => {
-                void query.refetch();
-              }}
-              isRetrying={query.isFetching}
+          {failure || (!loading && !hasListContent) ? (
+            // A state's stack outgrows a landscape body, so it scrolls like the
+            // list, ends clear of the tab bar, and draws its own refresh band
+            // (the app control hides the native spinner under reduced motion).
+            <ScrollView
               refreshControl={refreshControl}
-            />
-          ) : null}
-
-          {!loading && !failure && !hasListContent ? (
-            <EmptyState
-              icon={BellOff}
-              refreshControl={refreshControl}
-              title={t(
-                category === null
-                  ? 'notifications.history.emptyTitle'
-                  : 'notifications.history.emptyCategoryTitle'
+              contentContainerStyle={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}
+            >
+              <RefreshProgress refreshControl={refreshControl} />
+              {failure ? (
+                <QueryError
+                  placement="top"
+                  inset="gutter"
+                  message={t('notifications.history.loadError')}
+                  onRetry={() => void query.refetch()}
+                  isRetrying={query.isFetching}
+                />
+              ) : (
+                <EmptyState
+                  placement="top"
+                  inset="gutter"
+                  icon={BellOff}
+                  title={t(
+                    category === null
+                      ? 'notifications.history.emptyTitle'
+                      : 'notifications.history.emptyCategoryTitle'
+                  )}
+                  // The retention window describes the whole list, not one
+                  // category. The count selects the day-noun form: a language
+                  // whose numeral needs its own case reads it from the family.
+                  description={
+                    category === null
+                      ? t('notifications.history.emptyBody', {
+                          count: NOTIFICATION_HISTORY_RETENTION_DAYS,
+                          days: NOTIFICATION_HISTORY_RETENTION_DAYS,
+                        })
+                      : undefined
+                  }
+                />
               )}
-              // The retention window describes the whole list, not one category.
-              description={
-                category === null
-                  ? t('notifications.history.emptyBody', {
-                      days: NOTIFICATION_HISTORY_RETENTION_DAYS,
-                    })
-                  : undefined
-              }
-            />
+            </ScrollView>
           ) : null}
 
           {!loading && !failure && hasListContent ? (
@@ -336,7 +369,6 @@ export function NotificationHistoryScreen() {
               data={items}
               keyExtractor={item => item.id}
               renderItem={renderItem}
-              contentContainerStyle={listContentContainerStyle}
               // FlashList adds its own control from this pair; the element
               // below is for the state scrollers that accept one.
               refreshing={refreshing}

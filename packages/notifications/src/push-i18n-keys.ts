@@ -9,16 +9,24 @@ const SESSION_TITLE_KEY = 'session.title';
 /** The payload key the security-lifecycle producer sends. */
 export const SECURITY_LIFECYCLE_I18N_KEY = 'internal.securityLifecycle';
 
+/** The payload key the agent-session notification producer sends. */
+export const AGENT_SESSION_NOTIFICATION_I18N_KEY = 'agentSession.notification';
+
+/** The payload key the session-ready producer sends. */
+export const SESSION_READY_I18N_KEY = 'sessionReady';
+
+/** The leaf of the generic body the security-lifecycle notice reads. */
+export const SECURITY_LIFECYCLE_BODY_LEAF = 'securityUpdate';
+
 /** The one catalog entry the security-lifecycle push reads its body from. */
-const SECURITY_LIFECYCLE_BODY_KEY = 'generic.body.securityUpdate';
+const SECURITY_LIFECYCLE_BODY_KEY = `generic.body.${SECURITY_LIFECYCLE_BODY_LEAF}`;
 
 /** The security-finding kinds the internal dispatch producer can send. */
 type SecurityFindingNotificationKind = InternalDispatchSecurityFindingRequest['notificationKind'];
 
 /**
- * The catalog entry that carries each security-finding kind's title. The three
- * kinds differ only in that line, so they read one shared body entry
- * (`SECURITY_FINDING_PUSH_BODY_KEY`); a push names its title key in `i18nKey`.
+ * The catalog entry that carries each security-finding kind's title. A push
+ * names its title key in `i18nKey`.
  */
 export const SECURITY_FINDING_PUSH_TITLE_KEYS = {
   new_finding: 'internal.securityFindingNew',
@@ -39,8 +47,8 @@ export const SECURITY_FINDING_PUSH_BODY_KEY = 'internal.securityFinding.body';
  */
 const SHARED_TITLE_KEYS: ReadonlyMap<string, string> = new Map([
   [SECURITY_LIFECYCLE_I18N_KEY, GENERIC_PUSH_TITLE_KEY],
-  ['agentSession.notification', SESSION_TITLE_KEY],
-  ['sessionReady', SESSION_TITLE_KEY],
+  [AGENT_SESSION_NOTIFICATION_I18N_KEY, SESSION_TITLE_KEY],
+  [SESSION_READY_I18N_KEY, SESSION_TITLE_KEY],
 ]);
 
 /**

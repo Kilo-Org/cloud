@@ -44,14 +44,14 @@ export type OrganizationMembershipColumns = {
 };
 
 /** The organization is live: an "active" decision ignores soft-deleted rows. */
-function liveOrganizationCondition(organization: OrganizationColumns): SQL {
+export function liveOrganizationCondition(organization: OrganizationColumns): SQL {
   return isNull(organization.deleted_at);
 }
 
 /** The caller holds a membership row in the organization. */
 function membershipCondition(
   membership: OrganizationMembershipColumns,
-  organizationIdColumn: OrganizationIdColumn,
+  organizationIdColumn: string | AnyPgColumn,
   kiloUserId: string | AnyPgColumn
 ): SQL {
   return (
@@ -110,6 +110,20 @@ export function activeOrganizationJoinCondition(organizationIdColumn: Organizati
     and(eq(organizations.id, organizationIdColumn), liveOrganizationCondition(organizations)) ??
     sql`false`
   );
+}
+
+/**
+ * Equality filters for the caller's own membership in a given organization,
+ * for a `.where()` clause rather than a join. {@link organizationMembershipJoinCondition}
+ * builds the same predicate against a column; both delegate to one definition.
+ * The arguments are named because both are strings: a swapped call would still
+ * compile.
+ */
+export function directOrganizationMembershipCondition(params: {
+  organizationId: string;
+  kiloUserId: string;
+}): SQL {
+  return membershipCondition(organization_memberships, params.organizationId, params.kiloUserId);
 }
 
 /**
@@ -243,10 +257,10 @@ export function organizationAccessQuery(
       activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
     .where(
-      and(
-        eq(organization_memberships.organization_id, params.organizationId),
-        eq(organization_memberships.kilo_user_id, params.kiloUserId)
-      )
+      directOrganizationMembershipCondition({
+        organizationId: params.organizationId,
+        kiloUserId: params.kiloUserId,
+      })
     )
     .limit(1);
 }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { PreferencesScreen } from '@/components/preferences-screen';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.hoisted(() => {
@@ -26,6 +27,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -54,6 +59,18 @@ function row(renderer: ReactTestRenderer, title: string): ReactTestInstance {
   }
   return found;
 }
+function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
+  const ancestors: ReactTestInstance[] = [];
+  for (let parent = node.parent; parent !== null; parent = parent.parent) {
+    if (String(parent.type) === 'SettingsTarget') {
+      ancestors.push(parent);
+    }
+  }
+  return ancestors;
+}
+
+type SettingsTargetProps = { item: { id: string }; targetIds?: readonly string[] };
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
@@ -70,37 +87,33 @@ describe('PreferencesScreen hub', () => {
     const renderer = await mountPreferences();
 
     expect(hubRows(renderer)).toHaveLength(7);
-    expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
-    expect(row(renderer, 'Voice input').props).toMatchObject({
-      icon: 'Mic',
-      last: true,
-      subtitle:
-        "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
-    });
+    expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal' });
+    // The Voice input screen explains gateway transcription. A caption under
+    // this card sat below the last row, which has its own subtitle, so the hub
+    // does not repeat it.
+    expect(row(renderer, 'Voice input').props).toMatchObject({ icon: 'Mic' });
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
+    ).not.toContain(i18n.t('preferences.gatewayTranscriptionSubtitle'));
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',
-      last: true,
       subtitle:
         'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
     });
     expect(row(renderer, 'Account').props).toMatchObject({
       icon: 'Globe',
-      last: true,
       subtitle: 'Language, trusted hosts, and device sessions',
     });
     expect(row(renderer, 'Notifications').props).toMatchObject({
       icon: 'Bell',
       subtitle: 'Push preferences',
-      last: true,
     });
     expect(row(renderer, i18n.t('notifications.history.title')).props).toMatchObject({
       icon: 'History',
       subtitle: 'Notifications this account received',
-      last: true,
     });
     expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
       icon: 'Wallet',
-      last: true,
     });
   });
 
@@ -135,5 +148,72 @@ describe('PreferencesScreen hub', () => {
       { value: 'dark', label: 'Dark' },
     ]);
     expect(control[0]?.props.value).toBe('system');
+  });
+
+  it('keeps every rendered row and segment paired with its source definition', async () => {
+    const renderer = await mountPreferences();
+    const hubSettings = PREFERENCE_SETTINGS_SOURCES.filter(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/preferences'
+    ).flatMap(source => source.settings);
+    if (hubSettings.length === 0) {
+      throw new Error('preferences hub sources missing');
+    }
+    const sourceByLabel = new Map(
+      hubSettings.map(setting => [i18n.t(setting.label), setting] as const)
+    );
+
+    // Each rendered navigation row: the target names the same definition the
+    // index publishes, so a label cannot drift from its source. A bare row
+    // added without a target fails the ancestor assertion even though the
+    // flattened id list below still matches.
+    for (const renderedRow of hubRows(renderer)) {
+      const title = String(renderedRow.props.title);
+      const [target] = settingsTargetAncestors(renderedRow);
+      expect(target, `"${title}" renders without a SettingsTarget`).toBeDefined();
+      const setting = sourceByLabel.get(title);
+      expect(setting, `"${title}" is not in the hub source`).toBeDefined();
+      expect(target?.props.item).toBe(setting);
+    }
+
+    const [control] = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'SegmentedControl'
+    );
+    if (!control) {
+      throw new Error('appearance control missing');
+    }
+    const [controlTarget] = settingsTargetAncestors(control);
+    expect(controlTarget, 'the appearance control renders without a SettingsTarget').toBeDefined();
+    const controlProps = controlTarget?.props as SettingsTargetProps | undefined;
+    const options = control.props.options as { label: string }[];
+    for (const option of options) {
+      const setting = sourceByLabel.get(option.label);
+      expect(setting, `"${option.label}" is not in the hub source`).toBeDefined();
+      expect([controlProps?.item.id, ...(controlProps?.targetIds ?? [])]).toContain(setting?.id);
+    }
+
+    // Nothing the index publishes is invisible: the navigation rows, the three
+    // segment labels, and the labelled section account for every source label.
+    const sectionLabels = renderer.root
+      .findAll(node => typeof node.type === 'function' && node.type.name === 'Section')
+      .map(node => node.props.label)
+      .filter((label): label is string => typeof label === 'string');
+    const visibleLabels = [
+      ...hubRows(renderer).map(renderedRow => String(renderedRow.props.title)),
+      ...options.map(option => option.label),
+      ...sectionLabels,
+    ];
+    expect(new Set(visibleLabels)).toEqual(
+      new Set(hubSettings.map(setting => i18n.t(setting.label)))
+    );
+
+    const renderedIds: string[] = [];
+    for (const target of renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'SettingsTarget'
+    )) {
+      const props = target.props as SettingsTargetProps;
+      renderedIds.push(props.item.id, ...(props.targetIds ?? []));
+    }
+
+    expect(renderedIds).toEqual(hubSettings.map(setting => setting.id));
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { pushDataSchema } from './push-data';
+import { ANSWER_DRAFT_MAX_LENGTH, pushDataSchema } from './push-data';
 
 describe('pushDataSchema agent_briefing', () => {
   it('accepts only the privacy-minimal available-report list route', () => {
@@ -324,6 +324,44 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('round-trips the answerDraft of an undelivered inline reply', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'question',
+      answerDraft: 'Use the staging bucket for the export.',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('accepts an answer draft at the length the schema declares', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH),
+    };
+
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('refuses an answer draft past the schema bound', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'cloud_agent_session',
+        cliSessionId: 'cli1',
+        answerDraft: 'x'.repeat(ANSWER_DRAFT_MAX_LENGTH + 1),
+      }).success
+    ).toBe(false);
+  });
+
+  it('parses a session without an answerDraft and keeps the field absent', () => {
+    const payload = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+    const parsed = pushDataSchema.parse(payload);
+    expect(parsed).toEqual(payload);
+    expect('answerDraft' in parsed).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {
@@ -478,6 +516,54 @@ describe('pushDataSchema session_live_update approvalKey', () => {
     expect(pushDataSchema.safeParse(sessionLiveUpdate(null)).success).toBe(true);
     for (const key of ['a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'per_raw_permission', '']) {
       expect(pushDataSchema.safeParse(sessionLiveUpdate(key)).success).toBe(false);
+    }
+  });
+});
+
+describe('a session_live_update payload', () => {
+  const content = {
+    sessionId: 'session-1',
+    title: 'Fix the login bug',
+    statusKind: 'needsInput',
+    statusSince: '2026-11-12T09:00:00.000Z',
+    scheduledAt: null,
+    awaitingPermission: false,
+    approvalKey: null,
+    updatedAt: '2026-11-12T09:01:00.000Z',
+  };
+
+  const payload = (event: 'update' | 'end', dismissAfterMs?: number) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event,
+    content,
+    ...(dismissAfterMs === undefined ? {} : { dismissAfterMs }),
+  });
+
+  it('parses and round-trips an update and an end without dismissAfterMs', () => {
+    for (const event of ['update', 'end'] as const) {
+      const withoutDismiss = payload(event);
+      expect('dismissAfterMs' in withoutDismiss).toBe(false);
+      expect(pushDataSchema.parse(withoutDismiss)).toEqual(withoutDismiss);
+    }
+  });
+
+  it('parses and round-trips an end carrying dismissAfterMs', () => {
+    for (const dismissAfterMs of [0, 900_000]) {
+      const end = payload('end', dismissAfterMs);
+      expect(pushDataSchema.parse(end)).toEqual(end);
+    }
+  });
+
+  it('rejects dismissAfterMs on an update at that field', () => {
+    const result = pushDataSchema.safeParse(payload('update', 900_000));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toContainEqual(['dismissAfterMs']);
+  });
+
+  it('rejects a negative or a non-integer dismissAfterMs on an end', () => {
+    for (const dismissAfterMs of [-1, 1.5]) {
+      expect(pushDataSchema.safeParse(payload('end', dismissAfterMs)).success).toBe(false);
     }
   });
 });

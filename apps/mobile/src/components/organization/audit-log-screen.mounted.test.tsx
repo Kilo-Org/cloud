@@ -4,9 +4,10 @@
 // page's skeleton, a retryable first-page error, the empty state, the paged list
 // with its `hasMore` footer, and a later-page failure that keeps the rows it has.
 // A row also names its event through the catalog, falling back to the generic
-// event name for an action this build does not know; the created-organization
-// row drops its detail line, because the server's message there only restates
-// that event name in English.
+// event name for an action this build does not know. Its detail line is built
+// from the structured `details` payload in the reader's language, never from
+// the server's English `message`; a row with no payload at all shows its event
+// name alone and offers nothing to disclose.
 // A pull refreshes the read in place through the shared `useManualRefresh`.
 // One control serves the empty state and the paged list; the first-page error
 // branch carries none.
@@ -16,6 +17,8 @@
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type AuditDetail } from '@kilocode/app-shared/organizations';
+
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -24,6 +27,7 @@ import { i18n } from '@/i18n';
 // above; the screen reaches this adapter through `use-manual-refresh`, and
 // importing the mocked module here is how the test reads its spy.
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { auditEntryDetail } from './audit-log-detail';
 import { OrganizationAuditLogScreen } from './audit-log-screen';
 
 const pageQuery = {
@@ -76,6 +80,10 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
 // The pull control reaches the reduced-motion policy, which loads expo-battery;
 // the list's states are what this suite drives, not the gesture's indicator.
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The static band reserves its own row above the scroller under reduced motion;
+// this suite asserts where it sits and which control it carries, not its paint.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 
 // The failed refresh announces through this adapter, and the real module pulls
 // native deps; the spy records the screen's announcement instead.
@@ -156,6 +164,7 @@ vi.mock('@/components/query-error', async () => {
 vi.mock('@/components/empty-state', async () => {
   const { createElement: h } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { title?: string; description?: string }) => h('EmptyState', props),
   };
 });
@@ -190,6 +199,27 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 
+const t = i18n.t.bind(i18n);
+
+/**
+ * The detail line the row renders, derived through the same renderer the screen
+ * calls and in the language the suite is reading. An assertion therefore states
+ * the contract — this payload, this language — instead of pinning one catalog
+ * sentence, which any wording change would break.
+ */
+function detailFor(details: AuditDetail): string {
+  const line = auditEntryDetail(t, i18n.language, details);
+  if (line === undefined) {
+    throw new Error(`${details.id} rendered no detail line`);
+  }
+  return line;
+}
+
+/** The structured payload `entries()` stores, so an assertion derives its line. */
+function entryDetail(index: number): AuditDetail {
+  return { id: 'setting.name', previous: `Acme ${index}`, next: `Acme ${index + 1}` };
+}
+
 function entries(count: number, action = 'organization.settings.change', actorEmail?: string) {
   return Array.from({ length: count }, (_, index) => ({
     id: `audit-${index}`,
@@ -197,6 +227,9 @@ function entries(count: number, action = 'organization.settings.change', actorEm
     actor_id: 'user-1',
     actor_email: actorEmail ?? 'owner@example.com',
     actor_name: 'Owner',
+    // The row renders this payload; `message` stays the server's English
+    // sentence, which the screen must never show.
+    details: entryDetail(index),
     message: `Audit event ${index}`,
     created_at: '2026-01-01T00:00:00.000Z',
   }));
@@ -206,20 +239,48 @@ function entries(count: number, action = 'organization.settings.change', actorEm
 // can only hold the whole time when the actor text is the one that shrinks.
 const LONG_ACTOR_EMAIL = 'kilokwf1763399999_with_a_really_long_local_part@example.com';
 
-// A message that runs well past the clamped two lines: the sentence a role
-// change writes, long enough that the collapsed row must clip it.
-const LONG_MESSAGE =
+/**
+ * A detail line that runs well past the clamped two lines: an automatic
+ * re-routing save that names a whole pool of models, long enough that the
+ * collapsed row must clip it.
+ */
+const LONG_DETAIL = {
+  id: 'autoRouting.models',
+  added: [
+    {
+      provider: 'anthropic',
+      models: [
+        'claude-sonnet-4-5',
+        'claude-opus-4-1',
+        'claude-haiku-4-5',
+        'claude-3-7-sonnet',
+        'claude-3-5-haiku',
+      ],
+    },
+    {
+      provider: 'openai',
+      models: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'codex-mini-latest', 'o4-mini'],
+    },
+  ],
+  removed: ['gemini-2.5-pro', 'gemini-2.5-flash', 'grok-4'],
+} satisfies AuditDetail;
+
+// The server's English sentence for the same event. It is long as well, so a
+// row that fell back to it would pass a clamp check by accident; the suite
+// asserts it never reaches the screen at all.
+const SERVER_MESSAGE =
   'ada@example.com was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month, and the invoice for those seats now bills the organization instead of the personal account it started on';
 
-/** The one audit event whose message needs the row's disclosure. */
+/** The one audit event whose detail line needs the row's disclosure. */
 function longEntry() {
   return {
     id: 'audit-long',
-    action: 'organization.member.change_role',
+    action: 'organization.settings.auto_change',
     actor_id: 'user-1',
     actor_email: 'owner@example.com',
     actor_name: 'Owner',
-    message: LONG_MESSAGE,
+    details: LONG_DETAIL,
+    message: SERVER_MESSAGE,
     created_at: '2026-01-01T00:00:00.000Z',
   };
 }
@@ -285,14 +346,12 @@ function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handle
   return typeof handler === 'function' ? (handler as Handler) : undefined;
 }
 
-/** The row's message line, found by its opening words in either state. */
-function messageLine(renderer: ReactTestRenderer) {
+/** The row's detail line, found by the exact string the fixture payload renders. */
+function detailLine(renderer: ReactTestRenderer, details: AuditDetail) {
+  const expected = detailFor(details);
   return renderer.root
     .findAllByType('Text')
-    .find(
-      node =>
-        typeof node.props.children === 'string' && node.props.children.includes('billing manager')
-    );
+    .find(node => typeof node.props.children === 'string' && node.props.children === expected);
 }
 
 /** The row's disclosure state; the renderer's props carry no type. */
@@ -319,9 +378,9 @@ describe('OrganizationAuditLogScreen', () => {
 
     const denied = renderer.root.findAllByType('PermissionDenied');
     expect(denied).toHaveLength(1);
-    expect(denied[0]?.props.description).toBe(
-      'Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.'
-    );
+    // The refusal's copy lives in the catalog; this pins that the state reads
+    // this screen's own key, so a member sees the roles and the next step.
+    expect(denied[0]?.props.description).toBe(i18n.t('organization.auditLog.permissionDenied'));
     expect(renderer.root.findAllByType('FlashList')).toHaveLength(0);
     unmount();
   });
@@ -366,7 +425,7 @@ describe('OrganizationAuditLogScreen', () => {
     unmount();
   });
 
-  it('names the event, shows the actor, and requests the next page', async () => {
+  it('names the event, shows the detail, and requests the next page', async () => {
     pageHook.entries = entries(3);
     pageHook.hasMore = true;
     const { renderer, unmount } = await mount();
@@ -375,8 +434,10 @@ describe('OrganizationAuditLogScreen', () => {
       .findAllByType('Text')
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
+    // Each row renders its own structured detail, never the server's sentence.
     for (const index of [0, 1, 2]) {
-      expect(messages).toContain(`Audit event ${index}`);
+      expect(messages).toContain(detailFor(entryDetail(index)));
+      expect(messages).not.toContain(`Audit event ${index}`);
     }
     // The row names the event in the reader's language, never the wire action.
     expect(messages).toContain('Settings changed');
@@ -482,46 +543,93 @@ describe('OrganizationAuditLogScreen', () => {
     expect(messages).toContain('owner@example.com');
     expect(messages.some(text => text.startsWith(expectedMetaTime('en')))).toBe(true);
     // The row keeps the translated event name and drops the server sentence,
-    // which only restates that name and would age into a stale one.
+    // which would age into a stale English copy of that name.
     expect(messages).not.toContain('Organization Acme created');
     expect(texts.some(node => node.props.numberOfLines === 2)).toBe(false);
     expect(messages.some(text => text.includes('organization.created'))).toBe(false);
-    // Nothing to disclose, so the row is a plain view rather than a pressable.
+    // No structured event, so nothing to disclose and the row is a plain view.
     expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
     unmount();
   });
 
-  it('clamps a long message to two lines and reveals it on one press', async () => {
+  it('shows the event name alone for a row written before the details column', async () => {
+    // A row the server wrote before it stored a structured event: `details` is
+    // absent, and the English `message` is the only other text it carries. The
+    // row must show neither a detail line nor that message.
+    pageHook.entries = [
+      {
+        id: 'audit-historical',
+        action: 'organization.settings.change',
+        actor_id: 'user-1',
+        actor_email: 'owner@example.com',
+        actor_name: 'Owner',
+        message: SERVER_MESSAGE,
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'audit-null-details',
+        action: 'organization.settings.change',
+        actor_id: 'user-1',
+        actor_email: 'owner@example.com',
+        actor_name: 'Owner',
+        details: null,
+        message: SERVER_MESSAGE,
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const { renderer, unmount } = await mount();
+
+    const texts = renderer.root.findAllByType('Text');
+    const messages = texts
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    // Two rows, each naming its event and its actor, and nothing else.
+    expect(messages.filter(text => text === 'Settings changed')).toHaveLength(2);
+    expect(messages.filter(text => text === 'owner@example.com')).toHaveLength(2);
+    // No detail line, no server sentence, and so no clamp and no disclosure.
+    expect(texts.some(node => node.props.numberOfLines === 2)).toBe(false);
+    expect(messages).not.toContain(SERVER_MESSAGE);
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    unmount();
+  });
+
+  it('clamps a long detail line to two lines and reveals it on one press', async () => {
     pageHook.entries = [longEntry()];
     const { renderer, unmount } = await mount();
 
-    expect(LONG_MESSAGE.length).toBeGreaterThan(200);
+    const expected = detailFor(LONG_DETAIL);
+    expect(expected.length).toBeGreaterThan(200);
     // The node holds the whole sentence even while the layout clips it: the
     // bound is a layout prop, not a truncation of the copy.
-    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
-    expect(messageLine(renderer)?.props.numberOfLines).toBe(2);
+    expect(detailLine(renderer, LONG_DETAIL)?.props.children).toBe(expected);
+    expect(detailLine(renderer, LONG_DETAIL)?.props.numberOfLines).toBe(2);
+    // The detail is built from the payload, never from the server's sentence.
+    expect(
+      renderer.root.findAllByType('Text').some(node => node.props.children === SERVER_MESSAGE)
+    ).toBe(false);
 
     await pressDisclosure(renderer);
     // The same text node stays; the press drops the bound rather than swapping
     // in a second, fuller copy.
-    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
-    expect(messageLine(renderer)?.props.numberOfLines).not.toBe(2);
+    expect(detailLine(renderer, LONG_DETAIL)?.props.children).toBe(expected);
+    expect(detailLine(renderer, LONG_DETAIL)?.props.numberOfLines).toBeUndefined();
 
     await pressDisclosure(renderer);
-    expect(messageLine(renderer)?.props.numberOfLines).toBe(2);
+    expect(detailLine(renderer, LONG_DETAIL)?.props.numberOfLines).toBe(2);
     unmount();
   });
 
-  it('reports the disclosure and the whole message to assistive technology', async () => {
+  it('reports the disclosure and the whole detail to assistive technology', async () => {
     pageHook.entries = [longEntry()];
     const { renderer, unmount } = await mount();
 
+    const expected = detailFor(LONG_DETAIL);
     const pressables = renderer.root.findAllByType('Pressable');
     expect(pressables.filter(node => disclosureState(node) === false)).toHaveLength(1);
     const closed = pressables.find(node => disclosureState(node) === false);
     expect(closed?.props.accessibilityRole).toBe('button');
-    // The clamp is visual only: a reader reaches the whole sentence unopened.
-    expect(closed?.props.accessibilityLabel).toContain(LONG_MESSAGE);
+    // The clamp is visual only: a reader reaches the whole line unopened.
+    expect(closed?.props.accessibilityLabel).toContain(expected);
 
     await pressDisclosure(renderer);
     const open = renderer.root
@@ -529,7 +637,7 @@ describe('OrganizationAuditLogScreen', () => {
       .find(node => disclosureState(node) === true);
     expect(open).toBeDefined();
     expect(open?.props.accessibilityRole).toBe('button');
-    expect(open?.props.accessibilityLabel).toContain(LONG_MESSAGE);
+    expect(open?.props.accessibilityLabel).toContain(expected);
     unmount();
   });
 
@@ -542,7 +650,10 @@ describe('OrganizationAuditLogScreen', () => {
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
     expect(messages).toContain('Audit event');
-    expect(messages).toContain('Audit event 0');
+    // The unknown action hides only the event name: its structured detail still
+    // renders, and the wire identifier never reaches the screen.
+    expect(messages).toContain(detailFor(entryDetail(0)));
+    expect(messages).not.toContain('Audit event 0');
     expect(messages.some(text => text.includes('organization.future.action'))).toBe(false);
     unmount();
   });
@@ -557,7 +668,7 @@ describe('OrganizationAuditLogScreen', () => {
       .findAllByType('Text')
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
-    expect(messages).toContain('Audit event 0');
+    expect(messages).toContain(detailFor(entryDetail(0)));
 
     const retry = renderer.root
       .findAllByType('Button')
@@ -615,6 +726,40 @@ describe('OrganizationAuditLogScreen pull to refresh', () => {
     });
     expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it('draws the static band above the list with the same control', async () => {
+    // The band is the pull's visible half under reduced motion, so it sits
+    // beside the scroller rather than inside it: inside, its reserve would move
+    // the first row at rest and scroll away with the rows.
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    const { renderer, unmount } = await mount();
+
+    const bands = renderer.root.findAllByType('RefreshProgress');
+    expect(bands).toHaveLength(1);
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(bands[0]?.props.refreshControl).toBe(list.props.refreshControl);
+    unmount();
+  });
+
+  it('draws no band where there is no pull control', async () => {
+    // The empty state's own centered scroller carries the band, and the
+    // first-page error renders no pull at all, so the screen adds neither its
+    // own band nor a pull in either branch. (`EmptyState` is stubbed here, so
+    // what this counts is the screen's own band.)
+    const empty = await mount();
+    expect(empty.renderer.root.findAllByType('RefreshProgress')).toHaveLength(0);
+    empty.unmount();
+
+    pageQuery.isError = true;
+    pageQuery.data = { pages: [], pageParams: [] };
+    const failed = await mount();
+    expect(failed.renderer.root.findAllByType('RefreshProgress')).toHaveLength(0);
+    failed.unmount();
   });
 
   it('keeps the rows and announces the failure when the pull fails', async () => {

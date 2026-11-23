@@ -11,6 +11,12 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerSelection } from '@/lib/picker-bridge';
 
 /**
+ * The organization-default read failed while nothing is selected. Both composer
+ * branches state it in the model row and offer the read again.
+ */
+export type ModelSelectionFailure = { onRetry: () => void; isRetrying: boolean };
+
+/**
  * Public contract of `NewSessionPrompt`. The prompt surface takes every
  * attachment, model, and voice callback from the route, so the prop list is
  * long enough to read on its own — the component file keeps only the render.
@@ -25,6 +31,12 @@ export type NewSessionPromptProps = {
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
+  /**
+   * The organization-default read's failure while no model is selected, or
+   * null. Rendered under the toolbar, because the model row is where the
+   * missing organization default would have chosen a model.
+   */
+  modelSelectionFailure?: ModelSelectionFailure | null;
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
   onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;

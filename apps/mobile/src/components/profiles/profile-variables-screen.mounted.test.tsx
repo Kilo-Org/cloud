@@ -27,12 +27,17 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+  connectivity: 'online' as string,
   query: {
     data: undefined as TestVars | undefined,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -44,6 +49,9 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => h.permission,
 }));
@@ -54,6 +62,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -76,6 +87,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The screen hands its action to the manage slot, so the stub renders what it
   // is given: the read-only sentence replaces the button in the same subtree.
   EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
@@ -91,6 +103,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   Lock: 'Lock',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 describe('ProfileVariablesScreen', () => {
@@ -98,8 +111,10 @@ describe('ProfileVariablesScreen', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     h.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -118,13 +133,57 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     const queryError = findOne(renderer.root, 'QueryError');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -763,6 +822,94 @@ describe('ProfileVariablesScreen', () => {
     expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('');
     second.unmount();
   });
+
+  it('hides a stored add form from a member and names the required role', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'PORTAL_TOKEN');
+    changeText(first.renderer.root, 'Value', 'super-secret-value');
+    first.unmount();
+
+    h.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'StateAction')).toHaveLength(0);
+    expect(
+      findAll(second.renderer.root, 'Text').filter(node => node.props.children === ROLE_SENTENCE)
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('does not reopen the stored form once the denied read dropped it', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'PORTAL_TOKEN');
+    first.unmount();
+
+    h.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    pressButton(second.renderer.root, 'Add variable');
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('');
+    second.unmount();
+  });
+
+  it('keeps the stored form while the role resolves and reopens it on its text', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'portal token');
+    changeText(first.renderer.root, 'Value', 'super-secret-value');
+    first.unmount();
+
+    h.permission = 'resolving';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('portal token');
+    expect(findField(second.renderer.root, 'Value').props.defaultValue).toBe('super-secret-value');
+    second.unmount();
+  });
+
+  it('closes the open form when the role drops and keeps it closed on return', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'PORTAL_TOKEN');
+
+    h.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+    unmount();
+  });
 });
 
 /** The key the fixture row holds; the dialog must isolate exactly this run. */
@@ -790,7 +937,9 @@ describe('ProfileVariablesScreen delete confirmation', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     h.permission = 'allowed';
+    h.connectivity = 'online';
     h.query.data = testVars([{ key: VARIABLE_KEY, value: '1', isSecret: false }]);
+    h.query.error = undefined;
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;

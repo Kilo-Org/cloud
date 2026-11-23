@@ -283,7 +283,6 @@ export function buildChecksResult(args: {
     detailsUrl: c.details_url ?? c.html_url ?? null,
     appName: c.app?.name ?? null,
   }));
-  // Dedupe commit statuses per context, keeping the latest by updated_at.
   const byContext = new Map<string, (typeof args.commitStatuses)[number]>();
   for (const status of args.commitStatuses) {
     const existing = byContext.get(status.context);
@@ -456,8 +455,14 @@ export function buildReviewThreadsResult(args: {
   page: number;
   hasNextPage: boolean;
   endCursor: string | null;
+  /**
+   * Whether the caller stopped reading issue comments at the page ceiling.
+   * Only `true` reaches the result, so a thread list under the ceiling keeps
+   * the shape it always had.
+   */
+  conversationTruncated?: boolean;
 }): GitHubPrReviewReviewThreadsResult {
-  const { threads, conversation, page, hasNextPage, endCursor } = args;
+  const { threads, conversation, page, hasNextPage, endCursor, conversationTruncated } = args;
   const dtos: GitHubPrReviewReviewThread[] = threads.map(t => {
     const subjectType: 'LINE' | 'FILE' = t.subjectType === 'FILE' ? 'FILE' : 'LINE';
     const diffSide = t.diffSide === 'LEFT' || t.diffSide === 'RIGHT' ? t.diffSide : null;
@@ -480,11 +485,14 @@ export function buildReviewThreadsResult(args: {
     hasNextPage && endCursor && page < Number.MAX_SAFE_INTEGER / REVIEW_THREADS_PAGE_SIZE
       ? endCursor
       : null;
-  return GitHubPrReviewReviewThreadsResultSchema.parse({
+  const base = {
     threads: dtos,
     conversation: conversation.map(mapReviewComment),
     nextCursor,
-  });
+  };
+  return GitHubPrReviewReviewThreadsResultSchema.parse(
+    conversationTruncated ? { ...base, truncated: true } : base
+  );
 }
 
 // A GraphQL `search(type: ISSUE)` node. GitHub can return non-PullRequest

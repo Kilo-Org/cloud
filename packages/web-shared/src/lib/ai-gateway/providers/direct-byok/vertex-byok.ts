@@ -4,7 +4,7 @@ import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/ant
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/byok/direct-vertex-credentials';
 import type {
   DirectByokModel,
   DirectByokProvider,
@@ -17,6 +17,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+
+const id = 'vertex-byok';
 
 /**
  * Vertex AI serves Gemini and the managed open and partner models through its
@@ -101,7 +103,6 @@ export function getGcpVertexEndpoint(model: Pick<DirectByokModel, 'id' | 'endpoi
 
 /** The Mistral region closest to the configured location. */
 export function getGcpVertexMistralLocation(location: string) {
-  if (location === MISTRAL_US_LOCATION || location === MISTRAL_EU_LOCATION) return location;
   return location === 'eu' || location.startsWith('europe-')
     ? MISTRAL_EU_LOCATION
     : MISTRAL_US_LOCATION;
@@ -185,38 +186,30 @@ export function buildGcpVertexUpstream(
     supportedChatApis: [GCP_VERTEX_ENDPOINTS[endpoint]],
   } as const;
   const baseUrl = getGcpVertexBaseUrl(credentials);
-  if (endpoint === 'anthropic') {
+  if (endpoint === 'anthropic' || endpoint === 'mistral') {
     if (!MODEL_ID_PATTERN.test(model.id)) throw new Error('Invalid Vertex AI model id');
+    const publisher = endpoint === 'anthropic' ? 'anthropic' : 'mistralai';
+    const location =
+      endpoint === 'mistral'
+        ? getGcpVertexMistralLocation(credentials.location)
+        : credentials.location;
     return {
       ...auth,
-      apiUrl: `${baseUrl}/publishers/anthropic/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
+      apiUrl: `${getGcpVertexBaseUrl({ ...credentials, location })}/publishers/${publisher}/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
       disableUrlSuffix: true,
       responseTransforms: null,
     };
   }
-  if (endpoint === 'mistral') {
-    if (!MODEL_ID_PATTERN.test(model.id)) throw new Error('Invalid Vertex AI model id');
-    const location = getGcpVertexMistralLocation(credentials.location);
-    const mistralBaseUrl = getGcpVertexBaseUrl({ ...credentials, location });
-    return {
-      ...auth,
-      apiUrl: `${mistralBaseUrl}/publishers/mistralai/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
-      disableUrlSuffix: true,
-      responseTransforms: null,
-    };
-  }
+  const openApiUpstream = {
+    apiUrl: `${baseUrl}/endpoints/openapi`,
+    disableUrlSuffix: false,
+  } as const;
   if (endpoint === 'openapi-responses') {
-    return {
-      ...auth,
-      apiUrl: `${baseUrl}/endpoints/openapi`,
-      disableUrlSuffix: false,
-      responseTransforms: null,
-    };
+    return { ...auth, ...openApiUpstream, responseTransforms: null };
   }
   return {
     ...auth,
-    apiUrl: `${baseUrl}/endpoints/openapi`,
-    disableUrlSuffix: false,
+    ...openApiUpstream,
     // Gemini returns thoughts in Google's extra content; the managed open models in `reasoning_content`.
     responseTransforms: isGeminiModel(model.id)
       ? ReasoningDetailsTransform.GeminiThought
@@ -238,28 +231,42 @@ export async function resolveGcpVertexUpstream(
 }
 
 export default {
-  id: 'vertex-byok',
+  id,
   openrouter_inference_provider_id: 'google-vertex',
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;
-    if (request.kind === 'messages') {
-      dropThinkingBlocksOnPrefixMismatch(context);
-      // rawPredict takes the model from the URL and the API version from the body.
-      Reflect.deleteProperty(request.body, 'model');
-      Reflect.set(request.body, 'anthropic_version', VERTEX_ANTHROPIC_VERSION);
-      return;
-    }
-    if (request.kind === 'chat_completions') {
-      if (isGcpVertexMistralModelId(request.body.model)) {
+    // The route passes the served model with its endpoint metadata, so the endpoint needs no
+    // classification from the requested model id.
+    const endpoint = getGcpVertexEndpoint(context.directByokModel);
+    switch (endpoint) {
+      case 'anthropic':
+        dropThinkingBlocksOnPrefixMismatch(context);
+        // rawPredict takes the model from the URL and the API version from the body.
+        Reflect.deleteProperty(request.body, 'model');
+        Reflect.set(request.body, 'anthropic_version', VERTEX_ANTHROPIC_VERSION);
+        return;
+      case 'mistral':
         // rawPredict takes the model from the URL but still requires it in the body.
         toMistralChatCompletionsBody(request.body);
         return;
-      }
-      request.body.model = toGcpVertexOpenApiModelId(request.body.model);
+      case 'openapi':
+        // `GCP_VERTEX_ENDPOINTS` serves this endpoint over Chat Completions, so the route sends
+        // that kind and the body carries its model.
+        if (request.kind === 'chat_completions') {
+          request.body.model = toGcpVertexOpenApiModelId(request.body.model);
+        }
+        return;
+      case 'openapi-responses':
+        // This endpoint serves `xai/grok-*` ids only, and those ids always carry their publisher
+        // prefix, so the body needs no rewrite.
+        return;
+      default:
+        // A fifth endpoint fails to compile here instead of silently skipping its rewrite.
+        return endpoint satisfies never;
     }
   },
-  models: cachedDirectByokModelList('vertex-byok'),
+  models: cachedDirectByokModelList(id),
   chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);

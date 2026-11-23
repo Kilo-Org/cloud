@@ -130,8 +130,21 @@
       "secret_name": "INTERNAL_API_SECRET_PROD",
     },
     {
+      // Credential for the temporary internal raw session row export route
+      // only. Deliberately separate from INTERNAL_API_SECRET_PROD: a token
+      // minted for that export must not authenticate any other internal route,
+      // and the shared internal secret must not authenticate this one.
+      // @dev-generate base64 32
+      "binding": "SESSION_ROWS_EXPORT_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "SESSION_ROWS_EXPORT_TOKEN",
+    },
+    {
       "binding": "SESSION_SHARE_JWT_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      // This Worker both signs and verifies share tokens, so `pnpm dev:env`
+      // generates a random local value; no other service reads it.
+      // @dev-generate base64 32
       "secret_name": "SESSION_SHARE_JWT_SECRET_PROD",
     },
   ],

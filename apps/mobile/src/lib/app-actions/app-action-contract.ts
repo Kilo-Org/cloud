@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the one description of the four OS actions: ids, URL grammar, payload, destinations and result shape read together */
 // The four app actions the OS surfaces (Siri, Spotlight, Shortcuts, the Action
 // button, Control Center, widget buttons) can run without opening the app.
 //
@@ -19,7 +20,7 @@ import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
-import { shouldShowNeedsInput } from '@/lib/session-attention';
+import { type SessionAttentionHydration, shouldShowNeedsInput } from '@/lib/session-attention';
 
 /** The four actions, in the order the OS surfaces list them. */
 export const APP_ACTION_IDS = [
@@ -201,16 +202,25 @@ export function appActionHref(request: AppActionRequest, input?: AppActionHrefIn
 export type NeedsInputSession = {
   id: string;
   status: string | null | undefined;
+  /** The ack store's phase when the row was read. */
+  hydration: SessionAttentionHydration;
   isAcked: boolean;
 };
 
 /**
  * The destination for `OpenNeedsInput`: the single waiting session, or the
- * Agents tab when none or several are waiting. An acked row is not waiting.
+ * Agents tab when none or several wait. A row waits only when it would show its
+ * affordance: not acked, and not held while the ack store hydrates (it answers
+ * "not acked" for every raise, so a held row would open a session the person
+ * may already have answered).
  */
 export function resolveNeedsInputHref(sessions: readonly NeedsInputSession[]): Href {
   const waiting = sessions.filter(session =>
-    shouldShowNeedsInput({ status: session.status, raiseId: null, isAcked: session.isAcked })
+    shouldShowNeedsInput({
+      status: session.status,
+      hydration: session.hydration,
+      isAcked: session.isAcked,
+    })
   );
   const only = waiting.length === 1 ? waiting[0] : undefined;
   return only === undefined ? AGENTS_TAB_HREF : getAgentSessionPath(only.id);
@@ -304,7 +314,6 @@ export function parseActionRepository(raw: string): ParsedActionRepository | nul
   return { kind: 'github', fullName: bare };
 }
 
-/** A target split into its path and its query, fragment dropped. */
 type ActionTarget = {
   path: string;
   search: string;
@@ -440,9 +449,6 @@ function requestFromPayload(payload: AppActionPayload): AppActionRequest | null 
   if (request !== null) {
     return request;
   }
-  // `buildRequest` for `StartAgent` is null exactly when neither a prompt nor a
-  // session was usable: hand it to the action path for the `empty-prompt`
-  // refusal instead of rejecting the whole payload as unrecognized.
   if (id === 'StartAgent') {
     return { action: 'StartAgent', prompt: fields.prompt ?? '' };
   }

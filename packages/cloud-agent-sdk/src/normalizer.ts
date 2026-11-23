@@ -4,7 +4,9 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
+import type { AgentBoardState } from './agent-board';
 import type { BackgroundActivityState } from './background-activity';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
@@ -34,6 +36,7 @@ import {
   sessionTurnCloseDataSchema,
   sessionQueueChangedDataSchema,
   questionAskedDataSchema,
+  questionAskedIdentitySchema,
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
@@ -99,6 +102,8 @@ export type ChatEvent = (
 export type ServiceEvent =
   | { type: 'background.activity'; state: BackgroundActivityState }
   | { type: 'background.invalidated' }
+  | { type: 'agent-board.state'; state: AgentBoardState }
+  | { type: 'agent-board.invalidated' }
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
   | { type: 'session.created'; info: SessionInfo }
   | { type: 'session.updated'; info: SessionInfo }
@@ -109,6 +114,16 @@ export type ServiceEvent =
       type: 'question.asked';
       requestId: string;
       questions?: QuestionInfo[] | undefined;
+    }
+  | {
+      /**
+       * A question request is waiting that this app cannot read: its list did
+       * not parse, or it carried no questions at all, so no answer card can be
+       * offered for it. The request is still pending for the CLI, so the user
+       * is told it exists rather than seeing it vanish.
+       */
+      type: 'question.unreadable';
+      requestId: string;
     }
   | { type: 'question.replied'; requestId: string }
   | { type: 'question.rejected'; requestId: string }
@@ -149,7 +164,16 @@ export type ServiceEvent =
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
+      /** The transport spent its reconnect budget; only `transport-disconnected` sets it. */
+      exhausted?: boolean | undefined;
       branch?: string | undefined;
+      /**
+       * The typed transcript-read failure this stop ends, when the transport
+       * reports one. `service-state` forwards it to the same `onError` channel
+       * the read used, so the terminal-vs-retryable decision keeps the machine
+       * kind instead of degrading to the generic stop message.
+       */
+      failure?: SessionSnapshotFailure | undefined;
     }
   | { type: 'warning' }
   | {
@@ -264,16 +288,21 @@ export type ServiceEvent =
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
 
-const CHAT_EVENT_TYPES = new Set([
-  'message.updated',
-  'message.part.updated',
-  'message.part.delta',
-  'message.part.removed',
-  'message.removed',
-]);
+/**
+ * Every `ChatEvent` variant, declared once. `satisfies` makes a renamed, added or
+ * typo'd variant a compile error here, so this table cannot drift from the union
+ * that `isChatEvent` narrows to.
+ */
+const CHAT_EVENT_TYPES = {
+  'message.updated': true,
+  'message.part.updated': true,
+  'message.part.delta': true,
+  'message.part.removed': true,
+  'message.removed': true,
+} as const satisfies Record<ChatEvent['type'], true>;
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
-  return CHAT_EVENT_TYPES.has(event.type);
+  return Object.hasOwn(CHAT_EVENT_TYPES, event.type);
 }
 
 /** Best-effort error message extraction from a loosely-typed error field. */
@@ -305,7 +334,7 @@ const connectedServiceDataSchema = connectedDataSchema.extend({
   activeMessageId: z.string().nullable().optional().catch(undefined),
 });
 
-// `cloud.message.canceled` mirrors the queued payload minus the content field.
+// `cloud.message.canceled` mirrors the queued payload minus its `content` and `delivery` fields.
 const cloudMessageCanceledDataSchema = z
   .object({
     messageId: z.string(),
@@ -440,13 +469,25 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     }
 
     case 'question.asked': {
+      // A request with no readable id has nothing to key a card or a notice
+      // to, and no reply that could clear it, so it is dropped.
+      const identity = questionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
       const r = questionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'question.asked',
-        requestId: r.data.id,
-        questions: r.data.questions,
-      };
+      // An answer card needs a non-empty list: an absent, empty or unreadable
+      // one would render nothing the user could answer.
+      if (r.success && r.data.questions !== undefined && r.data.questions.length > 0) {
+        return {
+          type: 'question.asked',
+          requestId: r.data.id,
+          questions: r.data.questions,
+        };
+      }
+      // A request whose list cannot be read cannot be offered as a card, and a
+      // request with no questions has nothing to ask. Neither is dropped,
+      // because the CLI keeps waiting for an answer the app would otherwise
+      // never mention.
+      return { type: 'question.unreadable', requestId: identity.data.id };
     }
 
     case 'question.replied': {
@@ -473,10 +514,6 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
           always: r.data.always,
         };
       }
-      // A request whose scope does not parse cannot be offered as a decision:
-      // forwarding an empty scope would describe settings the app never read.
-      // It is not dropped either, because the CLI keeps waiting for an answer
-      // the app would otherwise never mention.
       const identity = permissionAskedIdentitySchema.safeParse(data);
       if (!identity.success) return null;
       return { type: 'permission.unreadable', requestId: identity.data.id };

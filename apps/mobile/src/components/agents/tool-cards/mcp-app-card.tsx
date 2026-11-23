@@ -18,6 +18,7 @@ import {
   VIEW_HOST_PAGE,
   viewArguments,
   viewHeightOf,
+  viewSizeLimit,
 } from '@/lib/chat/remote-mcp-app';
 import { type RemoteMcpToolView } from '@/lib/chat/remote-mcp-state';
 import { deviceZone } from '@/lib/chat/tool-set';
@@ -54,11 +55,12 @@ type ViewState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'document'; readonly html: string }
   | { readonly kind: 'empty' }
+  | { readonly kind: 'tooLarge' }
   | { readonly kind: 'unavailable' };
 
-/** The page's call that puts a document in the sandbox, as a JS literal. */
-const mountCall = (html: string): string =>
-  `window.kiloMcpHost.mount(${JSON.stringify(html)});true;`;
+/** The page's call that puts a labeled document in the sandbox, as a JS literal. */
+const mountCall = (html: string, title: string): string =>
+  `window.kiloMcpHost.mount(${JSON.stringify(html)}, ${JSON.stringify(title)});true;`;
 
 /** The page's call that posts one bridge message into the sandbox. */
 const deliverCall = (text: string): string =>
@@ -163,7 +165,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
             webView.current?.injectJavaScript(deliverCall(text));
           },
         });
-        webView.current?.injectJavaScript(mountCall(html));
+        webView.current?.injectJavaScript(mountCall(html, t('modelChat.mcp.app.label')));
       } catch {
         // The handshake or the mount failed: the row says so and offers a retry.
         if (active) {
@@ -175,10 +177,10 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
     return () => {
       active = false;
     };
-  }, [pageLoaded, documentState, dark, i18n.language, part, view]);
+  }, [pageLoaded, documentState, dark, t, i18n.language, part, view]);
 
   return (
-    <View style={{ height }} className="overflow-hidden rounded-lg bg-secondary">
+    <View style={{ height }} className="overflow-hidden rounded-lg">
       <WebView<unknown>
         // A retry gets a page of its own: a page that failed to load has no
         // host object left to hand a document to.
@@ -218,6 +220,13 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
         <View className="absolute inset-0 items-center justify-center px-4">
           <Text className="text-center text-xs text-muted-foreground">
             {t('modelChat.mcp.app.empty')}
+          </Text>
+        </View>
+      ) : null}
+      {documentState.kind === 'tooLarge' ? (
+        <View className="absolute inset-0 items-center justify-center px-4">
+          <Text className="text-center text-xs text-muted-foreground">
+            {t('modelChat.mcp.app.tooLarge', { size: viewSizeLimit(i18n.language) })}
           </Text>
         </View>
       ) : null}

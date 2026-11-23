@@ -49,6 +49,7 @@ const NORDLICHT = {
   role: 'member',
 };
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
@@ -89,6 +90,7 @@ vi.mock('@/lib/chat/use-chat', async () => {
         chats: state.chats,
         isLoading: false,
         isError: false,
+        isSuccess: true,
         refetch: () => undefined,
         remove: async () => {
           await Promise.resolve();
@@ -106,8 +108,12 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [{ id: 'm1', name: 'One', isPreferred: true }],
     isLoading: false,
     isError: false,
+    isFetched: true,
     refetch: () => undefined,
   }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff', mutedForeground: '#6F6A61' }),
@@ -141,25 +147,39 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1, width: 400, height: 800 }),
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 16, FAB_SIZE: 56 }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The account row is the screen's inline header action; render it so the
+  // tests can reach the control the tab actually shows.
+  ScreenHeader: (props: { inlineActions?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.inlineActions),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   MessageCircle: 'MessageCircle',
+  MessageCirclePlus: 'MessageCirclePlus',
   Plus: 'Plus',
   Server: 'Server',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/chat/chat-row', () => ({ ChatRow: 'ChatRow' }));
+// The list's notice reads the encrypted store, whose native modules this
+// account-row suite does not load; a store that was never reset is the state
+// under test here.
+vi.mock('@/lib/persist/use-local-reset-notice', () => ({
+  useLocalResetNotice: () => ({ notice: { kind: 'absent' }, dismiss: () => undefined }),
+}));
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
 vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => [] }));
 vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));

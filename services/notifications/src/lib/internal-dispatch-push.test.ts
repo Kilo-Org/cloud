@@ -190,7 +190,7 @@ describe('dispatchInternalPushCore', () => {
         badge: null,
         push: {
           title: 'Kilo',
-          body: 'Active agents have an update',
+          body: 'Your agent brief is ready',
           data: { type: 'agent_briefing', url: '/agent-briefing' },
           sound: 'default',
           priority: 'default',
@@ -344,7 +344,7 @@ describe('dispatchInternalPushCore', () => {
     {
       notificationKind: 'new_finding' as const,
       severity: 'critical',
-      expectedTitle: 'New security finding (critical)',
+      expectedTitle: 'New security finding (Critical)',
       expectedI18nKey: 'internal.securityFindingNew',
     },
     {
@@ -393,6 +393,21 @@ describe('dispatchInternalPushCore', () => {
       } satisfies DispatchPushInput);
     }
   );
+
+  it('security_finding keeps a severity this build does not know in the stored title', async () => {
+    const { deps, calls } = fakeDeps();
+    const input = securityFinding({ severity: 'moderate', title: 'XSS in admin' });
+    const result = await dispatchInternalPushCore(input, deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+    expect(calls.dispatchPushInputs[0]?.push.title).toBe('New security finding (moderate)');
+    expect(calls.dispatchPushInputs[0]?.push.i18nParams).toEqual({
+      severity: 'moderate',
+      findingTitle: 'XSS in admin',
+      repoFullName: 'acme/api',
+    });
+  });
 
   it('security_finding with ghsaId set uses advisory-identity idempotency key', async () => {
     const { deps, calls } = fakeDeps();

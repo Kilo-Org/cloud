@@ -3,10 +3,11 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Tá nuashonrú ar do sheisiún ghníomhaire",
-      "lowBalance": "Teastaíonn aird ar do chothromas",
+      "lowBalance": "Teastaíonn aird ar d'iarmhéid",
       "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
+      "agentBriefing": "Tá do thuarascáil ar ghníomhaíocht an ghníomhaire réidh",
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Foláireamh chothromas íseal",
-      "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
+      "title": "Foláireamh iarmhéid ísil",
+      "body": "Thit iarmhéid {{organizationName}} faoi ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Foláireamh caiteachais",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Tátal slándála nua ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Criticiúil",
+      "high": "Ard",
+      "medium": "Meánach",
+      "low": "Íseal"
     },
     "securityFindingSlaWarning": {
       "title": "Rabhadh SLA"

@@ -11,7 +11,8 @@ import {
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
-import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
+import { ConsentDetails } from './consent-details';
+import { VoiceTranscriptionControl } from './voice-transcription-control';
 
 // ---- mocks ----
 
@@ -348,9 +349,6 @@ describe('ConsentDetails copy', () => {
     if (!link) {
       throw new Error('privacy link not found');
     }
-    // A real 28dp box plus the vertical slop: the control-size audit reads the
-    // node's own rect, and the 14dp text line alone was reported as too small
-    // to tap; the slop carries the 44pt region.
     // Test renderer props are untyped (`any` from the JSON tree); name them once.
     const props = link.props as { className?: string; hitSlop?: { top?: number; bottom?: number } };
     expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
@@ -410,8 +408,6 @@ describe('Voice transcription section', () => {
 
     const strings = findTextStrings(renderer.root);
     expect(strings).toContain('On device');
-    // The row label is the neutral section name. "Online transcription" next
-    // to an "On device" value contradicted itself (vr1 review, 2026-09-07).
     expect(strings).toContain('Voice transcription');
     expect(strings).not.toContain('Online transcription');
     expect(findSwitches(renderer.root).length).toBe(0);
@@ -489,8 +485,6 @@ describe('Voice transcription section', () => {
     const renderer = mountVoiceControl();
 
     const strings = findTextStrings(renderer.root);
-    // Regression: the row printed "On device" from supportsOnDevice() while
-    // the gateway engine was the one that actually ran.
     expect(strings).toContain('Via the Kilo gateway');
     expect(strings).not.toContain('On device');
     expect(findSwitches(renderer.root).length).toBe(0);
@@ -509,9 +503,6 @@ describe('Voice transcription section', () => {
   });
 
   it('shows the loading placeholder while the stored voice-language read resolves', async () => {
-    // The SecureStore read can take seconds on a slow keychain; deriving from
-    // the app-language default in that window would claim a mode for a stored
-    // choice that may exist (vr2 review, 2026-10-19). The gate waits for it.
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
     voiceLanguageGateMock.languageLoaded = false;
     const renderer = mountVoiceControl();

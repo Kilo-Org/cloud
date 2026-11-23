@@ -26,6 +26,12 @@ describe('filterNavigatorFiles', () => {
     expect(filterNavigatorFiles(files, 'APP')).toEqual([files[0]]);
   });
 
+  it('matches an accented query against an unaccented path', () => {
+    const files = [makeFile('src/cafe.ts')];
+    expect(filterNavigatorFiles(files, 'src/café')).toEqual(files);
+    expect(filterNavigatorFiles(files, 'src/cafe')).toEqual(files);
+  });
+
   it('returns [] when nothing matches', () => {
     const files = [makeFile('a.ts'), makeFile('b.ts')];
     expect(filterNavigatorFiles(files, 'zzz')).toEqual([]);

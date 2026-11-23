@@ -2,12 +2,13 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "သင့် agent session တွင် အသစ်အဆန်း ရှိသည်",
+      "cloudAgentSession": "သင့် အေးဂျင့် session တွင် အသစ်အဆန်း ရှိသည်",
       "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
       "spendAlert": "သင့်အသုံးစရိတ် အာရုံစိုက်ရန် လိုအပ်သည်",
       "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်",
       "securityUpdate": "လုံခြုံရေး စစ်ဆေးမှုတွင် အသစ်အဆန်း ရှိသည်",
-      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
+      "agentBriefing": "သင့် အေးဂျင့် အစီရင်ခံစာ အဆင်သင့် ဖြစ်ပါပြီ",
+      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော အေးဂျင့်များတွင် အသစ်အဆန်း ရှိသည်"
     }
   },
   "agentSession": {
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "အလွန်ပြင်းထန်",
+      "high": "မြင့်",
+      "medium": "အလယ်အလတ်",
+      "low": "နိမ့်"
     },
     "securityFindingSlaWarning": {
       "title": "SLA သတိပေးချက်"

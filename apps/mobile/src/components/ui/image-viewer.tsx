@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Platform, Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { ResumableZoom } from 'react-native-zoom-toolkit';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -12,7 +13,6 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Sheet } from '@/components/ui/sheet';
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -70,13 +70,7 @@ export function ImageViewer({
   // swallow the gutter. Zero insets collapse the wrapper style to `undefined`,
   // so portrait pixels are byte-identical and a rotation never moves anything
   // vertically.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
-      ? {
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-        }
-      : undefined;
+  const sideInsetStyle = useSideInsetStyle();
 
   const [imageError, setImageError] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -188,7 +182,10 @@ export function ImageViewer({
               <CenteredState className="w-full">
                 <View className="flex-row items-center justify-center gap-2 px-6">
                   <AlertCircle size={14} color="#ffffff" />
-                  <Text className="text-xs text-white">{t('common.imageUnavailable')}</Text>
+                  <AccessibleStatus
+                    message={t('common.imageUnavailable')}
+                    className="text-xs text-white"
+                  />
                 </View>
               </CenteredState>
             ) : null}

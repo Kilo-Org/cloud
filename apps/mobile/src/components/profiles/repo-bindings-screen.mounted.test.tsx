@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one mounted suite pins loading, both error classifications, the add pickers, unbind and search */
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -19,6 +21,14 @@ import { waitFor } from '@/test/render-with-providers';
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 type TestProfile = { id: string; name: string; isDefault: boolean };
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
+
 // The picker row for a private repository carries its privacy in the
 // accessible name, so it is matched by that name, never the bare full name.
 const PRIVATE_REPO_LABEL = 'acme/api, private repository';
@@ -26,8 +36,10 @@ const PRIVATE_REPO_LABEL = 'acme/api, private repository';
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
+    error: undefined as unknown,
     isLoading: true,
     isError: false,
     isRefetching: false,
@@ -41,6 +53,7 @@ const h = vi.hoisted(() => ({
     repositories: [] as TestRepoOption[],
     isLoading: false,
     isError: false,
+    error: undefined,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -50,6 +63,7 @@ const h = vi.hoisted(() => ({
     effectiveDefaultId: null as string | null,
     isLoading: false,
     isError: false,
+    error: undefined,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -68,8 +82,17 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -90,14 +113,20 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  Plus: 'Plus',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   GitBranch: 'GitBranch',
@@ -107,6 +136,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };
@@ -116,8 +146,10 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 describe('RepoBindingsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
+      error: undefined,
       isLoading: true,
       isError: false,
       isRefetching: false,
@@ -154,14 +186,94 @@ describe('RepoBindingsScreen', () => {
   });
 
   it('retryable: a bindings query failure shows QueryError and Retry refetches', async () => {
-    Object.assign(h.bindingsQuery, { isError: true, isLoading: false });
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
-    const queryError = findOne(renderer.root, 'QueryError');
-    expect(queryError.props.title).toBe("Couldn't load profiles");
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.variant).toBe('server');
     act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
+      queryError.onRetry?.();
+    });
+    expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    // The permission title already says access was denied, so the added line
+    // names who can grant it instead of repeating the title.
+    expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('forbidden: the header offers no create control on a terminal read failure', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The screen is not showing this profile's bindings at all, so it must not
+    // offer to add one from the header.
+    expect(
+      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Add default')
+    ).toBe(false);
+    expect(findOne(renderer.root, 'ScreenHeader').props.children).toBeUndefined();
+
+    unmount();
+  });
+
+  it('happy: the header offers the create control when the read succeeds', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(
+      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Add default')
+    ).toBe(true);
+    expect(findOne(renderer.root, 'ScreenHeader').props.children).toBeDefined();
+
+    unmount();
+  });
+
+  it('offline: keeps the load-failure title and a Retry that refetches', async () => {
+    h.connectivity = 'offline';
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('offline');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
 
@@ -308,6 +420,28 @@ describe('RepoBindingsScreen', () => {
     expect(
       findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/infra')
     ).toBe(true);
+
+    unmount();
+  });
+
+  it('closes the Add flow when the read turns terminal under it', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select repository…');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The same read now answers terminally: the screen shows the access state,
+    // so the sheet the removed form opened must close with it.
+    Object.assign(h.bindingsQuery, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('permission');
 
     unmount();
   });

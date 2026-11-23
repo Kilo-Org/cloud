@@ -80,9 +80,33 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
   });
 }
 
-/** Press the empty state's action, the button the manage slot renders for a manager. */
+/**
+ * Press a row's content press by the action it opens: the name starts with the
+ * action and continues with the facts the row paints under the server name
+ * (its type, key count and command or URL), which one element cannot split.
+ */
+export function pressRowContentPress(root: ReactTestInstance, action: string): void {
+  const pressable = findAll(root, 'Pressable').find(node => {
+    const label: unknown = node.props.accessibilityLabel;
+    return typeof label === 'string' && (label === action || label.startsWith(`${action}, `));
+  });
+  if (!pressable) {
+    throw new Error(`row content press ${action} was not rendered`);
+  }
+  const onPress: unknown = pressable.props.onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError(`row content press ${action} has no handler`);
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const press = onPress as () => void;
+  act(() => {
+    press();
+  });
+}
+
+/** Press the empty state's action, the `StateAction` the manage slot renders for a manager. */
 export function pressEmptyAction(renderer: ReactTestRenderer): void {
-  const button = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  const button = findAll(findOne(renderer.root, 'EmptyState'), 'StateAction')[0];
   if (!button) {
     throw new Error('the empty state has no action button');
   }

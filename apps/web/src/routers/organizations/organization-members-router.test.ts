@@ -4,6 +4,8 @@ import {
   createOrganization,
   addUserToOrganization,
   updateUserRoleInOrganization,
+  inviteUserToOrganization,
+  ORGANIZATION_MISSING_MESSAGE,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   admin_action_audit_logs,
@@ -100,6 +102,9 @@ jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => {
     ...actual,
     updateUserRoleInOrganization: jest.fn(
       actual.updateUserRoleInOrganization as typeof updateUserRoleInOrganization
+    ),
+    inviteUserToOrganization: jest.fn(
+      actual.inviteUserToOrganization as typeof inviteUserToOrganization
     ),
   };
 });
@@ -957,6 +962,61 @@ describe('organizations members trpc router', () => {
         });
         expect(remainingMembership).toBeUndefined();
         expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(target.id, child.id);
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('records the parent organization name on child membership audit rows', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      const child = await createChildOrganization('Parent Name Child Members', childOwner.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
+      const input = { organizationId: testOrganization.id, memberId: target.id };
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [child.id],
+          })
+        ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+
+        const addedAudits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, child.id),
+              sql`${organization_audit_logs.details}->>'id' = 'member.parentAdded'`
+            )
+          );
+        expect(addedAudits).toHaveLength(1);
+        expect(addedAudits[0].details).toMatchObject({
+          id: 'member.parentAdded',
+          parent: testOrganization.name,
+        });
+        expect(addedAudits[0].details).not.toMatchObject({ parent: testOrganization.id });
+
+        await expect(
+          caller.organizations.members.setChildMemberships({ ...input, childOrganizationIds: [] })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
+
+        const removedAudits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, child.id),
+              sql`${organization_audit_logs.details}->>'id' = 'member.parentRemoved'`
+            )
+          );
+        expect(removedAudits).toHaveLength(1);
+        expect(removedAudits[0].details).toMatchObject({
+          id: 'member.parentRemoved',
+          parent: testOrganization.name,
+        });
       } finally {
         await cleanupChildOrganizations([child.id]);
       }
@@ -2372,6 +2432,36 @@ describe('organizations members trpc router', () => {
           message: 'This user is already a member of this organization',
         });
       });
+    });
+
+    it('maps a deleted organization to NOT_FOUND', async () => {
+      // The invited organization row can disappear between the mutation's own
+      // 404 check and the invite write; the catch block must turn the library
+      // error into NOT_FOUND. SWC makes ESM exports non-configurable, so the
+      // module's mock factory above is the way to simulate the rejection.
+      const invite = jest.mocked(inviteUserToOrganization);
+      const realInvite = invite.getMockImplementation();
+      invite.mockImplementationOnce(
+        () => Promise.reject(new Error(ORGANIZATION_MISSING_MESSAGE)) as never
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.organizations.members.invite({
+            organizationId: testOrganization.id,
+            email: `${crypto.randomUUID()}@deleted-org.example.com`,
+            role: 'member',
+          })
+        ).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+          message: ORGANIZATION_MISSING_MESSAGE,
+        });
+      } finally {
+        if (realInvite) {
+          invite.mockImplementation(realInvite as never);
+        }
+      }
     });
 
     it('creates one invitation when the same new address is invited twice at once', async () => {

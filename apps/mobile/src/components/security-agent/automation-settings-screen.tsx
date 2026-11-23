@@ -1,28 +1,38 @@
 /* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the include-existing rows and severity pickers join their section heading to their accessible name */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { CircleCheck, Clock, GitPullRequest, ScanSearch, Trash2 } from '@/components/ui/icons';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
+  useRetrySecurityAgentConfig,
+  useRetrySecurityAgentSettings,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -48,27 +58,17 @@ const CONFIDENCE_OPTIONS = [
   { value: 'low', labelKey: 'securityAgent.automation.confidenceAny' },
 ] as const satisfies readonly { value: ConfidenceThreshold; labelKey: string }[];
 
-/** One titled settings group: the section heading above its own tighter stack. */
-function Section({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
-  return (
-    <View className="gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      <View className="gap-3">{children}</View>
-    </View>
-  );
-}
-
 function AutomationSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.automation.title')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
+      <ScreenHeader title={t('securityAgent.automation.title')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
+          <RowSkeleton tile subtitle />
+          <RowSkeleton tile subtitle />
+        </RowGroup>
       </View>
     </View>
   );
@@ -86,14 +86,20 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   }));
   const analysisSection = t('securityAgent.automation.autoAnalysis');
   const remediationSection = t('securityAgent.automation.autoRemediation');
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  // Only a settled denial disables the controls: a failed or still-unanswered role
+  // read is not evidence that the viewer cannot manage the settings.
+  const readOnly = capability.status === 'denied';
+  const settingsRecovery = useRetrySecurityAgentSettings(scope);
   const config = useSecurityAgentConfig(scope);
   const connectivity = useCommittedConnectivityStatus();
+  const capabilityPaused = isReadPausedBeforeData({ ...capability, connectivity });
   // This screen announces the outcome itself: the queued count when the save
   // schedules existing findings, the generic confirmation otherwise.
   const save = useSaveSecurityAgentConfig(scope, { announceSaved: false, announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const pausedRetry = useRetrySecurityAgentConfig(scope);
 
   const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(false);
   const [autoAnalysisMinSeverity, setAutoAnalysisMinSeverity] = useState<MinSeverity>('all');
@@ -211,16 +217,35 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   });
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}
+        errorTitle={t('securityAgent.automation.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
+      />
+    );
+  }
+  // A first read the online manager paused (the app's connectivity is known,
+  // offline or online) can never finish: the loading gate would hold the
+  // skeleton until connectivity returns. Name the connection and offer Retry,
+  // like the findings filter sheet's paused branch does.
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
+    return (
+      <PlatformErrorScreen
+        title={t('securityAgent.automation.title')}
+        errorTitle={t('securityAgent.automation.couldNotLoad')}
+        variant="offline"
+        onRetry={() => {
+          void pausedRetry.retry();
+        }}
+        isRetrying={pausedRetry.isRetrying}
       />
     );
   }
@@ -241,11 +266,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.automation.title')}
         onBack={onBack}
         headerRight={
-          canManage ? (
+          readOnly ? undefined : (
             <SettingsSaveButton
               dirty={dirty}
               valid={valid}
@@ -253,19 +277,31 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               onSave={handleSave}
               skipNextGuardRef={skipNextGuardRef}
             />
-          ) : undefined
+          )
         }
       />
       {feedback.node}
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
-        <Section title={analysisSection}>
-          <ToggleRow
-            title={t('securityAgent.automation.analyzeNewFindings')}
-            subtitle={t('securityAgent.automation.autoAnalysisDescription')}
-            value={autoAnalysisEnabled}
-            disabled={!canManage}
-            onValueChange={setAutoAnalysisEnabled}
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        {capability.status === 'error' || capabilityPaused ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+            isRetrying={settingsRecovery.isRetrying}
+            onRetry={() => {
+              void settingsRecovery.retry();
+            }}
           />
+        ) : null}
+        <Section label={analysisSection}>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={ScanSearch}
+              title={t('securityAgent.automation.analyzeNewFindings')}
+              subtitle={t('securityAgent.automation.autoAnalysisDescription')}
+              value={autoAnalysisEnabled}
+              disabled={readOnly}
+              onValueChange={setAutoAnalysisEnabled}
+            />
+          </RowGroup>
           {autoAnalysisEnabled && (
             <>
               <PillGroup
@@ -278,32 +314,38 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 label={t('securityAgent.automation.minimumSeverity')}
                 options={minSeverityOptions}
                 value={autoAnalysisMinSeverity}
-                disabled={!canManage}
+                disabled={readOnly}
                 onChange={setAutoAnalysisMinSeverity}
               />
-              <ToggleRow
-                title={t('securityAgent.automation.includeExistingFindings')}
-                accessibilityLabel={formatList(
-                  [t('securityAgent.automation.includeExistingFindings'), analysisSection],
-                  i18n.language
-                )}
-                subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
-                value={autoAnalysisIncludeExisting}
-                disabled={!canManage}
-                onValueChange={setAutoAnalysisIncludeExisting}
-              />
+              <RowGroup leadingTile>
+                <PreferenceRow
+                  icon={Clock}
+                  title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.includeExistingFindings'), analysisSection],
+                    i18n.language
+                  )}
+                  subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
+                  value={autoAnalysisIncludeExisting}
+                  disabled={readOnly}
+                  onValueChange={setAutoAnalysisIncludeExisting}
+                />
+              </RowGroup>
             </>
           )}
         </Section>
 
-        <Section title={remediationSection}>
-          <ToggleRow
-            title={t('securityAgent.automation.openFixPrs')}
-            subtitle={t('securityAgent.automation.autoRemediationDescription')}
-            value={autoRemediationEnabled}
-            disabled={!canManage}
-            onValueChange={handleAutoRemediationToggle}
-          />
+        <Section label={remediationSection}>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={GitPullRequest}
+              title={t('securityAgent.automation.openFixPrs')}
+              subtitle={t('securityAgent.automation.autoRemediationDescription')}
+              value={autoRemediationEnabled}
+              disabled={readOnly}
+              onValueChange={handleAutoRemediationToggle}
+            />
+          </RowGroup>
           {autoRemediationEnabled && (
             <>
               <PillGroup
@@ -314,51 +356,60 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 label={t('securityAgent.automation.minimumSeverity')}
                 options={minSeverityOptions}
                 value={autoRemediationMinSeverity}
-                disabled={!canManage}
+                disabled={readOnly}
                 onChange={setAutoRemediationMinSeverity}
               />
-              <ToggleRow
-                title={t('securityAgent.automation.includeExistingFindings')}
-                accessibilityLabel={formatList(
-                  [t('securityAgent.automation.includeExistingFindings'), remediationSection],
-                  i18n.language
-                )}
-                subtitle={t('securityAgent.automation.includeExistingFindingsRemediationSubtitle')}
-                value={autoRemediationIncludeExisting}
-                disabled={!canManage}
-                onValueChange={setAutoRemediationIncludeExisting}
-              />
-              <ToggleRow
-                title={t('securityAgent.automation.requireApproval')}
-                subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
-                value={autoRemediationRequireApproval}
-                disabled={!canManage}
-                onValueChange={setAutoRemediationRequireApproval}
-              />
+              <RowGroup leadingTile>
+                <PreferenceRow
+                  icon={Clock}
+                  title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.includeExistingFindings'), remediationSection],
+                    i18n.language
+                  )}
+                  subtitle={t(
+                    'securityAgent.automation.includeExistingFindingsRemediationSubtitle'
+                  )}
+                  value={autoRemediationIncludeExisting}
+                  disabled={readOnly}
+                  onValueChange={setAutoRemediationIncludeExisting}
+                />
+                <PreferenceRow
+                  icon={CircleCheck}
+                  title={t('securityAgent.automation.requireApproval')}
+                  subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
+                  value={autoRemediationRequireApproval}
+                  disabled={readOnly}
+                  onValueChange={setAutoRemediationRequireApproval}
+                />
+              </RowGroup>
             </>
           )}
         </Section>
 
-        <Section title={t('securityAgent.automation.autoDismiss')}>
-          <ToggleRow
-            title={t('securityAgent.automation.dismissNonExploitable')}
-            subtitle={t('securityAgent.automation.autoDismissDescription')}
-            value={autoDismissEnabled}
-            disabled={!canManage}
-            onValueChange={setAutoDismissEnabled}
-          />
+        <Section label={t('securityAgent.automation.autoDismiss')}>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Trash2}
+              title={t('securityAgent.automation.dismissNonExploitable')}
+              subtitle={t('securityAgent.automation.autoDismissDescription')}
+              value={autoDismissEnabled}
+              disabled={readOnly}
+              onValueChange={setAutoDismissEnabled}
+            />
+          </RowGroup>
           {autoDismissEnabled && (
             <PillGroup
               label={t('securityAgent.automation.confidenceThreshold')}
               options={confidenceOptions}
               value={autoDismissConfidenceThreshold}
-              disabled={!canManage}
+              disabled={readOnly}
               onChange={setAutoDismissConfidenceThreshold}
             />
           )}
         </Section>
 
-        {!canManage && (
+        {readOnly && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>

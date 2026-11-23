@@ -69,6 +69,9 @@ const {
   resolveLeadingPendingPermissionId,
   resolvePendingPermissionId,
 } = await import('@/lib/glanceable/pending-permission');
+// The unreadable-projection error has its own module; one class per file.
+const { PendingPermissionUnreadableError } =
+  await import('@/lib/glanceable/pending-permission-unreadable-error');
 // The real ack store: the republish's counts must read it, so the suite drives
 // it rather than replacing it.
 const { ackSessionAttention, isAttentionAcked, __resetSessionAttentionForTests } =
@@ -87,6 +90,17 @@ function connectedFrame(permissionIds: readonly string[]): CloudAgentEvent {
         permissions: permissionIds.map(id => ({ id })),
       },
     },
+  };
+}
+
+/** A `connected` frame carrying a raw `data` payload, decoded or not. */
+function connectedFrameWithData(data: unknown): CloudAgentEvent {
+  return {
+    eventId: 1,
+    sessionId: 'agent_1',
+    streamEventType: 'connected',
+    timestamp: '2026-01-01T00:00:00.000Z',
+    data,
   };
 }
 
@@ -246,6 +260,41 @@ describe('resolvePendingPermissionId', () => {
       { getTicket: resolveTicket, createConnection: stream.open }
     );
     expect(match).toEqual({ kind: 'none' });
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects as unreadable for a decodable frame with no projection', async () => {
+    // The control plane omits the projection when it holds no snapshot: absence is unknown, not empty.
+    const stream = fakeStream([connectedFrameWithData({})]);
+    const pending = resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'an identity this module cannot reduce to an id',
+      {
+        pendingInteractions: {
+          revision: 1,
+          questions: [],
+          permissions: [{ requestID: 'perm_x' }],
+        },
+      },
+    ],
+    ['an empty id', { pendingInteractions: { permissions: [{ id: '' }] } }],
+    ['a projection that is not an object', { pendingInteractions: 'nope' }],
+  ])('rejects as unreadable for %s and closes the stream', async (_label, data) => {
+    // A frame this module cannot decode is no proof that nothing is pending.
+    const stream = fakeStream([connectedFrameWithData(data)]);
+    const pending = resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
     expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
@@ -439,6 +488,35 @@ describe('resolveLeadingPendingPermissionId', () => {
     ).resolves.toBeNull();
   });
 
+  it('rejects as unreadable for a decodable frame with no projection', async () => {
+    const stream = fakeStream([connectedFrameWithData({})]);
+    const pending = resolveLeadingPendingPermissionId(
+      { cloudAgentSessionId: 'agent_1' },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects as unreadable when the projection carries no id this module can read', async () => {
+    // The leading read names no request it did not observe, so it fails instead.
+    const stream = fakeStream([
+      connectedFrameWithData({
+        pendingInteractions: {
+          revision: 1,
+          questions: [],
+          permissions: [{ requestID: 'perm_x' }],
+        },
+      }),
+    ]);
+    const pending = resolveLeadingPendingPermissionId(
+      { cloudAgentSessionId: 'agent_1' },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects with the retryable timeout, like the matching read', async () => {
     const stream = fakeStream([]);
     const deadlines: (() => void)[] = [];
@@ -531,6 +609,24 @@ describe('runGlanceableApprove', () => {
     expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
   });
 
+  it('is retryable, and answers nothing, when the projection cannot be read', async () => {
+    // The frame carries no id this module can read, so the ask's bound request
+    // is not among the ids the read observed. Nothing is answered, and the ask
+    // stays retryable because it may still be pending.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    createConnection.mockImplementation(
+      fakeStream([
+        connectedFrameWithData({
+          pendingInteractions: { permissions: [{ requestID: 'perm_1' }] },
+        }),
+      ]).open
+    );
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
+  });
+
   it('is retryable, with no request read, while the ask names no request', async () => {
     // A record with no binding cannot name a request, so the tap resolves
     // nothing and answers nothing.
@@ -544,11 +640,6 @@ describe('runGlanceableApprove', () => {
   });
 
   it('acks the answered raise so the republish counts it as answered', async () => {
-    // The tray row keeps reading permission until the control plane's status
-    // sync lands, and the caller republishes immediately after this resolves.
-    // Without the ack the republish would draw the answered session as still
-    // waiting, with Approve back on the ongoing notification it was just
-    // answered from.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockResolvedValue(undefined);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
@@ -764,11 +855,6 @@ describe('refreshGlanceableSnapshot', () => {
   });
 
   it('counts a raise the answer acked as answered while its tray row still trails', async () => {
-    // The tray keeps reading permission until the control plane's status sync
-    // lands, and this poll runs immediately after the answer. Counting the raw
-    // row would republish the pre-action snapshot — the answered session still
-    // waiting — on the ongoing card and the widget, which is what the ack is
-    // for. The poll still reads the raw row: that is what proves the sync.
     ackSessionAttention('ses_1', 'permission');
     const publisher = makePublisher();
     const rows = [{ id: 'ses_1', status: 'permission' }];
@@ -884,9 +970,6 @@ describe('refreshGlanceableSnapshot', () => {
       { sleep: vi.fn(), deadlineMs: 0 }
     );
 
-    // The skip happens at selection, not after it: recording the answered row
-    // would put Approve back on the surface the user already actioned, and
-    // discarding it after selection left a second waiting session unrecorded.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       context: { userId: 'user_1', organizationId: null },
       skipWaitingAskSessionId: 'ses_1',

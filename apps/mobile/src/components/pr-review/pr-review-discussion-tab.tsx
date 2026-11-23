@@ -38,7 +38,9 @@
 //                   conversation comments AND no terminal error;
 //                   render `EmptyState` with copy covering both
 //                   kinds and a "Review files" CTA that switches
-//                   to the Files tab via `onRequestFiles`.
+//                   to the Files tab via `onRequestFiles`. When the
+//                   server cut the conversation, the CTA is the
+//                   provider link instead: the rest is on its page.
 //
 //   - bottom CTA:   the happy and empty views render a static
 //                   "Comment on this pull request" bar under the
@@ -61,25 +63,25 @@
 // (max-lines extraction). Expansion settle bookkeeping stays here.
 
 import { type FlashListRef } from '@shopify/flash-list';
-import { MessageSquarePlus } from '@/components/ui/icons';
+import { FolderOpen, MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
+import { ProviderViewAction } from '@/components/pr-review/discussion/provider-view-action';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
@@ -91,7 +93,6 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -104,9 +105,12 @@ import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-co
 import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
+import {
+  connectionRefusesWrites,
+  useCommittedConnectivityStatus,
+} from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -160,12 +164,18 @@ export function PrReviewDiscussionTab({
   number,
   onRequestFiles,
 }: PrReviewDiscussionTabProps) {
-  const { query, threads, conversation, firstPageErrorState, laterPageError } =
-    usePrReviewDiscussionThreads({
-      owner,
-      repo,
-      number,
-    });
+  const {
+    query,
+    threads,
+    conversation,
+    conversationTruncated,
+    firstPageErrorState,
+    laterPageError,
+  } = usePrReviewDiscussionThreads({
+    owner,
+    repo,
+    number,
+  });
 
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -174,6 +184,7 @@ export function PrReviewDiscussionTab({
   // alone rather than forking the tab per provider.
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
+  const connectivity = useCommittedConnectivityStatus();
   const router = useRouter();
 
   // s4: the tab is the only place that owns the own-comment writes. Edit pushes
@@ -211,7 +222,7 @@ export function PrReviewDiscussionTab({
   // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
   // className gutter must survive portrait untouched (inline style wins over
   // className). Same treatment as the diff floating-actions bar.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
 
   // Full re-sort of every loaded thread + first-page conversation comments
   // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are
@@ -324,20 +335,23 @@ export function PrReviewDiscussionTab({
 
   // ── First-page error / terminal states ─────────────────────────────
   const isEmpty = isDiscussionEmpty(threads, conversation);
-  // A retryable gateway-class failure (retryable or service-unavailable)
-  // with already-loaded rows keeps them: the error renders as a later-page
-  // retry footer, not a tab-level blank.
+  // A recoverable first-page failure (retryable, a gateway failure, or a read
+  // that never reached the server) with already-loaded rows keeps them: the
+  // error renders as a later-page retry footer, not a tab-level blank. Losing
+  // the connection is not a reason to drop what the reader already had.
   const retainedContentError =
     !isEmpty &&
     (firstPageErrorState?.kind === 'retryable' ||
-      firstPageErrorState?.kind === 'service-unavailable');
+      firstPageErrorState?.kind === 'service-unavailable' ||
+      firstPageErrorState?.kind === 'offline');
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,
     // A pending page whose fetch is paused (offline, or a fetch that will
-    // never start) has no end — the retryable state, not the skeleton (spot
-    // check e7).
+    // never start) has no end — a failure state, not the skeleton (spot check
+    // e7), and the connection's own when it is the cause.
     isPaused: query.isPaused,
+    isOffline: connectivity === 'offline',
     isEmpty,
   });
 
@@ -412,6 +426,24 @@ export function PrReviewDiscussionTab({
     </View>
   );
 
+  // The server cut the conversation at its page ceiling while the page still
+  // carried comments: the rest is on the provider's page, so that page is the
+  // empty body's way out. A complete conversation keeps the Files action.
+  const conversationCut = conversationTruncated && conversation.length > 0;
+  // The empty body's one way out, in that order.
+  let emptyAction: ReactNode = null;
+  if (conversationCut) {
+    emptyAction = <ProviderViewAction prRef={ref} />;
+  } else if (onRequestFiles) {
+    emptyAction = (
+      <StateAction
+        label={t('prReview.discussion.reviewFiles')}
+        icon={FolderOpen}
+        onPress={onRequestFiles}
+      />
+    );
+  }
+
   // The tab owns the empty copy for both the empty view and the list, whose
   // blocked / muted filter can remove every row the page returned. The list
   // renders this node instead of its rows when that happens, so the body never
@@ -425,18 +457,7 @@ export function PrReviewDiscussionTab({
           ? t('prReview.terms.noDiscussionDescription')
           : t('prReview.discussion.noDiscussionDescription')
       }
-      action={
-        onRequestFiles ? (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
-            onPress={onRequestFiles}
-            accessibilityLabel={t('prReview.discussion.reviewFiles')}
-          >
-            <Text>{t('prReview.discussion.reviewFiles')}</Text>
-          </Button>
-        ) : null
-      }
+      action={emptyAction}
     />
   );
 
@@ -485,9 +506,26 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           <PrReviewReconnectNotice />
         </CenteredState>
+        {dialog}
+      </>
+    );
+  }
+  if (view.kind === 'offline') {
+    // The read never reached the server (or the device is offline before the
+    // first page started): name the connection, not the backend, and keep the
+    // Retry a restored network makes useful.
+    return (
+      <>
+        <QueryError
+          variant="offline"
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
         {dialog}
       </>
     );
@@ -538,12 +576,12 @@ export function PrReviewDiscussionTab({
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
+          <Card key={index} className="gap-2">
             <Skeleton className="h-3 w-1/2" />
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-6 w-2/3" />
-          </View>
+          </Card>
         ))}
         {dialog}
       </View>
@@ -580,6 +618,7 @@ export function PrReviewDiscussionTab({
         hasNextPage={query.hasNextPage}
         isFetchingNextPage={query.isFetchingNextPage}
         laterPageError={laterPageError || retainedContentError}
+        truncatedConversationCount={conversationCut ? conversation.length : null}
         onLoadMore={() => {
           void query.fetchNextPage();
         }}

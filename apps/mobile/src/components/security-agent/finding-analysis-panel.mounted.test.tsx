@@ -36,6 +36,13 @@ const startAnalysis = vi.hoisted(() => ({
   isPending: false,
 }));
 
+// The deliberate retry for the paused analysis read; a plain `refetch` (the
+// panel's `onRetry` prop) would only join the paused promise.
+const analysisRetry = vi.hoisted(() => ({
+  retry: vi.fn<() => Promise<void>>(),
+  isRetrying: false,
+}));
+
 const useSecurityAnalysisCapacity = vi.hoisted(() =>
   vi.fn((_scope: string, _enabled?: boolean) => capacity)
 );
@@ -57,6 +64,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
@@ -66,6 +74,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
+  useRetrySecurityAnalysis: () => analysisRetry,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
@@ -84,7 +93,10 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
@@ -152,6 +164,9 @@ function renderPanel(
         analysis,
         isLoading: false,
         isError: false,
+        isPending: false,
+        fetchStatus: 'idle',
+        connectivity: 'online',
         onRetry: () => undefined,
         ...props,
       })
@@ -175,6 +190,9 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     capacity.state = 'available';
     startAnalysis.isPending = false;
     startAnalysis.mutate.mockClear();
+    analysisRetry.retry.mockReset();
+    analysisRetry.retry.mockResolvedValue(undefined);
+    analysisRetry.isRetrying = false;
   });
 
   it.each([null, 'completed', 'pending', 'running', 'failed'])(
@@ -227,6 +245,46 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
     act(error.props.onRetry as () => void);
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  // A first read the online manager paused is neither loading nor failed, so
+  // without its own branch it reads as "no analysis yet" and never recovers.
+  it('names the connection for a paused read instead of the empty state', () => {
+    const tree = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'offline',
+    });
+
+    expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.analysis.couldNotLoad'));
+    expect(error.props.isRetrying).toBe(false);
+    act(error.props.onRetry as () => void);
+    expect(analysisRetry.retry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the skeleton and the empty state while connectivity is unsettled', () => {
+    const paused = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'unknown',
+    });
+    expect(paused.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(paused.root.findAllByType(EmptyState)).toHaveLength(1);
+
+    // A read still in flight keeps the panel's loading skeleton.
+    const loading = renderPanel(undefined, {
+      isPending: true,
+      fetchStatus: 'fetching',
+      isLoading: true,
+      connectivity: 'offline',
+    });
+    expect(loading.root.findAllByType(Skeleton)).toHaveLength(2);
+    expect(loading.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(loading.root.findAllByType(EmptyState)).toHaveLength(0);
   });
 
   it.each(['loading', 'error', 'full'] as const)(

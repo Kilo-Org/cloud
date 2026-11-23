@@ -2,12 +2,14 @@
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildAndroidWidgetProps } from '@/glanceable-android/widget-props';
 import { buildGlanceableViewProps } from '@/glanceable-ios/view-props';
 
+import { formatGlanceableCount } from './count-format';
 import { type GlanceableActionFeedback, setSurfaceExtras } from './surface-extras';
 
 /**
@@ -38,6 +40,7 @@ const COPY: Record<string, string> = {
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
+  'common.listJoiner': ', ',
 };
 const translate = (key: string): string => COPY[key] ?? key;
 
@@ -47,26 +50,30 @@ afterEach(() => {
 
 function snapshotFor(
   sessions: { status: string }[],
-  status?: GlanceableAgentsSnapshot['status']
+  status?: GlanceableSnapshotStatusOverride,
+  counts: { running?: number } = {}
 ): GlanceableAgentsSnapshot {
-  return buildGlanceableSnapshot({
-    sessions,
-    userId: 'u1',
-    organizationId: null,
-    now: NOW,
-    previousRevision: 0,
-    ...(status === undefined ? {} : { status }),
-  });
+  return {
+    ...buildGlanceableSnapshot({
+      sessions,
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+      previousRevision: 0,
+      ...(status === undefined ? {} : { status }),
+    }),
+    ...counts,
+  };
 }
 
 /** The state the user sees, as both builders describe it. */
 function visible(snapshot: GlanceableAgentsSnapshot) {
   const ios = buildGlanceableViewProps(snapshot, {}, translate);
-  const android = buildAndroidWidgetProps(snapshot, {}, translate);
+  const android = buildAndroidWidgetProps(snapshot, {}, translate, formatGlanceableCount);
   return {
     statusLine: [ios.statusLine, android.statusLine],
     countLines: [
-      ios.countLines.map(line => ({ ...line, count: String(line.count) })),
+      ios.countLines.map(line => ({ ...line, count: formatGlanceableCount(line.count) })),
       android.countLines,
     ],
     primaryLabel: [ios.primaryLabel, android.primaryLabel],
@@ -87,12 +94,13 @@ describe('iOS and Android widget props parity', () => {
     ],
     ['idle-only', snapshotFor([{ status: 'idle' }])],
     ['scheduled', snapshotFor([{ status: 'scheduled' }])],
-    ['empty', snapshotFor([], 'empty')],
+    ['empty', snapshotFor([])],
     ['waiting', snapshotFor([], 'waiting')],
     ['stale', snapshotFor([{ status: 'busy' }], 'stale')],
     ['expired', snapshotFor([], 'expired')],
     ['signed out', snapshotFor([], 'signed_out')],
     ['privacy', snapshotFor([], 'privacy')],
+    ['four-digit count', snapshotFor([{ status: 'busy' }], undefined, { running: 1234 })],
   ];
 
   it.each(MATRIX)('draws the same status, counts, and actions for %s', (_label, snapshot) => {
@@ -106,6 +114,17 @@ describe('iOS and Android widget props parity', () => {
   it.each(MATRIX)('shows the same compact primary count for %s', (_label, snapshot) => {
     const seen = visible(snapshot);
     expect(seen.primaryLabel[1]).toBe(seen.primaryLabel[0]);
+  });
+
+  it('groups a four-digit count the same way on both surfaces', () => {
+    const seen = visible(snapshotFor([{ status: 'busy' }], undefined, { running: 1234 }));
+    const grouped = formatGlanceableCount(1234);
+    expect(grouped).not.toBe('1234');
+    expect(seen.countLines[1]?.find(line => line.kind === 'running')?.count).toBe(grouped);
+    for (const label of seen.spoken) {
+      expect(label).toContain(grouped);
+      expect(label).not.toContain('1234');
+    }
   });
 
   const FEEDBACK: { label: string; feedback: GlanceableActionFeedback }[] = [

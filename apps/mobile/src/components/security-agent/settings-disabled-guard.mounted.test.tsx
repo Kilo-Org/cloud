@@ -71,9 +71,28 @@ const confirmDialog = vi.hoisted(() => ({
 // The guard is under test end to end: this suite keeps the real
 // useSettingsBackGuard / useConfirmDialog, and stubs only the native surfaces
 // they render through, so the screen-to-dialog wiring is exercised for real.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Brain: 'Brain',
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  Cpu: 'Cpu',
+  FolderGit2: 'FolderGit2',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Search: 'Search',
+  ShieldCheck: 'ShieldCheck',
+  Trash2: 'Trash2',
+  Wrench: 'Wrench',
+  Zap: 'Zap',
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
   Pressable: (props: {
     children?: ReactNode;
     accessibilityLabel?: string;
@@ -101,9 +120,23 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// The deferred swap has its own suite; these screens assert the bounce's
+// destination, so it is dispatched straight into the router mock.
+vi.mock('@/lib/navigation/settled-replace', () => {
+  // One stable object, like the real memoized hook, so the focus effect these
+  // screens register is not torn down on every render.
+  const settled = {
+    replace: (href: unknown) => {
+      router.replace(href);
+    },
+  };
+  return { useSettledReplace: () => settled };
+});
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
+  useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
@@ -148,7 +181,6 @@ vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain', Search: 'Search', Wrench: 'Wrench' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
   radioItemA11y: ({
@@ -180,8 +212,8 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: '
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
     title: string;
     value: boolean;
     disabled: boolean;
@@ -249,7 +281,11 @@ function pressToggle(title: string) {
 }
 
 function pressRadioOption(label: string) {
-  const option = radioOptions.options.find(candidate => candidate.accessibilityLabel === label);
+  // The record accumulates one entry per render, so the newest entry carries
+  // the current frame's `selected` and `onPress` — a segmented segment ignores
+  // a press while it is already selected, and only the latest closure knows
+  // which one that is.
+  const option = radioOptions.options.findLast(candidate => candidate.accessibilityLabel === label);
   if (!option) {
     throw new Error(`radio option not found: ${label}`);
   }

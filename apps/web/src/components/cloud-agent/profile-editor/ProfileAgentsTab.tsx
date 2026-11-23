@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Bot, Pencil, ChevronDown, Info } from 'lucide-react';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +25,7 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
-import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
+import { isRedundantAgentSlug, isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import {
   PERMISSION_TOOLS,
@@ -35,16 +36,6 @@ import {
 } from './agent-permissions';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
-const BUILTIN_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
 
 type Props = {
   profileId: string;
@@ -290,7 +281,7 @@ function AgentForm({
     () =>
       (modelsData?.data ?? []).map(m => ({
         id: m.id,
-        name: m.name,
+        name: modelNameWithRetirement(m),
         isFree: m.isFree,
         mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
         hasUserByokAvailable: m.hasUserByokAvailable,
@@ -312,7 +303,7 @@ function AgentForm({
       toast.error('Slug must start with a letter and contain only letters, digits, and dashes');
       return;
     }
-    if (BUILTIN_SLUGS.has(trimmedSlug)) {
+    if (isReservedAgentSlug(trimmedSlug)) {
       toast.error(`Slug "${trimmedSlug}" conflicts with a built-in agent; pick a different slug`);
       return;
     }

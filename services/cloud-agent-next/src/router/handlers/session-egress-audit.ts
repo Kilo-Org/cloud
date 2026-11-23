@@ -1,4 +1,6 @@
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { TRPCError } from '@trpc/server';
+import { egressAuditStore } from '../../egress/sandbox-egress.js';
 import { withLogTags } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
@@ -47,7 +49,8 @@ export function createSessionEgressAuditHandlers() {
             });
           }
           if (
-            workspace.sandboxProvider !== 'cloudflare-containers' ||
+            workspace.sandboxProvider === undefined ||
+            !egressRequestSupported(workspace.sandboxProvider, workspace) ||
             workspace.sandboxRoute !== undefined ||
             (workspace.sandboxKind !== undefined
               ? workspace.sandboxKind !== 'isolated'
@@ -60,7 +63,7 @@ export function createSessionEgressAuditHandlers() {
           }
 
           return withDORetry(
-            () => ctx.env.SANDBOX_CONTAINERS.getByName(sandboxId),
+            () => egressAuditStore(ctx.env, { logicalSandboxId: sandboxId }),
             sandbox => sandbox.getEgressAudit({ cursor: input.cursor, limit: input.limit }),
             'getEgressAudit'
           );

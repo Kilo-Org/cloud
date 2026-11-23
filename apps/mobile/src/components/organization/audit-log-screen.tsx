@@ -5,6 +5,7 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { auditActionLabel } from '@/components/organization/audit-log-action-label';
+import { auditEntryDetail } from '@/components/organization/audit-log-detail';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { canViewOrgAuditLog } from '@/components/organization/organization-settings-rows';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -12,8 +13,10 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -25,13 +28,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the skeleton's and
-// the empty and footer blocks' `px-6 pt-4` inset is spelled in pixels here.
-// NativeWind's native rem is 14, which makes px-6 21 dp and pt-4 14 dp; 24/16 is
-// the web rem and leaves the rows 3 dp inside those blocks. The tab
-// bar's own bottom padding rides on the footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -39,10 +42,10 @@ const RowSeparator = () => <View className="h-3" />;
 
 function RowSkeleton() {
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
+    </Card>
   );
 }
 
@@ -57,17 +60,20 @@ function formatAuditTime(createdAt: string): string {
 }
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
-  const { t } = useTranslation();
+  const { t, i18n: translation } = useTranslation();
   const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const eventName = auditActionLabel(t, entry.action);
-  // The server's message for the creation action is "Organization <name>
-  // created", which only restates the event name already shown above it. Every
-  // row of this log belongs to this organization, so the row shows neither that
-  // English sentence nor a name a later rename would change.
-  const showsDetail = entry.action !== 'organization.created';
+  // The detail line is built from the structured event the server stored, in
+  // the reader's language. The server's English message is never shown: it is
+  // the web client's sentence, and it carries serialized config JSON for some
+  // events. A row with no structured event — one written before the column
+  // existed, or an event this build has no sentence for — shows its event name
+  // alone rather than an English sentence.
+  const detail = auditEntryDetail(t, translation.language, entry.details);
+  const showsDetail = detail !== undefined;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each
   // keeps its own reading order. One string put the localized date inside the
@@ -81,12 +87,12 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
           // RN defaults `flexShrink` to 0; `min-w-0 shrink` lets the long
           // repeated email give up width and truncate instead of pushing the
           // time off the line.
-          <Text className="min-w-0 shrink text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="min-w-0 shrink" numberOfLines={1}>
             {actor}
           </Text>
         ) : null}
         {time ? (
-          <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="shrink-0" numberOfLines={1}>
             {time}
           </Text>
         ) : null}
@@ -94,18 +100,18 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
     ) : null;
   if (!showsDetail) {
     return (
-      <View className="gap-1 rounded-lg bg-secondary p-3">
+      <Card className="mx-4">
         <Text className="text-sm font-medium text-foreground">{eventName}</Text>
         {metaLine}
-      </View>
+      </Card>
     );
   }
-  // The message runs past two lines for most events, and nothing else in the
-  // app carries it, so the row itself is the detail view: it starts clamped and
-  // a press shows the whole sentence. The row cannot know whether the message
-  // fits two lines without measuring it — a clamped text reports only the lines
-  // it drew — so every event row offers the disclosure, and the reader who
-  // needs nothing more loses nothing by ignoring it.
+  // The detail runs past two lines for most events, and nothing else in the app
+  // carries it, so the row itself is the detail view: it starts clamped and a
+  // press shows the whole line. The row cannot know whether the text fits two
+  // lines without measuring it — a clamped text reports only the lines it drew —
+  // so every event row offers the disclosure, and the reader who needs nothing
+  // more loses nothing by ignoring it.
   return (
     <Pressable
       onPress={() => {
@@ -114,24 +120,26 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
       // the row is open.
-      accessibilityLabel={[eventName, entry.message, [actor, time].filter(Boolean).join(', ')]
+      accessibilityLabel={[eventName, detail, [actor, time].filter(Boolean).join(', ')]
         .filter(Boolean)
         .join('. ')}
       accessibilityState={{ expanded }}
-      className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
+      className="mx-4 active:opacity-70"
     >
-      <View className="flex-row items-center gap-2">
-        {expanded ? (
-          <ChevronUp size={16} color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={16} color={colors.mutedForeground} />
-        )}
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
-      </View>
-      <Text className="text-xs text-muted-foreground" numberOfLines={expanded ? undefined : 2}>
-        {entry.message}
-      </Text>
-      {metaLine}
+      <Card>
+        <View className="flex-row items-center gap-2">
+          {expanded ? (
+            <ChevronUp size={16} color={colors.mutedForeground} />
+          ) : (
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          )}
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
+        </View>
+        <Text variant="caption" numberOfLines={expanded ? undefined : 2}>
+          {detail}
+        </Text>
+        {metaLine}
+      </Card>
     </Pressable>
   );
 });
@@ -182,7 +190,10 @@ export function OrganizationAuditLogScreen() {
           title={t('organization.auditLog.title')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.auditLog.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -192,11 +203,22 @@ export function OrganizationAuditLogScreen() {
   // reading `isFetchNextPageError` rather than `isError` keeps a failed
   // background refetch of page one from replacing the list.
   const isLaterPageError = query.isFetchNextPageError;
+  const isEmptyList = entries.length === 0 && !hasMore && !isLaterPageError;
+
+  // The populated list's reduced-motion band sits above the scroller, never
+  // inside it. Under reduced motion it reserves its own row whether or not a
+  // pull is in flight, so in flow inside the scroll body it would move the
+  // first row at rest and scroll away with the rows; above the scroller it is a
+  // sibling in this screen's own column, which carries no gap, so under motion
+  // its empty box changes nothing. The skeleton and first-page-error branches
+  // carry no pull, and the empty state's own centered scroller draws its band,
+  // so this one belongs to the list branch alone.
+  const showsRefreshBand = !query.isPending && !isFirstPageError && !isEmptyList;
 
   let body: ReactNode = null;
   if (query.isPending) {
     body = (
-      <View className="gap-3 px-6 pt-4">
+      <View className="gap-3 pt-3">
         <RowSkeleton />
         <RowSkeleton />
         <RowSkeleton />
@@ -204,7 +226,7 @@ export function OrganizationAuditLogScreen() {
     );
   } else if (isFirstPageError) {
     body = <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
-  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+  } else if (isEmptyList) {
     body = (
       <EmptyState
         icon={ScrollText}
@@ -217,8 +239,8 @@ export function OrganizationAuditLogScreen() {
     const footer = (
       <View className="pt-3">
         {hasMore && !isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.auditLog.truncated')}
             </Text>
             <Button
@@ -233,8 +255,8 @@ export function OrganizationAuditLogScreen() {
           </View>
         ) : null}
         {isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('common.couldnTLoadMore')}
             </Text>
             <Button
@@ -255,12 +277,13 @@ export function OrganizationAuditLogScreen() {
     body = (
       <FlashList
         style={listStyle}
+        testID="organization-audit-log-list"
         data={entries}
         keyExtractor={item => item.id}
         renderItem={renderItem}
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
-        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponent={<ListTopPad />}
         refreshControl={refreshControl}
         ListFooterComponent={footer}
       />
@@ -270,6 +293,7 @@ export function OrganizationAuditLogScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('organization.auditLog.title')} backFallback={ORGANIZATION_HUB_PATH} />
+      {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
       {body}
     </View>
   );

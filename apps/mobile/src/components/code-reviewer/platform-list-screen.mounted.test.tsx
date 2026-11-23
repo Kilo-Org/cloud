@@ -15,18 +15,30 @@ const refetchMocks = vi.hoisted(() => ({
   github: vi.fn<() => void>(),
   gitlab: vi.fn<() => void>(),
   bitbucket: vi.fn<() => void>(),
+  bitbucketStatus: vi.fn<() => void>(),
 }));
 const membership = vi.hoisted(() => ({
   organizations: [] as { organizationId: string; organizationName: string }[],
 }));
 const status = vi.hoisted(() => ({ error: undefined as unknown }));
+/** The connected value the Bitbucket readiness read answers; GitHub and GitLab never read it. */
+const bitbucketReadiness = vi.hoisted(() => ({ connected: false }));
+/** The Bitbucket integration-status read, which only the Bitbucket row reads. */
+const bitbucketStatus = vi.hoisted(() => ({
+  data: undefined as Record<string, unknown> | undefined,
+  isPending: false,
+  isError: false,
+  error: undefined as unknown,
+}));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
 
 function statusResult(refetch: () => void) {
   return {
-    data: status.error ? undefined : { connected: false },
+    data: status.error
+      ? undefined
+      : { connected: refetch === refetchMocks.bitbucket ? bitbucketReadiness.connected : false },
     isLoading: false,
     isError: status.error !== undefined,
     isFetching: false,
@@ -40,6 +52,18 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useGitHubStatus: () => statusResult(refetchMocks.github),
   useGitLabStatus: () => statusResult(refetchMocks.gitlab),
   useBitbucketReadiness: () => statusResult(refetchMocks.bitbucket),
+  useBitbucketIntegrationStatus: (_scope: string, enabled = true) => ({
+    // A disabled read (personal scope) keeps `isPending` true with no data and
+    // no error — the shape the classifier must not read as loading on this
+    // screen either, because the row itself is hidden there.
+    isLoading: false,
+    isPending: enabled ? bitbucketStatus.isPending : true,
+    isError: enabled ? bitbucketStatus.isError : false,
+    isFetching: false,
+    data: enabled ? bitbucketStatus.data : undefined,
+    error: enabled ? bitbucketStatus.error : undefined,
+    refetch: refetchMocks.bitbucketStatus,
+  }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -50,6 +74,9 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises the platform list.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: router.push, replace: vi.fn() }),
   useFocusEffect: () => undefined,
@@ -64,24 +91,28 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/organization/scope-access-denied-screen', () => ({
   ScopeAccessDeniedScreen: (props: {
     title?: string;
-    eyebrow?: string;
+    subtitle?: string;
     kind?: string;
     onRetry?: () => void;
   }) => createElement('ScopeAccessDeniedScreenMock', props),
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; backFallback?: string }) =>
+  ScreenHeader: (props: { title?: string; subtitle?: string; backFallback?: string }) =>
     createElement('ScreenHeaderMock', {
       title: props.title,
-      eyebrow: props.eyebrow,
+      subtitle: props.subtitle,
       backFallback: props.backFallback,
     }),
 }));
 
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string; onPress?: () => void }) =>
-    createElement('ConfigureRowMock', { title: props.title, onPress: props.onPress }),
+  ConfigureRow: (props: { title?: string; subtitle?: string; onPress?: () => void }) =>
+    createElement('ConfigureRowMock', {
+      title: props.title,
+      subtitle: props.subtitle,
+      onPress: props.onPress,
+    }),
 }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -121,6 +152,14 @@ beforeEach(() => {
   // earlier test would title the next one's scope.
   _resetScopeNamesForTests();
   status.error = undefined;
+  // The default readiness answers "no token integration" and the default
+  // status read answers "no integration" the way the server does for an
+  // organization with none, so the Bitbucket row reads Not connected.
+  bitbucketReadiness.connected = false;
+  bitbucketStatus.data = { method: 'workspace_access_token', status: 'not_connected' };
+  bitbucketStatus.isPending = false;
+  bitbucketStatus.isError = false;
+  bitbucketStatus.error = undefined;
   router.push.mockClear();
   membership.organizations = [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }];
   for (const refetch of Object.values(refetchMocks)) {
@@ -135,8 +174,8 @@ describe('PlatformListScreen organization access', () => {
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
 
     expect(denied?.props.kind).toBe('denied');
-    expect(denied?.props.title).toBe('Drain Labs');
-    expect(denied?.props.eyebrow).toBe('Code Reviewer');
+    expect(denied?.props.title).toBe('Code Reviewer');
+    expect(denied?.props.subtitle).toBe('Drain Labs');
     expect(findByType(renderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {
@@ -144,13 +183,13 @@ describe('PlatformListScreen organization access', () => {
     });
   });
 
-  it('falls back to the generic organization title when the membership list no longer names it', () => {
+  it('falls back to the generic organization subtitle when the membership list no longer names it', () => {
     status.error = denial;
     membership.organizations = [];
     const renderer = mountScreen();
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
 
-    expect(denied?.props.title).toBe('Organization');
+    expect(denied?.props.subtitle).toBe('Organization');
 
     act(() => {
       renderer.unmount();
@@ -185,6 +224,10 @@ describe('PlatformListScreen organization access', () => {
 
     expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'ConfigureRowMock').length).toBeGreaterThan(0);
+    // The granted header is the product over the scope, like the denied one.
+    const header = findByType(renderer.root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Code Reviewer');
+    expect(header?.props.subtitle).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();

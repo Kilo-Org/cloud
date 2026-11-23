@@ -1,4 +1,14 @@
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/app-shared/organizations/model-access-providers';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
+import { type TFunction } from 'i18next';
+import * as z from 'zod';
+
+import { foldForSearch } from '@/i18n/fold-for-search';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
@@ -15,6 +25,8 @@ export type CatalogModel = Readonly<{
   id: string;
   name: string;
   inference_provider_ids?: readonly string[];
+  /** The `yyyy-MM-dd` the model retires, when the catalog entry dates it. */
+  retires_on?: string;
 }>;
 
 export type ModelAccessDraft = {
@@ -23,6 +35,20 @@ export type ModelAccessDraft = {
   /** Models no member may use, whichever provider serves them. */
   modelDenyList: readonly string[];
 };
+
+const modelAccessDraftSchema = z.object({
+  providerAllowList: z.array(z.string()),
+  modelDenyList: z.array(z.string()),
+});
+
+/**
+ * Runtime shape guard for a stored model-access draft: two lists of model and
+ * provider ids. It checks the shape only — which providers a catalog holds, and
+ * whether a list leaves a route open, is the form's own question.
+ */
+export function isModelAccessFormDraft(value: unknown): value is ModelAccessDraft {
+  return modelAccessDraftSchema.safeParse(value).success;
+}
 
 /**
  * The gateway's own normalisation (`normalizeModelId` in web-shared): a variant
@@ -46,7 +72,7 @@ function sortedUnique(values: readonly string[]): string[] {
  */
 export function catalogProviderSlugs(models: readonly CatalogModel[]): string[] {
   const slugs = models.flatMap(model => model.inference_provider_ids ?? []);
-  return sortedUnique(slugs);
+  return sortedUnique(normalizeInferenceProviderIds(slugs));
 }
 
 /**
@@ -64,14 +90,49 @@ export function providerRows(params: {
   available: readonly CatalogModel[];
   savedAllowList: readonly string[] | undefined;
 }): string[] {
-  return sortedUnique([
-    ...catalogProviderSlugs([...params.catalog, ...params.available]),
-    ...(params.savedAllowList ?? []),
-  ]);
+  return sortedUnique(
+    normalizeInferenceProviderIds([
+      ...catalogProviderSlugs([...params.catalog, ...params.available]),
+      ...(params.savedAllowList ?? []),
+    ])
+  );
 }
 
 /** One row of the deny list: a model an admin may allow or deny, by its bare id. */
-export type DenyListModel = Readonly<{ id: string; name: string }>;
+export type DenyListModel = Readonly<{ id: string; name: string; retiresOn?: string }>;
+
+/**
+ * The row's localized retirement note — `Retires Nov 20` alone, worded in the
+ * app language from `retires_on` — and absent when the entry carries no date.
+ * It renders on its own line under the model name, never inside it.
+ */
+export function denyListRowNote(item: DenyListModel, t: TFunction): string | undefined {
+  if (!item.retiresOn) {
+    return undefined;
+  }
+  const date = formatDate(new Date(`${item.retiresOn}T00:00:00Z`), i18n.language, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  return t('common.modelRetires', { date });
+}
+
+/**
+ * The two entry shapes the lists read: a `CatalogModel` (whose date is
+ * `retires_on`) and a built row.
+ */
+type DenyListEntry = Pick<CatalogModel, 'id' | 'name'> &
+  Partial<Pick<CatalogModel, 'retires_on' | 'inference_provider_ids'>>;
+
+/** The row a deny list renders from a catalog or available entry. */
+function denyRow(model: DenyListEntry): DenyListModel {
+  return {
+    id: normalizeModelId(model.id),
+    name: model.name,
+    ...(model.retires_on ? { retiresOn: model.retires_on } : {}),
+  };
+}
 
 /**
  * Every model the deny list can show, one row per bare id — the same list the
@@ -82,23 +143,23 @@ export type DenyListModel = Readonly<{ id: string; name: string }>;
  * gets a row, so a stale entry can be allowed again.
  */
 export function denyListModels(params: {
-  catalog: readonly DenyListModel[];
-  available: readonly DenyListModel[];
+  catalog: readonly DenyListEntry[];
+  available: readonly DenyListEntry[] | undefined;
   denyList: readonly string[];
 }): DenyListModel[] {
-  const nameById = new Map<string, string>();
-  for (const model of [...params.catalog, ...params.available]) {
-    const id = normalizeModelId(model.id);
-    if (!nameById.has(id)) {
-      nameById.set(id, model.name);
+  const rowById = new Map<string, DenyListModel>();
+  for (const model of [...params.catalog, ...(params.available ?? [])]) {
+    const row = denyRow(model);
+    if (!rowById.has(row.id)) {
+      rowById.set(row.id, row);
     }
   }
   for (const id of params.denyList) {
-    if (!nameById.has(id)) {
-      nameById.set(id, id);
+    if (!rowById.has(normalizeModelId(id))) {
+      rowById.set(normalizeModelId(id), { id: normalizeModelId(id), name: id });
     }
   }
-  return [...nameById].map(([id, name]) => ({ id, name })).sort((a, b) => a.id.localeCompare(b.id));
+  return [...rowById.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**
@@ -117,8 +178,26 @@ export function initialDraft(
 ): ModelAccessDraft {
   const denied = (settings.model_deny_list ?? []).map(modelId => normalizeModelId(modelId));
   return {
-    providerAllowList: sortedUnique(settings.provider_allow_list ?? catalogProviders),
+    providerAllowList: sortedUnique(
+      normalizeInferenceProviderIds(settings.provider_allow_list ?? catalogProviders)
+    ),
     modelDenyList: sortedUnique(denied),
+  };
+}
+
+/**
+ * The draft with every provider slug in the gateway's canonical form. A draft
+ * the encrypted form store persisted was written by an earlier build, and
+ * `isModelAccessFormDraft` checks the shape only, so it can hold a slug the
+ * current writers no longer store. The rows the Providers tab renders are
+ * canonical, so restoring that draft verbatim would leave its provider off and
+ * its models unusable. The deny list is unaffected: `normalizeModelId` already
+ * ran when the draft was written.
+ */
+export function canonicalDraft(draft: ModelAccessDraft): ModelAccessDraft {
+  return {
+    providerAllowList: sortedUnique(normalizeInferenceProviderIds(draft.providerAllowList)),
+    modelDenyList: sortedUnique(draft.modelDenyList.map(modelId => normalizeModelId(modelId))),
   };
 }
 
@@ -127,11 +206,12 @@ export function toggleProvider(
   providerSlug: string,
   nextAllowed: boolean
 ): ModelAccessDraft {
-  const allowed = new Set(draft.providerAllowList);
+  const allowed = new Set(normalizeInferenceProviderIds(draft.providerAllowList));
+  const canonical = normalizeInferenceProviderId(providerSlug);
   if (nextAllowed) {
-    allowed.add(providerSlug);
+    allowed.add(canonical);
   } else {
-    allowed.delete(providerSlug);
+    allowed.delete(canonical);
   }
   return { ...draft, providerAllowList: sortedUnique([...allowed]) };
 }
@@ -156,12 +236,13 @@ export function setProvidersAllowed(
   providerSlugs: readonly string[],
   nextAllowed: boolean
 ): ModelAccessDraft {
-  const allowed = new Set(draft.providerAllowList);
+  const allowed = new Set(normalizeInferenceProviderIds(draft.providerAllowList));
   for (const slug of providerSlugs) {
+    const canonical = normalizeInferenceProviderId(slug);
     if (nextAllowed) {
-      allowed.add(slug);
+      allowed.add(canonical);
     } else {
-      allowed.delete(slug);
+      allowed.delete(canonical);
     }
   }
   return { ...draft, providerAllowList: sortedUnique([...allowed]) };
@@ -201,12 +282,16 @@ export function usableModelIds(params: {
   models: readonly CatalogModel[];
   draft: ModelAccessDraft;
 }): string[] {
-  const allowedProviders = new Set(params.draft.providerAllowList);
+  // A draft restored from the form's encrypted store was written before writers
+  // stored the canonical form, and `isModelAccessFormDraft` checks the shape
+  // only, so the comparison set is built from the same canonical form as the
+  // catalog's slugs.
+  const allowedProviders = new Set(normalizeInferenceProviderIds(params.draft.providerAllowList));
   const denied = new Set(params.draft.modelDenyList);
   const usable = new Set<string>();
   for (const model of params.models) {
     const id = normalizeModelId(model.id);
-    const providers = model.inference_provider_ids ?? [];
+    const providers = normalizeInferenceProviderIds(model.inference_provider_ids ?? []);
     const servedByAllowedProvider =
       providers.length === 0 || providers.some(slug => allowedProviders.has(slug));
     if (!denied.has(id) && servedByAllowedProvider) {
@@ -228,6 +313,8 @@ export type ModelAccessSave =
       providerAllowList: readonly string[] | undefined;
       modelDenyList: readonly string[];
     }
+  /** The provider list moved, but the catalog's provider data has not loaded. */
+  | { kind: 'provider-catalog-unavailable' }
   /** The organization would be left with no allowed provider, blocking every route. */
   | { kind: 'empty-provider-list' }
   /** The organization would be left with no model any member could route to. */
@@ -247,9 +334,12 @@ export type ModelAccessSave =
  *
  * The rows also need the whole gateway catalog: without it they are only the
  * organization's own policy-filtered models plus the saved slugs, so a write
- * would drop every provider that serves a denied model. A save made while the
- * catalog is unavailable therefore leaves the provider list alone whatever the
- * draft holds, exactly like an untouched Providers tab.
+ * would drop every provider that serves a denied model. A save that did not
+ * move the provider list therefore leaves the stored list alone, exactly like
+ * an untouched Providers tab. A draft that did move it cannot be saved at all
+ * while the catalog's provider data is missing: writing the rows would narrow
+ * the policy, and dropping the edit would report it as saved, so the save is
+ * refused until the catalog arrives.
  *
  * An empty provider list is refused unless the organization's saved list was
  * already empty: it stops every Kilo route, which no toggle on this form should
@@ -266,6 +356,11 @@ export function modelAccessSave(params: {
    */
   providerCatalogLoaded: boolean;
   /**
+   * Whether the draft's provider list is the admin's own choice, away from the
+   * baseline it started from, rather than the server's list as it arrived.
+   */
+  providerListEdited: boolean;
+  /**
    * Every model the form knows: the gateway catalog plus the organization's own
    * list. Empty while the catalog is unavailable, which leaves the model guard
    * inert instead of refusing a save it cannot judge.
@@ -274,6 +369,12 @@ export function modelAccessSave(params: {
 }): ModelAccessSave {
   const providersChanged =
     params.draft.providerAllowList.join('\n') !== params.baseline.providerAllowList.join('\n');
+  // An unloaded catalog cannot judge or reproduce the edit: the rows behind it
+  // are a policy-filtered subset, so writing them would narrow the policy and
+  // dropping the edit would report it as saved. Refuse instead.
+  if (!params.providerCatalogLoaded && providersChanged && params.providerListEdited) {
+    return { kind: 'provider-catalog-unavailable' };
+  }
   const providerAllowList =
     !params.providerCatalogLoaded || (params.savedAllowList === undefined && !providersChanged)
       ? undefined
@@ -300,5 +401,16 @@ export function matchesSearch(fields: readonly (string | undefined)[], query: st
   if (normalized.length === 0) {
     return true;
   }
-  return fields.some(field => field?.toLocaleLowerCase().includes(normalized) === true);
+  const folded = foldForSearch(query).trim();
+  return fields.some(field => {
+    if (field === undefined) {
+      return false;
+    }
+    if (field.toLocaleLowerCase().includes(normalized)) {
+      return true;
+    }
+    // Extra match, never a replacement: a row the locale-aware lowercase
+    // already found keeps matching, and folding adds "mistral" for "Mistrál".
+    return folded.length > 0 && foldForSearch(field).includes(folded);
+  });
 }

@@ -1,4 +1,8 @@
-import { createWebSocketManager, type WebSocketManagerConfig } from './websocket-manager';
+import {
+  createWebSocketManager,
+  type ConnectionState,
+  type WebSocketManagerConfig,
+} from './websocket-manager';
 
 class MockCloseEvent extends Event {
   code: number;
@@ -89,6 +93,24 @@ function createConfig(overrides: Partial<WebSocketManagerConfig> = {}): WebSocke
     onStateChange: jest.fn(),
     ...overrides,
   };
+}
+
+function socketAt(index: number): MockWebSocket {
+  const socket = MockWebSocket.instances[index];
+  if (socket === undefined) {
+    throw new Error(`Expected WebSocket at index ${index}`);
+  }
+  return socket;
+}
+
+function recordStates() {
+  const reconnectAttempts: number[] = [];
+  const onStateChange = jest.fn((state: ConnectionState) => {
+    if (state.status === 'reconnecting') {
+      reconnectAttempts.push(state.attempt);
+    }
+  });
+  return { onStateChange, reconnectAttempts };
 }
 
 beforeEach(() => {
@@ -249,5 +271,186 @@ describe('cloud-agent-next websocket-manager', () => {
     ws.simulateMessage(eventMessage(1));
 
     expect(onStateChange).toHaveBeenCalledWith({ status: 'connected', executionId: 'exec-123' });
+  });
+
+  it('escalates the reconnect delay on repeated non-auth closes', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    expect(reconnectAttempts).toEqual([1]);
+
+    jest.advanceTimersByTime(999);
+    expect(MockWebSocket.instances).toHaveLength(1);
+    jest.advanceTimersByTime(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+    expect(reconnectAttempts).toEqual([1, 2]);
+
+    jest.advanceTimersByTime(1999);
+    expect(MockWebSocket.instances).toHaveLength(2);
+    jest.advanceTimersByTime(1);
+    expect(MockWebSocket.instances).toHaveLength(3);
+
+    socketAt(2).simulateClose(1011, 'Host shutting down');
+    expect(reconnectAttempts).toEqual([1, 2, 3]);
+
+    jest.advanceTimersByTime(3999);
+    expect(MockWebSocket.instances).toHaveLength(3);
+    jest.advanceTimersByTime(1);
+    expect(MockWebSocket.instances).toHaveLength(4);
+  });
+
+  it('stops retrying after the maximum number of attempts', () => {
+    const { onStateChange } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    const delays = [1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000];
+    for (const delay of delays) {
+      socketAt(MockWebSocket.instances.length - 1).simulateClose(1011, 'Host shutting down');
+      jest.advanceTimersByTime(delay);
+    }
+    socketAt(8).simulateClose(1011, 'Host shutting down');
+
+    expect(onStateChange).toHaveBeenCalledWith({
+      status: 'error',
+      error: 'Max reconnection attempts exceeded',
+      retryable: false,
+    });
+
+    const socketCount = MockWebSocket.instances.length;
+    jest.advanceTimersByTime(60000);
+    expect(MockWebSocket.instances).toHaveLength(socketCount);
+  });
+
+  it('keeps the reconnect budget across a ticket refresh', async () => {
+    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(2000);
+
+    socketAt(2).simulateClose(1006, '');
+    await flushPromises();
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+    expect(MockWebSocket.instances).toHaveLength(4);
+
+    socketAt(3).simulateClose(1011, 'Host shutting down');
+    expect(reconnectAttempts).toEqual([1, 2, 3]);
+  });
+
+  it('resets the reconnect budget after a stable connection', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(2000);
+
+    socketAt(2).simulateMessage(eventMessage(3));
+    jest.advanceTimersByTime(6000);
+    socketAt(2).simulateMessage(eventMessage(4));
+    jest.advanceTimersByTime(4000);
+    socketAt(2).simulateClose(1011, 'Host shutting down');
+
+    expect(reconnectAttempts).toEqual([1, 2, 1]);
+  });
+
+  it('keeps the escalation when a socket closes without delivering a frame', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    jest.advanceTimersByTime(30000);
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+
+    expect(reconnectAttempts).toEqual([1, 2]);
+  });
+
+  it('keeps the escalation when a socket closes before the stability window', () => {
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1011, 'Host shutting down');
+    jest.advanceTimersByTime(1000);
+
+    socketAt(1).simulateMessage(eventMessage(4));
+    jest.advanceTimersByTime(9999);
+    socketAt(1).simulateClose(1011, 'Host shutting down');
+
+    expect(reconnectAttempts).toEqual([1, 2]);
+  });
+
+  it('refreshes the ticket at most once per connection lifetime', async () => {
+    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
+    const { onStateChange, reconnectAttempts } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1006, '');
+    await flushPromises();
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    socketAt(1).simulateMessage(eventMessage(7));
+    socketAt(1).simulateClose(1006, '');
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+    expect(reconnectAttempts).toEqual([1]);
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    jest.advanceTimersByTime(1000);
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it('refreshes the ticket again when a stable socket closes with an auth code', async () => {
+    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
+    const { onStateChange } = recordStates();
+    const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
+
+    manager.connect();
+
+    socketAt(0).simulateClose(1006, '');
+    await flushPromises();
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    jest.advanceTimersByTime(10000);
+    socketAt(1).simulateMessage(eventMessage(8));
+    jest.advanceTimersByTime(10000);
+    socketAt(1).simulateClose(1008, 'policy violation');
+    await flushPromises();
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(2);
+    expect(onStateChange).not.toHaveBeenCalledWith({
+      status: 'error',
+      error: 'Authentication failed after ticket refresh. Check server configuration.',
+      retryable: false,
+    });
+    expect(MockWebSocket.instances).toHaveLength(3);
   });
 });

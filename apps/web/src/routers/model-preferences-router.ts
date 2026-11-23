@@ -45,9 +45,6 @@ async function getAllowedModelIdsForOrg(
     'member',
     { countryCode: null }
   );
-  if (!response) {
-    return new Set();
-  }
   return new Set(response.data.map(model => model.id));
 }
 

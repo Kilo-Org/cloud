@@ -22,6 +22,7 @@ vi.mock('react-native', () => ({
   Platform: device.platform,
   Pressable: 'Pressable',
   RefreshControl: 'NativeRefreshControl',
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
@@ -102,6 +103,37 @@ describe('SessionListRefreshStatus pull progress', () => {
     expect(mounted.root.findAllByType('Loader2' as ElementType)).toHaveLength(1);
     const updating = mounted.root.findByProps({ message: i18n.t('agents.sessionList.updating') });
     expect(String(updating.props.className)).not.toContain('absolute');
+    // The body's static indicator names itself: the platform control it stands
+    // in for is inert under reduced motion, so the row carries the role, the
+    // loading label (a visually hidden text child the platform aggregates),
+    // and the in-progress state a reader needs.
+    const progressRow = mounted.root.findByProps({ accessibilityRole: 'progressbar' });
+    expect(progressRow.props.accessible).toBe(true);
+    expect(progressRow.props.accessibilityState).toEqual({ busy: true });
+    expect(
+      progressRow.findByProps({ children: i18n.t('common.loading') }).props.className
+    ).toContain('absolute size-px overflow-hidden');
+    // Exactly one progressbar node exists while the pull is in flight: the
+    // band draws no second indicator beside the body's own (the settled
+    // contract lives in the case below).
+    const showsIndicator = mounted.root.findAllByProps({ accessibilityRole: 'progressbar' });
+    expect(showsIndicator.length).toBe(1);
+  });
+
+  it('mounts no progressbar node once the pull settles', () => {
+    device.reducedMotion = true;
+    // The pull's settled state clears the indicator. RN never clears the busy
+    // tag on a kept view (`setViewState` returns early on a nulled state), so
+    // the node must unmount, or the reader hears a busy spinner forever.
+    const refreshControl = createElement(RefreshControl, { refreshing: false, onRefresh: noop });
+    const mounted = mount(
+      createElement(
+        MotionContext.Provider,
+        { value: policy() },
+        createElement(RefreshProgress, { refreshControl })
+      )
+    );
+    expect(mounted.root.findAllByProps({ accessibilityRole: 'progressbar' })).toHaveLength(0);
   });
 
   it('keeps its own indicator when the centered body draws no pull progress', () => {

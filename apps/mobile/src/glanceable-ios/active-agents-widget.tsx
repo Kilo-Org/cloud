@@ -22,6 +22,7 @@ import {
   buttonStyle,
   containerBackground,
   cornerRadius,
+  dynamicTypeSize,
   environment,
   fixedSize,
   font,
@@ -156,6 +157,27 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     accessibilityLabel(safeText(props.accessibilityLabel) ?? ''),
   ];
   const family = widgetEnvironment.widgetFamily;
+  // Every text run except the big counts takes the Dynamic Type text style
+  // whose default size is the design size. It draws the design at the default
+  // text size and grows with the user's setting. The families have a fixed
+  // size, so each surface caps the growth at `xLarge`: above that, the
+  // tallest states no longer fit inside the 16pt band.
+  const TEXT_STYLES = {
+    11: 'caption2',
+    12: 'caption',
+    13: 'footnote',
+    15: 'subheadline',
+    17: 'body',
+    20: 'title3',
+    22: 'title2',
+  } as const;
+  type TextSize = keyof typeof TEXT_STYLES;
+  const scaledFont = (size: TextSize, weight?: Weight) =>
+    font({ textStyle: TEXT_STYLES[size], weight });
+  const textSizeCap = dynamicTypeSize({ max: 'xLarge' });
+  // Where a card is full at the default size, its secondary lines grow no
+  // further than that size.
+  const defaultTextSize = dynamicTypeSize({ max: 'large' });
   // SwiftUI's default line box for SF Pro: ascent 0.952em over descent 0.241em.
   // eslint-disable-next-line unicorn/consistent-function-scoping, max-params -- the stringified 'widget' layout cannot hoist helpers to module scope; the gap is between two baselines of two sizes
   const gap = (baseline: number, size: number, nextBaseline: number, nextSize: number) =>
@@ -225,6 +247,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     </ZStack>
   );
   if (family === 'accessoryCircular') {
+    // The count keeps a fixed size: the circle has no room for a larger one.
     const value = count(genericCount);
     let countSize = 30;
     if (value.length > 4) {
@@ -288,6 +311,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         modifiers={[
           bodyURL,
           ...genericA11y,
+          textSizeCap,
           padding({ leading: 6, trailing: 6 }),
           frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
         ]}
@@ -305,7 +329,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           />
           <Text
             modifiers={[
-              font({ size: 15, weight: 'bold' }),
+              scaledFont(15, 'bold'),
               monospacedDigit(),
               lineLimit(genericKind === null ? 2 : 1),
               white,
@@ -317,7 +341,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         {others.length === 0 ? null : (
           <Text
             modifiers={[
-              font({ size: 12 }),
+              scaledFont(12),
               monospacedDigit(),
               lineLimit(1),
               white,
@@ -333,6 +357,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   }
 
   // ── Home Screen: systemSmall, systemMedium, systemLarge ──
+  // The idle dot is the only mark a connected but quiet agent draws, so it
+  // takes the palette's muted ink: that ink clears 3:1 on the card and the page.
   const palette =
     widgetEnvironment.colorScheme === 'dark'
       ? {
@@ -342,7 +368,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           warn: '#F2B05F',
           good: '#5FCB8E',
           info: '#60A5FA',
-          idle: '#56544F',
+          idle: '#8A8680',
           primary: '#FFDD00',
           primaryFg: '#1A1A10',
           secondary: '#26262B',
@@ -355,7 +381,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           warn: '#956011',
           good: '#24784A',
           info: '#2260EB',
-          idle: '#A9A39A',
+          idle: '#6F6A61',
           primary: '#4F5A10',
           primaryFg: '#FFFFFF',
           secondary: '#F0EEE6',
@@ -425,6 +451,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     bodyURL,
     containerBackground(palette.bg, 'widget'),
     localeModifier,
+    textSizeCap,
     frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
     padding({
       top: inset(16, margins?.top),
@@ -436,8 +463,10 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
 
   // ── shared pieces ──
   // eslint-disable-next-line max-params -- a text run is its copy, size, colour and weight, named as the design names them
-  const text = (value: string, size: number, color: string, weight: Weight = 'regular') => (
-    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+  const text = (value: string, size: TextSize, color: string, weight: Weight = 'regular') => (
+    <Text modifiers={[scaledFont(size, weight), lineLimit(1), foregroundStyle(color)]}>
+      {value}
+    </Text>
   );
   // A child moved down (or, for a negative offset, up into the line box above
   // it) so its baseline sits where the design puts it.
@@ -481,13 +510,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   // Today is the clock time alone; another day adds a locale-formatted date.
   // There is no "Today"/"Tomorrow" word and no relative "ago" anywhere.
   // eslint-disable-next-line max-params -- the time, its text size and colour, and how much date to add on another day
-  const when = (date: Date, size: number, color: string, style: 'short' | 'long') => {
+  const when = (date: Date, size: TextSize, color: string, style: 'short' | 'long') => {
     if (date.toDateString() === today.toDateString()) {
       return (
         <Text
           date={date}
           dateStyle="time"
-          modifiers={[font({ size }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+          modifiers={[scaledFont(size), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
         />
       );
     }
@@ -507,12 +536,12 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         <Text
           date={date}
           dateStyle="date"
-          modifiers={[font({ size }), lineLimit(1), foregroundStyle(color)]}
+          modifiers={[scaledFont(size), lineLimit(1), foregroundStyle(color)]}
         />
         <Text
           date={date}
           dateStyle="time"
-          modifiers={[font({ size }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+          modifiers={[scaledFont(size), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
         />
       </HStack>
     );
@@ -538,7 +567,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const pill = (label: string, fill: string, color: string) => (
     <Text
       modifiers={[
-        font({ size: 12, weight: 'semibold' }),
+        scaledFont(12, 'semibold'),
         lineLimit(1),
         foregroundStyle(monochrome ? palette.fg : color),
         fixedSize({ horizontal: true, vertical: false }),
@@ -620,7 +649,12 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       'semibold'
     );
   } else if (status === 'waiting') {
-    footer = text(COPY.waiting ?? 'Updating agents', 11, palette.muted);
+    // The medium placeholders fill the card, so its line keeps the default size.
+    footer = (
+      <VStack alignment="leading" spacing={0} modifiers={wide ? [defaultTextSize] : []}>
+        {text(COPY.waiting ?? 'Updating agents', 11, palette.muted)}
+      </VStack>
+    );
   } else if (checkedAt !== null) {
     footer = (
       <HStack spacing={3}>
@@ -663,7 +697,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     // under the centred block: 26/6.6/1.7 small, 28/6.7/2.4 medium, 40/29/17 large.
     let lockSize = 26;
     let lockGap = 6.6;
-    let messageSize = 13;
+    let messageSize: TextSize = 13;
     let reserve = 1.7;
     if (wide) {
       lockSize = 28;
@@ -679,7 +713,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     const messageText = (line: string) => (
       <Text
         modifiers={[
-          font({ size: messageSize, weight: 'semibold' }),
+          scaledFont(messageSize, 'semibold'),
           lineLimit(1),
           multilineTextAlignment('center'),
           foregroundStyle(palette.fg),
@@ -791,7 +825,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
             />
             <Text
               modifiers={[
-                font({ size: large ? 14 : 13, weight: 'semibold' }),
+                scaledFont(large ? 15 : 13, 'semibold'),
                 lineLimit(1),
                 foregroundStyle(palette.fg),
               ]}
@@ -801,7 +835,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           </HStack>
         )
       : null;
-    let headlineSize = 17;
+    let headlineSize: TextSize = 17;
     if (large) {
       headlineSize = 22;
     } else if (wide) {
@@ -810,8 +844,9 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     const headline = (
       <Text
         modifiers={[
-          font({ size: headlineSize, weight: 'semibold' }),
-          lineLimit(2),
+          scaledFont(headlineSize, 'semibold'),
+          // The small card wraps a third line when the text size grows.
+          lineLimit(wide || large ? 2 : 3),
           multilineTextAlignment(large ? 'center' : 'leading'),
           foregroundStyle(palette.fg),
         ]}
@@ -849,6 +884,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   }
 
   // ── content ──
+  // The big count keeps its fixed design size: it already fills its slot, and
+  // a larger count would no longer fit the family.
   const countText = (size: number) => (
     <Text
       modifiers={[
@@ -864,7 +901,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     </Text>
   );
   // The dot sits a hair inside the count's edge, 6pt before the label.
-  const statusRow = (diameter: number, labelSize: number) => (
+  const statusRow = (diameter: number, labelSize: TextSize) => (
     <HStack
       alignment="center"
       spacing={6}
@@ -872,18 +909,14 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     >
       {dot(diameter, dotColors[primaryKind])}
       <Text
-        modifiers={[
-          font({ size: labelSize, weight: 'semibold' }),
-          lineLimit(1),
-          foregroundStyle(palette.fg),
-        ]}
+        modifiers={[scaledFont(labelSize, 'semibold'), lineLimit(1), foregroundStyle(palette.fg)]}
       >
         {primaryLabel}
       </Text>
     </HStack>
   );
   // One row's second line: why the agent waits, or when it wakes.
-  const rowDetail = (row: Record<string, unknown>, size: number, style: 'short' | 'long') => {
+  const rowDetail = (row: Record<string, unknown>, size: TextSize, style: 'short' | 'long') => {
     if (primaryKind === 'needsInput') {
       let reason = COPY.waitingToRetry ?? 'Waiting to retry';
       if (row.kind === 'permission') {
@@ -903,7 +936,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     return when(date, size, palette.muted, style);
   };
   const rowColor = primaryKind === 'scheduled' ? palette.info : palette.warn;
-  const titleRow = (row: Record<string, unknown>, size: number) => (
+  const titleRow = (row: Record<string, unknown>, size: TextSize) => (
     <HStack alignment="center" spacing={8}>
       {dot(8, rowColor)}
       {text(agentTitle(row.title), size, palette.fg)}
@@ -916,7 +949,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           {dot(8, dotColors[row.kind])}
           <Text
             modifiers={[
-              font({ size: 13 }),
+              scaledFont(13),
               monospacedDigit(),
               lineLimit(1),
               foregroundStyle(palette.fg),
@@ -929,12 +962,22 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     </VStack>
   );
   const sectionLabel = (label: string) => text(label, 12, palette.muted, 'semibold');
-  // The scheduled line under the label: the next wake, Awaiting update, or the title.
-  const scheduledLine = (size: number, color: string) => {
+  // The scheduled line under the label: Awaiting update inside the retry
+  // window, the clock time the wake was due after it, the next wake, or the
+  // title. A past wake keeps the line rather than leaving the slot empty.
+  const scheduledLine = (size: TextSize, color: string) => {
     if (awaitingUpdate) {
       return text(COPY.awaitingUpdate ?? 'Awaiting update', size, palette.muted);
     }
     if (scheduledAt !== null) {
+      if (scheduledAt.getTime() <= today.getTime()) {
+        return (
+          <HStack spacing={3}>
+            {text(COPY.wasDue ?? 'Was due', size, palette.muted)}
+            {when(scheduledAt, size, palette.muted, 'short')}
+          </HStack>
+        );
+      }
       return (
         <HStack spacing={3}>
           {text(COPY.nextRun ?? 'Next run', size, color)}
@@ -960,13 +1003,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       </VStack>
     );
     if (primaryKind === 'scheduled') {
-      // Count 80 @128, label 19 @158, line 13 @182, rule 206, "Next runs" @232, rows @258 + 34n.
+      // Count 80 @128, label 20 @158, line 13 @182, rule 206, "Next runs" @232, rows @258 + 34n.
       body = (
         <VStack alignment="leading" spacing={0}>
           {lead(128 - 0.952 * 80 - 40)}
           {countText(80)}
-          {shifted(gap(128, 80, 158, 19), statusRow(10, 19))}
-          {shifted(gap(158, 19, 182, 13), scheduledLine(13, palette.muted))}
+          {shifted(gap(128, 80, 158, 20), statusRow(10, 20))}
+          {shifted(gap(158, 20, 182, 13), scheduledLine(13, palette.muted))}
           {rule(205.5 - (182 + 0.241 * 13))}
           {shifted(232 - 0.952 * 12 - 206.5, sectionLabel(COPY.nextScheduled ?? 'Next scheduled'))}
           {detailRows.map((row, index) => (
@@ -976,13 +1019,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               spacing={0}
               modifiers={[
                 padding({
-                  top: index === 0 ? gap(232, 12, 258, 14) : gap(258, 14, 292, 14),
+                  top: index === 0 ? gap(232, 12, 258, 15) : gap(258, 15, 292, 15),
                   leading: 1,
                 }),
               ]}
             >
               <HStack alignment="firstTextBaseline" spacing={8}>
-                {titleRow(row, 14)}
+                {titleRow(row, 15)}
                 <Spacer minLength={0} />
                 {rowDetail(row, 12, 'long')}
               </HStack>
@@ -997,7 +1040,10 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       body = (
         <VStack alignment="leading" spacing={0}>
           {lead(106 - 0.952 * 64 - 40)}
-          <HStack alignment="top" spacing={0}>
+          {/* The header and the reason lines keep the default size: three rows
+              and three other counts fill the card, and a larger header would
+              cut "1,234 Working" and push the last row onto the footer. */}
+          <HStack alignment="top" spacing={0} modifiers={[defaultTextSize]}>
             <VStack
               alignment="leading"
               spacing={0}
@@ -1022,13 +1068,19 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               spacing={0}
               modifiers={[
                 padding({
-                  top: index === 0 ? gap(176, 12, 202, 14) : gap(219, 12, 248, 14),
+                  top: index === 0 ? gap(176, 12, 202, 15) : gap(219, 12, 248, 15),
                   leading: 1,
                 }),
               ]}
             >
-              {titleRow(row, 14)}
-              {shifted(gap(202, 14, 219, 12), rowDetail(row, 12, 'long'), 16)}
+              {titleRow(row, 15)}
+              {shifted(
+                gap(202, 15, 219, 12),
+                <VStack alignment="leading" spacing={0} modifiers={[defaultTextSize]}>
+                  {rowDetail(row, 12, 'long')}
+                </VStack>,
+                16
+              )}
             </VStack>
           ))}
           {rows.length === 0 && title !== null
@@ -1046,7 +1098,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       body = (
         <VStack alignment="leading" spacing={0}>
           {lead(120 - 0.952 * 64 - 40)}
-          <HStack alignment="top" spacing={0}>
+          {/* The other counts keep the default size, so "1,234 Working" is not cut. */}
+          <HStack alignment="top" spacing={0} modifiers={[defaultTextSize]}>
             <VStack
               alignment="leading"
               spacing={0}
@@ -1072,13 +1125,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
             <VStack
               alignment="leading"
               spacing={0}
-              modifiers={[padding({ top: gap(284, 12, 308, 14), leading: 1 })]}
+              modifiers={[padding({ top: gap(284, 12, 308, 15), leading: 1 })]}
             >
               <HStack alignment="center" spacing={8}>
                 {dot(8, palette.info)}
-                {text(agentTitle(next.title), 14, palette.fg)}
+                {text(agentTitle(next.title), 15, palette.fg)}
               </HStack>
-              {shifted(gap(308, 14, 326, 12), rowDetail(next, 12, 'long'), 16)}
+              {shifted(gap(308, 15, 326, 12), rowDetail(next, 12, 'long'), 16)}
             </VStack>
           )}
         </VStack>
@@ -1115,9 +1168,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               {titleRow(row, 13)}
               {shifted(
                 gap(74, 13, 90, 11),
-                rowDetail(row, 11, 'long') ?? (
-                  <Spacer minLength={0} modifiers={[frame({ height: 1.193 * 11 })]} />
-                ),
+                // Two agents fill the card, so their reason lines keep the
+                // design size and the larger titles still fit above the footer.
+                <VStack alignment="leading" spacing={0} modifiers={[defaultTextSize]}>
+                  {rowDetail(row, 11, 'long') ?? (
+                    <Spacer minLength={0} modifiers={[frame({ height: 1.193 * 11 })]} />
+                  )}
+                </VStack>,
                 16
               )}
             </VStack>
@@ -1147,7 +1204,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
             modifiers={[frame({ width: 152, alignment: 'leading' })]}
           >
             {countText(44)}
-            {shifted(gap(92, 44, 112, 14), statusRow(8, 14))}
+            {shifted(gap(92, 44, 112, 15), statusRow(8, 15))}
           </VStack>
           <VStack
             alignment="leading"
@@ -1176,8 +1233,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
       {header}
       {countText(44)}
-      {shifted(gap(78, 44, 98, 14), statusRow(8, 14))}
-      {shifted(gap(98, 14, 117, 13), detail)}
+      {shifted(gap(78, 44, 98, 15), statusRow(8, 15))}
+      {shifted(gap(98, 15, 117, 13), detail)}
       {fill}
       {footer}
     </VStack>

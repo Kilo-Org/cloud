@@ -13,8 +13,9 @@ import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { ReadMarkdownBody } from '../read-markdown-body';
 import { isMarkdownPath } from '../read-tool-markdown';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
+import { useToolDisplay } from '../use-tool-display';
 
 const WRITE_CODE_CHARACTER_CAP = 50_000;
 
@@ -65,7 +66,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

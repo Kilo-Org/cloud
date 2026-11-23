@@ -53,6 +53,7 @@ vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' })
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+vi.mock('./preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
 // The condensed-row module pulls `fixed-part-row` → `activity-indicator` →
 // `a11y/motion` → `expo-battery`, which the pure project cannot load. The a11y
 // harness inspects the element tree, so stand the row in as a sentinel like the
@@ -101,6 +102,9 @@ describe.each([
       });
       const wrapper = findElementByType(tree, 'Pressable');
       expect(wrapper?.props.accessible).toBe(false);
+      // Not a native click target either: a focusable wrapper stayed a
+      // role-less clickable stop around the whole row on Android.
+      expect(wrapper?.props.focusable).toBe(false);
       expect(wrapper?.props.accessibilityRole).toBeUndefined();
       expect(wrapper?.props.accessibilityLabel).toBeUndefined();
       expect(wrapper?.props.accessibilityHint).toBeUndefined();
@@ -132,6 +136,9 @@ describe.each([
       expect(host?.props.accessibilityRole).toBe('text');
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();
+      // Android treats a zero-opacity view as invisible to the user, so a
+      // transparent-by-opacity host never reached TalkBack.
+      expect(String(host?.props.className)).not.toContain('opacity-0');
       const exposed = host?.props.accessibilityActions as { name: string; label: string }[];
       expect(exposed).toEqual(
         actions.map(name => ({

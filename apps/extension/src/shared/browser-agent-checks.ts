@@ -72,6 +72,161 @@ const CLASS_BY_TOOL: ReadonlyMap<string, BrowserGrantClass> = new Map([
 export const toolGrantClass = (toolName: string): BrowserGrantClass =>
   CLASS_BY_TOOL.get(toolName) ?? 'act';
 
+/**
+ * Every tool whose page action can start a download: a click, a dropped or
+ * dragged item, a key press (Enter on a focused link), a form filled or
+ * submitted, the two tools that run model-authored code, an answer to a JS
+ * dialog — the click that opened it returns at once, and its handler resumes in
+ * the answer — and a load the page did not ask a human for: a navigate to an
+ * attachment URL, a back/forward to one, or a tab opened at a URL that answers
+ * with a file.
+ */
+const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
+  'browser_click',
+  'browser_drag',
+  'browser_drop',
+  'browser_evaluate',
+  // Fills each field through the page's own `input`/`change` handler, and clicks a checkbox or radio into place.
+  'browser_fill_form',
+  // The dialog's owner resumes in this call: the click that opened it has already answered.
+  'browser_handle_dialog',
+  'browser_navigate',
+  'browser_navigate_back',
+  'browser_navigate_forward',
+  'browser_press_key',
+  'browser_reload',
+  'browser_run_code_unsafe',
+  // Dispatches `change` on the element, and an export-style handler can answer with an attachment.
+  'browser_select_option',
+  'browser_tabs',
+  // `submit` presses Enter on the filled field, and typing alone fires the page's `input` handler.
+  'browser_type',
+  // Runs page-registered code, which can start a download like any other page action.
+  'browser_webmcp_call',
+]);
+
+/** `browser_tabs` opens a page only for `new`; list, select and close touch no document. */
+export const canStartDownload = (toolName: string, args: Record<string, unknown> = {}): boolean => {
+  if (toolName === 'browser_tabs') {
+    return args['action'] === 'new';
+  }
+
+  return DOWNLOAD_CAPABLE_TOOLS.has(toolName);
+};
+
+/**
+ * The one guard a call runs, chosen once from the browser and the optional
+ * `downloads` permission — never two at a time, because each one decides the
+ * same item and the later one would only overrule the earlier.
+ * - `hold`: `chrome.downloads.onDeterminingFilename` exists, so the item is held before its file exists.
+ * - `intercept`: Chrome without the permission, so the response that would become a file is failed.
+ * - `legacy`: neither the event nor a permission to hold with (`downloadsApi` is `undefined` only on a browser
+ *   whose `chrome.downloads` cannot be read), so the item is cancelled after it starts.
+ * - `none`: this call cannot start a download, or its approval already names the one file it buys.
+ *
+ * `holdsDownloads` is whether this browser has the event at all, which is what the hold object exists for; a hold
+ * without the permission cannot answer it, so the permission picks `intercept` there and never `hold`.
+ */
+export type DownloadTier =
+  /** `onDeterminingFilename` holds the item before its file exists. */
+  | 'hold'
+  /** The response that would become a file is failed, because the permission to hold it is not granted. */
+  | 'intercept'
+  /** The item is cancelled after it starts: a browser with neither the event nor the permission. */
+  | 'legacy'
+  /** This call cannot start a download, or its approval already names the one file it buys. */
+  | 'none';
+
+export const downloadTierOf = ({
+  approved,
+  canDownload,
+  canIntercept,
+  hasHold,
+  hasPermission,
+  needsTheFile,
+  sensitiveToken,
+}: {
+  /** Whether this call redeemed a download approval. */
+  readonly approved: boolean;
+  /** Whether this call is an agent call that can start a download at all. */
+  readonly canDownload: boolean;
+  /** Whether this tab can pause a response at all: a debugger backend, so Chrome and not Firefox. */
+  readonly canIntercept: boolean;
+  /** Whether the browser raises `onDeterminingFilename`, so a hold can decide an item. */
+  readonly hasHold: boolean;
+  /** Whether the optional `downloads` permission is granted right now. */
+  readonly hasPermission: boolean;
+  /** Whether the approval still names the one file it buys: without it nothing could be exempt from the guard. */
+  readonly needsTheFile: boolean;
+  /** Set when the gate already refused this step for a sensitive target: the guard would only repeat that. */
+  readonly sensitiveToken: boolean;
+}): DownloadTier => {
+  if (!canDownload || sensitiveToken) {
+    return 'none';
+  }
+
+  if (!hasPermission) {
+    // Without the permission the hold's event does not exist: the response is the only thing left to fail.
+    return canIntercept ? 'intercept' : 'none';
+  }
+
+  if (!hasHold) {
+    return approved && !needsTheFile ? 'none' : 'legacy';
+  }
+
+  return 'hold';
+};
+
+/**
+ * The tab an approved download step opened is gone, so there is no tab to
+ * repeat that step on. Opening a fresh one would download the file again
+ * without the approval the human gave.
+ */
+export const DOWNLOAD_STEP_TAB_GONE_ERROR =
+  'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
+
+/**
+ * A report for a download the browser started where nothing could hold it: the
+ * optional `downloads` permission is missing, so `onDeterminingFilename` does
+ * not exist. On Chrome the response interceptor still stops an http(s)
+ * attachment, so this text is only reached by a `blob:`, `data:` or
+ * `<a download>` file no network response can fail. The step ran and the file
+ * may exist, so the text names both and the one action that guards the next.
+ */
+export const DOWNLOAD_PERMISSION_MISSING_ERROR =
+  'A download may have been saved: the optional Downloads permission is not granted, so the download guard could not watch it. Turn "Allow local agents" off and on again to grant it, then retry.';
+
+/**
+ * The refusal for an http(s) download the response interceptor stopped: the file
+ * is named, and the approval is named as the thing the Downloads permission
+ * makes possible. Without that permission a step token cannot be redeemed, so no
+ * approval is offered — the text asks for the grant instead.
+ */
+export const downloadStoppedWithoutPermissionError = (filename: string): string =>
+  `The download of ${filename} was stopped before it was saved. Granting the optional Downloads permission lets this download be approved and repeated.`;
+
+/**
+ * The line for the files one call started besides the file its approval bought:
+ * one click can start several, and the approval names exactly one of them. The
+ * call did what the human approved, so these are named as stopped — a refusal
+ * would read as "the approved file never landed".
+ */
+export const alsoStoppedDownloadsText = (filenames: readonly string[]): string => {
+  const names = [...new Set(filenames)].join(', ');
+
+  return `${names}: the download was stopped before it was saved — each file needs its own approval, and the permission covers one download at a time.`;
+};
+
+/**
+ * The refusal for an approval that could not produce its file: Chrome's own
+ * multiple-downloads limiter blocks the approved repeat, so the browser creates
+ * no item at all. The approval is still unspent — a second human approval must
+ * not be needed for a file Chrome silently swallowed — and the text names the
+ * browser setting that unblocks it.
+ */
+export const DOWNLOAD_BLOCKED_BY_BROWSER_ERROR =
+  'The browser blocked this download. The user can allow automatic downloads for this site in Chrome, then repeat the step.';
+
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
 const parseUrl = (url: string): URL | undefined => {
@@ -153,6 +308,12 @@ export interface BrowserPermissionItem {
 export interface BrowserNeedsPermission {
   readonly items: readonly BrowserPermissionItem[];
   readonly kind: 'needs_permission';
+  /**
+   * The step whose repeat needs the approval, when it is not simply this call:
+   * a late download is reported by the next call, so the CLI must bind the
+   * token to the click that started it, not to the call carrying the news.
+   */
+  readonly step?: { readonly argumentsHash: string; readonly tool: string };
   /** Present for sensitive steps: the token the CLI retries with once a human approves. */
   readonly stepToken?: string;
 }
@@ -167,9 +328,51 @@ export interface BrowserOriginChanged {
 /** The tool error text a refused call carries when the bridge is not in the loop (E2E, panel). */
 export const NEEDS_PERMISSION_ERROR =
   'The browser action needs permission for this origin. Nothing was changed.';
+
+/**
+ * The D9 refusal: an agent reached for a tab outside its session's group. The
+ * bridge maps it onto `blocked` (-32011); the message names the fix.
+ */
+export const AGENT_TAB_OUTSIDE_GROUP_ERROR =
+  'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
+
+/**
+ * The extension cannot run Playwright code: a snippet would have to be compiled
+ * in the extension, and the MV3 script policy of Chrome and Firefox forbids
+ * evaluating strings there. The bridge maps it onto `unsupported_in_browser`
+ * (-32005) before the gate runs.
+ */
+export const RUN_CODE_UNSUPPORTED_ERROR =
+  'browser_run_code_unsafe is not available: the Kilo extension cannot run Playwright code in Chrome or Firefox. Run a JavaScript function in the page with browser_evaluate instead.';
+
+/**
+ * The pinned tools no backend can run here. The vendored contract keeps them —
+ * its SHA-256 is of the upstream `tools/list` and the handshake compares that —
+ * but a listing must not offer a tool whose every call is refused above.
+ */
+export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'browser_run_code_unsafe',
+]);
+
+/** The two tools that run model-authored page code (D11: they need the `act` grant). */
+export const isScriptTool = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
+
+// Callers name the snapshot tool differently (the side panel prefixes `kilo_`), so the hint names none.
+export const FRESH_SNAPSHOT_HINT =
+  'Take a new page snapshot and use a ref from it, or pass a unique CSS selector.';
+
+/** A ref no snapshot registered, or one whose element is gone: every backend answers it with this one error. */
+export const STALE_REF_ERROR = `The element reference is stale or unknown. ${FRESH_SNAPSHOT_HINT}`;
+
+const BROWSER_REF_PATTERN = /^(?:ref=)?(?:f\d+)?e\d+$/u;
+
+/** Whether a target names a snapshot ref (`e12`, `ref=e12`, `f1e12`) rather than a CSS selector. */
+export const looksLikeBrowserRef = (target: string): boolean =>
+  BROWSER_REF_PATTERN.test(target.trim());
 
 export const ORIGIN_CHANGED_ERROR =
   'The page redirected to a different origin than the one this navigation was approved for.';
@@ -177,12 +380,15 @@ export const ORIGIN_CHANGED_ERROR =
 /** Sensitive reasons, kept short and free of page content so they are safe to show a model. */
 export const SENSITIVE_REASON = {
   cardFormSubmit: 'submitting a form with payment fields',
-  download: 'starting a download',
+  download: 'downloading a file',
   fileUpload: 'uploading a file',
+  frameUnverified: 'acting in a frame whose page could not be inspected',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',
   paymentField: 'typing into a payment field',
+  script: 'a page script can reach a sensitive field',
+  scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
 
@@ -324,19 +530,41 @@ export const sensitiveReasonForField = (kind: BrowserSensitiveField['kind']): st
   }
 };
 
-const STEP_TOKEN_TTL_MS = 60_000;
+/** How long a step token, and the one file its need names, lives. */
+export const STEP_TOKEN_TTL_MS = 60_000;
 
 /** What a step token binds: the tab, the element, the tool, and the exact arguments. */
 export interface StepTokenBinding {
   readonly argumentHash: string;
   readonly element?: string | undefined;
   readonly origin: string;
+  /** The agent session the approval belongs to: another session's token never applies. */
+  readonly session: string;
   readonly tabId: number;
   readonly toolName: string;
 }
 
+/**
+ * The one download a step's approval buys: the tab it was on and the url of the file it started.
+ *
+ * `page` covers any download of that page — a repeat that regenerates its link (`?click=2`) is the same file the
+ * human approved. `exact` covers one url alone: it is what a refusal arms when the call's own requests named none of
+ * the stopped files, so the file the step meant is unknown and only the file the browser named may pass.
+ */
+export type StepTokenNeed =
+  | { readonly kind: 'exact'; readonly tabId: number; readonly url: string }
+  | { readonly kind: 'page'; readonly tabId: number; readonly url: string };
+
 export interface StepTokenIssue extends StepTokenBinding {
+  /** The download this approval is for, when the step was refused for one: the call keeps that file alone. */
+  readonly need?: StepTokenNeed | undefined;
   readonly reason: string;
+}
+
+/** What consuming a token answered: whether it named the call, and the file its approval buys. */
+export interface StepTokenTake {
+  readonly need?: StepTokenNeed | undefined;
+  readonly ok: boolean;
 }
 
 export interface StepTokenStore {
@@ -344,6 +572,11 @@ export interface StepTokenStore {
   readonly issue: (input: StepTokenIssue) => string;
   /** Consumes a token: true only when it names the same call and has not expired. */
   readonly consume: (token: string, binding: StepTokenBinding) => boolean;
+  /**
+   * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
+   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
+   */
+  readonly take: (token: string, binding: StepTokenBinding) => StepTokenTake;
   readonly size: () => number;
 }
 
@@ -364,6 +597,25 @@ export const parseToolArguments = (args: unknown): Record<string, unknown> => {
   return parsed.success ? parsed.data : {};
 };
 
+/**
+ * The canonical text of a call's arguments, hashed to the name a step token
+ * binds. The form, which a CLI must reproduce to read `step.argumentsHash`:
+ *
+ * - An array is `[` + its items in order, each canonical, joined by `,` + `]`.
+ * - A plain object is `{` + its keys sorted by UTF-16 code unit (`toSorted()`)
+ *   written as `"key":value` joined by `,` + `}` — key order never matters.
+ * - Every other value is `JSON.stringify(value) ?? 'null'`, so a string keeps
+ *   its JSON quotes, `undefined` becomes `null`, and absent arguments hash as
+ *   `null`.
+ *
+ * The hash starts at `2_166_136_261` and walks the canonical text once per
+ * UTF-16 index (`index < text.length`): at each index it XORs
+ * `text.codePointAt(index) ?? 0` and multiplies by `16_777_619`. An astral
+ * character therefore contributes its full code point at its first index and
+ * its low surrogate at the second, which a plain code-unit fold would not. The
+ * result is `hex:length`: the hash in unpadded lowercase hexadecimal, a colon,
+ * and the canonical text's length counted in UTF-16 code units.
+ */
 export const hashBrowserToolArguments = (args: unknown): string => {
   const canonical = (value: unknown): string => {
     if (Array.isArray(value)) {
@@ -399,6 +651,7 @@ export const stepTokenBindingMatches = (
   stored: StepTokenBinding & { readonly expiresAt: number; readonly reason: string },
   binding: StepTokenBinding
 ): boolean =>
+  stored.session === binding.session &&
   stored.tabId === binding.tabId &&
   stored.toolName === binding.toolName &&
   stored.argumentHash === binding.argumentHash &&
@@ -419,7 +672,11 @@ export const createStepTokenStore = ({
 } = {}): StepTokenStore => {
   const tokens = new Map<
     string,
-    StepTokenBinding & { readonly expiresAt: number; readonly reason: string }
+    StepTokenBinding & {
+      readonly expiresAt: number;
+      readonly need?: StepTokenNeed | undefined;
+      readonly reason: string;
+    }
   >();
 
   const prune = (): void => {
@@ -432,21 +689,27 @@ export const createStepTokenStore = ({
     }
   };
 
+  const take: StepTokenStore['take'] = (token, binding) => {
+    prune();
+
+    const stored = tokens.get(token);
+
+    if (stored === undefined) {
+      return { ok: false };
+    }
+
+    // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
+    tokens.delete(token);
+
+    if (!stepTokenBindingMatches(stored, binding)) {
+      return { ok: false };
+    }
+
+    return stored.need === undefined ? { ok: true } : { need: stored.need, ok: true };
+  };
+
   return {
-    consume: (token, binding) => {
-      prune();
-
-      const stored = tokens.get(token);
-
-      if (stored === undefined) {
-        return false;
-      }
-
-      // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
-      tokens.delete(token);
-
-      return stepTokenBindingMatches(stored, binding);
-    },
+    consume: (token, binding) => take(token, binding).ok,
     issue: input => {
       prune();
 
@@ -458,8 +721,10 @@ export const createStepTokenStore = ({
         expiresAt: now() + STEP_TOKEN_TTL_MS,
         origin: input.origin,
         reason: input.reason,
+        session: input.session,
         tabId: input.tabId,
         toolName: input.toolName,
+        ...(input.need === undefined ? {} : { need: input.need }),
       });
 
       return token;
@@ -469,6 +734,7 @@ export const createStepTokenStore = ({
 
       return tokens.size;
     },
+    take,
   };
 };
 

@@ -7,7 +7,12 @@ import {
   gateThresholdLabel,
   severityLabelKey,
 } from '@/components/code-reviewer/review-detail-helpers';
+import { Card } from '@/components/ui/card';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
+import { specialistCopy } from '@/lib/code-reviewer-council';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn } from '@/lib/utils';
 
@@ -25,25 +30,10 @@ const SEVERITY_CLASS = {
   nitpick: 'text-muted-foreground',
 } satisfies Record<string, string>;
 
-export function MetaRow({
-  label,
-  value,
-  valueClassName,
-}: Readonly<{ label: string; value: string; valueClassName?: string }>) {
-  return (
-    <View className="flex-row items-center justify-between py-1">
-      <Text variant="muted" className="text-xs">
-        {label}
-      </Text>
-      <Text className={cn('text-xs', valueClassName)}>{value}</Text>
-    </View>
-  );
-}
-
 export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <Card className="gap-1">
       <View className="flex-row items-center justify-between">
         <Text
           className={cn(
@@ -61,29 +51,42 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
         </Text>
       </View>
       <Text className="text-xs">{finding.rationale}</Text>
-    </View>
+    </Card>
   );
 }
 
 export function CouncilSection({ councilResult }: Readonly<{ councilResult: CouncilResult }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.council')}</Text>
-      <View className="gap-1 rounded-lg bg-secondary p-4">
-        <MetaRow
+    <Section label={t('codeReviewer.reviewDetail.council')}>
+      {/* Facts, not a card of prose: every key/value row on this screen is the
+          shared row, so the council's rows stand at the same height as the
+          gate's and the details'. */}
+      <RowGroup>
+        <KvRow
           label={t('codeReviewer.reviewDetail.decision')}
           value={councilDecisionLabel(councilResult.decision)}
+          valueFace="text"
         />
-        {councilResult.specialists.map(specialist => (
-          <MetaRow
-            key={specialist.id}
-            label={specialist.name}
-            value={councilVoteLabel(specialist.vote)}
-          />
-        ))}
-      </View>
-    </View>
+        {councilResult.specialists.map(specialist => {
+          const copy = specialistCopy(specialist.id);
+          return (
+            <KvRow
+              key={specialist.id}
+              // A preset's stored name is the shared roster's English copy, so
+              // the row names the concern from the catalog instead. Only a
+              // custom specialist has a name of its own to show.
+              label={copy.kind === 'preset' ? t(copy.nameKey) : specialist.name}
+              value={councilVoteLabel(specialist.vote)}
+              valueFace="text"
+              // A custom name is arbitrary and can be long: it truncates so the
+              // vote the row exists to show stays in view.
+              labelShrink
+            />
+          );
+        })}
+      </RowGroup>
+    </Section>
   );
 }
 
@@ -104,17 +107,21 @@ export function GateSection({
     checkRunLabel = t('codeReviewer.reviewDetail.gateHidden');
   }
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.gate')}</Text>
-      <View className="gap-1 rounded-lg bg-secondary p-4">
-        <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
+    <Section label={t('codeReviewer.reviewDetail.gate')}>
+      <RowGroup>
+        <KvRow
+          label={t('codeReviewer.reviewDetail.checkRun')}
+          value={checkRunLabel}
+          valueFace={checkRunId == null ? 'text' : 'mono'}
+        />
         {gateThreshold ? (
-          <MetaRow
+          <KvRow
             label={t('codeReviewer.reviewDetail.threshold')}
             value={gateThresholdLabel(gateThreshold)}
+            valueFace="text"
           />
         ) : null}
-      </View>
-    </View>
+      </RowGroup>
+    </Section>
   );
 }

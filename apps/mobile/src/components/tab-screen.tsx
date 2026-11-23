@@ -15,7 +15,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 import { scrollFocusedInputAboveKeyboard } from '@/lib/keyboard-reveal';
 import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -46,21 +46,33 @@ export function useTabBarBottomPadding() {
  *
  * The band is a margin on a `flex-1` frame, so it must be clamped against the
  * room a short window actually has: see `MIN_BODY_VIEWPORT` in
- * `@/lib/body-viewport`, which the `measureFrame` callback below enforces from
- * the frame's own layout. The measured room, not the band it was measured
- * under, is what is kept: the band itself changes with the keyboard, and a limit
- * derived from the tab-bar band would otherwise outlive it and truncate the IME
- * reservation.
+ * `@/lib/body-viewport`, which `useClampedFrameMargin` enforces from the frame's
+ * own layout. The measured room, not the band it was measured under, is what is
+ * kept: the band itself changes with the keyboard, and a limit derived from the
+ * tab-bar band would otherwise outlive it and truncate the IME reservation.
  *
  * `TabScreenScrollView` and the list bodies that cannot nest a virtualized list
  * inside a scroll view read this, so both reserve the same clearance.
  */
 export function useTabScreenFrame() {
   const tabBarHeight = useTabBarHeight();
-  const { left, right } = useScreenInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // The provider's keyboard height reaches the screen bottom on both platforms.
   const keyboardOcclusion = useKeyboardState(state => state.height);
   const reservedBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
+  const { frameMargin, measureFrame } = useClampedFrameMargin(reservedBand);
+  const frameStyle = { marginBottom: frameMargin, ...sideInsetMarginStyle };
+  return { frameStyle, keyboardOcclusion, measureFrame };
+}
+
+/**
+ * The declared band a scroll frame reserves below its body, clamped to the room
+ * that frame measured for itself: a window shorter than the band gives up part
+ * of the band instead of collapsing the viewport below `MIN_BODY_VIEWPORT`.
+ * `measureFrame` is the frame's `onLayout` handler; a caller that already has
+ * one runs both.
+ */
+function useClampedFrameMargin(reservedBand: number) {
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const frameMargin =
     availableHeight === null
@@ -76,12 +88,7 @@ export function useTabScreenFrame() {
     },
     [frameMargin]
   );
-  const frameStyle = {
-    marginBottom: frameMargin,
-    ...(left > 0 ? { marginLeft: left } : undefined),
-    ...(right > 0 ? { marginRight: right } : undefined),
-  };
-  return { frameStyle, keyboardOcclusion, measureFrame };
+  return { frameMargin, measureFrame };
 }
 
 /**
@@ -91,19 +98,34 @@ export function useTabScreenFrame() {
  * stealing viewport space.
  *
  * On Android the bar hides with the keyboard, so the frame reserves the IME
- * occlusion instead of the bar height. On iOS the native formSheet covers the
+ * occlusion instead of the bar height. That band is clamped to the sheet
+ * frame's own measured room: a short sheet — a half detent with the keyboard
+ * up — keeps a scrollable viewport of `MIN_BODY_VIEWPORT` instead of letting the
+ * band collapse it to nothing. On iOS the native formSheet covers the
  * underlying tab bar; it owns its safe-area and keyboard insets, so no extra
- * frame margin is needed.
+ * frame margin is reserved.
  */
-export function SheetScrollView({ children, style, ...props }: ScrollViewProps) {
+export function SheetScrollView({ children, style, onLayout, ...props }: ScrollViewProps) {
   const tabBarHeight = useTabBarHeight();
   const keyboardOcclusion = useKeyboardState(state => state.height);
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   let frameMargin = 0;
   if (Platform.OS === 'android') {
     frameMargin = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
   }
+  // Clamped against the sheet frame's own measured room, so a short sheet gives
+  // up part of the band instead of collapsing its scroll viewport. The iOS band
+  // above is 0, and clamping 0 keeps 0.
+  const clamped = useClampedFrameMargin(frameMargin);
   return (
-    <ScrollView {...props} style={[style, { marginBottom: frameMargin }]}>
+    <ScrollView
+      {...props}
+      onLayout={event => {
+        clamped.measureFrame(event);
+        onLayout?.(event);
+      }}
+      style={[style, { marginBottom: clamped.frameMargin, ...sideInsetMarginStyle }]}
+    >
       {children}
       <View style={{ height: TAB_SCREEN_TRAILING_GAP }} pointerEvents="none" />
     </ScrollView>
@@ -177,11 +199,10 @@ export function TabScreenScrollView({
   // submit button receives the tap while the keyboard is open instead of the
   // first tap only dismissing it.
   //
-  // With the keyboard down the margin is the tab bar's band. With it up the
-  // tab bar hides, so the band is replaced by the IME occlusion. The IME is
-  // always reserved in the frame (never left to the native inset): the native
-  // inset does not clamp programmatic scrolls to the keyboard top, leaving
-  // focused content under the IME with no scroll range to drag it clear.
+  // The IME is always reserved in the frame (never left to the native inset):
+  // the native inset does not clamp programmatic scrolls to the keyboard top,
+  // leaving focused content under the IME with no scroll range to drag it
+  // clear.
   // `useTabScreenFrame` owns the band and its short-window clamp.
   // The scroll view's own focused-field reveal runs on focus only. Two
   // re-layouts leave the focused row (and whatever sits under it) parked behind

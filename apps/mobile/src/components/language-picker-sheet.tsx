@@ -35,13 +35,15 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
-// second opaque layer would cover the sheet's own themed surface.
+// second opaque layer would cover the sheet's own themed surface. Rows own the
+// page gutter themselves, so the list adds none of its own.
 const listFlexStyle = { flex: 1 } satisfies ViewStyle,
-  listPadStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
+  listPadStyle = { paddingBottom: 16 } satisfies ViewStyle;
 // A query that matches nothing leaves the no-match state as the list's only
 // content, and the sheet body is far taller than it. Without this the content
 // box shrinks to the state's own height, so the state's own centring collapses
@@ -73,6 +75,7 @@ export function LanguagePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // A sheet shorter than its header plus one row (a short window, and the
   // keyboard takes more of it) cannot show a pinned search field and a result
   // row at the same time. The search field then leads the scrolling list
@@ -292,7 +295,7 @@ export function LanguagePickerSheet({
         scrollable={false}
       >
         <CenteredState>
-          <View className="items-center px-6">
+          <View className="items-center px-4">
             <Text variant="muted" className="text-center">
               {t('language.languageSaved')}
             </Text>
@@ -316,7 +319,7 @@ export function LanguagePickerSheet({
         scrollable={false}
       >
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <ActivityIndicator color={colors.mutedForeground} />
             <Text variant="muted" className="text-center">
               {t('language.restarting')}
@@ -326,13 +329,12 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
-  // The field lives in `@/components/language-search-field`: the pill chrome
-  // and the shared single-line `Input`, extracted to keep this sheet within
-  // its max-lines budget.
+  // The field lives in `@/components/language-search-field`, the shared
+  // `SearchField`, extracted to keep this sheet within its max-lines budget.
   const searchField = (
     <LanguageSearchField
-      searchInList={searchInList}
       editable={!busy}
+      hasText={query !== ''}
       inputRef={searchInputRef}
       draftRef={searchTextRef}
       onChangeText={text => {
@@ -367,7 +369,7 @@ export function LanguagePickerSheet({
       <FlashList<LanguagePickerItem>
         nestedScrollEnabled
         ref={listRef}
-        style={listFlexStyle}
+        style={[listFlexStyle, sideInsetMarginStyle]}
         contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
         data={items}
         extraData={rowExtraData}
@@ -380,6 +382,7 @@ export function LanguagePickerSheet({
         ListEmptyComponent={
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={SearchX}
             title={t('language.noMatches')}
             description={t('agents.sessionList.tryDifferentSearch')}

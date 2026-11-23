@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
@@ -60,6 +61,15 @@ type FieldsProps = {
  * The form itself, mounted only once the saved links have arrived: the fields are
  * uncontrolled (a ref per field, `defaultValue` for the initial text), so they
  * cannot be filled in by a query that settles after their first render.
+ *
+ * The fields stay editable while a save is pending, and the Save button carries
+ * the whole busy state. Disabling them repaints the Android text input as
+ * `opacity-50`, and that attribute change makes Fabric publish a text state built
+ * from `defaultValue` — the link last saved — so the field would show the old
+ * link for the whole pending window and drop the typed one for good. Keeping the
+ * fields live is also the rule the other saving forms follow (the new-session
+ * prompt states it): the person can still read the link being sent, and a refused
+ * save leaves it there to retry.
  */
 function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const { t } = useTranslation();
@@ -67,6 +77,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
   const githubRef = useRef(githubUrl ?? '');
+  // A save that is already in flight must not be sent again by a press that
+  // arrives before the pending render commits.
+  const submitLockedRef = useRef(false);
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
   const validateUrl = createProfileUrlError(t('profile.editProfile.invalidUrl'));
@@ -74,6 +87,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const update = useMutation(
     trpc.user.updateProfile.mutationOptions({
       onSuccess: () => {
+        // A completion can arrive after the reader left, and this form can still
+        // be mounted then; releasing the lock keeps Save usable for a later edit.
+        submitLockedRef.current = false;
         // The screen's read is cached for the default staleTime, so a quick return
         // would show the links as they were before this save.
         void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
@@ -83,12 +99,25 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         onDone();
       },
       // The server's message is the account of what it refused, so it is shown
-      // as written rather than replaced with a generic failure.
-      onError: error => toast.error(error.message),
+      // as written rather than replaced with a generic failure. A refused save
+      // releases the form so the typed link can be sent again.
+      onError: error => {
+        submitLockedRef.current = false;
+        toast.error(error.message);
+      },
     })
   );
 
   const onSubmit = () => {
+    // One save at a time. `update.isPending` is read from the render that made
+    // this closure, so a press dispatched before the pending render commits
+    // still sees `false` and would reach `mutate` a second time; the ref is
+    // shared across renders and is set before the request, so it closes that
+    // window. `isPending` stays the settle-time half of the check: it holds
+    // until the mutation actually settles, including the wait for it to start.
+    if (update.isPending || submitLockedRef.current) {
+      return;
+    }
     const linkedin = submittedUrl(linkedinRef.current, linkedinUrl);
     const github = submittedUrl(githubRef.current, githubUrl);
     const nextLinkedinError = validateUrl(linkedinRef.current);
@@ -102,6 +131,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
       onDone();
       return;
     }
+    submitLockedRef.current = true;
     update.mutate({
       ...(linkedin === undefined ? {} : { linkedin_url: linkedin }),
       ...(github === undefined ? {} : { github_url: github }),
@@ -119,7 +149,6 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={linkedinError ?? undefined}
-        disabled={update.isPending}
         onChangeText={value => {
           linkedinRef.current = value;
           setLinkedinError(null);
@@ -134,7 +163,6 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={githubError ?? undefined}
-        disabled={update.isPending}
         onChangeText={value => {
           githubRef.current = value;
           setGithubError(null);
@@ -187,11 +215,17 @@ export function ProfileEditScreen() {
   let body: ReactNode = null;
   if (links.isPending) {
     body = (
-      <View className="gap-6">
-        <Skeleton className="h-[74px] rounded-lg" />
-        <Skeleton className="h-[74px] rounded-lg" />
-        <Skeleton className="h-11 rounded-lg" />
-      </View>
+      <>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
+        <Skeleton className="h-11 rounded-md" />
+      </>
     );
   } else if (links.isError) {
     body = <QueryError onRetry={() => void links.refetch()} isRetrying={links.isFetching} />;
@@ -214,7 +248,7 @@ export function ProfileEditScreen() {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

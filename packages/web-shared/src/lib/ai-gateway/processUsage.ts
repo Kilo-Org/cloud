@@ -44,6 +44,7 @@ import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
+import { usageMayAutoTopUp } from './usage-auto-topup-policy';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -340,7 +341,12 @@ export async function toInsertableDbUsageRecord(
     latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
-    is_byok: usageStats.is_byok,
+    // Custom LLM routes supply their own upstream credentials without using a user's BYOK key.
+    is_byok:
+      provider === 'custom' ||
+      provider === 'custom-public' ||
+      provider === 'partner' ||
+      usageStats.is_byok,
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
@@ -869,6 +875,10 @@ function organizationUsageMutationTask(
 
 function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
   if (usage.cost <= 0) return;
+  // A benchmark case never initiates a purchase for its payer. The reserved project prefix is
+  // stripped from a caller-supplied header (`extractFraudAndProjectHeaders`), so only the
+  // authenticated benchmark assignment can produce a row under it.
+  if (!usageMayAutoTopUp(usage)) return;
   try {
     if (result.organizationUsage) {
       scheduleOrganizationUsageAutoTopUp(result.organizationUsage);

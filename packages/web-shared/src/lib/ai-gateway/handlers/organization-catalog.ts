@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import type { CustomRouterDefinition } from '@kilocode/auto-routing-contracts';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
@@ -48,16 +48,13 @@ export async function organizationMemberCatalog(params: {
   kiloUserId: string;
   countryCode: string | null;
   endpoint: string;
-}): Promise<OpenRouterModelsResponse | null> {
+}): Promise<OpenRouterModelsResponse> {
   const result = await getAvailableModelsForOrganization(
     params.organizationId,
     { type: 'member', kiloUserId: params.kiloUserId },
     'member',
     { fromDb: readDb, countryCode: params.countryCode }
   );
-  if (!result) {
-    return null;
-  }
   const [models, customRouters] = await Promise.all([
     addAutoRoutingModels(result.data),
     usableCustomRouters({

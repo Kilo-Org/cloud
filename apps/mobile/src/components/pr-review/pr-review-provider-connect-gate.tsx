@@ -1,11 +1,11 @@
 /* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
-import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
+import { useSegments } from 'expo-router';
+import { GitMerge, PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
@@ -13,17 +13,15 @@ import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-a
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
+import { PrReviewGateSurface } from '@/components/pr-review/pr-review-gate-surface';
 import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
@@ -42,7 +40,6 @@ import {
   useProviderPrScopeOrNull,
 } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -81,8 +78,9 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const pushOnce = useSinglePushRoute();
-  const colors = useThemeColors();
-  const mutedDisabledInk = useMutedDisabledInk();
+  // The current route segments: an arm must not tear down a presented sheet
+  // (see `PrReviewGateSurface`).
+  const segments = useSegments();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();
@@ -242,191 +240,206 @@ export function ProviderConnectGate({
     organizationSelectionLoaded: selectionSettled,
   });
 
-  if (view === 'org-only') {
-    // Only claim there is nowhere to go once the memberships answer says so;
-    // until it lands, keep the guidance the common case with an organization
-    // can act on. A failed read is neither case: the context line already
-    // reports it with a retry, and neither wording is true, so the gate adds
-    // no second description over an account line it cannot vouch for.
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <EmptyState
-          icon={ShieldAlert}
-          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
-          iconColor={iconColor}
-          title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
-          description={
-            <>
-              <PrReviewGateItemLine prRef={prRef} />
-              {/* The switcher stays above this arm's explanation: its copy tells
+  // The arms render into the keeper below instead of replacing the review
+  // subtree: a status change that arrives while a comment sheet is presented
+  // must not unmount the Stack that owns it.
+  function renderArm(): ReactNode {
+    if (view === 'org-only') {
+      // Only claim there is nowhere to go once the memberships answer says so;
+      // until it lands, keep the guidance the common case with an organization
+      // can act on. A failed read is neither case: the context line already
+      // reports it with a retry, and neither wording is true, so the gate adds
+      // no second description over an account line it cannot vouch for.
+      return (
+        <View className="flex-1 bg-background">
+          <PrReviewGateHeader />
+          <EmptyState
+            icon={ShieldAlert}
+            iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+            iconColor={iconColor}
+            title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
+            description={
+              <>
+                <PrReviewGateItemLine prRef={prRef} />
+                {/* The switcher stays above this arm's explanation: its copy tells
                   the reader to switch "the account above", so the control has to
                   be the line they read first. */}
-              <PrReviewContextLine />
-              <OrgOnlyDescription
-                membershipsError={memberships.isError}
-                organizationCount={memberships.data?.length}
-              />
-            </>
-          }
-        />
-      </View>
-    );
-  }
-
-  if (view === 'error') {
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <QueryError
-          variant="server"
-          title={
-            platform === 'gitlab'
-              ? t('prReview.connect.checkFailedTitleGitLab')
-              : t('prReview.connect.checkFailedTitleBitbucket')
-          }
-          message={t('prReview.connect.providerCheckFailedMessage')}
-          onRetry={() => {
-            void status.refetch();
-          }}
-          isRetrying={status.isFetching}
-        />
-      </View>
-    );
-  }
-
-  if (view === 'loading') {
-    return <PrReviewGateLoading />;
-  }
-
-  if (view === 'connect' || view === 'reconnect' || view === 'instance-mismatch') {
-    const reconnect = view === 'reconnect';
-    // The mismatch arm lists in `instance-mismatch`: the connection is live,
-    // on another instance than the opened merge request, so no read can
-    // succeed and nothing about the item is being claimed.
-    const mismatch = view === 'instance-mismatch' ? instanceMismatch : null;
-    // The mismatch CTA opens the integration page for an owner that already has
-    // a GitLab row, so it answers to the same role rule as a re-authorization.
-    const action = selectPrReviewConnectAction({
-      platform,
-      view: view === 'instance-mismatch' ? 'reconnect' : view,
-      organizationId,
-      canManageOrganizationBilling: permission.status === 'ready' ? permission.canEdit : null,
-    });
-    // Reused translated copy: the title above already names the expired
-    // provider connection, so the description carries only the re-check
-    // instruction and never restates the title. One key serves both the
-    // provider gate and the mid-session notice, so the two surfaces cannot
-    // drift apart.
-    //
-    // The first-time connect description is the benefit alone, never a second
-    // "Connect your … account": the title and the CTA already say that, and the
-    // context line above names the scope. GitHub and Bitbucket review pull
-    // requests, so both arms share one key; GitLab names merge requests.
-    const connectTitle =
-      platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
-    const connectDescription =
-      platform === 'gitlab'
-        ? t('prReview.connect.gitlabDescription')
-        : t('common.prReviewSubtitle');
-    const reconnectTitle =
-      platform === 'gitlab'
-        ? t('prReview.reconnectNotice.gitlabTitle')
-        : t('prReview.reconnectNotice.bitbucketTitle');
-    // The expired-connection arm's CTA names the reconnection, the way the
-    // GitHub revoked gate's button and title both say "Reconnect GitHub": the
-    // reader already authorized this provider once, so the action is not a
-    // first-time connect.
-    const reconnectActionTitle =
-      platform === 'gitlab'
-        ? t('prReview.connect.reconnectTitleGitLab')
-        : t('prReview.connect.reconnectTitleBitbucket');
-    let title = reconnect ? reconnectTitle : connectTitle;
-    let description = connectDescription;
-    if (reconnect) {
-      // The title above already names the expired provider connection, so the
-      // description carries only the re-check instruction and never restates
-      // the title. One key serves both the provider gate and the mid-session
-      // notice, so the two surfaces cannot drift apart.
-      description = t('prReview.reconnectNotice.message');
+                <PrReviewContextLine />
+                <OrgOnlyDescription
+                  membershipsError={memberships.isError}
+                  organizationCount={memberships.data?.length}
+                />
+              </>
+            }
+          />
+        </View>
+      );
     }
-    if (mismatch) {
-      // The mismatch description names both hosts, because they are the whole
-      // difference the reader has to act on and both are the account's own
-      // data: the status read that supplied one belongs to the same reader.
-      title = t('prReview.connect.gitlabInstanceMismatchTitle');
-      description = t('prReview.connect.gitlabInstanceMismatchDescription', {
-        connected: mismatch.connectedHost,
-        requested: mismatch.requestedHost,
+
+    if (view === 'error') {
+      return (
+        <View className="flex-1 bg-background">
+          <PrReviewGateHeader />
+          <QueryError
+            variant="server"
+            title={
+              platform === 'gitlab'
+                ? t('prReview.connect.checkFailedTitleGitLab')
+                : t('prReview.connect.checkFailedTitleBitbucket')
+            }
+            message={t('prReview.connect.providerCheckFailedMessage')}
+            onRetry={() => {
+              void status.refetch();
+            }}
+            isRetrying={status.isFetching}
+          />
+        </View>
+      );
+    }
+
+    if (view === 'loading') {
+      return <PrReviewGateLoading />;
+    }
+
+    if (view === 'connect' || view === 'reconnect' || view === 'instance-mismatch') {
+      const reconnect = view === 'reconnect';
+      // The mismatch arm lists in `instance-mismatch`: the connection is live,
+      // on another instance than the opened merge request, so no read can
+      // succeed and nothing about the item is being claimed.
+      const mismatch = view === 'instance-mismatch' ? instanceMismatch : null;
+      // The mismatch CTA opens the integration page for an owner that already has
+      // a GitLab row, so it answers to the same role rule as a re-authorization.
+      const action = selectPrReviewConnectAction({
+        platform,
+        view: view === 'instance-mismatch' ? 'reconnect' : view,
+        organizationId,
+        canManageOrganizationBilling: permission.status === 'ready' ? permission.canEdit : null,
       });
-    }
-    if (action === 'organization-admin-only' && mismatch === null) {
-      // The reader cannot complete the integration page's action from this
-      // role, so the state names the roles that can and carries no action. An
-      // expired GitLab connection keeps its title and asks for a reconnection;
-      // an absent Bitbucket connection cannot make the connect call its title
-      // no longer offers, so that title states the absence instead.
-      if (platform === 'gitlab') {
-        description = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-      } else {
-        title = t('prReview.connect.bitbucketNotConnectedTitle');
-        description = t('prReview.connect.bitbucketAdminOnlyDescription');
+      // Reused translated copy: the title above already names the expired
+      // provider connection, so the description carries only the re-check
+      // instruction and never restates the title. One key serves both the
+      // provider gate and the mid-session notice, so the two surfaces cannot
+      // drift apart.
+      //
+      // The first-time connect description is the benefit alone, never a second
+      // "Connect your … account": the title and the CTA already say that, and the
+      // context line above names the scope. GitHub and Bitbucket review pull
+      // requests, so both arms share one key; GitLab names merge requests.
+      const connectTitle =
+        platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
+      const connectDescription =
+        platform === 'gitlab'
+          ? t('prReview.connect.gitlabDescription')
+          : t('common.prReviewSubtitle');
+      const reconnectTitle =
+        platform === 'gitlab'
+          ? t('prReview.reconnectNotice.gitlabTitle')
+          : t('prReview.reconnectNotice.bitbucketTitle');
+      // The expired-connection arm's CTA names the reconnection, the way the
+      // GitHub revoked gate's button and title both say "Reconnect GitHub": the
+      // reader already authorized this provider once, so the action is not a
+      // first-time connect.
+      const reconnectActionTitle =
+        platform === 'gitlab'
+          ? t('prReview.connect.reconnectTitleGitLab')
+          : t('prReview.connect.reconnectTitleBitbucket');
+      let title = reconnect ? reconnectTitle : connectTitle;
+      let description = connectDescription;
+      if (reconnect) {
+        // The title above already names the expired provider connection, so the
+        // description carries only the re-check instruction and never restates
+        // the title. One key serves both the provider gate and the mid-session
+        // notice, so the two surfaces cannot drift apart.
+        description = t('prReview.reconnectNotice.message');
       }
-    }
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <EmptyState
-          icon={reconnect || mismatch ? ShieldAlert : PlugZap}
-          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
-          iconColor={iconColor}
-          title={title}
-          description={
-            <>
-              <PrReviewGateItemLine prRef={prRef} />
-              <Text variant="muted" className="text-center">
-                {description}
-              </Text>
-              {/* An organization member who cannot complete the action still
+      if (mismatch) {
+        // The mismatch description names both hosts, because they are the whole
+        // difference the reader has to act on and both are the account's own
+        // data: the status read that supplied one belongs to the same reader.
+        title = t('prReview.connect.gitlabInstanceMismatchTitle');
+        description = t('prReview.connect.gitlabInstanceMismatchDescription', {
+          connected: mismatch.connectedHost,
+          requested: mismatch.requestedHost,
+        });
+      }
+      if (action === 'organization-admin-only' && mismatch === null) {
+        // The reader cannot complete the integration page's action from this
+        // role, so the state names the roles that can and carries no action.
+        //
+        // Every organization GitLab connect asks the integration page for a
+        // billing role, a first connect included, so the two GitLab outcomes word
+        // the roles differently: an expired connection keeps the reconnection
+        // wording under its expiry title, while a first connect carries no title
+        // claiming an expired connection and names the roles that can connect
+        // instead. An absent Bitbucket connection cannot make the connect call
+        // its title no longer offers, so that title states the absence instead.
+        if (platform === 'gitlab') {
+          description = reconnect
+            ? t('prReview.connect.reconnectAdminOnlyDescription')
+            : t('prReview.connect.adminOnlyConnectDescription');
+        } else {
+          title = t('prReview.connect.bitbucketNotConnectedTitle');
+          description = t('prReview.connect.bitbucketAdminOnlyDescription');
+        }
+      }
+      return (
+        <View className="flex-1 bg-background">
+          <PrReviewGateHeader />
+          <EmptyState
+            icon={reconnect || mismatch ? ShieldAlert : PlugZap}
+            iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+            iconColor={iconColor}
+            title={title}
+            description={
+              <>
+                <PrReviewGateItemLine prRef={prRef} />
+                <Text variant="muted" className="text-center">
+                  {description}
+                </Text>
+                {/* An organization member who cannot complete the action still
                   needs to know whose action it is, under the explanation of
                   why the connection does not fit. */}
-              {action === 'organization-admin-only' && mismatch !== null ? (
-                <Text variant="muted" className="text-center">
-                  {t('prReview.connect.gitlabReconnectAdminOnlyDescription')}
-                </Text>
-              ) : null}
-            </>
-          }
-          action={
-            // The mismatch copy already names the requested host, so the
-            // caption keeps naming only the scope.
-            <PrReviewGateActionGroup instanceHint={mismatch === null ? instanceHint : undefined}>
-              {action === 'connect' ? (
-                <Button
-                  className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
-                  disabled={connecting}
-                  onPress={() => {
-                    if (platform === 'bitbucket') {
-                      openBitbucketConnect();
-                      return;
-                    }
-                    void handleConnect();
-                  }}
-                >
-                  {connecting ? (
-                    <ActivityIndicator size="small" color={mutedDisabledInk} />
-                  ) : (
-                    <RefreshCcw size={16} color={colors.primaryForeground} />
-                  )}
-                  <Text>{reconnect ? reconnectActionTitle : connectTitle}</Text>
-                </Button>
-              ) : null}
-            </PrReviewGateActionGroup>
-          }
-        />
-      </View>
-    );
+                {action === 'organization-admin-only' && mismatch !== null ? (
+                  <Text variant="muted" className="text-center">
+                    {t('prReview.connect.reconnectAdminOnlyDescription')}
+                  </Text>
+                ) : null}
+              </>
+            }
+            action={
+              // The mismatch copy already names the requested host, so the
+              // caption keeps naming only the scope.
+              <PrReviewGateActionGroup instanceHint={mismatch === null ? instanceHint : undefined}>
+                {action === 'connect' ? (
+                  <StateAction
+                    label={reconnect ? reconnectActionTitle : connectTitle}
+                    // A first connect carries the provider's mark, as the Code
+                    // Reviewer connect actions do; only a reconnection refreshes.
+                    icon={reconnect ? RefreshCcw : GitMerge}
+                    loading={connecting}
+                    disabled={connecting}
+                    onPress={() => {
+                      if (platform === 'bitbucket') {
+                        openBitbucketConnect();
+                        return;
+                      }
+                      void handleConnect();
+                    }}
+                  />
+                ) : null}
+              </PrReviewGateActionGroup>
+            }
+          />
+        </View>
+      );
+    }
+
+    return null;
   }
 
-  return <>{children}</>;
+  return (
+    <PrReviewGateSurface arm={renderArm()} segments={segments}>
+      {children}
+    </PrReviewGateSurface>
+  );
 }

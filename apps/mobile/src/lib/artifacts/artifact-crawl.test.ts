@@ -4,6 +4,8 @@ import { File } from 'expo-file-system';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ARTIFACT_DOWNLOAD_TIMEOUT_MS,
+  ARTIFACT_PROBE_TIMEOUT_MS,
   type ArtifactCrawlDeps,
   buildSessionArtifacts,
   extractSessionArtifacts,
@@ -17,6 +19,7 @@ import {
 
 const fakeFs = vi.hoisted(() => {
   type Tracked = {
+    aborted: boolean;
     created: boolean;
     deleted: boolean;
     size: number;
@@ -26,6 +29,7 @@ const fakeFs = vi.hoisted(() => {
   const files: Tracked[] = [];
 
   class FileMock {
+    aborted = false;
     created = false;
     deleted = false;
     size = 0;
@@ -56,6 +60,11 @@ const fakeFs = vi.hoisted(() => {
         write: chunk => {
           this.streamed += chunk.byteLength;
           this.size += chunk.byteLength;
+        },
+        abort: () => {
+          // The sink's abort releases the file handle; a stream left to an
+          // abandoned pipe never reaches it.
+          this.aborted = true;
         },
       });
     }
@@ -272,20 +281,20 @@ describe('materializeArtifact', () => {
         downloadFile: offline,
         probeContentLength: vi.fn(async () => null),
       })
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status: null } });
 
     await expect(
       materializeArtifact({ id: 'file-1', mime: 'image/png', url: SANDBOX_URL }, new File(), {
         presignAttachmentDownload: noAuth,
       })
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status: null } });
 
     await expect(
       materializeArtifact(
         { id: 'file-1', mime: 'text/plain', url: 'file:///etc/passwd' },
         new File()
       )
-    ).resolves.toEqual({ ok: false, reason: 'unsupported' });
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
   });
 
   it('drops a download larger than the byte cap when no length was declared', async () => {
@@ -299,7 +308,10 @@ describe('materializeArtifact', () => {
       { downloadFile, probeContentLength }
     );
 
-    expect(result).toEqual({ ok: false, reason: 'too-large' });
+    expect(result).toEqual({
+      ok: false,
+      reason: { cause: 'too-large', kind: 'terminal', status: null },
+    });
     expect(tracked.deleted).toBe(true);
   });
 
@@ -316,7 +328,10 @@ describe('materializeArtifact', () => {
       { downloadFile, probeContentLength }
     );
 
-    expect(result).toEqual({ ok: false, reason: 'too-large' });
+    expect(result).toEqual({
+      ok: false,
+      reason: { cause: 'too-large', kind: 'terminal', status: null },
+    });
     expect(probeContentLength).toHaveBeenCalledWith(ALLOWED_URL);
     // The whole point of the pre-check: no byte of body reached the target.
     expect(downloadFile).not.toHaveBeenCalled();
@@ -346,7 +361,7 @@ describe('materializeArtifact', () => {
         downloadFile,
         presignAttachmentDownload: presignResolving(signedUrl),
       })
-    ).toEqual({ ok: false, reason: 'too-large' });
+    ).toEqual({ ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } });
     expect(downloadFile).not.toHaveBeenCalled();
     expect(tracked.writes).toEqual([]);
     expect(probeFetch).toHaveBeenCalledWith(signedUrl, {
@@ -392,7 +407,7 @@ describe('materializeArtifact', () => {
       await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, new File(), {
         downloadFile,
       })
-    ).toEqual({ ok: false, reason: 'too-large' });
+    ).toEqual({ ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } });
     expect(downloadFile).not.toHaveBeenCalled();
     expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
   });
@@ -415,7 +430,7 @@ describe('materializeArtifact', () => {
       await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file, {
         downloadFile,
       })
-    ).toEqual({ ok: false, reason: 'too-large' });
+    ).toEqual({ ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } });
     expect(downloadFile).toHaveBeenCalledOnce();
     expect(tracked.deleted).toBe(true);
     expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
@@ -441,13 +456,13 @@ describe('materializeArtifact', () => {
     ['a loopback URL', 'http://127.0.0.1:3000/local.png'],
     ['a LAN URL', 'http://192.168.1.10/local.png'],
     ['a link-local URL', 'http://169.254.169.254/latest/meta-data/'],
-  ])('reports %s as unsupported without issuing any request', async (_case, url) => {
+  ])('reports %s as a terminal miss without issuing any request', async (_case, url) => {
     const { file, tracked } = target();
     const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
 
     await expect(
       materializeArtifact({ id: 'f1', mime: 'text/plain', url }, file, { downloadFile })
-    ).resolves.toEqual({ ok: false, reason: 'unsupported' });
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
 
     expect(probeFetch).not.toHaveBeenCalled();
     expect(downloadFile).not.toHaveBeenCalled();
@@ -571,7 +586,7 @@ describe('materializeArtifact', () => {
 
     await expect(
       materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status: 500 } });
     expect(cancelled).toBe(true);
     expect(tracked.created).toBe(false);
   });
@@ -602,7 +617,7 @@ describe('materializeArtifact', () => {
 
     await expect(
       materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status: null } });
     expect(cancelled).toBe(true);
     expect(tracked.streamed).toBe(0);
   });
@@ -623,7 +638,7 @@ describe('materializeArtifact', () => {
 
     await expect(
       materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
     // The hop is never followed: no request leaves the allowed origin.
     expect(probeFetch.mock.calls.every(call => call[0] === ALLOWED_URL)).toBe(true);
     expect(tracked.created).toBe(false);
@@ -639,9 +654,189 @@ describe('materializeArtifact', () => {
 
     await expect(
       materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
-    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
     expect(probeFetch.mock.calls.length).toBeLessThanOrEqual(12);
     expect(tracked.created).toBe(false);
+  });
+
+  it('gives up on a body that never completes, and leaves no bytes behind', async () => {
+    vi.useFakeTimers();
+    try {
+      const downloadSignals: AbortSignal[] = [];
+      let cancelled = false;
+      probeFetch.mockImplementation(async (_url, init) => {
+        if (init?.headers !== undefined) {
+          return new Response('x', {
+            status: 206,
+            headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+          });
+        }
+        if (init?.signal) {
+          downloadSignals.push(init.signal);
+        }
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            // The read a stalled transfer represents: the stream never delivers
+            // another chunk and never closes.
+            pull: () => Promise.withResolvers<undefined>().promise,
+            cancel: () => {
+              cancelled = true;
+            },
+          }),
+          { status: 200 }
+        );
+      });
+      const { file, tracked } = target();
+
+      const result = materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file);
+      // The transfer is under way, and its signal is not aborted yet.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(downloadSignals).toHaveLength(1);
+      expect(downloadSignals[0]?.aborted).toBe(false);
+
+      // The stalled body now reaches the deadline.
+      await vi.advanceTimersByTimeAsync(ARTIFACT_DOWNLOAD_TIMEOUT_MS);
+
+      // A transfer with no status to report says nothing about the artifact, so
+      // the next run retries it.
+      await expect(result).resolves.toEqual({
+        ok: false,
+        reason: { kind: 'temporary', status: null },
+      });
+      expect(downloadSignals[0]?.aborted).toBe(true);
+      expect(tracked.deleted).toBe(true);
+      expect(tracked.streamed).toBe(0);
+      expect(tracked.writes).toEqual([]);
+      // A transfer that stalls until the deadline must release both ends: the
+      // destination's writer (the file handle) and the body it was reading.
+      expect(tracked.aborted).toBe(true);
+      expect(cancelled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('downloads anyway when the probe never answers, and aborts the probe', async () => {
+    vi.useFakeTimers();
+    try {
+      // The probe's request never answers, so only the deadline can end it.
+      probeFetch.mockImplementation(() => Promise.withResolvers<Response>().promise);
+      const { file } = target();
+      const downloadFile = downloadResolving(7);
+
+      const result = materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file, {
+        downloadFile,
+      });
+      await vi.advanceTimersByTimeAsync(ARTIFACT_PROBE_TIMEOUT_MS);
+
+      await expect(result).resolves.toEqual({ ok: true, size: 7 });
+      expect(downloadFile).toHaveBeenCalledOnce();
+      expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([401, 403, 404, 410])(
+    'reports a %s answer as a terminal miss and keeps no bytes',
+    async status => {
+      probeFetch.mockImplementation(async (_url, init) =>
+        init?.headers === undefined
+          ? new Response(null, { status })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            })
+      );
+      const { file, tracked } = target();
+
+      await expect(
+        materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+      ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status } });
+      expect(tracked.created).toBe(false);
+      expect(tracked.streamed).toBe(0);
+      expect(tracked.writes).toEqual([]);
+      expect(tracked.size).toBe(0);
+    }
+  );
+
+  it.each([408, 429, 503])('reports a %s answer as a temporary failure', async status => {
+    probeFetch.mockImplementation(async (_url, init) =>
+      init?.headers === undefined
+        ? new Response(null, { status })
+        : new Response('x', {
+            status: 206,
+            headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+          })
+    );
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status } });
+    expect(tracked.created).toBe(false);
+    expect(tracked.streamed).toBe(0);
+  });
+
+  it('reads a presign NOT_FOUND as a terminal miss', async () => {
+    const presignAttachmentDownload = vi
+      .fn<ArtifactCrawlDeps['presignAttachmentDownload']>()
+      .mockRejectedValue(
+        Object.assign(new Error('attachment missing'), { data: { code: 'NOT_FOUND' } })
+      );
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact(
+        { id: 'f1', mime: 'image/png', filename: 'shot.png', url: SANDBOX_URL },
+        file,
+        {
+          presignAttachmentDownload,
+        }
+      )
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
+    expect(presignAttachmentDownload).toHaveBeenCalledWith({
+      messageUuid: UUID,
+      filename: 'shot.png',
+    });
+    expect(tracked.writes).toEqual([]);
+  });
+
+  it.each<[string, Error]>([
+    [
+      'a server code other than NOT_FOUND',
+      Object.assign(new Error('forbidden'), { data: { code: 'FORBIDDEN' } }),
+    ],
+    ['a bare transport error', new Error('offline')],
+  ])('reads a presign rejection with %s as a temporary failure', async (_case, error) => {
+    const presignAttachmentDownload = vi
+      .fn<ArtifactCrawlDeps['presignAttachmentDownload']>()
+      .mockRejectedValue(error);
+    const { file } = target();
+
+    await expect(
+      materializeArtifact(
+        { id: 'f1', mime: 'image/png', filename: 'shot.png', url: SANDBOX_URL },
+        file,
+        {
+          presignAttachmentDownload,
+        }
+      )
+    ).resolves.toEqual({ ok: false, reason: { kind: 'temporary', status: null } });
+  });
+
+  it('reads a data: URL whose payload cannot be decoded as a terminal miss', async () => {
+    const { file, tracked } = target();
+    const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'image/png', url: 'data:image/png,not-base64' }, file, {
+        downloadFile,
+      })
+    ).resolves.toEqual({ ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } });
+    expect(tracked.writes).toEqual([]);
+    expect(downloadFile).not.toHaveBeenCalled();
   });
 });
 

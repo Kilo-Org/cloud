@@ -65,8 +65,8 @@ describe('modelLabelFromCatalogue', () => {
     expect(modelLabelFromCatalogue(catalogue, 'anthropic/claude-sonnet-4')).toBe('Claude Sonnet 4');
   });
 
-  it('falls back to the stored name, then the id, for a model the catalogue lacks', () => {
+  it('shows the readable reference, not the raw id, for a model the catalogue lacks', () => {
     expect(modelLabelFromCatalogue(catalogue, 'openai/gpt-5', 'GPT-5')).toBe('GPT-5');
-    expect(modelLabelFromCatalogue(catalogue, 'openai/gpt-5')).toBe('openai/gpt-5');
+    expect(modelLabelFromCatalogue(catalogue, 'openai/gpt-5')).toBe('gpt 5');
   });
 });

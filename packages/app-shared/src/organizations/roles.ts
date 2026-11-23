@@ -1,27 +1,36 @@
-// Canonical organization role values. Matches apps/web's
-// OrganizationRoleSchema (lib/organizations/organization-types.ts, a
-// z.enum(ORGANIZATION_ROLES)) and packages/db's OrganizationRole type.
+// Canonical organization role values. The web validator's OrganizationRoleSchema
+// (packages/web-shared/src/lib/organizations/organization-types.ts, a
+// z.enum(ORGANIZATION_ROLES)) and packages/db's OrganizationRole type must stay in
+// sync with this list.
 export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
+
+/** Rank of each role in the precedence below; a canonical role with no rank fails typecheck. */
+const ORGANIZATION_ROLE_RANK = {
+  owner: 0,
+  admin: 1,
+  billing_manager: 2,
+  member: 3,
+} as const satisfies Record<OrganizationRole, number>;
 
 /**
  * Precedence when a caller holds more than one role for the same organization,
  * for example a direct `member` row and an `owner` row on the parent. The first
  * matching role wins.
  */
-export const ORGANIZATION_ROLE_PRIORITY = [
-  'owner',
-  'admin',
-  'billing_manager',
-  'member',
-] satisfies OrganizationRole[];
+export const ORGANIZATION_ROLE_PRIORITY: readonly OrganizationRole[] = [...ORGANIZATION_ROLES].sort(
+  (a, b) => ORGANIZATION_ROLE_RANK[a] - ORGANIZATION_ROLE_RANK[b]
+);
 
 /**
  * Roles with organization-management authority. `admin` matches `owner`
  * everywhere except owner management, which {@link canManageOrganizationOwners}
  * reserves for owners.
  */
-export const ORGANIZATION_MANAGE_ROLES = ['owner', 'admin'] satisfies OrganizationRole[];
+export const ORGANIZATION_MANAGE_ROLES = [
+  'owner',
+  'admin',
+] as const satisfies readonly OrganizationRole[];
 
 /**
  * Roles that may manage organization billing. Admins are included because they
@@ -31,14 +40,14 @@ export const ORGANIZATION_BILLING_ROLES = [
   'owner',
   'admin',
   'billing_manager',
-] satisfies OrganizationRole[];
+] as const satisfies readonly OrganizationRole[];
 
 // Parent access is separate from billing scope so billing changes cannot widen child inheritance.
 export const ORGANIZATION_PARENT_ACCESS_ROLES = [
   'owner',
   'admin',
   'billing_manager',
-] satisfies OrganizationRole[];
+] as const satisfies readonly OrganizationRole[];
 
 /**
  * Membership roles that receive an organization-scope spend alert: the
@@ -56,7 +65,7 @@ export const ORGANIZATION_PARENT_ACCESS_ROLES = [
 export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
   'owner',
   'billing_manager',
-] satisfies OrganizationRole[];
+] as const satisfies readonly OrganizationRole[];
 
 export function canManageOrganization(role: OrganizationRole | undefined): boolean {
   return ORGANIZATION_MANAGE_ROLES.some(allowed => allowed === role);
@@ -76,8 +85,7 @@ export function canManageOrganizationOwners(role: OrganizationRole | undefined):
 }
 
 /**
- * True for roles that may manage organization billing (owner, admin or
- * billing_manager). Ported from web's `canManageBilling`
+ * Ported from web's `canManageBilling`
  * (components/organizations/subscription/utils.ts) and mobile's
  * `isMoneyRole` (lib/hooks/use-organization-queries.ts) — both had the
  * identical `role === 'owner' || role === 'billing_manager'` check; `admin`

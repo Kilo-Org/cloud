@@ -2,7 +2,7 @@ import { mount, press, text } from './native-remote-test-utils';
 import { expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { act } from '@/test/renderer';
-import { nativeRemoteFixture, readySession } from './native-remote-test-helpers';
+import { nativeRemoteFixture, readySession } from './native-remote.test-helpers';
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
@@ -10,6 +10,11 @@ const renderedMessageSchema = z.object({
   info: z.object({ id: z.string() }),
   parts: z.array(z.object({ id: z.string(), type: z.string() }).passthrough()),
 });
+
+/** The marks the transcript puts around a displayed value, written as code points. */
+const ISOLATE_OPEN = '\u2066';
+const ISOLATE_CLOSE = '\u2069';
+const FIRST_STRONG_OPEN = '\u2068';
 
 it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and reset states distinct', async () => {
   const fixture = nativeRemoteFixture();
@@ -86,7 +91,10 @@ it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and 
       messages: readySession.messages.map(item => ({ ...item, incomplete: true })),
     })
   );
-  expect(text(renderer.root)).toContain('Native transcript recovery is incomplete');
+  // A missing part reads as a localized gap banner, never as a raw id list.
+  expect(text(renderer.root)).toContain('nativeRemote.recoveryGaps');
+  expect(text(renderer.root)).toContain('common.retry');
+  expect(text(renderer.root)).not.toContain('msg_snapshot');
   expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
   expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
 });
@@ -111,81 +119,6 @@ it.each(['forbidden', 'session_deleted'])(
   }
 );
 
-it('opens native tool details through the shared host and keeps an open sheet live', async () => {
-  const fixture = nativeRemoteFixture();
-  const renderer = await mount(fixture.client);
-  await press(renderer, 'ses-first');
-  await act(() =>
-    fixture.publishSession('ses-first', {
-      ...readySession,
-      messages: [
-        {
-          seq: 1,
-          message: {
-            id: 'msg_tool',
-            type: 'assistant',
-            time: { created: 1 },
-            content: [
-              {
-                type: 'tool',
-                id: 'call',
-                name: 'shell',
-                time: { created: 1, ran: 2 },
-                state: { status: 'running', input: { command: 'pwd' } },
-              },
-            ],
-          },
-        },
-      ],
-    })
-  );
-  const row = renderer.root.findByType('MessageBubble');
-  const tool = renderedMessageSchema.parse(row.props.message).parts[0];
-  if (!tool) {
-    throw new Error('Native tool was not projected');
-  }
-  await press(renderer, 'Open bash details');
-  expect(renderer.root.findByType('PartDetailSheet').props).toMatchObject({
-    visible: true,
-    part: { id: tool.id, type: 'tool', state: { status: 'running', input: { command: 'pwd' } } },
-  });
-  await act(() =>
-    fixture.publishSession('ses-first', {
-      ...readySession,
-      messages: [
-        {
-          seq: 1,
-          message: {
-            id: 'msg_tool',
-            type: 'assistant',
-            time: { created: 1, completed: 4 },
-            content: [
-              {
-                type: 'tool',
-                id: 'call',
-                name: 'shell',
-                time: { created: 1, ran: 2, completed: 3 },
-                state: {
-                  status: 'completed',
-                  input: { command: 'pwd' },
-                  content: [{ type: 'text', text: '/owned/project' }],
-                },
-              },
-            ],
-          },
-        },
-      ],
-    })
-  );
-  expect(renderer.root.findByType('PartDetailSheet').props).toMatchObject({
-    visible: true,
-    part: {
-      id: tool.id,
-      state: { status: 'completed', input: { command: 'pwd' }, output: '/owned/project' },
-    },
-  });
-});
-
 it('shows one unreadable notice instead of consent controls and keeps readable cards', async () => {
   const fixture = nativeRemoteFixture();
   const renderer = await mount(fixture.client);
@@ -197,6 +130,7 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
       pending: {
         permissions: [],
         questions: [],
+        unreadableQuestions: [],
         unreadablePermissions: [{ requestId: 'perm-proof' }],
       },
     })
@@ -214,7 +148,12 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
   await act(() =>
     fixture.publishSession('ses-first', {
       ...readySession,
-      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
     })
   );
   expect(text(renderer.root)).not.toContain('agentChat.permissionCard.unreadableTitle');
@@ -226,6 +165,7 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
       pending: {
         permissions: [{ id: 'perm-readable', action: 'shell', resources: ['Run tests'] }],
         questions: [],
+        unreadableQuestions: [],
         unreadablePermissions: [{ requestId: 'perm-proof' }],
       },
     })
@@ -247,4 +187,43 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
     'agentChat.permissionCard.alwaysAllow',
     'agentChat.permissionCard.deny',
   ]);
+});
+
+it('prints the permission action, resources and message as readable text', async () => {
+  const fixture = nativeRemoteFixture();
+  const renderer = await mount(fixture.client);
+  await press(renderer, 'ses-first');
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      pending: {
+        permissions: [
+          {
+            id: 'perm-bidi',
+            action: 'shell\u202E',
+            resources: ['/tmp/\u200Ex\nrm'],
+            message: 'run\u0000it',
+          },
+        ],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
+    })
+  );
+  const rendered = text(renderer.root);
+
+  // A format character prints as the text that names it, and the marks around
+  // each value keep its reading order on a right-to-left screen. The action and
+  // the resources are pinned left to right; the message takes the direction of
+  // its own first strong character, so an English message still reads left to
+  // right and an Arabic one keeps its own.
+  expect(rendered).toContain(`${ISOLATE_OPEN}shell\\u202e${ISOLATE_CLOSE}`);
+  expect(rendered).toContain(`${ISOLATE_OPEN}/tmp/\\u200ex\\nrm${ISOLATE_CLOSE}`);
+  expect(rendered).toContain(`${FIRST_STRONG_OPEN}run\\x00it${ISOLATE_CLOSE}`);
+  expect(rendered).not.toContain(`${ISOLATE_OPEN}run\\x00it${ISOLATE_CLOSE}`);
+  expect(rendered).toContain('• ');
+  expect(rendered).not.toContain('shell\u202E');
+  expect(rendered).not.toContain('/tmp/\u200Ex');
+  expect(rendered).not.toContain('run\u0000it');
 });

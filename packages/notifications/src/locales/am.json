@@ -7,6 +7,7 @@
       "spendAlert": "ወጪዎ ትኩረት ይፈልጋል",
       "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
       "securityUpdate": "የደህንነት ፍተሻ ማዘመኛ አለው",
+      "agentBriefing": "የወኪል ሪፖርትዎ ዝግጁ ነው",
       "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "አዲስ የደህንነት ግኝት ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "እጅግ ከፍተኛ",
+      "high": "ከፍተኛ",
+      "medium": "መካከለኛ",
+      "low": "ዝቅተኛ"
     },
     "securityFindingSlaWarning": {
       "title": "የSLA ማስጠንቀቂያ"

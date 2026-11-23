@@ -29,7 +29,8 @@
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
  * there is nothing to inflect. Those are the reviewed `NO_AGREEMENT` entries
- * below, each with the reason it holds.
+ * below, each with the reason it holds. The check runs both ways, so an entry
+ * whose counted call is gone is reported too.
  *
  * The call sites come from the syntax tree oxc builds (tools/lib/ast.mjs): a
  * call is a call, its arguments are arguments, and an option is a property in
@@ -43,7 +44,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogTags,
   declaresPluralFamily,
@@ -51,7 +52,7 @@ import {
   missingPluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
-import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceTree, readSourceEntry } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -69,16 +70,15 @@ const COUNTED_OPTIONS = ['count', 'displayCount', 'itemCount'];
  * Counted messages whose English copy has no word whose form the count
  * changes, so a plural family would be noise. Reviewed one by one: before
  * adding an entry, read the English copy and confirm every word reads the same
- * at 1 and at 5. If a word does change, declare the family instead.
+ * at 1 and at 5. If a word does change, declare the family instead. The list is
+ * checked in both directions: a counted key that is neither a family nor here is
+ * a problem, and so is an entry here whose counted call the source no longer
+ * has, so a removed call site cannot leave a stale exemption behind.
  */
 export const NO_AGREEMENT = new Map([
   [
     'agentChat.blockingCard.positionHint',
     'position, not agreement: "(1 of {{displayCount}})" names no inflected word',
-  ],
-  [
-    'agentChat.contextUsage.modelAccessibilityLabel',
-    'accessibility label: "{{name}}, {{provider}}, {{steps}}, {{cost}}" holds no counted noun',
   ],
   [
     'agentChat.preparation.setupCommandOf',
@@ -87,10 +87,6 @@ export const NO_AGREEMENT = new Map([
   [
     'agentChat.sessionChanges.reviewTitle',
     'bare count in parentheses: "Review ({{count}})" names no inflected word',
-  ],
-  [
-    'chat.reactions.accessibility',
-    'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
   [
     'codeReviewer.repos.allModeCount',
@@ -121,24 +117,6 @@ export const NO_AGREEMENT = new Map([
     'securityAgent.settingsOverview.notificationsCount',
     'fixed total: "{{displayCount}} of 2 enabled" reads the same at every count',
   ],
-  [
-    'prReview.fileList.filesViewed',
-    'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.loadingFiles',
-    'progress read-out: "Loading {{loaded}} of {{total}}…" has no inflected word',
-  ],
-  ['prReview.hunkRows.loadingAllFiles', 'progress read-out: "Loading all files — {{loaded}}…"'],
-  [
-    'prReview.hunkRows.loadingAllFilesOf',
-    'progress read-out: "Loading all files — {{loaded}} of {{total}}…"',
-  ],
-  [
-    'prReview.hunkRows.loadingLines',
-    'progress read-out: "Loading {{loaded}} of {{total}} lines…" — "lines" counts loaded, and the row is a spinner',
-  ],
-  ['prReview.hunkRows.loadingContext', 'progress read-out: "Loading context…" has no count'],
   [
     'modelChat.mcp.available',
     'carried count, no inflected word: "Tools available: {{count}}" counts by number alone',
@@ -175,8 +153,9 @@ export const NO_AGREEMENT = new Map([
  * written the way the source writes it with its whitespace collapsed.
  */
 function countedKey(argument, text) {
-  if (argument.type === 'Literal' && typeof argument.value === 'string') {
-    return { key: argument.value };
+  const key = stringLiteralValue(argument);
+  if (key !== null) {
+    return { key };
   }
   if (argument.type === 'TemplateLiteral' && argument.expressions.length === 0) {
     const [chunk] = argument.quasis;
@@ -391,6 +370,36 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
+  [
+    'GLANCEABLE_COUNT_NOUN_KEY[kind]',
+    {
+      keys: [
+        'glanceable.countNoun.needsInput',
+        'glanceable.countNoun.running',
+        'glanceable.countNoun.scheduled',
+        'glanceable.countNoun.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_NOUN_KEY',
+      reason:
+        'GLANCEABLE_COUNT_NOUN_KEY map in presentation.ts; the count noun inflects with its own number on the split layouts',
+    },
+  ],
+  [
+    'GLANCEABLE_COUNT_MESSAGE_KEY[kind]',
+    {
+      keys: [
+        'glanceable.count.needsInput',
+        'glanceable.count.running',
+        'glanceable.count.scheduled',
+        'glanceable.count.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_MESSAGE_KEY',
+      reason:
+        'GLANCEABLE_COUNT_MESSAGE_KEY map in presentation.ts; each whole count line inflects with its own count',
+    },
+  ],
 ]);
 
 /**
@@ -405,9 +414,9 @@ function typeKeys(typeNode) {
     if (node.type !== 'TSLiteralType') {
       return;
     }
-    const literal = unwrap(node.literal);
-    if (literal.type === 'Literal' && typeof literal.value === 'string') {
-      keys.push(literal.value);
+    const key = stringLiteralValue(node.literal);
+    if (key !== null) {
+      keys.push(key);
     }
   });
   return keys;
@@ -429,29 +438,50 @@ function objectKeys(initializer) {
     if (property.type !== 'Property') {
       continue;
     }
-    const value = unwrap(property.value);
-    if (value.type === 'Literal' && typeof value.value === 'string') {
-      keys.push(value.value);
+    const key = stringLiteralValue(property.value);
+    if (key !== null) {
+      keys.push(key);
     }
   }
   return keys;
 }
 
 /**
+ * The noun phrase naming the initialiser shape `objectKeys` could not read.
+ * `unwrap` already reads through the TypeScript wrappers, so the shape is the
+ * node the check actually saw. One node type has a name the generic form would
+ * get wrong; every other node spells its own type as words, which keeps an
+ * unlisted expression readable in the diagnostic.
+ */
+function initializerShape(initializer) {
+  if (initializer === null) {
+    return 'no initializer';
+  }
+  const node = unwrap(initializer);
+  if (node.type === 'ArrayExpression') {
+    // It says "literal", where the generic formatter would say "array expression".
+    return 'an array literal';
+  }
+  const words = node.type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`;
+}
+
+/**
  * The keys one declaration names, read from the syntax tree of the module that
  * owns it: a union alias's members, or a const object's values, in the order
- * the declaration writes them. Null when the module declares no such alias or
- * const, so a renamed declaration is reported instead of passing as an empty
- * set.
+ * the declaration writes them. `found` is false when the module declares no
+ * such alias or const, so a renamed declaration is reported instead of passing
+ * as an empty set; when it is declared but its initialiser is not a string-key
+ * object, `keys` is null and `shape` names what the check found instead.
  */
 function declaredKeys(entry, declaration) {
-  let keys = null;
+  let result = { found: false };
   walk(entry.program, node => {
-    if (keys !== null) {
+    if (result.found) {
       return;
     }
     if (node.type === 'TSTypeAliasDeclaration' && node.id.name === declaration) {
-      keys = typeKeys(node.typeAnnotation);
+      result = { found: true, keys: typeKeys(node.typeAnnotation), shape: null };
       return;
     }
     if (
@@ -461,42 +491,29 @@ function declaredKeys(entry, declaration) {
     ) {
       return;
     }
-    // A declarator without an initialiser does not declare the keys either,
-    // and objectKeys would read through null, so it stays the same null the
-    // missing-alias case reports.
-    if (node.init !== null) {
-      keys = objectKeys(node.init);
-    }
+    // objectKeys reads through an initialiser, so a declarator without one is
+    // named by the shape helper rather than handed to it.
+    const keys = node.init === null ? null : objectKeys(node.init);
+    result = { found: true, keys, shape: keys === null ? initializerShape(node.init) : null };
   });
-  return keys;
+  return result;
 }
 
 /**
  * One declaration module, read and parsed once: the normalised path its
  * diagnostics name it by, the syntax tree its declarations are read from, the
- * lines that say the parser refused it, and the keys read from each declaration
- * so far — the two `McpStatusKey` entries share one read.
+ * lines that say the parser refused it, and the read of each declaration so
+ * far — whether it is declared, the keys it names, and the shape that stopped
+ * the read when it names none — the two `McpStatusKey` entries share one read.
  *
- * A refused read is worded exactly as the tree walk words it. The module sits
- * below the source root, so both reads reach it; one wording means the caller's
- * `reported` set drops the line the scan already owns instead of printing the
- * same failure twice.
+ * The read is the tree walk's own step, `readSourceEntry`, so a refused read
+ * yields that step's single line instead of a copy of its wording. The module
+ * sits below the source root, so both reads reach it; one wording means the
+ * caller's `reported` set drops the line the scan already owns instead of
+ * printing the same failure twice.
  */
 function readDeclarationModule(rootDir, source) {
-  const file = join(rootDir, source);
-  let text;
-  try {
-    text = readFileSync(file, 'utf8');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      path: source,
-      entry: null,
-      declarations: new Map(),
-      problems: [`${source}: cannot read: ${message}`],
-    };
-  }
-  const entry = parseSourceEntry(rootDir, rootDir, file, text);
+  const entry = readSourceEntry(rootDir, rootDir, join(rootDir, source));
   return { path: entry.path, entry, declarations: new Map(), problems: entry.problems };
 }
 
@@ -535,13 +552,20 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
     if (!source.declarations.has(listed.declaration)) {
       source.declarations.set(listed.declaration, declaredKeys(source.entry, listed.declaration));
     }
-    const keys = source.declarations.get(listed.declaration);
-    if (keys === null) {
+    const read = source.declarations.get(listed.declaration);
+    if (!read.found) {
       problems.push(
         `${source.path}: ${listed.declaration} is not declared in this module, so ${expression} cannot be checked against it`
       );
       continue;
     }
+    if (read.keys === null) {
+      problems.push(
+        `${source.path}: ${listed.declaration} is declared with ${read.shape}, so the string keys ${expression} relies on cannot be read; ${expression} is left unchecked`
+      );
+      continue;
+    }
+    const keys = read.keys;
     const listedKeys = new Set(listed.keys);
     for (const key of new Set(keys)) {
       if (!listedKeys.has(key)) {
@@ -563,12 +587,27 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
 }
 
 /**
- * One catalog, flattened by tag. The English read and the per-locale loop both
+ * One catalog, flattened by tag. The audited read and the per-locale loop both
  * decode through here, so a change to how a catalog is read has one place to
- * land; each caller keeps its own handling of a refused or malformed file.
+ * land. The read-and-report step is `readAuditedCatalog`; the plural-rule
+ * failure is reported by its caller with the same line.
  */
 function readCatalog(tag, localesDir = LOCALES_DIR) {
   return flattenCatalog(JSON.parse(readFileSync(join(localesDir, `${tag}.json`), 'utf8')));
+}
+
+/**
+ * One catalog read and reported: the flattened catalog and the problem lines a
+ * caller must print, or a `null` catalog and one line naming the cause when the
+ * filesystem refuses the file or `JSON.parse` rejects it.
+ */
+export function readAuditedCatalog(tag, localesDir = LOCALES_DIR) {
+  try {
+    return { catalog: readCatalog(tag, localesDir), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { catalog: null, problems: [`${tag}: cannot audit catalog: ${message}`] };
+  }
 }
 
 /**
@@ -578,12 +617,7 @@ function readCatalog(tag, localesDir = LOCALES_DIR) {
  * audit reporting instead of a stack trace.
  */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  try {
-    return { catalog: readCatalog('en', localesDir), problems: [] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { catalog: null, problems: [`en: cannot audit catalog: ${message}`] };
-  }
+  return readAuditedCatalog('en', localesDir);
 }
 
 /**
@@ -632,6 +666,29 @@ export function findCountlessFamilies(scan, english) {
   );
 }
 
+/**
+ * The `NO_AGREEMENT` entries the scan no longer produces: a reviewed entry whose
+ * counted call is gone, sorted ascending. It is the reverse of
+ * `findCountlessFamilies`, which names a counted key with no review; this names
+ * a review with no counted key, so a removed call site cannot leave a stale
+ * exemption behind. `checkDynamicCountedKeySources` reports the same pairing for
+ * the dynamic lists. It projects a scan the caller made once with
+ * `auditCountedCalls`.
+ *
+ * A scan that could not read or parse every file cannot say which keys exist —
+ * a refused file's messages are invisible — so it proves no entry stale and
+ * names none. Its own problem lines already say why. This is the same reason
+ * `checkDynamicCountedKeySources` drops its per-key lines for a module it could
+ * not read.
+ */
+export function findOrphanedNoAgreementEntries(scan) {
+  if (scan.problems.length > 0) {
+    return [];
+  }
+  const keys = new Set(auditKeys(scan));
+  return [...NO_AGREEMENT.keys()].filter(key => !keys.has(key)).sort();
+}
+
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
@@ -640,9 +697,6 @@ function run() {
   const englishRead = readEnglishCatalog();
   const english = englishRead.catalog;
   problems.push(...englishRead.problems);
-  // The scan already read every file below the source root, the declaration
-  // modules included, so it owns their parse diagnostics; the declaration check
-  // skips the lines this scan already reported.
   const unparsed = findUnparsedFiles(scan);
   const reported = new Set(unparsed);
 
@@ -660,6 +714,12 @@ function run() {
     );
   }
 
+  for (const key of findOrphanedNoAgreementEntries(scan)) {
+    problems.push(
+      `en: NO_AGREEMENT lists "${key}", but no counted call produces it; remove the entry or restore its call site`
+    );
+  }
+
   for (const expression of findUnlistedDynamicCalls(scan)) {
     problems.push(
       `en: counted call with variable key "${expression}" is not listed in DYNAMIC_COUNTED_KEYS; name its possible keys or add the call site's expression`
@@ -674,11 +734,14 @@ function run() {
       if (tag === 'en') {
         continue;
       }
-      let catalog;
+      const read = readAuditedCatalog(tag);
+      problems.push(...read.problems);
+      if (read.catalog === null) {
+        continue;
+      }
       let missing;
       try {
-        catalog = readCatalog(tag);
-        missing = missingPluralCategories(english, catalog, tag);
+        missing = missingPluralCategories(english, read.catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         problems.push(`${tag}: cannot audit catalog: ${message}`);
@@ -708,7 +771,10 @@ function run() {
       counts.push(`${report.length} language(s) with missing plural categories`);
     }
     console.error(`\ncheck-plurals: ${counts.join('; ')}`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(

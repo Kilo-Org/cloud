@@ -1,5 +1,6 @@
 // Fixture builders, status parsing, and opt-in materialization polling.
 // Importing this module has no database or network side effects.
+import type { platform_integrations } from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   kiloSdkMessageHistorySchema,
@@ -447,6 +448,58 @@ export function fixtureCleanupSessionIds(childPerformance = false): string[] {
     UNSUPPORTED_SESSION_ID,
     EMPTY_SESSION_ID,
   ];
+}
+
+/**
+ * The repository the root session names when the account has no GitHub
+ * integration of its own. The owner is invented, like the `app:integrations`
+ * fixture's, so nothing on GitHub answers to it.
+ */
+const FIXTURE_REPOSITORY_OWNER = 'devseed-acme';
+const FIXTURE_REPOSITORY_NAME = 'mobile-sheet-fixtures';
+export const FIXTURE_REPOSITORY = `${FIXTURE_REPOSITORY_OWNER}/${FIXTURE_REPOSITORY_NAME}`;
+
+/**
+ * One fake installation per account: a workflow installation id is unique
+ * across the table, and several fake accounts share one local database.
+ */
+export function fixtureInstallationId(userId: string): string {
+  return `devseed-mobile-sheet-fixtures-${userId}`;
+}
+
+/**
+ * A user-owned GitHub App integration whose cached snapshot lists the fixture
+ * repository, so the root session's repository reads as connected without a
+ * GitHub App or its credentials. The server answers from a synced snapshot and
+ * never contacts GitHub for it.
+ */
+export function buildFixtureIntegrationValues(
+  userId: string,
+  syncedAt: string
+): typeof platform_integrations.$inferInsert {
+  return {
+    owned_by_user_id: userId,
+    owned_by_organization_id: null,
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: fixtureInstallationId(userId),
+    platform_account_id: `devseed-mobile-sheet-fixtures-account-${userId}`,
+    platform_account_login: FIXTURE_REPOSITORY_OWNER,
+    integration_status: 'active',
+    repository_access: 'selected',
+    repositories: [
+      {
+        id: 1_101_301,
+        name: FIXTURE_REPOSITORY_NAME,
+        full_name: FIXTURE_REPOSITORY,
+        private: true,
+        default_branch: 'main',
+      },
+    ],
+    repositories_synced_at: syncedAt,
+    github_app_type: 'standard',
+    github_connection_role: 'workflow',
+  };
 }
 
 export function buildMobileSheetFixtureResult(

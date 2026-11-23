@@ -18,6 +18,7 @@ import {
   background,
   buttonStyle,
   cornerRadius,
+  dynamicTypeSize,
   environment,
   fixedSize,
   font,
@@ -105,6 +106,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   })();
 
   const dark = activityEnvironment.colorScheme === 'dark';
+  // The idle dot is the only mark a connected but quiet agent draws, so it
+  // takes the palette's muted ink: that ink clears 3:1 on the card and the page.
   const palette = dark
     ? {
         bg: '#17171A',
@@ -113,7 +116,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#F2B05F',
         good: '#5FCB8E',
         info: '#60A5FA',
-        idle: '#56544F',
+        idle: '#8A8680',
         primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
@@ -126,12 +129,29 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#956011',
         good: '#24784A',
         info: '#2260EB',
-        idle: '#A9A39A',
+        idle: '#6F6A61',
         primary: '#4F5A10',
         primaryFg: '#FFFFFF',
         secondary: '#F0EEE6',
         track: '#DEDBD2',
       };
+  // Every text run takes the Dynamic Type text style whose default size is
+  // the design size, so it draws the design at the default text size and
+  // grows with the user's setting. The Lock Screen card caps the growth at
+  // `xLarge`, where its three rows still fit beside the controls; the island
+  // and the small banner keep the default size, because their system frames
+  // have no room to grow.
+  const TEXT_STYLES = {
+    11: 'caption2',
+    12: 'caption',
+    13: 'footnote',
+    15: 'subheadline',
+    16: 'callout',
+  } as const;
+  type TextSize = keyof typeof TEXT_STYLES;
+  const scaledFont = (size: TextSize, weight?: 'regular' | 'semibold') =>
+    font({ textStyle: TEXT_STYLES[size], weight });
+  const defaultTextSize = dynamicTypeSize('large');
   type Scheme = {
     fg: string;
     muted: string;
@@ -142,7 +162,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     secondary: string;
     track: string;
     dot: string;
-    titleSize: number;
+    titleSize: TextSize;
   };
   const dots = {
     needsInput: palette.warn,
@@ -170,7 +190,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     needsInput: '#F2B05F',
     running: '#5FCB8E',
     scheduled: '#60A5FA',
-    idle: '#56544F',
+    idle: '#8A8680',
     failed: '#F2B05F',
   };
   const ISLAND_DOT = {
@@ -321,13 +341,16 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // eslint-disable-next-line max-params -- a text run is its copy, size, colour and weight, named as the design names them
   const text = (
     value: string,
-    size: number,
+    size: TextSize,
     color: string,
     weight: 'regular' | 'semibold' = 'regular',
     // Only for a run drawn from a list, where React needs a stable key.
     listKey?: string
   ) => (
-    <Text key={listKey} modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>
+    <Text
+      key={listKey}
+      modifiers={[scaledFont(size, weight), lineLimit(1), foregroundStyle(color)]}
+    >
       {value}
     </Text>
   );
@@ -336,7 +359,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // eslint-disable-next-line max-params -- see above
   const number = (
     value: string,
-    size: number,
+    size: TextSize,
     color: string,
     weight: 'regular' | 'semibold' = 'regular',
     listKey?: string
@@ -344,7 +367,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     <Text
       key={listKey}
       modifiers={[
-        font({ size, weight }),
+        scaledFont(size, weight),
         lineLimit(1),
         fixedSize({ horizontal: true, vertical: false }),
         monospacedDigit(),
@@ -359,13 +382,13 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // eslint-disable-next-line max-params -- see above
   const fixedLabel = (
     value: string,
-    size: number,
+    size: TextSize,
     color: string,
     weight: 'regular' | 'semibold' = 'regular'
   ) => (
     <Text
       modifiers={[
-        font({ size, weight }),
+        scaledFont(size, weight),
         lineLimit(1),
         fixedSize({ horizontal: true, vertical: false }),
         foregroundStyle(color),
@@ -388,8 +411,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       />
     </ZStack>
   );
-  const timeModifiers = (size: number, color: string) => [
-    font({ size }),
+  const timeModifiers = (size: TextSize, color: string) => [
+    scaledFont(size),
     lineLimit(1),
     fixedSize({ horizontal: true, vertical: false }),
     monospacedDigit(),
@@ -401,15 +424,15 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // width that holds its short forms ("59 min", "23 hr") instead, so it does
   // not shift the line as it counts. A static time string keeps `fixedSize`.
   const TIMER_MIN_WIDTH = 54;
-  const timerModifiers = (size: number, color: string) => [
-    font({ size }),
+  const timerModifiers = (size: TextSize, color: string) => [
+    scaledFont(size),
     lineLimit(1),
     monospacedDigit(),
     foregroundStyle(color),
     frame({ minWidth: TIMER_MIN_WIDTH, alignment: 'leading' }),
   ];
   // The clock time alone today; another day adds the locale date.
-  const clock = (date: Date, size: number, color: string) => {
+  const clock = (date: Date, size: TextSize, color: string) => {
     if (date.toDateString() === new Date().toDateString()) {
       return <Text date={date} dateStyle="time" modifiers={timeModifiers(size, color)} />;
     }
@@ -429,7 +452,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // The time in the current state. Working counts up on the device from the
   // last status change; the other states name the moment the state began, or
   // the wake time for a scheduled session.
-  const stateTime = (size: number, color: string) => {
+  const stateTime = (size: TextSize, color: string) => {
     if (kind === 'scheduled') {
       if (scheduledAt === null) {
         return null;
@@ -448,7 +471,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   };
   // The quiet line counts up on its own from the last activity the server saw,
   // so the card reaches the warning without a push for the clock alone.
-  const quietLine = (size: number, color: string) =>
+  const quietLine = (size: TextSize, color: string) =>
     lastActivityAt === null ? null : (
       <HStack spacing={4}>
         {text(COPY.noActivity ?? 'No activity for', size, color, 'semibold')}
@@ -487,7 +510,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // shows it twice. The counts are separate runs because a number must not
   // truncate, and the runs keep the template's own spacing, so a catalog that
   // attaches an affix to a count ("7-dən 3") is not given a gap in its middle.
-  const planCount = (scheme: Scheme, size: number) => (
+  const planCount = (scheme: Scheme, size: TextSize) => (
     <HStack spacing={0}>
       {planSegments.map((segment, at) => {
         if ('name' in segment) {
@@ -505,7 +528,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       })}
     </HStack>
   );
-  const planLine = (scheme: Scheme, size: number) =>
+  const planLine = (scheme: Scheme, size: TextSize) =>
     plan === null || planTotal === 0 ? null : (
       <VStack alignment="leading" spacing={4}>
         <HStack alignment="center" spacing={6}>
@@ -516,7 +539,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         {plan.current == null ? null : text(plan.current, size, scheme.muted)}
       </VStack>
     );
-  const changesLine = (scheme: Scheme, size: number) => {
+  const changesLine = (scheme: Scheme, size: TextSize) => {
     const changes = props.changes ?? null;
     if (changes === null || changes.files === 0) {
       return null;
@@ -559,7 +582,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     const amount = `${count(grouped)}${decimal}${count(fraction ?? '')}`;
     return template.split('#').join(amount);
   })();
-  const costLine = (scheme: Scheme, size: number) =>
+  const costLine = (scheme: Scheme, size: TextSize) =>
     costText === null ? null : number(costText, size, scheme.muted);
   // The outcome of a finished session: the pull request it opened, its diff,
   // or nothing. The duration prints beside it when the session start is known.
@@ -575,9 +598,9 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     const rest = minutes % 60;
     return `${count(hours)} ${COPY.hour ?? 'h'} ${count(rest)} ${COPY.minute ?? 'min'}`;
   })();
-  const finishedLine = (size: number, color: string) =>
+  const finishedLine = (size: TextSize, color: string) =>
     finishedDuration === null ? null : text(finishedInText(finishedDuration), size, color);
-  const outcomeLine = (scheme: Scheme, size: number) => {
+  const outcomeLine = (scheme: Scheme, size: TextSize) => {
     const outcome = props.outcome?.kind ?? null;
     if (outcome === 'pr_opened') {
       return text(COPY.prOpened ?? 'Pull request opened', size, scheme.good, 'semibold');
@@ -649,7 +672,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // reason when it failed, and the outcome when it finished. The status line
   // carries the state time for every kind but a working card, whose timer
   // sits here beside the step, so each card prints its time once.
-  const detailLine = (scheme: Scheme, size: number) => {
+  const detailLine = (scheme: Scheme, size: TextSize) => {
     if (kind === 'failed') {
       return (
         <HStack spacing={6}>
@@ -737,7 +760,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const pill = (label: string, tone: { fill: string; color: string }) => (
     <Text
       modifiers={[
-        font({ size: 13, weight: 'semibold' }),
+        scaledFont(13, 'semibold'),
         lineLimit(1),
         foregroundStyle(tone.color),
         fixedSize({ horizontal: true, vertical: false }),
@@ -850,8 +873,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // controls, and one detail line that merges the step or the state's own
   // fact with the compact plan count and the diff. The expanded island keeps
   // the full card, with the bar and every line.
-  const sep = (scheme: Scheme, size: number) => text('·', size, scheme.muted);
-  const compactFacts = (scheme: Scheme, size: number, withCost: boolean) => {
+  const sep = (scheme: Scheme, size: TextSize) => text('·', size, scheme.muted);
+  const compactFacts = (scheme: Scheme, size: TextSize, withCost: boolean) => {
     const changes = props.changes ?? null;
     const facts = [
       plan === null || planTotal === 0 ? null : (
@@ -890,7 +913,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     );
   };
   // The fact a state leads its detail line with, or null for none.
-  const leadFact = (scheme: Scheme, size: number) => {
+  const leadFact = (scheme: Scheme, size: TextSize) => {
     if (kind === 'failed') {
       return text(failureText, size, scheme.warn, 'semibold');
     }
@@ -926,7 +949,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     }
     return null;
   };
-  const lockScreenDetail = (scheme: Scheme, size: number) => {
+  const lockScreenDetail = (scheme: Scheme, size: TextSize) => {
     if (notice !== null) {
       return text(notice, size, scheme.warn, 'semibold');
     }
@@ -937,7 +960,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         <HStack alignment="center" spacing={0}>
           <Text
             modifiers={[
-              font({ size, weight: 'semibold' }),
+              scaledFont(size, 'semibold'),
               lineLimit(1),
               foregroundStyle(scheme.warn),
               layoutPriority(1),
@@ -1012,6 +1035,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           // The widget process takes its locale from the device language; the
           // baked tag keeps the times in the app language.
           environment({ key: 'locale', value: locale }),
+          dynamicTypeSize({ max: 'xLarge' }),
           opacity(dimmed ? 0.72 : 1),
         ]}
       >
@@ -1032,6 +1056,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           padding({ horizontal: 12, vertical: 10 }),
           frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
           environment({ key: 'locale', value: locale }),
+          defaultTextSize,
           opacity(dimmed ? 0.72 : 1),
         ]}
       >
@@ -1074,7 +1099,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       <HStack
         alignment="center"
         spacing={6}
-        modifiers={[accessibilityElement('combine'), accessibilityLabel(spoken)]}
+        modifiers={[accessibilityElement('combine'), accessibilityLabel(spoken), defaultTextSize]}
       >
         {dot(8, island.dot)}
         {stateTime(13, island.fg)}
@@ -1094,6 +1119,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         modifiers={[
           padding({ leading: 14, trailing: 14, bottom: 10 }),
           environment({ key: 'locale', value: locale }),
+          defaultTextSize,
         ]}
       >
         {expandedCard(island)}

@@ -55,9 +55,6 @@ export async function getItemAsync(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<string | null> {
-  // The guard stays outside the catch: a locked device is not a read failure
-  // and must not file a report, exactly as the guard in `readStoredValue` does
-  // not.
   assertProtectedDataAvailable();
   try {
     return await readStoredValue(key, options);

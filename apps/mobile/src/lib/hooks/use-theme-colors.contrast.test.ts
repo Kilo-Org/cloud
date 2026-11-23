@@ -14,7 +14,8 @@ vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 
 // The color maps come from `src/lib/hooks/theme-colors.generated.ts`, which is
 // generated from `src/global.css` and checked by `scripts/assert-theme-colors.mjs`.
-// The contrast assertions below fail if a shipped pair regresses below 4.5:1.
+// The text-pair contrast assertions below fail if a shipped pair regresses
+// below 4.5:1.
 
 const MIN_TEXT_RATIO = 4.5;
 const MIN_NON_TEXT_RATIO = 3;
@@ -225,43 +226,25 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 });
 
 describe('disabled primary action fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints its label on
-  // `--primary-disabled-action`: the palette's disabled primary under white in
-  // light, and a dim neutral under `--foreground` in dark. The dark plate must
-  // stay a visible object on the near-black page and stand off the outlined
-  // control beside it, while staying clearly below the enabled brand fill. The
-  // palette's `--primary-disabled` is left to the Switch's disabled on-track.
-  it('light theme: primaryForeground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
+  // A disabled default-variant Button paints its label on the palette's muted
+  // pair (`--muted` fill, `--muted-foreground` ink). Both schemes clear 4.5:1
+  // and the fill stays clearly below the enabled brand fill, so an inactive
+  // Start never reads as a second action colour.
+  it('light theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: foreground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.foreground, darkColors.primaryDisabledAction);
+  it('dark theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.mutedForeground, darkColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
-  });
-
-  it('dark theme: the disabled plate stays a visible object on the page', () => {
-    // 2.6:1 off the page. The inactive icon surface (1.7:1) leaves a full-width
-    // plate without presence, so a disabled primary reads as a stray label.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.background)
-    ).toBeGreaterThanOrEqual(2);
-  });
-
-  it('dark theme: the disabled plate outranks the outlined control beside it', () => {
-    // The outline variant fills with `--secondary`; a disabled primary must
-    // still read as the stronger surface, not as a second outlined control.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.secondary)
-    ).toBeGreaterThanOrEqual(1.5);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
     // The plate must read as a superseded control next to the enabled brand
     // fill, not as a second brand colour, or a disabled Start would look
     // tappable and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
+    const separation = contrastRatio(darkColors.primary, darkColors.muted);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });
@@ -314,6 +297,34 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('offline banner warn-solid pair contrast', () => {
+  it('light theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
+    const ratio = contrastRatio(lightColors.warnSolidForeground, lightColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 6.14:1 for #FFFFFF on #8A5614.
+    const ratio = contrastRatio(darkColors.warnSolidForeground, darkColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  // The band is a full-width surface, so WCAG 1.4.11 asks for 3:1 off the page
+  // it covers; below that it stops reading as a distinct surface.
+  it('light theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 5.08:1 for #956011 on #FBFAF5.
+    const ratio = contrastRatio(lightColors.warnSolid, lightColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 3.14:1 for #8A5614 on #0E0E10.
+    const ratio = contrastRatio(darkColors.warnSolid, darkColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+});
+
 describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
   // A 16px stroked glyph on a 30x30 tile is a non-text graphic, so WCAG 1.4.11
   // asks for 3:1: measured against the row surface (`secondary`) and against the
@@ -341,14 +352,10 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
 });
 
 describe('idle composer control and ring track contrast (non-text)', () => {
-  // Two surfaces that needed their own step: the composer's send circle while
-  // there is nothing to send (dark only — the light theme keeps its neutral),
-  // and the track under the context-usage ring's arc (both themes: the light
-  // hairline tint sat within 1.2:1 of its pill and left the ring invisible just
-  // as the dark one did). The floors below are perception floors, not a WCAG
-  // bar: the fill and the track must read as objects on their surfaces, and the
-  // ring track must stay under the neutral arc so a part-filled arc still reads
-  // as a fraction.
+  // The composer's send circle while there is nothing to send needed its own
+  // step (dark only — the light theme keeps its neutral). Its 1.6 floor is a
+  // perception floor, not a WCAG bar: the fill must read as an object on its
+  // surface, while the arrow keeps the 3:1 non-text floor.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],
@@ -374,8 +381,9 @@ describe('idle composer control and ring track contrast (non-text)', () => {
   // message-details sheets (`background`), so the track is measured over both
   // rather than over the page alone. It must clear the perception floor on each
   // and stay under the neutral arc so a part-filled arc still reads as a
-  // fraction. Light once shipped the hairline tint here (1.11:1 on the pill),
-  // which left the ring as a lone arc with no circle under it.
+  // fraction. Both themes once shipped a hairline tint here, which left the
+  // ring as a lone arc with no circle under it; dark replaced it first, and
+  // light kept it at 1.11:1 on the pill.
   it('every theme: the ring track reads on its surfaces and stays under the neutral arc', () => {
     for (const [themeName, colors] of themes) {
       const arcRatio = contrastRatio(colors.mutedForeground, colors.secondary);
@@ -485,6 +493,45 @@ describe('filled neutral action contrast (non-text)', () => {
       expect(
         contrastRatio(colors.secondaryForeground, colors.secondaryFill)
       ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
+  });
+});
+
+// The session status glyph's idle ring and scheduled clock, and the Home
+// widget's idle dot, are the mark's whole meaning: WCAG 1.4.11 asks 3:1, and a
+// row can sit on the page, on a card, or on the pill/row fill. They paint the
+// muted text ink; the focus-only `mutedSoft` measured about 2.2–2.5:1 on those
+// surfaces in both palettes and left the mark unreadable.
+describe('status mark ink contrast (WCAG 1.4.11 non-text)', () => {
+  it('every theme: the status mark clears 3:1 on background, card and secondary', () => {
+    for (const [themeName, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      for (const surfaceName of ['background', 'card', 'secondary'] as const) {
+        expect(
+          contrastRatio(colors.mutedForeground, colors[surfaceName]),
+          `status mark vs ${surfaceName} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      }
+    }
+  });
+
+  // The Android widget palette and the iOS glanceable renderers paint their own
+  // surfaces: the page in light, the card in dark, a secondary step of their own,
+  // and the always-black Dynamic Island. The idle dot takes the muted ink on each.
+  it('every theme: the widget idle dot clears 3:1 on the widget surfaces', () => {
+    const widgetSurfaces = [
+      ['light', lightColors, [lightColors.background, lightColors.secondary]],
+      ['dark', darkColors, [darkColors.card, '#26262B', '#000000']],
+    ] as const;
+    for (const [themeName, colors, surfaces] of widgetSurfaces) {
+      for (const surface of surfaces) {
+        expect(
+          contrastRatio(colors.mutedForeground, surface),
+          `widget idle dot vs ${surface} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      }
     }
   });
 });

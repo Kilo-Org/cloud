@@ -77,6 +77,12 @@ describe('displaySafeText', () => {
   it('keeps an astral character whole', () => {
     expect(displaySafeText('\u{1F44B}')).toBe('\u{1F44B}');
   });
+
+  it('spells out a lone surrogate and keeps a surrogate pair whole', () => {
+    expect(displaySafeText('a\uD800b')).toBe('a\\ud800b');
+    expect(displaySafeText('\uDC00')).toBe('\\udc00');
+    expect(displaySafeText('\uD83D\uDE00')).toBe('\uD83D\uDE00');
+  });
 });
 
 describe('hasVisibleGlyph', () => {
@@ -108,5 +114,12 @@ describe('hasVisibleGlyph', () => {
     expect(hasVisibleGlyph('\u180B\u180C')).toBe(false);
     expect(hasVisibleGlyph('\u17B4')).toBe(false);
     expect(hasVisibleGlyph('\u0301\u0308')).toBe(false);
+  });
+
+  it('rejects a lone surrogate and accepts a surrogate pair', () => {
+    expect(hasVisibleGlyph('\uD800')).toBe(false);
+    expect(hasVisibleGlyph('\uDC00\uD800')).toBe(false);
+    expect(hasVisibleGlyph('\uD83D\uDE00')).toBe(true);
+    expect(hasVisibleGlyph('a\uD800')).toBe(true);
   });
 });

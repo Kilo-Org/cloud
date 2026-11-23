@@ -196,6 +196,7 @@ describe('KiloClaw funding and recovery copy', () => {
     ['enrollment_failed', true, '/claw/subscription', 'Choose hosting plan'],
     ['requires_reprovision', false, null, null],
     ['signup_unavailable', false, '/profile', 'Go to profile'],
+    ['hosting_ended', false, '/profile', 'Go to profile'],
     ['missing_instance', false, null, null],
     ['destroyed_instance', false, null, null],
     ['stale_intent', false, '/claw/subscription', 'Choose hosting plan'],

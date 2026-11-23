@@ -17,6 +17,7 @@ vi.mock('react-native', () => ({
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Alert: { alert: alertFn },
+  Keyboard: { dismiss: vi.fn() },
   Modal: 'Modal',
   Platform: {
     get OS() {
@@ -24,6 +25,8 @@ vi.mock('react-native', () => ({
     },
   },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 
@@ -61,6 +64,7 @@ vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -155,9 +159,9 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
   Users: 'Users',
   Workflow: 'Workflow',
+  X: 'X',
 }));
 
-vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
@@ -166,6 +170,18 @@ vi.mock('@/components/language-picker-sheet', () => ({
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The search field belongs to the settings-search surface; this suite renders it
+// as a marker so its minimal react-native stub (no TextInput) keeps working.
+vi.mock('@/components/settings-search/settings-search', () => ({
+  SettingsSearchField: 'SettingsSearchField',
+  SettingsSearchResults: 'SettingsSearchResults',
+}));
+// The integration index reads a cached tRPC setup-status query this harness does
+// not model; an empty source keeps the suite on the sign-out rows.
+vi.mock('@/lib/settings-search/integration-source', () => {
+  const source = { settings: [] };
+  return { useIntegrationSearchSource: () => source };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
@@ -204,7 +220,10 @@ describe('ProfileScreen sign-out confirmation', () => {
 
   function pressSignOutTile(renderer: TestRenderer.ReactTestRenderer) {
     const tile = renderer.root.find(
-      node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
+      node =>
+        isType(node, 'ConfigureRow') &&
+        node.props.variant === 'action' &&
+        node.props.title === 'Sign out'
     );
     callProp(tile, 'onPress');
   }

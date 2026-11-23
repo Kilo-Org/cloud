@@ -32,6 +32,20 @@ import {
 // with `uploadOne` as a manually-resolved promise. `uploadOne` is mocked so
 // the upload-task module and the tRPC client never load in the node env.
 
+/** The bounded decode the strip asks for: never a full-resolution photo. */
+type DecodeOptions = { maxWidth?: number; maxHeight?: number };
+
+/** The context `ImageManipulator.manipulate` hands back before `renderAsync`. */
+type StubImageContext = { renderAsync: () => Promise<StubImageRef> };
+
+/** The decoded image ref the mocked `renderAsync` resolves to. */
+type StubImageRef = {
+  width: number;
+  height: number;
+  release: () => void;
+  saveAsync: (options?: unknown) => Promise<ImageResult>;
+};
+
 const hoisted = vi.hoisted(() => {
   let idCounter = 0;
   return {
@@ -41,7 +55,12 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
-    manipulateAsync: vi.fn<() => Promise<ImageResult>>(),
+    // Contextual image API: `manipulate` records the decode request and hands
+    // back the context whose `renderAsync` resolves `rendered`; every rendered
+    // ref saves through the shared `saveAsync`.
+    manipulate: vi.fn<(source: string, options?: DecodeOptions) => StubImageContext>(),
+    rendered: vi.fn<() => Promise<StubImageRef>>(),
+    saveAsync: vi.fn<(options?: unknown) => Promise<ImageResult>>(),
     cancel: vi.fn<() => void>(),
     fileDelete: vi.fn(),
     captureException: vi.fn(),
@@ -54,7 +73,9 @@ vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
 vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
-  manipulateAsync: hoisted.manipulateAsync,
+  ImageManipulator: {
+    manipulate: hoisted.manipulate,
+  },
 }));
 vi.mock('@/lib/agent-attachments/local-image', async importOriginal => ({
   ...(await importOriginal<typeof LocalImageModule>()),
@@ -97,6 +118,29 @@ vi.mock('expo-file-system', () => {
     Paths: { cache: { uri: 'file:///cache' } },
   };
 });
+
+/**
+ * Arms the metadata strip's contextual image API: the bounded decode renders at
+ * once and every rendered ref saves through the shared `saveAsync` mock, which
+ * a test overrides with a pending or failing promise.
+ */
+function armStrip(): void {
+  hoisted.manipulate.mockReset();
+  hoisted.rendered.mockReset();
+  hoisted.saveAsync.mockReset();
+  hoisted.manipulate.mockReturnValue({ renderAsync: hoisted.rendered });
+  hoisted.rendered.mockResolvedValue({
+    width: 100,
+    height: 100,
+    release: vi.fn<() => void>(),
+    saveAsync: hoisted.saveAsync,
+  });
+  hoisted.saveAsync.mockResolvedValue({
+    uri: 'file:///cache/stripped.jpg',
+    width: 100,
+    height: 100,
+  });
+}
 
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
@@ -363,9 +407,9 @@ describe('feature-state matrix — send-admission behavior', () => {
   });
 });
 
-describe('size limits (20 MB / 5 files) — constant parity', () => {
-  it('exposes the 20 MB constant for both web and mobile parity', () => {
-    expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20 * 1024 * 1024);
+describe('size limits (20 MB / 5 files) — decimal cap', () => {
+  it('holds the composer to the decimal 20 MB the refusal copy states', () => {
+    expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20_000_000);
   });
 });
 
@@ -463,10 +507,10 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
   });
 
   it('never uploads a strip-failed image and marks it a terminal chip', async () => {
-    hoisted.manipulateAsync.mockReset();
-    // Every re-encode attempt fails, so the strip result is not ok and the
-    // hook reads metadataStripFailed.
-    hoisted.manipulateAsync.mockRejectedValue(new Error('re-encode failed'));
+    armStrip();
+    // Every decode fails, so both strip attempts reject, the strip result is
+    // not ok, and the hook reads metadataStripFailed.
+    hoisted.rendered.mockRejectedValue(new Error('re-encode failed'));
     const renderer = await mountHook();
     await act(async () => {
       await hookApi().addCandidates([
@@ -1242,12 +1286,7 @@ describe('selection-time image upload (Step 2)', () => {
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
-    hoisted.manipulateAsync.mockReset();
-    hoisted.manipulateAsync.mockResolvedValue({
-      uri: 'file:///cache/stripped.jpg',
-      width: 100,
-      height: 100,
-    });
+    armStrip();
     resolveUpload = undefined;
     rejectUpload = undefined;
     const controlled = new Promise<{ key: string }>((resolve, reject) => {
@@ -1595,6 +1634,75 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('deletes the stripped copy when reset runs during the strip window', async () => {
+    // The strip runs while measurement resolves: hold the save promise so the
+    // continuation suspends inside the strip/measure loop with an app-owned
+    // stripped copy pending.
+    const saved = Promise.withResolvers<{ uri: string; width: number; height: number }>();
+    armStrip();
+    hoisted.saveAsync.mockReturnValueOnce(saved.promise);
+    const renderer = await mountHook();
+
+    let addPromise: Promise<void> | undefined = undefined;
+    await act(async () => {
+      addPromise = hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+
+    // The reset must not delete the picker-owned original; only the stripped
+    // app-owned copy is deletable.
+    await act(async () => {
+      saved.resolve({ uri: 'file:///cache/stripped.jpg', width: 100, height: 100 });
+      await addPromise;
+      await settle();
+    });
+
+    // The stale-generation discard deletes the app-owned stripped copy the
+    // loop created: no orphaned cache file, no chip, no upload.
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
+    expect(hookApi().attachments).toHaveLength(0);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('deletes the stripped copy when the composer unmounts during the strip window', async () => {
+    const saved = Promise.withResolvers<{ uri: string; width: number; height: number }>();
+    armStrip();
+    hoisted.saveAsync.mockReturnValueOnce(saved.promise);
+    const renderer = await mountHook();
+
+    let addPromise: Promise<void> | undefined = undefined;
+    await act(async () => {
+      addPromise = hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer.unmount();
+      await settle();
+    });
+
+    await act(async () => {
+      saved.resolve({ uri: 'file:///cache/stripped.jpg', width: 100, height: 100 });
+      await addPromise;
+      await settle();
+    });
+
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
     renderer.unmount();
   });
 
@@ -2010,12 +2118,7 @@ describe('local delivery', () => {
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
-    hoisted.manipulateAsync.mockReset();
-    hoisted.manipulateAsync.mockResolvedValue({
-      uri: 'file:///cache/stripped.jpg',
-      width: 100,
-      height: 100,
-    });
+    armStrip();
     hoisted.encodeLocalImage.mockReset();
     vi.mocked(toast.error).mockClear();
   });

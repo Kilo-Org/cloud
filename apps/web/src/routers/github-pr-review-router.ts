@@ -701,15 +701,15 @@ async function fetchConversationCommentsPage(args: {
 
 // First-page-only conversation comments. Loops against pageInfo up to
 // CONVERSATION_COMMENTS_MAX_PAGES × CONVERSATION_COMMENTS_PAGE_SIZE (5 × 100).
-// Past the cap, remaining pages are dropped and whatever was collected is
-// returned (silent truncation) — same ceiling spirit as bot review-comment
+// Past the cap, remaining pages are dropped and the result carries
+// `truncated: true` — same ceiling spirit as bot review-comment
 // pagination (bot/platforms/github.ts).
 export async function fetchAllConversationComments(args: {
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
   owner: string;
   repo: string;
   number: number;
-}): Promise<ReturnType<typeof normalizeComment>[]> {
+}): Promise<{ comments: ReturnType<typeof normalizeComment>[]; truncated: boolean }> {
   const { octokit, owner, repo, number } = args;
   const collected: ReturnType<typeof normalizeComment>[] = [];
   let cursor: string | null = null;
@@ -721,14 +721,16 @@ export async function fetchAllConversationComments(args: {
       number,
       cursor,
     });
-    if (!connection) break;
+    if (!connection) return { comments: collected, truncated: false };
     collected.push(...connection.nodes.map(normalizeComment));
     if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) {
-      return collected;
+      return { comments: collected, truncated: false };
     }
     cursor = connection.pageInfo.endCursor;
   }
-  return collected;
+  // Fall-through means the cap exhausted every page while GitHub kept
+  // reporting another one; anything else returned above with `truncated: false`.
+  return { comments: collected, truncated: true };
 }
 
 async function fetchReviewThreadsPage(args: {
@@ -1087,15 +1089,13 @@ type PrLedgerMutationArgs<T> = {
   parseCanonical: (raw: unknown) => T;
 };
 
-/** The canonical result replayed under the same key carries `replayed: true`. */
 type ReplayedResult<T> = T & { replayed: true };
 
 /**
  * UGC gate: a user must have accepted the current Terms before a
- * comment-creating mutation (`createReviewComment`, `replyToComment`,
- * `submitReview`). Runs before `admitOperation` so a missing acceptance never
- * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
- * absent.
+ * comment-publishing mutation. Runs before `admitOperation` so a missing
+ * acceptance never creates a ledger row. Throws PRECONDITION_FAILED
+ * `terms_required` when absent.
  */
 export async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db
@@ -1344,7 +1344,7 @@ async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
 }
 
 /**
- * The shared shape of the three non-idempotent comment/review writes. Without
+ * The shared shape of the non-idempotent comment/review writes. Without
  * an `operationKey` the write runs exactly as before, unledgered. With one it
  * admits a `pr` row, settles the canonical result at the committed-effect
  * boundary, and reconciles a same-key retry by re-reading the recorded GitHub
@@ -1926,7 +1926,8 @@ export const githubPrReviewRouter = createTRPCRouter({
             number: input.number,
             cursor: input.cursor ?? null,
           }),
-          // Conversation comments only on the first page; cursored pages get [].
+          // Conversation comments only on the first page; cursored pages get
+          // an empty, complete list.
           isFirstPage
             ? fetchAllConversationComments({
                 octokit,
@@ -1934,15 +1935,16 @@ export const githubPrReviewRouter = createTRPCRouter({
                 repo: input.repo,
                 number: input.number,
               })
-            : Promise.resolve([]),
+            : Promise.resolve({ comments: [], truncated: false }),
         ]);
         if (!connection) {
           return buildReviewThreadsResult({
             threads: [],
-            conversation,
+            conversation: conversation.comments,
             page: 1,
             hasNextPage: false,
             endCursor: null,
+            conversationTruncated: conversation.truncated,
           });
         }
         const threads = await Promise.all(
@@ -1970,10 +1972,11 @@ export const githubPrReviewRouter = createTRPCRouter({
         );
         return buildReviewThreadsResult({
           threads: threads as never,
-          conversation,
+          conversation: conversation.comments,
           page: 1,
           hasNextPage: connection.pageInfo.hasNextPage,
           endCursor: connection.pageInfo.endCursor,
+          conversationTruncated: conversation.truncated,
         });
       },
     });

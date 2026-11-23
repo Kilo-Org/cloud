@@ -3,6 +3,7 @@
 // own field and Add-button contract lives in
 // `repo-bindings-screen.add-form.mounted.test.tsx`.
 
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -35,6 +36,7 @@ const h = vi.hoisted(() => ({
     repositories: [] as TestRepoOption[],
     isLoading: false,
     isError: false,
+    error: undefined,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -44,6 +46,7 @@ const h = vi.hoisted(() => ({
     effectiveDefaultId: null as string | null,
     isLoading: false,
     isError: false,
+    error: undefined,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -63,8 +66,14 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -85,14 +94,22 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: (props: { label: string; onPress: () => void }) =>
+    createElement('StateAction', props),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  Plus: 'Plus',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   GitBranch: 'GitBranch',
@@ -132,7 +149,7 @@ describe('RepoBindingsScreen add form profile picker', () => {
     expect(empty.description).toBe(
       'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
+    expect(empty.action?.props.label).toBe('Create profile');
     act(() => {
       empty.action?.props.onPress();
     });

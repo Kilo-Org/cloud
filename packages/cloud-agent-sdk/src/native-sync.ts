@@ -5,7 +5,12 @@ import {
   type NativeSnapshotMessage,
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
-import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import {
+  applyNativeEvent,
+  applyNativeSessionEvent,
+  projectNativeEvent,
+} from './native-conversation-reducer';
+import { messageIDFromEventID } from './message-id';
 import {
   reduceNativePendingRequests,
   type NativePendingRequests,
@@ -17,6 +22,14 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
+import {
+  NATIVE_SNAPSHOT_BLOB_CACHE_BYTES,
+  NATIVE_SYNC_REQUEST_DEADLINE_MS,
+  NATIVE_SYNC_RETAINED_WORK_BYTES,
+  NATIVE_SYNC_RETAINED_WORK_FRAMES,
+  NATIVE_SYNC_TICKET_MINT_DEADLINE_MS,
+} from './limits';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -31,6 +44,12 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandStatusRank: Record<z.infer<typeof commandStatusSchema>, number> = {
+  queued: 0,
+  delivered: 1,
+  expired: 2,
+};
+const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
   tenant: tenantSchema,
@@ -73,11 +92,21 @@ export type NativeSessionState = {
   /** Canonical message identities awaiting a revision-pinned native snapshot. */
   pendingSnapshotMessageIDs?: string[] | undefined;
   assetURLs?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Keys, in kilo2AssetKey form, that no authorization can bind. The snapshot reported them, so
+   * recovery must not chase them and the transcript stays readable.
+   */
+  unavailableAssetKeys?: string[] | undefined;
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
-  commands: Record<string, 'queued' | 'delivered' | 'expired'>;
+  commands: Record<string, z.infer<typeof commandStatusSchema>>;
   error?: string | undefined;
+  /**
+   * Set when automatic transcript reads stopped after repeated failures. The transport does
+   * not reconnect until `refresh()` asks for one read cycle again.
+   */
+  snapshotFailure?: { error: string } | undefined;
 };
 export type NativeInstanceReply = {
   commandID: string;
@@ -108,8 +137,12 @@ export type NativeSessionConnection = {
   replyQuestion(requestID: string, answers: string[][]): Promise<string>;
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
-  getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
+  /** Retries missing transcript parts over the live socket without reconnecting. */
+  requestRecovery(): Promise<void>;
   clear(): void;
+  /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
+  refresh(): void;
   close(): void;
 };
 export type NativeSocket = {
@@ -124,7 +157,7 @@ export type NativeSocket = {
 export type NativeSocketConstructor = new (url: string, protocols: string[]) => NativeSocket;
 export type NativeSyncOptions = {
   baseUrl: string;
-  getCredential: () => Promise<string>;
+  getCredential: (signal?: AbortSignal) => Promise<string>;
   fetch?: typeof fetch;
   WebSocket?: NativeSocketConstructor;
 };
@@ -148,15 +181,99 @@ const reason = (error: unknown) =>
 /**
  * Authorization failures and deleted sessions cannot recover by reconnecting. A 404 stays
  * retryable: a just-created session is briefly unknown until its runner registers it.
+ * `snapshot_unavailable` is the latched transcript failure: only an explicit refresh retries.
  */
 const isPermanent = (error: unknown) =>
   (error instanceof NativeSyncError && (error.status === 401 || error.status === 403)) ||
-  (error instanceof Error && 'code' in error && error.code === 'session_deleted');
+  (error instanceof Error &&
+    'code' in error &&
+    (error.code === 'session_deleted' || error.code === 'snapshot_unavailable'));
+
+/**
+ * Settles with `operation` unless the signal aborts first, then rejects with `failure()`.
+ * The fetcher may ignore the abort signal, so the deadline must win the race; the operation
+ * keeps a rejection handler so a late failure is never unhandled. A value that arrives after
+ * the abort is handed to `discard`, so a late response can release its body.
+ */
+function raceAbort<T>(
+  signal: AbortSignal,
+  failure: () => Error,
+  operation: () => Promise<T>,
+  discard?: (value: T) => void
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(failure());
+      return;
+    }
+    const abort = () => reject(failure());
+    signal.addEventListener('abort', abort, { once: true });
+    void operation().then(
+      value => {
+        signal.removeEventListener('abort', abort);
+        if (signal.aborted) {
+          discard?.(value);
+          reject(failure());
+        } else resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      }
+    );
+  });
+}
+
+/** Read one authorized asset body, bounded to the advertised blob size and never left locked. */
+async function readAssetBytes(response: Response, advertisedBytes: number): Promise<ArrayBuffer> {
+  const reader = response.body?.getReader();
+  try {
+    const length = response.headers.get('Content-Length');
+    if (length !== null) {
+      if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
+        throw new NativeSyncError('invalid_content_length');
+      }
+      if (Number(length) > advertisedBytes) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+    }
+    if (!reader) {
+      if (advertisedBytes === 0) return new ArrayBuffer(0);
+      throw new NativeSyncError('blob_hash_mismatch');
+    }
+    const bytes = new Uint8Array(advertisedBytes);
+    let offset = 0;
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
+        return bytes.buffer;
+      }
+      if (result.value.byteLength > advertisedBytes - offset) {
+        throw new NativeSyncError('blob_hash_mismatch');
+      }
+      bytes.set(result.value, offset);
+      offset += result.value.byteLength;
+    }
+  } catch (error) {
+    try {
+      await reader?.cancel();
+    } catch {
+      // The bounded read fails closed even if the stream cannot be canceled.
+    }
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+}
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
-const liveBacklogBytes = 4 * 1024 * 1024;
-const liveBacklogCount = 1024;
+const SNAPSHOT_FAILURE_LIMIT = 3;
+// Bounds for a connect that never reaches hello: a failing ticket mint, an offline fetch, or an
+// immediate close.
+const connectBackoffFloorMs = 1000;
+const connectBackoffCeilMs = 60_000;
 type SocketEpoch = {
   signal: AbortSignal;
   current: () => boolean;
@@ -181,7 +298,12 @@ function snapshotCoversLiveGap(
   if (snapshot.revision <= requirement.revision || snapshot.position < requirement.position)
     return false;
   const item = snapshot.messages.find(item => item.message.id === requirement.messageID);
-  if (!item || item.incomplete || hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs))
+  const unavailable = new Set<string>(snapshot.unavailableAssetKeys);
+  if (
+    !item ||
+    item.incomplete ||
+    hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs, unavailable)
+  )
     return false;
   const files = readKilo2FileReferences(item.message);
   if (
@@ -232,20 +354,29 @@ function snapshotCoversLiveGap(
   return true;
 }
 
+/** First snapshot entry per message id, matching the first-match semantics of Array.find. */
+function indexNativeMessages(
+  messages: NativeSnapshotMessage[]
+): Map<string, NativeSnapshotMessage> {
+  const byID = new Map<string, NativeSnapshotMessage>();
+  for (const item of messages) if (!byID.has(item.message.id)) byID.set(item.message.id, item);
+  return byID;
+}
+
 /** Non-content-addressed native files need fresh authorization after their content is replaced. */
 function nativeAssetURLsAfterMessages(
-  previous: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
   messages: NativeSnapshotMessage[],
   assetURLs: Readonly<Record<string, string>> | undefined
 ) {
   if (!assetURLs) return assetURLs;
   let changed: Record<string, string> | undefined;
   for (const item of messages) {
-    const before = previous.find(candidate => candidate.message.id === item.message.id);
+    const before = previousByID.get(item.message.id);
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
-      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      if (/^(media:|data:)/.test(file.uri) || assetURLs[key] === undefined) continue;
       const replaced =
         file.contentIndex === undefined
           ? before?.message.files !== item.message.files
@@ -259,92 +390,299 @@ function nativeAssetURLsAfterMessages(
   return changed ?? assetURLs;
 }
 
+/**
+ * Snapshot items whose content the current frame cannot certify, in messages order. A
+ * replaced asset URL set invalidates keys shared by otherwise unchanged messages, so the
+ * caller retries them too.
+ */
+function nativeGapMessages(
+  messages: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  isPending: (messageID: string) => boolean,
+  recheckUnchanged: boolean,
+  unavailable: ReadonlySet<string>
+): NativeSnapshotMessage[] {
+  const gaps: NativeSnapshotMessage[] = [];
+  for (const item of messages) {
+    const previous = previousByID.get(item.message.id);
+    const missingDependency =
+      item.incomplete &&
+      (!previous?.incomplete || (item !== previous && item.message === previous.message));
+    if (missingDependency) {
+      gaps.push(item);
+      continue;
+    }
+    if (!recheckUnchanged && previous?.message === item.message) continue;
+    if (
+      !item.incomplete &&
+      hasUnresolvedKilo2Assets(item.message, assetURLs, unavailable) &&
+      !isPending(item.message.id)
+    )
+      gaps.push(item);
+  }
+  return gaps;
+}
+
+/** A set is built only once some candidate gap actually asks about pending identities. */
+function pendingLookup(pendingIDs: readonly string[] | undefined): (messageID: string) => boolean {
+  let known: Set<string> | undefined;
+  return messageID => {
+    if (!pendingIDs?.length) return false;
+    known ??= new Set(pendingIDs);
+    return known.has(messageID);
+  };
+}
+
+/**
+ * Live frames the published ring retains beside the current remote state: the frame being
+ * published plus the 498 before it, which is the window this transport has always published.
+ */
+const EVENT_RING_LIMIT = 499;
+
+/** A transcript entry the client can certify: complete, and every private asset resolved. */
+function certifiedTranscriptEntry(
+  item: NativeSnapshotMessage,
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  unavailable: ReadonlySet<string>
+): boolean {
+  return !item.incomplete && !hasUnresolvedKilo2Assets(item.message, assetURLs, unavailable);
+}
+
+/**
+ * Pending identities a snapshot still owes. An identity is settled by a certified message with the
+ * same id, unless a live replay still requires it; one with no certified message stays owed.
+ */
+function owedPendingSnapshotIDs(
+  pendingIDs: readonly string[] | undefined,
+  messages: NativeSnapshotMessage[],
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  liveRequirementIDs: ReadonlySet<string> | undefined,
+  unavailable: ReadonlySet<string>
+): string[] | undefined {
+  return pendingIDs?.filter(
+    id =>
+      liveRequirementIDs?.has(id) === true ||
+      !messages.some(
+        item => item.message.id === id && certifiedTranscriptEntry(item, assetURLs, unavailable)
+      )
+  );
+}
+
+type NativeTranscriptFacts = {
+  session: NativeSnapshotSession | undefined;
+  messages: NativeSnapshotMessage[];
+  assetURLs: Readonly<Record<string, string>> | undefined;
+  pendingSnapshotMessageIDs: readonly string[] | undefined;
+  quarantinedFrames: number;
+  unavailableAssetKeys: readonly string[] | undefined;
+};
+
+/**
+ * Whether the transcript still has unrecovered content. Every recovery decision uses this one
+ * rule: recovery starts, recovery completes, pending identities are pruned, and the integrity
+ * notice clears only while it reports no gap.
+ *
+ * A gap is any of: no session yet, a frame the client could not project, a listed pending
+ * identity, an incomplete message, or a private asset with no authorized bytes. An unresolved
+ * asset is a gap because the transcript cannot render that reference until its bytes arrive.
+ *
+ * `integrityGap` is deliberately not an input: it means live replay was lost, which only a
+ * canonical snapshot read can repair, so it never blocks a recovery. Callers apply it where it
+ * matters, as the reason the notice is not cleared.
+ */
+function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
+  if (facts.session === undefined || facts.quarantinedFrames > 0) return true;
+  const unavailable = new Set<string>(facts.unavailableAssetKeys);
+  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs, unavailable)))
+    return true;
+  // Every listed identity renders as pending in the shared projection until a snapshot or its
+  // live replay settles it, so the list itself is the gap signal; `owedPendingSnapshotIDs`
+  // decides which entries may leave it.
+  return (facts.pendingSnapshotMessageIDs?.length ?? 0) > 0;
+}
+
+const projectedFrameGap =
+  'Native live sync skipped an event it could not read and is restoring the transcript from a canonical snapshot.';
+
+/** A grant and the cached entry that answered it, so a caller can evict only what it used. */
+type NativeGrantEntry = {
+  entry: Promise<z.infer<typeof grantSchema>>;
+  grant: z.infer<typeof grantSchema>;
+};
+
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
   private readonly fetcher: typeof fetch;
   private readonly socketConstructor: NativeSocketConstructor;
   private readonly grants = new Map<string, Promise<z.infer<typeof grantSchema>>>();
+  private readonly snapshotBlobs = new NativeSnapshotBlobCache(NATIVE_SNAPSHOT_BLOB_CACHE_BYTES);
   constructor(private readonly options: NativeSyncOptions) {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socketConstructor = options.WebSocket ?? globalThis.WebSocket;
   }
-  private async grant(organizationID?: string) {
+  private async grant(organizationID?: string): Promise<NativeGrantEntry> {
     const key = organizationID ?? '';
     const existing = this.grants.get(key);
     if (existing) {
       const grant = await existing;
-      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return grant;
+      if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return { entry: existing, grant };
     }
     const pending = (async () => {
-      const credential = await this.options.getCredential();
+      const credential = await this.credential();
       return grantSchema.parse(
-        await (
-          await this.response('/v1/auth/exchange', {
+        await this.exchange(
+          '/v1/auth/exchange',
+          {
             method: 'POST',
             headers: { Authorization: `Bearer ${credential}` },
             body: JSON.stringify({ version: 1, ...(organizationID ? { organizationID } : {}) }),
-          })
-        ).json()
+          },
+          response => response.json()
+        )
       );
     })();
     this.grants.set(key, pending);
     try {
-      return await pending;
+      return { entry: pending, grant: await pending };
     } catch (error) {
-      this.grants.delete(key);
+      // Two callers can mint at once: both await the same expired entry, then each replaces it.
+      // Delete only this exchange, so a newer cached grant survives its predecessor's failure.
+      if (this.grants.get(key) === pending) this.grants.delete(key);
       throw error;
     }
   }
-  private async response(path: string, init?: RequestInit): Promise<Response> {
-    const response = await this.fetcher(new URL(path, this.options.baseUrl).href, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-    });
-    if (!response.ok) {
-      const body = record(await response.json().catch(() => null));
-      const error = record(body['error']);
-      const retry = response.headers.get('Retry-After');
-      const retryAfterMs = retry
-        ? /^\d+$/.test(retry)
-          ? Number(retry) * 1000
-          : Math.max(0, Date.parse(retry) - Date.now())
-        : 0;
-      throw new NativeSyncError(
-        typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
-        response.status,
-        retryAfterMs
+  /**
+   * Both consumers fetch the credential over the network, so a lookup that black-holes would
+   * leave the cached mint pending forever: it could never settle, its catch could never evict
+   * it, and every later caller would join the dead entry. Bound it like the exchange itself,
+   * and hand the deadline's signal to the source so it can cancel its own request instead of
+   * leaving it in flight, because each reconnect can otherwise leave another one behind.
+   */
+  private async credential(): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    try {
+      return await raceAbort(
+        controller.signal,
+        () => new NativeSyncError('request_timeout'),
+        () => this.options.getCredential(controller.signal)
       );
+    } finally {
+      clearTimeout(timer);
     }
-    return response;
   }
-  private async authorizedResponse(
+  private async exchange<T>(
     path: string,
-    init?: RequestInit,
-    organizationID?: string
-  ): Promise<Response> {
-    const grant = await this.grant(organizationID);
+    init: RequestInit | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const controller = new AbortController();
+    let failure = new NativeSyncError('request_canceled');
+    const timer = setTimeout(() => {
+      failure = new NativeSyncError('request_timeout');
+      controller.abort();
+    }, NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    const cancel = () => {
+      failure = new NativeSyncError('request_canceled');
+      controller.abort();
+    };
+    init?.signal?.addEventListener('abort', cancel, { once: true });
+    if (init?.signal?.aborted) cancel();
+    try {
+      const response = await raceAbort(
+        controller.signal,
+        () => failure,
+        () =>
+          this.fetcher(new URL(path, this.options.baseUrl).href, {
+            ...init,
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', ...init?.headers },
+          }),
+        // A fetcher that ignores the abort signal can still answer, so release its body now
+        // rather than at collection.
+        late => void late.body?.cancel().catch(() => undefined)
+      );
+      if (!response.ok) {
+        const body = record(
+          await raceAbort(
+            controller.signal,
+            () => failure,
+            () => response.json().catch(() => null)
+          )
+        );
+        const error = record(body['error']);
+        const retry = response.headers.get('Retry-After');
+        const retryAfterMs = retry
+          ? /^\d+$/.test(retry)
+            ? Number(retry) * 1000
+            : Math.max(0, Date.parse(retry) - Date.now())
+          : 0;
+        throw new NativeSyncError(
+          typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
+          response.status,
+          retryAfterMs
+        );
+      }
+      return await raceAbort(
+        controller.signal,
+        () => failure,
+        () => read(response)
+      );
+    } finally {
+      clearTimeout(timer);
+      init?.signal?.removeEventListener('abort', cancel);
+    }
+  }
+  /**
+   * The grant is shared across callers, so one caller's cancellation must not abort it; it
+   * stops waiting instead, and the exchange stays bounded by its own deadline.
+   */
+  private async grantFor(
+    organizationID: string | undefined,
+    signal: AbortSignal | null | undefined
+  ): Promise<NativeGrantEntry> {
+    if (!signal) return await this.grant(organizationID);
+    return await raceAbort(
+      signal,
+      () => new NativeSyncError('request_canceled'),
+      () => this.grant(organizationID)
+    );
+  }
+  private async authorized<T>(
+    path: string,
+    init: RequestInit | undefined,
+    organizationID: string | undefined,
+    read: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const used = await this.grantFor(organizationID, init?.signal);
     if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
     try {
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${used.grant.token}` } },
+        read
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
-      this.grants.delete(organizationID ?? '');
-      const renewed = await this.grant(organizationID);
+      // A concurrent 401 may already have replaced the entry with an in-flight renewal, and
+      // deleting that would make both callers exchange again.
+      if (this.grants.get(organizationID ?? '') === used.entry)
+        this.grants.delete(organizationID ?? '');
+      const renewed = await this.grantFor(organizationID, init?.signal);
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
-      return await this.response(path, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` },
-      });
+      return await this.exchange(
+        path,
+        { ...init, headers: { ...init?.headers, Authorization: `Bearer ${renewed.grant.token}` } },
+        read
+      );
     }
   }
   async request<T>(path: string, init?: RequestInit, organizationID?: string): Promise<T> {
     // Snapshot parsing lives at its canonical boundary; other callers validate below.
     try {
-      return (await (await this.authorizedResponse(path, init, organizationID)).json()) as T;
+      return (await this.authorized(path, init, organizationID, response => response.json())) as T;
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -357,46 +695,9 @@ export class NativeSyncClient {
     organizationID?: string
   ): Promise<ArrayBuffer> {
     try {
-      const response = await this.authorizedResponse(path, init, organizationID);
-      const reader = response.body?.getReader();
-      try {
-        const length = response.headers.get('Content-Length');
-        if (length !== null) {
-          if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
-            throw new NativeSyncError('invalid_content_length');
-          }
-          if (Number(length) > advertisedBytes) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-        }
-        if (!reader) {
-          if (advertisedBytes === 0) return new ArrayBuffer(0);
-          throw new NativeSyncError('blob_hash_mismatch');
-        }
-        const bytes = new Uint8Array(advertisedBytes);
-        let offset = 0;
-        while (true) {
-          const result = await reader.read();
-          if (result.done) {
-            if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
-            return bytes.buffer;
-          }
-          if (result.value.byteLength > advertisedBytes - offset) {
-            throw new NativeSyncError('blob_hash_mismatch');
-          }
-          bytes.set(result.value, offset);
-          offset += result.value.byteLength;
-        }
-      } catch (error) {
-        try {
-          await reader?.cancel();
-        } catch {
-          // The bounded read fails closed even if the stream cannot be canceled.
-        }
-        throw error;
-      } finally {
-        reader?.releaseLock();
-      }
+      return await this.authorized(path, init, organizationID, response =>
+        readAssetBytes(response, advertisedBytes)
+      );
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -426,6 +727,8 @@ export class NativeSyncClient {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let renewalTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectAfterMs = 1000;
+    let connectBackoffMs = connectBackoffFloorMs;
+    let greeted = false;
     let generation = 0;
     let retire: (() => void) | undefined;
     const send = (value: unknown) => {
@@ -433,17 +736,41 @@ export class NativeSyncClient {
       socket.send(JSON.stringify(value));
       return true;
     };
-    const mint = async () =>
-      ticketSchema.parse(
-        await this.request(
-          ticketPath,
-          {
-            method: 'POST',
-            body: JSON.stringify({ role: 'controller' }),
-          },
-          organizationID
-        )
-      );
+    /**
+     * One ticket mint: the credential lookup, the grant exchange and the ticket POST, bounded
+     * end to end. Each hop carries its own deadline, yet three slow hops would still hold a
+     * connect for their sum, so the whole chain races one mint deadline. The deadline's signal
+     * is the one the ticket POST carries, so that request is cancelled when the bound fires.
+     * The credential lookup and the grant exchange are shared with every other caller of this
+     * client, so they keep their own deadlines and are not cancelled with this mint.
+     */
+    const mint = ({ signal }: { signal?: AbortSignal } = {}) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), NATIVE_SYNC_TICKET_MINT_DEADLINE_MS);
+      // ES2022/Hermes consumers do not provide AbortSignal.any: each source aborts the mint.
+      const cancel = () => controller.abort();
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
+      return raceAbort(
+        controller.signal,
+        () => new NativeSyncError('request_timeout'),
+        async () =>
+          ticketSchema.parse(
+            await this.request(
+              ticketPath,
+              {
+                method: 'POST',
+                body: JSON.stringify({ role: 'controller' }),
+                signal: controller.signal,
+              },
+              organizationID
+            )
+          )
+      ).finally(() => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+      });
+    };
     const scheduleRenewal = (body: Record<string, unknown>) => {
       clearTimeout(renewalTimer);
       const deadline =
@@ -483,11 +810,14 @@ export class NativeSyncClient {
       }
       clearTimeout(reconnectTimer);
       const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
+      const delay = Math.max(retry, reconnectAfterMs, connectBackoffMs);
+      // Without hello there is no server retry budget to honour, so each miss doubles the wait.
+      if (!greeted) connectBackoffMs = Math.min(connectBackoffCeilMs, connectBackoffMs * 2);
       reconnectTimer = setTimeout(
         () => {
           void connect();
         },
-        Math.max(retry, reconnectAfterMs) + Math.random() * reconnectAfterMs
+        delay + Math.random() * reconnectAfterMs
       );
     };
     const connect = async () => {
@@ -498,14 +828,21 @@ export class NativeSyncClient {
       let retainedBytes = 0;
       let retainedCount = 0;
       let draining = false;
+      // The connect mint needs its own controller: aborting the epoch controller makes
+      // `epoch.current()` false, so the failed mint's `epoch.fail` would stop calling `reconnect`
+      // and the client would sit in `connecting` for ever with no backoff.
+      const connectMint = new AbortController();
+      // One `reauth_required` mint per connection; later frames join it instead of starting
+      // another POST or holding the queue.
+      let reauthMint: AbortController | undefined;
       const epoch: SocketEpoch = {
         signal: controller.signal,
         current: () => !stopped && current === generation && !controller.signal.aborted,
         retain: bytes => {
           if (
             !epoch.current() ||
-            retainedCount >= liveBacklogCount ||
-            retainedBytes + bytes > liveBacklogBytes
+            retainedCount >= NATIVE_SYNC_RETAINED_WORK_FRAMES ||
+            retainedBytes + bytes > NATIVE_SYNC_RETAINED_WORK_BYTES
           )
             return false;
           retainedCount++;
@@ -523,17 +860,38 @@ export class NativeSyncClient {
       retire = () => {
         for (const item of queue) epoch.release(item.bytes);
         queue.length = 0;
+        reauthMint?.abort();
+        connectMint.abort();
         controller.abort();
       };
+      greeted = false;
       onConnection('connecting');
       try {
-        const ticket = await mint();
+        const ticket = await mint({ signal: connectMint.signal });
         if (!epoch.current()) return;
         const url = new URL(path, this.options.baseUrl);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         const next = new this.socketConstructor(url.href, [`kilo-session-ticket.${ticket.ticket}`]);
         socket = next;
         const sendCurrent = (value: unknown) => epoch.current() && send(value);
+        // Starts the one ticket mint this connection may have in flight and returns at once, so
+        // later queued frames keep draining. The mint owns its deadline because the fetcher may
+        // ignore the abort signal; `retire` cancels it together with the epoch.
+        const requestReauth = () => {
+          if (reauthMint) return;
+          const controller = new AbortController();
+          reauthMint = controller;
+          void mint({ signal: controller.signal })
+            .then(
+              value => sendCurrent({ type: 'reauth', ticket: value.ticket }),
+              (error: unknown) => {
+                if (epoch.current()) reconnect(error);
+              }
+            )
+            .finally(() => {
+              if (reauthMint === controller) reauthMint = undefined;
+            });
+        };
         const drain = async () => {
           if (draining) return;
           draining = true;
@@ -549,14 +907,12 @@ export class NativeSyncClient {
                 if (frame.type === 'hello') {
                   if (typeof body['reconnectAfterMs'] === 'number')
                     reconnectAfterMs = Math.min(60_000, Math.max(1000, body['reconnectAfterMs']));
+                  greeted = true;
+                  connectBackoffMs = connectBackoffFloorMs;
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
-                if (frame.type === 'reauth_required') {
-                  const ticket = await mint();
-                  if (!epoch.current()) return;
-                  sendCurrent({ type: 'reauth', ticket: ticket.ticket });
-                }
+                if (frame.type === 'reauth_required') requestReauth();
                 if (frame.type === 'reauthorized') scheduleRenewal(body);
               }
               await onFrame(frame, sendCurrent, epoch, item.bytes);
@@ -593,6 +949,18 @@ export class NativeSyncClient {
     void connect();
     return {
       send,
+      restart: () => {
+        stopped = false;
+        generation++;
+        connectBackoffMs = connectBackoffFloorMs;
+        retire?.();
+        retire = undefined;
+        clearTimeout(reconnectTimer);
+        clearTimeout(renewalTimer);
+        socket?.close();
+        socket = undefined;
+        void connect();
+      },
       close: () => {
         stopped = true;
         generation++;
@@ -705,7 +1073,8 @@ export class NativeSyncClient {
       sessionID,
       signal,
       (route: string, advertisedBytes: number, init?: RequestInit) =>
-        this.requestAsset(route, advertisedBytes, init, organizationID)
+        this.requestAsset(route, advertisedBytes, init, organizationID),
+      this.snapshotBlobs
     );
   }
 
@@ -719,7 +1088,12 @@ export class NativeSyncClient {
       connection: 'connecting',
       runnerConnected: false,
       messages: [],
-      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
       events: [],
       commands: {},
     };
@@ -733,13 +1107,53 @@ export class NativeSyncClient {
       requirements: Map<number, NativeRecoveryRequirement>;
       completed: boolean;
       cancel: () => void;
+      /** Settles when this run stops, whether it recovered or gave up. */
+      done: Promise<void>;
     };
     let recovery: Recovery | undefined;
+    let liveEpoch: SocketEpoch | undefined;
     let integrityError: string | undefined;
     let failureError: string | undefined;
+    let snapshotFailures = 0;
+    let snapshotFailure: string | undefined;
     let integrityGap = false;
+    let quarantined: { seq: number; position: number }[] = [];
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
+    /**
+     * The published transcript's first entry per id: the previous-entry source for the entries
+     * one frame reports. It mirrors `state.messages` exactly, so a frame that reports nothing
+     * leaves it untouched.
+     */
+    let known = new Map<string, NativeSnapshotMessage>();
+    /** Chronological live frames once the ring is full, oldest-first from `ringStart`. */
+    const ring: NativeEvent[] = [];
+    let ringStart = 0;
+    const indexPublished = (messages: NativeSnapshotMessage[]) => {
+      known = indexNativeMessages(messages);
+      return messages;
+    };
+    /** The published ring: the current remote state, then the retained live frames. */
+    const publishedEvents = (): NativeEvent[] => {
+      const recent =
+        ring.length < EVENT_RING_LIMIT
+          ? ring.slice()
+          : [...ring.slice(ringStart), ...ring.slice(0, ringStart)];
+      return remoteState ? [remoteState, ...recent] : recent;
+    };
+    const recordEvent = (frame: NativeEvent) => {
+      if (frame.type === 'remote.state') {
+        ring.length = 0;
+        ringStart = 0;
+        remoteState = frame;
+        return;
+      }
+      if (ring.length < EVENT_RING_LIMIT) ring.push(frame);
+      else {
+        ring[ringStart] = frame;
+        ringStart = (ringStart + 1) % EVENT_RING_LIMIT;
+      }
+    };
     const publish = (patch: Partial<NativeSessionState>) => {
       if (closed) return;
       if ('error' in patch) failureError = patch.error;
@@ -750,8 +1164,30 @@ export class NativeSyncClient {
       state = { ...state, ...patch, error };
       listener(state);
     };
-    const visible = (messages: NativeSnapshotMessage[]) =>
-      clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
+    // Status moves only forward: a late POST/poll answer must not regress a frame-reported delivery.
+    const recordCommandStatus = (
+      commandID: string,
+      status: z.infer<typeof commandStatusSchema>
+    ): z.infer<typeof commandStatusSchema> => {
+      const current = state.commands[commandID];
+      if (current !== undefined && commandStatusRank[current] >= commandStatusRank[status])
+        return current;
+      publish({ commands: { ...state.commands, [commandID]: status } });
+      return status;
+    };
+    /**
+     * Published messages never carry a cleared id, so only a frame that reports a cleared entry
+     * can make the filter necessary; a frame that reports nothing keeps the full filter.
+     */
+    const visible = (
+      messages: NativeSnapshotMessage[],
+      changed: NativeSnapshotMessage[] | undefined
+    ) => {
+      if (clearedIDs.size === 0) return messages;
+      if (changed !== undefined && !changed.some(item => clearedIDs.has(item.message.id)))
+        return messages;
+      return messages.filter(item => !clearedIDs.has(item.message.id));
+    };
     const beyond = (frame: NativeEvent, position: number) => {
       const syncPosition = record(frame.body)['syncPosition'];
       const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
@@ -767,43 +1203,93 @@ export class NativeSyncClient {
       const next = await readSnapshot(epoch);
       if (!epoch.current() || next.position < snapshotPosition) return;
       snapshotPosition = next.position;
+      pruneQuarantined(next.position);
+      integrityError =
+        quarantined.length === 0 && integrityError === projectedFrameGap
+          ? undefined
+          : integrityError;
+      const messages = indexPublished(visible(next.messages, undefined));
       publish({
         session: next.session,
         snapshot: { position: next.position, revision: next.revision },
-        messages: visible(next.messages),
+        messages,
         assetURLs: next.assetURLs,
-        pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-          id =>
-            !next.messages.some(
-              item =>
-                item.message.id === id &&
-                !item.incomplete &&
-                !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-            )
+        unavailableAssetKeys: next.unavailableAssetKeys,
+        pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+          state.pendingSnapshotMessageIDs,
+          next.messages,
+          next.assetURLs,
+          undefined,
+          new Set<string>(next.unavailableAssetKeys)
         ),
       });
     };
     const markGap = () => {
+      if (snapshotFailure) return;
       integrityGap = true;
       integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
       publish({});
     };
-    const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
+    /**
+     * One failed snapshot cycle. At the limit this returns the permanent error that settles
+     * the connection, and `refresh()` starts the streak again.
+     */
+    const noteSnapshotFailure = (error: unknown) => {
+      if (isPermanent(error)) return undefined;
+      if (error instanceof NativeSyncError && error.status === 404) return undefined;
+      // A canceled read says nothing about the transcript, whichever signal canceled it.
       if (
-        recovery ||
-        !epoch.current() ||
-        (!force &&
-          state.session &&
-          !state.messages.some(message => message.incomplete) &&
-          !state.pendingSnapshotMessageIDs?.length)
+        (error instanceof NativeSyncError && error.code === 'request_canceled') ||
+        (error instanceof Error && error.name === 'AbortError')
       )
-        return;
+        return undefined;
+      snapshotFailures += 1;
+      if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
+      const cause = reason(error);
+      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Open the session again to retry.`;
+      snapshotFailure = message;
+      integrityError = undefined;
+      publish({ snapshotFailure: { error: message }, error: message });
+      return Object.assign(new Error(message), { code: 'snapshot_unavailable' });
+    };
+    const pruneQuarantined = (position: number) => {
+      quarantined = quarantined.filter(entry => entry.position > position);
+    };
+    /** The live transcript facts every recovery decision shares. */
+    const transcriptFacts = (): NativeTranscriptFacts => ({
+      session: state.session,
+      messages: state.messages,
+      assetURLs: state.assetURLs,
+      pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs,
+      quarantinedFrames: quarantined.length,
+      unavailableAssetKeys: state.unavailableAssetKeys,
+    });
+    /**
+     * A snapshot cycle is successful only when nothing it could not certify remains: a read
+     * that returns, yet still leaves a gap, is a failure cycle.
+     */
+    const transcriptSettled = () => !transcriptHasGap(transcriptFacts());
+    /** A settled transcript owns no terminal failure, so the published marker goes with it. */
+    const settleSnapshotStreak = () => {
+      snapshotFailures = 0;
+      if (snapshotFailure === undefined) return;
+      snapshotFailure = undefined;
+      publish({ snapshotFailure: undefined, error: undefined });
+    };
+    const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
+      if (recovery || !epoch.current() || (!force && !transcriptHasGap(transcriptFacts()))) return;
       const controller = new AbortController();
+      // ES2022/Hermes consumers do not provide Promise.withResolvers.
+      let settle: () => void = () => {};
+      const done = new Promise<void>(resolve => {
+        settle = resolve;
+      });
       const current: Recovery = {
         attempt: 0,
         replay: [],
         requirements: new Map(),
         completed: false,
+        done,
         cancel: () => {
           if (current.replay.length > 0) markGap();
           dispose();
@@ -820,6 +1306,8 @@ export class NativeSyncClient {
         current.replay.length = 0;
         current.requirements.clear();
         if (recovery === current) recovery = undefined;
+        // A cancelled run still answers its caller; settling twice is a no-op.
+        settle();
       };
       epoch.signal.addEventListener('abort', current.cancel, { once: true });
       void (async () => {
@@ -840,6 +1328,11 @@ export class NativeSyncClient {
               return;
             }
             if (current.attempt >= 4) {
+              const stop = noteSnapshotFailure(error);
+              if (stop) {
+                epoch.fail(stop);
+                return;
+              }
               integrityError = `Native transcript recovery is incomplete: ${reason(error)}`;
               publish({});
               return;
@@ -873,27 +1366,31 @@ export class NativeSyncClient {
               continue;
             const previous = messages;
             messages = applyNativeEvent(messages, item.frame, session);
-            assetURLs = nativeAssetURLsAfterMessages(previous, messages, assetURLs);
+            assetURLs = nativeAssetURLsAfterMessages(
+              indexNativeMessages(previous),
+              messages,
+              assetURLs
+            );
             session = applyNativeSessionEvent(session, item.frame);
           }
           if (!stale) {
             snapshotPosition = next.position;
+            const requiredMessageIDs = new Set(
+              [...current.requirements.values()].map(requirement => requirement.messageID)
+            );
+            const published = indexPublished(visible(messages, undefined));
             publish({
               session,
               snapshot: { position: next.position, revision: next.revision },
-              messages: visible(messages),
+              messages: published,
               assetURLs,
-              pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-                id =>
-                  [...current.requirements.values()].some(
-                    requirement => requirement.messageID === id
-                  ) ||
-                  !next.messages.some(
-                    item =>
-                      item.message.id === id &&
-                      !item.incomplete &&
-                      !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-                  )
+              unavailableAssetKeys: next.unavailableAssetKeys,
+              pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+                state.pendingSnapshotMessageIDs,
+                next.messages,
+                next.assetURLs,
+                requiredMessageIDs,
+                new Set<string>(next.unavailableAssetKeys)
               ),
             });
           }
@@ -905,22 +1402,27 @@ export class NativeSyncClient {
               epoch.release(item.bytes);
               return false;
             });
+            pruneQuarantined(next.position);
           }
-          if (
-            state.session &&
-            !state.messages.some(
-              item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
-            ) &&
-            !state.pendingSnapshotMessageIDs?.length
-          ) {
+          if (!transcriptHasGap(transcriptFacts())) {
+            // A snapshot read cannot prove live replay loss is repaired, so the notice stays
+            // until `refresh()` reads the transcript again.
             if (!integrityGap) {
               integrityError = undefined;
               publish({ error: undefined });
             }
             current.completed = true;
+            if (transcriptSettled()) settleSnapshotStreak();
             return;
           }
           if (current.attempt >= 4) {
+            const stop = noteSnapshotFailure(
+              new Error('Native transcript recovery is incomplete.')
+            );
+            if (stop) {
+              epoch.fail(stop);
+              return;
+            }
             integrityError = 'Native transcript recovery is incomplete.';
             publish({});
             return;
@@ -934,6 +1436,7 @@ export class NativeSyncClient {
           epoch.signal.removeEventListener('abort', current.cancel);
           if (!current.completed && current.replay.length > 0 && epoch.current()) markGap();
           dispose();
+          settle();
         });
     };
     const connection = this.socket(
@@ -941,13 +1444,21 @@ export class NativeSyncClient {
       `${path}/live-ticket`,
       organizationID,
       async (frame, send, epoch, bytes) => {
+        liveEpoch = epoch;
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
             publish({ runnerConnected: body['runnerConnected'] === true });
             if (lastSeq === undefined) {
-              await snapshot(epoch);
+              try {
+                await snapshot(epoch);
+              } catch (error) {
+                // A read the retiring socket canceled never described the transcript.
+                if (!epoch.current()) throw error;
+                throw noteSnapshotFailure(error) ?? error;
+              }
               if (!epoch.current()) return;
+              if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }
             send({ type: 'subscribe', afterSeq: lastSeq });
@@ -956,8 +1467,14 @@ export class NativeSyncClient {
           if (frame.type === 'reset_required') {
             markGap();
             recovery?.cancel();
-            await snapshot(epoch);
+            try {
+              await snapshot(epoch);
+            } catch (error) {
+              if (!epoch.current()) throw error;
+              throw noteSnapshotFailure(error) ?? error;
+            }
             if (!epoch.current()) return;
+            if (transcriptSettled()) settleSnapshotStreak();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             send({ type: 'subscribe', afterSeq: lastSeq });
             recoverIncomplete(epoch);
@@ -966,8 +1483,7 @@ export class NativeSyncClient {
             frame.type === 'subscribed' &&
             state.session &&
             !integrityGap &&
-            !state.messages.some(message => message.incomplete) &&
-            !state.pendingSnapshotMessageIDs?.length
+            !transcriptHasGap(transcriptFacts())
           ) {
             integrityError = undefined;
             publish({ error: undefined });
@@ -977,9 +1493,11 @@ export class NativeSyncClient {
             publish({ runnerConnected: body['runnerConnected'] === true });
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
-            const parsed = commandStatusSchema.safeParse(body['status']);
-            if (parsed.success)
-              publish({ commands: { ...state.commands, [body['commandID']]: parsed.data } });
+            const parsed = commandAckSchema.safeParse({
+              commandID: body['commandID'],
+              status: body['status'],
+            });
+            if (parsed.success) recordCommandStatus(parsed.data.commandID, parsed.data.status);
           }
           if (frame.type === 'error')
             publish({
@@ -988,42 +1506,103 @@ export class NativeSyncClient {
           return;
         }
         if (frame.channel !== 'events' || (lastSeq !== undefined && frame.seq <= lastSeq)) return;
-        // Validate/project before accepting the relay cursor. A malformed native
-        // value must not acknowledge an event that this client failed to retain.
-        const messages = beyond(frame, snapshotPosition)
-          ? visible(applyNativeEvent(state.messages, frame, state.session))
-          : state.messages;
-        const pending = reduceNativePendingRequests(state.pending, frame);
-        const session = applyNativeSessionEvent(state.session, frame);
-        const assetURLs = nativeAssetURLsAfterMessages(state.messages, messages, state.assetURLs);
-        const newGaps = messages.filter(item => {
-          const previous = state.messages.find(previous => previous.message.id === item.message.id);
-          const missingDependency =
-            item.incomplete &&
-            (!previous?.incomplete || (item !== previous && item.message === previous.message));
-          return (
-            missingDependency ||
-            (!item.incomplete &&
-              hasUnresolvedKilo2Assets(item.message, assetURLs) &&
-              !state.pendingSnapshotMessageIDs?.includes(item.message.id))
-          );
-        });
-        let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
-        if (newGaps.length)
-          pendingSnapshotMessageIDs = [
-            ...new Set([
-              ...(pendingSnapshotMessageIDs ?? []),
-              ...newGaps.map(item => item.message.id),
-            ]),
-          ];
-        if (frame.type === 'session.moved') {
-          const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
-          const messageID = `msg_${eventID.slice(4)}`;
-          if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+        // A frame this client cannot project is retained as an integrity-gap record
+        // before its cursor advances; the transcript is repaired from a canonical snapshot.
+        const projectEventsFrame = () => {
+          const projection = beyond(frame, snapshotPosition)
+            ? projectNativeEvent(state.messages, frame, state.session)
+            : undefined;
+          const changed = projection?.changed;
+          const messages = projection ? visible(projection.messages, changed) : state.messages;
+          const pending = reduceNativePendingRequests(state.pending, frame);
+          const session = applyNativeSessionEvent(state.session, frame);
+          const isPending = pendingLookup(state.pendingSnapshotMessageIDs);
+          const unavailable = new Set<string>(state.unavailableAssetKeys);
+          // A frame that reports the entries it touched, none of them hidden by a local clear,
+          // only needs those entries examined. An entry the frame did not touch keeps its
+          // identity, so today's scan skips it too unless an asset key disappeared — which
+          // instead takes the whole-transcript path below. Anything else keeps that path, and
+          // it also refreshes the per-id bookkeeping.
+          const tracked =
+            changed !== undefined &&
+            known.size === state.messages.length &&
+            !changed.some(item => clearedIDs.has(item.message.id));
+          const changedAssets = tracked
+            ? nativeAssetURLsAfterMessages(known, changed, state.assetURLs)
+            : state.assetURLs;
+          const fast = tracked && changedAssets === state.assetURLs;
+          let assetURLs: Readonly<Record<string, string>> | undefined;
+          let newGaps: NativeSnapshotMessage[];
+          if (fast) {
+            assetURLs = changedAssets;
+            newGaps = nativeGapMessages(changed, known, assetURLs, isPending, false, unavailable);
+          } else {
+            const previousByID = indexNativeMessages(state.messages);
+            assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
+            newGaps = nativeGapMessages(
+              messages,
+              previousByID,
+              assetURLs,
+              isPending,
+              assetURLs !== state.assetURLs,
+              unavailable
+            );
+          }
+          let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
+          if (newGaps.length)
             pendingSnapshotMessageIDs = [
-              ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ...new Set([
+                ...(pendingSnapshotMessageIDs ?? []),
+                ...newGaps.map(item => item.message.id),
+              ]),
             ];
-        }
+          if (frame.type === 'session.moved') {
+            const messageID = messageIDFromEventID(record(body['data'])['id']);
+            if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+              pendingSnapshotMessageIDs = [
+                ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ];
+          }
+          return {
+            messages,
+            pending,
+            session,
+            assetURLs,
+            newGaps,
+            pendingSnapshotMessageIDs,
+            changed,
+            fast,
+          };
+        };
+        const projected = (() => {
+          try {
+            return projectEventsFrame();
+          } catch {
+            quarantined.push({
+              seq: frame.seq,
+              position:
+                typeof body['syncPosition'] === 'number'
+                  ? body['syncPosition']
+                  : snapshotPosition + 1,
+            });
+            lastSeq = frame.seq;
+            integrityError = projectedFrameGap;
+            publish({});
+            if (!recovery) recoverIncomplete(epoch, true);
+            return undefined;
+          }
+        })();
+        if (!projected) return;
+        const {
+          messages,
+          pending,
+          session,
+          assetURLs,
+          newGaps,
+          pendingSnapshotMessageIDs,
+          changed,
+          fast,
+        } = projected;
         if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
           recoverIncomplete(epoch, true);
         if (recovery) {
@@ -1042,23 +1621,20 @@ export class NativeSyncClient {
               files: readKilo2FileReferences(item.message),
             });
         }
-        lastSeq = frame.seq;
         if (typeof body['incarnation'] === 'string')
           identity = {
             incarnation: body['incarnation'],
             ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
           };
-        if (frame.type === 'remote.state') remoteState = frame;
-        const recent =
-          frame.type === 'remote.state'
-            ? []
-            : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
-        const events =
-          frame.type === 'remote.state'
-            ? [frame]
-            : [...(remoteState ? [remoteState] : []), ...recent, frame];
+        if (fast && changed) {
+          for (const item of changed) known.set(item.message.id, item);
+        } else indexPublished(messages);
+        recordEvent(frame);
+        // The frame is retained: acknowledge the cursor before notifying a consumer, so a
+        // throwing listener cannot replay the same sequence for ever.
+        lastSeq = frame.seq;
         publish({
-          events,
+          events: publishedEvents(),
           session,
           pending,
           messages,
@@ -1102,7 +1678,7 @@ export class NativeSyncClient {
       if (options.liveOnly && (state.connection !== 'connected' || !state.runnerConnected))
         throw new NativeSyncError('runner_offline');
       const commandID = cloudAgentSdkRuntime.randomUUID();
-      const result = z.object({ commandID: z.string(), status: commandStatusSchema }).parse(
+      const result = commandAckSchema.parse(
         await this.request(
           `${path}/commands`,
           {
@@ -1112,13 +1688,19 @@ export class NativeSyncClient {
           organizationID
         )
       );
-      publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+      recordCommandStatus(result.commandID, result.status);
       return result.commandID;
     };
     const live = (type: string, body: Record<string, unknown> = {}) => {
       if (!identity?.runID)
         return Promise.reject<string>(new NativeSyncError('active_run_unknown'));
       return command(type, { ...body, ...identity }, { liveOnly: true });
+    };
+    /** A local clear hides every published id, so the per-id bookkeeping goes with them. */
+    const clearTranscript = () => {
+      for (const item of state.messages) clearedIDs.add(item.message.id);
+      known.clear();
+      publish({ messages: [] });
     };
     return {
       sendMessage: (text: string, options: { queueIfOffline?: boolean; ttlMs?: number } = {}) => {
@@ -1141,8 +1723,7 @@ export class NativeSyncClient {
       sendCommand: (input: string, args?: string) => {
         const name = input.trim().replace(/^\//, '').split(/\s+/, 1)[0];
         if (name === 'clear') {
-          for (const item of state.messages) clearedIDs.add(item.message.id);
-          publish({ messages: [] });
+          clearTranscript();
           return Promise.resolve('local-clear');
         }
         if (!['compact', 'new', 'skill', 'models', 'agents'].includes(name ?? ''))
@@ -1154,40 +1735,88 @@ export class NativeSyncClient {
         );
       },
       getCommandStatus: async (commandID: string) => {
-        const result = z
-          .object({ commandID: z.string(), status: commandStatusSchema })
-          .parse(
-            await this.request(
-              `${path}/commands/${encodeURIComponent(commandID)}`,
-              undefined,
-              organizationID
-            )
-          );
-        publish({ commands: { ...state.commands, [result.commandID]: result.status } });
-        return result.status;
+        const result = commandAckSchema.parse(
+          await this.request(
+            `${path}/commands/${encodeURIComponent(commandID)}`,
+            undefined,
+            organizationID
+          )
+        );
+        return recordCommandStatus(result.commandID, result.status);
+      },
+      requestRecovery: async () => {
+        if (closed) return;
+        // Already whole: nothing to fetch, so the retry resolves at once.
+        const unavailable = new Set<string>(state.unavailableAssetKeys);
+        if (
+          state.session &&
+          !state.messages.some(
+            item =>
+              item.incomplete ||
+              hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
+          ) &&
+          !state.pendingSnapshotMessageIDs?.length
+        )
+          return;
+        const epoch = liveEpoch;
+        if (!epoch?.current()) return;
+        // Re-enters the recovery loop over the live socket; the socket stays open.
+        recoverIncomplete(epoch, true);
+        await recovery?.done;
       },
       clear: () => {
-        for (const item of state.messages) clearedIDs.add(item.message.id);
-        publish({ messages: [] });
+        clearTranscript();
+      },
+      refresh: () => {
+        if (closed) return;
+        // Retire any in-flight recovery first: its cancel path publishes the replay-loss notice,
+        // which this reset then supersedes instead of leaving it set behind the retry.
+        recovery?.cancel();
+        snapshotFailures = 0;
+        snapshotFailure = undefined;
+        lastSeq = undefined;
+        snapshotPosition = -1;
+        integrityGap = false;
+        // A frame the client could not project keeps its warning until a snapshot read covers it.
+        integrityError ??= quarantined.length === 0 ? undefined : projectedFrameGap;
+        publish({ snapshotFailure: undefined, error: undefined });
+        // A retry is a clean read of the authoritative transcript: the next hello reads it
+        // again instead of resuming from the cursor that preceded the failure, and a reset
+        // transcript at a lower position is accepted.
+        connection.restart();
       },
       close: () => {
         closed = true;
         connection.close();
         recovery?.cancel();
+        // The closed session's snapshot history is gone, so its retained attachment bodies
+        // leave with it instead of occupying the shared budget.
+        this.snapshotBlobs.forgetSession(sessionID);
         state = {
           ...state,
           session: undefined,
           snapshot: undefined,
           pendingSnapshotMessageIDs: undefined,
           assetURLs: undefined,
+          unavailableAssetKeys: undefined,
           messages: [],
-          pending: { permissions: [], questions: [], unreadablePermissions: [] },
+          pending: {
+            permissions: [],
+            questions: [],
+            unreadableQuestions: [],
+            unreadablePermissions: [],
+          },
           events: [],
           commands: {},
+          snapshotFailure: undefined,
         };
         clearedIDs.clear();
+        known.clear();
         remoteState = undefined;
+        ring.length = 0;
+        ringStart = 0;
         identity = undefined;
+        liveEpoch = undefined;
       },
     };
   }

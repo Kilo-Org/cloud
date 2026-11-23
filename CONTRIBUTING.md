@@ -74,6 +74,10 @@ pnpm dev:db:reset
 pnpm drizzle migrate
 ```
 
+The reset empties `POSTGRES_SCRIPT_URL`'s database and the migrate step recreates `POSTGRES_URL`'s,
+so both variables must name the same database. `pnpm dev:infra-env` writes the local database to
+both, and the reset refuses to run when the two disagree.
+
 To smoke-test migrations from a fresh database:
 
 ```bash
@@ -154,7 +158,7 @@ Resets do not restore assignments that an earlier reset removed.
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Auto-format all supported files with oxfmt |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts |
+| `pnpm validate` | Run the shared chain: typecheck, lint, test, and the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 

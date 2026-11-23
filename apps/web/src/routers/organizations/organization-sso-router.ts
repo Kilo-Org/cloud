@@ -17,8 +17,8 @@ import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/company-domain';
 import {
-  OrganizationSSODomainSchema,
   type OrganizationSsoConfigView,
   type OrganizationSsoStatusView,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -93,6 +93,7 @@ async function releaseSsoDomain(
     actor_email: actor.google_user_email,
     actor_id: actor.id,
     actor_name: actor.google_user_name,
+    details: { id: 'sso.domainRemoved', domain: locked.ssoDomain },
     message: `Cleared SSO domain ${locked.ssoDomain}`,
     organization_id: organizationId,
     tx,
@@ -295,6 +296,7 @@ export const organizationSsoRouter = createTRPCRouter({
         actor_email: opts.ctx.user.google_user_email,
         actor_id: opts.ctx.user.id,
         actor_name: opts.ctx.user.google_user_name,
+        details: { id: 'sso.domainSet', domain: ssoDomain },
         message: `Set SSO domain to ${ssoDomain}`,
         organization_id: organizationId,
         tx,

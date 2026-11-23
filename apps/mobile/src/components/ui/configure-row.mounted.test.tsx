@@ -9,6 +9,7 @@ import { ConfigureRow } from './configure-row';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
@@ -51,8 +52,12 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function renderRow(
   props: {
     title?: string;
+    /** The line under the title; `null` renders the row without one. */
+    subtitle?: string | null;
+    subtitleNumberOfLines?: number | 'all';
     tone?: 'good' | 'warn' | 'danger';
     disabled?: boolean;
+    testID?: string;
     /** `false` renders the inert row a display-only row is: no Pressable at all. */
     pressable?: boolean;
   } = {}
@@ -61,10 +66,14 @@ function renderRow(
     const element = createElement(ConfigureRow, {
       icon: Globe,
       title: props.title ?? 'General',
-      subtitle: 'Transcribe',
+      ...(props.subtitle === null ? {} : { subtitle: props.subtitle ?? 'Transcribe' }),
+      ...(props.subtitleNumberOfLines === undefined
+        ? {}
+        : { subtitleNumberOfLines: props.subtitleNumberOfLines }),
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
+      ...(props.testID === undefined ? {} : { testID: props.testID }),
     });
     if (renderer) {
       renderer.update(element);
@@ -78,10 +87,10 @@ function renderRow(
   return renderer.root;
 }
 
-/** The classes of the row body: the one View that carries the row padding. */
+/** The classes of the row body: the one element that carries the row padding. */
 function rowClasses(root: TestRenderer.ReactTestInstance): string[] {
   const body = root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('py-3')
+    node => typeof node.props.className === 'string' && node.props.className.includes('py-3')
   );
   return String(body.props.className).split(' ');
 }
@@ -113,10 +122,6 @@ afterEach(() => {
 });
 
 describe('ConfigureRow mounted layout', () => {
-  // A 160 dp window leaves the text block between the icon tile and the
-  // chevron too little room for one word, and Android broke it mid-word
-  // ("Gene ral" / "Trans cribe", e1-settings, 2026-09-21). Stacking hands the
-  // title and subtitle the row's full width.
   it('stacks the icon above the title in a narrow window', () => {
     windowDims.width = 160;
     const classes = rowClasses(renderRow());
@@ -128,6 +133,12 @@ describe('ConfigureRow mounted layout', () => {
     const classes = rowClasses(renderRow());
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'gap-3']));
     expect(classes).not.toContain('gap-2');
+  });
+
+  it('takes the contract row anatomy', () => {
+    const classes = rowClasses(renderRow());
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
   });
 
   it('still stacks at the large-font-scale threshold', () => {
@@ -164,6 +175,45 @@ describe('ConfigureRow icon tile', () => {
   });
 });
 
+/** The mounted subtitle node: the single text node painted with `content`. */
+function subtitleNodeOf(
+  root: TestRenderer.ReactTestInstance,
+  content: string
+): TestRenderer.ReactTestInstance {
+  return root.find(
+    candidate => Object.is(candidate.type, 'Text') && Object.is(candidate.props.children, content)
+  );
+}
+
+describe('ConfigureRow subtitle line cap', () => {
+  // The subtitle is one line of `text-xs`. Uncapped, a single unbreakable token
+  // (an email, a host name) cannot wrap on Android and is hard-clipped at the
+  // row edge with no ellipsis, while a long sentence grows the row past its
+  // neighbours, so the cap is the row's own default and a caller whose subtitle
+  // is prose opts into the second line.
+  it('caps a subtitle the caller does not size', () => {
+    expect(subtitleNodeOf(renderRow(), 'Transcribe').props.numberOfLines).toBe(1);
+  });
+
+  it('gives a caller-sized subtitle the second line it asks for', () => {
+    const node = subtitleNodeOf(renderRow({ subtitleNumberOfLines: 2 }), 'Transcribe');
+
+    expect(node.props.numberOfLines).toBe(2);
+  });
+
+  it('leaves the subtitle uncapped when the caller asks for every line', () => {
+    const node = subtitleNodeOf(renderRow({ subtitleNumberOfLines: 'all' }), 'Transcribe');
+
+    expect(node.props.numberOfLines).toBeUndefined();
+  });
+
+  it('renders no subtitle line at all when the row has no subtitle', () => {
+    const texts = renderRow({ subtitle: null }).findAll(node => Object.is(node.type, 'Text'));
+
+    expect(texts.map(node => node.props.children)).toEqual(['General']);
+  });
+});
+
 /** The mounted text node carrying `content`. */
 function textOf(root: TestRenderer.ReactTestInstance, content: string): string[] {
   const node = root.find(
@@ -173,11 +223,6 @@ function textOf(root: TestRenderer.ReactTestInstance, content: string): string[]
 }
 
 describe('ConfigureRow disabled cue', () => {
-  // Regression: a disabled row halved the entire row with `opacity-50` on top
-  // of its already-muted subtitle, which lands that line at 2.15:1 on the dark
-  // `bg-secondary` card and 1.95:1 on the light one — under the 3:1 floor, so a
-  // row the user cannot open stopped being readable. The cue is the muted ink,
-  // applied once; no row carries a second dim.
   it('dims a disabled row by token, never by row opacity', () => {
     expect(rowClasses(renderRow({ disabled: true }))).not.toContain('opacity-50');
     expect(rowClasses(renderRow())).not.toContain('opacity-50');
@@ -236,5 +281,24 @@ describe('ConfigureRow disabled cue', () => {
     // no state of its own to announce from a node a reader never reaches.
     expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
     expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
+  });
+});
+
+describe('ConfigureRow test handle', () => {
+  it("puts the caller's testID on the tappable row", () => {
+    const control = renderRow({ testID: 'configure-1' }).find(node =>
+      Object.is(node.type, 'Pressable')
+    );
+
+    expect(control.props.testID).toBe('configure-1');
+  });
+
+  it('puts it on the inert row, which has no Pressable', () => {
+    const root = renderRow({ testID: 'configure-2', pressable: false });
+    const row = root.find(
+      node => typeof node.type === 'string' && node.props.testID === 'configure-2'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

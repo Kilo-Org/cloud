@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one hydration harness drives all four settings screens; splitting it would duplicate the mock set and the frame recorder */
 // Regression for the four Security Agent settings screens that hydrate their
 // draft from the loaded config in an effect. A body painted before that
 // hydration shows the default draft and then moves every control below it once
@@ -45,9 +46,28 @@ const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 // events turns them into one frame per body render.
 const record = vi.hoisted(() => ({ events: [] as Event[] }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Brain: 'Brain',
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  Cpu: 'Cpu',
+  FolderGit2: 'FolderGit2',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Search: 'Search',
+  ShieldCheck: 'ShieldCheck',
+  Trash2: 'Trash2',
+  Wrench: 'Wrench',
+  Zap: 'Zap',
+}));
 vi.mock('react-native', () => ({
   View: ({ children }: { children?: ReactNode }): ReactNode => children ?? null,
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
   Pressable: (props: {
     children?: ReactNode;
     accessibilityRole?: string;
@@ -70,7 +90,13 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
-  useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useNavigation: () => ({
+    dispatch: vi.fn(),
+    goBack: vi.fn(),
+    // `useSettledReplace` hears the navigator's transition events; this suite's
+    // config is enabled, so the bounce never dispatches.
+    addListener: () => () => undefined,
+  }),
   useFocusEffect: (effect: () => void) => {
     useEffect(effect, [effect]);
   },
@@ -80,6 +106,8 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({ canManage: true }),
   useSecurityAgentConfig: () => config,
+  useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -88,6 +116,10 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [],
     isLoading: false,
     isError: false,
+    // The screen's catalogue classifier asks whether the read delivered a list,
+    // which is what keeps a delivered-empty catalogue out of its loading state.
+    isFetched: true,
+    hasDeliveredData: true,
     refetch: vi.fn(),
   }),
 }));
@@ -123,7 +155,6 @@ vi.mock('@/components/ui/configure-row', () => ({
     return null;
   },
 }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain', Search: 'Search', Wrench: 'Wrench' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
   radioItemA11y: ({
@@ -161,8 +192,8 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: { value: boolean }): null => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: { value: boolean }): null => {
     record.events.push({ kind: 'toggle', value: props.value });
     return null;
   },
@@ -240,7 +271,9 @@ const CASES: { name: string; Screen: ComponentType<{ scope: string }>; settled: 
         { label: i18n.t('securityAgent.analysisMode.shallow'), checked: false },
         { label: i18n.t('securityAgent.analysisMode.deep'), checked: true },
       ],
-      rows: ['vendor/triage', 'vendor/analysis', 'vendor/remediation'],
+      // Model rows name the stored slug readably: the catalogue is empty here,
+      // so each row shows the reference's last segment, never `vendor/triage`.
+      rows: ['triage', 'analysis', 'remediation'],
       inputs: [],
     },
   },

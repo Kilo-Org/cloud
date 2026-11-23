@@ -15,6 +15,7 @@ import {
   type OpenRouterModelSlugSnapshot,
   type OpenRouterProviderModelsSnapshot,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export type ProviderPolicyFilter = 'all' | 'yes' | 'no';
 
@@ -201,7 +202,7 @@ export function providersAndModelsAllowListsReducer(
 
     case 'SET_PROVIDERS_ENABLED': {
       if (state.status !== 'ready') return state;
-      const providerSlugs = new Set(action.providerSlugs);
+      const providerSlugs = new Set(normalizeInferenceProviderIds(action.providerSlugs));
       return {
         ...state,
         draftProviderAllowList: action.nextEnabled

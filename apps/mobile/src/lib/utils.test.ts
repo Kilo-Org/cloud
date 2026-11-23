@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { timeAgo } from './utils';
+import { relativeTime, timeAgo } from './utils';
 
 describe('timeAgo', () => {
   afterEach(() => {
@@ -25,9 +25,6 @@ describe('timeAgo', () => {
   });
 
   it('derives the label from the passed clock so a tick can advance it', () => {
-    // The list row's label is memoized against its traced inputs: it must
-    // change when only the caller's clock advances, with the conversation
-    // untouched. An untracked `Date.now()` read freezes the on-screen text.
     const created = new Date('2026-08-23T11:59:30Z');
 
     expect(timeAgo(created, 'en', Date.parse('2026-08-23T12:00:00Z'))).toBe('Just now');
@@ -37,15 +34,22 @@ describe('timeAgo', () => {
   });
 
   it('reads a future instant forward, for a scheduled wake', () => {
-    // A glanceable's scheduled row formats a wake ahead of the clock; without
-    // the sign it would read "Just now", because the magnitude alone is small.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
 
-    expect(timeAgo(new Date('2026-08-23T12:05:00Z'), 'en')).toBe('in 5 minutes');
-    expect(timeAgo(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
-    expect(timeAgo(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
+    expect(relativeTime(new Date('2026-08-23T12:05:00Z'), 'en')).toBe('in 5 minutes');
+    expect(relativeTime(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
+    expect(relativeTime(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
   });
+
+  it('reads an event stamped after a trailing clock sample as now, never as ahead', () => {
+    const sampled = Date.parse('2026-08-23T14:34:00Z');
+    const answered = new Date('2026-08-23T14:35:05Z');
+
+    expect(timeAgo(answered, 'en', sampled)).toBe('Just now');
+    expect(timeAgo(new Date('2026-08-23T16:00:00Z'), 'en', sampled)).toBe('Just now');
+  });
+
   it('omits an invalid timestamp instead of formatting a relative time', () => {
     expect(timeAgo(new Date(Number.NaN))).toBe('');
   });

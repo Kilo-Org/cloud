@@ -36,6 +36,7 @@ describe('pickAutoSelectedModel', () => {
     expect(pickAutoSelectedModel({ ...base, models: [claude, efficient, gpt] })).toEqual({
       model: 'kilo-auto/efficient',
       variant: '',
+      source: 'dev-default',
     });
   });
 
@@ -43,6 +44,7 @@ describe('pickAutoSelectedModel', () => {
     expect(pickAutoSelectedModel({ ...base, models: [claude, gpt] })).toEqual({
       model: 'anthropic/claude',
       variant: 'thinking',
+      source: 'catalog-first',
     });
   });
 
@@ -53,7 +55,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         orgDefaultModel: 'anthropic/claude',
       })
-    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '', source: 'dev-default' });
   });
 
   it('dev, org default not in catalog → efficient', () => {
@@ -63,7 +65,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         orgDefaultModel: 'gone/model',
       })
-    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '', source: 'dev-default' });
   });
 
   it('dev, persisted server combo wins over the efficient default', () => {
@@ -73,7 +75,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         lastSelected: { model: 'anthropic/claude', variant: 'thinking' },
       })
-    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
+    ).toEqual({ model: 'anthropic/claude', variant: 'thinking', source: 'last-selected' });
   });
 
   it('dev, server combo restores the selected effort', () => {
@@ -83,7 +85,7 @@ describe('pickAutoSelectedModel', () => {
         models: [opus, efficient],
         lastSelected: { model: 'anthropic/opus', variant: 'high' },
       })
-    ).toEqual({ model: 'anthropic/opus', variant: 'high' });
+    ).toEqual({ model: 'anthropic/opus', variant: 'high', source: 'last-selected' });
   });
 
   it('dev, local persisted combo wins over the efficient default', () => {
@@ -93,7 +95,7 @@ describe('pickAutoSelectedModel', () => {
         models: [gpt, efficient],
         stored: { personal: { model: 'openai/gpt', variant: '' } },
       })
-    ).toEqual({ model: 'openai/gpt', variant: '' });
+    ).toEqual({ model: 'openai/gpt', variant: '', source: 'stored' });
   });
 
   it('dev, persisted model gone from the catalog → falls back to efficient', () => {
@@ -103,7 +105,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         stored: { personal: { model: 'gone/model', variant: 'high' } },
       })
-    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
+    ).toEqual({ model: 'kilo-auto/efficient', variant: '', source: 'dev-default' });
   });
 
   it('dev, efficient absent → server lastSelected still wins', () => {
@@ -113,13 +115,14 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, gpt],
         lastSelected: { model: 'openai/gpt' },
       })
-    ).toEqual({ model: 'openai/gpt', variant: '' });
+    ).toEqual({ model: 'openai/gpt', variant: '', source: 'last-selected' });
   });
 
   it('release, efficient in catalog → keeps production fallback models[0]', () => {
     expect(pickAutoSelectedModel({ ...base, isDev: false, models: [claude, efficient] })).toEqual({
       model: 'anthropic/claude',
       variant: 'thinking',
+      source: 'catalog-first',
     });
   });
 
@@ -131,7 +134,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         orgDefaultModel: 'anthropic/claude',
       })
-    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
+    ).toEqual({ model: 'anthropic/claude', variant: 'thinking', source: 'org-default' });
   });
 
   it('release, org default not in catalog → models[0]', () => {
@@ -142,7 +145,7 @@ describe('pickAutoSelectedModel', () => {
         models: [claude, efficient],
         orgDefaultModel: 'gone/model',
       })
-    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
+    ).toEqual({ model: 'anthropic/claude', variant: 'thinking', source: 'catalog-first' });
   });
 
   it('empty catalog → null', () => {
@@ -152,6 +155,6 @@ describe('pickAutoSelectedModel', () => {
   it('dev, efficient absent, matching org default → org default wins', () => {
     expect(
       pickAutoSelectedModel({ ...base, models: [claude, gpt], orgDefaultModel: 'openai/gpt' })
-    ).toEqual({ model: 'openai/gpt', variant: '' });
+    ).toEqual({ model: 'openai/gpt', variant: '', source: 'org-default' });
   });
 });

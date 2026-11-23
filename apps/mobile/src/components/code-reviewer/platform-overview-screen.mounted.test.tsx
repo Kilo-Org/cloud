@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
@@ -60,6 +60,12 @@ const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
 
 const councilUi = vi.hoisted(() => ({ allowed: false }));
+
+// The header's scope subtitle reads the membership list; this suite tests the
+// overview body, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -121,9 +127,7 @@ vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
   resolveRowOnPress: () => undefined,
 }));
-vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
-  ProviderConnectCard: 'ProviderConnectCard',
-}));
+vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
     variant?: string;
@@ -141,10 +145,16 @@ vi.mock('@/components/platform-error-screen', () => ({
   },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: () => null,
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  GitBranch: 'GitBranch',
+  GitMerge: 'GitMerge',
+  ScrollText: 'ScrollText',
+}));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
     skeletonRenders.count += 1;
@@ -201,6 +211,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+  useMutedDisabledInk: () => '#999',
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
@@ -247,6 +258,29 @@ function collectText(node: unknown): string[] {
     return collectText((node as { children?: unknown }).children);
   }
   return [];
+}
+
+/** The rendered Text node holding exactly `copy`, if it is mounted. */
+function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .find(node => node.children.length === 1 && node.children[0] === copy);
+}
+
+/** The heading the refused state carries for `platform`, from the catalog. */
+function refusedTitle(platform: 'github' | 'gitlab'): string {
+  return i18n.t('codeReviewer.providerConnect.notConnectedTitle', {
+    platform: i18n.t(platform === 'github' ? 'common.github' : 'common.gitlab'),
+  });
+}
+
+/** The sentence naming who may connect `platform`, from the catalog. */
+function refusedDescription(platform: 'github' | 'gitlab'): string {
+  return i18n.t(
+    platform === 'github'
+      ? 'codeReviewer.providerConnect.githubAdminOnlyDescription'
+      : 'prReview.connect.adminOnlyConnectDescription'
+  );
 }
 
 async function render(
@@ -327,12 +361,12 @@ beforeEach(() => {
 
 describe('PlatformOverviewScreen disconnected setup', () => {
   it.each([
-    ['an owner or admin', { canEdit: true, canManage: true }, true],
-    ['a billing manager', { canEdit: true, canManage: false }, false],
-    ['a member', { canEdit: false, canManage: false }, false],
+    ['an owner or admin', { canEdit: true, canManage: true }, false],
+    ['a billing manager', { canEdit: true, canManage: false }, true],
+    ['a member', { canEdit: false, canManage: false }, true],
   ] as const)(
     'offers the GitHub app install to %s only when that role may run it',
-    async (_who, capabilities, showsCard) => {
+    async (_who, capabilities, refused) => {
       provider.status = 'disconnected';
       permission.canEdit = capabilities.canEdit;
       permission.canManage = capabilities.canManage;
@@ -342,9 +376,19 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
       expect(centeredState).toHaveBeenCalledOnce();
       expect(scrollView).not.toHaveBeenCalled();
-      expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(showsCard ? 1 : 0);
-      const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
-      expect(texts.includes(notice)).toBe(!showsCard);
+      if (refused) {
+        // The install rule refuses the role: the state names the platform
+        // neutrally and says who may connect it, and offers no press the role
+        // cannot finish.
+        expect(texts).toContain(refusedTitle('github'));
+        expect(texts).toContain(refusedDescription('github'));
+        expect(texts).not.toContain('Connect GitHub');
+        expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+      } else {
+        expect(texts).toContain('Connect GitHub');
+        expect(texts).not.toContain(refusedTitle('github'));
+        expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
+      }
     }
   );
 
@@ -354,25 +398,29 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     permission.canManage = false;
 
     const renderer = await render('org-1', 'gitlab');
+    const texts = collectText(renderer.toJSON());
 
-    expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(1);
+    expect(texts).toContain('Connect GitLab');
+    expect(texts).not.toContain(refusedTitle('gitlab'));
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
   });
 
-  it.each([
-    ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
-    [
-      'gitlab',
-      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it.",
-    ],
-  ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
-    provider.status = 'disconnected';
-    permission.canEdit = false;
-    permission.canManage = false;
+  it.each(['github', 'gitlab'] as const)(
+    'gives a read-only viewer the neutral %s heading and no connect action',
+    async platform => {
+      provider.status = 'disconnected';
+      permission.canEdit = false;
+      permission.canManage = false;
 
-    const texts = await renderScreen(platform);
+      const renderer = await render('org-1', platform);
+      const texts = collectText(renderer.toJSON());
 
-    expect(texts).toContain(copy);
-  });
+      expect(texts).toContain(refusedTitle(platform));
+      expect(texts).toContain(refusedDescription(platform));
+      expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
+      expect(texts).not.toContain(platform === 'github' ? 'Connect GitHub' : 'Connect GitLab');
+    }
+  );
 });
 
 describe('PlatformOverviewScreen connected with unavailable config', () => {
@@ -690,12 +738,20 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 });
 
 describe('PlatformOverviewScreen Automatic reviews account line', () => {
-  /** The muted line painted under the Automatic reviews label, when present. */
+  /**
+   * The optional account line in the Automatic reviews card. Scoped to the
+   * label's own sibling stack so the Follow REVIEW.md subtitle, which is also a
+   * muted line, cannot be mistaken for the account.
+   */
   function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
-    return renderer.root
+    const label = renderer.root
       .findAllByType('Text')
-      .filter(node => node.props.variant === 'muted')
-      .map(node => node.props.children);
+      .find(node => node.props.children === 'Automatic reviews');
+    const stack = label?.parent?.children ?? [];
+    return stack
+      .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== 'string')
+      .filter(child => child.props.variant === 'muted')
+      .map(child => child.props.children);
   }
 
   it('paints the connected account under the label', async () => {

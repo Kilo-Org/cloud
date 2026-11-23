@@ -10,6 +10,7 @@ import {
   useAvailableModels,
   useOrgDefaultModel,
 } from '@/lib/hooks/use-available-models';
+import { i18n } from '@/i18n';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -64,7 +65,13 @@ type CatalogSnapshot = {
   refetch: () => unknown;
 };
 
-type OrgDefaultSnapshot = { defaultModel: string | undefined; isLoading: boolean };
+type OrgDefaultSnapshot = {
+  defaultModel: string | undefined;
+  isPending: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => unknown;
+};
 
 type PreferencesSnapshot = {
   favorites: string[];
@@ -83,8 +90,8 @@ function CatalogProbe() {
 }
 
 function OrgDefaultProbe() {
-  const { defaultModel, isLoading } = useOrgDefaultModel('org_1');
-  orgDefaultRead.current = { defaultModel, isLoading };
+  const { defaultModel, isPending, isError, isFetching, refetch } = useOrgDefaultModel('org_1');
+  orgDefaultRead.current = { defaultModel, isPending, isError, isFetching, refetch };
   return null;
 }
 
@@ -149,7 +156,10 @@ describe('model catalogue reads while the online manager reports offline', () =>
     onlineManager.setOnline(true);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (i18n.language !== 'en') {
+      await i18n.changeLanguage('en');
+    }
     onlineManager.setOnline(true);
     vi.unstubAllGlobals();
   });
@@ -221,7 +231,33 @@ describe('model catalogue reads while the online manager reports offline', () =>
 
     await waitFor(() => orgDefaultRead.current?.defaultModel === 'org/default');
     expect(matching('/api/organizations/org_1/defaults')).toBe(1);
-    expect(orgDefaultRead.current?.isLoading).toBe(false);
+    expect(orgDefaultRead.current?.isPending).toBe(false);
+    expect(orgDefaultRead.current?.isError).toBe(false);
+    unmount();
+  });
+
+  it('settles a failed org-default read into its error state and lets the retry issue a request', async () => {
+    world.catalog = 'unreachable';
+    const queryClient = newClient();
+    onlineManager.setOnline(false);
+
+    const { unmount } = await renderWithProviders(<OrgDefaultProbe />, { queryClient, wrapper });
+
+    await waitFor(() => orgDefaultRead.current?.isError === true);
+    expect(orgDefaultRead.current?.defaultModel).toBeUndefined();
+    expect(orgDefaultRead.current?.isPending).toBe(false);
+    expect(matching('/api/organizations/org_1/defaults')).toBe(1);
+
+    // The model row's Retry calls this hook's own `refetch`, so a paused read
+    // would never issue a second request.
+    await act(() => {
+      void orgDefaultRead.current?.refetch();
+    });
+    await waitFor(() => matching('/api/organizations/org_1/defaults') === 2);
+    // v5 clears the error and reports `pending` while the no-data retry runs, so
+    // the hook's own flag has to keep the failure visible through it.
+    await waitFor(() => orgDefaultRead.current?.isError === true);
+    expect(orgDefaultRead.current?.defaultModel).toBeUndefined();
     unmount();
   });
 
@@ -235,6 +271,44 @@ describe('model catalogue reads while the online manager reports offline', () =>
     expect(world.procedures).toEqual(['modelPreferences.get']);
     expect(preferencesRead.current?.isLoading).toBe(false);
     expect(preferencesRead.current?.lastSelected).toEqual({ model: 'a/model' });
+    unmount();
+  });
+
+  it('re-sorts the option list without a refetch after a language change', async () => {
+    // Two catalog rows whose order the two languages disagree on: `en`
+    // collation keeps "Schematron" before "Seed"; `cs` treats the "ch" digraph
+    // as a letter after "h", so "Seed" moves first.
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      world.requests.push(url);
+      return Promise.resolve(
+        Response.json({
+          data: [
+            { id: 'c/schematron', name: 'Schematron V2 Turbo' },
+            { id: 'c/seed', name: 'Seed 2.1 Turbo' },
+          ],
+        })
+      );
+    });
+    const queryClient = newClient();
+    onlineManager.setOnline(false);
+
+    const { unmount } = await renderWithProviders(<CatalogProbe />, { queryClient, wrapper });
+
+    await waitFor(() => catalogRead.current?.isFetched === true);
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
+    expect(matching('/api/openrouter/models')).toBe(1);
+
+    await act(async () => {
+      await i18n.changeLanguage('cs');
+    });
+    expect(matching('/api/openrouter/models')).toBe(1);
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/seed', 'c/schematron']);
+
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
     unmount();
   });
 });

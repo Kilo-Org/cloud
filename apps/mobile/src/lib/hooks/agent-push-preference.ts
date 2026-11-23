@@ -38,7 +38,6 @@ export type NotificationPreferences = Readonly<{
   notificationPreviews?: 'generic' | 'full';
 }>;
 
-/** What the cache may hold — either the typed full row or the legacy `agentPushEnabled` snapshot. */
 type NotificationPreferencesSnapshot =
   | NotificationPreferences
   | Readonly<{ agentPushEnabled: boolean }>
@@ -98,7 +97,6 @@ export function deriveGateSettled({
   return pushTokensSettled && deviceTokenSettled;
 }
 
-/** Map the legacy single-key cache shape to the new per-category shape. */
 function defaultPreferences(
   overrides: Partial<NotificationPreferences> = {}
 ): NotificationPreferences {
@@ -199,12 +197,7 @@ type OptimisticContext = Readonly<{
   previousWasLegacy: boolean;
 }>;
 
-/**
- * Apply the optimistic flip for a single category. Returns the previous
- * snapshot for rollback and a flag indicating whether the cache held the
- * legacy `agentPushEnabled`-only shape (so the rollback can restore it
- * verbatim instead of leaving the new per-category shape behind).
- */
+/** Apply the optimistic flip for a single category. */
 export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<OptimisticContext> {
   await args.queryClient.cancelQueries({ queryKey: args.queryKey });
   // Stamp after the last await, in the same synchronous block as the cache
@@ -265,9 +258,6 @@ export function rollbackAgentPushOptimistic(args: RollbackArgs): void {
   }
   if (args.context.previous) {
     if (args.context.previousWasLegacy) {
-      // Restore the exact legacy shape by overwriting the cache with only the
-      // original legacy fields. The next refetch will repopulate the new
-      // per-category shape.
       args.queryClient.setQueryData(args.queryKey, args.context.previous);
       return;
     }

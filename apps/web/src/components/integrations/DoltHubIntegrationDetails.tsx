@@ -39,7 +39,7 @@ export function DoltHubIntegrationDetails({
   organizationId,
   success,
   error,
-  canManage = true,
+  canManage = false,
 }: DoltHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -75,7 +75,7 @@ export function DoltHubIntegrationDetails({
 
   const handleConnect = () => {
     setIsStartingConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, organizationId);
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, { organizationId });
   };
 
   const handleDisconnect = async () => {

@@ -6,6 +6,8 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { Sheet } from '@/components/ui/sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { SheetFocusSink } from './sheet-focus-sink';
+
 /** The one detent: the whole window. */
 const SHEET_SNAP_POINTS = ['100%'];
 
@@ -93,6 +95,11 @@ export function SessionPageSheet({
         className="flex-1 bg-background"
         testID="session-page-sheet-surface"
       >
+        {/* Every session sheet renders its content here, so the focus sink lives
+            at this one point instead of in each caller: any sheet whose first
+            focusable node is a read-only value would otherwise open with that
+            value focused and paint the platform's focus layer over it. */}
+        <SheetFocusSink />
         {children}
       </StateSurface>
     </Sheet>

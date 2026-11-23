@@ -95,8 +95,6 @@ function authorizationMatches(params: {
     ...(params.challengeId === undefined
       ? []
       : [eq(passkey_management_authorizations.passkey_challenge_id, params.challengeId)]),
-    // Account recovery rotates the pepper on the user row. A grant minted
-    // under the previous one authorizes nothing afterwards.
     pepperMatchesAccount(params.userId),
     sql`EXISTS (
       SELECT 1 FROM ${device_sessions}
@@ -295,6 +293,31 @@ export type CollectedPasskeyManagementGrant = {
 };
 
 /**
+ * Hold the caller's device session for the rest of the caller's transaction, so
+ * a concurrent revocation either lands before that work or waits for it. The
+ * row lock is the point: without it a revocation could commit between this read
+ * and the write, and the change would land on a session that no longer exists.
+ */
+async function lockLiveDeviceSession(
+  executor: DrizzleConnection,
+  params: { deviceSessionId: string; userId: string }
+): Promise<boolean> {
+  const [session] = await executor
+    .select({ id: device_sessions.id })
+    .from(device_sessions)
+    .where(
+      liveDeviceSessionCondition({
+        deviceSessionId: params.deviceSessionId,
+        userId: params.userId,
+      })
+    )
+    .limit(1)
+    .for('share');
+
+  return session !== undefined;
+}
+
+/**
  * Exchange an approved SSO request for its grant, exactly once. The exchange
  * is atomic and runs in one transaction that also locks the device session, so
  * a concurrent revocation either lands before the grant is issued or waits for
@@ -308,19 +331,7 @@ export async function collectPasskeyManagementSsoGrant(params: {
   const grant = createPasskeyManagementGrantToken();
 
   const collected = await db.transaction(async tx => {
-    const [session] = await tx
-      .select({ id: device_sessions.id })
-      .from(device_sessions)
-      .where(
-        liveDeviceSessionCondition({
-          deviceSessionId: params.deviceSessionId,
-          userId: params.userId,
-        })
-      )
-      .limit(1)
-      .for('share');
-
-    if (!session) {
+    if (!(await lockLiveDeviceSession(tx, params))) {
       return null;
     }
 
@@ -500,19 +511,7 @@ export async function consumePasskeyManagementAuthorization(
 ): Promise<boolean> {
   const executor = params.fromDb ?? db;
 
-  const [session] = await executor
-    .select({ id: device_sessions.id })
-    .from(device_sessions)
-    .where(
-      liveDeviceSessionCondition({
-        deviceSessionId: params.deviceSessionId,
-        userId: params.userId,
-      })
-    )
-    .limit(1)
-    .for('share');
-
-  if (!session) {
+  if (!(await lockLiveDeviceSession(executor, params))) {
     return false;
   }
 

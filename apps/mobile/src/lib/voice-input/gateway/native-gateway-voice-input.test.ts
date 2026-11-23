@@ -153,10 +153,6 @@ describe('gatewayVoiceInputNative recorder construction', () => {
   });
 
   it('pairs allowsRecording with playsInSilentMode so expo-audio iOS accepts the recording mode', async () => {
-    // expo-audio's native iOS validation throws InvalidAudioModeException
-    // when allowsRecording is set while the stored playsInSilentMode is
-    // false — and false is the native default. Without the pair the gateway
-    // recorder never starts on iOS, so every gateway session dies at start.
     gatewayVoiceInputNative.start(START_OPTIONS);
     await vi.waitFor(() => {
       expect(vi.mocked(setAudioModeAsync)).toHaveBeenCalled();
@@ -192,9 +188,6 @@ describe('gatewayVoiceInputNative recorder construction', () => {
       numberOfChannels: 2,
       bitRate: 128_000,
       isMeteringEnabled: false,
-      // iOS-only constructor requirement (no Android equivalent field): the
-      // iOS deserializer rejects the construction without a top-level
-      // `audioQuality`; Android ignores the unknown key.
       audioQuality: 127,
     });
     expect(options).not.toHaveProperty('ios');
@@ -265,8 +258,6 @@ describe('resolveGatewayTranscriptionModelId', () => {
       id: 'first-model',
       name: 'First Model',
     });
-    // Persisted so the auto-picked model survives launches even if the user
-    // never opens the settings page.
     expect(writeTranscriptionModel).toHaveBeenCalledWith({
       id: 'first-model',
       name: 'First Model',

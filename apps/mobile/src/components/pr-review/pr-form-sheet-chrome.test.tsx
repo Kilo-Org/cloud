@@ -1,218 +1,121 @@
+// The form sheet's chrome is the shared `SheetHeader` and `ScreenFooter`: this
+// suite pins the wiring only — the reference on the header's own caption line,
+// Close as the way out, the inset the sheet's presentation decides, and a footer
+// whose bottom band the primitive owns while the keyboard lift stays with the
+// host. The primitives' own geometry is theirs to test.
+
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+
 import { PrFormSheetFooter, PrFormSheetHeader } from './pr-form-sheet-chrome';
 
-const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
-const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-const statusBarState = vi.hoisted(() => ({ currentHeight: null as number | null }));
-const stackRootState = vi.hoisted(() => ({ isRoot: true }));
+const topInsetState = vi.hoisted(() => ({ value: 'android-window-top' as string }));
 
 vi.mock('react-native', () => ({
-  View: 'View',
-  Platform: platformState,
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
-  StatusBar: {
-    get currentHeight() {
-      return statusBarState.currentHeight;
-    },
-  },
-  useWindowDimensions: () => ({ width: 411.43, height: 914.29 }),
+  Platform: { OS: 'ios' },
+  View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insetsState,
+vi.mock('@/lib/navigation/sheet-header-top-inset', () => ({
+  useFormSheetHeaderTopInset: () => topInsetState.value,
 }));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
-}));
-vi.mock('@/lib/navigation/route-focus', () => ({
-  useRouteIsStackRoot: () => stackRootState.isRoot,
-}));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 
-function mountFooter(): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(createElement(PrFormSheetFooter, null, 'CTAs'));
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function footerStyleProp(
-  renderer: TestRenderer.ReactTestRenderer,
-  key: 'paddingBottom' | 'paddingLeft' | 'paddingRight'
-): number | undefined {
-  const views = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'View'
-  );
-  const footer = views[0];
-  if (!footer) {
-    throw new Error('footer View not found');
-  }
-  return (footer.props.style as Record<string, number | undefined> | undefined)?.[key];
-}
-
-function mountHeader(): TestRenderer.ReactTestRenderer {
+function mountHeader(overrides: { title?: string; eyebrow?: string } = {}) {
+  const onBack = vi.fn<() => void>();
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
       createElement(PrFormSheetHeader, {
-        title: 'Merge pull request',
-        eyebrow: 'octocat/hello-world#1',
-        onBack: () => undefined,
+        title: overrides.title ?? 'Merge pull request',
+        eyebrow: overrides.eyebrow,
+        onBack,
       })
     );
   });
-  const renderer = ref.current;
-  if (!renderer) {
+  if (!ref.current) {
     throw new Error('renderer was not created');
   }
-  return renderer;
+  return { renderer: ref.current, onBack };
 }
 
-/** The header container is the element react-native-screens keeps at index 0. */
-function headerPaddingTop(renderer: TestRenderer.ReactTestRenderer): number | undefined {
-  const container = renderer.root.find(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'View' &&
-      node.props.collapsable === false
-  );
-  return (container.props.style as Record<string, number | undefined> | undefined)?.paddingTop;
+function headerProps(renderer: TestRenderer.ReactTestRenderer) {
+  const [header] = renderer.root.findAllByType('SheetHeader');
+  if (!header) {
+    throw new Error('SheetHeader not found');
+  }
+  return header.props as {
+    title: string;
+    eyebrow?: string;
+    variant?: string;
+    doneLabel?: string;
+    topInset?: string;
+    onDone: () => void;
+  };
 }
 
-describe('PrFormSheetFooter bottom inset (plan §6)', () => {
+describe('PrFormSheetHeader', () => {
   beforeEach(() => {
-    platformState.OS = 'ios';
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
+    topInsetState.value = 'android-window-top';
   });
 
-  it('keeps the 16-point base padding on iOS at a nonzero inset', () => {
-    insetsState.bottom = 34;
-    const renderer = mountFooter();
+  it('keeps the reference on the header’s own caption line', () => {
+    const { renderer } = mountHeader({ title: 'Merge pull request', eyebrow: 'octocat/hello#1' });
 
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(16);
+    const props = headerProps(renderer);
+    expect(props.title).toBe('Merge pull request');
+    expect(props.eyebrow).toBe('octocat/hello#1');
   });
 
-  it('keeps the 16-point base padding on Android at a zero inset', () => {
-    platformState.OS = 'android';
-    insetsState.bottom = 0;
-    const renderer = mountFooter();
+  it('closes with the shared close variant and Close label', () => {
+    const { renderer, onBack } = mountHeader();
 
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(16);
+    const props = headerProps(renderer);
+    expect(props.variant).toBe('close');
+    expect(props.doneLabel).toBe('Close');
+    props.onDone();
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('adds the Android system inset to the 16-point base padding', () => {
-    platformState.OS = 'android';
-    insetsState.bottom = 34;
-    const renderer = mountFooter();
+  it('takes the top inset from the sheet presentation, not a measured frame', () => {
+    topInsetState.value = 'bottom-form-sheet';
 
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(50);
+    const { renderer } = mountHeader();
+
+    expect(headerProps(renderer).topInset).toBe('bottom-form-sheet');
   });
 });
 
-describe('PrFormSheetFooter side insets (landscape)', () => {
-  beforeEach(() => {
-    platformState.OS = 'ios';
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
-  });
+describe('PrFormSheetFooter', () => {
+  it('keeps its bottom clearance from the primitive and the keyboard lift at the host', () => {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(createElement(PrFormSheetFooter, null, 'CTAs'));
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
 
-  it('keeps the 24-point gutter at zero portrait insets', () => {
-    const renderer = mountFooter();
-
-    expect(footerStyleProp(renderer, 'paddingLeft')).toBe(24);
-    expect(footerStyleProp(renderer, 'paddingRight')).toBe(24);
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(16);
-  });
-
-  it('widens the gutter by the landscape side insets on iOS', () => {
-    insetsState.left = 59;
-    insetsState.right = 59;
-    const renderer = mountFooter();
-
-    expect(footerStyleProp(renderer, 'paddingLeft')).toBe(83);
-    expect(footerStyleProp(renderer, 'paddingRight')).toBe(83);
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(16);
-  });
-
-  it('widens the gutter by the landscape side insets on Android too', () => {
-    platformState.OS = 'android';
-    insetsState.left = 24;
-    insetsState.right = 24;
-    const renderer = mountFooter();
-
-    expect(footerStyleProp(renderer, 'paddingLeft')).toBe(48);
-    expect(footerStyleProp(renderer, 'paddingRight')).toBe(48);
-    // Side insets are independent of the Android bottom-inset rule.
-    expect(footerStyleProp(renderer, 'paddingBottom')).toBe(16);
-  });
-});
-
-/**
- * Who clears the status bar depends on how the sheet was presented: a sheet
- * that is its stack's first screen presents with the surface at the window top
- * and the header reserves the inset; a sheet pushed over another screen settles
- * at the detent cap, an inset lower, and reserves nothing. Both come from the
- * window inset the app boots with, so the first frame is the settled one — a
- * nested safe-area provider reported 0 before the sheet presented and the inset
- * after, which moved the whole header by the status-bar height once it landed.
- */
-describe('PrFormSheetHeader top clearance', () => {
-  beforeEach(() => {
-    platformState.OS = 'android';
-    insetsState.top = 0;
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
-    statusBarState.currentHeight = 44;
-    stackRootState.isRoot = true;
-  });
-
-  it('reserves the status-bar height before the window inset resolves', () => {
-    const renderer = mountHeader();
-
-    expect(headerPaddingTop(renderer)).toBe(44);
-  });
-
-  it('keeps the resolved window inset instead of flipping the reserve', () => {
-    insetsState.top = 44;
-    const renderer = mountHeader();
-
-    expect(headerPaddingTop(renderer)).toBe(44);
-  });
-
-  it('leaves a pushed sheet, whose edge already clears the status bar, with no reserve', () => {
-    stackRootState.isRoot = false;
-    insetsState.top = 44;
-    const renderer = mountHeader();
-
-    expect(headerPaddingTop(renderer)).toBeUndefined();
-  });
-
-  it('leaves the iOS sheet, which presents below the status bar, with no reserve', () => {
-    platformState.OS = 'ios';
-    insetsState.top = 59;
-    const renderer = mountHeader();
-
-    expect(headerPaddingTop(renderer)).toBeUndefined();
-  });
-
-  it('paints one container whose header stays the screen content index 0', () => {
-    const renderer = mountHeader();
-    const containers = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'View'
-    );
-
-    expect(containers).toHaveLength(1);
-    expect(containers[0]?.props.collapsable).toBe(false);
-    expect(containers[0]?.props.className).toContain('border-b');
+    const [footer] = renderer.root.findAllByType('ScreenFooter');
+    if (!footer) {
+      throw new Error('ScreenFooter not found');
+    }
+    const props = footer.props as {
+      clearance?: string;
+      keyboard?: string;
+      children?: unknown;
+    };
+    // The CTAs sit on a sheet that owns its own window; the primitive's
+    // safe-area band is what keeps them off the home indicator, and the scroll
+    // view's keyboard inset is the only lift (a second one would push them
+    // under the keyboard).
+    expect(props.clearance).toBe('safe-area');
+    expect(props.keyboard).toBe('host');
+    expect(props.children).toBe('CTAs');
   });
 });

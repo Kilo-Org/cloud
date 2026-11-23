@@ -3,10 +3,11 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Kalfadhigaaga wakiilka ayaa leh cusboonaysiin",
-      "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
+      "lowBalance": "Hadhaagaagu wuxuu u baahan yahay feejignaan",
       "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
       "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
-      "securityUpdate": "Hubin ammin ayaa leh cusboonaysiin",
+      "securityUpdate": "Hubin amni ayaa leh cusboonaysiin",
+      "agentBriefing": "Warbixintaada wakiilka waa diyaar",
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Digniinta dheelitirka hooseeya",
-      "body": "{{organizationName}} dheelitirku wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
+      "title": "Digniinta hadhaaga yar",
+      "body": "{{organizationName}} hadhaagu wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Digniinta kharashka",
@@ -28,7 +29,13 @@
       "body": "{{findingTitle}} gudaha {{repoFullName}}"
     },
     "securityFindingNew": {
-      "title": "Natiijo ammin cusub ({{severity}})"
+      "title": "Natiijo amni cusub ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Halis daran",
+      "high": "Sare",
+      "medium": "Dhexdhexaad",
+      "low": "Hoose"
     },
     "securityFindingSlaWarning": {
       "title": "Digniin SLA"

@@ -88,6 +88,15 @@ describe('visibleProfileAgents', () => {
     const agent = { ...base, config: { mode: 'subagent' } };
     expect(visibleProfileAgents([agent])).toHaveLength(0);
   });
+
+  it('drops a stored agent whose id belongs to the CLI', () => {
+    const agents = [
+      { ...base, slug: 'explore', name: 'Explore', config: {} },
+      { ...base, slug: 'title', name: 'Title', config: { mode: 'primary' } },
+      { ...base, slug: 'reviewer', name: 'Reviewer', config: {} },
+    ];
+    expect(visibleProfileAgents(agents).map(a => a.slug)).toEqual(['reviewer']);
+  });
 });
 
 describe('customModeOptionsFromProfileAgents', () => {
@@ -126,10 +135,10 @@ describe('customModeOptionsFromRuntimeAgents', () => {
 });
 
 describe('ensureSelectedCustomOption', () => {
-  it('appends the selected unknown slug once', () => {
+  it('appends the selected unknown slug once, with no label', () => {
     const custom: ModeOption[] = [];
     expect(ensureSelectedCustomOption(custom, 'reviewer')).toEqual([
-      { value: 'reviewer', label: 'reviewer', description: '' },
+      { value: 'reviewer', label: '', description: '' },
     ]);
   });
 
@@ -303,9 +312,7 @@ describe('resolveSessionRoleView', () => {
       selectedMode: 'inherited',
     });
 
-    expect(view.customOptions).toEqual([
-      { value: 'inherited', label: 'inherited', description: '' },
-    ]);
+    expect(view.customOptions).toEqual([{ value: 'inherited', label: '', description: '' }]);
   });
 });
 

@@ -25,12 +25,12 @@ import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
   DEVICE_AUTH_CODE_LIFETIME_SECONDS,
-  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
-  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  normalizeDeviceAuthUserCode,
   getDeviceAuthPendingLink,
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
-import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 // Capture real implementations for pass-through default behaviour.
@@ -38,20 +38,7 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 // const/let initializers, but var is hoisted with an undefined initial value
 // that is safe to assign to.
 // eslint-disable-next-line no-var
-var _realIssueSessionCredentials: ((...args: any[]) => any) | undefined;
-// eslint-disable-next-line no-var
 var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
-
-jest.mock('@/lib/auth/device-sessions', () => {
-  const actual = jest.requireActual('@/lib/auth/device-sessions') as any;
-  _realIssueSessionCredentials = actual.issueSessionCredentials;
-  return {
-    ...actual,
-    issueSessionCredentials: jest.fn((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    ),
-  };
-});
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
@@ -62,7 +49,6 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
   };
 });
 
-const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
 
 /**
@@ -89,9 +75,6 @@ describe('Device Auth', () => {
 
   afterEach(async () => {
     // Reset mocks to pass-through defaults.
-    mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    );
     mockedGenerateApiToken.mockImplementation((...args: any[]) =>
       (_realGenerateApiToken as any)(...args)
     );
@@ -121,6 +104,33 @@ describe('Device Auth', () => {
     test('is an alias for generateUserCode', () => {
       // They are the same function reference.
       expect(generateDeviceCode).toBe(generateUserCode);
+    });
+  });
+
+  describe('normalizeDeviceAuthUserCode', () => {
+    test.each([
+      ['abcd-efgh', 'ABCD-EFGH'],
+      ['ABCDEFGH', 'ABCD-EFGH'],
+      ['abcd efgh', 'ABCD-EFGH'],
+      ['ABCD-EFGH', 'ABCD-EFGH'],
+      ['ABCD\tEFGH', 'ABCD-EFGH'],
+      // Each row below needs the dash removal: without it the cleaned value is
+      // longer than eight characters and cannot reach the split form.
+      ['A-B-C-D-E-F-G-H', 'ABCD-EFGH'],
+      ['ABCD\u2013EFGH', 'ABCD-EFGH'],
+      ['ABCD\u2014EFGH', 'ABCD-EFGH'],
+    ])('canonicalizes %j to %j', (input, expected) => {
+      expect(normalizeDeviceAuthUserCode(input)).toBe(expected);
+    });
+
+    test('keeps a non-dash separator, so an unusable entry is not silently rewritten', () => {
+      // Only dash punctuation is a separator here. An underscore is not one, so
+      // the value keeps it and cannot reach a stored code.
+      expect(normalizeDeviceAuthUserCode('ABCD_EFGH')).toBe('ABCD_EFGH');
+    });
+
+    test('returns a cleaned value that is not a whole code', () => {
+      expect(normalizeDeviceAuthUserCode(' abc')).toBe('ABC');
     });
   });
 
@@ -507,11 +517,13 @@ describe('Device Auth', () => {
     ])('refuses %s and leaves the request pending', async (_label, confirmedClientId) => {
       const { userCode } = await createDeviceAuthRequest({ requestingClient });
 
-      await expect(
-        approveDeviceAuthRequest(userCode, testUserId, {
-          ...(confirmedClientId ? { confirmedClientId } : {}),
-        })
-      ).rejects.toThrow(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+      const refusal = approveDeviceAuthRequest(userCode, testUserId, {
+        ...(confirmedClientId ? { confirmedClientId } : {}),
+      });
+      await expect(refusal).rejects.toBeInstanceOf(DeviceAuthRefusalError);
+      await expect(refusal).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch,
+      });
 
       expect(await getDeviceAuthRequest(userCode)).toMatchObject({
         status: 'pending',
@@ -546,18 +558,18 @@ describe('Device Auth', () => {
     });
 
     test('throws error for non-existent request', async () => {
-      await expect(approveDeviceAuthRequest('XXX-XXX', testUserId)).rejects.toThrow(
-        'Device authorization request not found'
-      );
+      await expect(approveDeviceAuthRequest('XXX-XXX', testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestNotFound,
+      });
     });
 
     test('throws error for already approved request', async () => {
       const { userCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request is not pending'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+      });
     });
 
     test('concurrent approvals preserve the single winning user', async () => {
@@ -584,9 +596,9 @@ describe('Device Auth', () => {
 
           expect(approved).toHaveLength(1);
           expect(rejected).toHaveLength(1);
-          expect(rejected[0]?.reason).toEqual(
-            new Error('Device authorization request is not pending')
-          );
+          expect(rejected[0]?.reason).toMatchObject({
+            code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+          });
           expect((await getDeviceAuthRequest(userCode))?.kilo_user_id).toBe(approved[0]?.value);
           expect((await consumeDeviceAuthByDeviceCode(deviceCode)).userId).toBe(approved[0]?.value);
         }
@@ -608,9 +620,9 @@ describe('Device Auth', () => {
           .where(eq(device_auth_requests.user_code, userCode));
         const before = await getDeviceAuthRequest(userCode);
 
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request is not pending'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+        });
 
         expect(await getDeviceAuthRequest(userCode)).toEqual(before);
       }
@@ -639,9 +651,9 @@ describe('Device Auth', () => {
       const selectSpy = jest.spyOn(db, 'select').mockReturnValueOnce(staleSelect);
 
       try {
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request is not pending'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+        });
         expect((await getDeviceAuthRequest(userCode))?.status).toBe('denied');
       } finally {
         selectSpy.mockRestore();
@@ -672,9 +684,9 @@ describe('Device Auth', () => {
       });
 
       try {
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request has expired'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+        });
         expect((await getDeviceAuthRequest(userCode))?.status).toBe('expired');
       } finally {
         jest.useRealTimers();
@@ -690,9 +702,9 @@ describe('Device Auth', () => {
         .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
         .where(eq(device_auth_requests.user_code, userCode));
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request has expired'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+      });
     });
   });
 
@@ -710,9 +722,9 @@ describe('Device Auth', () => {
 
           expect(succeeded).toHaveLength(1);
           expect(rejected).toHaveLength(1);
-          expect(rejected[0]?.reason).toEqual(
-            new Error('Device authorization request is not pending')
-          );
+          expect(rejected[0]?.reason).toMatchObject({
+            code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+          });
           expect((await getDeviceAuthRequest(userCode))?.status).toBe(succeeded[0]?.value);
         } finally {
           await db.delete(device_auth_requests).where(eq(device_auth_requests.user_code, userCode));
@@ -911,12 +923,14 @@ describe('Device Auth', () => {
     });
 
     test('failed issuance after consume restores row and removes orphan session (supportsRefresh)', async () => {
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      // First consume fails because issueSessionCredentials throws.
+      // First consume fails while minting the pair, inside the transaction.
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -926,17 +940,12 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('approved');
       expect(request?.consumed_at).toBeNull();
 
-      // No device session was left behind.
+      // No device session was left behind: the failed mint rolled it back.
       const sessions = await db
         .select()
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request!.id));
       expect(sessions).toHaveLength(0);
-
-      // Reset mock to pass-through for the re-consume.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
 
       // A later consume succeeds.
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
@@ -966,9 +975,9 @@ describe('Device Auth', () => {
         email: testUserEmail,
         displayName: 'octocat',
       });
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired,
+      });
 
       await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: false });
       const request = await getDeviceAuthRequest(userCode);
@@ -996,7 +1005,9 @@ describe('Device Auth', () => {
       });
       await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
 
-      mockedIssueSessionCredentials.mockRejectedValueOnce(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -1007,9 +1018,6 @@ describe('Device Auth', () => {
         .where(eq(pending_auth_links.id, pendingLink.id));
       expect(pendingRow.consumed_at).toBeNull();
 
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true });
       expect(retry.status).toBe('approved');
       expect(retry.pendingLink).toEqual({ status: 'linked', provider: 'github' });
@@ -1051,13 +1059,15 @@ describe('Device Auth', () => {
       expect(result2.token).toBeDefined();
 
       // Now make the first request's issuance fail.
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode1, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
 
-      // The first request's session was cleaned up.
+      // The first request's session was rolled back with the failed mint.
       const request1 = await getDeviceAuthRequest(userCode1);
       const sessions1 = await db
         .select()
@@ -1072,11 +1082,6 @@ describe('Device Auth', () => {
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request2!.id));
       expect(sessions2).toHaveLength(1);
-
-      // Reset mock.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
     });
   });
 
@@ -1362,9 +1367,9 @@ describe('Device Auth', () => {
       // request deadline hides it.
       await expect(getDeviceAuthPendingLink(userCode)).resolves.toBeNull();
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request has expired'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+      });
       const request = await getDeviceAuthRequest(userCode);
       expect(request?.status).toBe('expired');
     });

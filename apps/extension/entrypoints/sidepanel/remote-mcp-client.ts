@@ -15,11 +15,7 @@ import type {
   RemoteMcpCachedTool,
   RemoteMcpServer,
 } from '../../src/shared/remote-mcp';
-import {
-  loadRemoteMcpStore,
-  saveRemoteMcpStore,
-  upsertRemoteMcpServer,
-} from '../../src/shared/remote-mcp-storage';
+import { updateRemoteMcpStore, upsertRemoteMcpServer } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
@@ -226,10 +222,10 @@ export const connectRemoteMcpServer = async ({
 };
 
 /*
- * Connect a server and persist the connection results. Reloads the store before
- * merging so OAuth tokens written by the provider mid-connect survive, then saves
- * only the connection fields. Returns the saved servers, or undefined when the
- * server was removed mid-connect.
+ * Connect a server and persist the connection results. The merge runs on the
+ * store the serialized update loads, so OAuth tokens written by the provider
+ * mid-connect survive, and only the connection fields are saved. Returns the
+ * saved servers, or undefined when the server was removed mid-connect.
  */
 export const connectAndPersistRemoteMcpServer = async ({
   fetch: fetchFn,
@@ -241,23 +237,67 @@ export const connectAndPersistRemoteMcpServer = async ({
   readonly storageArea: RemoteMcpStorageArea;
 }): Promise<readonly RemoteMcpServer[] | undefined> => {
   const updated = await connectRemoteMcpServer({ fetch: fetchFn, server, storageArea });
-  const freshStore = await loadRemoteMcpStore(storageArea);
-  const freshServer = freshStore.servers.find(found => found.id === server.id);
 
-  if (freshServer === undefined) {
-    return undefined;
+  return updateRemoteMcpStore(storageArea, freshStore => {
+    const freshServer = freshStore.servers.find(found => found.id === server.id);
+    if (freshServer === undefined) {
+      return { result: undefined, store: freshStore };
+    }
+
+    const nextStore = upsertRemoteMcpServer(freshStore, {
+      ...freshServer,
+      cachedTools: updated.cachedTools,
+      lastConnectedAt: updated.lastConnectedAt,
+      lastError: updated.lastError,
+      status: updated.status,
+    });
+
+    return { result: nextStore.servers, store: nextStore };
+  });
+};
+
+/*
+ * The tool path is model-initiated, so it must never open the user's browser:
+ * an unauthorized server becomes a tool error that asks the user for
+ * credentials. Every other provider call (stored tokens, non-interactive
+ * refresh) still delegates unchanged.
+ */
+const withoutInteractiveSignIn = (provider: RemoteMcpOAuthProvider): RemoteMcpOAuthProvider => ({
+  ...provider,
+  redirectToAuthorization(): Promise<void> {
+    throw new UnauthorizedError('Interactive sign-in is required for this server.');
+  },
+});
+
+/*
+ * Persist needs-sign-in for a server the tool path could not authenticate, so
+ * its settings row shows the Connect/Edit affordance with the reason instead of
+ * the last good status.
+ */
+const persistNeedsAuth = async (
+  storageArea: RemoteMcpStorageArea | undefined,
+  serverId: string,
+  message: string
+): Promise<void> => {
+  if (storageArea === undefined) {
+    return;
   }
 
-  const nextStore = upsertRemoteMcpServer(freshStore, {
-    ...freshServer,
-    cachedTools: updated.cachedTools,
-    lastConnectedAt: updated.lastConnectedAt,
-    lastError: updated.lastError,
-    status: updated.status,
-  });
-  await saveRemoteMcpStore(storageArea, nextStore);
+  await updateRemoteMcpStore(storageArea, store => {
+    const freshServer = store.servers.find(found => found.id === serverId);
+    if (freshServer === undefined) {
+      return { result: undefined, store };
+    }
 
-  return nextStore.servers;
+    return {
+      result: undefined,
+      store: upsertRemoteMcpServer(store, {
+        ...freshServer,
+        lastError: message,
+        status: 'needs_auth',
+      }),
+    };
+  });
 };
 
 export const callRemoteMcpTool = async ({
@@ -277,7 +317,12 @@ export const callRemoteMcpTool = async ({
 }): Promise<CallToolResult> => {
   const combined = combineSignal(signal, CONNECT_TIMEOUT_MS);
   const client = makeClient();
-  const transport = makeTransport(server, fetchFn, makeAuthProvider(server, storageArea));
+  const authProvider = makeAuthProvider(server, storageArea);
+  const transport = makeTransport(
+    server,
+    fetchFn,
+    authProvider === undefined ? undefined : withoutInteractiveSignIn(authProvider)
+  );
 
   try {
     await client.connect(asTransport(transport), { signal: combined });
@@ -293,8 +338,14 @@ export const callRemoteMcpTool = async ({
      */
     return CallToolResultSchema.parse(result);
   } catch (error) {
+    const described = describeConnectFailure(error);
+    if (described.needsAuth) {
+      // The user-facing tool result must not depend on whether the status write lands.
+      await persistNeedsAuth(storageArea, server.id, described.message).catch(() => {});
+    }
+
     return {
-      content: [{ text: describeConnectFailure(error).message, type: 'text' }],
+      content: [{ text: described.message, type: 'text' }],
       isError: true,
     };
   } finally {

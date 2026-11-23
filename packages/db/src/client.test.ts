@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { jest as JestGlobal } from '@jest/globals';
 
 // `jest.mock` is hoisted above the compiled `require`s only when it is called on
@@ -8,7 +8,8 @@ import type { jest as JestGlobal } from '@jest/globals';
 declare const jest: typeof JestGlobal;
 
 jest.mock('pg', () => {
-  const Pool = jest.fn(function Pool(this: object) {
+  const Pool = jest.fn(function Pool(this: { on: unknown }) {
+    this.on = jest.fn();
     return this;
   });
 
@@ -35,6 +36,16 @@ import { createDrizzleClient, databaseTypeParsers, getWorkerDb } from './client'
 
 const workerConnectionString = 'postgres://worker.example/db';
 
+const originalDatabaseCa = process.env.DATABASE_CA;
+
+afterEach(() => {
+  if (originalDatabaseCa === undefined) {
+    delete process.env.DATABASE_CA;
+  } else {
+    process.env.DATABASE_CA = originalDatabaseCa;
+  }
+});
+
 describe('getWorkerDb', () => {
   it('creates separate Worker DB transports for identical inputs', () => {
     const firstDb = getWorkerDb(workerConnectionString);
@@ -42,13 +53,17 @@ describe('getWorkerDb', () => {
     const drizzleMock = jest.mocked(drizzle);
 
     expect(pg.Pool).toHaveBeenNthCalledWith(1, {
+      connectionTimeoutMillis: 15_000,
       connectionString: workerConnectionString,
       max: 1,
+      maxUses: 1,
       types: databaseTypeParsers,
     });
     expect(pg.Pool).toHaveBeenNthCalledWith(2, {
+      connectionTimeoutMillis: 15_000,
       connectionString: workerConnectionString,
       max: 1,
+      maxUses: 1,
       types: databaseTypeParsers,
     });
     expect(drizzleMock.mock.calls[0]?.[0]).not.toBe(drizzleMock.mock.calls[1]?.[0]);
@@ -64,6 +79,52 @@ describe('createDrizzleClient', () => {
       expect.objectContaining({ types: databaseTypeParsers })
     );
   });
+
+  it('keeps the reserved connection settings authoritative for a widened poolConfig', () => {
+    delete process.env.DATABASE_CA;
+    // Built through `URL` so the credential-shaped fixtures stay out of the source text.
+    const derivedUrl = new URL('postgres://derived.example:5432/derived');
+    derivedUrl.username = 'alice';
+    derivedUrl.password = 'secret';
+    const widenedUrl = new URL('postgres://widened.example:6543/widened');
+    widenedUrl.username = 'widener';
+    widenedUrl.password = 'widener-secret';
+    const widened: pg.PoolConfig = {
+      connectionString: widenedUrl.toString(),
+      user: 'widener',
+      password: 'widener-secret',
+      host: 'widened.example',
+      port: 6543,
+      database: 'widened',
+      ssl: { ca: 'widened' },
+      types: { getTypeParser: jest.fn() },
+      max: 7,
+      application_name: 'widened-pool',
+    };
+
+    createDrizzleClient({
+      connectionString: derivedUrl.toString(),
+      poolConfig: widened,
+    });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        user: 'alice',
+        password: 'secret',
+        host: 'derived.example',
+        port: 5432,
+        database: 'derived',
+        ssl: false,
+        types: databaseTypeParsers,
+        max: 7,
+        application_name: 'widened-pool',
+      })
+    );
+    const calls = jest.mocked(pg.Pool).mock.calls;
+    const config = calls[calls.length - 1]?.[0] as pg.PoolConfig;
+    expect(Object.hasOwn(config, 'connectionString')).toBe(true);
+    expect(config.connectionString).toBeUndefined();
+  });
 });
 
 // Compile-time guards: the helpers own the int8 parser, so their option types must reject
@@ -75,17 +136,44 @@ type PoolConfigOption = NonNullable<Parameters<typeof createDrizzleClient>[0]['p
 const acceptsWorkerSetting: WorkerOptions = { application_name: 'worker', statement_timeout: 1000 };
 // @ts-expect-error getWorkerDb installs databaseTypeParsers on its pool.
 const workerTypes: WorkerOptions = { types: databaseTypeParsers };
+// @ts-expect-error getWorkerDb owns the lock bound of each transaction.
+const workerLockTimeout: WorkerOptions = { lock_timeout: 1000 };
+// @ts-expect-error getWorkerDb closes each connection after one use.
+const workerMaxUses: WorkerOptions = { maxUses: 10 };
 const acceptsPoolSetting: PoolConfigOption = {
   application_name: 'local-kilo-script',
   max: 10,
 };
 // @ts-expect-error createDrizzleClient installs databaseTypeParsers on its pool.
 const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
+// @ts-expect-error createDrizzleClient derives the connection fields from its `connectionString` argument.
+const poolConnectionString: PoolConfigOption = { connectionString: 'postgres://other.example/db' };
+// @ts-expect-error createDrizzleClient parses `user` from its `connectionString` argument.
+const poolUser: PoolConfigOption = { user: 'someone' };
+// @ts-expect-error createDrizzleClient parses `password` from its `connectionString` argument.
+const poolPassword: PoolConfigOption = { password: 'secret' };
+// @ts-expect-error createDrizzleClient parses `host` from its `connectionString` argument.
+const poolHost: PoolConfigOption = { host: 'other.example' };
+// @ts-expect-error createDrizzleClient parses `port` from its `connectionString` argument.
+const poolPort: PoolConfigOption = { port: 5432 };
+// @ts-expect-error createDrizzleClient parses `database` from its `connectionString` argument.
+const poolDatabase: PoolConfigOption = { database: 'other' };
+// @ts-expect-error createDrizzleClient owns TLS; the dedicated `ssl` option replaces it.
+const poolSsl: PoolConfigOption = { ssl: { ca: 'ca' } };
 
 void acceptsWorkerSetting;
 void acceptsPoolSetting;
 void workerTypes;
+void workerLockTimeout;
+void workerMaxUses;
 void poolTypes;
+void poolConnectionString;
+void poolUser;
+void poolPassword;
+void poolHost;
+void poolPort;
+void poolDatabase;
+void poolSsl;
 
 describe('databaseTypeParsers', () => {
   it('reads int8 as BigInt', () => {

@@ -129,35 +129,77 @@ The benchmark worker stays the only writer of measurements and routing tables.
 
 | Entry | Who runs the eval | Who pays inference | Stored as |
 |---|---|---|---|
-| Gateway model that the platform key can serve | Platform container | Platform | Global `benchmark_profiles`, keyed by base router |
+| Gateway model in the platform pool | Platform container | Platform | Global `benchmark_profiles`, keyed by base router |
+| Gateway model only in an owner pool | Platform container, after the owner's explicit confirmed request | One payer account per model request; platform coverage from the platform's join onward | Same global registry row; the request's D1 case receipts |
 | Linked gateway or client entry | No new eval; live platform measurement | No new inference | Referenced global measurement, repriced for the entry |
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
-- Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
-  hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
-  (HTTP 429) with `retryAt`, and every other validation runs before admission.
-  Web saves fetch the catalog and admit benchmarks before locking, and the owner's PostgreSQL
-  advisory lock covers the final validation and the write, so queued saves do not hold a pooled
-  connection across an outbound benchmark request. Admission runs at most one in-flight request per
-  owner. Updates admit the merged definition computed from a pre-lock read; if a concurrent save
-  changes the base router or pool before the lock is taken, the locked definition is admitted again
-  while that lock is held, before the write. Deletes and client-entry edits use the same lock without
-  admission. All registration batches share a ten-second HTTP deadline, including response-body
-  reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
-  PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
-  rejection, a database commit failure, or a save that loses a concurrent race can leave
-  already-admitted profiles and quota charges. There is no refund API. Re-registering current
-  pending, running, or ready profiles is idempotent, but cannot undo those charges.
-- The frontier base gets an owner queue, as the efficient base has today.
+- **A pool save starts nothing.** Saving a pool (create, edit, alias move, subscription sync)
+  validates it and records a registry row with both demand flags off: the row is serving
+  bookkeeping and can be claimed by an explicit request, but it never queues measurement by
+  itself. `POST /admin/profiles/register` still admits pairs, but only the platform list and an
+  explicit paid request drive work; nothing re-admits a pool automatically.
+- **An owner benchmarks explicitly.** The pool's benchmark surface asks for a quote (a read-only
+  plan), shows the estimate and an advisory full-cost scenario, and starts only on the owner's
+  click. The quote is a frozen plan over (engine identity, concrete model, variant, repetition,
+  case); a pool edit, a case-dataset deploy, or an alias move invalidates the quote rather than
+  changing what a confirmed one measures. A quote expires; each click consumes one quote, and a
+  request that is still staging when its plan changes closes and asks for a fresh estimate.
+- **Reuse is per slot, across repetition counts.** A slot is satisfied by one valid stored draw at
+  this engine identity: successful exit, not timed out, above the case's minimum revision, and not
+  preceded by the pair's invalidation. Repetition `r` is filled only by repetition `r`, so a prior
+  run of any repetition count contributes its measured repetitions and one draw is never counted
+  twice. A reused slot is not a new draw and never charges.
+- **One payer per model request, billed just in time.** The gateway's native usage writer bills the
+  request against exactly one attached payer account, and the worker records a read-only receipt
+  for the signed usage id. The case store assigns that account deterministically round-robin among
+  distinct active payer accounts at the moment the model request starts; a known pre-provider
+  payment refusal detaches it and the next funded account may be assigned for the same model
+  request. Once usage is accepted, or the attempt is uncertain, nothing reassigns it. A platform
+  membership that commits first latches the case run as platform-covered: that coverage is sticky,
+  no user account is attached afterwards, and a user charge already recorded stands. Platform
+  joining later covers the later requests of that case, never the earlier ones retroactively.
+  Usage is booked under a reserved project: `Auto-routing benchmarks / platform` for a
+  platform-covered call, else `Auto-routing benchmarks / <user|org>/<pool-slug>/<routerId>`, with
+  the concrete model on the usage row, so spend groups by pool and model without naming the owner.
+  A usage id whose native receipt has not committed is reported `pending`, never free and never
+  charged twice.
+- **The quote's maximum is advisory, never a cap.** It is the sum of the per-slot estimates for
+  the slots that request would pay for. Nothing is reserved, deducted or refunded; confirmed
+  native spend may exceed it, is disclosed as an overage, and does not stop the request. Spending
+  stops only on an owner pause or a payer that cannot pay, and the settled native amount is
+  authoritative. An expired quote, or one whose pool, engine, case set or alias target changed,
+  is never reused: the owner needs a fresh estimate.
+- **A payment refusal skips only that payer.** The case store detaches a payer only after the
+  gateway confirms that no provider call started. It can then select a different payer for the
+  same request. A superseded selection is resolved again without detaching its payer. If no
+  candidate remains, pause the case and require fresh confirmation. A call that may have reached
+  the provider is never reassigned.
+- **Pause removes one payer, not the generation.** Pausing detaches the request's payers. Other
+  payers can keep the case running. If the last payer pauses, the store cancels the exact
+  generation and stops the runner. Native charges for calls that already ran stand, even if the
+  case fails, returns no usable result, or is cancelled. A refusal before dispatch charges nothing.
+- **Permanent failure is proven, not counted per row.** Six consecutive failed attempts with no
+  newly completed valid case make a retryable failure permanent. An attempt counts only when the
+  run's own finalization saw its durable results and lane evidence: copied results are not
+  progress, and cancellations, runs that never attempted the pair, and operator-fenced legacy work
+  neither extend nor break the streak. A valid score of zero is progress. Terminal classes stay
+  permanent at once, and an explicit admin re-admission is the only way back; a pool save cannot
+  re-admit a pair.
+- **The deploy changes no measurement.** The engine identity, the active measurement revision
+  (revision 3), the case set, and the ranking policy stay as deployed. A deploy schedules no stored
+  work again: it does not requeue pairs, consume a staged measurement activation, invalidate
+  results, backfill a measurement, or rebuild an unchanged routing artifact. A later platform
+  measurement, serving membership change, or explicit routing policy edit can publish a new table.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.
 - Only router editors upload client results. For an organization, the editor roles are the
   organization owner, admin, and billing manager.
 - Client latency comes from the uploader's machine.
 - The engine identity stays `router:vN:datasetHash`. The CLI version is deliberately not part of
-  it: the platform container also tracks the latest CLI without changing identity, and a CLI
-  release must not force hours of client re-evals. A change that invalidates results increments
-  `BENCHMARK_ENGINE_VERSION`.
+  it: the platform container pins its CLI version, and a CLI release must not force hours of
+  client re-evals. A change that invalidates results, including a platform CLI bump that changes
+  measurements, increments `BENCHMARK_ENGINE_VERSION`.
 
 ## Client eval protocol
 
@@ -191,6 +233,38 @@ graded cases; the Wilson lower bound penalizes thin coverage.
 - Thresholds, noise band, token profile, and switch settings come from the base router.
 - Ranking: within the accuracy band, $0 candidates rank before paid candidates. $0 candidates are
   ordered by `effectiveLatency^1.5 / wilson^15`. Paid candidates keep the existing value formula.
+- **Serving pins.** A completed request pins the usable concrete target its owner confirmed.
+  Confirmation time orders callbacks; the pool must still match the confirmed version.
+  When the stable catalog alias moves, save its previous concrete target on existing pools
+  that have a ready shared measurement but no pin. Save the observations and the alias move
+  in one transaction under the benchmark readiness lease. This does not start any measurement.
+  The promotion takes the alias-promotion key exclusively, then every affected owner's advisory
+  lock, then reads those pools `FOR UPDATE`, so it is ordered in both directions against both a
+  pool save from this release and a save from a deployed instance that knows only the owner lock.
+  A pool created while the promotion runs is discovered again and locked before it is pinned.
+  Unmeasured entries follow the new target. Do not infer targets from before deployment.
+  Both serving paths rank and dispatch the pinned target while it remains usable.
+  If the catalog no longer serves it, dispatch the live target and show a warning.
+  A ready replacement can be confirmed at no cost. Clients cannot write pins.
+  A pool edit preserves the stored pin by entry key.
+- **Benchmark output is shared, not per pool.** A ready measurement is global for its concrete
+  target, base router, variant, engine identity, and repetitions. Every pool that uses that target
+  (directly, through a `measuredAs` link, or through a saved serving pin) reads the same rows, so a
+  new compatible result serves all of them without their owner requesting, confirming or paying for
+  it. The per-pool request only ever pays for slots that had no reusable draw; nothing about it
+  scopes the result.
+- **A model row states whether it can serve in that pool.** The editor distinguishes a model that
+  is active (served by a current or pinned measurement), benchmarking, paused with its reason,
+  permanently failed, and an alias whose pinned target has gone so it needs re-benchmarking. A
+  case whose payers cannot be charged is paused and carries that reason; there is no separate
+  waiting state. A model with no measurement yet is simply not benchmarked, which is not an error.
+  These indicators come from the shared registry and status reads, so a measurement that lands is
+  reflected on every pool's next routing and status read, without a click or a charge. The exact
+  re-read timing is an implementation detail, not a contract.
+- **Adding a permanently failed model is refused.** The read-only add check resolves each asked
+  model, alias included, to its exact gateway pairs at the target base router and refuses the add
+  when any pair is permanently unavailable, naming the pair and the reason. A model already saved
+  stays in the pool with that explanation; the check never admits a benchmark or spends.
 
 ## Serving
 
@@ -355,6 +429,99 @@ the entire original cohort into a new directory would notify successful recipien
 - During tooling retirement, reuse the persisted namespace and verify these settings again.
 - Confirm the retired conversion endpoint returns not found while mode reads and writes remain available.
 
+## Paid benchmark deployment
+
+This is the operator choreography for the explicit paid flow. Do not treat any step as already
+proved for a given release: run every check on the release being deployed and record counts and
+pass/fail, never customer data, model output, credentials, or tenant identifiers.
+
+1. **Freeze the release.** Confirm the branch is the reviewed head and that the engine identity,
+   the active measurement revision, the case dataset, and the ranking policy are unchanged from
+   what is deployed. A raise of the engine identity or measurement revision is a separate,
+   budgeted change, not part of this deploy.
+2. **Rehearse on non-production data.** Take a bounded read-only copy of the benchmark D1 database
+   and only the PostgreSQL rows the flow needs, keep it on the single test host, and apply the
+   additive migrations to the copy. Run both a normal dispatch tick and the unchanged daily
+   reconciliation over it, including a pool that already has correct measurements and no pending
+   work. Compare, before and after: sorted result counts and digests, published
+   routing-artifact bytes, the runnable slot set, registry statuses, request statuses, payer
+   assignments, and usage receipts. Also compare, per saved pool, the routing table bytes and the
+   classification of each model row (active, benchmarking, paused, permanently failed, alias
+   re-benchmark needed). Pass when no stored measurement is scheduled again, no artifact changes
+   for an unchanged pool, every already correctly benchmarked pool keeps the same table and needs
+   no quote or click, and no request transitions on its own. Report counts and pass/fail only.
+   Delete the exact copies and local artifacts afterwards and log the deletion.
+3. **Enter the operator hold and cancel every legacy run.** An operator acquires the dispatch pause
+   token before any migration or deploy, so no dispatcher claims work during the rollout. The
+   deploy wrapper retains that token and fails closed if it changes or expires; do not release it
+   until step 6 passes. While the hold is retained, run `scripts/legacy-cancel.mjs` from
+   `services/auto-routing-benchmark` in the mandatory order: `--dry-run --remote` to review the
+   exact statements, `--apply --remote --baseline-out <path>` to cancel, then
+   `--verify --remote --baseline <path>` as the last pre-deploy gate. Deploy only on exit `0`:
+   `3` means the lease guard refused, `4` means live work remained or a protected artifact moved
+   (while still PRE-cutover, re-apply and re-verify; after migration 0038 do not re-run — see
+   step 5), and `5` is a D1/transport error. Pass the exact held token
+   (`--expect-token operator-pause-<name>`) and a remaining-lease floor (`--min-remaining-ms`);
+   this release does not use a broad `token LIKE 'operator-pause-%'` check, because it would
+   accept another operator's pause. The cancel fences every unfinished legacy run and its chunks,
+   parks profile and re-measure claims, and preserves every completed result, summary, lane record,
+   routing artifact and finished profile row; a cancelled run is marked `failed` with an
+   operator-cancel marker, not a model failure. A run the old image admits inside the window keeps
+   the same guarantee only through the worker's own retirement: any decider run whose
+   `admission_marker` is `NULL` is never initialized, measured or published, whatever its
+   `started_at`, so a post-cutover timestamp cannot make legacy work claimable. Migration
+   `0038` adds that column with no backfill: existing rows stay `NULL` and are treated as legacy.
+4. **Apply and deploy.** Apply the additive D1 migrations and the PostgreSQL pool-entry index.
+   The index serves the alias promotion's `entries @> ANY($1)` candidate read: on PostgreSQL 16.16
+   over 20,000 analyzed pools, a two-alias promotion with no planner overrides planned a Bitmap
+   Index Scan on it, so a promotion does not scan pools while it holds the exclusive lock.
+   PostgreSQL keeps the existing native usage schema. D1 migration `0038` creates the case
+   fence, request tables, receipts, and attempt history, and adds `benchmark_runs.admission_marker`.
+   The readiness migration adds one epoch row per base router. It does not invalidate results or
+   rebuild a table. Each custom routing request reads that epoch by key before reusing cached
+   rankings. A shared gateway benchmark changes the epoch with its ready profile, so the next
+   request can use that result. Owner-local client measurements remain separate and can take up to
+   the existing cache limit of 60 seconds to appear. If the epoch is unavailable, the serving
+   Worker reads the full pool table and shares that read with concurrent requests. If both reads
+   fail, it returns a retryable error instead of serving an unverified cached table.
+   The wrapper holds dispatch while it drains active work, applies migrations, deploys the
+   benchmark Worker, and waits for a changed container image. Verify the platform funding
+   organization and its executor membership before dispatch resumes. The Worker, web, and
+   gateway deploy jobs can complete in different orders. The operator hold fences benchmark
+   dispatch, not ordinary routing.
+5. **Prove legacy work is fenced and existing pools are unchanged.** With the worker live and the
+   hold still held, read (do not write) the request, registry, and run tables: every legacy run is
+   terminally cancelled (none queued, paused, or resumable), no pre-cutover user run resumes, no
+   queued owner subscription becomes a paid request, no legacy profile is pending for the drained
+   queue, and no stored measurement is requeued. Use `scripts/legacy-cancel.mjs --legacy-residue
+   --remote` for the late legacy check: it is read-only, defined only for the post-cutover schema,
+   and reports legacy work (a run whose `admission_marker` is `NULL`, the same predicate the paid
+   Worker uses) separately from paid work, exiting `4` if a legacy run is `running` or owns an
+   unfinished chunk. **Do not re-run `--apply`, `--verify` or `--dry-run` after the migration** —
+   they refuse on a post-cutover database (exit `4`, no writes), because on that schema a
+   `status = 'running'` cancel cannot distinguish a legacy run from one a user explicitly
+   confirmed through the paid flow. A nonzero legacy count means keep the hold and escalate. A paid
+   request that is `preparing`/`active` with a running case while the hold is retained is an
+   expected user confirmation — a legitimate click under the hold — and is never a reason to
+   cancel; confirm only that no paid work is spending while the hold is in place. Check that a pool
+   save or alias scan creates no request, and that an already correctly benchmarked pool keeps its
+   routing table and model indicators without a quote or click.
+6. **Release and verify.** Before release, confirm the benchmark Worker, serving Worker, web, and
+   gateway each contain the merged head. Confirm the benchmark Worker answers the serving
+   Worker's readiness check. One successful deployment proves nothing about the others.
+   Until the serving Worker and gateway deploys are both verified, an older gateway verifies
+   the unchanged `v1` token and ignores the optional alias proof fields because its parser
+   strips them, so strict signed alias-retirement verification must not be claimed.
+   Then release only the exact pause token passed to `--expect-token`, never a broad `LIKE` match.
+   Verify read-only:
+   platform dispatch resumes, a pool quote is `empty` or `ready` without starting work, a fresh
+   confirmed request produces its cases, and the usage receipts and admin payer breakdown match
+   the requests that ran. A failed check keeps the hold and stops the rollout; do not compensate by
+   editing balances, request rows, or registry statuses by hand.
+
+Roll back by restoring the previous worker and web releases. The migrations are additive, so a
+previous release ignores the new tables; leave stored results, requests, and receipts in place.
+
 ## Invariants
 
 1. The benchmark worker is the only writer of measurements and tables (ADR 0002 invariant 1).
@@ -363,20 +530,28 @@ the entire original cohort into a new directory would notify successful recipien
 4. Client measurements are owner-scoped and never affect another owner's routing.
 5. Platform routers require exact engine identity; custom routers serve the newest measurement
    and flag it stale.
-6. The platform pays only for inference that the platform key serves. Linking an entry never
-   starts new platform inference. The owner pays for client inference, judged grading of client
-   outputs, and classification.
+6. Inference is billed per model request to one payer account, and user work exists only after an
+   explicit confirmed request. A platform pool membership that commits before the request covers it
+   from then on; it never covers a charge already recorded. Linking an entry never starts new
+   platform inference. The owner pays for client inference, judged grading of client outputs, and
+   classification.
+7. A custom pool save, alias move, subscription sync, schedule, retry, or deploy starts no
+   measurement without an owner confirmation. The platform still measures new members and moved
+   platform aliases automatically. Deployment never requeues an existing measurement.
 
 ## Consequences
 
 - The auto-routing worker gets public routes with user authentication. It needs the token
   secret, a decision-signing secret shared with the gateway, and balance reads.
-- The benchmark worker gets owner-scoped tables and a second owner queue.
+- The benchmark worker gets owner-scoped request tables, a case fence shared by every measuring
+  path, and the durable accounting receipts the admin console reads.
 - Every user prompt on the CLI path goes to Kilo for classification, including routers with only
   local models. A local-only router is not private.
 - A dataset change makes rankings mix datasets in custom routers until re-evaluation.
 - Client latency reflects one machine. Organization members on other hardware see the uploader's
   ranking.
+- An owner's benchmark spend follows the models they measured: a shared model request bills one
+  attached account, and the pool that joins later may see only platform-covered requests.
 
 ## Alternatives considered
 

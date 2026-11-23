@@ -94,6 +94,10 @@ export type ManagedInstallationLookupResult =
   | InstallationLookupFailure
   | { success: false; reason: 'repository_not_installed' };
 
+export type HostedWorkspaceInstallation = InstallationLookupSuccess & {
+  selectedRepositories: ReadonlySet<string> | null;
+};
+
 export class GitHubInstallationAccessDeniedError extends Error {
   constructor() {
     super('GitHub installation is not available through one active association');
@@ -742,28 +746,77 @@ export class InstallationLookupService {
     };
   }
 
+  async findHostedWorkspaceInstallation(
+    params: FindInstallationParams & { orgId: string; expectedIntegrationId: string }
+  ): Promise<
+    | HostedWorkspaceInstallation
+    | InstallationLookupFailure
+    | { success: false; reason: 'repository_not_installed' }
+  > {
+    const validationFailure = this.validateParams(params);
+    if (validationFailure) return validationFailure;
+
+    const rows = await buildManagedInstallationLookupQuery(this.getDb(), {
+      ...params,
+      accessPurpose: 'workflow',
+    });
+    const selected = ExactManagedInstallationLookupResultSchema.safeParse(rows[0]);
+    if (!selected.success || !this.matchesExpectedAssociation(selected.data, params)) {
+      return { success: false, reason: 'integration_mismatch' };
+    }
+    if (!this.matchesStoredRepositoryAccess(selected.data, params.githubRepo)) {
+      return { success: false, reason: 'repository_not_installed' };
+    }
+
+    return {
+      success: true,
+      installationId: selected.data.platform_installation_id,
+      accountLogin: selected.data.platform_account_login ?? '',
+      githubAppType: selected.data.github_app_type ?? 'standard',
+      selectedRepositories:
+        selected.data.repository_access === 'all'
+          ? null
+          : new Set(
+              selected.data.repositories?.map(repository => repository.full_name.toLowerCase())
+            ),
+    };
+  }
+
   private matchesExpectedIntegration(
     selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
     params: FindInstallationParams
   ): boolean {
-    if (
-      selected.id !== params.expectedIntegrationId ||
-      selected.integration_status !== 'active' ||
-      (params.orgId === undefined
-        ? selected.owned_by_user_id !== params.userId || selected.owned_by_organization_id !== null
-        : selected.owned_by_organization_id !== params.orgId ||
-          selected.owned_by_user_id !== null) ||
-      selected.platform_account_login?.toLowerCase() !==
-        params.githubRepo.split('/')[0]?.toLowerCase()
-    ) {
-      return false;
-    }
+    return (
+      this.matchesExpectedAssociation(selected, params) &&
+      this.matchesStoredRepositoryAccess(selected, params.githubRepo)
+    );
+  }
 
+  private matchesExpectedAssociation(
+    selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
+    params: FindInstallationParams
+  ): boolean {
+    return (
+      selected.id === params.expectedIntegrationId &&
+      selected.integration_status === 'active' &&
+      (params.orgId === undefined
+        ? selected.owned_by_user_id === params.userId && selected.owned_by_organization_id === null
+        : selected.owned_by_organization_id === params.orgId &&
+          selected.owned_by_user_id === null) &&
+      selected.platform_account_login?.toLowerCase() ===
+        params.githubRepo.split('/')[0]?.toLowerCase()
+    );
+  }
+
+  private matchesStoredRepositoryAccess(
+    selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
+    githubRepo: string
+  ): boolean {
     if (selected.repository_access === 'all') return true;
     if (selected.repository_access !== 'selected') return false;
     return Boolean(
       selected.repositories?.some(
-        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
+        repository => repository.full_name.toLowerCase() === githubRepo.toLowerCase()
       )
     );
   }

@@ -15,9 +15,16 @@
 
 import { createHash } from 'node:crypto';
 
+import {
+  LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
+  LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS,
+  type LocalFakeTranscriptionModelId,
+} from '@kilocode/app-shared/local-fake-llm';
+
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
 import { backgroundActivityScenario } from './fake-llm-background-activity.js';
+import { agentBoardChildScenario, agentBoardScenario } from './fake-llm-agent-board.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -65,6 +72,7 @@ export type Directive = {
  *   file:write:<opTag>:<path>:<contents>       literal contents; real write call
  *   file:seed:<opTag>:<path>:<bytes>:<nonce>   fake-generated fixture; real write call
  *   file:read:<opTag>:<path>                   real read call; echo the parsed result
+ *   file-read-pair:<tag>:<path1>:<path2>       read both paths in one turn; echo both results
  *
  * `opTag` is `[A-Za-z0-9_-]+` and is the attribution key: `directiveTag` returns
  * it, never the op. The scenario mints a fresh `opTag` per turn, so a reused
@@ -736,6 +744,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'write-then-gate',
       'read-edit-then-gate',
       'read-then-write',
+      'file-read-pair',
       'tool-stream',
       'question',
       'first-token',
@@ -839,7 +848,13 @@ function supportsRequiredArguments(
 function resolveTool(
   tools: AdvertisedTool[],
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): { tool: AdvertisedTool; arguments: Record<string, unknown> } | null {
   const names: Record<ToolKind, string[]> = {
     write: ['write', 'write_file', 'write_to_file'],
@@ -854,18 +869,29 @@ function resolveTool(
 
   const args: Record<string, unknown> = {};
   if (kind === 'question') {
+    // The default path must stay byte-identical (single `Continue` option) so
+    // existing assertions on the emitted option list keep passing.
+    const optionCount = input.optionCount ?? 1;
+    const defaultOption = { label: 'Continue', description: 'Continue the E2E scenario' };
+    const options =
+      optionCount === 1
+        ? [defaultOption]
+        : Array.from({ length: optionCount }, (_, index) => ({
+            label: `Option ${index + 1}`,
+            description: `Option ${index + 1} of ${optionCount} emitted by the E2E fake`,
+          }));
     if ('questions' in properties && input.question !== undefined) {
       args.questions = [
         {
           question: input.question,
           header: 'E2E',
-          options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+          options,
         },
       ];
     } else if ('question' in properties && input.question !== undefined) {
       args.question = input.question;
       if ('options' in properties) {
-        args.options = [{ label: 'Continue', description: 'Continue the E2E scenario' }];
+        args.options = options;
       }
     } else {
       return null;
@@ -956,7 +982,7 @@ function readFileContents(result: string): string {
  * this model as `kilo/fake-deterministic` (provider prefix + bare id).
  */
 const FAKE_MODEL = {
-  id: 'fake-deterministic',
+  id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
   name: 'Fake Deterministic',
   description: 'Deterministic fake model for cloud-agent E2E harness.',
   context_length: 200000,
@@ -980,24 +1006,48 @@ function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
 
 /**
  * Speech-to-text catalogue served for `GET /api/openrouter/models` with
- * `output_modalities=transcription`. Two ids: the happy path the mobile e2e
- * scenarios address, and a broken one whose transcription request 404s so the
- * non-retryable unhappy state is provable without an upstream key.
+ * `output_modalities=transcription`. The ids come from the shared list the web
+ * gateway routes to this fake, so a rename cannot leave a stale copy here; the
+ * metadata record below must name every shared id, and only those.
+ *
+ * Field order matches the previously served bytes: `name` and `description`
+ * are taken by name because the shared record holds them without `created`
+ * between them.
  */
-const TRANSCRIPTION_MODELS = [
-  {
-    id: 'fake-transcribe',
+const TRANSCRIPTION_MODEL_METADATA: Record<
+  LocalFakeTranscriptionModelId,
+  { name: string; description: string }
+> = {
+  'fake-transcribe': {
     name: 'Fake Transcribe',
-    context_length: 128000,
-    pricing: { prompt: '0', completion: '0' },
+    description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
   },
-  {
-    id: 'fake-transcribe-broken',
+  'fake-transcribe-broken': {
     name: 'Broken Transcriber',
+    description: 'Fake speech-to-text model whose transcription request 404s.',
+  },
+};
+
+const TRANSCRIPTION_MODELS = LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS.map(id => {
+  const metadata = TRANSCRIPTION_MODEL_METADATA[id];
+  return {
+    id,
+    name: metadata.name,
+    created: 0,
+    description: metadata.description,
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
-  },
-];
+  };
+});
+
+/** The shared id whose transcription request 404s. */
+const BROKEN_TRANSCRIPTION_MODEL_ID: LocalFakeTranscriptionModelId = 'fake-transcribe-broken';
 
 type ToolCallDelta = {
   index: number;
@@ -1121,6 +1171,17 @@ export const MAX_REALISTIC_PIECES = 512;
  * silently smaller stream.
  */
 export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
+
+/**
+ * Upper bound for the opt-in `question:<tag>:<count>:<question text>` option
+ * count. The product schema (`SESSION_QUESTION_MAX_OPTIONS`) caps one question
+ * at 32 options, and the purpose of the count form is to emit MORE than that,
+ * so the bound comfortably exceeds 32: it covers the exact legal boundary (32)
+ * and over-limit probes (33+) while keeping the generated tool-call arguments
+ * bounded for the streamed fake. A request beyond it is an invalid directive
+ * (HTTP 402) rather than a silently smaller list.
+ */
+export const MAX_QUESTION_DIRECTIVE_OPTIONS = 64;
 
 /**
  * Upper bound for the `slow:<n>:<ms>:<bytes>` per-chunk delay. Without it a
@@ -1331,7 +1392,13 @@ function runToolScenario(
   ctx: ScenarioContext,
   tag: string,
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): void {
   const resolved = resolveTool(ctx.tools, kind, input);
   if (!resolved) {
@@ -1341,12 +1408,97 @@ function runToolScenario(
   writeToolCall(ctx, tag, kind, resolved);
 }
 
+function readToolResultBody(
+  result: ToolResult,
+  path: string
+): { ok: true; body: string } | { ok: false; message: string } {
+  const normalization = normalizeToolResult(result.content);
+  if (!normalization.ok) return normalization;
+  const normalized = normalization.result;
+  const resultPath = readResultPath(normalized);
+  if (!resultPath.ok || normalized.error || !readResultMatchesRequest(resultPath.path, path)) {
+    return { ok: false, message: 'read tool did not return file contents for the requested path' };
+  }
+  const body = stripPromptContext(readFileContents(normalized.output));
+  return body === ''
+    ? { ok: false, message: 'read tool did not return file contents' }
+    : { ok: true, body };
+}
+
+/**
+ * `bash:<tag>:<command>` — one native `bash` call carrying the caller's command
+ * verbatim, then the runtime's own verdict once the tool result comes back.
+ *
+ * The command is the rest of the trailing argument, so it may contain spaces,
+ * colons and shell punctuation; only the appended `<environment_details>` block
+ * is stripped. The tool call id is `bash_<tag>`, so a replay of the same request
+ * sees its own result instead of running the command a second time. The second
+ * turn echoes that result's text (bounded, so a huge output cannot bloat the
+ * transcript) after a `bash-result-<tag>` marker, which lets a driver read the
+ * sandbox's verdict straight out of the model transcript.
+ */
+function bashScenario(args: string[], ctx: ScenarioContext): void {
+  const parsed = /^([A-Za-z0-9_-]{1,64}):([\s\S]*)$/.exec(args[0] ?? '');
+  const command = parsed ? stripPromptContext(parsed[2]) : '';
+  if (!parsed || command === '') {
+    ctx.emit.json(400, { error: 'expected bash:<tag>:<command>' });
+    return;
+  }
+  const [, tag] = parsed;
+  if (!ctx.tools.some(advertised => advertised.name === 'bash')) {
+    ctx.emit.json(422, { error: 'bash fixture requires native bash' });
+    return;
+  }
+  const id = `bash_${tag}`;
+
+  if (hasToolResult(ctx.body, id)) {
+    const result =
+      isRecord(ctx.body) && Array.isArray(ctx.body.messages)
+        ? ctx.body.messages.find(
+            message => isRecord(message) && message.role === 'tool' && message.tool_call_id === id
+          )
+        : undefined;
+    const resultText = isRecord(result) ? toolResultContent(result.content) : '';
+    writeChunk(
+      ctx.emit,
+      makeChunk(ctx.id, ctx.model, {
+        role: 'assistant',
+        content: `bash-result-${tag}\n${resultText.slice(0, 4000)}`,
+      })
+    );
+    writeFinish(ctx.emit, ctx.id, ctx.model, 1);
+    ctx.emit.end();
+    return;
+  }
+
+  writeChunk(
+    ctx.emit,
+    makeChunk(ctx.id, ctx.model, {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id,
+          type: 'function',
+          function: {
+            name: 'bash',
+            arguments: JSON.stringify({ command, description: 'Fixture bash command' }),
+          },
+        },
+      ],
+    })
+  );
+  writeFinish(ctx.emit, ctx.id, ctx.model, 1, 'tool_calls');
+  ctx.emit.end();
+}
+
 /**
  * Scenario registry. Each handler writes SSE chunks through `ctx.emit` and is
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
  */
 export const scenarioRegistry: Record<string, ScenarioHandler> = {
   supervision: supervisionScenario,
+  bash: bashScenario,
   echo(args, ctx) {
     // Harness `echo:<token>` only takes the first identifier so kilo's
     // appended `<environment_details>` cannot leak into the transcript.
@@ -1601,6 +1753,44 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     parkGate(ctx, tag, `done-${tag}`);
   },
 
+  'file-read-pair'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:\n]+):([^:\n]+)$/
+    );
+    if (!parsed || parsed[2] === parsed[3]) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        'file-read-pair requires a tag and two distinct paths',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, firstPath, secondPath] = parsed;
+    const bodies: string[] = [];
+    for (const [index, path] of [firstPath, secondPath].entries()) {
+      const readTag = `${tag}-${index + 1}`;
+      const status = scenarioStatus(ctx.state, readTag);
+      const result =
+        status.toolCalls.read > 0
+          ? toolResults(ctx.body, readTag, ctx.state).find(
+              entry => entry.id === toolCallId(readTag, 'read')
+            )
+          : undefined;
+      if (!result) {
+        runToolScenario(ctx, readTag, 'read', { path });
+        return;
+      }
+      const read = readToolResultBody(result, path);
+      if (!read.ok) {
+        writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
+        return;
+      }
+      bodies.push(read.body.trim());
+    }
+    writeAssistantResponse(ctx, `file-read-pair:${JSON.stringify(bodies)}`);
+  },
+
   /**
    * `file:<op>:<opTag>:...` — one real tool turn per request, attributed to the
    * fresh per-turn `opTag`. `toolResults()` matches `(tag, kind)` across the
@@ -1676,38 +1866,13 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
 
-    const normalization = normalizeToolResult(toolResultContent(result.content));
-    if (!normalization.ok) {
-      writeJsonError(ctx.emit, 422, normalization.message, 'invalid_tool_result');
-      return;
-    }
-    const normalized = normalization.result;
-    const resultPath = readResultPath(normalized);
-    if (
-      !resultPath.ok ||
-      normalized.error ||
-      !readResultMatchesRequest(resultPath.path, directive.path)
-    ) {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents for the requested path',
-        'invalid_tool_result'
-      );
-      return;
-    }
-    const body = stripPromptContext(readFileContents(normalized.output));
-    if (body === '') {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents',
-        'invalid_tool_result'
-      );
+    const read = readToolResultBody(result, directive.path);
+    if (!read.ok) {
+      writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
       return;
     }
     status.fileCompleted = true;
-    writeAssistantResponse(ctx, `file-read:${directive.path}\n${body}`);
+    writeAssistantResponse(ctx, `file-read:${directive.path}\n${read.body}`);
   },
 
   'tool-stream'(args, ctx) {
@@ -1812,14 +1977,30 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       );
       return;
     }
-    const [, tag, question] = parsed;
+    // Opt-in count form: `question:<tag>:<count>:<question text>` emits
+    // `<count>` options. A digits-only whole segment directly after the tag is
+    // treated as a count; anything else — including text that merely starts
+    // with digits — keeps the original single-option form.
+    const countMatch = parsed[2].match(/^(\d+):([\s\S]+)$/);
+    const optionCount = countMatch ? Number.parseInt(countMatch[1] ?? '0', 10) : 1;
+    const question = countMatch ? (countMatch[2] ?? '') : parsed[2];
+    if (countMatch && (optionCount < 1 || optionCount > MAX_QUESTION_DIRECTIVE_OPTIONS)) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        `question option count must be between 1 and ${MAX_QUESTION_DIRECTIVE_OPTIONS}, got ${optionCount}`,
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag] = parsed;
     if (ctx.tools.length === 0) {
       writeAssistantResponse(ctx, `done-${tag}`);
       return;
     }
     const results = toolResults(ctx.body, tag, ctx.state);
     if (!results.some(result => result.id === toolCallId(tag, 'question'))) {
-      runToolScenario(ctx, tag, 'question', { question });
+      runToolScenario(ctx, tag, 'question', { question, optionCount });
       return;
     }
     writeAssistantResponse(ctx, `done-${tag}`);
@@ -1833,6 +2014,8 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     runChildTask(args, ctx, true);
   },
   'background-activity': backgroundActivityScenario,
+  board: agentBoardScenario,
+  'board-child': agentBoardChildScenario,
 
   cron(args, ctx) {
     runSchedule(
@@ -2116,7 +2299,7 @@ async function handleAudioTranscriptions(
     fail(400, 'model field is required', 'invalid_request', 'missing-model');
     return;
   }
-  if (model === 'fake-transcribe-broken') {
+  if (model === BROKEN_TRANSCRIPTION_MODEL_ID) {
     fail(404, `model not found: ${model}`, 'model_not_found', 'model-not-found');
     return;
   }

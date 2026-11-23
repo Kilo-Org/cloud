@@ -1,6 +1,8 @@
 import { type ElementType } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BRIEFING_PREVIEW_MAX_GRAPHEMES } from '@/lib/agent-briefing-format';
+import { formatNumber } from '@/lib/format';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
@@ -14,13 +16,19 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false, getConstants: () => ({ isRTL: false }) },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/icons', () => ({ X: 'X' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/lib/a11y/tap-target', () => ({
+  DENSE_ROW_FRAME_CLASS: 'dense-row',
+  ICON_TARGET_BOX_CLASS: 'icon-box',
+  ROW_TARGET_CLASS: 'row-target',
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<() => void>() }) }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, values?: { value?: string }) =>
-      values?.value === undefined ? key : `${key}:${values.value}`,
+    t: (key: string, values?: Record<string, unknown>) =>
+      values === undefined ? key : `${key}:${JSON.stringify(values)}`,
     i18n: { language: 'en' },
   }),
 }));
@@ -121,7 +129,25 @@ function pressablesIn(renderer: ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as ElementType);
 }
 
+function graphemeCount(value: string): number {
+  return [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(value)].length;
+}
+
 describe('BriefingCard in the Home card frame', () => {
+  it('names the scorecard control after its action with the three counts', () => {
+    const label = pressablesIn(renderCardInFrame('drawn'))[0]?.props.accessibilityLabel;
+    // The name carries the three counts, each formatted the way the scorecard
+    // rows format it (same `formatNumber` call, same locale).
+    const { sessions, pullRequests, blockers } = briefingReport.scorecard;
+    expect(label).toBe(
+      `agentBriefing.scorecardLabel:${JSON.stringify({
+        sessions: formatNumber(sessions, 'en'),
+        pullRequests: formatNumber(pullRequests, 'en'),
+        blockers: formatNumber(blockers, 'en'),
+      })}`
+    );
+  });
+
   it('keeps every control pressable in the layer the frame draws', () => {
     const pressables = pressablesIn(renderCardInFrame('drawn'));
     expect(pressables).toHaveLength(3);
@@ -132,6 +158,35 @@ describe('BriefingCard in the Home card frame', () => {
 
   it('renders no pressable at all in the layer that only reserves height', () => {
     expect(pressablesIn(renderCardInFrame('reserved'))).toHaveLength(0);
+  });
+
+  it('names the summary control with a bounded excerpt of a long summary', () => {
+    const summary = 'Word '.repeat(80).trim();
+    expect(summary.length).toBe(399);
+    const longReport = {
+      ...briefingReport,
+      summary: { status: 'ready', text: summary },
+    } as unknown as Parameters<typeof BriefingCard>[0]['report'];
+    const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(<BriefingCard report={longReport} />);
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('BriefingCard did not mount');
+    }
+    const summaryControl = pressablesIn(renderer)[1];
+    const label = String(summaryControl?.props.accessibilityLabel);
+    const wrapper = 'agentBriefing.viewWithPreview:';
+    expect(label.startsWith(wrapper)).toBe(true);
+    const { preview } = JSON.parse(label.slice(wrapper.length)) as { preview: string };
+    expect(preview.endsWith('…')).toBe(true);
+    expect(graphemeCount(preview)).toBeLessThanOrEqual(BRIEFING_PREVIEW_MAX_GRAPHEMES);
+    // The visible line still carries the whole summary, wrapped to two lines.
+    const visible = renderer.root
+      .findAllByType('Text' as ElementType)
+      .find(node => node.props.children === summary);
+    expect(visible?.props.numberOfLines).toBe(2);
   });
 });
 
@@ -163,21 +218,23 @@ describe('BriefingCard layout ownership', () => {
   }
 
   function summaryRowClasses(classes: string[]): string[] {
-    return classes.filter(
-      name => name.includes('flex-row items-center gap-2') && name.includes('px-4 py-3')
-    );
+    return classes.filter(name => name.startsWith('flex-row items-center gap-2'));
   }
 
   it('fills the layer it is drawn in and lets the summary row hold its height', () => {
-    const classes = classNames(renderCard(true));
+    const renderer = renderCard(true);
+    const classes = classNames(renderer);
     expect(classes[0]).toContain('grow');
-    expect(classes.filter(name => name.includes('h-px'))).toEqual(['h-px bg-border']);
-    expect(summaryRowClasses(classes)).toEqual([expect.stringContaining('flex-1')]);
+    expect(summaryRowClasses(classes)).toContain('flex-row items-center gap-2 flex-1');
+    // The embedded card borrows the frame's surface instead of painting one.
+    expect(renderer.root.findAllByType('Card' as ElementType)).toHaveLength(0);
   });
 
   it('keeps its intrinsic height outside the frame', () => {
-    const classes = classNames(renderCard(false));
+    const renderer = renderCard(false);
+    const classes = classNames(renderer);
     expect(classes[0]).not.toContain('grow');
-    expect(summaryRowClasses(classes)).toEqual([expect.not.stringContaining('flex-1')]);
+    expect(summaryRowClasses(classes)).not.toContain('flex-row items-center gap-2 flex-1');
+    expect(renderer.root.findAllByType('Card' as ElementType)).toHaveLength(1);
   });
 });

@@ -9,8 +9,10 @@
 
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
+import { getBuiltinModeLabelKey } from '@/components/agents/mode-options';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -19,8 +21,12 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
+import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useCloudTrigger } from '@/lib/cloud-triggers/use-cloud-triggers';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 
 import { TriggerDeliveries } from './trigger-deliveries';
@@ -41,10 +47,19 @@ function TriggerDetailSkeleton() {
 
 /**
  * What a trigger is, for the viewer who cannot change it. Every value is the
- * saved one; nothing here is editable, so the rows carry no control.
+ * saved one, shown with the same labels the form uses; nothing here is
+ * editable, so the rows carry no control.
  */
-function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
+function ReadOnlyTrigger({
+  detail,
+  organizationId,
+}: Readonly<{ detail: CloudTriggerDetail; organizationId?: string }>) {
   const { t } = useTranslation();
+  const mode = detail.mode?.trim() ?? '';
+  const model = detail.model?.trim() ?? '';
+  const modelCatalogue = useAvailableModels(organizationId, 'shared_services', {
+    enabled: model !== '',
+  });
   return (
     <View>
       <KvRow label={t('common.repository')} value={detail.githubRepo ?? t('common.unknown')} />
@@ -57,11 +72,16 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
         }
         valueFace="text"
       />
-      <KvRow label={t('common.agent')} value={detail.mode ?? t('common.unknown')} />
+      <KvRow
+        label={t('common.agent')}
+        value={mode === '' ? t('common.unknown') : t(getBuiltinModeLabelKey(mode) ?? mode)}
+        valueFace="text"
+      />
       <KvRow
         label={t('common.model')}
-        value={detail.model ?? t('common.unknown')}
-        last
+        value={
+          model === '' ? t('common.unknown') : modelLabelFromCatalogue(modelCatalogue.models, model)
+        }
         valueFace="text"
       />
     </View>
@@ -73,6 +93,7 @@ export function TriggerDetailScreen({
   organizationId,
 }: Readonly<{ triggerId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const boundary = useOrgBoundary(organizationId);
   const isOrgScope = organizationId !== undefined;
   const scopeResolved = !isOrgScope || (!boundary.isResolving && boundary.org != null);
@@ -88,28 +109,23 @@ export function TriggerDetailScreen({
   }
 
   let body: ReactNode = null;
+  const errorVariant = query.isError && query.data == null ? trpcErrorVariant(query.error) : null;
+  const notFound = errorVariant === 'not-found';
   if (query.isPending) {
     body = <TriggerDetailSkeleton />;
   } else if (query.isError && query.data == null) {
-    const variant = trpcErrorVariant(query.error);
-    body =
-      variant === 'not-found' ? (
-        <QueryError
-          placement="top"
-          variant="not-found"
-          title={t('cloudAgent.triggers.detailNotFoundTitle')}
-          message={triggerId}
-        />
-      ) : (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('cloudAgent.triggers.detailLoadFailedTitle')}
-          message={t('cloudAgent.triggers.loadFailedDescription')}
-          onRetry={() => void query.refetch()}
-          isRetrying={query.isFetching}
-        />
-      );
+    body = notFound ? (
+      <QueryError variant="not-found" title={t('cloudAgent.triggers.detailNotFoundTitle')} />
+    ) : (
+      <QueryError
+        placement="top"
+        variant="server"
+        title={t('cloudAgent.triggers.detailLoadFailedTitle')}
+        message={t('cloudAgent.triggers.loadFailedDescription')}
+        onRetry={() => void query.refetch()}
+        isRetrying={query.isFetching}
+      />
+    );
   } else if (query.data.canEdit && query.data.targetType === 'cloud_agent') {
     body = <TriggerEditPanel detail={query.data} organizationId={organizationId} />;
   } else {
@@ -126,14 +142,12 @@ export function TriggerDetailScreen({
         {query.data.activationMode === 'scheduled' ? null : (
           <TriggerUrlCard url={query.data.inboundUrl} />
         )}
-        <ReadOnlyTrigger detail={query.data} />
+        <ReadOnlyTrigger detail={query.data} organizationId={organizationId} />
         {editableTarget ? (
           // A legacy KiloClaw Chat trigger that this viewer may write is still
           // not a Cloud Agent one: this screen has no KiloClaw form, so it says
           // where the trigger is managed instead of offering the wrong one.
-          <Text variant="muted" className="text-xs">
-            {t('common.manageOnWeb')}
-          </Text>
+          <Text variant="caption">{t('common.manageOnWeb')}</Text>
         ) : null}
         <View className="gap-2">
           <Text className="text-sm font-medium text-foreground">
@@ -147,16 +161,31 @@ export function TriggerDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={triggerId} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-4 px-4 pt-4"
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {body}
-      </TabScreenScrollView>
+      <ScreenHeader
+        title={triggerId}
+        showBackButton
+        onBack={() => {
+          // POP_TO puts the list under this screen whether or not it is already
+          // beneath (the create flow retires the form after the transition, a
+          // deep link may have none), so Back always returns to the list the
+          // trigger is a row of. `showBackButton` keeps the control painted on
+          // a restored stack where the router reports no history to pop.
+          router.dismissTo(triggersListHref(organizationId) as Href);
+        }}
+      />
+      {notFound ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

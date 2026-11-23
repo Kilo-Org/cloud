@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { isExpectedAuthFailure } from '@/lib/auth/trpc-unauthorized';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -12,6 +13,7 @@ import { useTRPC } from '@/lib/trpc';
 import {
   shouldClearConnectCheckFailed,
   shouldSetConnectCheckFailed,
+  shouldToastRepositoryRefreshFailure,
 } from './use-github-repos-refresh-helpers';
 
 // ── Hook ────────────────────────────────────────────────────────────
@@ -28,6 +30,10 @@ type UseGitHubReposRefreshResult = {
    * busy state over the whole of it instead of returning before the mint settles.
    */
   openGitHubIntegration: () => Promise<void>;
+  /**
+   * Rejects when the refresh fails and shows no toast: the caller refreshes
+   * every provider at once and reports their failures with one toast.
+   */
   refreshReposForceFresh: () => Promise<void>;
   isRefreshingRepos: boolean;
   connectCheckFailed: boolean;
@@ -50,6 +56,7 @@ export function useGitHubReposRefresh({
   }, [integrationInstalled, connectCheckFailed]);
 
   // ── Force-fresh refetch ──────────────────────────────────────────
+  // Rejects on failure; each caller decides how to report it.
   const performForceFresh = useCallback(
     async (isReturnTriggered: boolean) => {
       setIsRefreshingRepos(true);
@@ -89,8 +96,6 @@ export function useGitHubReposRefresh({
         } else if (shouldClearConnectCheckFailed({ integrationInstalled: installed })) {
           setConnectCheckFailed(false);
         }
-      } catch {
-        toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
       } finally {
         setIsRefreshingRepos(false);
       }
@@ -113,9 +118,19 @@ export function useGitHubReposRefresh({
           toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
         },
       });
+    } catch (error: unknown) {
+      // An ended session shows its own toast over the login screen.
+      if (!isExpectedAuthFailure(error)) {
+        toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
+      }
+      return;
+    }
+    try {
       await performForceFresh(true);
-    } catch {
-      toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
+    } catch (error: unknown) {
+      if (shouldToastRepositoryRefreshFailure([error])) {
+        toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
+      }
     }
   }, [organizationId, performForceFresh]);
 

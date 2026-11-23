@@ -47,8 +47,6 @@ export const getSandboxSelectionOptions = protectedProcedure
       env: ctx.env,
       owner,
       repositoryType,
-      // The picker does not know the environment yet (chunk 8).
-      environment: null,
       readiness,
       ...(repositoryFullName && (repositoryType === 'github' || repositoryType === 'gitlab')
         ? { target: { platform: repositoryType, fullName: repositoryFullName } }

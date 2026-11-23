@@ -1,6 +1,6 @@
 import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 
-import { type PushData } from './push-data';
+import { classifyCloudAgentSessionPush, type PushData } from './push-data';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -41,20 +41,24 @@ export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
  * The channel every Android build before the agent-channel split addressed the
- * glanceable active-agents pushes with. It is not in
- * `ANDROID_NOTIFICATION_CHANNELS`: current builds only create the split
- * channels, and this id exists solely so a server push can still reach a token
- * registered by an older build (see `androidChannelIdForPushDataToAppVersion`).
+ * glanceable active-agents pushes with. Not in `ANDROID_NOTIFICATION_CHANNELS`
+ * for the reason given on `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
  */
 export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
 
 /**
- * The channel `androidChannelIdForPushDataToAppVersion` keeps an agent briefing
- * on for a token that predates the split. The id itself is current — every
- * split build creates `agent-progress` (see `AGENT_CHANNEL_SPLIT_APP_VERSION`)
- * — so this is not legacy vocabulary: it names the fallback role the resolver
- * gives the channel, the one place a briefing goes to a channel the version
- * gate, not the payload, chose.
+ * The channel `androidChannelIdForPushDataToAppVersion` falls back to for an
+ * agent briefing when the token's client predates `agent-briefing`. The id
+ * itself is current — every split build creates `agent-progress` (see
+ * `AGENT_CHANNEL_SPLIT_APP_VERSION`) — so this is not legacy vocabulary: it
+ * names the fallback role the resolver gives the channel, the one place a
+ * briefing goes to a channel the version gate, not the payload, chose.
+ *
+ * The fallback is version-gated like any other channel, so it reaches only the
+ * tokens that already create it: `1.0.12` through `1.0.15`. A token older than
+ * the split gets no channel id at all — `agent-progress` does not exist on that
+ * build either — and the caller omits `channelId`, so Android posts to the
+ * app's default channel.
  */
 export const BRIEFING_FALLBACK_CHANNEL_ID: AndroidNotificationChannelId = 'agent-progress';
 
@@ -69,10 +73,23 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 
 /**
  * The first mobile version whose every build creates `agent-briefing`. Builds of
- * `1.0.15` shipped without it, so a lower version keeps the brief on
- * `agent-progress` (see `androidChannelIdForPushDataToAppVersion`).
+ * `1.0.15` shipped without it, so a version from `1.0.12` through `1.0.15`
+ * keeps the brief on `agent-progress` (see
+ * `androidChannelIdForPushDataToAppVersion`). The split channels start at
+ * `AGENT_CHANNEL_SPLIT_APP_VERSION`, so a pre-split token is below both gates:
+ * it also has no `agent-progress`, gets no channel id, and the push lands on the
+ * app's default channel.
  */
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
+
+/**
+ * The first mobile version whose every build creates
+ * `followed-sessions-lock-screen`. Builds of `1.0.14` shipped both without it
+ * (release tags from before the channel existed) and with it, so a lower
+ * version must not be addressed with the id (see
+ * `androidChannelIdForPushDataToAppVersion`).
+ */
+export const FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION = '1.0.15';
 
 /**
  * The minimum app version that creates each channel, or `undefined` when every
@@ -86,7 +103,7 @@ const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<AndroidNotificationChannelId, str
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
   balance: undefined,
   security: undefined,
-  'followed-sessions-lock-screen': undefined,
+  'followed-sessions-lock-screen': FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION,
 };
 
 /** A channel a server push may address, including pre-split channel ids. */
@@ -117,8 +134,29 @@ export function androidChannelIdForPushDataToAppVersion(
       return LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
     case 'agent_briefing':
       return androidChannelIdForRegisteredClient(BRIEFING_FALLBACK_CHANNEL_ID, appVersion);
-    default:
+    case 'session_live_update':
+      // Only some `1.0.14` builds created `followed-sessions-lock-screen` (see
+      // `FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION`), so a lower version cannot
+      // be addressed with it, and no legacy id exists under another name to
+      // redirect to. The push is data-only: the caller omits `channelId` and the
+      // client draws its own card.
       return undefined;
+    // Unreachable by construction, and named only so the switch stays total: a
+    // null app version already returned at the guard above, and each of these
+    // variants carries a channel no build gates by version, so the
+    // registered-client lookup returned it. A variant added here without an arm
+    // would instead fall into the exhaustiveness guard below.
+    case 'low_balance':
+    case 'spend_alert':
+    case 'security_finding':
+    case 'security_lifecycle':
+      return undefined;
+    default: {
+      // Exhaustiveness: a new push variant must be classified above, so one
+      // that only a version-gated channel accepts cannot silently lose it.
+      const _exhaustive: never = data;
+      return _exhaustive;
+    }
   }
 }
 
@@ -166,7 +204,9 @@ function isAgentPushData(data: PushData): data is AgentPushData {
 /**
  * The single needs-input rule for the counts the glanceable snapshot carries.
  * The push route and the local Android card both read it, so a snapshot with
- * work waiting on the user maps to the same kind in both places.
+ * work waiting on the user maps to the same kind in both places. The aggregate
+ * Live Activity card's relevance band reads it too, so the Lock Screen order
+ * cannot disagree with the kind.
  */
 export function agentNotificationKindForGlanceableSnapshot(snapshot: {
   needsInput: number;
@@ -178,9 +218,9 @@ export function agentNotificationKindForGlanceableSnapshot(snapshot: {
 function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   switch (data.type) {
     case 'cloud_agent_session':
-      // The schema default is 'status', applied at the producer's enforcement
-      // read site; an omitted category is a status update, not a question.
-      return data.category === 'attention' ? 'needs-input' : 'progress';
+      // An omitted category is a status update, not a question: the shared
+      // classifier applies the schema default.
+      return classifyCloudAgentSessionPush(data) === 'attention' ? 'needs-input' : 'progress';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {

@@ -1,5 +1,9 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
 import {
+  ACCOUNT_BLOCKED_REFUSAL_REASONS,
+  type AccountBlockedRefusalReason,
+} from '@kilocode/app-shared/auth';
+import {
   customerBillingFailureSchema,
   parseCustomerBillingFailure,
 } from '@kilocode/cloud-agent-sdk';
@@ -43,6 +47,28 @@ export class AuthContextError extends Error {
   }
 }
 
+/**
+ * Marker for the context-level FORBIDDEN raised when authorization refused a
+ * blocked account or an account whose domain is blacklisted (the R0/R1
+ * branches of `validateUserAuthorization`). The error-formatter surfaces it as
+ * `data.accountBlocked` (that the account is refused) and
+ * `data.accountBlockedReason` (which refusal), letting the mobile client
+ * explain *why* it cannot use the account instead of signing the user out.
+ *
+ * The two reasons are not interchangeable: a blocked account can be unblocked
+ * by support, so a retry may succeed, while a blacklisted email domain cannot
+ * change through anything the client does, so the app must not offer a retry
+ * there. `data.authRequired` (a genuine session failure, see
+ * `AuthContextError`) stays unset for this refusal, so the client keeps the
+ * session and only changes the screen.
+ */
+export class AccountBlockedError extends Error {
+  constructor(readonly reason: AccountBlockedRefusalReason) {
+    super(reason);
+    this.name = 'AccountBlockedError';
+  }
+}
+
 export const TrpcZodFlattenedErrorSchema = z.object({
   formErrors: z.array(z.string()),
   fieldErrors: z.record(z.string(), z.array(z.string())),
@@ -57,12 +83,25 @@ export const TrpcErrorDataSchema = z
     zodError: TrpcZodFlattenedErrorSchema.nullable(),
     upstreamCode: z.string().optional(),
     authRequired: z.boolean().optional(),
+    accountBlocked: z.boolean().optional(),
+    accountBlockedReason: z.enum(ACCOUNT_BLOCKED_REFUSAL_REASONS).optional(),
     stepUp: z
       .object({
         code: z.string(),
         actionClass: z.string(),
         purpose: z.string(),
         maxAgeSeconds: z.number(),
+        binding: z
+          .object({
+            actionClass: z.string(),
+            surface: z.string(),
+            route: z.string(),
+            method: z.string(),
+            targetKind: z.string(),
+            targetId: z.string().nullable(),
+          })
+          .nullable()
+          .optional(),
       })
       .optional(),
     billingFailure: customerBillingFailureSchema.optional(),
@@ -130,6 +169,9 @@ export const trpcErrorFormatter = (({ shape, error }) => {
           : null,
       upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
       authRequired: error.cause instanceof AuthContextError ? true : undefined,
+      accountBlocked: error.cause instanceof AccountBlockedError ? true : undefined,
+      accountBlockedReason:
+        error.cause instanceof AccountBlockedError ? error.cause.reason : undefined,
       stepUp:
         error.cause instanceof StepUpRequiredError
           ? {
@@ -137,6 +179,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
               actionClass: error.cause.actionClass,
               purpose: error.cause.purpose,
               maxAgeSeconds: error.cause.maxAgeSeconds,
+              binding: error.cause.binding,
             }
           : undefined,
       ...(billingFailure ? { billingFailure } : {}),

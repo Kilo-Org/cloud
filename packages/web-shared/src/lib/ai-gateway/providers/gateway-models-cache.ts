@@ -6,6 +6,7 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import {
   formatModelIds,
   getOpenRouterAliasTarget,
+  isLatestAliasId,
   joinGatewayModelEndpoints,
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
@@ -73,7 +74,7 @@ export const getOpenRouterModelsMetadataFromDatabase = createGatewayModelsFetche
 );
 
 export async function resolveOpenRouterModelAlias(modelId: string): Promise<string> {
-  if (!modelId.startsWith('~')) {
+  if (!isLatestAliasId(modelId)) {
     return modelId;
   }
 
@@ -127,28 +128,35 @@ export function extractVercelInferenceProviderIdsFromModel(
 }
 
 /**
- * Inference provider ids per model id, projected from the cached Vercel metadata map. Nothing is
- * keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
+ * Inference provider ids per model id, projected once from the cached Vercel metadata map. Nothing
+ * is keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
  */
-const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<string, string[]>>(
-  async () => {
-    const models = await getVercelModelsMetadataFromDatabase();
-    return new Map(
-      Object.entries(models).map(([modelId, model]) => [
-        modelId,
-        extractVercelInferenceProviderIdsFromModel(model),
-      ])
-    );
-  },
-  TTL_MS,
-  new Map(),
-  { name: 'vercelInferenceProviderIdsByModel' }
-);
+function projectVercelInferenceProviderIds(models: GatewayModelMap): ReadonlyMap<string, string[]> {
+  return new Map(
+    Object.entries(models).map(([modelId, model]) => [
+      modelId,
+      extractVercelInferenceProviderIdsFromModel(model),
+    ])
+  );
+}
+
+// The cached metadata map is a new object per refresh and is never mutated in place, so a
+// projection memoized on it has exactly the metadata snapshot's lifetime.
+const vercelInferenceProviderIdsByModel = new WeakMap<
+  GatewayModelMap,
+  ReadonlyMap<string, string[]>
+>();
 
 export async function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
 ): Promise<string[] | null> {
-  return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
+  const models = await getVercelModelsMetadataFromDatabase();
+  let inferenceProviderIdsByModel = vercelInferenceProviderIdsByModel.get(models);
+  if (inferenceProviderIdsByModel === undefined) {
+    inferenceProviderIdsByModel = projectVercelInferenceProviderIds(models);
+    vercelInferenceProviderIdsByModel.set(models, inferenceProviderIdsByModel);
+  }
+  return inferenceProviderIdsByModel.get(modelId) ?? null;
 }
 
 function createModelIdsFetcher(
@@ -164,19 +172,19 @@ function createModelIdsFetcher(
   );
 }
 
-export const getVercelModelsFromDatabase = createModelIdsFetcher(
+export const getVercelLanguageModelIdsFromDatabase = createModelIdsFetcher(
   'vercelLanguageModelIds',
   getVercelModelsMetadataFromDatabase,
   getVercelLanguageModelIds
 );
 
-export const getOpenRouterModelsFromDatabase = createModelIdsFetcher(
+export const getOpenRouterChatModelIdsFromDatabase = createModelIdsFetcher(
   'openRouterChatModelIds',
   getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterChatModelIds
 );
 
-export const getOpenRouterSystemOneModelsFromDatabase = createModelIdsFetcher(
+export const getOpenRouterSystemOneModelIdsFromDatabase = createModelIdsFetcher(
   'openRouterSystemOneModelIds',
   getOpenRouterModelsMetadataFromDatabase,
   getSystemOneModelIds
@@ -190,7 +198,7 @@ export async function isValidOpenRouterModelId(modelId: string): Promise<boolean
   if (legacyOpenRouterAliases.has(modelId)) {
     return true;
   }
-  const openRouterModelIds = await getOpenRouterModelsFromDatabase();
+  const openRouterModelIds = await getOpenRouterChatModelIdsFromDatabase();
   if (openRouterModelIds.size === 0) {
     if (warnedMissingOpenRouterModelMetadataFor !== openRouterModelIds) {
       warnedMissingOpenRouterModelMetadataFor = openRouterModelIds;

@@ -8,7 +8,7 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const SONNET = 'anthropic/claude-sonnet-5';
@@ -49,8 +49,8 @@ function snapshotModel(
 function catalogModel(
   id: string,
   name: string,
-  pricing: CatalogModel['pricing'] = { prompt: '-1', completion: '-1' }
-): CatalogModel {
+  pricing: OpenRouterCatalogModel['pricing'] = { prompt: '-1', completion: '-1' }
+): OpenRouterCatalogModel {
   return {
     id,
     name,

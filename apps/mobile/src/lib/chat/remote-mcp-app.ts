@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { formatNumber } from '@/lib/format';
+
 /**
  * The document one MCP Apps view is drawn from, and the sandbox it is drawn in.
  *
@@ -45,6 +47,20 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
  * refused rather than turned into a bridge message.
  */
 export const MAX_VIEW_BYTES = 1_000_000;
+
+/**
+ * The cap as copy names it, in the reader's own locale. The catalog
+ * interpolates this string, so a changed `MAX_VIEW_BYTES` cannot leave the
+ * sentence saying an old limit, and a reader whose language does not write
+ * "MB" the way English does still reads a unit in their own script.
+ */
+export function viewSizeLimit(locale: string): string {
+  return formatNumber(MAX_VIEW_BYTES / 1_000_000, locale, {
+    style: 'unit',
+    unit: 'megabyte',
+    unitDisplay: 'short',
+  });
+}
 
 /**
  * One origin a policy may name: a scheme, an exact host and an optional port.
@@ -233,9 +249,10 @@ export function viewDocument(html: string, policy: string): string {
  * iframe's own messages are handed back to the app. A message from anywhere
  * else on this page is dropped.
  *
- * The names are the seam the app calls: `window.kiloMcpHost.mount(html)` puts a
- * document in the sandbox, and `window.kiloMcpHost.deliver(text)` posts one
- * bridge message into it.
+ * The names are the seam the app calls: `window.kiloMcpHost.mount(html, label)`
+ * puts a document in the sandbox, and `label` names the frame for assistive
+ * technology; `window.kiloMcpHost.deliver(text)` posts one bridge message into
+ * it.
  */
 export const VIEW_HOST_PAGE = `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -247,7 +264,7 @@ html,body{margin:0;padding:0;background:transparent;overflow:hidden;}
 const view = document.getElementById('view');
 const post = text => window.ReactNativeWebView.postMessage(text);
 window.kiloMcpHost = {
-  mount: html => { view.srcdoc = html; },
+  mount: (html, label) => { if (typeof label === 'string' && label !== '') view.title = label; view.srcdoc = html; },
   deliver: text => {
     if (view.contentWindow) {
       view.contentWindow.postMessage(JSON.parse(text), '*');

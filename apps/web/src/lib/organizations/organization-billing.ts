@@ -459,6 +459,7 @@ export async function processTopupForOrganization(
       actor_id: kiloUserId,
       actor_email: user?.google_user_email || 'unknown',
       actor_name: user?.google_user_name || 'unknown',
+      details: { id: 'funds.purchased', amount: amountInCents / 100, method: config.type },
       organization_id: organization.id,
       message: `Purchased $${(amountInCents / 100).toFixed(2)} credit via ${config.type}`,
       tx,

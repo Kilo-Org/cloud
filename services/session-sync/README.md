@@ -157,8 +157,9 @@ deadlines/cancellation/revision recovery, and deduplicate bytes by blob hash.
 No native local path, raw media URI or credential-bearing service URL is exposed
 as an attachment URL. The sidecar `assetURLs` contains actual downloaded bytes as
 data URLs keyed by `kilo2AssetKey(displayFileID, originalURI, mime)`; canonical native
-messages and asset entities remain unchanged. Missing/mismatched mappings fail
-explicitly rather than silently dropping a file or making an unauthenticated fetch.
+messages and asset entities remain unchanged. A missing or mismatched mapping never
+authorizes a download and never triggers an unauthenticated fetch: the reference is
+reported as unavailable and only its own file part is withheld.
 
 The shared projector exposes every completed/errored native tool image/document
 as an ordinary message FilePart, so specialized tool cards cannot hide files and
@@ -712,6 +713,11 @@ code 4009 without a false offline transition. Session runners treat 4009 as
 terminal for that session and never automatically reconnect; otherwise two
 processes can repeatedly evict one another. Overload uses `503 service_overloaded`
 and `Retry-After`. Other reconnects respect the independent 1–60 second jitter.
+A connect that fails before its `hello` frame — a failed ticket mint, an unreachable
+relay, or an immediate close — doubles its retry delay from 1 second to the same
+60-second ceiling, so an outage does not drive one ticket request every second.
+`hello` resets that delay, and `NativeSessionConnection.refresh()` starts a fresh
+budget. The server `reconnectAfterMs` and a typed `Retry-After` remain lower bounds.
 
 ### Presence and watch signals
 
@@ -1294,6 +1300,17 @@ cursor is accepted. Recovery keeps its snapshot revision/position requirement an
 native part identity until authoritative state covers the gap. Neither an unchanged
 snapshot nor a newer unrelated snapshot proves that a missing tool/result arrived.
 Exhausted recovery remains an explicit error, not a complete empty transcript.
+Repeated snapshot failures are bounded per connection: after three failed read cycles —
+a hello/reset read that throws, or a recovery that ends without converging — the client
+stops automatic reads and reconnection, publishes `snapshotFailure` with the reason, and
+resumes only through `NativeSessionConnection.refresh()`, which re-reads the authoritative
+transcript, or a new connection. A stored reference with no authorized asset mapping does
+not fail the read: the producer stores a message and its asset mappings in one batch, so
+such an attachment can never resolve. The snapshot reports its key in
+`unavailableAssetKeys`, that file part is withheld from the display, and the message keeps
+its text, reasoning and tool output. Such a message stays in `incompleteMessageIDs`
+and in the reader's incomplete count, and it is never a recovery gap, because no retry can
+bind it.
 
 Native stored-media and tool-file references retain their original canonical
 values. The native reader resolves only authorized asset mappings using the same
@@ -1303,6 +1320,15 @@ identity, native URI and MIME. Replacing non-content-addressed local file result
 invalidates previously resolved bytes until a newer authoritative snapshot
 reauthorizes them. Unresolved live attachments remain visibly incomplete; they do
 not crash the transcript or silently expose local paths as fetchable display URLs.
+A reference no authorization can bind withholds only its own file part, and the
+containing message still displays. A reference content storage was expected to
+provide — a stored `media:`/workspace reference, or one the snapshot reported as
+unmapped — is reported by the snapshot projection and the live reader in
+`incompleteMessageIDs`, so those surfaces show an incomplete transcript. An absolute
+`http(s)` reference is never fetched on purpose, so only its own file part is withheld
+and the transcript is not reported incomplete, unless the snapshot declared that
+reference unavailable. The paged history reader keeps only its existing omitted-item
+count.
 
 Snapshot fetching, relay cursors, replay and recovery remain native-owned.
 `session.moved` requires an authoritative canonical snapshot because its event does
@@ -1352,7 +1378,8 @@ The preview defaults to the isolated local Worker at `http://localhost:8817`;
 permissions are included in the web CSP only in development. The CLI and SDK
 production endpoints are unchanged.
 The mobile preview also requires a development bundle (`__DEV__`) and an explicit
-`EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
+`EXPO_PUBLIC_SESSION_SYNC_URL`; `pnpm dev:env:mobile` writes the local Worker URL.
+Release bundles expose neither its Profile entry
 nor its route, regardless of remote feature flags.
 Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
 and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only

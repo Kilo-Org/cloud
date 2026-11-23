@@ -10,19 +10,21 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Mic, Search, SearchX } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Mic, SearchX } from '@/components/ui/icons';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import {
   reconcileVoiceInputLanguageTag,
   voiceInputLanguageDisplayName,
   voiceInputLanguageEnglishName,
+  voiceInputLanguageLocalizedName,
 } from '@/lib/voice-input/voice-input-language';
 import {
   useVoiceInputLanguage,
@@ -31,36 +33,28 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
-import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. Rows own the page gutter, so the list adds
+// none of its own.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { paddingBottom: 16 } satisfies ViewStyle;
 
-// Static skeleton rows: count and shape match the real ChoiceRow rows (name
-// line + caption; the trailing check is transparent unless selected, so the
-// skeleton carries no trailing control) so the swap never moves layout and
-// never shows a shape the loaded row will not have.
+// Static skeleton rows: count and shape match the real ChoiceRow rows so the
+// swap never moves layout and never shows a shape the loaded row will not have.
 const SKELETON_ROW_COUNT = 6;
 
 function SkeletonRows() {
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="px-4 pb-4 pt-1">
+    <View className="pt-1" style={sideInsetStyle}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-        // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View
+        <RowSkeleton
+          // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
           key={index}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
-        >
-          <View className="flex-1 gap-1.5 pr-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-28" />
-          </View>
-        </View>
+          subtitle
+          className={index < SKELETON_ROW_COUNT - 1 ? 'border-b-[0.5px] border-hair-soft' : ''}
+        />
       ))}
     </View>
   );
@@ -111,6 +105,7 @@ function VoiceLanguageList({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const listRef = useRef<FlashListRef<VoiceLanguageOption>>(null);
   // `matchesQuery` folds the label, the description and every search term of
   // every option, so the filter only reruns when the option array or the query
@@ -141,7 +136,7 @@ function VoiceLanguageList({
     <FlashList<VoiceLanguageOption>
       nestedScrollEnabled
       ref={listRef}
-      style={[listStyle, { backgroundColor: colors.background }]}
+      style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
       // FlashList stores its props during render and can index `data` past its
@@ -192,25 +187,33 @@ function DeviceVoiceLanguages({
   const { languages, isLoading, isError, refetch } = useVoiceRecognitionLanguages();
 
   // The fetched locale list is stable while the result stands, so the row
-  // objects (endonyms plus the English search terms) are built once per list
-  // instead of on every render. Built above the early returns so the hook order
-  // is identical in every state.
+  // objects (endonyms plus the English and UI-language search terms) are
+  // built once per list instead of on every render. Built above the early
+  // returns so the hook order is identical in every state. The UI language is
+  // read before the memo so the dep is the value: a language change rebuilds
+  // the list.
+  const uiLanguage = getResolvedLanguage();
   const options = useMemo<VoiceLanguageOption[]>(
     () => [
       automaticOption(t),
       ...languages.map(tag => {
         const englishName = voiceInputLanguageEnglishName(tag);
+        const localizedName = voiceInputLanguageLocalizedName(tag, uiLanguage);
+        const searchTerms = [englishName, localizedName].filter(
+          (name): name is string => name !== undefined
+        );
         return {
           tag,
           label: voiceInputLanguageDisplayName(tag),
           description: tag,
-          // The endonym and the tag are already searchable; the English name is
-          // what a user who does not read the native name will type.
-          searchTerms: englishName ? [englishName] : [],
+          // The endonym and the tag are already searchable; the English name
+          // and the UI language's own name are what a user who does not read
+          // the native name will type.
+          searchTerms,
         };
       }),
     ],
-    [t, languages]
+    [t, languages, uiLanguage]
   );
 
   if (isLoading) {
@@ -255,7 +258,6 @@ function DeviceVoiceLanguages({
 export function VoiceLanguagePickerSheet() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const { gatewayTranscriptionEnabled, hasLoaded: gatewayTranscriptionLoaded } =
     useGatewayTranscriptionPreference();
   const chosen = useVoiceInputLanguage();
@@ -273,24 +275,26 @@ export function VoiceLanguagePickerSheet() {
 
   // The canonical app language picker's list: every supported language collated
   // by endonym, with the English name as the secondary line. `languageRows('')`
-  // copies, collates and maps the whole catalog, so it is built once per
-  // translation function instead of on every sheet render. Memoized above the
-  // branch because a hook cannot be called conditionally; the device branch
-  // builds its own list from the fetched locales.
+  // reads the resolved UI language so the search terms carry that language's
+  // generated names. The UI language is read before the memo so the dep is the
+  // value: a language change rebuilds the list. Memoized above the branch
+  // because a hook cannot be called conditionally; the device branch builds
+  // its own list from the fetched locales.
+  const uiLanguage = getResolvedLanguage();
   const gatewayOptions = useMemo<VoiceLanguageOption[]>(
     () => [
       automaticOption(t),
-      ...languageRows('').map(row => ({
+      ...languageRows('', uiLanguage).map(row => ({
         tag: row.tag,
         label: row.endonym,
         description: row.englishName,
-        // The row already shows the endonym and English name; the tag is
-        // searchable too, so "zh-Hant" finds a language whose endonym the
-        // user cannot type.
-        searchTerms: [row.tag],
+        // The row already shows the endonym and English name; the generated
+        // UI-language name and the tag are searchable too, so "Arabisch" and
+        // "zh-Hant" find a language whose endonym the user cannot type.
+        searchTerms: [row.tag, ...row.searchNames],
       })),
     ],
-    [t]
+    [t, uiLanguage]
   );
 
   // The SecureStore reads resolve after mount; until both settle the mode and
@@ -324,29 +328,14 @@ export function VoiceLanguagePickerSheet() {
       }}
       scrollable={false}
       headerContent={
-        // Same filled pill as the account language picker and the repository
-        // and share pickers: one search-field shape for the same control. The
-        // field itself is the shared single-line `Input`, so the pill owns only
-        // the chrome while the field owns the height floor, the one line box for
-        // the placeholder and the value, and the RTL content alignment.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`;
-            // `onChangeText` only feeds the filter.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
+        // Uncontrolled: iOS drops keystrokes when state drives `value`;
+        // `onChangeText` only feeds the filter.
+        <SearchField
+          className="mx-4 my-3"
+          placeholder={t('language.search')}
+          hasText={query !== ''}
+          onChangeText={setQuery}
+        />
       }
     >
       {content}

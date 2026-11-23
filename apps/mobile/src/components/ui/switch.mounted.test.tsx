@@ -16,6 +16,7 @@ vi.mock('react-native', () => ({
   },
   useColorScheme: () => native.scheme,
   Switch: 'Switch',
+  View: 'View',
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -28,6 +29,7 @@ type SwitchFixture = {
   thumbColor?: string;
   value?: boolean;
   style?: { marginVertical?: number };
+  onValueChange?: (next: boolean) => void;
 };
 
 function renderSwitch(props: SwitchFixture) {
@@ -49,12 +51,28 @@ function nativeProps(root: I): {
   thumbColor?: string;
   value?: boolean;
   style?: unknown;
+  onStartShouldSetResponder?: () => boolean;
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
     throw new Error('native Switch was not rendered');
   }
   return node.props as never;
+}
+
+function touchBox(root: I):
+  | {
+      accessible?: boolean;
+      className?: string;
+      style?: unknown;
+      onStartShouldSetResponder?: () => boolean;
+      onLayout?: (event: { nativeEvent: { layout: { width: number; height: number } } }) => void;
+      onResponderRelease?: (event: {
+        nativeEvent: { locationX: number; locationY: number };
+      }) => void;
+    }
+  | undefined {
+  return root.findAll(candidate => (candidate.type as string) === 'View')[0]?.props;
 }
 
 describe('Switch', () => {
@@ -114,8 +132,6 @@ describe('Switch', () => {
     expect(props.thumbColor).not.toBe(darkColors.primaryForeground);
   });
 
-  // Dark's accent is the brand yellow, which glares on the near-black page; the
-  // on pair takes the muted olive both schemes share instead.
   it('paints the dark on track with the muted olive, not the accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
@@ -139,72 +155,122 @@ describe('Switch', () => {
     expect(props.thumbColor).toBe('#333333');
   });
 
-  it('gives the control a full touch target on both axes', () => {
+  it('gives the Android control a full touch target on both axes, with no touch box', () => {
     native.os = 'android';
-    const props = nativeProps(renderSwitch({}).root);
+    const root = renderSwitch({}).root;
+    const props = nativeProps(root);
     expect((props.style as unknown[])[0]).toEqual({
       minHeight: TOUCH_TARGET_DP,
       minWidth: TOUCH_TARGET_DP,
     });
+    expect(props.onStartShouldSetResponder).toBeUndefined();
+    expect(touchBox(root)).toBeUndefined();
   });
 
-  it('applies a caller style after the touch target box', () => {
+  it('applies a caller style after the touch target box on Android', () => {
     native.os = 'android';
     const style = { marginVertical: 3 };
     const props = nativeProps(renderSwitch({ style }).root);
     expect(props.style).toEqual([{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]);
   });
 
-  it('paints the muted pair on a disabled on switch and keeps it on', () => {
+  it('centers the iOS control at its own size in a hidden 44pt touch box', () => {
+    native.os = 'ios';
+    const style = { marginVertical: 3 };
+    const root = renderSwitch({ style }).root;
+    const props = nativeProps(root);
+    expect(props.style).toBeUndefined();
+    expect(props.onStartShouldSetResponder?.()).toBe(true);
+    const box = touchBox(root);
+    expect(box?.accessible).toBe(false);
+    expect(box?.className).toBe('justify-center self-center');
+    expect(box?.style).toEqual([{ minHeight: TOUCH_TARGET_DP }, style]);
+  });
+
+  it('flips the iOS value when a tap ends inside the touch box, and not when disabled', () => {
+    native.os = 'ios';
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const enabled = touchBox(renderSwitch({ value: true, onValueChange }).root);
+    expect(enabled?.onStartShouldSetResponder?.()).toBe(true);
+    act(() => enabled?.onLayout?.({ nativeEvent: { layout: { width: 63, height: 44 } } }));
+    act(() => enabled?.onResponderRelease?.({ nativeEvent: { locationX: 30, locationY: 4 } }));
+    expect(onValueChange).toHaveBeenCalledWith(false);
+    const disabled = touchBox(renderSwitch({ disabled: true, onValueChange }).root);
+    expect(disabled?.onStartShouldSetResponder?.()).toBe(false);
+  });
+
+  it('keeps the iOS value when a gesture from the touch box lifts outside it', () => {
+    native.os = 'ios';
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const box = touchBox(renderSwitch({ value: true, onValueChange }).root);
+    act(() => box?.onLayout?.({ nativeEvent: { layout: { width: 63, height: 44 } } }));
+    for (const [locationX, locationY] of [
+      [-20, 20],
+      [90, 20],
+      [30, -10],
+      [30, 60],
+    ] as const) {
+      act(() => box?.onResponderRelease?.({ nativeEvent: { locationX, locationY } }));
+    }
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('paints the quiet pair on a disabled on switch and keeps it on', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
     expect(props.trackColor).toEqual({
-      false: lightColors.mutedSoft,
-      true: lightColors.primaryDisabled,
+      false: lightColors.ringTrack,
+      true: lightColors.ringTrack,
     });
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
-    expect(props.trackColor?.true).not.toBe(lightColors.primary);
+    expect(props.thumbColor).toBe(lightColors.muted);
   });
 
-  it('paints the muted grip on a disabled off switch', () => {
+  it('paints the same quiet pair on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(props.trackColor).toEqual({
-      false: lightColors.mutedSoft,
-      true: lightColors.primaryDisabled,
+      false: lightColors.ringTrack,
+      true: lightColors.ringTrack,
     });
-    expect(props.thumbColor).toBe(lightColors.mutedForeground);
+    expect(props.thumbColor).toBe(lightColors.muted);
   });
 
-  it('keeps the disabled pair off the brand accent in dark mode', () => {
+  it('never paints a disabled grip in the scheme ink, which outranks an enabled one', () => {
+    native.os = 'android';
+    for (const [scheme, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      native.scheme = scheme;
+      const disabled = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+      const enabled = nativeProps(renderSwitch({ value: true }).root);
+      expect(disabled.thumbColor).not.toBe(colors.foreground);
+      expect(disabled.thumbColor).not.toBe(enabled.thumbColor);
+    }
+  });
+
+  it('paints one disabled pair shape in dark mode too, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(on.trackColor).toEqual({
-      false: darkColors.mutedSoft,
-      true: darkColors.primaryDisabled,
+      false: darkColors.ringTrack,
+      true: darkColors.ringTrack,
     });
-    // The disabled on grip is the mid neutral, never the scheme's on ink. A
-    // light grip on the muted fill reads as a working control, and dark's
-    // `primaryForeground` is the card's own near-black: on the thumb's
-    // overhanging arc it is 1.1:1 with the row and the pill loses its right end.
-    expect(on.thumbColor).toBe(darkColors.mutedSoft);
-    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
-    expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
+    expect(on.thumbColor).toBe(darkColors.mutedForeground);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(off.thumbColor).toBe(darkColors.mutedForeground);
-    expect(on.trackColor?.true).not.toBe(darkColors.primary);
+    expect(off.thumbColor).toBe(on.thumbColor);
   });
 
   it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+    expect(props.trackColor?.true).toBe(lightColors.ringTrack);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

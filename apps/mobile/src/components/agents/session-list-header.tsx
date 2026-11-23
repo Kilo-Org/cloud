@@ -1,15 +1,17 @@
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode } from 'react';
 import { type Href } from 'expo-router';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { IconButton } from '@/components/ui/icon-button';
 import { Search } from '@/components/ui/icons';
+import { ICON_TARGET_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type SessionListHeaderProps = {
@@ -41,56 +43,57 @@ export function SessionListHeader({
 }: Readonly<SessionListHeaderProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { left, right } = useSafeAreaInsets();
-  const sidePadding = useMemo(
-    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
-    [left, right]
-  );
+  const sideInsetStyle = useSideInsetStyle();
   return (
     <>
       <ScreenHeader
         title={title}
-        size="large"
+        size={showBackButton ? 'default' : 'large'}
         showBackButton={showBackButton}
         backFallback={backFallback}
-        className="px-[22px] pb-0"
         inlineActions={
           <View className="min-w-0 shrink flex-row items-center">
+            {headerAction}
             <View className="min-w-0 shrink">
               <ContextControl />
             </View>
-            {headerAction}
           </View>
         }
         allowInlineActionsStacking={false}
+        // The header action is one icon button and the picker's chevron is a
+        // fixed glyph, so neither can shrink; the picker's label truncates.
+        inlineActionsMinWidth={(headerAction ? ICON_TARGET_DP : 0) + CONTEXT_CONTROL_INLINE_MIN_DP}
       />
-      <View style={sidePadding}>
-        <View
-          className={cn(
-            'min-h-[48px] flex-row items-center justify-between',
-            onOpenSearch && 'border-b border-border'
-          )}
-        >
-          {onOpenSearch ? tabHeader : search}
-          <View className="shrink-0 flex-row items-center">
-            {onOpenSearch ? (
-              <IconButton
-                accessibilityLabel={t('agents.search.searchSessions')}
-                accessibilityState={{ expanded: searchOpen }}
-                testID="agents-open-search"
-                onPress={onOpenSearch}
-              >
-                <Search size={20} color={colors.mutedForeground} />
-              </IconButton>
-            ) : null}
-            {canFilter ? (
-              <SessionFilterButton
-                activeCount={activeFilterCount}
-                testID="agents-open-filters"
-                hitSlop={0}
-                onPress={onOpenFilters}
-              />
-            ) : null}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_GUTTER_CLASS}>
+          <View
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between',
+              onOpenSearch && 'border-b-[0.5px] border-hair-soft'
+            )}
+          >
+            {onOpenSearch ? tabHeader : search}
+            <View className="shrink-0 flex-row items-center">
+              {onOpenSearch ? (
+                <IconButton
+                  accessibilityLabel={t('agents.search.searchSessions')}
+                  accessibilityState={{ expanded: searchOpen }}
+                  testID="agents-open-search"
+                  onPress={onOpenSearch}
+                >
+                  <Search size={20} color={colors.mutedForeground} />
+                </IconButton>
+              ) : null}
+              {canFilter ? (
+                <SessionFilterButton
+                  activeCount={activeFilterCount}
+                  testID="agents-open-filters"
+                  hitSlop={0}
+                  onPress={onOpenFilters}
+                />
+              ) : null}
+            </View>
           </View>
         </View>
       </View>

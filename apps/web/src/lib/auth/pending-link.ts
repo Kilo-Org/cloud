@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import * as z from 'zod';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -15,6 +15,7 @@ import {
   type CreateOrUpdateUserArgs,
   type DifferentOAuthFailure,
 } from '@/lib/user';
+import { hashOpaqueSecret } from './secret-hash';
 
 const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
 export const PENDING_LINK_COOKIE = useSecureCookies
@@ -52,12 +53,29 @@ export type PendingLinkSummary = {
 const secretSchema = z.string().trim().min(1).max(512);
 
 export function hashPendingLinkSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
+  return hashOpaqueSecret(secret);
 }
 
 function parseSecret(secret: unknown): string | null {
   const parsed = secretSchema.safeParse(secret);
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Deletes the rows no sign-in can use again: ones that lapsed more than a day
+ * ago, so a completion in flight is never cut short.
+ *
+ * This runs from the `cleanup-device-auth` cron, not from a creation. A sweep
+ * on the create path would repeat the same table-wide statement for every
+ * different-account sign-in, and a slow or failing sweep would then refuse a
+ * creation that only needed its own insert.
+ */
+export async function cleanupExpiredPendingAuthLinks(): Promise<number> {
+  const result = await db
+    .delete(pending_auth_links)
+    .where(sql`${pending_auth_links.expires_at} < NOW() - INTERVAL '1 day'`);
+
+  return result.rowCount ?? 0;
 }
 
 export async function createPendingLink(params: {
@@ -69,11 +87,6 @@ export async function createPendingLink(params: {
 }): Promise<{ secret: string; pendingLink: PendingAuthLink }> {
   const secret = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + PENDING_LINK_TTL_MINUTES * 60 * 1000).toISOString();
-  // Rows are single-use and short-lived; drop those expired for a day so the
-  // table stays small without a separate job.
-  await db
-    .delete(pending_auth_links)
-    .where(sql`${pending_auth_links.expires_at} < NOW() - INTERVAL '1 day'`);
   const [row] = await db
     .insert(pending_auth_links)
     .values({
@@ -248,8 +261,8 @@ async function completePendingLinkByHash(
   secretHash: string,
   resolvedUserId: string
 ): Promise<PendingLinkResult> {
-  const row = await findByHash(secretHash);
-  if (!row || !isLive(row)) return { status: 'failed', reason: 'EXPIRED' };
+  const row = await getLivePendingLinkByHash(secretHash);
+  if (!row) return { status: 'failed', reason: 'EXPIRED' };
   if (resolvedUserId !== row.kilo_user_id) return { status: 'failed', reason: 'WRONG_ACCOUNT' };
 
   const [claimed] = await db

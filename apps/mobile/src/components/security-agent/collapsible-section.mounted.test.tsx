@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); the section's motion, class and surface contracts share one harness. */
 
 // Reduce-motion gate for the security-agent CollapsibleSection. When
 // `useMotionPolicy()` reports reduced motion the chevron must jump to its
@@ -14,6 +14,8 @@ import { type ComponentProps, type ElementType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+
+import { RowGroup } from '@/components/ui/row-group';
 
 import { CollapsibleSection, DisclosureChevron, DisclosureLayout } from './collapsible-section';
 
@@ -56,8 +58,9 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
 }));
 
-const OUTER_CLASSES = 'rounded-lg bg-secondary';
-const BODY_CLASSES = 'gap-2 px-3 pb-3';
+const BODY_CLASSES = 'gap-3 pt-3';
+const SURFACE_CLASSES = 'rounded-xl bg-secondary overflow-hidden';
+const SURFACE_BODY_CLASSES = 'gap-3 pb-3';
 const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;
@@ -77,6 +80,16 @@ function mountSection(
     throw new Error('CollapsibleSection did not mount');
   }
   return mounted;
+}
+
+/** The section's own animated frame: `DisclosureLayout` wraps everything, so it
+ *  is the first `Animated.View` in the tree (the carat and body are inside). */
+function layoutView(renderer: ReactTestRenderer) {
+  const [first] = renderer.root.findAll(node => node.type === ('Animated.View' as ElementType));
+  if (!first) {
+    throw new Error('the section did not render its layout frame');
+  }
+  return first;
 }
 
 /** The single `Animated.View` rendered with the given resolved className. */
@@ -135,7 +148,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = true;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(reanimated.withTiming).not.toHaveBeenCalled();
     expect(rotationValue()).toBe(0);
 
@@ -163,7 +176,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = false;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
 
     toggle(renderer);
     expect(animatedView(renderer, BODY_CLASSES).props.entering).toEqual({ __fadeIn: 150 });
@@ -234,7 +247,41 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
     expect(title(renderer).props.className).toBe(
       'flex-1 text-sm font-medium text-base font-semibold'
     );
-    expect(animatedView(renderer, 'gap-2 px-3 pb-3 bg-card p-4 gap-3')).toBeDefined();
+    expect(animatedView(renderer, 'gap-3 pt-3 bg-card p-4 gap-3')).toBeDefined();
+  });
+
+  it('draws the body on the header surface only with bodyOnSurface', () => {
+    // Default: the header is a row group of its own and the body sits on the
+    // page below it, because those children bring their own surface.
+    const pageSection = mountSection({ expanded: true });
+    expect(pageSection.root.findAllByType(RowGroup)).toHaveLength(1);
+    expect(animatedView(pageSection, BODY_CLASSES)).toBeDefined();
+
+    // A surface body belongs to the header's card: one surface holds both, so
+    // no row group and no hairline splits them, and the body starts at the
+    // header row's own bottom edge at the body's inner gap.
+    const surfaceSection = mountSection({ expanded: true, bodyOnSurface: true });
+    expect(surfaceSection.root.findAllByType(RowGroup)).toHaveLength(0);
+    const surfaces = surfaceSection.root.findAll(
+      node => node.type === ('View' as ElementType) && node.props.className === SURFACE_CLASSES
+    );
+    expect(surfaces).toHaveLength(1);
+    const [surface] = surfaces;
+    if (!surface) {
+      throw new Error('the surface body did not render the header and its body in one card');
+    }
+    expect(surface.findAllByType('Pressable' as ElementType)).toHaveLength(1);
+    expect(surface.findAll(node => node.children.includes(SECTION_BODY)).length).toBeGreaterThan(0);
+    expect(animatedView(surfaceSection, SURFACE_BODY_CLASSES)).toBeDefined();
+
+    // The gap under the title is the header row's own doing: it gives up its
+    // bottom padding for this variant, and it keeps that padding when the body
+    // is closed, so the title never moves. A page body keeps the full `py-3`.
+    expect(pressableNode(surfaceSection).props.className).toContain('py-3');
+    expect(pressableNode(surfaceSection).props.className).toContain('pb-0');
+    expect(pressableNode(mountSection({ bodyOnSurface: true })).props.className).toContain('pb-0');
+    expect(pressableNode(pageSection).props.className).toContain('py-3');
+    expect(pressableNode(pageSection).props.className).not.toContain('pb-0');
   });
 });
 
@@ -258,7 +305,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
     const onToggle = vi.fn<() => void>();
     const renderer = mountSection({ expanded: true, onToggle, animateLayout: false });
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(title(renderer).props.children).toBe('Source');
     expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
 
@@ -270,7 +317,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
   it('keeps the layout transition by default', () => {
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
   });
 });
 

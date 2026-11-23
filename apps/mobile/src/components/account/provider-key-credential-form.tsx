@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Plus, X } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -63,12 +64,10 @@ export function ProviderKeyCredentialForm({
   const [nextRowId, setNextRowId] = useState(0);
 
   return (
-    <View className="gap-4">
+    <View className="gap-3">
       {form.showsAuthMode ? (
         <View className="gap-2">
-          <Text className="text-sm font-medium text-foreground">
-            {t('profile.providerKeys.authMethod')}
-          </Text>
+          <Text variant="small">{t('profile.providerKeys.authMethod')}</Text>
           <SegmentedControl
             options={[
               { value: 'apiKey', label: t('profile.providerKeys.apiKeyLabel') },
@@ -87,15 +86,10 @@ export function ProviderKeyCredentialForm({
           required
           {...CREDENTIAL_INPUT_PROPS}
           secureTextEntry={field.secret}
-          multiline={field.multiline}
-          showSoftInputOnFocus={!field.multiline}
-          {...(field.multiline
-            ? {
-                numberOfLines: 4,
-                className: 'min-h-[88px]',
-                placeholder: t('profile.providerKeys.apiKeyPlaceholder'),
-              }
-            : {})}
+          // Only a secret is pasted as a whole value; a project, a region or an
+          // email address is typed, and suggesting "Paste the key" there would
+          // describe the wrong field.
+          {...(field.secret ? { placeholder: t('profile.providerKeys.apiKeyPlaceholder') } : {})}
           disabled={disabled}
           error={errors[field.id]}
           onChangeText={value => {
@@ -107,17 +101,13 @@ export function ProviderKeyCredentialForm({
       {form.showsModelMappings ? (
         <View className="gap-3">
           <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t('profile.providerKeys.modelMappings')}
-            </Text>
-            <Text className="text-xs text-muted-foreground">
-              {t('profile.providerKeys.modelMappingsDescription')}
-            </Text>
+            <Text variant="small">{t('profile.providerKeys.modelMappings')}</Text>
+            <Text variant="caption">{t('profile.providerKeys.modelMappingsDescription')}</Text>
           </View>
           {rows.map((row, index) => (
-            <View key={row.id} className="gap-2 rounded-lg bg-secondary p-3">
+            <Card key={row.id}>
               <View className="flex-row items-center justify-between">
-                <Text className="text-xs font-medium text-muted-foreground">
+                <Text variant="caption">
                   {t('profile.providerKeys.mappingTitle', { number: index + 1 })}
                 </Text>
                 <Button
@@ -164,7 +154,7 @@ export function ProviderKeyCredentialForm({
                   onEdit();
                 }}
               />
-            </View>
+            </Card>
           ))}
           <Button
             variant="outline"

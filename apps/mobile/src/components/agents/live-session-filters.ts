@@ -1,11 +1,14 @@
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import {
-  formatGitUrlProject,
   knownPlatformBucket,
   normalisePlatformSelection,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
   projectOptionKey,
 } from '@/components/agents/session-list-helpers';
+import { foldForSearch } from '@/i18n/fold-for-search';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 /** The part of an active session the live filters read. */
@@ -83,17 +86,29 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
  * `sessionDisplayTitle`, so the server's creation-default placeholder
  * (`New session - <ISO timestamp>`) is not searchable: the row shows the
  * generic untitled label for it, never that timestamp.
+ *
+ * The branch appears twice on purpose: the haystack holds both the stored
+ * (percent-encoded) branch and the decoded branch the row paints, so a person
+ * finds the row by typing either form.
  */
 function matchesSearch(session: LiveFilterSession, needle: string): boolean {
+  // Every compared value folds case and diacritics, the same as the query, so
+  // an unaccented query finds `Revisão do fluxo` and an accented query still
+  // matches an accented branch or URL: folding is a superset of the plain
+  // lowercase comparison, so no match it found is lost.
   return [
     sessionDisplayTitle(session.title),
     session.id,
     session.gitUrl,
     session.gitUrl ? formatGitUrlProject(session.gitUrl) : undefined,
     session.gitBranch,
+    sessionBranchLabel(session.gitBranch),
     session.associatedPr?.title,
     session.associatedPr?.number?.toString(),
-  ].some(value => value?.toLowerCase().includes(needle));
+  ]
+    .filter((value): value is string => value != null)
+    .map(value => foldForSearch(value))
+    .some(value => value.includes(needle));
 }
 
 /**
@@ -107,7 +122,9 @@ export function filterLiveSessions<T extends LiveFilterSession>(
   query: LiveSessionQuery
 ): T[] {
   const { platformFilter, projectFilter } = query;
-  const needle = query.searchQuery.trim().toLowerCase();
+  // Fold the query exactly as `matchesSearch` folds every compared value, so a
+  // match the plain lowercase comparison found is never lost.
+  const needle = foldForSearch(query.searchQuery.trim());
   if (platformFilter.length === 0 && projectFilter.length === 0 && needle.length === 0) {
     return sessions;
   }

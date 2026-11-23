@@ -133,6 +133,11 @@ vi.mock('drizzle-orm/d1', () => {
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
+      failure_class: (row.failure_class as string | null) ?? null,
+      failure_attempts: Number(row.failure_attempts ?? 0),
+      model_failure_attempts: Number(row.model_failure_attempts ?? 0),
+      first_failed_at: (row.first_failed_at as string | null) ?? null,
+      retry_after: (row.retry_after as string | null) ?? null,
       platform_requested: row.platform_requested === true,
       user_requested: row.user_requested !== false,
     };
@@ -379,7 +384,7 @@ import { variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 
 const ENGINE = 'v-test:engine';
-const REPS = 1;
+const REPS = 3;
 const NOW = new Date('2026-07-28T12:00:00.000Z');
 
 function entry(model: string, variant: string | null = null): BenchmarkPair {
@@ -400,9 +405,27 @@ function profileRow(
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
+    failure_class: null,
+    failure_attempts: 0,
+    model_failure_attempts: 0,
+    first_failed_at: null,
+    retry_after: null,
     platform_requested: false,
     user_requested: true,
     ...partial,
+  };
+}
+
+/** The wire failure of a `profileRow` fixture failed before failure history was recorded. */
+function legacyRetryableFailure(reason: string) {
+  return {
+    kind: 'retryable',
+    failureClass: 'unknown',
+    reason,
+    attempts: 1,
+    firstFailedAt: '2026-07-27T00:00:00.000Z',
+    lastFailedAt: '2026-07-27T00:00:00.000Z',
+    retryAfter: '2026-07-27T00:00:00.000Z',
   };
 }
 
@@ -461,6 +484,7 @@ async function applyProductionAdmissionBatch(opts: {
 }
 
 const config = {
+  router: 'efficient' as const,
   minAccuracy: 0.7,
   accuracyNoiseBand: 0.05,
   productionTokenProfile: null,
@@ -513,7 +537,7 @@ describe('isCurrentBenchmarkProfile', () => {
           model: 'm/a',
           variant: 'xhigh',
           engine_identity: ENGINE,
-          repetitions: 3,
+          repetitions: 1,
         },
         current,
         e
@@ -572,7 +596,44 @@ describe('classifyProfileAdmission', () => {
         e,
         false
       )
-    ).toEqual({ kind: 'report', status: 'failed', failureReason: 'boom' });
+    ).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'boom',
+      failure: legacyRetryableFailure('boom'),
+    });
+  });
+
+  it('reports a permanent failure as failed with its cause', () => {
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            failure_reason: 'gone',
+            failure_class: 'catalog_absent',
+            failure_attempts: 1,
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'gone',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'catalog_absent',
+        reason: 'gone',
+        attempts: 1,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'terminal_class',
+      },
+    });
   });
 
   it('charges admission for explicit failed retry', () => {
@@ -584,6 +645,99 @@ describe('classifyProfileAdmission', () => {
         true
       )
     ).toEqual({ kind: 'admit', charged: true });
+  });
+
+  it('refuses an owner retry of a permanent failure; only admin re-admission lifts it', () => {
+    const permanent = profileRow({
+      model: 'm',
+      status: 'unavailable',
+      failure_reason: 'Six consecutive runs failed.',
+      failure_class: 'provider_unavailable',
+      failure_attempts: 6,
+    });
+    const expected = {
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six consecutive runs failed.',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'provider_unavailable',
+        reason: 'Six consecutive runs failed.',
+        attempts: 6,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'infrastructure_budget_exhausted',
+      },
+    };
+    expect(classifyProfileAdmission([permanent], current, e, true)).toEqual(expected);
+    expect(classifyProfileAdmission([permanent], current, e, false)).toEqual(expected);
+  });
+
+  it('refuses admission when the same pair is permanent at another repetition count', () => {
+    const permanentSibling = profileRow({
+      model: 'm',
+      status: 'unavailable',
+      repetitions: REPS - 1,
+      failure_reason: 'Six proven runs failed.',
+      failure_class: 'provider_unavailable',
+      failure_attempts: 6,
+    });
+    // The pair, not the row, is permanent for this engine: a new-repetition admission must
+    // not promise eligibility the quote/permit path refuses.
+    expect(classifyProfileAdmission([permanentSibling], current, e, false)).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six proven runs failed.',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'provider_unavailable',
+        reason: 'Six proven runs failed.',
+        attempts: 6,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'infrastructure_budget_exhausted',
+      },
+    });
+    // An explicit owner retry cannot bypass a permanent verdict either.
+    expect(classifyProfileAdmission([permanentSibling], current, e, true)).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six proven runs failed.',
+      failure: expect.objectContaining({ kind: 'permanent' }),
+    });
+  });
+
+  it('ignores a permanent row from another engine or router when admitting', () => {
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            repetitions: REPS - 1,
+            engine_identity: 'v-old:engine',
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            repetitions: REPS - 1,
+            router: 'frontier',
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
   });
 
   it('charges for a never-seen pair', () => {
@@ -784,6 +938,7 @@ describe('registerProfiles', () => {
         entry: entry('a/fail'),
         status: 'failed',
         failureReason: 'container crash',
+        failure: legacyRetryableFailure('container crash'),
       },
     ]);
     expect(store.events).toHaveLength(0);
@@ -1065,7 +1220,12 @@ describe('lookupProfileStatuses', () => {
 
     expect(result.statuses).toEqual([
       { entry: entry('a/ready'), status: 'ready', failureReason: null },
-      { entry: entry('a/fail'), status: 'failed', failureReason: 'nope' },
+      {
+        entry: entry('a/fail'),
+        status: 'failed',
+        failureReason: 'nope',
+        failure: legacyRetryableFailure('nope'),
+      },
     ]);
     expect(store.events).toHaveLength(0);
   });

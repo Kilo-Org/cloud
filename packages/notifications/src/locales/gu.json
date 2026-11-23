@@ -7,6 +7,7 @@
       "spendAlert": "તમારા ખર્ચને ધ્યાનની જરૂર છે",
       "securityFinding": "સુરક્ષા તારણ ધ્યાનની જરૂર છે",
       "securityUpdate": "સુરક્ષા તપાસમાં અપડેટ છે",
+      "agentBriefing": "તમારા એજન્ટનો રિપોર્ટ તૈયાર છે",
       "activeAgentsGlanceable": "સક્રિય એજન્ટોમાં અપડેટ છે"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "નવું સુરક્ષા તારણ ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "ગંભીર",
+      "high": "ઉચ્ચ",
+      "medium": "મધ્યમ",
+      "low": "ઓછું"
     },
     "securityFindingSlaWarning": {
       "title": "SLA ચેતવણી"

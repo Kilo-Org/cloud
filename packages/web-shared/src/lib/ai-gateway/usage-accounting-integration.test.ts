@@ -359,7 +359,7 @@ describe('production queued accounting eligibility', () => {
     { name: 'missing master', env: { USAGE_QUEUE_ONLY_ENABLED: undefined }, queued: true },
     { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' }, queued: true },
     { name: 'malformed master', env: { USAGE_QUEUE_ONLY_ENABLED: 'TRUE' }, queued: true },
-    { name: 'vercel transport', env: { USAGE_QUEUE_TRANSPORT: 'vercel' }, queued: true },
+    { name: 'legacy vercel selector', env: { USAGE_QUEUE_TRANSPORT: 'vercel' }, queued: true },
     {
       name: 'production with staging target',
       env: { VERCEL_TARGET_ENV: 'staging' },

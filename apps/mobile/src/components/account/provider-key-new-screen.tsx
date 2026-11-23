@@ -1,17 +1,17 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ProviderKeyCredentialForm } from '@/components/account/provider-key-credential-form';
+import { ProviderKeySaveFailure } from '@/components/account/provider-key-save-failure';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,8 +37,9 @@ import {
   providerKeyScopeInput,
   providerKeysHref,
 } from '@/lib/byok/provider-key-scope';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
-import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
@@ -124,13 +125,23 @@ export function ProviderKeyNewScreen() {
   if (providers.isPending || providers.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+        {/* The loaded header names the provider on its subtitle line, so the
+            pending header holds that line and the form does not move when the
+            provider list answers. */}
+        <ScreenHeader
+          title={title}
+          reserveSubtitle={providers.isPending}
+          backFallback={PROFILE_TAB_HREF}
+        />
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
-          <View className="gap-6 px-4 pt-4">
-            <Skeleton className="h-[74px] rounded-lg" />
-            <Skeleton className="h-11 rounded-lg" />
+          <View className={SCREEN_BODY_CLASS}>
+            <View className="gap-1">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-12 rounded-md" />
+            </View>
+            <Skeleton className="h-11 rounded-md" />
           </View>
         )}
       </View>
@@ -212,12 +223,26 @@ export function ProviderKeyNewScreen() {
     }
     if (credential.tag === 'incomplete-mapping' || credential.tag === 'refused') {
       // A half-filled mapping is on screen, so its number points at the row to
-      // fix; every other shape refusal names no value the reader can see.
-      const message =
-        credential.tag === 'incomplete-mapping'
-          ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
-          : t('profile.providerKeys.invalidCredentials');
-      attempt.fail({ kind: 'refused', message });
+      // fix. A refused private key is masked, so the sentence naming what it
+      // wants sits under that field; every other refusal names no value the
+      // reader can see. The sentence follows the cause: a complete block a
+      // passphrase protects is already whole, so only the encrypted case names
+      // the passphrase.
+      if (credential.tag === 'refused' && credential.field === 'privateKey') {
+        setFieldErrors({
+          privateKey:
+            credential.cause === 'key-encrypted'
+              ? t('profile.providerKeys.privateKeyEncrypted')
+              : t('profile.providerKeys.privateKeyBlockRequired'),
+        });
+      }
+      attempt.fail({
+        kind: 'refused',
+        message:
+          credential.tag === 'incomplete-mapping'
+            ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
+            : t('profile.providerKeys.invalidCredentials'),
+      });
       return;
     }
     try {
@@ -256,59 +281,40 @@ export function ProviderKeyNewScreen() {
     router.dismissTo(backHref);
   };
 
-  const failure = save.failure;
-  let saveFailure: ReactNode = null;
-  if (failure) {
-    switch (failure.kind) {
-      case 'retryable': {
-        saveFailure = (
-          <View className="gap-2">
-            <AccessibleStatus message={failure.message} className="text-sm" />
-            <Button
-              variant="outline"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              onPress={() => void submit()}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        );
-        break;
-      }
-      case 'refused': {
-        saveFailure = <AccessibleStatus message={failure.message} className="text-sm" />;
-        break;
-      }
-      default: {
-        saveFailure = assertSurfaceFailureHandled(failure);
-      }
-    }
-  }
+  const saveFailure = (
+    <ProviderKeySaveFailure
+      failure={save.failure}
+      onRetry={() => void submit()}
+      retryLabel={t('common.retry')}
+    />
+  );
 
   const pending = save.feedback.status === 'pending';
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+      {/* The provider is the scope of the key, so it is the header's subtitle,
+          not a body line that read as a field label with no field. */}
+      <ScreenHeader
+        title={title}
+        subtitle={providerKeyName(provider.id, provider.name)}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text className="text-sm font-medium text-foreground">{provider.name}</Text>
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="muted">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')
               : t('profile.providerKeys.editKeyDescription')}
           </Text>
           {keyId === undefined || !form?.showsModelMappings ? null : (
-            <Text className="text-xs text-muted-foreground">
-              {t('profile.providerKeys.editKeyMappingsWarning')}
-            </Text>
+            <Text variant="caption">{t('profile.providerKeys.editKeyMappingsWarning')}</Text>
           )}
         </View>
         {form ? (

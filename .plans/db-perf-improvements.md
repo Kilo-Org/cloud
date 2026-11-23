@@ -24,7 +24,7 @@ The `microdollar_usage` table has grown large enough that per-user/org aggregati
 - Existing indexes (`kilo_user_id, created_at`) require heap fetches for every matched row to read aggregated columns (`cost`, `input_tokens`, etc.)
 - No covering indexes exist for the aggregation patterns
 - Org-scoped queries lack a `(organization_id, created_at)` composite index
-- No `statement_timeout` is configured for interactive reads (despite `POSTGRES_MAX_QUERY_TIME` being validated at startup)
+- No `statement_timeout` is configured for interactive reads
 - Admin aggregation queries run on the primary instead of the replica
 
 ## Current Schema
@@ -53,7 +53,7 @@ packages/db/src/schema.ts (lines 566-600)
 - Because of that, a single partial personal index `WHERE organization_id IS NULL` is **not** a complete replacement for a broader user-scoped index.
 - The org usage page already has a period selector, but org autocomplete currently ignores it.
 - `readDb` already exists and can be used for replica-safe analytics reads.
-- `POSTGRES_MAX_QUERY_TIME` is validated at startup but is not currently wired into query execution behavior.
+- No query timeout is currently wired into query execution behavior for the shared pool.
 
 ### Slow query sources
 
@@ -151,7 +151,7 @@ Do **not** apply one blanket timeout policy to all reads.
 - **Change:** Configure differentiated statement timeouts:
   - Interactive usage reads (dashboard, billing, autocomplete): **3-5 seconds**. These are the queries causing pool saturation. If they haven't completed in 5s, they are already degrading the system.
   - Admin/reporting reads (abuse stats): **20 seconds** or route to replica (see 1c). These can tolerate longer execution but should still have an upper bound.
-- **Implementation:** The existing `POSTGRES_MAX_QUERY_TIME` env var is validated at startup but never used. Preferred approach: route-scoped `SET LOCAL statement_timeout` before hot queries. Acceptable fallback: a dedicated pool/connection config for interactive usage queries. Avoid relying only on the global value if it would affect unrelated reads and writes through the shared pool.
+- **Implementation:** No existing timeout setting is applied to the shared pool. Preferred approach: route-scoped `SET LOCAL statement_timeout` before hot queries. Acceptable fallback: a dedicated pool/connection config for interactive usage queries. Avoid relying only on a single shared timeout if it would affect unrelated reads and writes through the shared pool.
 - **Implementation caveat:** `SET LOCAL` only takes effect inside an explicit transaction block. Most of the hot queries currently use bare `db.select()` calls, which run as implicit single-statement transactions — `SET LOCAL` before them would behave like a session-scoped `SET` and could leak the timeout to subsequent queries on the same pooled connection. The implementer must either: (1) wrap the hot read in `db.transaction()` so `SET LOCAL` is properly scoped, (2) use `SET` with an explicit reset after the query, or (3) use a separate pool/connection with a configured `statement_timeout`. Do not assume `SET LOCAL` works without verifying the transaction context.
 - **Effect:** Runaway interactive queries are cancelled in seconds instead of holding connections for 10-22s.
 - **Risk:** Low. Any interactive query hitting 5s is already broken from a UX perspective.

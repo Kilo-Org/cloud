@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { QueryError } from '@/components/query-error';
 import { AgentSessionListContent } from './session-list-content';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { type SessionListRow } from './session-list-rows';
@@ -87,7 +88,10 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   RefreshControl: 'RefreshControl',
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: platform,
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ fontScale: 1, height: 844 }),
 }));
 vi.mock('expo-router', async () => {
@@ -111,6 +115,16 @@ vi.mock('react-native-safe-area-context', () => ({
     right: controls.rightInset,
   }),
 }));
+// The content's skeleton rows are the shared `RowSkeleton`, whose row graph
+// reaches the haptics module and, behind the session helpers, `expo` itself.
+// Both read React Native/expo globals the test renderer does not provide
+// (`__DEV__`), so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
@@ -124,6 +138,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
   History: 'History',
   SearchX: 'SearchX',
   AlertCircle: 'AlertCircle',
@@ -131,11 +147,13 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Plus: 'Plus',
+  X: 'X',
 }));
 vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999', primaryForeground: '#FFFFFF' }),
+  useMutedDisabledInk: () => '#777777',
 }));
 vi.mock('@/lib/session-attention', () => ({ getRevisionSnapshot: () => 17 }));
 
@@ -176,6 +194,7 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     hasFreshHistory: true,
     isFetchingNextPage: false,
     isFetchNextPageError: false,
+    isRetentionLimited: false,
     onRetryNextPage: () => undefined,
     refetch: vi.fn<ContentProps['refetch']>().mockResolvedValue(undefined),
     onRetry: () => undefined,
@@ -186,6 +205,8 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     hasActiveFilters: false,
     isSearching: false,
     isRetrying: false,
+    isPaused: false,
+    onRetryPaused: () => undefined,
     searchQuery: '',
     onClearAction: () => undefined,
     onCreateSession: () => undefined,
@@ -228,6 +249,11 @@ function press(node: TestRenderer.ReactTestInstance | undefined) {
   }
   const { onPress } = node.props as { onPress: () => void };
   act(onPress);
+}
+/** A state action's busy state, as its button announces it; its label never leaves. */
+function busy(node: TestRenderer.ReactTestInstance | undefined): boolean {
+  const state = node?.props.accessibilityState as unknown;
+  return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
 }
 
 describe('AgentSessionListContent liveness', () => {
@@ -522,6 +548,30 @@ describe('AgentSessionListContent liveness', () => {
       )
     ).toBe(true);
   });
+  it('shows the offline card with Retry instead of skeletons while the read is paused', () => {
+    // Offline with nothing of its own cached: the read will not settle until
+    // the network returns, so skeletons here would never land. The surface is
+    // the app's offline card, and its Retry re-issues the read.
+    const onRetryPaused = vi.fn<() => void>();
+    const renderer = mount(contentProps({ isPaused: true, isLoading: true, onRetryPaused }));
+    const cards = renderer.root.findAllByType(QueryError);
+    expect(cards).toHaveLength(1);
+    const card = cards[0];
+    if (!card) {
+      throw new Error('the paused read rendered no offline card');
+    }
+    expect(card.props.variant).toBe('offline');
+    expect(typeof card.props.onRetry).toBe('function');
+    expect(skeletonRows(renderer)).toHaveLength(0);
+    expect(hosts(renderer, 'Skeleton')).toHaveLength(0);
+    expect(hosts(renderer, 'FlashList')).toHaveLength(0);
+
+    act(() => {
+      (card.props.onRetry as () => void)();
+    });
+    expect(onRetryPaused).toHaveBeenCalledOnce();
+  });
+
   it('keeps stale history behind pull recovery feedback and its timeout', async () => {
     const { promise, resolve } = Promise.withResolvers<undefined>();
     vi.useFakeTimers();
@@ -542,12 +592,12 @@ describe('AgentSessionListContent liveness', () => {
         renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(true);
       act(() => {
         vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(false);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(false);
       await act(async () => {
         resolve(undefined);
         await promise;
@@ -603,7 +653,7 @@ describe('AgentSessionListContent liveness', () => {
         pull()?.props.onRefresh();
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(true);
       await act(async () => {
         second.resolve(undefined);
         await second.promise;
@@ -639,7 +689,7 @@ describe('AgentSessionListContent liveness', () => {
     });
     const statusMessages = hosts(renderer, 'AccessibleStatus').map(node => node.props.message);
     expect(statusMessages).not.toContain(i18n.t('common.couldNotLoadSessions'));
-    expect(hosts(renderer, 'Button').some(node => node.props.loading === true)).toBe(false);
+    expect(hosts(renderer, 'Button').some(node => busy(node))).toBe(false);
   });
 
   it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
@@ -842,6 +892,7 @@ describe('AgentSessionListContent liveness', () => {
   });
 
   it('keeps stale history behind the busy Retry control until refetch completes', () => {
+    const onRetry = vi.fn<() => void>();
     const renderer = mount(
       contentProps({
         sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
@@ -849,10 +900,25 @@ describe('AgentSessionListContent liveness', () => {
         hasAnySessions: true,
         hasFreshHistory: false,
         isRetrying: true,
+        onRetry,
       })
     );
     const retry = hosts(renderer, 'Button')[0];
-    expect(retry?.props.loading).toBe(true);
+    // Busy keeps the action's face: the spinner takes the icon slot and the
+    // label stays drawn at full strength, so the reader still reads "Retry".
+    expect(busy(retry)).toBe(true);
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(
+      retry?.findAll(node => {
+        if (!isHost(node, 'Text')) {
+          return false;
+        }
+        const { children } = node.props;
+        return typeof children === 'string' && children === i18n.t('common.retry');
+      })
+    ).toHaveLength(1);
+    press(retry);
+    expect(onRetry).not.toHaveBeenCalled();
     expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
     act(() => {
       renderer.update(
@@ -877,7 +943,7 @@ describe('AgentSessionListContent liveness', () => {
     if (!start) {
       throw new Error('the empty history body rendered no action');
     }
-    expect(start.props.loading).toBeUndefined();
+    expect(busy(start)).toBe(false);
     press(start);
     expect(onCreateSession).toHaveBeenCalledOnce();
   });
@@ -954,6 +1020,65 @@ describe('AgentSessionListContent next-page footer', () => {
     });
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
       i18n.t('common.couldnTLoadMore')
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('says the history stopped at the retention bound', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+      })
+    );
+    // The bound is a third ending: the rows stay, and the list says why it
+    // stopped instead of ending silently like a complete history.
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('agents.sessionList.retentionLimit')
+    );
+    expect(hosts(renderer, 'Button')).toHaveLength(0);
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+  });
+
+  it('shows the failed next page instead of the bound line', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    const texts = hosts(renderer, 'Text').map(node => node.props.children);
+    expect(texts).toContain(i18n.t('common.couldnTLoadMore'));
+    expect(texts).not.toContain(i18n.t('agents.sessionList.retentionLimit'));
+  });
+
+  it('shows the spinner instead of the bound line while the next page loads', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: true,
+        isFetchingNextPage: true,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('agents.sessionList.retentionLimit')
+    );
+  });
+
+  it('renders no footer for a complete history', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isRetentionLimited: false,
+      })
+    );
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('agents.sessionList.retentionLimit')
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });

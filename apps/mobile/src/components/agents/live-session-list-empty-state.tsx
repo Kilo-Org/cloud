@@ -1,26 +1,21 @@
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type ScrollViewProps, View } from 'react-native';
+import { type ScrollViewProps } from 'react-native';
 
-import { NewSessionButton } from '@/components/agents/new-session-button';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
-import { EmptyState } from '@/components/empty-state';
-import { Bot } from '@/components/ui/icons';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { Bot, Plus } from '@/components/ui/icons';
 
 type LiveSessionListEmptyStateProps = {
   organizationId: string | null;
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Short presentation for a clear region that cannot hold the full state. */
   compact?: boolean;
-  /** Secondary action under the primary one, e.g. the route to stored history. */
-  historyAction?: ReactNode;
 };
 
 export function LiveSessionListEmptyState({
   organizationId,
   refreshControl,
   compact = false,
-  historyAction,
 }: Readonly<LiveSessionListEmptyStateProps>) {
   const { openNewSession } = useNewSessionNavigator();
   const { t } = useTranslation();
@@ -32,15 +27,13 @@ export function LiveSessionListEmptyState({
       description={t('agents.sessionList.noSessionsYetDescription')}
       compact={compact}
       action={
-        <View className="items-center gap-3">
-          <NewSessionButton
-            compact={compact}
-            onPress={() => {
-              openNewSession(organizationId);
-            }}
-          />
-          {historyAction}
-        </View>
+        <StateAction
+          label={t('common.newSession')}
+          icon={Plus}
+          onPress={() => {
+            openNewSession(organizationId);
+          }}
+        />
       }
     />
   );

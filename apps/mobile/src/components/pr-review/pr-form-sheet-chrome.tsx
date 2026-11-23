@@ -7,30 +7,23 @@
 // as trailing ScrollView content, not as a sticky sibling. Header must stay
 // OUTSIDE the ScrollView so keyboard focus does not scroll the title off-screen.
 //
-// collapsable={false}: keep a stable native subview at index 0 (SheetHeader
-// pattern). Who clears the status bar depends on how the route was presented,
-// and the header decides it before its first frame: a sheet that is its stack's
-// first screen presents with the surface at the window top, so the header
-// reserves the inset itself; a sheet pushed over another screen settles at the
-// detent cap, an inset lower, so its header reserves nothing. Both come from the
-// shared rule in `lib/form-sheet`, never from a measured safe-area frame — a
-// nested provider reported 0 on the first frame and the inset once it settled,
-// which moved the whole header by the status-bar height after it landed. Keep
-// `pt-5` for the grabber space on top of the clearance.
+// The header is the shared `SheetHeader`, which decides who clears the status
+// bar from the rule in `lib/form-sheet` before its first frame: a sheet that is
+// its stack's first screen presents with the surface at the window top and the
+// header reserves the inset itself; a sheet pushed over another screen settles
+// at the detent cap, an inset lower, so its header reserves nothing.
 //
-// Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
-// NOT re-apply the full keyboard height: an extra lift beside the native one
-// double-counts and pushes CTAs under the keyboard until the user scrolls. Body
-// fields cap their height while the keyboard is open so the trailing footer
-// still fits in the inset viewport at scroll offset 0.
+// Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets, so the footer
+// leaves the keyboard lift to its host (`keyboard="host"`) instead of applying
+// a second lift that would push the CTAs under the keyboard.
 
 import { type ReactNode, useEffect, useState } from 'react';
-import { Keyboard, Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Keyboard, Platform } from 'react-native';
 
-import { ScreenHeader } from '@/components/screen-header';
-import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import { SheetHeader } from '@/components/sheet-header';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
+import { useTranslation } from 'react-i18next';
 
 export function useFormSheetKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
@@ -53,49 +46,35 @@ export function useFormSheetKeyboardVisible(): boolean {
   return visible;
 }
 
-export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBack: () => void }) {
-  const topClearance = useSheetHeaderTopClearance(useFormSheetHeaderTopInset());
+/** The sheet's pinned title row: the shared header, with Close as the way out. */
+export function PrFormSheetHeader(props: { title: string; eyebrow?: string; onBack: () => void }) {
+  const { t } = useTranslation();
+  // The reference the caller names in `eyebrow` (owner/repo#number) is what
+  // tells two sheets apart, so it rides the shared header's own caption line
+  // under the title instead of a composed title the header cannot truncate
+  // apart. `close` keeps the one control this sheet has: the X that closes it.
   return (
-    <View
-      collapsable={false}
-      className="border-b border-border bg-background"
-      style={topClearance > 0 ? { paddingTop: topClearance } : undefined}
-    >
-      {/* Left-aligned heading on the back row: `centerTitle` would split the
-          header into a centered title row and a second row holding a lone
-          dismiss chevron, which read as a stray control under the title. */}
-      <ScreenHeader
-        title={props.title}
-        eyebrow={props.eyebrow}
-        onBack={props.onBack}
-        backIcon="close"
-        showBackButton
-        safeAreaTop={false}
-        className="pt-5"
-      />
-    </View>
+    <SheetHeader
+      title={props.title}
+      eyebrow={props.eyebrow}
+      variant="close"
+      onDone={props.onBack}
+      doneLabel={t('common.close')}
+      topInset={useFormSheetHeaderTopInset()}
+    />
   );
 }
 
 /**
- * Trailing ScrollView footer for formSheets. No keyboard-height padding —
- * parent ScrollView automaticallyAdjustKeyboardInsets owns that. On Android
- * the footer sits on the bottom edge, so it adds the system bottom inset.
- * The px-6 gutter is widened by the side insets so the footer CTAs clear the
- * landscape safe area when the sheet runs edge-to-edge (portrait insets are
- * zero, so the gutter stays 24).
+ * Trailing ScrollView footer for formSheets: the shared footer bar owns the
+ * safe-area band under the CTAs, while the keyboard lift stays with the scroll
+ * view (`keyboard="host"`), whose `automaticallyAdjustKeyboardInsets` hosts the
+ * footer as trailing content.
  */
 export function PrFormSheetFooter(props: { children: ReactNode }) {
-  const { bottom, left, right } = useSafeAreaInsets();
-  const paddingBottom = Platform.OS === 'android' ? 16 + bottom : 16;
-  const paddingLeft = 24 + left;
-  const paddingRight = 24 + right;
   return (
-    <View
-      className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background pt-3"
-      style={{ paddingBottom, paddingLeft, paddingRight }}
-    >
+    <ScreenFooter clearance="safe-area" keyboard="host" className="mt-3">
       {props.children}
-    </View>
+    </ScreenFooter>
   );
 }

@@ -21,12 +21,13 @@ function makePart(id: string, messageId: string, text = ''): Part {
 function makeToolPart(
   id: string,
   status: 'running' | 'completed',
-  time: { start: number; end?: number }
+  time: { start: number; end?: number },
+  messageID = 'msg-1'
 ): Part {
   return {
     id,
     sessionID: 'ses-1',
-    messageID: 'msg-1',
+    messageID,
     type: 'tool',
     callID: `call-${id}`,
     tool: 'task',
@@ -146,6 +147,76 @@ describe('createMemoryStorage', () => {
       const parts = s.getParts('msg-1');
       const part = parts.find(p => p.id === 'p-1');
       expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
+    });
+
+    test('forgets ordering evidence under the message bucket when the part is deleted', () => {
+      // The bucket and the part's own label disagree. The backend records the
+      // ordering evidence under the bucket, so deleting the part from that
+      // bucket takes the evidence with it. Keyed by the label instead, the
+      // delete would miss it and the orphan would hold back this terminal.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'), 200);
+      s.deletePart('msg-A', 'p-1');
+      // A replay re-delivers the run with no event time, which records no new
+      // evidence.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'));
+      // The terminal postdates the run's start, so it applies: the deleted
+      // part's event time of 200 must no longer make it look stale.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'completed', { start: 1, end: 150 }, 'msg-B'), 150);
+
+      const parts = s.getParts('msg-A');
+      const part = parts.find(p => p.id === 'p-1');
+      expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
+    });
+
+    test('a rejected stale lifecycle update publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 2000 }), 200);
+      const before = s.getParts('msg-1');
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // A terminal whose event time predates the stored running update is
+      // dropped, so the parts channel and the cached snapshot must stay
+      // untouched.
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1000, end: 1500 }), 150);
+
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+
+      // Control: an accepted update still notifies once and rebuilds.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(s.getParts('msg-1')).not.toBe(before);
+    });
+
+    test('a bounded preview of a stored tool publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1, end: 2 }), 200);
+      const before = s.getParts('msg-1');
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // The same settled call, carrying only a bounded preview marker. Its
+      // event time postdates the stored one, so only the preview guard can
+      // reject it, and a rejection must stay invisible to readers.
+      const preview = {
+        ...makeToolPart('p-1', 'completed', { start: 1, end: 2 }),
+        cloudDetail: {
+          version: 1,
+          revision: 1,
+          omitted: ['state.output'],
+          omittedCount: 1,
+          omittedBytes: 64,
+        },
+      } as unknown as Part;
+      s.upsertPart('msg-1', preview, 300);
+
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+      expect(Reflect.get(s.getPart('msg-1', 'p-1') ?? {}, 'cloudDetail')).toBeUndefined();
+
+      // Control: an accepted update still notifies once and rebuilds.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(s.getParts('msg-1')).not.toBe(before);
     });
   });
 
@@ -277,6 +348,40 @@ describe('createMemoryStorage', () => {
       (returnedParts[0] as Part & { text: string }).text = 'mutated';
 
       expect(s.getParts('msg-1')[0]).toEqual(expect.objectContaining({ text: 'hello' }));
+    });
+
+    test('rebuild after a delta reuses the views of unchanged parts', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-1', makePart('c', 'msg-1', 'three'));
+
+      const before = s.getParts('msg-1');
+      s.applyPartDelta('msg-1', 'b', 'text', '!');
+      const after = s.getParts('msg-1');
+
+      expect(after[0]).toBe(before[0]);
+      expect(after[2]).toBe(before[2]);
+      expect(after[1]).not.toBe(before[1]);
+      expect(after[1]).toEqual(expect.objectContaining({ id: 'b', text: 'two!' }));
+    });
+
+    test('caches views per message', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-2', makePart('a', 'msg-2', 'other'));
+
+      const oneBefore = s.getParts('msg-1');
+      const twoBefore = s.getParts('msg-2');
+
+      s.applyPartDelta('msg-1', 'a', 'text', '!');
+
+      const oneAfter = s.getParts('msg-1');
+      const twoAfter = s.getParts('msg-2');
+
+      expect(oneAfter[0]).not.toBe(oneBefore[0]);
+      expect(oneAfter[1]).toBe(oneBefore[1]);
+      expect(twoAfter[0]).toBe(twoBefore[0]);
+      expect(twoAfter[0]).toEqual(expect.objectContaining({ id: 'a', text: 'other' }));
     });
   });
 

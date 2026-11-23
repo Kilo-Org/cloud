@@ -51,6 +51,13 @@ jest.mock('@/components/cloud-agent/demo-config', () => ({
 
 const cachedRepositories = [{ id: 1, name: 'repo', full_name: 'org/repo', private: false }];
 
+// Loads the helper and the budget module from one module registry.
+async function loadWithBudget() {
+  const helpers = await import('./github-integration-helpers');
+  const budget = await import('@/lib/integrations/platforms/github/listing-budget');
+  return { ...helpers, ...budget };
+}
+
 const buildIntegration = (overrides: Partial<PlatformIntegration> = {}): PlatformIntegration =>
   ({
     id: 'integration-1',
@@ -203,6 +210,39 @@ describe('github-integration-helpers', () => {
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
       ]);
+    });
+    it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+
+      const {
+        fetchGitHubRepositoriesForUser,
+        GITHUB_LISTING_BUDGET_MESSAGE,
+        GitHubListingBudgetExceededError,
+      } = await loadWithBudget();
+      mockFetchGitHubRepositories.mockRejectedValue(
+        new GitHubListingBudgetExceededError(
+          'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+        )
+      );
+
+      await expect(fetchGitHubRepositoriesForUser('user-123', true)).rejects.toMatchObject({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: expect.any(GitHubListingBudgetExceededError),
+      });
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('keeps the retryable generic error for a non-budget provider failure', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123', true)).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch GitHub repositories',
+      });
     });
   });
 
@@ -556,6 +596,72 @@ describe('github-integration-helpers', () => {
       await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toThrow(
         'Failed to fetch GitHub repositories'
       );
+    });
+
+    it('answers an oversized listing as PAYLOAD_TOO_LARGE when every installation exceeds the budget', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ id: 'integration-1', repositories: null }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+
+      const {
+        fetchAllGitHubRepositoriesForOrganization,
+        GITHUB_LISTING_BUDGET_MESSAGE,
+        GitHubListingBudgetExceededError,
+      } = await loadWithBudget();
+      mockFetchGitHubRepositories.mockRejectedValue(
+        new GitHubListingBudgetExceededError(
+          'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+        )
+      );
+
+      await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toMatchObject({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+      });
+    });
+
+    it("keeps the healthy installations' repositories when only one exceeds the budget", async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_installation_id: 'installation-1',
+          repositories: null,
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      const { fetchAllGitHubRepositoriesForOrganization, GitHubListingBudgetExceededError } =
+        await loadWithBudget();
+      mockFetchGitHubRepositories.mockImplementation(
+        jest.fn<(installationId: string) => Promise<unknown[]>>(installationId =>
+          installationId === 'installation-1'
+            ? Promise.reject(
+                new GitHubListingBudgetExceededError(
+                  'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+                )
+              )
+            : Promise.resolve([{ id: 3, name: 'ok', full_name: 'acme/ok', private: false }])
+        )
+      );
+
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123', true);
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme/ok',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
     });
   });
 });

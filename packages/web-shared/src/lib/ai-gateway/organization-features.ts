@@ -1,5 +1,4 @@
 import { ai_gateway_config } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import {
   DEFAULT_ORGANIZATION_FEATURES,
@@ -7,16 +6,18 @@ import {
   type OrganizationFeature,
   type OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
-import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  selectGatewayConfigRow,
+  type GatewayConfigRowDb,
+} from '@kilocode/web-shared/lib/ai-gateway/select-gateway-config-row';
 
-export async function readOrganizationFeatures(fromDb: typeof db): Promise<OrganizationFeatures> {
-  const [row] = await fromDb
-    .select({ config: ai_gateway_config.config })
-    .from(ai_gateway_config)
-    .where(eq(ai_gateway_config.id, 1))
-    .limit(1);
-  if (!row) return DEFAULT_ORGANIZATION_FEATURES;
-  return GatewayOrganizationFeaturesConfigSchema.parse(row.config).organization_features;
+export async function readOrganizationFeatures(
+  fromDb: GatewayConfigRowDb
+): Promise<OrganizationFeatures> {
+  const config = await selectGatewayConfigRow(fromDb, ai_gateway_config.config);
+  if (config === undefined) return DEFAULT_ORGANIZATION_FEATURES;
+  return GatewayOrganizationFeaturesConfigSchema.parse(config).organization_features;
 }
 
 export function isOrganizationFeatureEnabled(

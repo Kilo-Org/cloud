@@ -1,7 +1,7 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
 import { type PushData } from './push-data';
-import { GENERIC_PUSH_TITLE_KEY } from './push-i18n-keys';
+import { GENERIC_PUSH_TITLE_KEY, SECURITY_LIFECYCLE_BODY_LEAF } from './push-i18n-keys';
 
 type GenericBodyLeaf = keyof typeof en.generic.body;
 
@@ -13,6 +13,11 @@ const SESSION_UPDATE_LEAF: GenericBodyLeaf = 'cloudAgentSession';
 // Generic, count-free lock-screen banner copy: the ongoing notification never
 // leaks how many agents are running or which sessions they are.
 const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
+
+// A scheduled brief is not the ongoing agents card: it announces one report the
+// reader can open, so it must not tell the reader their running agents changed.
+// It still names no session, count, amount, or brief content.
+const BRIEFING_LEAF: GenericBodyLeaf = 'agentBriefing';
 
 /**
  * The one body per `PushData` variant, named by the leaf its sentence lives
@@ -29,10 +34,19 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   security_finding: 'securityFinding',
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
-  security_lifecycle: 'securityUpdate',
-  agent_briefing: ACTIVE_AGENTS_LEAF,
+  security_lifecycle: SECURITY_LIFECYCLE_BODY_LEAF,
+  agent_briefing: BRIEFING_LEAF,
   active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };
+
+/**
+ * The content-free product name a push shows as its title, in `locale`. The
+ * English entry is the fallback, so a catalog that lost the entry shows the
+ * product name rather than a raw key.
+ */
+export function genericPushTitle(locale: string | null | undefined): string {
+  return translatePush(locale, GENERIC_PUSH_TITLE_KEY, undefined, en.generic.title);
+}
 
 /**
  * Content-free push copy for the `generic` preview mode. Never embeds a
@@ -52,7 +66,7 @@ export function genericPushContentForPushData(
   // only the body's leaf differs.
   const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
-    title: translatePush(locale, GENERIC_PUSH_TITLE_KEY, undefined, en.generic.title),
+    title: genericPushTitle(locale),
     body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
   };
 }

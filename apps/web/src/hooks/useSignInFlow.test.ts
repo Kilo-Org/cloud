@@ -19,8 +19,6 @@ const mockClearHint = jest.fn();
 const mockSendMagicLink =
   jest.fn<(email: string, callbackUrl?: string) => Promise<{ success: true }>>();
 let mockHint: SignInHint | null = null;
-const mockPrepareWatchwood = jest.fn<() => Promise<void>>();
-const mockSubmitWatchwood = jest.fn<() => Promise<void>>();
 
 jest.mock('next-auth/react', () => ({ signIn: mockSignIn }));
 jest.mock('@/hooks/useSignInHint', () => ({
@@ -32,10 +30,6 @@ jest.mock('@/hooks/useSignInHint', () => ({
   }),
 }));
 jest.mock('@/lib/auth/send-magic-link', () => ({ sendMagicLink: mockSendMagicLink }));
-jest.mock('@/lib/auth/watchwood.client', () => ({
-  prepareWatchwoodSignup: mockPrepareWatchwood,
-  submitWatchwoodSignup: mockSubmitWatchwood,
-}));
 
 const { useSignInFlow } = require('./useSignInFlow') as {
   useSignInFlow: (props: SignInFlowProps) => SignInFlowReturn;
@@ -225,10 +219,6 @@ describe('useSignInFlow discovery cancellation', () => {
     mockClearHint.mockReset();
     mockSendMagicLink.mockReset();
     mockSendMagicLink.mockResolvedValue({ success: true });
-    mockPrepareWatchwood.mockReset();
-    mockPrepareWatchwood.mockResolvedValue(undefined);
-    mockSubmitWatchwood.mockReset();
-    mockSubmitWatchwood.mockResolvedValue(undefined);
     fetchMock.mockReset();
     globalThis.fetch = fetchMock;
   });
@@ -238,7 +228,7 @@ describe('useSignInFlow discovery cancellation', () => {
     mounted = undefined;
   });
 
-  it('does not submit Watchwood before successful Turnstile verification', async () => {
+  it('does not continue before successful Turnstile verification', async () => {
     const verification = deferred<Response>();
     fetchMock.mockReturnValue(verification.promise);
     mounted = mountFlow();
@@ -247,7 +237,7 @@ describe('useSignInFlow discovery cancellation', () => {
       button(mounted!.container, 'first').click();
       await flushAsyncWork();
     });
-    expect(mockSubmitWatchwood).not.toHaveBeenCalled();
+    expect(mockSignIn).not.toHaveBeenCalled();
 
     const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
@@ -255,7 +245,6 @@ describe('useSignInFlow discovery cancellation', () => {
         verification.resolve(response({ success: false }));
         await flushAsyncWork();
       });
-      expect(mockSubmitWatchwood).not.toHaveBeenCalled();
       expect(mockSignIn).not.toHaveBeenCalled();
       expect(mounted.container.querySelector('#turnstile-error')?.textContent).toBe('true');
     } finally {
@@ -264,10 +253,8 @@ describe('useSignInFlow discovery cancellation', () => {
   });
 
   it.each(['discovery', 'email', 'sso', 'oauth'] as const)(
-    'awaits Watchwood after Turnstile and before %s continues',
+    'continues to %s after Turnstile verification succeeds',
     async nextAction => {
-      const submission = deferred<void>();
-      mockSubmitWatchwood.mockReturnValue(submission.promise);
       fetchMock
         .mockResolvedValueOnce(response({ success: true }))
         .mockResolvedValueOnce(response({ kind: 'new', providers: ['google', 'email'] }));
@@ -285,15 +272,6 @@ describe('useSignInFlow discovery cancellation', () => {
       }
       await act(async () => {
         button(mounted!.container, 'first').click();
-        await flushAsyncWork();
-      });
-
-      expect(mockSubmitWatchwood).toHaveBeenCalledTimes(1);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(mockSignIn).not.toHaveBeenCalled();
-      expect(mockSendMagicLink).not.toHaveBeenCalled();
-      await act(async () => {
-        submission.resolve();
         await flushAsyncWork();
       });
 
@@ -316,18 +294,17 @@ describe('useSignInFlow discovery cancellation', () => {
   );
 
   it.each(['back', 'email-change', 'unmount'] as const)(
-    'ignores a completed Watchwood submission after %s invalidates its context',
+    'ignores a completed Turnstile verification after %s invalidates its context',
     async cancellation => {
-      const submission = deferred<void>();
-      mockSubmitWatchwood.mockReturnValue(submission.promise);
-      fetchMock.mockResolvedValue(response({ success: true }));
+      const verification = deferred<Response>();
+      fetchMock.mockReturnValue(verification.promise);
       mounted = mountFlow();
       act(() => button(mounted!.container, 'sso').click());
       await act(async () => {
         button(mounted!.container, 'first').click();
         await flushAsyncWork();
       });
-      expect(mockSubmitWatchwood).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
 
       if (cancellation === 'unmount') {
         mounted.cleanup();
@@ -338,7 +315,7 @@ describe('useSignInFlow discovery cancellation', () => {
         );
       }
       await act(async () => {
-        submission.resolve();
+        verification.resolve(response({ success: true }));
         await flushAsyncWork();
       });
 

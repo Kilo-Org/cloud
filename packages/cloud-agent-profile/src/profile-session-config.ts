@@ -13,7 +13,11 @@ import {
   type StoredMcpSecretValue,
 } from './profile-mcp-service';
 import { getSkillsForSession, type SkillForSession } from './profile-skills-service';
-import { getAgentsForSession, type AgentForSession } from './profile-agents-service';
+import {
+  getAgentsForSession,
+  type AgentForSession,
+  type SessionAgents,
+} from './profile-agents-service';
 import {
   getKiloCommandsForSession,
   type KiloCommandForSession,
@@ -26,6 +30,8 @@ import { appliesRepoBindings, resolveProfileLayers } from './profile-resolution'
 import { buildOwnershipCondition } from './profile-utils';
 import { encryptedEnvelopeSchema, type EnvironmentSessionLayer } from './environment-contracts';
 import type { ProfileOwner } from './types';
+import type { NetworkSecrets } from '@kilocode/worker-utils/network-secrets';
+import { storedNetworkSecret } from './network-secret-storage';
 
 export class ProfileNotFoundError extends Error {
   constructor(public profileId: string) {
@@ -102,6 +108,7 @@ export type EnvironmentInlineArgs = Pick<
 >;
 
 export type MergeProfileConfigurationResult = {
+  networkSecrets?: NetworkSecrets;
   envVars?: Record<string, string>;
   setupCommands?: string[];
   /** The environment's start commands. Only an environment supplies them. */
@@ -115,6 +122,11 @@ export type MergeProfileConfigurationResult = {
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
   agents?: MergedAgentForSession[];
+  /**
+   * Stored profile agents left out because their id belongs to the CLI, so the
+   * caller can record which stored rows stopped applying.
+   */
+  skippedAgentSlugs?: string[];
   kiloCommands?: KiloCommandForSession[];
   /**
    * The profile that claimed the active layer: the explicit pick or effective
@@ -167,6 +179,7 @@ async function verifyProfileIdAccessible(
 type Layer = {
   envVars: Record<string, string>;
   secrets: Record<string, EncryptedEnvelope>;
+  networkSecrets: NetworkSecrets;
   commands: string[];
   mcpServers: McpServerForSession[];
   skills: SkillForSession[];
@@ -180,7 +193,7 @@ type ProfileLayerData = {
   commands: string[];
   mcpServers: McpServerForSession[];
   skills: SkillForSession[];
-  agents: AgentForSession[];
+  agents: SessionAgents;
   kiloCommands: KiloCommandForSession[];
   instructions: InstructionForSession[];
 };
@@ -188,8 +201,15 @@ type ProfileLayerData = {
 function profileToLayer(data: ProfileLayerData): Layer {
   const envVars: Record<string, string> = {};
   const secrets: Record<string, EncryptedEnvelope> = {};
+  const networkSecrets: NetworkSecrets = {};
   for (const variable of data.vars) {
-    if (variable.isSecret) {
+    if (variable.delivery === 'network') {
+      networkSecrets[variable.key] = storedNetworkSecret({
+        ...variable,
+        allowedHosts: variable.allowedHosts ?? null,
+        locations: variable.locations ?? null,
+      });
+    } else if (variable.isSecret) {
       secrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
     } else {
       envVars[variable.key] = variable.value;
@@ -198,10 +218,11 @@ function profileToLayer(data: ProfileLayerData): Layer {
   return {
     envVars,
     secrets,
+    networkSecrets,
     commands: [...data.commands],
     mcpServers: [...data.mcpServers],
     skills: [...data.skills],
-    agents: [...data.agents],
+    agents: [...data.agents.agents],
     kiloCommands: [...data.kiloCommands],
     instructions: [...data.instructions],
   };
@@ -247,6 +268,7 @@ function inlineToLayer(args: EnvironmentInlineArgs): Layer | null {
   return {
     envVars: { ...(envVars ?? {}) },
     secrets: { ...(encryptedSecrets ?? {}) },
+    networkSecrets: {},
     commands: setupCommands ? [...setupCommands] : [],
     mcpServers: mcpServers ? clientRecordToMcpServers(mcpServers) : [],
     skills: (runtimeSkills ?? []).map(s =>
@@ -271,12 +293,14 @@ function environmentToLayer(environment: EnvironmentSessionLayer | undefined): L
   const hasContent =
     Object.keys(environment.envVars ?? {}).length > 0 ||
     Object.keys(environment.encryptedSecrets ?? {}).length > 0 ||
+    Object.keys(environment.networkSecrets ?? {}).length > 0 ||
     (environment.setupCommands?.length ?? 0) > 0;
   if (!hasContent) return null;
 
   return {
     envVars: { ...(environment.envVars ?? {}) },
     secrets: { ...(environment.encryptedSecrets ?? {}) },
+    networkSecrets: { ...(environment.networkSecrets ?? {}) },
     commands: environment.setupCommands ? [...environment.setupCommands] : [],
     mcpServers: [],
     skills: [],
@@ -300,6 +324,7 @@ function environmentToLayer(environment: EnvironmentSessionLayer | undefined): L
 function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const envVars: Record<string, string> = {};
   const secrets: Record<string, EncryptedEnvelope> = {};
+  const networkSecrets: NetworkSecrets = {};
   const commands: string[] = [];
   const mcpByName = new Map<string, McpServerForSession>();
   const skillByName = new Map<string, MergedSkillForSession>();
@@ -308,13 +333,25 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const instructionByName = new Map<string, MergedInstructionForSession>();
 
   for (const layer of layers) {
-    for (const key of Object.keys(layer.envVars)) delete secrets[key];
-    for (const key of Object.keys(layer.secrets)) delete envVars[key];
+    for (const key of Object.keys(layer.envVars)) {
+      delete secrets[key];
+      delete networkSecrets[key];
+    }
+    for (const key of Object.keys(layer.secrets)) {
+      delete envVars[key];
+      delete networkSecrets[key];
+    }
+    for (const key of Object.keys(layer.networkSecrets)) {
+      delete envVars[key];
+      delete secrets[key];
+    }
     for (const [key, value] of Object.entries(layer.envVars)) {
-      if (Object.hasOwn(layer.secrets, key)) continue;
+      if (Object.hasOwn(layer.secrets, key) || Object.hasOwn(layer.networkSecrets, key)) continue;
       envVars[key] = value;
     }
     Object.assign(secrets, layer.secrets);
+    Object.assign(networkSecrets, layer.networkSecrets);
+    for (const key of Object.keys(layer.networkSecrets)) delete secrets[key];
     commands.push(...layer.commands);
     for (const server of layer.mcpServers) {
       if (!server.enabled) continue;
@@ -346,6 +383,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     envVars: Object.keys(envVars).length > 0 ? envVars : undefined,
     setupCommands: commands.length > 0 ? commands : undefined,
     encryptedSecrets: Object.keys(secrets).length > 0 ? secrets : undefined,
+    ...(Object.keys(networkSecrets).length > 0 ? { networkSecrets } : {}),
     mcpServers: mcpByName.size > 0 ? Array.from(mcpByName.values()) : undefined,
     skills: skillByName.size > 0 ? Array.from(skillByName.values()) : undefined,
     agents: agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined,
@@ -454,11 +492,13 @@ export async function mergeProfileConfiguration(
   const startCommands = args.environment?.startCommands ?? [];
   const environmentSetupCommandCount =
     args.environment === undefined ? undefined : (args.environment.setupCommands?.length ?? 0);
+  const skippedAgentSlugs = profileData.flatMap(data => data.agents.skippedSlugs);
   return {
     ...mergeLayers(layers),
     ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
     ...(environmentSetupCommandCount === undefined ? {} : { environmentSetupCommandCount }),
     ...(resolvedProfileId ? { resolvedProfileId } : {}),
+    ...(skippedAgentSlugs.length > 0 ? { skippedAgentSlugs } : {}),
   };
 }
 

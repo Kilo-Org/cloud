@@ -21,7 +21,7 @@ import { KiloPassCadence } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 
-import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { KiloPassPaymentProvider } from './enums';
@@ -32,12 +32,8 @@ import {
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { computeKiloPassBonusUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
 
 export const KILO_PASS_BONUS_LIKE_ITEM_KINDS = [
   KiloPassIssuanceItemKind.Bonus,
@@ -138,7 +134,7 @@ type AppendKiloPassAuditLogParams = {
 };
 
 export async function appendKiloPassAuditLog(
-  db: DbOrTx,
+  db: DrizzleConnection,
   params: AppendKiloPassAuditLogParams
 ): Promise<void> {
   const {

@@ -5,6 +5,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationHistoryScreen } from '@/components/notification-history-screen';
+import { MotionContext } from '@/lib/a11y/motion-context';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 type Row = {
@@ -93,17 +94,31 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  // The flat list's rows draw the shared `RowChevron`, whose directional glyph
+  // reads `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  // The state scroller's refresh band picks its indicator ink by scheme.
+  useColorScheme: () => 'light',
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('@/components/ui/icons', () => ({ BellOff: 'BellOff' }));
+vi.mock('@/components/ui/icons', () => ({
+  // The flat row's trailing chevron is the shared directional glyph.
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  BellOff: 'BellOff',
+  Loader2: 'Loader2',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -370,6 +385,27 @@ describe('NotificationHistoryScreen', () => {
       title: 'No notifications yet',
       description: 'Notifications this account receives appear here. They are kept for 90 days.',
     });
+  });
+
+  // The app's RefreshControl hides the native spinner under reduced motion, so
+  // the state scroller must show and announce a pull itself.
+  it('shows and announces a pull on the empty state under reduced motion', async () => {
+    view = await renderWithProviders(
+      <MotionContext value={{ scrollAnimated: false, reducedMotion: true }}>
+        <NotificationHistoryScreen />
+      </MotionContext>
+    );
+    await waitFor(() => byType('EmptyState').length > 0);
+    expect(byType('View').filter(n => n.props.accessibilityRole === 'progressbar')).toHaveLength(0);
+
+    const scroller = byType('ScrollView').find(n => n.props.refreshControl !== undefined);
+    const refreshControl = scroller?.props.refreshControl as
+      | ReactElement<{ onRefresh: () => void }>
+      | undefined;
+    act(() => {
+      refreshControl?.props.onRefresh();
+    });
+    expect(byType('View').filter(n => n.props.accessibilityRole === 'progressbar')).toHaveLength(1);
   });
 
   it('offers a retry when the first page fails', async () => {

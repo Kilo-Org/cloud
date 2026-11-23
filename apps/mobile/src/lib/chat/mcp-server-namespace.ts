@@ -17,11 +17,6 @@
 /** The id the built-in server's tools are named under: `mcp_kilo_<tool>`. */
 export const KILO_MCP_SERVER_ID = 'kilo';
 
-/**
- * Whether an id already names the built-in server. That is the id itself and
- * every id that begins with it and a separator after it, because those are the
- * ids whose tool names start with the built-in server's `mcp_kilo_` prefix and
- * can therefore collide with its own.
- */
+/** Whether an id already occupies the built-in server's tool-name namespace. */
 export const isReservedMcpServerId = (id: string): boolean =>
   id === KILO_MCP_SERVER_ID || id.startsWith(`${KILO_MCP_SERVER_ID}_`);

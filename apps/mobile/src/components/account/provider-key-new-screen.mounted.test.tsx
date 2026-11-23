@@ -1,4 +1,7 @@
 /* eslint-disable max-lines -- one suite covers the form's states, the organization boundary, both credential shapes and the save failures. */
+// eslint-disable-next-line import/no-nodejs-modules -- test-only fixture: a real key, because the form refuses anything else
+import { generateKeyPairSync } from 'node:crypto';
+
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -16,6 +19,14 @@ import { type ModelMapping } from '@/lib/byok/credential-fields';
 
 import { ProviderKeyNewScreen } from './provider-key-new-screen';
 import type * as ReactQuery from '@tanstack/react-query';
+
+/**
+ * A real key: the Vertex form refuses a private key that is not a PEM, so a
+ * placeholder value would never reach the create call this suite asserts.
+ */
+const { privateKey: fixtureKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const exportedKey = fixtureKey.export({ type: 'pkcs8', format: 'pem' });
+const PEM_KEY = typeof exportedKey === 'string' ? exportedKey : exportedKey.toString('utf8');
 
 type MutationOptions = { kind?: 'create' | 'update' };
 
@@ -194,12 +205,16 @@ afterEach(() => {
 });
 
 describe('ProviderKeyNewScreen', () => {
-  it('names the chosen provider and masks the key field', async () => {
+  it('names the chosen provider in the header subtitle and masks the key field', async () => {
     const root = await mount();
 
+    // The provider is the header's subtitle, not a body line that read as a
+    // field label with no field under it.
+    const [header] = root.findAll(node => Object.is(node.type, 'ScreenHeader'));
+    expect(header?.props.subtitle).toBe('Anthropic');
     expect(
       root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
-    ).toContain('Anthropic');
+    ).not.toContain('Anthropic');
     expect(apiKeyField(root).props.secureTextEntry).toBe(true);
   });
 
@@ -442,7 +457,7 @@ describe('ProviderKeyNewScreen', () => {
         project: 'project',
         location: 'global',
         clientEmail: 'service@example.test',
-        privateKey: 'pem',
+        privateKey: PEM_KEY,
       };
     });
     await act(() => {
@@ -454,9 +469,67 @@ describe('ProviderKeyNewScreen', () => {
       api_key: JSON.stringify({
         project: 'project',
         location: 'global',
-        googleCredentials: { clientEmail: 'service@example.test', privateKey: 'pem' },
+        googleCredentials: { clientEmail: 'service@example.test', privateKey: PEM_KEY.trim() },
       }),
     });
+  });
+
+  it('puts a refused Vertex key under its own field and sends nothing', async () => {
+    state.params = { provider: 'vertex' };
+    state.providers = [{ id: 'vertex', name: 'Google Vertex AI' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = {
+        project: 'project',
+        location: 'global',
+        clientEmail: 'service@example.test',
+        privateKey: 'not a key',
+      };
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(credentialForm(root).errors).toEqual({
+      privateKey: 'Paste the whole key block, from the BEGIN line to the END line.',
+    });
+    expect(statusMessages(root)).toHaveLength(1);
+  });
+
+  // A complete block a passphrase protects is already whole, so the sentence
+  // asking for the whole block names what the reader has pasted and offers no
+  // way forward. The form names the passphrase instead.
+  it('names the passphrase under an encrypted Vertex key, not a missing block', async () => {
+    state.params = { provider: 'vertex' };
+    state.providers = [{ id: 'vertex', name: 'Google Vertex AI' }];
+    const root = await mount();
+    const encrypted = fixtureKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: 'x',
+    });
+
+    act(() => {
+      credentialForm(root).values.current = {
+        project: 'project',
+        location: 'global',
+        clientEmail: 'service@example.test',
+        privateKey: typeof encrypted === 'string' ? encrypted : encrypted.toString('utf8'),
+      };
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(credentialForm(root).errors).toEqual({
+      privateKey:
+        'This key block is passphrase-protected. Paste a service account key that has no passphrase.',
+    });
+    expect(statusMessages(root)).toHaveLength(1);
   });
 
   it('names the field a structured credential still needs', async () => {

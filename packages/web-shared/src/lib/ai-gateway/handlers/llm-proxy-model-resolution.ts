@@ -144,12 +144,14 @@ async function authenticatedRoutingCaller(
 async function autoRoutingDenials(
   ctx: ModelResolutionContext,
   fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-  fromPrivacy: () => Promise<string[]>
+  fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>
 ): Promise<string[]> {
   const groupPolicy = await ctx.organizationGroupPolicyPromise;
   const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
-    isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy) ? fromPrivacy() : [],
+    isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
+      ? fromPrivacy({ zdr: ctx.effectivePrivacy.zdr === true })
+      : [],
   ]);
   return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy])];
 }
@@ -224,7 +226,7 @@ async function resolveAutoModelId(
     const deniedModelIds = await autoRoutingDenials(
       ctx,
       policy => collectDeniedAutoRoutingModelIds(policy, router),
-      () => collectDataCollectionRequiredAutoRoutingModelIds(router)
+      options => collectDataCollectionRequiredAutoRoutingModelIds(router, options)
     );
     const result = await fetchEfficientAutoDecision({
       ...decisionRequest(ctx, owner),
@@ -252,13 +254,19 @@ async function resolveAutoModelId(
         autoRoutingDenials(
           ctx,
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
-          () => dataCollectionRequiredAutoRoutingCandidates(candidateIds)
+          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
         ),
-      decide: async (router, deniedModelIds) => {
+      decide: async (router, deniedModelIds, aliasTargets) => {
         const outcome = await fetchCustomRouterDecision({
           ...decisionRequest(ctx, caller),
           router: router.baseRouter,
           customRouter: reference,
+          // The same definition the deny policy above was derived from, so the worker cannot
+          // dispatch a target this gateway did not check (and vice versa).
+          customRouterDefinition: router,
+          // The alias targets from that same snapshot, so a denied live target routes around in
+          // the worker instead of being ranked here and refused after it is picked.
+          customRouterAliasTargets: aliasTargets,
           requestedModel: customRouterModelId(router.ownerType, router.slug),
           deniedModelIds,
         });
@@ -337,8 +345,8 @@ async function catalogModeModelForRoutedModel(
   model: string,
   callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  const directByok = await getDirectByokModel(model.toLowerCase());
+  if (!directByok || !supportsCatalogMode(directByok.provider.id)) return null;
   const caller = await callerPromise;
   if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -120,15 +120,16 @@ export async function handleModelsRequest(
   const countryCode = requestCountryCode(request.headers);
   try {
     if (auth?.organizationId && auth.user) {
-      const catalog = await organizationMemberCatalog({
-        organizationId: auth.organizationId,
-        kiloUserId: auth.user.id,
-        countryCode,
-        endpoint: 'openrouter/models',
-      });
-      if (catalog) {
-        return await modelResponse(catalog, 'perCaller', readDb);
-      }
+      return await modelResponse(
+        await organizationMemberCatalog({
+          organizationId: auth.organizationId,
+          kiloUserId: auth.user.id,
+          countryCode,
+          endpoint: 'openrouter/models',
+        }),
+        'perCaller',
+        readDb
+      );
     }
 
     if (!auth?.user) {

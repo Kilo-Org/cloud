@@ -19,6 +19,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
@@ -28,6 +29,7 @@ import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallatio
 import { GitHubIdentityCard } from './GitHubIdentityCard';
 import {
   APP_RETURN_PATH,
+  INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
   INSTALLATION_UNAVAILABLE_MESSAGE,
   appReturnBasePath,
   buildAppReturnHref,
@@ -126,6 +128,8 @@ function GitHubIntegrationOutcomeToasts({
       );
     } else if (error === 'installation_unavailable') {
       toast.error(INSTALLATION_UNAVAILABLE_MESSAGE, { duration: 8000 });
+    } else if (error === 'installation_listing_too_large') {
+      toast.error(INSTALLATION_LISTING_TOO_LARGE_MESSAGE, { duration: 8000 });
     } else if (error === 'multiple_installations_disabled') {
       toast.error('This organization can currently connect only one GitHub organization.', {
         duration: 8000,
@@ -262,7 +266,7 @@ function GitHubIntegrationDetailsContent({
     return (
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

@@ -375,7 +375,7 @@ describe('ChildSessionSection live subscription', () => {
   });
 
   it.each([
-    { status: 'error', message: 'Synthetic history failure' },
+    { status: 'error', kind: null, message: 'Synthetic history failure' },
     {
       status: 'ready',
       cursor: null,
@@ -757,6 +757,7 @@ describe('ChildSessionDrawer header', () => {
   const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
   const drawerSource = atom<StoredMessage[]>([]);
   const hasOlderMessages = atom(false);
+  const drawerHydration = atom<ChildSessionHydrationState | null>(null);
   const drawerStore = createStore();
   const manager = {
     atoms: {
@@ -768,6 +769,8 @@ describe('ChildSessionDrawer header', () => {
       }),
       childSessionHydrationState: atom(get => {
         const hasOlder = get(hasOlderMessages);
+        const override = get(drawerHydration);
+        if (override) return (_sessionId: string): ChildSessionHydrationState => override;
         return (_sessionId: string): ChildSessionHydrationState => ({
           status: 'ready',
           cursor: null,
@@ -795,6 +798,7 @@ describe('ChildSessionDrawer header', () => {
     act(() => root?.unmount());
     root = undefined;
     drawerStore.set(hasOlderMessages, false);
+    drawerStore.set(drawerHydration, null);
   });
 
   afterAll(() => {
@@ -890,6 +894,52 @@ describe('ChildSessionDrawer header', () => {
     expect(container.innerHTML).toContain('Agent: explore');
     expect(container.innerHTML).not.toContain('Model:');
   });
+  it.each([
+    {
+      label: 'a retryable failure',
+      hydration: {
+        status: 'error',
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      },
+      copy: 'Session history temporarily unavailable',
+      retry: true,
+    },
+    {
+      label: 'a failure with no typed kind',
+      hydration: { status: 'error', kind: null, message: 'Child session not found' },
+      copy: 'Child session not found',
+      retry: true,
+    },
+    {
+      label: 'an oversized history',
+      hydration: { status: 'error', kind: 'too_large', message: 'ignored' },
+      copy: "This sub-agent's history is too large to load.",
+      retry: false,
+    },
+    {
+      label: 'unreadable history data',
+      hydration: { status: 'error', kind: 'invalid_data', message: 'ignored' },
+      copy: "This sub-agent's history isn't available.",
+      retry: false,
+    },
+  ] satisfies {
+    label: string;
+    hydration: ChildSessionHydrationState;
+    copy: string;
+    retry: boolean;
+  }[])('shows $label copy and retry state $retry', ({ hydration, copy, retry }) => {
+    drawerStore.set(drawerHydration, hydration);
+    renderDrawer({ sessionId: childSessionId, description: 'Failed child' });
+
+    expect(container.textContent).toContain('Could not load sub-agent history.');
+    expect(container.textContent).toContain(copy);
+    const retryButton = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Retry history load'
+    );
+    expect(retryButton !== undefined).toBe(retry);
+  });
+
   it('keeps completed child rows idle while unfinished text and reasoning stream, then completes them', () => {
     const completed = {
       ...childMessageWithTools(0),

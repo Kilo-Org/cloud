@@ -1,3 +1,4 @@
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   type CloudflareContainersInstance,
@@ -10,7 +11,8 @@ export function kiloContainersInstance(
   destination: SandboxAllocationRequest | SandboxDestination | undefined
 ): CloudflareContainersInstance | null {
   if (
-    destination?.provider.id !== 'cloudflare-containers' ||
+    destination === undefined ||
+    !providerSupports(destination.provider.id, 'meteredBilling') ||
     destination.provider.account !== 'kilo'
   )
     return null;

@@ -334,9 +334,11 @@ observable behavior is the same.
    sound and vibration explicitly; user changes to notification settings remain
    authoritative. An install with the old low-importance channel MUST migrate
    to a new channel id because Android keeps channel importance after creation.
-2. The system MUST key the notification by the session id, through a stable
-   notification id derived from it, so an update replaces that session's
-   notification and never another session's.
+2. The system MUST key the notification by the whole session id, so an update
+   replaces that session's notification and never another session's. Android
+   keys a notification by the pair (tag, id), so the session id is the tag and
+   the id names nothing on its own; each session's actions MUST carry the same
+   whole id on their intents, so a session owns its action records.
 3. The system MUST request the promoted-ongoing Live Update where the platform
    allows it (Android 16.1 or later, with the user's Live Updates setting on),
    and MUST fall back to an ordinary ongoing notification everywhere else. It
@@ -381,6 +383,15 @@ observable behavior is the same.
 5. Approve MUST answer at most once per request and MUST NOT be dropped because
    another answer is in flight: a repeat tap of the same ask while its answer
    runs MUST be suppressed, and a tap on a different ask MUST be answered.
+6. A post that does not land MUST leave every action of the card still in the
+   shade bound to the request that card shows, and the superseded Approve
+   record MUST be retired only after the newer card is posted. The record of an
+   ask therefore carries the ask as well as the session, so preparing a newer
+   card cannot rewrite the record of the request the surviving card shows.
+   A sweep of the records a crash left named MUST NOT retire the request the
+   card in the shade shows, nor the request the previous card showed: a repeat
+   of one request carries the same key, and cancelling it would leave that card
+   answering nothing.
 
 ### Android: updates and ending
 
@@ -421,6 +432,17 @@ observable behavior is the same.
    the notification's data for routing and approval only.
 
 ## Changelog
+
+### 2026-11-22 -- A failed post leaves the card answering the request it shows
+
+- Added Actions rule 6: an Approve record names the ask it answers as well as
+  the session, so preparing a newer card cannot rebind the action of a card
+  still in the shade. A post that does not land restores the facts of the card
+  that is still posted and drops the record of the newer ask, and the
+  superseded ask's record is retired only once the newer card is posted.
+- A sweep of the records a crash left named keeps the request the card in the
+  shade shows and the request the previous card showed, and a stored card entry
+  that cannot be read is ignored instead of failing the post.
 
 ### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
 

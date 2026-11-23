@@ -12,6 +12,7 @@
  */
 import { presenceContextForCliSession } from '@kilocode/event-service';
 import {
+  AGENT_SESSION_NOTIFICATION_I18N_KEY,
   sendAgentSessionNotificationInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
@@ -111,7 +112,7 @@ export function buildAgentSessionNotificationDispatchInput(
       body: content.body,
       // Session title and agent-authored message are user-authored; both pass
       // through the catalog templates as params.
-      i18nKey: 'agentSession.notification',
+      i18nKey: AGENT_SESSION_NOTIFICATION_I18N_KEY,
       i18nParams: { sessionTitle: content.title, message: content.body },
       // The explicit `notify_user` tool call is a question for the user, so the
       // push is classified as needs-input (breaks through Do Not Disturb) rather

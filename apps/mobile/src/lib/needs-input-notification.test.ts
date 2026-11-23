@@ -12,6 +12,7 @@ import {
   shouldPublishForSession,
 } from './needs-input-notification';
 import {
+  markNeedsInputReplyResult,
   notificationIdentifierForSession,
   readNeedsInputPresentation,
 } from './needs-input-presentation';
@@ -498,10 +499,6 @@ describe('planNeedsInputNotifications', () => {
   });
 
   it('withholds posting, and keeps what is posted, until the preference row loads', () => {
-    // Before the `agentAttention` row is in the cache the plan must not fall
-    // back to ON (it would alert a category the user turned off after a
-    // restart) and must not fall back to OFF (it would drop a standing raise):
-    // it waits, leaving both the publish and dismiss sets empty.
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow(), notifiedRow({ sessionId: 'ses_gone', kind: 'permission' })],
       next: [makeCached({ id: 'ses_1', status: 'question' })],
@@ -705,11 +702,31 @@ describe('applyNeedsInputNotifications', () => {
         }),
       })
     );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.not.objectContaining({ interruptionLevel: 'timeSensitive' }),
+      })
+    );
+  });
+
+  it('keeps the time-sensitive level and the platform sound on a first post', async () => {
+    // No `updates` entry: nothing is replaced, so the raise is new information
+    // and must alert at the time-sensitive level with the platform's own sound.
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ interruptionLevel: 'timeSensitive' }),
+      })
+    );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.not.objectContaining({ sound: false }),
+      })
+    );
   });
 
   it('does not silence a re-post the same plan dismissed', async () => {
-    // The dismissal runs before the post, so the notification the post creates
-    // is new: it must carry the sound a fresh raise carries.
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow({ organizationId: null })],
       next: [
@@ -733,6 +750,47 @@ describe('applyNeedsInputNotifications', () => {
         identifier: 'needs-input:ses_1',
         content: expect.not.objectContaining({ sound: false }),
       })
+    );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ interruptionLevel: 'timeSensitive' }),
+      })
+    );
+  });
+
+  it("retires a reply's result left under a push's identifier when the raise ends", async () => {
+    markNeedsInputReplyResult('ses_1', 'fcm-remote-1');
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([
+      ['needs-input:ses_1'],
+      ['fcm-remote-1'],
+    ]);
+  });
+
+  it("retires a reply's result before a later raise of the same session is posted", async () => {
+    markNeedsInputReplyResult('ses_1', 'fcm-remote-1');
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+    expect(mocks.dismissNotificationAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.scheduleNotificationAsync.mock.invocationCallOrder[0] ?? 0
     );
   });
 

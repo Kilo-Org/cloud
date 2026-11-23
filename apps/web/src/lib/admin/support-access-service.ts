@@ -103,6 +103,47 @@ function assertAdminActor(actor: GrantActorRow | undefined): GrantActorRow {
   return actor;
 }
 
+/**
+ * Whether this grant may still be approved by this actor. The router calls it
+ * before it claims the single-use step-up proof so a refusal costs no passkey
+ * prompt; `approveSupportGrant` calls it again under the grant locks, and that
+ * run decides the outcome.
+ */
+export function assertGrantApprovable(params: {
+  approverKiloUserId: string;
+  grant: Pick<SupportAccessGrant, 'actor_kilo_user_id' | 'action_class' | 'status'>;
+  requester: GrantActorRow | undefined;
+}): void {
+  if (params.grant.actor_kilo_user_id === params.approverKiloUserId) {
+    throw badRequest('A request cannot be approved by its requester');
+  }
+  if (params.grant.status !== 'pending') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
+  }
+  if (params.grant.action_class !== 'support_write') {
+    throw badRequest('Only write grants require approval');
+  }
+  assertAdminActor(params.requester);
+}
+
+/**
+ * Whether an organization is live, for a caller outside a transaction: the
+ * router reads this before it claims the single-use step-up proof. The write
+ * paths keep their own share-locked read inside the transaction.
+ */
+export async function assertSupportOrganizationLive(
+  organizationId: string,
+  fromDb: typeof db = db
+): Promise<void> {
+  const [organization] = await fromDb
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+}
+
 async function assertLiveOrganization(
   tx: DrizzleTransaction,
   organizationId: string
@@ -367,9 +408,6 @@ export async function approveSupportGrant(params: {
       .where(eq(support_access_grants.id, params.grantId))
       .limit(1);
     if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (unlocked.actor_kilo_user_id === params.approverKiloUserId) {
-      throw badRequest('A request cannot be approved by its requester');
-    }
 
     // Advisory lock before any row lock: request() takes advisory first, and a
     // reverse order here would deadlock.
@@ -385,17 +423,12 @@ export async function approveSupportGrant(params: {
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!pending) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (pending.status !== 'pending') {
-      throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
-    }
-    if (pending.action_class !== 'support_write') {
-      throw badRequest('Only write grants require approval');
-    }
-    assertAdminActor(actors.get(pending.actor_kilo_user_id));
-    const approver = actors.get(params.approverKiloUserId);
-    if (!approver || isBlockedAccount(approver) || !approver.is_admin) {
-      throw forbidden('Platform admin access required');
-    }
+    assertGrantApprovable({
+      approverKiloUserId: params.approverKiloUserId,
+      grant: pending,
+      requester: actors.get(pending.actor_kilo_user_id),
+    });
+    assertAdminActor(actors.get(params.approverKiloUserId));
     await assertLiveOrganization(tx, pending.organization_id);
 
     const durationSeconds = clampDuration(
@@ -660,19 +693,53 @@ export async function listMySupportGrants(actorKiloUserId: string): Promise<Supp
     .orderBy(desc(support_access_grants.requested_at));
 }
 
+/**
+ * The pending queue answers with the requests whose window is still ahead: a
+ * row counts as pending only while `request_expires_at` is still ahead, the
+ * same rule `deriveGrantStatus` applies when a grant is presented.
+ *
+ * A request outside its window is left out of this queue on purpose; its
+ * requester still sees it, marked expired, in `listMySupportGrants`.
+ *
+ * A pending row always carries `request_expires_at`: `requestSupportGrant` is the
+ * only writer that creates one, and it stamps the deadline on every write request.
+ * A grant loses that deadline only in the same update that moves it off `pending`
+ * (approve, deny, cancel, revoke), so no row leaves `pending` and keeps a window
+ * this predicate would filter on. This is an application-level guarantee: the
+ * column is nullable and no check ties it to `status`, so a new writer that inserts
+ * a pending row without a deadline would drop out of this queue.
+ */
 export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> {
   return db
     .select()
     .from(support_access_grants)
-    .where(eq(support_access_grants.status, 'pending'))
+    .where(
+      and(
+        eq(support_access_grants.status, 'pending'),
+        sql`${support_access_grants.request_expires_at} > now()`
+      )
+    )
     .orderBy(asc(support_access_grants.requested_at));
 }
 
+/**
+ * The active queue answers with the grants whose window is still ahead: a row
+ * counts as active only while `expires_at` is still ahead, the same rule
+ * `deriveGrantStatus` applies when a grant is presented.
+ *
+ * A grant outside its window is left out of this queue on purpose; its holder
+ * still sees it, marked expired, in `listMySupportGrants`.
+ */
 export async function listActiveSupportGrants(): Promise<SupportAccessGrant[]> {
   return db
     .select()
     .from(support_access_grants)
-    .where(eq(support_access_grants.status, 'active'))
+    .where(
+      and(
+        eq(support_access_grants.status, 'active'),
+        sql`${support_access_grants.expires_at} > now()`
+      )
+    )
     .orderBy(asc(support_access_grants.expires_at));
 }
 

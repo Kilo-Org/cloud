@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { foldDecimalDigits } from '@/lib/format';
 import { type PasskeyVerificationState } from '@/lib/passkeys/passkey-verification-state';
 
 type Props = {
@@ -41,9 +42,9 @@ export function PasskeyVerificationPanel({
   const { t } = useTranslation();
 
   return (
-    <View className="gap-3 rounded-lg border border-border bg-card p-3">
-      <Text className="text-base font-semibold">{t('profile.passkeyVerifyTitle')}</Text>
-      <Text className="text-sm text-muted-foreground">{t('profile.passkeyVerifyDescription')}</Text>
+    <Card>
+      <Text variant="heading">{t('profile.passkeyVerifyTitle')}</Text>
+      <Text variant="muted">{t('profile.passkeyVerifyDescription')}</Text>
 
       {state.phase === 'choose' && (
         <>
@@ -162,7 +163,7 @@ export function PasskeyVerificationPanel({
           </Button>
         </>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -199,6 +200,7 @@ function CodeEntry({
         label={t('profile.confirmationCode')}
         placeholder={t('profile.confirmationCodePlaceholder')}
         keyboardType="number-pad"
+        maxLength={6}
         // Android only: keep the IME docked to the number pad instead of its
         // full-screen extract editor, which would cover the controls below.
         disableFullscreenUI
@@ -215,8 +217,12 @@ function CodeEntry({
         ]}
         editable={!retrying}
         onChangeText={value => {
-          codeRef.current = value;
-          setCanSubmit(value.trim().length > 0);
+          // The field keeps what was typed, but validation and the code sent to
+          // the server work on ASCII: the sign-in code is issued in ASCII, and a
+          // keyboard in another script types the same code in its own digits.
+          const digits = foldDecimalDigits(value);
+          codeRef.current = digits;
+          setCanSubmit(/^\d{6}$/.test(digits));
         }}
       />
       <Button

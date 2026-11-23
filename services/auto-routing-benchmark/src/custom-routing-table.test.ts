@@ -40,6 +40,10 @@ function summary(
     routeKey,
     accuracy,
     avgCostUsd,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
     avgLatencyMs: 100,
     p50LatencyMs: 90,
     p95LatencyMs: 120,
@@ -249,6 +253,7 @@ describe('buildCustomRoutingTable', () => {
 
 describe('assembleCustomRoutingTable', () => {
   const config = {
+    router: 'efficient' as const,
     minAccuracy: 0.7,
     accuracyNoiseBand: 0.05,
     productionTokenProfile: null,
@@ -296,7 +301,7 @@ describe('assembleCustomRoutingTable', () => {
     ]);
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ engineIdentity: engine, repetitions: 1 }),
+      expect.objectContaining({ engineIdentity: engine, repetitions: 3 }),
       expect.any(Array)
     );
     expect(result.table).not.toBeNull();

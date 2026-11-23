@@ -1,6 +1,15 @@
 import type Stripe from 'stripe';
 import * as z from 'zod';
 import { capitalize } from '@/lib/utils';
+import { getKiloPassPriceMetadataFromInvoice } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
+
+export const stripeBillingHistoryLineSchema = z.object({
+  // The tier values stay inline rather than the KiloPassTier enum: the mobile
+  // app consumes this wire type without @kilocode/db, whose enum import would
+  // drag server-only types into the client bundle.
+  kind: z.enum(['trial', 'initial', 'renewal', 'upgrade', 'unknown']),
+  tier: z.enum(['tier_19', 'tier_49', 'tier_199']).nullable(),
+});
 
 export const stripeBillingHistoryEntrySchema = z.object({
   kind: z.literal('stripe'),
@@ -12,6 +21,12 @@ export const stripeBillingHistoryEntrySchema = z.object({
   invoiceUrl: z.string().nullable(),
   invoicePdfUrl: z.string().nullable(),
   description: z.string().nullable(),
+  /**
+   * The invoice line typed for the reader, present only where the producing
+   * router classifies it. Kilo Pass rows carry it; the other routers' rows
+   * omit the key, so their wire shapes stay unchanged.
+   */
+  line: stripeBillingHistoryLineSchema.optional().nullable(),
 });
 
 export const creditsBillingHistoryEntrySchema = z.object({
@@ -65,4 +80,41 @@ export function mapStripeInvoiceToBillingHistoryEntry(
     invoicePdfUrl: invoice.invoice_pdf ?? null,
     description: invoice.lines.data[0]?.description ?? null,
   };
+}
+
+/**
+ * The invoice line typed for a Kilo Pass reader, or null when the invoice has
+ * no line to classify.
+ *
+ * The kind comes from the billing reason, with the $0 first invoice read as the
+ * trial it is. The tier comes from the dominant known Kilo Pass price across
+ * every line, so a leading proration or a service-fee line cannot name a plan
+ * the invoice did not move to.
+ */
+export function mapKiloPassInvoiceLine(
+  invoice: Stripe.Invoice
+): NonNullable<StripeBillingHistoryEntry['line']> | null {
+  const lines = invoice.lines?.data ?? [];
+  if (lines.length === 0) return null;
+
+  return {
+    kind: getInvoiceLineKind(invoice),
+    tier: getKiloPassPriceMetadataFromInvoice(invoice)?.tier ?? null,
+  };
+}
+
+function getInvoiceLineKind(
+  invoice: Stripe.Invoice
+): NonNullable<StripeBillingHistoryEntry['line']>['kind'] {
+  switch (invoice.billing_reason) {
+    case 'subscription_create':
+      // Only a zero invoice is the trial; a 100%-off promotion code zeroes amount_due alone.
+      return (invoice.amount_due ?? 0) === 0 && (invoice.subtotal ?? 0) === 0 ? 'trial' : 'initial';
+    case 'subscription_cycle':
+      return 'renewal';
+    case 'subscription_update':
+      return 'upgrade';
+    default:
+      return 'unknown';
+  }
 }

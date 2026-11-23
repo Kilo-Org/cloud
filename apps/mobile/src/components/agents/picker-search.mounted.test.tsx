@@ -15,7 +15,7 @@ import { ModelPickerContent } from '@/components/agents/model-picker-content';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type RepoOption } from '@/lib/picker-bridge';
 import { modelPickerSlot, repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 // Live so a test can flip the interface direction before it mounts; the input
 // alignment helper reads `I18nManager.isRTL` when it composes the style.
@@ -49,10 +49,13 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: i18nManager,
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   BackHandler: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
@@ -75,6 +78,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   Info: 'Info',
   Lock: 'Lock',
+  Plug: 'Plug',
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
@@ -85,6 +89,7 @@ vi.mock('@/components/agents/model-selector', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: theme.foreground }),
+  useMutedDisabledInk: () => theme.foreground,
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),
@@ -134,7 +139,7 @@ describe('repository picker Bitbucket scope note', () => {
   it('explains the Personal limitation without a retry action', async () => {
     const renderer = await mount(RepoPickerScreen);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
-    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(repoRows(renderer)).toHaveLength(1);
   });
 
   it.each(['recents', 'no-bitbucket-rows'] as const)(
@@ -164,7 +169,7 @@ describe('repository picker Bitbucket scope note', () => {
       });
       const renderer = await mount(RepoPickerScreen);
       expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
-      expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+      expect(repoRows(renderer)).toHaveLength(1);
       if (kind === 'recents') {
         const row = renderer.root.findByProps({ accessibilityLabel: 'Bitbucket workspace/repo' });
         act(() => {
@@ -189,7 +194,7 @@ describe('repository picker Bitbucket scope note', () => {
       changeSearch('org/repo');
       await Promise.resolve();
     });
-    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(repoRows(renderer)).toHaveLength(1);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
     await act(async () => {
       changeSearch('');
@@ -326,6 +331,13 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
+/** The repository rows: every Pressable but the search field's own clear control. */
+function repoRows(renderer: Awaited<ReturnType<typeof mount>>) {
+  return hosts(renderer, 'Pressable').filter(
+    node => node.props.accessibilityLabel !== i18n.t('common.clearSearch')
+  );
+}
+
 /** The style RN flattens an input's array to, or nothing when it carries none. */
 function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unknown> {
   const entries: unknown[] = [input.props.style];
@@ -339,14 +351,19 @@ function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unk
 // (PickerSheet scrollable=false); the repository picker renders mapped rows
 // inside the shell ScrollView and so always keeps that ScrollView mounted.
 describe.each([
-  { name: 'model', Component: ModelPickerContent, rowHost: 'FlashList', hasShellScrollView: false },
+  {
+    name: 'model',
+    Component: ModelPickerContent,
+    rowsOf: (renderer: Awaited<ReturnType<typeof mount>>) => hosts(renderer, 'FlashList'),
+    hasShellScrollView: false,
+  },
   {
     name: 'repository',
     Component: RepoPickerScreen,
-    rowHost: 'Pressable',
+    rowsOf: repoRows,
     hasShellScrollView: true,
   },
-])('$name picker centering', ({ Component, rowHost, hasShellScrollView }) => {
+])('$name picker centering', ({ Component, rowsOf, hasShellScrollView }) => {
   it('keeps the search input and native header mounted when replacing the list', async () => {
     const renderer = await mount(Component);
     const input = hosts(renderer, 'TextInput')[0];
@@ -357,7 +374,7 @@ describe.each([
     const group = header.parent;
     expect(group?.props.collapsable).toBe(false);
     expect(group?.findAll(node => node === input)).toHaveLength(1);
-    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
+    expect(rowsOf(renderer).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
@@ -368,7 +385,7 @@ describe.each([
       changeSearch('no matching choice');
       await Promise.resolve();
     });
-    expect(hosts(renderer, rowHost)).toHaveLength(0);
+    expect(rowsOf(renderer)).toHaveLength(0);
     if (!hasShellScrollView) {
       expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
     }
@@ -381,7 +398,7 @@ describe.each([
       changeSearch('');
       await Promise.resolve();
     });
-    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
+    expect(rowsOf(renderer).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(header.parent).toBe(group);

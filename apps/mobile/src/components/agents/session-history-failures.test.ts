@@ -4,8 +4,8 @@ import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 import {
   SESSION_HISTORY_FAILURES,
+  sessionHistoryFailureCopy,
   SessionHistoryFailureError,
-  TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES,
 } from './session-history-failures';
 
 function declaredTelemetry(error: Error): unknown {
@@ -61,6 +61,17 @@ describe('SessionHistoryFailureError', () => {
       fingerprint: ['session-history-page', kind],
       tags: { 'error.subsystem': 'session-history', 'error.operation': 'read-page' },
     });
-    expect(TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES).toContain(failure.message);
+  });
+});
+
+describe('sessionHistoryFailureCopy', () => {
+  it.each([
+    ['retryable_failure', 'agentChat.session.historyTemporarilyUnavailable', true],
+    ['too_large', 'agentChat.session.historyTooLarge', false],
+    ['invalid_data', 'agentChat.session.historyUnavailable', false],
+  ] as const)('gives the %s kind its copy key and retryability', (kind, copyKey, retryable) => {
+    // The kind decides both: a retryable read keeps its Retry, and a terminal
+    // read states a page a retry re-reads unchanged.
+    expect(sessionHistoryFailureCopy(kind)).toEqual({ copyKey, retryable });
   });
 });

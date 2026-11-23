@@ -4,7 +4,7 @@
 // leaves it unmocked and requires the message to reach the input's composed
 // accessibility label, which the reserved copy never populates.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +68,19 @@ vi.mock('@/components/organization/permission-denied', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+// The settings-search wrappers belong to the search surface; this suite drives
+// the field's own rule, so they pass their content through.
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: ({
+    settingsTarget,
+    children,
+  }: {
+    settingsTarget?: string;
+    children?: ReactNode;
+  }) => createElement('SettingsSearchScrollView', { settingsTarget }, children),
+  SettingsTarget: ({ item, children }: { item: { id: string }; children?: ReactNode }) =>
+    createElement('SettingsTarget', { item }, children),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
@@ -84,6 +96,19 @@ vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The real persist modules open the encrypted SQLite store, which this Node
+// project cannot import; the screen reads only the key helper and the loaded
+// state, and this suite is about the field's own rule, not the draft.
+vi.mock('@/lib/persist/drafts', () => ({
+  spendAlertsFormDraftKey: (organizationId: string | undefined) =>
+    `spend-alerts-form:${organizationId ?? 'personal'}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () => ({ kind: 'ready', value: null, save: vi.fn(), clear: vi.fn() }),
 }));
 vi.mock('@/lib/format', () => {
   const normalizeLocalizedNumber = (value: string) => {

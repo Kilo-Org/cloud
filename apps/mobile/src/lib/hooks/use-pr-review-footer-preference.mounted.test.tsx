@@ -26,9 +26,9 @@ type PreferenceHook = typeof usePrReviewFooterPreference;
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
 /**
- * Mounting the shipped hook is what starts the store's disk read: nothing else
- * preloads it. The probe prints the value and the load flag, so a case can wait
- * for the read to land instead of guessing at a microtask count.
+ * Loading the module constructs the store, and construction starts its disk
+ * read. The probe prints the value and the load flag, so a case can wait for
+ * the read to land instead of guessing at a microtask count.
  */
 function Probe({ usePreference }: { usePreference: PreferenceHook }) {
   const { prReviewFooter, hasLoaded } = usePreference();
@@ -69,9 +69,10 @@ function deferredRead<T>(): { promise: Promise<T>; resolve: (value: T) => void }
   return { promise, resolve };
 }
 
-// The store is a module-level singleton that latches its one disk read, so each
-// case loads a fresh copy to start cold with the mocks above in effect. A static
-// import cannot reset the module registry, so this suite imports at run time.
+// The store is a module-level singleton that starts its one disk read as it is
+// constructed, so each case loads a fresh copy to start cold with the mocks
+// above in effect. A static import cannot reset the module registry, so this
+// suite imports at run time.
 function loadModule() {
   vi.resetModules();
   return import('./use-pr-review-footer-preference');
@@ -123,8 +124,6 @@ describe('pr-review-footer store', () => {
     const mod = await loadModule();
     const renderer = await renderProbe(mod.usePrReviewFooterPreference);
 
-    // The shipped default shows before the read settles, and the read uses the
-    // shipped key.
     expect(probeText(renderer)).toBe('true:false');
     expect(getItemAsync).toHaveBeenCalledWith(PR_REVIEW_FOOTER_KEY);
 
@@ -135,7 +134,6 @@ describe('pr-review-footer store', () => {
       expect(probeText(renderer)).toBe('true:true');
     });
 
-    // The settled read keeps the shipped default and writes nothing back.
     expect(mod.getPrReviewFooter()).toBe(true);
     expect(setItemAsync).not.toHaveBeenCalled();
   });
@@ -157,6 +155,18 @@ describe('pr-review-footer store', () => {
       expect(probeText(renderer)).toBe('false:true');
     });
     expect(mod.getPrReviewFooter()).toBe(false);
+  });
+
+  it('reads the stored value for the getter with no renderer', async () => {
+    getItemAsync.mockResolvedValue('false');
+    // The getter is the settings-registry read path and runs before any
+    // subscriber mounts: loading the module constructs the store, and
+    // construction starts its read.
+    const mod = await loadModule();
+
+    await vi.waitFor(() => {
+      expect(mod.getPrReviewFooter()).toBe(false);
+    });
   });
 
   it('persists each set value and clears back to the default from off on sign-out', async () => {

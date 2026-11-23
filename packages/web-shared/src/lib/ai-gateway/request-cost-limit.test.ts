@@ -1,5 +1,5 @@
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -73,7 +73,10 @@ async function enforceRequestCostLimit(
     )
   ).refusal;
 }
-const catalogModel = (id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel =>
+const catalogModel = (
+  id: string,
+  pricing: OpenRouterCatalogModel['pricing']
+): OpenRouterCatalogModel =>
   ({
     id,
     name: id,
@@ -83,7 +86,7 @@ const catalogModel = (id: string, pricing: OpenRouterModel['pricing']): OpenRout
     top_provider: { is_moderated: false },
     pricing,
     context_length: 128_000,
-  }) satisfies OpenRouterModel;
+  }) satisfies OpenRouterCatalogModel;
 beforeEach(() => {
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
     [model.id]: model,

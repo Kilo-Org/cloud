@@ -35,7 +35,7 @@ export function isSecurityConfigPatchDirty<T extends Record<string, unknown>>(
 
 type SecurityRepository = { id: number };
 
-type SecurityRepositoryScopeConfig = {
+export type SecurityRepositoryScopeConfig = {
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: readonly number[];
 };
@@ -57,20 +57,35 @@ export function getSecurityRepositoriesInScope<T extends SecurityRepository>(
  * (e.g. an empty repository selection, an out-of-range SLA day count) — the
  * screen supplies `valid` since only it knows its own validation rule.
  */
-type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
+export type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
 
 const MIN_SLA_DAYS = 1;
 const MAX_SLA_DAYS = 365;
 
 /**
- * Parses a raw numeric `TextInput` string into a whole-day count, or `NaN`
- * if it isn't one — shared by the notification screen's SLA warning lead
- * time and the SLA screen's four severity day thresholds, all validated as
- * 1-365 whole days.
+ * Parses a raw numeric input string into a whole-day count, or `NaN` if it
+ * isn't one — any day count validated as 1-365 whole days goes through here.
+ *
+ * The raw input carries the keypad's own digits, and a keypad follows its
+ * script, not the ASCII one: an Arabic-Indic keyboard types `٣٢` for 32.
+ * Every decimal digit (`\p{Nd}`) set is ten consecutive code points in
+ * ascending order and adjacent sets share no separator, so a digit's value is
+ * its offset from the start of its run modulo ten — the same fold the mobile
+ * app's `foldDecimalDigits` (apps/mobile/src/lib/format.ts) applies. The
+ * mobile settings screens read their `TextInput`s through
+ * `parseLocalizedNumber`, which folds inside it, and keep this parser for the
+ * domain rule the save path enforces (tests pin both).
  */
 export function parseDayCount(raw: string): number {
-  const trimmed = raw.trim();
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+  const folded = raw.trim().replace(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (/\p{Nd}/u.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String((codePoint - start) % 10);
+  });
+  return /^\d+$/.test(folded) ? Number(folded) : Number.NaN;
 }
 
 export function isValidDayCount(value: number): boolean {
@@ -88,7 +103,7 @@ export function getSettingsDirtyState<T extends Record<string, unknown>>(
   return valid ? 'dirty-valid' : 'dirty-invalid';
 }
 
-type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
+export type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
 
 /**
  * Which buttons a back-navigation confirmation alert should offer. A clean

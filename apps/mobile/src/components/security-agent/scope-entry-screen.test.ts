@@ -55,6 +55,9 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+// The scope title reads the shared memberships hook, which reads the auth
+// token; mock it so this suite does not load the real auth module.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 // The hand-off helper imports the browser launcher, which reaches a native
 // module no test project loads; this suite needs the mint, not the launch.
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -79,6 +82,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   Cpu: 'Cpu',
   FolderGit2: 'FolderGit2',
+  ShieldCheck: 'ShieldCheck',
   Zap: 'Zap',
 }));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
@@ -470,8 +474,8 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('org_123');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Drain Labs');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Drain Labs');
   });
 
   it('names the personal scope on the reauthorize view', async () => {
@@ -482,30 +486,30 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('personal');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Personal');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Personal');
   });
 
   it('names the organization on the load-failure view', async () => {
     failingProcedures = new Set(['getConfig']);
     const root = await mount('org_123');
     const failure = host(root, 'PlatformErrorScreen')[0];
-    expect(failure?.props.title).toBe('Drain Labs');
-    expect(failure?.props.eyebrow).toBe('Security Agent');
+    expect(failure?.props.title).toBe('Security Agent');
+    expect(failure?.props.subtitle).toBe('Drain Labs');
   });
 
   it('names the organization on the no-access view', async () => {
     deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
     const root = await mount('org_123');
     const denied = host(root, 'ScopeAccessDeniedScreen')[0];
-    expect(denied?.props.title).toBe('Drain Labs');
-    expect(denied?.props.eyebrow).toBe('Security Agent');
+    expect(denied?.props.title).toBe('Security Agent');
+    expect(denied?.props.subtitle).toBe('Drain Labs');
   });
 
   it('keeps the header line while the membership list is still loading', async () => {
     // The name arrives with the shared membership list. Until then the header
-    // keeps a placeholder title rather than an empty line, so the body does not
-    // move when the real name lands.
+    // keeps a placeholder subtitle rather than an empty line, so the body does
+    // not move when the real name lands.
     heldProcedures = new Set(['list']);
     permissionData = {
       hasIntegration: true,
@@ -514,8 +518,8 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('org_123');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Organization');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Organization');
     releaseHeld?.();
   });
 });
@@ -585,9 +589,10 @@ describe('ScopeEntryScreen cached destination', () => {
   });
 
   it('keeps the cached destination while connectivity pauses its reads', async () => {
-    // A save on a flaky connection can land here with every read paused. The
-    // cached config still renders the dashboard, so the screen must not report
-    // a load failure the user would read as a lost save.
+    // A save on a flaky connection can land here with the config and GitHub
+    // status reads paused. The cached config still renders the dashboard, and
+    // the role read settles into its own failure, so the screen must not
+    // report a load failure the user would read as a lost save.
     configData.isEnabled = true;
     onlineManager.setOnline(false);
     const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
@@ -601,7 +606,8 @@ describe('ScopeEntryScreen cached destination', () => {
   });
 
   it('keeps the load-error screen when the paused reads cannot name a destination', async () => {
-    // No cached config: the setup gates genuinely need the paused reads.
+    // No cached config: the setup gates genuinely need the config and GitHub
+    // status reads, which pause here.
     onlineManager.setOnline(false);
     const root = await mount('personal');
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
@@ -757,8 +763,12 @@ describe.each([
     }
   );
 
-  it('recovers a paused organization capability without changing other queries or future fetching', async () => {
+  it('recovers a settled organization capability failure without changing other queries or future fetching', async () => {
     onlineManager.setOnline(false);
+    // The capability read comes through the hook that owns the shared options,
+    // so it settles offline instead of pausing: the request runs and fails
+    // without reaching the server.
+    unreachableProcedures = new Set(['list']);
     const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
     const configKey = trpc.organizations.securityAgent.getConfig.queryKey({
       organizationId: 'org_123',
@@ -768,21 +778,30 @@ describe.each([
       try {
         await queryClient.query(other);
       } catch {
-        // Offline: the fetch stays paused for the retry path.
+        // Offline: this read keeps the paused fetch the assertions pin below.
       }
     })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
+    // The role read fails without pausing: the shared options run it past the
+    // offline manager, so it settles into an error the screen can name.
+    expect(queryClient.getQueryState(trpc.organizations.list.queryKey())).toMatchObject({
+      status: 'error',
+      fetchStatus: 'idle',
+    });
     const error = host(root, 'PlatformErrorScreen')[0];
-    // The inline entry shows its own load-failure surface, and a paused read
-    // is an offline one: the description names the connection on the first
-    // screen. The standalone settings screen names the failed read.
+    // The inline entry shows its own load-failure surface, and a failed read
+    // that never reached the server is the connection: the description names
+    // it on the first screen. The standalone settings screen names the read.
     expect(error?.props.errorTitle).toBe(
       presentation === 'inline' ? 'Could not load Security Agent' : undefined
     );
     expect(error?.props.message ?? error?.props.errorTitle).toBe(
       presentation === 'inline' ? CONNECTION_COPY : 'Could not load permissions'
     );
+    // The retry forces every failed read past the offline manager, so the role
+    // read answers on this attempt.
+    unreachableProcedures = new Set();
     await retry(root);
     expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
     expect(queryClient.getQueryState(other.queryKey)?.fetchStatus).toBe('paused');

@@ -4,8 +4,10 @@
 // without mounting a screen.
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { type TFunction } from 'i18next';
 import { z } from 'zod';
 
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -42,7 +44,7 @@ export function readBitbucketToken(value: string): BitbucketTokenField {
  * authorization the web page owns. The readiness read above models the token
  * alone, so this is the only read that can name an OAuth connection.
  */
-type BitbucketIntegrationStatus = RouterOutputs['organizations']['bitbucket']['getStatus'];
+export type BitbucketIntegrationStatus = RouterOutputs['organizations']['bitbucket']['getStatus'];
 
 /**
  * The one fact a repair needs from an existing integration: which method
@@ -122,9 +124,10 @@ export type BitbucketTokenRefusal = 'first-connect' | 'replace-token';
  * the axis above.
  */
 const FAILURE_COPY_KEY = {
-  // The same role rule the integration page states: an owner, admin or billing
-  // manager is who can connect the workspace.
-  'role-refused': 'prReview.connect.bitbucketAdminOnlyDescription',
+  // The same role rule the integration page states, named for this connection's
+  // organization: the sheet and the recovery card both hold the name, and a
+  // person in several organizations cannot tell which one refused the role.
+  'role-refused': 'codeReviewer.bitbucketConnect.deniedConnectRole',
   'connection-changed': 'prReview.connect.checkFailedTitleBitbucket',
   retryable: 'prReview.connect.providerCheckFailedMessage',
 } as const satisfies Record<Exclude<BitbucketFailure['kind'], 'token-refused'>, string>;
@@ -184,15 +187,185 @@ function failureKind(error: unknown): BitbucketFailure['kind'] {
  * submitting surface names its side of the refusal axis: a token Bitbucket
  * refused has two honest sentences, and only the surface knows whether it
  * pasted a first token that never worked or sat on a connection whose token
- * has stopped working.
+ * has stopped working. `organization` is the display name of the organization
+ * whose role rule refused: every surface that submits holds it, and the role
+ * sentence reads as this one organization's rule rather than as a rule in the
+ * abstract.
  */
+// oxlint-disable-next-line max-params -- the refusal axis, the translator and the organization name are separate inputs every surface already holds; folding them into an options bag would hide which sentence depends on the name
 export function bitbucketConnectionFailure(
   error: unknown,
-  translate: (key: string) => string,
-  tokenRefusal: BitbucketTokenRefusal
+  translate: TFunction,
+  tokenRefusal: BitbucketTokenRefusal,
+  organization: string
 ): BitbucketFailure {
   const kind = failureKind(error);
-  return kind === 'token-refused'
-    ? { kind, message: translate(TOKEN_REFUSED_COPY_KEY[tokenRefusal]) }
-    : { kind, message: translate(FAILURE_COPY_KEY[kind]) };
+  if (kind === 'token-refused') {
+    return { kind, message: translate(TOKEN_REFUSED_COPY_KEY[tokenRefusal]) };
+  }
+  if (kind === 'role-refused') {
+    return { kind, message: translate(FAILURE_COPY_KEY[kind], { organization }) };
+  }
+  return { kind, message: translate(FAILURE_COPY_KEY[kind]) };
+}
+
+/**
+ * The organization's Bitbucket connection as the reviewer surfaces render it,
+ * from both reads: the readiness the token form owns, and the integration
+ * status that also sees an OAuth authorization. The readiness read alone
+ * reports an OAuth-connected organization as not connected, so every surface
+ * that used to read it alone showed "Not connected" beside an active
+ * connection — classifier order encodes what outranks what.
+ */
+export type BitbucketConnection =
+  | { kind: 'loading' }
+  | {
+      kind: 'error';
+      permanent: boolean;
+      variant: 'server' | 'permission' | 'not-found';
+      refetch: () => void;
+      isRetrying: boolean;
+    }
+  | { kind: 'token-connected'; readiness: BitbucketReadiness }
+  /** The web page owns the connection; the app renders it read-only. */
+  | { kind: 'oauth-connected'; workspace: { slug: string | null; displayName: string | null } }
+  /** Authorized through Bitbucket OAuth but not yet usable — no token form. */
+  | { kind: 'oauth-attention' }
+  | { kind: 'not-connected'; readiness: BitbucketReadiness | undefined };
+
+type ReadinessRead = {
+  isLoading: boolean;
+  isPending?: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  data: BitbucketReadiness | undefined;
+  error?: unknown;
+  refetch: () => void;
+};
+
+type IntegrationStatusRead = {
+  isPending?: boolean;
+  isLoading?: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  data: BitbucketIntegrationStatus | undefined;
+  error?: unknown;
+  refetch: () => void;
+};
+
+/**
+ * Turn the two Bitbucket reads into the one connection a surface renders.
+ * Precedence: a token connection wins over a (possibly stale) OAuth status;
+ * an OAuth answer wins over the readiness read's "no integration"; loading and
+ * error only apply when neither read names a connection.
+ */
+export function classifyBitbucketConnection(input: {
+  readiness: ReadinessRead;
+  status: IntegrationStatusRead;
+}): BitbucketConnection {
+  const { readiness, status } = input;
+
+  // Rule 1 — the token integration wins: the status read may still carry an
+  // OAuth answer from before the token was connected.
+  if (readiness.data?.connected === true) {
+    return { kind: 'token-connected', readiness: readiness.data };
+  }
+
+  // Rule 2/3 — an OAuth authorization answers for the whole organization.
+  if (status.data?.method === 'oauth') {
+    const oauthStatus = status.data.status;
+    if (oauthStatus === 'connected') {
+      return {
+        kind: 'oauth-connected',
+        workspace: {
+          slug: status.data.workspace?.slug ?? null,
+          displayName: status.data.workspace?.displayName ?? null,
+        },
+      };
+    }
+    if (oauthStatus === 'workspace_selection_required' || oauthStatus === 'reconnect_required') {
+      return { kind: 'oauth-attention' };
+    }
+    // `not_connected` under `method: 'oauth'` cannot occur from the server
+    // (an OAuth row answers only from an existing integration), but the
+    // readiness data below still decides between not-connected and error.
+  }
+
+  // Rule 4 — loading: a read that has no answer yet and may still land. The
+  // readiness read answering first is not an answer about the connection: a
+  // workspace with no token row reads `connected: false` while the status read
+  // that names an OAuth authorization is still in flight, so a pending status
+  // holds the surface rather than letting it claim "not connected". `isPending`
+  // is a first fetch that has not decided; `isLoading` adds `isFetching`, and
+  // neither reads as loading once that read has failed — the same
+  // settled-on-failure shape the provider-state classifier keeps out of the
+  // loading state.
+  const readinessDeciding =
+    !readiness.isError && (readiness.isLoading || readiness.isPending === true);
+  const statusDeciding =
+    !status.isError && (status.isLoading === true || status.isPending === true);
+  if (readinessDeciding || (status.data === undefined && statusDeciding)) {
+    return { kind: 'loading' };
+  }
+
+  // Rule 5 — error: a read that failed without data decides the variant, the
+  // readiness failure preferred when both failed. The two reads name one
+  // connection, so a retry re-runs both: one re-read alone could leave the
+  // other's stale answer on screen.
+  const readinessFailed = readiness.data === undefined && readiness.isError;
+  const statusFailed = status.data === undefined && status.isError;
+  if (readinessFailed || statusFailed) {
+    const failedRead = readinessFailed ? readiness : status;
+    const { permanent, variant } = classifyProviderErrorCode(
+      readTrpcErrorField(failedRead.error, 'code')
+    );
+    return {
+      kind: 'error',
+      permanent,
+      variant,
+      refetch: () => {
+        readiness.refetch();
+        status.refetch();
+      },
+      isRetrying: failedRead.isFetching,
+    };
+  }
+
+  // Rule 6 — whatever readiness answered (or not) is the whole answer.
+  return { kind: 'not-connected', readiness: readiness.data };
+}
+
+/**
+ * Whether the web page owns this connection. An OAuth authorization has no
+ * token the app can replace and no form the server would accept, so every
+ * surface states that fact instead of offering an action.
+ */
+export function isWebManagedConnection(
+  connection: BitbucketConnection
+): connection is Extract<
+  BitbucketConnection,
+  { kind: 'oauth-connected' } | { kind: 'oauth-attention' }
+> {
+  return connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention';
+}
+
+/** The one word the platform list paints beside the Bitbucket row. */
+export type BitbucketRowStatus =
+  | 'checking'
+  | 'status-unavailable'
+  | 'connected'
+  | 'needs-attention'
+  | 'not-connected';
+
+const ROW_STATUS_BY_CONNECTION = {
+  loading: 'checking',
+  error: 'status-unavailable',
+  'token-connected': 'connected',
+  'oauth-connected': 'connected',
+  'oauth-attention': 'needs-attention',
+  'not-connected': 'not-connected',
+} as const satisfies Record<BitbucketConnection['kind'], BitbucketRowStatus>;
+
+export function bitbucketRowStatus(connection: BitbucketConnection): BitbucketRowStatus {
+  return ROW_STATUS_BY_CONNECTION[connection.kind];
 }

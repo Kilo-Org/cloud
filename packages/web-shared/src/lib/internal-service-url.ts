@@ -28,8 +28,7 @@ export function parseInternalServiceUrl(value: string | null | undefined): URL |
  * the rule accepted instead of from string concatenation.
  *
  * The path must be absolute on that endpoint. A path outside that form counts as
- * unconfigured, and the resolved URL must keep the endpoint's origin, so the request URL
- * always derives from the value the rule accepted.
+ * unconfigured, and the resolved URL must keep the endpoint's origin.
  */
 export function parseInternalServiceEndpoint(
   value: string | null | undefined,

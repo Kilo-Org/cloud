@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   buildGlanceableSnapshot,
+  isApprovableGlanceableStatus,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { timestampToIso } from '@kilocode/app-shared/utils';
@@ -31,13 +32,15 @@ type HomeWidgetScope = { userId: string; organizationId: string | null };
  * The permission row the widget offers Approve for: the `permission` row with
  * the earliest usable `statusUpdatedAt`, timestamp-less rows last, list order
  * breaking ties. Mirrors mobile `pickFrontApprovableSession`, so the key binds
- * the row the app re-validates against.
+ * the row the app re-validates against. The eligibility test is the shared
+ * `isApprovableGlanceableStatus` rule, so this picker, the `needsApproval`
+ * count and the Home widget's approving row cannot drift.
  */
 function pickFrontPermissionRow(sessions: readonly ActiveSession[]): ActiveSession | null {
   let front: ActiveSession | null = null;
   let frontAt: number | null = null;
   for (const row of sessions) {
-    if (row.status !== 'permission') continue;
+    if (!isApprovableGlanceableStatus(row.status)) continue;
     const parsed = row.statusUpdatedAt === undefined ? Number.NaN : Date.parse(row.statusUpdatedAt);
     const at = Number.isNaN(parsed) ? null : parsed;
     if (front === null || (at !== null && (frontAt === null || at < frontAt))) {
@@ -191,11 +194,8 @@ export type GlanceableDelivery = {
 const LIVE_PR_STATES = new Set(['open', 'draft', 'unknown']);
 
 /**
- * True when the session's pull request is worth telling the user about: a
- * link GitHub verified for this session (the session list's own rule for
- * `associatedPr`), whose pull request is still open or a draft, or not yet
- * synced. A merged or closed pull request, and a stored link nobody verified,
- * do not count.
+ * True when the session's pull request is worth telling the user about. A
+ * stored link nobody verified never counts.
  */
 export function isSessionCardPrOpened(pr: { verified: boolean; state: string | null }): boolean {
   return pr.verified && LIVE_PR_STATES.has(pr.state ?? 'unknown');

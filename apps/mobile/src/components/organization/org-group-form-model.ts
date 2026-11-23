@@ -5,17 +5,51 @@
  * rules.
  */
 
+import { hasVisibleText } from '@kilocode/app-shared/text';
+import { foldForSearch } from '@/i18n/fold-for-search';
+import * as z from 'zod';
+
 /** `OrganizationGroupMetadataSchema.name` bound, and the field's `maxLength`. */
 export const ORG_GROUP_NAME_MAX_LENGTH = 80;
 
 /** `OrganizationGroupMetadataSchema.description` bound, and the field's `maxLength`. */
 export const ORG_GROUP_DESCRIPTION_MAX_LENGTH = 500;
 
+/** A group form's durable draft: its two texts, its member selection and search. */
+export type OrgGroupFormDraft = {
+  name: string;
+  description: string;
+  memberIds: readonly string[];
+  memberQuery: string;
+};
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgGroupFormDraftSchema = z.strictObject({
+  name: z.string(),
+  description: z.string(),
+  memberIds: z.array(z.string()),
+  memberQuery: z.string(),
+});
+
+/** Shape guard for a stored group form draft; another build's value is refused. */
+export function isOrgGroupFormDraft(value: unknown): value is OrgGroupFormDraft {
+  return orgGroupFormDraftSchema.safeParse(value).success;
+}
+
 export type OrgGroupNameError = 'required' | 'tooLong' | null;
 
+/**
+ * The name verdict the form shows, matching `OrganizationGroupNameSchema` on the
+ * server: a value made only of zero-width or control characters is as empty as
+ * spaces, so it is `required` and the form keeps the existing copy for it.
+ */
 export function orgGroupNameError(name: string): OrgGroupNameError {
   const trimmed = name.trim();
-  if (trimmed.length === 0) {
+  if (!hasVisibleText(trimmed)) {
     return 'required';
   }
   return trimmed.length > ORG_GROUP_NAME_MAX_LENGTH ? 'tooLong' : null;
@@ -101,4 +135,74 @@ export function isOrgGroupFormDirty(
     values.memberIds.length !== initial.memberIds.length ||
     values.memberIds.some(id => !initial.memberIds.includes(id))
   );
+}
+
+/** How a group form leaves to the Groups list. */
+export type OrgGroupFormExit =
+  | {
+      kind: 'list';
+      /** The key of the list route the pop-to truncates to. */
+      listRouteKey: string;
+    }
+  | { kind: 'back' }
+  | { kind: 'push-list' };
+
+/**
+ * The way out of a saved group's form.
+ *
+ * The reader reaches this form from the Groups list, so returning to it truncates
+ * the stack with one pop-to commit over the list that is already beneath. That
+ * truncation also cuts a form the reader can never see again: the create form
+ * this screen replaced on the first save stays in the stack when the retire that
+ * `stack-safe-replace` schedules is dropped (its transition end is lost inside
+ * the hook's short bound), and a plain pop would then land on that stale create
+ * form, prefilled with the saved group's name — one Save away from a duplicate.
+ *
+ * Pop-to with no matching route rewrites the stack in one commit — the
+ * remove-and-insert shape that crashes the Android native stack
+ * (`stack-safe-replace.ts`) — so when no list is beneath, the form goes back to
+ * the route that opened it. A form with nothing beneath it — restored or linked
+ * as the only route of its stack — has neither a pop to make nor a list to
+ * reuse: it replaces itself with the list through the stack-safe replace.
+ */
+export function orgGroupFormExit({
+  routes,
+  currentIndex,
+  listRouteName,
+}: Readonly<{
+  /** The routes of the Stack this form is mounted in, bottom first. */
+  routes: readonly { readonly name: string; readonly key: string }[];
+  /** The index of this form in `routes`. */
+  currentIndex: number;
+  /** The route name the Groups list registers in this Stack. */
+  listRouteName: string;
+}>): OrgGroupFormExit {
+  // The nearest list beneath: the pop-to truncates the stack to it, so its key
+  // is the scene the leave reveals.
+  const listIndex = routes
+    .slice(0, Math.max(currentIndex, 0))
+    .findLastIndex(route => route.name === listRouteName);
+  if (listIndex !== -1) {
+    const route = routes[listIndex];
+    if (route !== undefined) {
+      return { kind: 'list', listRouteKey: route.key };
+    }
+  }
+  return currentIndex <= 0 ? { kind: 'push-list' } : { kind: 'back' };
+}
+
+/**
+ * The members a group form's search keeps, in the server's order. Folds case
+ * and diacritics on both sides, so a query for "anais" keeps "Anaís" and a
+ * query for the email still matches.
+ */
+export function filterOrgGroupMembers<T extends Readonly<{ name: string; email: string }>>(
+  members: readonly T[],
+  query: string
+): readonly T[] {
+  const needle = foldForSearch(query.trim());
+  if (needle.length === 0) {
+    return members;
+  }
+  return members.filter(member => foldForSearch(`${member.name} ${member.email}`).includes(needle));
 }

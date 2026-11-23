@@ -22,14 +22,14 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { User } from '@kilocode/db/schema';
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 const mockedGetEnhancedOpenRouterModels =
   getEnhancedOpenRouterModels as unknown as jest.MockedFunction<typeof getEnhancedOpenRouterModels>;
 
-function makeOpenRouterModel(id: string): OpenRouterModel {
+function makeOpenRouterModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,

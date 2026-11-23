@@ -5,14 +5,18 @@ import { ScrollView, View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import {
   SettingsSection,
-  SettingsSwitchRow,
   SettingsValueRow,
 } from '@/components/organization/settings-form-sections';
 import { QueryError } from '@/components/query-error';
 import { Settings2 } from '@/components/ui/icons';
 import { MenuSheet } from '@/components/ui/menu-sheet';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 import {
   type OrgGatewaySettings,
   useSaveOrgGatewaySettings,
@@ -43,6 +47,7 @@ const REGION_CHOICES = [
  */
 export function GatewaySettingsSection({
   organizationId,
+  canManageBilling = false,
   settings,
   isError,
   isFetching,
@@ -50,6 +55,8 @@ export function GatewaySettingsSection({
   onRetry,
 }: Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   settings: OrgGatewaySettings | undefined;
   isError: boolean;
   isFetching: boolean;
@@ -57,98 +64,114 @@ export function GatewaySettingsSection({
   onRetry: () => void;
 }>) {
   const { t } = useTranslation();
-  const save = useSaveOrgGatewaySettings(organizationId);
+  // The Models and Providers tabs hand their rows to a list frame that carries
+  // the window's side insets; this tab has no such frame, so its own body takes
+  // them and the three tabs keep one column on a landscape display cutout.
+  const sideInsetStyle = useSideInsetStyle();
+  const save = useSaveOrgGatewaySettings(organizationId, canManageBilling);
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
   const region: RegionChoice = settings?.data_region ?? 'global';
 
+  // Every state of this tab keeps the same column: the loaded body below takes
+  // the inset on its own frame, so the failure, pending and unavailable states
+  // take it here rather than jumping sideways when the settings arrive.
   if (isError && settings == null) {
     return (
-      <QueryError
-        className="bg-background"
-        message={t('organizationModelAccess.loadError')}
-        onRetry={onRetry}
-        isRetrying={isFetching}
-      />
+      <View className="flex-1" style={sideInsetStyle}>
+        <QueryError
+          className="bg-background"
+          message={t('organizationModelAccess.loadError')}
+          onRetry={onRetry}
+          isRetrying={isFetching}
+        />
+      </View>
     );
   }
 
   if (settings == null) {
     return (
-      <View className="gap-3 px-4 pt-4">
-        <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
+      <View style={sideInsetStyle}>
+        <View className="gap-3 px-4 pt-3">
+          <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
+        </View>
       </View>
     );
   }
 
   if (!settings.available) {
     return (
-      <EmptyState
-        placement="top"
-        className="bg-background px-4 pt-4"
-        icon={Settings2}
-        title={t('organizationModelAccess.gatewaysUnavailable')}
-      />
+      <View className="flex-1" style={sideInsetStyle}>
+        <EmptyState
+          placement="top"
+          inset="gutter"
+          className="bg-background pt-4"
+          icon={Settings2}
+          title={t('organizationModelAccess.gatewaysUnavailable')}
+        />
+      </View>
     );
   }
 
   const disabled = !canEdit || save.isPending;
 
   return (
-    <ScrollView
-      className="flex-1"
-      contentContainerClassName="px-4 pt-4 pb-10 gap-3"
-      keyboardShouldPersistTaps="handled"
-    >
-      <SettingsSection
-        title={t('organizationModelAccess.tabGateways')}
-        description={t('organizationModelAccess.gatewaysDescription')}
+    <View className="flex-1" style={sideInsetStyle}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-10')}
+        keyboardShouldPersistTaps="handled"
       >
-        <SettingsSwitchRow
-          label={t('organizationModelAccess.openrouter')}
-          description={t('organizationModelAccess.openrouterNote')}
-          value={!settings.disable_openrouter}
-          disabled={disabled}
-          onValueChange={enabled => {
-            save.mutate({ organizationId, disable_openrouter: !enabled });
+        <SettingsSection
+          title={t('organizationModelAccess.tabGateways')}
+          description={t('organizationModelAccess.gatewaysDescription')}
+        >
+          <RowGroup>
+            <PreferenceRow
+              title={t('organizationModelAccess.openrouter')}
+              subtitle={t('organizationModelAccess.openrouterNote')}
+              value={!settings.disable_openrouter}
+              disabled={disabled}
+              onValueChange={enabled => {
+                save.mutate({ organizationId, disable_openrouter: !enabled });
+              }}
+            />
+            <SettingsValueRow
+              label={t('organizationModelAccess.inferenceRegion')}
+              value={t(REGION_KEYS[region])}
+              disabled={disabled}
+              onPress={() => {
+                setRegionPickerOpen(true);
+              }}
+            />
+          </RowGroup>
+          <View className="gap-3">
+            <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
+            <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
+          </View>
+        </SettingsSection>
+        <MenuSheet
+          visible={regionPickerOpen}
+          title={t('organizationModelAccess.inferenceRegion')}
+          options={REGION_CHOICES.map(choice => ({
+            label: t(REGION_KEYS[choice]),
+            selected: region === choice,
+          }))}
+          cancelLabel={t('common.cancel')}
+          onSelect={index => {
+            const choice = REGION_CHOICES[index];
+            setRegionPickerOpen(false);
+            if (choice !== undefined) {
+              save.mutate({
+                organizationId,
+                data_region: choice === 'global' ? null : choice,
+              });
+            }
+          }}
+          onClose={() => {
+            setRegionPickerOpen(false);
           }}
         />
-        <SettingsValueRow
-          label={t('organizationModelAccess.inferenceRegion')}
-          value={t(REGION_KEYS[region])}
-          disabled={disabled}
-          onPress={() => {
-            setRegionPickerOpen(true);
-          }}
-        />
-        <Text className="text-xs text-muted-foreground">
-          {t('organizationModelAccess.inferenceRegionDescription')}
-        </Text>
-        <Text className="text-xs text-muted-foreground">
-          {t('organizationModelAccess.disableOpenrouterNote')}
-        </Text>
-      </SettingsSection>
-      <MenuSheet
-        visible={regionPickerOpen}
-        title={t('organizationModelAccess.inferenceRegion')}
-        options={REGION_CHOICES.map(choice => ({
-          label: t(REGION_KEYS[choice]),
-          selected: region === choice,
-        }))}
-        cancelLabel={t('common.cancel')}
-        onSelect={index => {
-          const choice = REGION_CHOICES[index];
-          setRegionPickerOpen(false);
-          if (choice !== undefined) {
-            save.mutate({
-              organizationId,
-              data_region: choice === 'global' ? null : choice,
-            });
-          }
-        }}
-        onClose={() => {
-          setRegionPickerOpen(false);
-        }}
-      />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

@@ -343,6 +343,39 @@ describe('GitHubTokenService', () => {
     );
   });
 
+  it('bypasses token caches and requests only metadata for live repository verification', async () => {
+    const tokenCache = createTokenCache();
+    const auth = vi.fn().mockResolvedValue({
+      token: 'fresh-token',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+    vi.mocked(createAppAuth).mockReturnValue(Object.assign(auth, { hook: vi.fn() }));
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+      TOKEN_CACHE: tokenCache,
+    } as unknown as CloudflareEnv);
+    const signal = new AbortController().signal;
+
+    await expect(
+      service.getFreshTokenForRepositorySelection(
+        '123',
+        'standard',
+        { repositoryNames: ['repo'] },
+        signal
+      )
+    ).resolves.toBe('fresh-token');
+    expect(Octokit).toHaveBeenCalledWith({ request: { signal } });
+    expect(auth).toHaveBeenCalledWith({
+      type: 'installation',
+      repositoryNames: ['repo'],
+      permissions: { metadata: 'read' },
+      refresh: true,
+    });
+    expect(tokenCache.get).not.toHaveBeenCalled();
+    expect(tokenCache.put).not.toHaveBeenCalled();
+  });
+
   it('refreshes installation account login and stores a fifteen minute cooldown marker', async () => {
     const tokenCache = createTokenCache();
     vi.mocked(createAppAuth).mockReturnValue(
@@ -365,6 +398,26 @@ describe('GitHubTokenService', () => {
     );
     expect(Octokit).toHaveBeenCalledWith({ auth: 'app-jwt' });
     expect(mockGetInstallation).toHaveBeenCalledWith({ installation_id: 123 });
+  });
+
+  it('applies a supplied timeout to the installation login refresh request', async () => {
+    const auth = vi.fn().mockResolvedValue({ token: 'app-jwt' });
+    vi.mocked(createAppAuth).mockReturnValue(Object.assign(auth, { hook: vi.fn() }));
+    mockGetInstallation.mockResolvedValue({ data: { account: { login: 'renamed-owner' } } });
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+    } as CloudflareEnv);
+    const timeouts = vi.spyOn(AbortSignal, 'timeout');
+
+    await expect(
+      service.refreshInstallationAccountLoginIfDue('123', 'standard', 4_000)
+    ).resolves.toBe('renamed-owner');
+    expect(timeouts).toHaveBeenCalledExactlyOnceWith(4_000);
+    expect(mockGetInstallation).toHaveBeenCalledExactlyOnceWith({
+      installation_id: 123,
+      request: { signal: timeouts.mock.results[0]?.value },
+    });
   });
 
   it('suppresses installation login refresh during the cooldown window', async () => {

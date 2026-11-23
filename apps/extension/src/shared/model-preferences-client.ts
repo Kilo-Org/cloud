@@ -26,17 +26,33 @@ export class ModelPreferencesError extends Error {
   }
 }
 
-interface ModelPreferencesClientOptions {
+interface ModelPreferencesBaseOptions {
   readonly apiBaseUrl: string;
   readonly fetch: FetchLike;
-  readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal;
   readonly token: string;
 }
 
-type ModelFavoriteMutationOptions = ModelPreferencesClientOptions & {
+interface ModelPreferencesClientOptions extends ModelPreferencesBaseOptions {
+  readonly organizationId?: string | undefined;
+}
+
+interface ModelFavoriteMutationOptions extends ModelPreferencesBaseOptions {
   readonly model: string;
-};
+}
+
+/* The read accepts an organization scope; the mutations are per user and carry none. */
+type ModelPreferencesRequestOptions<Data> = {
+  readonly apiBaseUrl: string;
+  readonly fetch: FetchLike;
+  readonly procedure: string;
+  readonly signal?: AbortSignal;
+  readonly successEnvelopeSchema: z.ZodType<{ result: { data: Data } }>;
+  readonly token: string;
+} & (
+  | { readonly method: 'GET'; readonly organizationId?: string | undefined }
+  | { readonly body: string; readonly method: 'POST' }
+);
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
@@ -134,38 +150,21 @@ const performModelPreferencesFetch = async ({
   }
 };
 
-const requestModelPreferences = async <Data>({
-  apiBaseUrl,
-  body,
-  successEnvelopeSchema,
-  fetch,
-  method,
-  organizationId,
-  procedure,
-  signal,
-  token,
-}: {
-  readonly apiBaseUrl: string;
-  readonly body?: string;
-  readonly successEnvelopeSchema: z.ZodType<{ result: { data: Data } }>;
-  readonly fetch: FetchLike;
-  readonly method: 'GET' | 'POST';
-  readonly organizationId?: string | undefined;
-  readonly procedure: string;
-  readonly signal?: AbortSignal;
-  readonly token: string;
-}): Promise<Data> => {
+const requestModelPreferences = async <Data>(
+  options: ModelPreferencesRequestOptions<Data>
+): Promise<Data> => {
+  const { apiBaseUrl, fetch, procedure, signal, successEnvelopeSchema, token } = options;
   const url =
-    method === 'GET'
-      ? buildProcedureUrl(apiBaseUrl, procedure, getQueryInput(organizationId))
+    options.method === 'GET'
+      ? buildProcedureUrl(apiBaseUrl, procedure, getQueryInput(options.organizationId))
       : buildProcedureUrl(apiBaseUrl, procedure);
 
   const response = await performModelPreferencesFetch({
     fetch,
-    method,
+    method: options.method,
     token,
     url,
-    ...(body === undefined ? {} : { body }),
+    ...(options.method === 'POST' ? { body: options.body } : {}),
     ...(signal === undefined ? {} : { signal }),
   });
   // eslint-disable-next-line unicorn/no-useless-undefined -- initialized in the try block below
@@ -247,11 +246,14 @@ export const fetchModelPreferences = async ({
   return { favorites: data.favorites, lastSelected: data.lastSelected };
 };
 
+/*
+ * Favorites are stored per user, so add and remove are unscoped on purpose:
+ * neither mutation takes the organization selector the read accepts.
+ */
 export const addModelFavorite = async ({
   apiBaseUrl,
   fetch,
   model,
-  organizationId,
   signal,
   token,
 }: ModelFavoriteMutationOptions): Promise<void> => {
@@ -263,7 +265,6 @@ export const addModelFavorite = async ({
     procedure: 'modelPreferences.addFavorite',
     successEnvelopeSchema: mutationSuccessEnvelopeSchema,
     token,
-    ...(organizationId === undefined ? {} : { organizationId }),
     ...(signal === undefined ? {} : { signal }),
   });
 };
@@ -272,7 +273,6 @@ export const removeModelFavorite = async ({
   apiBaseUrl,
   fetch,
   model,
-  organizationId,
   signal,
   token,
 }: ModelFavoriteMutationOptions): Promise<void> => {
@@ -284,7 +284,6 @@ export const removeModelFavorite = async ({
     procedure: 'modelPreferences.removeFavorite',
     successEnvelopeSchema: mutationSuccessEnvelopeSchema,
     token,
-    ...(organizationId === undefined ? {} : { organizationId }),
     ...(signal === undefined ? {} : { signal }),
   });
 };

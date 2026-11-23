@@ -132,7 +132,7 @@ describe('Cloud Agent Durable Object real SDK boundaries', () => {
         lifecycle: { version: 1, timestamp: 1 },
       });
       const session = new InstrumentedSession(ctx, telemetryEnv);
-      await expect(session.assertCloudAgentManagementAuthority(null)).rejects.toThrow();
+      await expect(session.finishWorktreeDeletion('not-a-worktree')).rejects.toThrow();
     });
     await captured(1);
     expect(events[0]?.user).toEqual({ id: userId });

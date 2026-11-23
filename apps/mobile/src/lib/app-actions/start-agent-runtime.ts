@@ -11,9 +11,11 @@
 
 import * as Crypto from 'expo-crypto';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { type ParsedActionRepository } from '@/lib/app-actions/app-action-contract';
+import { i18n } from '@/i18n';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
@@ -68,7 +70,7 @@ export type StartAgentOutbox = {
     fingerprint: string;
     input: unknown;
   }) => Promise<void>;
-  removeOutboxRow: (fingerprint: string) => Promise<void>;
+  removeOutboxRow: (fingerprint: string) => Promise<boolean>;
 };
 
 // ── Operation key ─────────────────────────────────────────────────────
@@ -142,7 +144,8 @@ export async function modelCatalog(): Promise<ModelOption[] | null> {
     if (!response.ok) {
       return null;
     }
-    return toModelOptions(OpenRouterModelsResponseSchema.parse(await response.json()));
+    const catalog = OpenRouterModelsResponseSchema.parse(await response.json());
+    return toModelOptions(catalog, i18n.language);
   } catch {
     return null;
   }
@@ -221,8 +224,8 @@ export function createOutbox(userId: string): StartAgentOutbox {
       const operationKey = storedKeyFor(rows, row.fingerprint) ?? row.operationKey;
       await writeOutboxRow(userId, { ...row, operationKey, taxonomy: 'safe-retry' });
     },
-    async removeOutboxRow(fingerprint): Promise<void> {
-      await removeStoredOutboxRow(userId, fingerprint);
+    removeOutboxRow(fingerprint: string): Promise<boolean> {
+      return removeStoredOutboxRow(userId, fingerprint);
     },
   };
 }

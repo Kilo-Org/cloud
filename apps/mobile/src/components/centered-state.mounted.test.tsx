@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
+import { REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT } from '@/components/ui/refresh-progress';
 
 import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
@@ -56,9 +57,11 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   // Portrait by default, so the short-band flag the scroller publishes stays
   // false and a state inside it keeps its full stack.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ ...native.window, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
@@ -72,17 +75,37 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: () => null,
   AlertCircle: () => null,
   Lock: () => null,
+  RotateCcw: () => null,
   SearchX: () => null,
   ServerCrash: () => null,
   WifiOff: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn<() => void>() }) }));
+// The invalid-route state's Back hands off through the settled-replace hook (a
+// literal `router.replace` crashes Android Fabric); this suite only renders the
+// state's placement.
+vi.mock('@/lib/navigation/settled-replace', () => ({
+  useSettledReplace: () => ({ replace: vi.fn() }),
+}));
+
+// The reduced-motion policy a mounted state reads, and the one `RefreshProgress`
+// reads: both come from one provider on a device, so one mock serves both.
+const motion = vi.hoisted(() => ({ reducedMotion: false }));
+
+vi.mock('@/lib/a11y/motion-context', () => ({
+  useProvidedMotionPolicy: () => ({
+    reducedMotion: motion.reducedMotion,
+    scrollAnimated: !motion.reducedMotion,
+  }),
+}));
 
 const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
@@ -125,11 +148,20 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
   act(() => {
     contentNode()?.props.onLayout?.(contentLayout as LayoutChangeEvent);
   });
+  // The scroller's own layout event is the only thing that starts a
+  // measurement: a mount requests none, so a test that expects a measured
+  // placement fires it before draining `native.measurements`.
+  const scrollLayout = () => {
+    act(() => {
+      scroll().onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+  };
   return {
     ...mounted,
     content,
     contentNode,
     scroll,
+    scrollLayout,
     rerender: () => {
       act(() => {
         rerender?.();
@@ -181,6 +213,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  motion.reducedMotion = false;
 });
 
 describe('Shared state placement', () => {
@@ -254,9 +287,75 @@ describe('Shared state placement', () => {
 });
 
 describe('CenteredState measurements', () => {
+  it('starts one measurement for a mount, not two', async () => {
+    // The mount commit used to start two requests — the measuring callback ref
+    // for the scroller and the mount layout effect — and the token guard
+    // discarded one of them on every mount. The scroller's own layout event is
+    // the only trigger now, so a mount plus one event is exactly one request.
+    const mounted = await mount();
+    expect(native.measureInWindow).not.toHaveBeenCalled();
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  it('starts no second request in the commit that mounts the scroller', async () => {
+    // The second request on a mount came from the mount effect, not from a
+    // second layout event, so one event must cost exactly one measurement and
+    // only a new event may add another.
+    const mounted = await mount();
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(2);
+    mounted.unmount();
+  });
+
+  it('keeps the scroller ref callback across a window change', async () => {
+    // The callback ref used to be rebuilt from the measurement, so a window
+    // height change detached the node and re-attached it, which marked the
+    // state unplaceable on the way back.
+    const mounted = await mount();
+    mounted.scrollLayout();
+    mounted.settle(380, 340);
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({
+      minHeight: 340,
+      paddingBottom: 16,
+    });
+    expect(native.measureInWindow).toHaveBeenCalledTimes(1);
+    const refBefore = (
+      mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<typeof ScrollView>
+    ).ref;
+
+    native.window = { width: 400, height: 700 };
+    mounted.rerender();
+    expect(
+      (
+        mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
+          typeof ScrollView
+        >
+      ).ref
+    ).toBe(refBefore);
+    // The shortened band waits for its own measurement; the placement already
+    // painted is not carried into a window it was not measured against.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+
+    mounted.scrollLayout();
+    expect(native.measureInWindow).toHaveBeenCalledTimes(2);
+    mounted.settle(380, 340);
+    // The new window clips the scroller 20 above its bottom, so the placement
+    // carries that clip and the state is placed, not left at the estimate.
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 36,
+    });
+    mounted.unmount();
+  });
+
   it('keeps a horizontal inset on the content box, not the scroller', async () => {
-    // The scroller's own padding does not narrow the scroll content, so an inset
-    // set through `className` leaves the end side flush in a right-to-left layout.
     const mounted = await mount({
       className: 'bg-background',
       contentContainerClassName: 'px-6',
@@ -281,6 +380,7 @@ describe('CenteredState measurements', () => {
       } else {
         expectPainted(mounted);
       }
+      mounted.scrollLayout();
       mounted.settle();
       expectPainted(mounted);
       expect(mounted.scroll().contentContainerStyle).toEqual({
@@ -312,14 +412,11 @@ describe('CenteredState measurements', () => {
   ] as const)(
     'holds a state out of %s until its scroller measures',
     async (_name, band, bandHeight) => {
-      // The estimate centers in the scroller and carries the bottom reserve, which
-      // is the band placement only when the band starts at the scroller's top. A
-      // moved band gets the scroller's own frame first, so no frame paints a
-      // position the measurement then corrects.
       band();
       const mounted = await mount();
       expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
       expect(mounted.scroll().contentContainerStyle).toBeUndefined();
+      mounted.scrollLayout();
       mounted.settle(80, 340);
       expectPainted(mounted);
       expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: bandHeight });
@@ -334,6 +431,7 @@ describe('CenteredState measurements', () => {
     native.surface.bottomInset = 78;
     const mounted = await mount();
     expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
+    mounted.scrollLayout();
     act(() => {
       for (const onMeasure of native.measurements.splice(0)) {
         onMeasure(0, Number.NaN, 400, Number.NaN);
@@ -351,6 +449,7 @@ describe('CenteredState measurements', () => {
 
   it('waits for finite native viewport bounds without hiding the state', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     act(() => {
       for (const onMeasure of native.measurements.splice(0)) {
         onMeasure(0, Number.NaN, 400, Number.NaN);
@@ -373,10 +472,9 @@ describe('CenteredState measurements', () => {
     // scene re-attaching its host view, a native clip edge arriving late — is no
     // reason to move a state that is already on screen.
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle(80, 340);
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
+    mounted.scrollLayout();
     const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
@@ -394,11 +492,12 @@ describe('CenteredState measurements', () => {
 
   it('drops a stale viewport when the window it was measured in changes', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
     expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
+    // A request still in flight when the window changes describes the band it
+    // was started for, so its answer must not place the state in the new one.
+    mounted.scrollLayout();
     const stale = native.measurements.splice(0);
     native.window = { width: 400, height: 700 };
     mounted.rerender();
@@ -413,6 +512,7 @@ describe('CenteredState measurements', () => {
     // A viewport measured against the old window is not reused for the new one.
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    mounted.scrollLayout();
     mounted.settle(380, 340);
     expectPainted(mounted);
     // Content taller than the shortened band scrolls from its top, and the
@@ -428,10 +528,9 @@ describe('CenteredState measurements', () => {
 
   it('keeps a revealed state on screen with its placement when its scroller detaches', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
-    act(() => {
-      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
-    });
+    mounted.scrollLayout();
     const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     const props = mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
@@ -441,12 +540,10 @@ describe('CenteredState measurements', () => {
       throw new TypeError('Expected a measuring callback ref');
     }
     const ref = props.ref;
+    const beforeDetach = native.measureInWindow.mock.calls.length;
     act(() => {
       ref(null);
     });
-    // The host view re-attaches on a screen's return, and the band it had is
-    // the band it still has: the placement must survive the gap rather than
-    // re-center and jump back.
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
@@ -459,6 +556,13 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
+    // Recording the node only records it: neither the detach nor the re-attach
+    // starts a request, so the placement stays and no answer is discarded.
+    expect(native.measureInWindow.mock.calls).toHaveLength(beforeDetach);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    mounted.scrollLayout();
+    expect(native.measureInWindow.mock.calls).toHaveLength(beforeDetach + 1);
     mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
@@ -467,6 +571,7 @@ describe('CenteredState measurements', () => {
 
   it('keeps the state painted and placed while the surface re-measures', async () => {
     const mounted = await mount();
+    mounted.scrollLayout();
     mounted.settle();
     expectPainted(mounted);
     const placed = mounted.scroll().contentContainerStyle;
@@ -479,11 +584,11 @@ describe('CenteredState measurements', () => {
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     native.surface.frame = frame;
     mounted.rerender();
-    mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     // An unreadable re-measure leaves the state painted at the pending
     // placement; the next readable measurement places it again.
+    mounted.scrollLayout();
     mounted.settle(0, 0);
     expectPainted(mounted);
     act(() => {
@@ -523,6 +628,7 @@ describe('CenteredState first-frame paint', () => {
     cycle();
 
     // A real measurement still wins and replaces the pending placement.
+    mounted.scrollLayout();
     mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual({
@@ -556,13 +662,6 @@ describe('CenteredState first-frame paint', () => {
   });
 
   it('holds the state until a pending native surface reports, then paints it placed', async () => {
-    // A pushed stack screen paints its surface insets 0/0 while the native
-    // geometry probe is still arriving; the probe's safe-area bottom then
-    // raises the band bottom and a state painted from the estimate jumped up
-    // half the band change after it first appeared (explorer:android
-    // layout-jump, Recent Reviews). A pending native surface is a band the
-    // estimate cannot place, so the state waits for the surface's frame — and
-    // its first painted placement already carries the reported insets.
     native.surface.frame = null;
     native.surface.bounds = null;
     native.surface.source = 'pending';
@@ -585,6 +684,7 @@ describe('CenteredState first-frame paint', () => {
     native.surface.topInset = 52;
     native.surface.bottomInset = 24;
     held.rerender();
+    held.scrollLayout();
     held.settle(80, 900 - 80);
     expectPainted(held);
     // First paint: the band style built from the reported insets. The band
@@ -628,6 +728,7 @@ describe('CenteredState first-frame paint', () => {
     native.surface.topInset = 0;
     native.surface.bottomInset = 0;
     const heldLate = await mount();
+    heldLate.scrollLayout();
     heldLate.settle(80, 900 - 80);
     expect(heldLate.contentNode()).toBeUndefined();
     expect(heldLate.scroll().contentContainerStyle).toBeUndefined();
@@ -653,5 +754,61 @@ describe('CenteredState first-frame paint', () => {
     };
     expect(placedLate.paddingTop).toBeCloseTo(304, 5);
     heldLate.unmount();
+  });
+});
+
+describe('CenteredState reduced-motion refresh reserve', () => {
+  // `RefreshProgress` is the first in-flow child of the measured content box, so
+  // under reduced motion it adds its 31.5dp `h-9` box above the visible stack.
+  // The placement must centre the stack, not the box that carries it.
+  const refreshControl = createElement('RefreshControl', { refreshing: false });
+  const RESERVE = REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT;
+
+  it('centres the visible stack above the reserve instead of the box', async () => {
+    motion.reducedMotion = true;
+    const reduced = await mount({ refreshControl });
+    reduced.scrollLayout();
+    reduced.settle(80, 820);
+    const reducedStyle = reduced.scroll().contentContainerStyle as {
+      minHeight: number;
+      paddingTop: number;
+      paddingBottom: number;
+    };
+    reduced.unmount();
+
+    motion.reducedMotion = false;
+    const plain = await mount({ refreshControl });
+    plain.scrollLayout();
+    plain.settle(80, 820);
+    const plainStyle = plain.scroll().contentContainerStyle as {
+      minHeight: number;
+      paddingTop: number;
+      paddingBottom: number;
+    };
+    plain.unmount();
+
+    // The reserve is subtracted before centring, so the box that carries it
+    // starts half the reserve higher: 15.75dp, reported as 15.5 because the
+    // harness rounds every padding to half a pixel.
+    expect(plainStyle.paddingTop - reducedStyle.paddingTop).toBe(15.5);
+
+    // The band is the scroller's 80..900, its centre 490. The visible stack
+    // starts one reserve below the box and is [contentHeight - reserve] tall,
+    // so its centre lands on the band's centre rather than 15.75 below it.
+    const stackTop = reducedStyle.paddingTop + 80 + RESERVE;
+    expect(stackTop + (700 - RESERVE) / 2).toBeCloseTo(490, 0);
+
+    // No refresh control reserves nothing: the placement is what it always was.
+    motion.reducedMotion = true;
+    const plainWithoutRefresh = await mount();
+    plainWithoutRefresh.scrollLayout();
+    plainWithoutRefresh.settle(80, 820);
+    expect(plainWithoutRefresh.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 820,
+      paddingTop: 60,
+      paddingBottom: 60,
+    });
+    plainWithoutRefresh.unmount();
   });
 });

@@ -38,7 +38,7 @@ type ParsedIPv6Range = {
   mask: bigint;
 };
 
-function parseIPv6(ip: string): bigint | null {
+export function parseIPv6(ip: string): bigint | null {
   const halves = ip.split('::');
   if (halves.length > 2) return null;
 
@@ -78,7 +78,6 @@ function parseIPv6CIDR(cidr: string): ParsedIPv6Range | null {
 
 // --- Parsed ranges (computed once at module evaluation) ---
 
-// Source: https://api.cloudflare.com/client/v4/ips
 const IPV4_RANGES = [
   '173.245.48.0/20',
   '103.21.244.0/22',

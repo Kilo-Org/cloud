@@ -4,11 +4,23 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { parseTimestamp } from '@kilocode/app-shared/utils';
 
-import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
+import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
+import {
+  type GlanceableCountKind,
+  glanceableCountMessage,
+  glanceableCountNoun,
+  type GlanceableTranslate,
+} from '@/lib/glanceable/presentation';
 import { type GlanceableActionFeedback } from '@/lib/glanceable/surface-extras';
 
+/** The persisted count props the widget host stores: the numeral and its noun. */
 export type AndroidWidgetCount = { label: string; kind: GlanceableCountKind; count: string };
-export type GlanceableCountFormat = (value: number) => string;
+/**
+ * One Home count line. It keeps the persisted fields — the layout still draws
+ * the numeral and its noun in separate styled nodes — and adds the whole
+ * sentence, which the card draws where one string is enough.
+ */
+type AndroidWidgetHomeCount = AndroidWidgetCount & { text: string };
 /** A clock time, with the date added when `at` is not today. */
 export type GlanceableClockFormat = (at: string) => string;
 
@@ -26,9 +38,14 @@ export type AndroidWidgetHomeCopy = {
   emptyShort: string;
   /** The agent the count is about; an untitled agent reads `common.agent`. */
   title: string | null;
-  /** "Next run <time>", or "Awaiting update" once the wake has passed. */
+  /** "Next run <time>", "Awaiting update" inside the retry window, then "Was due <time>". */
   wake: string | null;
-  wakeOverdue: boolean;
+  /**
+   * True when the wake line states a wake that is already behind us — the
+   * retry window, then the overdue time. A passed wake is secondary
+   * information, so the line draws muted; only a future wake draws in ink.
+   */
+  wakePassed: boolean;
   /** "Checked <time>", or "Last known · <time>" when the data is stale. */
   footer: string | null;
   /** "Approving…" or "Could not approve" while an approve press is in flight or failed. */
@@ -36,18 +53,12 @@ export type AndroidWidgetHomeCopy = {
   /** The Medium/Large footer that replaces the checked time after a failed approve. */
   approveFailed: string;
   headings: { recent: string; waitingForYou: string; nextScheduled: string };
-  secondaryCounts: AndroidWidgetCount[];
+  secondaryCounts: AndroidWidgetHomeCount[];
   waitingAgents: { title: string; reason: string }[];
   scheduledAgents: { title: string; time: string | null }[];
   accessibilityLabel: string;
 };
 
-const HOME_COUNT_KEYS = {
-  needsInput: 'glanceable.needsInput',
-  running: 'common.working',
-  scheduled: 'common.scheduled',
-  idle: 'common.idle',
-} as const;
 const WAIT_REASON_KEYS = {
   permission: 'agentChat.permissionCard.title',
   question: 'glanceable.answerNeeded',
@@ -58,23 +69,41 @@ const ACTION_FEEDBACK_KEYS = {
   couldNotApprove: 'glanceable.couldNotApprove',
 } as const;
 
+/**
+ * The card's wake line, and whether it states a wake already behind us. One
+ * read of the clock decides both, so the copy and its muted ink cannot
+ * disagree about which case the line draws.
+ *
+ * The line is one message, so its wording and the place of the time belong to
+ * the translator. The shared prefix keys (`glanceable.nextRun`, `wasDue`,
+ * `checked`, `lastKnown`) stay for the surfaces that still paste a prefix onto
+ * a clock: the iOS layout draws the time as its own SwiftUI text node, and the
+ * in-app Home card and the native copy payload read them unchanged.
+ */
 function wakeLine(
   home: HomeWidgetPresentation,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatClock: GlanceableClockFormat
-): string | null {
+): { value: string; passed: boolean } | null {
   if (home.awaitingUpdate) {
-    return translate('glanceable.awaitingUpdate');
+    return { value: translate('glanceable.awaitingUpdate'), passed: true };
   }
   if (home.scheduledAt === null) {
     return null;
   }
-  return `${translate('glanceable.nextRun')} ${formatClock(home.scheduledAt)}`;
+  // The retry window has closed, so the card names the clock time it waited
+  // for instead of repeating the footer's checked time.
+  const due = parseTimestamp(home.scheduledAt).getTime();
+  const time = formatClock(home.scheduledAt);
+  if (Number.isFinite(due) && due <= Date.now()) {
+    return { value: translate('glanceable.wake.wasDue', { time }), passed: true };
+  }
+  return { value: translate('glanceable.wake.nextRun', { time }), passed: false };
 }
 
 function scheduledAgentTime(
   scheduledAt: string | null,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatClock: GlanceableClockFormat
 ): string | null {
   if (scheduledAt === null) {
@@ -88,32 +117,35 @@ function scheduledAgentTime(
 
 function footerLine(
   home: HomeWidgetPresentation,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatClock: GlanceableClockFormat
 ): string | null {
   if (home.checkedAt === null) {
     return null;
   }
-  const at = formatClock(home.checkedAt);
-  return home.stale
-    ? `${translate('glanceable.lastKnown')} · ${at}`
-    : `${translate('glanceable.checked')} ${at}`;
+  const time = formatClock(home.checkedAt);
+  return translate(home.stale ? 'glanceable.footer.lastKnown' : 'glanceable.footer.checked', {
+    time,
+  });
 }
 
 // eslint-disable-next-line max-params -- shared policy, translator and injected number/clock formatters keep native/i18n imports out of this builder
 export function buildAndroidHomeCopy(
   home: HomeWidgetPresentation,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatCount: GlanceableCountFormat,
   formatClock: GlanceableClockFormat,
   feedback: GlanceableActionFeedback
 ): AndroidWidgetHomeCopy {
   const primaryLabel =
-    home.primaryKind === null ? null : translate(HOME_COUNT_KEYS[home.primaryKind]);
+    home.primaryKind === null
+      ? null
+      : glanceableCountNoun(home.primaryKind, home.primaryCount, translate);
   const secondaryCounts = home.secondaryCounts.map(line => ({
-    ...line,
+    kind: line.kind,
     count: formatCount(line.count),
-    label: translate(HOME_COUNT_KEYS[line.kind]),
+    label: glanceableCountNoun(line.kind, line.count, translate),
+    text: glanceableCountMessage(line.kind, line.count, formatCount, translate),
   }));
   const status =
     home.status === 'content'
@@ -142,8 +174,8 @@ export function buildAndroidHomeCopy(
     home.primaryKind === null
       ? []
       : [
-          `${formatCount(home.primaryCount)} ${primaryLabel}`,
-          ...secondaryCounts.map(line => `${line.count} ${line.label}`),
+          glanceableCountMessage(home.primaryKind, home.primaryCount, formatCount, translate),
+          ...secondaryCounts.map(line => line.text),
         ];
   return {
     statusKind: home.status,
@@ -153,8 +185,8 @@ export function buildAndroidHomeCopy(
     status,
     emptyShort: translate('glanceable.empty'),
     title,
-    wake,
-    wakeOverdue: home.awaitingUpdate,
+    wake: wake?.value ?? null,
+    wakePassed: wake?.passed ?? false,
     footer,
     actionLine,
     approveFailed: translate('glanceable.approveFailed'),
@@ -175,11 +207,11 @@ export function buildAndroidHomeCopy(
     accessibilityLabel: [
       status,
       ...counts,
-      actionLine ?? wake ?? title,
+      actionLine ?? wake?.value ?? title,
       footer,
       translate('glanceable.openAgents'),
     ]
       .filter(Boolean)
-      .join(', '),
+      .join(translate('common.listJoiner')),
   };
 }

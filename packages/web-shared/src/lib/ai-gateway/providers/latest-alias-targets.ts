@@ -8,7 +8,10 @@ import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { MetadataDb } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
-import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import {
+  isLatestAliasId,
+  type GatewayModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 /**
  * How old a new target must be before an alias that already has a stored target switches to it, so
@@ -18,9 +21,13 @@ export const LATEST_ALIAS_TARGET_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type LatestAliasTargets = ReadonlyMap<string, LatestAliasTarget>;
 
-/** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
+/**
+ * Throws on an invalid stored config, so the cached getter keeps its last valid value. Accepts a
+ * transaction client so a caller can read the alias targets in the same snapshot as the pool
+ * definition it serves from, instead of a target the next promotion has already replaced.
+ */
 export async function readLatestAliasTargets(
-  fromDb: MetadataDb = readDb
+  fromDb: Pick<MetadataDb, 'select'> = readDb
 ): Promise<LatestAliasTargets> {
   const [row] = await fromDb
     .select({ config: ai_gateway_config.latest_alias_targets })
@@ -63,8 +70,10 @@ export function applyLatestAliasTargets(
  * live target at once. An alias with a stored target switches to a new live target once that
  * target is `LATEST_ALIAS_TARGET_MIN_AGE_MS` old, counted from its `created` time or, when that is
  * unknown, from when the switch was first seen; until then the switch is kept as `pending`. An
- * alias whose stored target left the catalog switches at once. Aliases that left the catalog are
- * dropped.
+ * alias whose stored target left the catalog switches at once. An alias the refresh reports
+ * without a live target, and one the refresh omits entirely, keeps its stored entry — including
+ * any pending switch — so a transient upstream omission cannot drop the pin and switch the alias
+ * back the moment it reappears.
  */
 export function updateLatestAliasTargets(params: {
   previous: LatestAliasTargets;
@@ -76,11 +85,15 @@ export function updateLatestAliasTargets(params: {
 }): LatestAliasTarget[] {
   const { previous, models, createdAtMs, nowMs } = params;
   const entries: LatestAliasTarget[] = [];
-  for (const [alias, model] of Object.entries(models)) {
-    const liveTarget = model.alias_target?.slug;
-    if (!alias.startsWith('~') || liveTarget === undefined) continue;
+  const aliases = new Set([
+    ...Object.keys(models).filter(isLatestAliasId),
+    ...[...previous.keys()].filter(isLatestAliasId),
+  ]);
+  for (const alias of aliases) {
     const stored = previous.get(alias);
-    if (!Object.hasOwn(models, liveTarget)) {
+    const model = Object.hasOwn(models, alias) ? models[alias] : undefined;
+    const liveTarget = model?.alias_target?.slug;
+    if (liveTarget === undefined || !Object.hasOwn(models, liveTarget)) {
       if (stored) entries.push(stored);
       continue;
     }

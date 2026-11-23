@@ -80,6 +80,8 @@ import {
   validateCloudAgentRootSessionsCursor,
   validateCloudAgentWorkspacesCursor,
   validateKiloSdkMessagesCursor,
+  type CanGenerateTitleForCloudAgentParams,
+  type SetGeneratedTitleForCloudAgentParams,
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
@@ -101,9 +103,16 @@ describe('publishCloudAgentSessionStatus', () => {
   const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
   const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
 
-  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+  it('forwards only the validated status projection, rename and live summary with an immutable runtime-owner fence', async () => {
     const rpc = new SessionIngestRPC(ctx, env as never);
-    await rpc.publishCloudAgentSessionStatus(input);
+    const rename = { title: 'Renamed by the agent', transitionId: input.transitionId };
+    const liveSummary = {
+      step: { verb: 'editing', target: 'index.ts' },
+      plan: null,
+      changes: null,
+      failure: null,
+    } as const;
+    await rpc.publishCloudAgentSessionStatus({ ...input, rename, liveSummary });
     expect(applyMetadataChanges).toHaveBeenCalledWith(
       env,
       input.kiloUserId,
@@ -114,7 +123,8 @@ describe('publishCloudAgentSessionStatus', () => {
         ['statusTransitionId', input.transitionId],
       ]),
       ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      { rename, liveSummary }
     );
   });
 
@@ -123,6 +133,16 @@ describe('publishCloudAgentSessionStatus', () => {
     { transitionId: 'invalid' },
     { occurredAt: 'not-a-date' },
     { transcript: 'not metadata' },
+    { totalCostMicrodollars: -1 },
+    { totalCostMicrodollars: 1.5 },
+    {
+      liveSummary: {
+        step: { verb: 'dancing', target: null },
+        plan: null,
+        changes: null,
+        failure: null,
+      },
+    },
   ])('rejects invalid publication %j', async invalid => {
     const rpc = new SessionIngestRPC(ctx, env as never);
     await expect(
@@ -1085,7 +1105,8 @@ describe('setGeneratedTitleForCloudAgent', () => {
         rpc.setGeneratedTitleForCloudAgent({
           sessionId: badSessionId,
           kiloUserId: 'usr_owner',
-          cloudAgentSessionId: badCloudId,
+          cloudAgentSessionId:
+            badCloudId as SetGeneratedTitleForCloudAgentParams['cloudAgentSessionId'],
           title,
         })
       ).rejects.toThrow();
@@ -1112,12 +1133,8 @@ describe('canGenerateTitleForCloudAgent', () => {
   };
 
   function makeParams(
-    overrides: Partial<{
-      sessionId: string;
-      kiloUserId: string;
-      cloudAgentSessionId: string;
-    }> = {}
-  ) {
+    overrides: Partial<CanGenerateTitleForCloudAgentParams> = {}
+  ): CanGenerateTitleForCloudAgentParams {
     return { sessionId, kiloUserId, cloudAgentSessionId, ...overrides };
   }
 
@@ -1299,7 +1316,11 @@ describe('canGenerateTitleForCloudAgent', () => {
 
     await expect(
       rpc.canGenerateTitleForCloudAgent(
-        makeParams({ sessionId: badSessionId, cloudAgentSessionId: badCloudId })
+        makeParams({
+          sessionId: badSessionId,
+          cloudAgentSessionId:
+            badCloudId as CanGenerateTitleForCloudAgentParams['cloudAgentSessionId'],
+        })
       )
     ).rejects.toThrow();
 
@@ -2843,8 +2864,16 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
 });
 
 describe('Kilo SDK persisted identity schemas', () => {
-  it('accepts generated message IDs and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+  it('accepts every stored message id family and rejects non-message, slash-bearing, or NUL-bearing IDs', () => {
+    // The stored rule checks the shared stem, not the canonical shape: a row the
+    // store already holds keeps the id its sender supplied. Tightening this to
+    // MESSAGE_ID_PATTERN would fail the whole stored page for these ids.
+    expect(messageIdSchema.safeParse('msg_8bcfe5680000ABZa012ABCDEFp').success).toBe(true);
     expect(messageIdSchema.safeParse('msg_storage').success).toBe(true);
+    expect(messageIdSchema.safeParse('msgsynthetic1').success).toBe(true);
+    expect(messageIdSchema.safeParse('msg_1b4e28ba-2fa1-11d2-883f-0016d3cca427').success).toBe(
+      true
+    );
     expect(messageIdSchema.safeParse('other_storage').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage/child').success).toBe(false);
     expect(messageIdSchema.safeParse('msg_storage\u0000child').success).toBe(false);

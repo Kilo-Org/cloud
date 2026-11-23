@@ -14,6 +14,9 @@ export const MAGIC_LINK_EMAIL_ERRORS = {
   NO_PLUS: 'EMAIL-CANNOT-CONTAIN-PLUS',
 } as const;
 
+export type MagicLinkEmailError =
+  (typeof MAGIC_LINK_EMAIL_ERRORS)[keyof typeof MAGIC_LINK_EMAIL_ERRORS];
+
 /**
  * Domain that is allowed to use + in email addresses for internal testing.
  */
@@ -42,17 +45,14 @@ const isLowercase = (email: string): boolean => email === email.toLowerCase();
 const hasAllowedPlus = (email: string): boolean => !email.includes('+') || isKilocodeDomain(email);
 
 /**
- * Validates that an email is suitable for magic link signup:
- * - Must be a syntactically valid address
- * - Must be lowercase
- * - Must not contain a + character (except for @kilocode.ai emails)
+ * Validates that an email is suitable for magic link signup.
  *
  * This is NOT enforced during sign-in to existing accounts.
  * Returns error codes that can be displayed via AuthErrorNotification.
  */
 export function validateMagicLinkSignupEmail(email: string): {
   valid: boolean;
-  error: string | null;
+  error: MagicLinkEmailError | null;
 } {
   if (!isSyntacticallyValid(email)) {
     return { valid: false, error: MAGIC_LINK_EMAIL_ERRORS.INVALID_FORMAT };

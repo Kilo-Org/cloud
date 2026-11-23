@@ -57,6 +57,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Platform: { OS: 'ios' },
   BackHandler: {
     addEventListener: (_event: string, handler: () => boolean) => backHandler.add(handler),
   },
@@ -132,7 +133,14 @@ vi.mock('@/lib/tour/tour-completion', () => ({
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
+vi.mock('@/lib/layout', () => ({ SCREEN_BODY_CLASS: 'screen-body' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
+}));
+
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -254,7 +262,7 @@ describe('TourScreen', () => {
   it('hands off to the new-session page with Cloud Agent preselected', async () => {
     const { renderer, unmount } = await mountTour();
 
-    pressControl(renderer, 'ChoiceRow', 'tour.cloudOptionTitle');
+    pressControl(renderer, 'Pressable', 'tour.cloudOptionTitle');
 
     // The Cloud card does not open a step: it completes the tour by handing
     // straight to the form, and it never pops the tour.
@@ -278,7 +286,7 @@ describe('TourScreen', () => {
   it('hands off to the new-session page with the computer target preselected when the computer card is chosen', async () => {
     const { renderer, unmount } = await mountTour();
 
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+    pressControl(renderer, 'Pressable', 'tour.remoteOptionTitle');
 
     // The computer card records the decision and hands straight to the form
     // too. It preselects the computer target: the form binds the first
@@ -300,8 +308,8 @@ describe('TourScreen', () => {
     organizationState.organizationId = null;
     const { renderer, unmount } = await mountTour();
 
-    pressControl(renderer, 'ChoiceRow', 'tour.cloudOptionTitle');
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+    pressControl(renderer, 'Pressable', 'tour.cloudOptionTitle');
+    pressControl(renderer, 'Pressable', 'tour.remoteOptionTitle');
 
     // Personal is the form's own default, so the hand-off names no scope and
     // each card keeps its run-on behavior.
@@ -341,15 +349,19 @@ describe('TourScreen', () => {
 
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    // The dismiss swap goes through the stack-safe replace its caller passes
+    // in; a literal `router.replace` there is the Android Fabric `addViewAt`
+    // crash.
+    expect(stackSafeReplace).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    expect(routerReplace).not.toHaveBeenCalled();
 
     // Hardware Back dismisses through the same guarded path.
     act(() => {
       backHandler.press();
     });
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(2);
+    expect(stackSafeReplace).toHaveBeenCalledTimes(2);
 
     unmount();
   });
@@ -409,7 +421,7 @@ describe('TourScreen', () => {
     // Not gated on the stored decision: the Profile replay renders the fork.
     expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
 
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+    pressControl(renderer, 'Pressable', 'tour.remoteOptionTitle');
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(stackSafeReplace).toHaveBeenCalledWith(
       '/(app)/agent-chat/new?organizationId=org-1&preselectRunOn=computer'

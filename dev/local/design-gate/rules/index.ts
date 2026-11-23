@@ -1,9 +1,11 @@
 import type { Finding } from '../findings';
 import type { Rgba } from '../pixels';
 import type { LayoutTree } from '../tree';
+import { checkGutter } from './gutter';
 import { checkInkCentering } from './ink';
 import { checkInsetAsymmetry } from './inset';
 import { checkLeadingGap } from './lead';
+import { checkLoadingAffordance, checkLoadingLabels } from './loading';
 import {
   checkClipped,
   checkCutOff,
@@ -17,6 +19,7 @@ import {
 export { normalize } from '../tree';
 export { checkMirror } from './mirror';
 export { checkShift } from './shift';
+export { checkLoadingAffordance, checkLoadingLabels, loadingPlaceholders } from './loading';
 
 export function checkScreen(tree: LayoutTree, image?: Rgba): Finding[] {
   return [
@@ -30,5 +33,6 @@ export function checkScreen(tree: LayoutTree, image?: Rgba): Finding[] {
     ...checkInsetAsymmetry(tree),
     ...checkSafeArea(tree),
     ...checkLeadingGap(tree),
+    ...checkGutter(tree),
   ];
 }

@@ -1,8 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
+import type * as PaidBenchmarkModule from './paid-benchmark';
 
-vi.mock('./subscriptions', () => ({ dailyReconcileSubscriptions: vi.fn() }));
-import { dailyReconcileSubscriptions } from './subscriptions';
+// The scheduled handler's paid tick needs a real D1 handle; these tests exercise router
+// draining, so it runs over an empty in-memory database exactly as a quiet tick would.
+vi.mock('./paid-benchmark', async importOriginal => {
+  const actual = await importOriginal<typeof PaidBenchmarkModule>();
+  return {
+    ...actual,
+    reconcilePaidBenchmarkRequests: vi.fn(async () => ({
+      staged: 0,
+      completed: [],
+      failed: [],
+      closed: [],
+    })),
+    reconcilePaidUsageReceipts: vi.fn(async () => ({ recorded: 0, pending: 0, mismatched: 0 })),
+  };
+});
+
+vi.mock('./system-optimal', () => ({
+  fetchProductionAutoMetrics: vi.fn(),
+  reevaluateSystemOptimalSettings: vi.fn(),
+}));
+
+vi.mock('./subscriptions', () => ({
+  dailyReconcileSubscriptions: vi.fn(),
+  continueDailyReconcile: vi.fn(),
+}));
+import { continueDailyReconcile, dailyReconcileSubscriptions } from './subscriptions';
+import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 
 vi.mock('./run', async importOriginal => {
   const actual = await importOriginal<typeof RunModule>();
@@ -33,6 +59,13 @@ import worker from './index';
 const send = vi.fn();
 const env = { BENCH_QUEUE: { send } } as unknown as Env;
 
+const dailyResult = {
+  router: 'efficient' as const,
+  day: '2026-11-20',
+  platform: { status: 'ok' as const, attempts: 1 },
+  owners: { status: 'ok' as const, reconciled: 1, pages: 1 },
+};
+
 function fakeBatch(queue: string, bodies: unknown[]) {
   const messages = bodies.map(body => ({
     id: 'm',
@@ -52,7 +85,10 @@ beforeEach(() => {
   vi.mocked(processDeadLetter).mockResolvedValue(undefined);
   vi.mocked(processJob).mockResolvedValue(undefined);
   send.mockReset().mockResolvedValue(undefined);
-  vi.mocked(dailyReconcileSubscriptions).mockResolvedValue(undefined);
+  vi.mocked(dailyReconcileSubscriptions).mockResolvedValue(dailyResult);
+  vi.mocked(continueDailyReconcile).mockResolvedValue(null);
+  vi.mocked(fetchProductionAutoMetrics).mockResolvedValue(null);
+  vi.mocked(reevaluateSystemOptimalSettings).mockResolvedValue(null);
 });
 
 describe('queue handler — DLQ branch', () => {
@@ -144,6 +180,8 @@ describe('scheduled router queues', () => {
     await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env);
     expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient');
     expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
+    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'efficient');
+    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'frontier');
     expect(dailyReconcileSubscriptions).not.toHaveBeenCalled();
   });
 
@@ -152,6 +190,7 @@ describe('scheduled router queues', () => {
     vi.mocked(syncPlatformRegistry).mockResolvedValue({ desiredEntries: 0 });
     vi.mocked(drainQueues).mockResolvedValue([]);
     vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
     expect(sweepStaleRuns).toHaveBeenCalledTimes(2);
     expect(dailyReconcileSubscriptions).toHaveBeenCalledTimes(2);
@@ -167,6 +206,11 @@ describe('scheduled router queues', () => {
       expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, router);
       expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
     }
+    const summaries = log.mock.calls
+      .map(([message]) => JSON.parse(String(message)) as { event: string; router?: string })
+      .filter(entry => entry.event === 'benchmark_daily_sync_summary');
+    expect(summaries.map(entry => entry.router)).toEqual(['efficient', 'frontier']);
+    log.mockRestore();
     expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();
   });
 
@@ -178,19 +222,66 @@ describe('scheduled router queues', () => {
     vi.mocked(dailyReconcileSubscriptions).mockRejectedValueOnce(new Error('catalog unavailable'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
+    await expect(
+      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env)
+    ).rejects.toThrow('Benchmark scheduled routers failed');
 
     expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, 'efficient');
     expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient');
     expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, 'efficient');
     expect(warn).toHaveBeenCalledWith(
       JSON.stringify({
-        event: 'benchmark_subscription_daily_failed',
-        category: 'daily_reconciliation',
+        event: 'benchmark_daily_step_failed',
+        cron: '0 5 * * *',
         router: 'efficient',
+        step: 'subscriptions',
+        error: 'catalog unavailable',
       })
     );
     warn.mockRestore();
+  });
+
+  it('publishes and drains when the platform registry sync fails', async () => {
+    vi.mocked(sweepStaleRuns).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistry).mockRejectedValueOnce(new Error('D1 DB is overloaded'));
+    vi.mocked(drainQueues).mockResolvedValue([]);
+    vi.mocked(publishPlatformRoutingTable).mockResolvedValue({ version: 'registry-v1' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env)
+    ).rejects.toThrow('Benchmark scheduled routers failed');
+
+    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient');
+    expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, 'efficient');
+    expect(warn).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_daily_step_failed',
+        cron: '0 5 * * *',
+        router: 'efficient',
+        step: 'registrySync',
+        error: 'D1 DB is overloaded',
+      })
+    );
+    warn.mockRestore();
+  });
+
+  it('reports an unfinished alias sync on the frequent tick', async () => {
+    vi.mocked(sweepStaleRunsAndDrain).mockResolvedValue({ staleRunIds: [], drained: [] });
+    vi.mocked(continueDailyReconcile).mockResolvedValue({
+      ...dailyResult,
+      owners: { status: 'pending', reconciled: 200, pages: 2 },
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await worker.scheduled({ cron: '* * * * *' } as ScheduledController, env);
+    const tick = log.mock.calls
+      .map(([message]) => JSON.parse(String(message)) as Record<string, unknown>)
+      .find(entry => entry.event === 'benchmark_queue_drain_tick_completed');
+    expect(tick?.dailyAliasSync).toEqual({
+      platform: dailyResult.platform,
+      owners: { status: 'pending', reconciled: 200, pages: 2 },
+    });
+    log.mockRestore();
   });
 
   it('still drains frontier when the efficient drain fails and reports the failure', async () => {

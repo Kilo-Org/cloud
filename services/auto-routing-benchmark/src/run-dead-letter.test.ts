@@ -7,6 +7,8 @@ vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
+    copyRemeasureBaselines: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
@@ -69,7 +71,6 @@ const claim = {
   run_id: runId,
   model: 'b/dead',
   variant: 'high',
-  providers: '["provider-b"]',
   rep: 0,
   chunk: 27,
   case_ids: JSON.stringify([DECIDER_CASES[27].id]),
@@ -77,6 +78,7 @@ const claim = {
   token: 'owned-token',
   attempts: 2,
   throttle_deferrals: 0,
+  catalog_deferrals: 0,
 } satisfies SchedulerClaim;
 const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
@@ -210,6 +212,9 @@ describe('processDeadLetter — legacy migration', () => {
         repetitions: 2,
         classifier_max_p95_latency_ms: null,
         purpose: 'platform',
+        // A run the dead letter re-materializes is current work: the cutover fence retires
+        // only runs without this marker.
+        admission_marker: 'marker-dead-letter',
       },
       models: [
         { model: 'b/dead', variant: 'high', enqueued: true, reasoning_effort: 'high' },
@@ -268,8 +273,8 @@ describe('processDeadLetter — legacy migration', () => {
       expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
         runId,
         entries: [
-          { model: 'b/dead', variant: 'high', providers: [] },
-          { model: 'b/dead', variant: 'low', providers: [] },
+          { model: 'b/dead', variant: 'high' },
+          { model: 'b/dead', variant: 'low' },
         ],
         repetitions: 2,
         caseIds: DECIDER_CASES.map(c => c.id),
@@ -290,11 +295,10 @@ describe('processDeadLetter — legacy migration', () => {
       await processDeadLetter(env, { runId, kind: 'decider', model: 'b/dead' });
       expect(fetcher).not.toHaveBeenCalled();
       expect(scheduleRunChunks).not.toHaveBeenCalled();
-      expect(markProfilesFailedForRun).toHaveBeenCalledWith(
-        env.BENCH_DB,
-        runId,
-        'Benchmark run is missing its execution identity.'
-      );
+      expect(markProfilesFailedForRun).toHaveBeenCalledWith(env.BENCH_DB, runId, {
+        failureClass: 'run_init_failed',
+        reason: 'Benchmark run is missing its execution identity.',
+      });
       expect(markRunFailed).toHaveBeenCalledWith(
         env.BENCH_DB,
         runId,

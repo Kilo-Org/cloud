@@ -14,6 +14,7 @@ import { eq, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
+import { GitHubAppInstallationProtectedError } from '@/lib/integrations/platforms/github/protected-installation';
 import { uninstallGitHubOrganizationInstallation } from './github-installation-uninstall';
 
 const mockBotInitialize = jest.fn<Promise<void>, []>();
@@ -437,6 +438,27 @@ describe('uninstallGitHubOrganizationInstallation', () => {
         .set({ owned_by_user_id: replacementOwner.id })
         .where(eq(platform_integrations.id, row.id))
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  test('answers a protected forge fixture installation with CONFLICT and keeps the row', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const row = await integration({ userId: owner.id });
+    const refusal = new GitHubAppInstallationProtectedError('123');
+    upstream.mockRejectedValue(refusal);
+
+    await expect(
+      uninstallGitHubOrganizationInstallation({
+        input: request(row, { type: 'user', id: owner.id }),
+        actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: refusal.message });
+    expect(
+      await db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, row.id),
+      })
+    ).toBeDefined();
+    expect(sentryCaptureException).not.toHaveBeenCalled();
   });
 
   test('standard deletion webhook reconciles a legacy row retained after local cleanup rolls back', async () => {

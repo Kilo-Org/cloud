@@ -4,9 +4,9 @@ import {
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -14,7 +14,7 @@ import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gate
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
-  getVercelModelsFromDatabase: jest.fn(),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(),
   isValidOpenRouterModelId: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(async (modelId: string) => modelId),
 }));
@@ -36,12 +36,12 @@ beforeEach(() => {
       endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
     } as GatewayModelWithEndpoints,
   });
-  jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([SONNET]));
+  jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set([SONNET]));
   jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
 });
 
 describe('addUserByokAvailability', () => {
-  const sonnet = { id: SONNET } as OpenRouterModel;
+  const sonnet = { id: SONNET } as OpenRouterCatalogModel;
 
   test('marks a Vercel AI Gateway key available only when Vercel honors the allowed providers', async () => {
     jest.mocked(canRouteToVercel).mockResolvedValue(false);
@@ -71,7 +71,7 @@ describe('addUserByokAvailability', () => {
 
     expect(model.hasUserByokAvailable).toBe(false);
     expect(getVercelModelsMetadataFromDatabase).not.toHaveBeenCalled();
-    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(getVercelLanguageModelIdsFromDatabase).not.toHaveBeenCalled();
     expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
   });
 
@@ -79,7 +79,7 @@ describe('addUserByokAvailability', () => {
     const [model] = await addUserByokAvailability([sonnet], ['anthropic']);
 
     expect(model.hasUserByokAvailable).toBe(true);
-    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(getVercelLanguageModelIdsFromDatabase).not.toHaveBeenCalled();
     expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
   });
 
@@ -116,7 +116,7 @@ describe('getModelUserByokProviders', () => {
       'anthropic',
       'bedrock',
     ]);
-    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(getVercelLanguageModelIdsFromDatabase).not.toHaveBeenCalled();
     expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
 
     jest.clearAllMocks();
@@ -129,7 +129,7 @@ describe('getModelUserByokProviders', () => {
 
   test('keeps free models on Kilo accounts', async () => {
     const modelId = 'vendor/model:free';
-    jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([modelId]));
+    jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set([modelId]));
 
     const providers = await getModelUserByokProviders(modelId);
 

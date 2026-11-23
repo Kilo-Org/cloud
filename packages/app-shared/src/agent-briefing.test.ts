@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BRIEFING_FALLBACK_TITLE,
   BRIEFING_MAX_EXCERPT_BYTES,
+  BRIEFING_MAX_TITLE_BYTES,
+  briefingContextPreferencesSchema,
+  briefingEstimateSchema,
   briefingHasActivity,
   briefingSourceSchema,
   briefingSummarySchema,
@@ -131,12 +133,10 @@ describe('scheduled briefing contracts', () => {
     expect(truncateBriefingUtf8('abcdefgh', 5)).toBe('abcde');
     // A full-span cap keeps the whole string.
     expect(truncateBriefingUtf8('ab', 2)).toBe('ab');
-    // The required title is never blank: a title whose first cluster is wider than
-    // the cap truncates to nothing, so the neutral fallback stands in for it.
-    expect(redactBriefingTitle('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBe(
-      BRIEFING_FALLBACK_TITLE
-    );
-    expect(redactBriefingTitle(family, 10)).toBe(BRIEFING_FALLBACK_TITLE);
+    // The title is absent, never a server label: a title whose first cluster is wider
+    // than the cap truncates to nothing.
+    expect(redactBriefingTitle('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBeUndefined();
+    expect(redactBriefingTitle(family, 10)).toBeUndefined();
     // A title that survives the cap keeps its own text.
     expect(redactBriefingTitle('Release notes', 160)).toBe('Release notes');
   });
@@ -161,6 +161,65 @@ describe('scheduled briefing contracts', () => {
     ).toBe(false);
     expect(briefingSummarySchema.shape.status.safeParse('outdated').success).toBe(false);
     expect(briefingHasActivity({ sessions: 0, pullRequests: 0, blockers: 0 })).toBe(false);
+  });
+  it('accepts only whole microdollars and whole seconds', () => {
+    const summary = {
+      status: 'ready',
+      text: 'Briefing',
+      model: 'model-a',
+      costMicrodollars: 0,
+      chargeStatus: 'settled',
+      estimatedCostMicrodollars: null,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+    };
+    expect(briefingSummarySchema.safeParse(summary).success).toBe(true);
+    expect(briefingSummarySchema.safeParse({ ...summary, costMicrodollars: 0.5 }).success).toBe(
+      false
+    );
+    expect(
+      briefingSummarySchema.safeParse({ ...summary, estimatedCostMicrodollars: 1.5 }).success
+    ).toBe(false);
+    expect(
+      briefingSummarySchema.safeParse({ ...summary, estimatedCostMicrodollars: 7 }).success
+    ).toBe(true);
+    const estimate = {
+      model: 'model-a',
+      estimatedCostMicrodollars: 1000,
+      maximumCostMicrodollars: 2_000_000,
+      maxDurationSeconds: 600,
+      estimateToken: 'token',
+      canGenerate: true,
+      unavailableReason: null,
+    };
+    expect(briefingEstimateSchema.safeParse(estimate).success).toBe(true);
+    for (const fractional of [
+      { estimatedCostMicrodollars: 1000.5 },
+      { maximumCostMicrodollars: 2.5 },
+      { maxDurationSeconds: 0.5 },
+    ]) {
+      expect(briefingEstimateSchema.safeParse({ ...estimate, ...fractional }).success).toBe(false);
+    }
+    const preferences = {
+      context: { id: 'personal', organizationId: null, name: 'Personal' },
+      enabled: true,
+      model: 'model-a',
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_000_000,
+    };
+    expect(briefingContextPreferencesSchema.safeParse(preferences).success).toBe(true);
+    for (const fractional of [{ maxDurationSeconds: 1.5 }, { maxSpendMicrodollars: 1.5 }]) {
+      expect(
+        briefingContextPreferencesSchema.safeParse({ ...preferences, ...fractional }).success
+      ).toBe(false);
+    }
+  });
+  it('budgets a title in UTF-8 bytes by default', () => {
+    // Only holds when the default budget is the byte constant, not the character bound.
+    const title = redactBriefingTitle('é'.repeat(200));
+    expect(title).toBe('é'.repeat(80));
+    expect(utf8ByteLength(title ?? '')).toBe(BRIEFING_MAX_TITLE_BYTES);
   });
 });
 
@@ -357,11 +416,11 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingTitle(text)).not.toContain('hunter' + '2');
   });
 
-  it('screens titles with the excerpt rules and keeps a neutral title otherwise', () => {
+  it('screens titles with the excerpt rules and withholds one that screening cannot clear', () => {
     expect(redactBriefingTitle('Captured session')).toBe('Captured session');
     expect(redactBriefingTitle('Deploy ' + 'AWS_SECRET_ACCESS_KEY=' + secretKey)).toBe(
       'Deploy [redacted credential]'
     );
-    expect(redactBriefingTitle('Plan for client_' + 'secret: "' + secretKey)).toBe('Agent session');
+    expect(redactBriefingTitle('Plan for client_' + 'secret: "' + secretKey)).toBeUndefined();
   });
 });

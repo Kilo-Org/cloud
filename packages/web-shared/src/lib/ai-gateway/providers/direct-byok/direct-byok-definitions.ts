@@ -7,9 +7,8 @@ import chutesByok from './chutes-byok';
 import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
-import martian from './martian';
 import morph from './morph';
-import neuralwatt from './neurowatt';
+import neuralwatt from './neuralwatt';
 import nvidiaByok from './nvidia-byok';
 import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';
@@ -31,7 +30,6 @@ const DIRECT_BYOK_PROVIDERS = [
   edenai,
   inceptronByok,
   kimiCoding,
-  martian,
   morph,
   neuralwatt,
   nvidiaByok,
@@ -45,6 +43,14 @@ const DIRECT_BYOK_PROVIDERS = [
   zaiCoding,
 ] satisfies ReadonlyArray<DirectByokProvider>;
 
+/**
+ * The provider list as one widened list, for lookups and iterations: the tuple keeps
+ * `EveryDirectByokProviderHasDefinition` exhaustive, and consumers read this view instead of
+ * restating the widening. It is also this module's default export, so both specifiers carry one
+ * value and one type.
+ */
+export const directByokProviderList: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+
 /** A provider the shared metadata names without a definition; such a provider cannot be used. */
 type UndefinedDirectByokProviderId = Exclude<
   DirectByokProviderMetaId,
@@ -53,4 +59,4 @@ type UndefinedDirectByokProviderId = Exclude<
 
 export type EveryDirectByokProviderHasDefinition = AssertNever<UndefinedDirectByokProviderId>;
 
-export default DIRECT_BYOK_PROVIDERS;
+export default directByokProviderList;

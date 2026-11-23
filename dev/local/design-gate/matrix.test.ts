@@ -44,6 +44,7 @@ test('rtl-compact combines rtl and compact and mirrors against compact', () => {
     rtl: true,
     compact: true,
     landscape: false,
+    fontMax: false,
   });
   assert.ok(cell);
   assert.equal(mirrorReference(cell), 'compact');
@@ -81,6 +82,88 @@ test('landscape expects the base height as width', () => {
     []
   );
   assert.equal(envMismatches(landscape, env, env.window).length, 1);
+});
+
+test('--cell base is a no-op, and a cell the platform lacks is refused by name', () => {
+  assert.deepEqual(
+    matrixCells('android', 'base', ['base', 'font-max']).map(cell => cell.id),
+    ['base', 'font-max']
+  );
+  assert.deepEqual(
+    matrixCells('ios', 'base', ['compact', 'landscape']).map(cell => cell.id),
+    ['base', 'compact', 'landscape']
+  );
+  assert.throws(() => matrixCells('ios', 'standard', ['rtl-compact']), /ios has no rtl-compact/);
+});
+
+test('iOS landscape expects the base height as width', () => {
+  const landscape = matrixCells('ios', 'full', ['landscape']).find(cell => cell.id === 'landscape');
+  assert.ok(landscape);
+  const portrait = { width: 402, height: 874 };
+  assert.deepEqual(
+    envMismatches(
+      landscape,
+      { ...env, platform: 'ios', window: { width: 874, height: 402 } },
+      portrait,
+      undefined,
+      'ios'
+    ),
+    []
+  );
+  assert.deepEqual(
+    envMismatches(
+      landscape,
+      { ...env, platform: 'ios', window: portrait },
+      portrait,
+      undefined,
+      'ios'
+    ),
+    ['window width 402 dp, expected 874 dp']
+  );
+});
+
+test('iOS compact expects a phone at or below the cap, not an exact width', () => {
+  const compact = matrixCells('ios', 'full', ['compact']).find(cell => cell.id === 'compact');
+  assert.ok(compact);
+  const se = { width: 375, height: 667 };
+  const pro = { width: 402, height: 874 };
+  assert.deepEqual(
+    envMismatches(compact, { ...env, platform: 'ios', window: se }, se, undefined, 'ios'),
+    []
+  );
+  // A 402 pt iPhone passed off as a compact cell is a mismatch, not a pass.
+  assert.deepEqual(
+    envMismatches(compact, { ...env, platform: 'ios', window: pro }, pro, undefined, 'ios'),
+    ['window width 402 dp, expected at most 380 dp']
+  );
+  // A window narrower than any iPhone is a bad display read, not a small phone.
+  assert.deepEqual(
+    envMismatches(
+      compact,
+      { ...env, platform: 'ios', window: { width: 250, height: 445 } },
+      se,
+      undefined,
+      'ios'
+    ),
+    ['window width 250 dp, expected at least 320 dp']
+  );
+  // Android keeps its exact 360 dp target.
+  const androidCompact = matrixCells('android', 'standard')[2];
+  assert.ok(androidCompact);
+  assert.deepEqual(
+    envMismatches(androidCompact, { ...env, window: { width: 411, height: 914 } }, env.window),
+    ['window width 411 dp, expected 360 dp']
+  );
+});
+
+test('font-max expects a scale above 1 and every other cell expects 1', () => {
+  const [base, fontMax] = matrixCells('android', 'base', ['font-max']);
+  assert.ok(base && fontMax);
+  assert.deepEqual(envMismatches(fontMax, { ...env, fontScale: 2 }, env.window), []);
+  assert.deepEqual(envMismatches(fontMax, env, env.window), ['fontScale 1, expected above 1']);
+  assert.deepEqual(envMismatches(base, { ...env, fontScale: 2 }, env.window), [
+    'fontScale 2, expected 1',
+  ]);
 });
 
 test('every right-to-left language the app ships is classified as right-to-left', () => {

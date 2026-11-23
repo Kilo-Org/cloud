@@ -1,22 +1,24 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { selectionHaptic } from '@/lib/haptics';
-import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
+import { Info, Lock, Plug, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Input } from '@/components/ui/input';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Card } from '@/components/ui/card';
+import { SearchField } from '@/components/ui/search-field';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { connectedServicesHref } from '@/lib/profile-navigation';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
-import { selectionCheckColor } from '@/lib/selection-check-color';
+import { useDetailScreenBottomPadding, useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -31,7 +33,8 @@ type PickerSelectionFailure = { readonly kind: 'select-failed' };
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -45,6 +48,32 @@ export default function RepoPickerScreen() {
   const closePicker = useCallback(() => {
     router.back();
   }, [router]);
+
+  // One admission guard for both ways out: a pick and the empty state's exit
+  // each pop this route once, and the attempt stays pending until the route
+  // unmounts, which is the adapter's invalidation.
+  const selection = useSurfaceFeedback<PickerSelectionFailure>();
+
+  /**
+   * The empty state's way out. The picker is a formSheet in the composer's
+   * Stack, so it clears its own bridge slot and pops first; the push must
+   * follow that pop, or Connected services joins the stack under the picker
+   * instead of the stack the composer left.
+   *
+   * It shares the selection's admission guard: one press is one pop and one
+   * push, so the second tap of a dismissal burst cannot take the composer's
+   * screen off the stack as well.
+   */
+  const openConnectedServices = useCallback(() => {
+    if (selection.begin() === null) {
+      return;
+    }
+    const organizationId = bridgeRef.current?.organizationId ?? undefined;
+    repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+    bridgeRef.current = undefined;
+    closePicker();
+    router.push(connectedServicesHref(organizationId));
+  }, [closePicker, router, selection]);
 
   useFocusEffect(
     useCallback(() => {
@@ -101,18 +130,13 @@ export default function RepoPickerScreen() {
     return items;
   }, [bridge, filtered, deferredSearch]);
 
-  const selection = useSurfaceFeedback<PickerSelectionFailure>();
-
   const handleSelect = useCallback(
     (repo: string) => {
       if (selection.begin() === null) {
         // A second tap in the dismissal burst must not select and pop again.
-        // The attempt stays pending until this route unmounts, which is the
-        // adapter's invalidation; a picker that fails to pop therefore keeps
-        // refusing rather than popping the screen beneath it.
+        // The attempt stays pending until this route unmounts.
         return;
       }
-      selectionHaptic();
       dismissSearchPickerKeyboard();
       bridgeRef.current?.onSelect(repo);
       repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
@@ -141,47 +165,13 @@ export default function RepoPickerScreen() {
       onCancel={closePicker}
       scrollable={false}
       headerContent={
-        <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-          <Search size={18} color={colors.mutedForeground} />
-          {/* The placeholder is a single-line Text overlay, not the input's own
-              placeholder: Android lays the native hint out at the field's width
-              with no line cap, so copy wider than a narrow field wraps onto a
-              second line inside the one-line field. A tail-ellipsized Text
-              truncates the copy at any width instead. Both texts share
-              leading-[normal] and a centred text rect so the overlay sits
-              exactly where the typed text will. The overlay box is a row, so
-              the copy starts at the field's start edge — the physical right in
-              RTL — and the hugging Text cannot drift to the other side of the
-              field. */}
-          <View className="relative flex-1">
-            <Input
-              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-              textAlignVertical="center"
-              className="p-0 text-base leading-[normal] text-foreground"
-              style={{ color: colors.foreground }}
-              onChangeText={setSearch}
-            />
-            {search.length === 0 ? (
-              <View
-                className="absolute inset-0 flex-row items-center justify-start"
-                pointerEvents="none"
-              >
-                <Text
-                  accessible={false}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  className="shrink max-w-full text-base leading-[normal] font-normal text-muted-foreground"
-                >
-                  {t('agentChat.repoPicker.searchPlaceholder')}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
+        <SearchField
+          className="mx-4 my-3"
+          accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+          placeholder={t('agentChat.repoPicker.searchPlaceholder')}
+          hasText={search.length > 0}
+          onChangeText={setSearch}
+        />
       }
     >
       {listItems.length === 0 ? (
@@ -197,6 +187,15 @@ export default function RepoPickerScreen() {
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.repoPicker.noRepositoriesDescription')
           }
+          action={
+            deferredSearch.trim() ? undefined : (
+              <StateAction
+                label={t('integrations.sectionTitle')}
+                icon={Plug}
+                onPress={openConnectedServices}
+              />
+            )
+          }
         />
       ) : (
         // Mapped rows inside the list's own scroll view rather than a virtualized
@@ -205,66 +204,60 @@ export default function RepoPickerScreen() {
         // scroll so its search field and rows share one tap contract — the first
         // tap on a row arrives even while the search keyboard is up.
         <ScrollView
+          style={sideInsetMarginStyle}
           className="flex-1"
           nestedScrollEnabled
           {...SEARCHABLE_PICKER_LIST_PROPS}
-          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           {listItems.map(item => {
             if (item.kind === 'header') {
-              return (
-                <Text
-                  key={item.key}
-                  className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  {t(item.titleKey)}
-                </Text>
-              );
+              return <SectionHeader key={item.key} inset label={t(item.titleKey)} />;
             }
             const repo = item.repo;
             const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
             const rowLabel = `${platformName} ${repo.fullName}`;
             const isSelected = bridge.currentValue === `${repo.platform}:${repo.fullName}`;
             return (
-              <Pressable
+              <ChoiceRow
                 key={item.key}
-                className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
+                className="border-b-[0.5px] border-hair-soft"
+                selected={isSelected}
+                accessibleName={rowLabel}
                 onPress={() => {
                   handleSelect(`${repo.platform}:${repo.fullName}`);
                 }}
-                accessibilityRole="button"
-                accessibilityLabel={rowLabel}
-                accessibilityState={{ selected: isSelected }}
               >
-                {repo.isPrivate ? (
-                  <Lock size={14} color={colors.mutedForeground} />
-                ) : (
-                  <Unlock size={14} color={colors.mutedForeground} />
-                )}
-                {item.showPlatform ? (
-                  <Text
-                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
-                    numberOfLines={1}
-                  >
-                    {platformName}
-                  </Text>
-                ) : null}
-                {/* Middle ellipsis keeps both ends of the name: long names in a
-                    large organization share a prefix, so a tail cut made every
-                    row look identical and hid the distinguishing suffix. The
-                    min-w-0 box truncates inside the row, so the name can never
-                    run into the trailing check. */}
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className="text-base text-foreground"
-                    numberOfLines={1}
-                    ellipsizeMode="middle"
-                  >
-                    {repo.fullName}
-                  </Text>
+                <View className="min-w-0 flex-1 flex-row items-center gap-3">
+                  {repo.isPrivate ? (
+                    <Lock size={14} color={colors.mutedForeground} />
+                  ) : (
+                    <Unlock size={14} color={colors.mutedForeground} />
+                  )}
+                  {/* Middle ellipsis keeps both ends of the name: long names in a
+                      large organization share a prefix, so a tail cut made every
+                      row look identical and hid the distinguishing suffix. The
+                      min-w-0 box truncates inside the row, so the name can never
+                      run into the trailing check. */}
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-sm font-medium" numberOfLines={1} ellipsizeMode="middle">
+                      {repo.fullName}
+                    </Text>
+                  </View>
+                  {/* A recently-used row mixes providers under a header that
+                      names none, so it names its own — after the name, where the
+                      provider sections put nothing, so every repository name in
+                      this list starts on one edge instead of two. */}
+                  {item.showPlatform ? (
+                    <Text
+                      className="shrink-0 text-xs font-medium text-muted-foreground"
+                      numberOfLines={1}
+                    >
+                      {platformName}
+                    </Text>
+                  ) : null}
                 </View>
-                {isSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
-              </Pressable>
+              </ChoiceRow>
             );
           })}
           {renderBitbucketNote()}
@@ -289,12 +282,11 @@ export default function RepoPickerScreen() {
       return null;
     }
     return (
-      <View className="mx-4 mt-3 gap-1 rounded-lg border border-border bg-card p-3">
-        <Text className="text-sm font-semibold text-foreground">
-          {t('agentChat.repoPicker.platformBitbucket')}
-        </Text>
+      <Card className="mx-4 mt-3">
+        {/* One sentence, which already names the product: the note carried a
+            'Bitbucket' title above it and the body repeated the name. */}
         <Text variant="muted">{t('agentChat.newSession.bitbucketOrganizationsOnly')}</Text>
-      </View>
+      </Card>
     );
   }
 }

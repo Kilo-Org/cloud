@@ -1,17 +1,18 @@
-import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../shared/runtime-environment.js';
+import { RESERVED_ENV_VARS } from '../../shared/runtime-environment.js';
 import { ISSUED_CREDENTIAL_ENV_KEYS } from '../../sandbox-control/session-credentials.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../../utils/encryption.js';
+import { parseControlPlaneCredential } from '../../shared/control-plane-credential.js';
 
 /**
- * Names a secret must never reintroduce when the pre-overlay spec did not carry
- * them: the runtime org comes from `spec.kilo`, not profile secrets, and the
- * control-runtime names belong to the platform. SCM names are deliberately
+ * Names the frame takes only from the pre-overlay spec: the runtime org comes
+ * from `spec.kilo`, not profile secrets, and the control-runtime and
+ * session-identity names come from the platform. SCM names are deliberately
  * excluded — a plaintext var of the same name survives today, so a secret may
  * set one the grant did not issue.
  */
 const DELETE_WHEN_UNOWNED_ENV_KEYS: readonly string[] = [
   'KILOCODE_ORGANIZATION_ID',
-  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  ...RESERVED_ENV_VARS,
 ];
 
 export type FrameEnvInput = {
@@ -48,7 +49,10 @@ export function buildFrameEnv(input: FrameEnvInput): FrameEnvResult {
     input.privateKey
   );
   const restored = new Set<string>();
-  for (const key of ISSUED_CREDENTIAL_ENV_KEYS) {
+  const networkKeys = Object.keys(preOverlay).filter(
+    key => parseControlPlaneCredential(preOverlay[key])?.purpose === 'secret'
+  );
+  for (const key of [...ISSUED_CREDENTIAL_ENV_KEYS, ...networkKeys]) {
     if (Object.hasOwn(preOverlay, key)) {
       merged[key] = preOverlay[key];
       restored.add(key);

@@ -19,14 +19,14 @@ const attentionKv = vi.hoisted(() => ({
   getItem: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
-const routerReplace = vi.hoisted(() => vi.fn());
+const routerNavigate = vi.hoisted(() => vi.fn());
 // Mutable so a test can present a different route: the tabs layout reads these
 // segments to decide whether a form sheet covers the tab's screen.
 const segments = vi.hoisted(() => ({
   current: ['(app)', '(tabs)', '(0_home)'] as readonly string[],
 }));
 
-export { attentionKv, fetchSessions, organization, routerReplace, segments };
+export { attentionKv, fetchSessions, organization, routerNavigate, segments };
 
 vi.mock('@/lib/persist/encrypted-kv', () => attentionKv);
 vi.mock('@/lib/trpc', () => {
@@ -54,7 +54,7 @@ vi.mock('expo-router', () => ({
   usePathname: () => '/',
   useSegments: () => segments.current,
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ replace: routerReplace, setParams: vi.fn() }),
+  useRouter: () => ({ navigate: routerNavigate, setParams: vi.fn() }),
   useNavigation: () => ({ isFocused: () => false }),
   useFocusEffect: () => undefined,
   useScrollToTop: () => undefined,
@@ -71,9 +71,10 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 // the minimal `react-native` mock below.
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native', () => ({
-  // The live Agents header reads the interface direction for its action
-  // label's LTR-only letterspacing (session-list-screen.tsx), so the mock
-  // needs the export to exist.
+  // The live Agents header follows the copy's script for its action label's
+  // capitals and tracking — right-to-left script copy drops them inside an RTL
+  // interface (`keepsLatinDisplay`, session-list-screen.tsx) — so the mock needs
+  // the export to exist.
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
@@ -110,16 +111,25 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 0, FAB_SIZE: 0 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 0, FAB_SIZE: 0 };
+});
 // `agent-sessions-section` (drawn by the live list screen) animates the card
 // switch with Reanimated and reads the motion policy, whose real module reaches
 // `expo-battery` -> `expo-modules-core`; neither native module loads in the

@@ -8,23 +8,11 @@ import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  type RepoOption as BridgeRepoOption,
-  REPO_PLATFORM_LABEL_KEYS,
-  type RepoPickerSection,
-  type RepoPlatform,
-} from '@/lib/picker-bridge';
+import { REPO_PLATFORM_LABEL_KEYS, type RepoPlatform } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
-type RepoOption = {
-  fullName: string;
-  isPrivate: boolean;
-  /** Provider platform; omitted rows are treated as GitHub until d1 fills it. */
-  platform?: RepoPlatform;
-  workspaceUuid?: string;
-  repositoryUuid?: string;
-};
+import { buildRepoSections, type RepoOption, toBridgeRepo } from './repo-sections';
 
 type RepoSelectorProps = {
   value: string;
@@ -44,62 +32,6 @@ type RepoSelectorProps = {
 
 function isRepoPlatform(platform: string): platform is RepoPlatform {
   return platform === 'github' || platform === 'gitlab' || platform === 'bitbucket';
-}
-
-/** Constant order for provider sections (Bitbucket only when its rows exist, i.e. an org is set). */
-const PROVIDER_SECTION_ORDER: readonly RepoPlatform[] = ['github', 'gitlab', 'bitbucket'];
-
-function toBridgeRepo(repo: RepoOption): BridgeRepoOption {
-  return {
-    platform: repo.platform ?? 'github',
-    fullName: repo.fullName,
-    isPrivate: repo.isPrivate,
-    ...(repo.workspaceUuid !== undefined ? { workspaceUuid: repo.workspaceUuid } : {}),
-    ...(repo.repositoryUuid !== undefined ? { repositoryUuid: repo.repositoryUuid } : {}),
-  };
-}
-
-/**
- * Assemble the picker's grouped sections: a "Recently used" section over the
- * recents, then one provider section per platform (in PROVIDER_SECTION_ORDER)
- * over the provider's non-recent rows. Each recent row appears once (under
- * recents), and Bitbucket only appears when it has rows.
- */
-function buildRepoSections({
-  repositories,
-  recents,
-}: {
-  repositories: RepoOption[];
-  recents: RepoOption[];
-}): RepoPickerSection[] {
-  const recentKeys = new Set(
-    recents.map(repo => `${repo.platform ?? 'github'}/${repo.fullName.toLowerCase()}`)
-  );
-  const sections: RepoPickerSection[] = [];
-  if (recents.length > 0) {
-    sections.push({
-      key: 'recents',
-      titleKey: 'agentChat.newSession.recentlyUsed',
-      repos: recents.map(repo => toBridgeRepo(repo)),
-    });
-  }
-  for (const platform of PROVIDER_SECTION_ORDER) {
-    const repos = repositories.filter(repo => {
-      const repoPlatform = repo.platform ?? 'github';
-      return (
-        repoPlatform === platform &&
-        !recentKeys.has(`${repoPlatform}/${repo.fullName.toLowerCase()}`)
-      );
-    });
-    if (repos.length > 0) {
-      sections.push({
-        key: platform,
-        titleKey: REPO_PLATFORM_LABEL_KEYS[platform],
-        repos: repos.map(repo => toBridgeRepo(repo)),
-      });
-    }
-  }
-  return sections;
 }
 
 export function RepoSelector({
@@ -137,7 +69,7 @@ export function RepoSelector({
       <View
         accessible
         accessibilityLabel={t('agentChat.repoPicker.accessibility', {
-          label: t('agentChat.repoPicker.loading'),
+          label: t('common.loading'),
         })}
         accessibilityState={{ busy: true }}
         className={FIELD_TRIGGER_FRAME_CLASS}
@@ -166,7 +98,7 @@ export function RepoSelector({
     if (effectivelyDisabled) {
       return;
     }
-    const bridgeRepositories: BridgeRepoOption[] = repositories.map(repo => toBridgeRepo(repo));
+    const bridgeRepositories = repositories.map(repo => toBridgeRepo(repo));
     repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
       repositories: bridgeRepositories,
       sections: buildRepoSections({ repositories, recents }),

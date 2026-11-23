@@ -139,7 +139,7 @@ describe('round trip and absent load', () => {
 
   it('no-ops every API when the userId is unknown', async () => {
     await writeOutboxRow('', safeRetryRow());
-    await removeOutboxRow('', 'fp');
+    await expect(removeOutboxRow('', 'fp')).resolves.toBe(true);
     await expect(loadOutboxRow('', 'fp')).resolves.toBeNull();
     await expect(listOutboxRows('')).resolves.toEqual([]);
     expect(kvMock.setItem).not.toHaveBeenCalled();
@@ -168,6 +168,12 @@ describe('remove and list', () => {
   it('removes a stored row', async () => {
     await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp' }));
     await removeOutboxRow('u1', 'fp');
+    await expect(loadOutboxRow('u1', 'fp')).resolves.toBeNull();
+  });
+
+  it('resolves true for a committed remove', async () => {
+    await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp' }));
+    await expect(removeOutboxRow('u1', 'fp')).resolves.toBe(true);
     await expect(loadOutboxRow('u1', 'fp')).resolves.toBeNull();
   });
 
@@ -259,7 +265,11 @@ describe('write rejection boundary', () => {
 
   it('reports and swallows a failed remove', async () => {
     kvMock.removeItem.mockRejectedValueOnce(new Error('kv down'));
-    await expect(removeOutboxRow('u1', 'fp')).resolves.toBeUndefined();
+    await expect(removeOutboxRow('u1', 'fp')).resolves.toBe(false);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'mutation-outbox', 'error.operation': 'remove' },
+    });
   });
 });

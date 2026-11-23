@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, afterEach, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as nextServerModule from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
@@ -452,7 +452,6 @@ beforeEach(async () => {
     scope: 'code-review-status-callback',
     resourceParts: [REVIEW_ID, ''],
   });
-  mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
   mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
     makeAttempt({
       status: params.status,
@@ -514,6 +513,10 @@ beforeEach(async () => {
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
   ({ POST, isWorkspaceCapacityFailure, USAGE_LAG_RECHECK_DELAY_MS } = await import('./route'));
   ({ AUTOMATIC_RETRY_ATTEMPT_LIMIT } = await import('@/lib/code-reviews/retry-review'));
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe('isWorkspaceCapacityFailure', () => {
@@ -627,7 +630,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         })
       );
       expect(mockUpdateCodeReviewAttemptForCallback).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).toHaveBeenCalled();
     });
 
@@ -689,7 +692,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
         expect.objectContaining({ codeReviewId: REVIEW_ID, status: 'completed' })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'completed',
         expect.any(Object)
@@ -750,7 +753,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({
@@ -773,7 +776,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -795,7 +798,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -817,7 +820,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -843,7 +846,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -868,7 +871,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -912,7 +915,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -946,7 +949,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -1042,7 +1045,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           terminalReason: 'selected_model_unavailable',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -1050,7 +1053,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           terminalReason: 'selected_model_unavailable',
         })
       );
-      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
       expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
@@ -1090,7 +1092,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -1136,7 +1138,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
           REVIEW_ID,
           'failed',
           expect.objectContaining({
@@ -1167,7 +1169,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenLastCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'github_installation_required' })
@@ -1184,6 +1186,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
       mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
       mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
 
       await POST(
@@ -1195,7 +1198,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenLastCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'github_ip_allow_list' })
@@ -1214,7 +1217,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({
@@ -1319,6 +1322,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         })
       );
       mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
       mockGetIntegrationById.mockResolvedValue(makeIntegration());
 
       await POST(
@@ -1329,7 +1333,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenLastCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: undefined })
@@ -1349,7 +1353,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -1360,7 +1364,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   });
 
   describe('terminal_reason persistence', () => {
-    it('passes terminalReason to updateCodeReviewStatus', async () => {
+    it('passes terminalReason to updateCodeReviewStatusIfNonTerminal', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       await POST(
@@ -1372,7 +1376,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'timeout' })
@@ -1391,7 +1395,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'sandbox_error' })
@@ -1403,7 +1407,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'completed',
         expect.objectContaining({ terminalReason: undefined })
@@ -1482,7 +1486,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         if (byok) {
           expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
           expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-          expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+          expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
             REVIEW_ID,
             'failed',
             expect.objectContaining({ terminalReason })
@@ -1538,7 +1542,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_invalid_request_byok' })
@@ -1668,7 +1672,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           cliSessionId: 'ses_current',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'running',
         expect.objectContaining({
@@ -1730,7 +1734,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: '00000000-0000-0000-0000-000000000201',
         retryAttemptId: '00000000-0000-0000-0000-000000000202',
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
@@ -1789,7 +1793,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: '00000000-0000-0000-0000-000000000203',
         retryAttemptId: '00000000-0000-0000-0000-000000000204',
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
@@ -1826,7 +1830,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
@@ -1854,7 +1858,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(response.status).toBe(200);
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -1903,7 +1907,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
@@ -1987,7 +1991,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'upstream_error' })
@@ -2038,7 +2042,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
@@ -2086,7 +2090,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
@@ -2144,7 +2148,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           failedAttemptId: retryFlow.failedAttemptId,
           retryAttemptId: retryFlow.retryAttemptId,
         });
-        expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+        expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       }
     );
 
@@ -2176,7 +2180,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'sandbox_error' })
@@ -2264,7 +2268,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
             reason: warnReason,
           })
         );
-        expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
           REVIEW_ID,
           'failed',
           expect.objectContaining({ terminalReason: 'sandbox_error' })
@@ -2304,7 +2308,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'sandbox_error' })
@@ -2351,7 +2355,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'sandbox_error' })
@@ -2409,7 +2413,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('allows one bounded usage-unavailable retry for a post-dispatch agent activity failure', async () => {
@@ -2432,7 +2436,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           cli_session_id: 'ses_assistant_error',
         })
       );
-      mockListCodeReviewAttempts.mockResolvedValue([makeAttempt()]);
+      const boundRead = Promise.withResolvers<void>();
+      mockListCodeReviewAttempts.mockImplementation(async () => {
+        boundRead.resolve();
+        return [makeAttempt()];
+      });
       mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
         outcome: 'created',
         attempt: makeAttempt({
@@ -2446,37 +2454,32 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetSessionUsageFromBilling.mockResolvedValue(null);
       jest.useFakeTimers();
 
-      let response: Response | undefined;
-      let responsePromise: Promise<Response> | undefined;
-      try {
-        responsePromise = POST(
-          makeRequest({
-            status: 'failed',
-            cloudAgentSessionId: 'agent-assistant-error',
-            kiloSessionId: 'ses_assistant_error',
-            errorMessage: 'Assistant request failed',
-            terminalReason: 'assistant_failed',
-            failure: {
-              stage: 'agent_activity',
-              code: 'assistant_error',
-              message: 'Assistant request failed',
-            },
-          }),
-          makeParams(REVIEW_ID)
-        );
+      const responsePromise = POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-assistant-error',
+          kiloSessionId: 'ses_assistant_error',
+          errorMessage: 'Assistant request failed',
+          terminalReason: 'assistant_failed',
+          failure: {
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            message: 'Assistant request failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
 
-        // Flush the first usage read and the bound read without advancing the
-        // lag timer, so a premature wait would hang the flush below.
-        await jest.advanceTimersByTimeAsync(0);
-        // The bound still allows the retry, so the guard waits out the billing
-        // lag and re-reads before treating the review as unmeasurable.
-        await jest.advanceTimersByTimeAsync(USAGE_LAG_RECHECK_DELAY_MS);
-        response = await responsePromise;
-      } finally {
-        jest.useRealTimers();
-      }
+      // The callback token check awaits a WebCrypto job on the libuv threadpool,
+      // which fake timers cannot flush. Advancing the clock before the bound
+      // read lets the lag timer be scheduled after the jump, so it never fires.
+      await boundRead.promise;
+      // The bound still allows the retry, so the guard waits out the billing
+      // lag and re-reads before treating the review as unmeasurable.
+      await jest.advanceTimersByTimeAsync(USAGE_LAG_RECHECK_DELAY_MS);
+      const response = await responsePromise;
 
-      expect(response?.status).toBe(200);
+      expect(response.status).toBe(200);
       // Both the first read and the lag re-read return nothing.
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(2);
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
@@ -2494,7 +2497,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: '00000000-0000-0000-0000-000000000601',
         retryAttemptId: '00000000-0000-0000-0000-000000000602',
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('stops the second usage-unavailable failure at the bound and warns', async () => {
@@ -2560,7 +2563,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           reason: 'usage_unavailable_retries_exhausted',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_failed' })
@@ -2609,7 +2612,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(response.status).toBe(200);
       // Without a readable bound the callback still fails the review; it must
       // not create an unbounded retry nor wait out the billing lag.
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_failed' })
@@ -2673,7 +2676,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_failed' })
@@ -2742,7 +2745,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           reason: 'usage_unavailable_retries_exhausted',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_failed' })
@@ -2784,7 +2787,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         retryReason: 'infra_failure',
       });
       expect(mockRetryReviewFresh).toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('does not retry when the parent review is already superseded', async () => {
@@ -2824,7 +2827,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -2845,7 +2848,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
       expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -2889,7 +2892,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failedAttemptId: retryFlow.failedAttemptId,
         retryAttemptId: retryFlow.retryAttemptId,
       });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('does not start a fresh retry if the review becomes superseded before worker startup', async () => {
@@ -2956,7 +2959,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           terminalReason: 'superseded',
         })
       );
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('does not retry when retry creation is skipped because the review is inactive', async () => {
@@ -3000,7 +3003,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         skipped: 'inactive',
       });
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('does not retry maximum runtime failures', async () => {
@@ -3016,7 +3019,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'timeout' })
@@ -3054,8 +3057,127 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(response.status).toBe(200);
       expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+    });
+
+    it('returns without provider side effects when another caller terminalized the parent', async () => {
+      // A `completed` callback is the case that reaches the parent compare-and-set: a `failed`
+      // one with a retryable reason is handled by the infra-retry branch above, which owns its
+      // own gate, so it would never prove this path.
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Review already in terminal state',
+      });
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockSetCommitStatus).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockAddReactionToMR).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('omits a live currentStatus from the lost-compare-and-set body', async () => {
+      // The caller parses `currentStatus` as an enum of terminal values, and the
+      // row read at the top is non-terminal on this path, so a live re-read row
+      // must make the body omit `currentStatus` entirely instead of answering
+      // with a non-terminal status the parse would reject.
+      mockGetCodeReviewById
+        .mockResolvedValueOnce(makeReview({ status: 'running' }))
+        .mockResolvedValueOnce(makeReview({ status: 'running' }));
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.message).toBe('Review already in terminal state');
+      // A live row answers without the field at all: the orchestrator schema
+      // only accepts terminal values here.
+      expect(body.currentStatus).toBeUndefined();
+      expect(mockGetCodeReviewById).toHaveBeenCalledTimes(2);
+    });
+
+    it('answers a terminal re-read row when the parent compare-and-set loses', async () => {
+      mockGetCodeReviewById
+        .mockResolvedValueOnce(makeReview({ status: 'running' }))
+        .mockResolvedValueOnce(makeReview({ status: 'failed', terminal_reason: 'upstream_error' }));
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Review already in terminal state',
+        currentStatus: 'failed',
+        terminalReason: 'upstream_error',
+      });
+    });
+
+    it('returns without a parent update or provider side effects when a failed callback hits a terminal attempt', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({ id: '00000000-0000-0000-0000-000000000311', status: 'cancelled' })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'timeout',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Stale callback for a terminal attempt',
+      });
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockSetCommitStatus).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockAddReactionToMR).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('keeps normal handling when a running callback reads back a terminal attempt', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({ id: '00000000-0000-0000-0000-000000000312', status: 'failed' })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ id: '00000000-0000-0000-0000-000000000312', status: 'failed' })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'running', sessionId: 'agent-current' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'running',
+        expect.objectContaining({ sessionId: 'agent-current' })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalled();
     });
 
     it('ignores duplicate failed callbacks after a fresh retry was already queued', async () => {
@@ -3100,7 +3222,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
     });
 
     it('terminalizes a retry attempt with the targeted pre-dispatch sandbox failure', async () => {
@@ -3147,7 +3269,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockGetSessionUsageFromBilling).not.toHaveBeenCalled();
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({
@@ -3195,7 +3317,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(response.status).toBe(200);
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
@@ -3262,7 +3384,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
@@ -3422,8 +3544,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
       mockGitLabReviewIntegration();
-      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
         callOrder.push('persist');
+        return true;
       });
       mockSetCommitStatus.mockImplementation(async () => {
         callOrder.push('publish');
@@ -3437,7 +3560,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(response.status).toBe(200);
       expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'completed',
         expect.any(Object)
@@ -3462,8 +3585,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it('persists GitHub terminal status when check run publication fails', async () => {
       const callOrder: string[] = [];
       mockGetCodeReviewById.mockResolvedValue(makeReview());
-      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
         callOrder.push('persist');
+        return true;
       });
       mockUpdateCheckRun.mockImplementation(async () => {
         callOrder.push('publish');
@@ -3477,7 +3601,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(response.status).toBe(200);
       expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'completed',
         expect.any(Object)
@@ -3883,7 +4007,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       const published = JSON.stringify(mockUpdateCheckRun.mock.calls);
       expect(published).not.toContain('upstream 502');
       expect(published).not.toContain('8f14e45f');
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ errorMessage })
@@ -3920,7 +4044,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       const published = JSON.stringify(mockSetCommitStatus.mock.calls);
       expect(published).not.toContain('upstream 502');
       expect(published).not.toContain('8f14e45f');
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
         expect.objectContaining({ errorMessage })
@@ -4403,7 +4527,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
       expect(mockCreatePRComment).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledTimes(1);
     });
   });
 

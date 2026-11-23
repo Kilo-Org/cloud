@@ -1,5 +1,6 @@
 /** Builds the grouped metadata used by control-plane session registration. */
 import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
+import type { HostedGitHubRepositories } from '../persistence/hosted-github-repositories.js';
 import {
   isLegacySharedSandboxWorkspace,
   serializeSessionMetadata,
@@ -39,6 +40,7 @@ export type GroupedRegisterSessionInput = {
     appendSystemPrompt?: string;
   };
   repository?: SessionRepositoryRequest;
+  hostedGitHubRepositories?: HostedGitHubRepositories;
   profile?: SessionProfileBundle;
   /** The environment scope preflight authorized; registration adds the branch of each V2 repository. */
   environment?: EnvironmentScope;
@@ -50,6 +52,7 @@ export type GroupedRegisterSessionInput = {
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
     | 'sandboxKind'
+    | 'worktreeId'
     | 'parentWorktreeId'
     | 'sandboxProvider'
     | 'sandboxProviderBinding'
@@ -267,13 +270,18 @@ export async function buildSessionMetadataFromRegistration(
     finalization: input.finalization,
     profile: input.profile,
     ...(environment.reference ? { environment: environment.reference } : {}),
+    ...(input.hostedGitHubRepositories
+      ? { hostedGitHubRepositories: input.hostedGitHubRepositories }
+      : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,
       ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
       branchName,
-      ...(environment.reference?.repositories ? { generatedBranchName: generatedBranch } : {}),
+      ...(environment.reference?.repositories || input.hostedGitHubRepositories
+        ? { generatedBranchName: generatedBranch }
+        : {}),
     },
     lifecycle: {
       version: now,

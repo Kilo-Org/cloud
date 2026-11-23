@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   briefingAccessDenied,
+  briefingDurationSeconds,
   briefingEstimateUnavailableKey,
   briefingReportMissing,
+  type BriefingSafeguardField,
+  type BriefingSafeguardInput,
+  briefingSpendMicrodollars,
+  briefingSummaryStatusKey,
   briefingSyncDelayMs,
   canReadBriefingContext,
   parseBriefingSafeguardInput,
-  parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
 } from './agent-briefing-state';
@@ -145,6 +149,33 @@ describe('briefingEstimateUnavailableKey', () => {
   });
 });
 
+describe('briefingSummaryStatusKey', () => {
+  it('names a skipped summary not_admitted instead of a generic failure', () => {
+    expect(briefingSummaryStatusKey('failed', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmitted'
+    );
+    expect(briefingSummaryStatusKey('unavailable', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmitted'
+    );
+  });
+
+  it('keeps a failed or timed-out summary a failure, and status alone unchanged', () => {
+    expect(briefingSummaryStatusKey('failed', 'time_limit')).toBe(
+      'agentBriefing.snapshotSummaryFailed'
+    );
+    expect(briefingSummaryStatusKey('failed')).toBe('agentBriefing.snapshotSummaryFailed');
+    expect(briefingSummaryStatusKey('failed', null)).toBe('agentBriefing.snapshotSummaryFailed');
+    expect(briefingSummaryStatusKey('unavailable')).toBe('agentBriefing.summaryUnavailable');
+    expect(briefingSummaryStatusKey('disabled')).toBe('agentBriefing.summaryUnavailable');
+    expect(briefingSummaryStatusKey('pending')).toBe('agentBriefing.summaryPending');
+    expect(briefingSummaryStatusKey('running')).toBe('agentBriefing.summaryPending');
+    expect(briefingSummaryStatusKey('ready')).toBe('agentBriefing.summary');
+    expect(briefingSummaryStatusKey('failed', 'gateway_declined')).toBe(
+      'agentBriefing.snapshotSummaryFailed'
+    );
+  });
+});
+
 const trpcError = (code: string) => ({ data: { code } });
 
 describe('missing report versus lost access', () => {
@@ -162,103 +193,114 @@ describe('missing report versus lost access', () => {
   });
 });
 
-describe('parseBriefingSafeguards', () => {
+describe('briefing safeguard ranges', () => {
   it('accepts the server range: whole seconds from 1 to 600 and a positive spend', () => {
-    expect(parseBriefingSafeguards(10, 2)).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 2_000_000,
-    });
-    expect(parseBriefingSafeguards(1 / 60, 0.5)).toEqual({
-      maxDurationSeconds: 1,
-      maxSpendMicrodollars: 500_000,
-    });
+    expect(briefingDurationSeconds(10)).toBe(600);
+    expect(briefingDurationSeconds(1 / 60)).toBe(1);
+    expect(briefingSpendMicrodollars(2)).toBe(2_000_000);
+    expect(briefingSpendMicrodollars(0.5)).toBe(500_000);
   });
 
   it('rejects a duration the server would refuse', () => {
-    expect(parseBriefingSafeguards(10.1, 2)).toBeNull();
-    expect(parseBriefingSafeguards(60, 2)).toBeNull();
-    expect(parseBriefingSafeguards(0, 2)).toBeNull();
-    expect(parseBriefingSafeguards(-1, 2)).toBeNull();
+    expect(briefingDurationSeconds(10.1)).toBeNull();
+    expect(briefingDurationSeconds(60)).toBeNull();
+    expect(briefingDurationSeconds(0)).toBeNull();
+    expect(briefingDurationSeconds(-1)).toBeNull();
   });
 
   it('rejects a non-finite or non-positive spend', () => {
-    expect(parseBriefingSafeguards(5, 0)).toBeNull();
-    expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
-    expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
-    expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+    expect(briefingSpendMicrodollars(0)).toBeNull();
+    expect(briefingSpendMicrodollars(Number.NaN)).toBeNull();
+    expect(briefingSpendMicrodollars(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(briefingSpendMicrodollars(Number.MAX_SAFE_INTEGER)).toBeNull();
   });
 });
 
+/** The expected result of a pair the card must mark, one entry per field at fault. */
+function invalidSafeguards(...fields: BriefingSafeguardField[]): BriefingSafeguardInput {
+  return { kind: 'invalid', fields };
+}
+
+/** The expected result of a pair the server would accept. */
+function validSafeguards(
+  maxDurationSeconds: number,
+  maxSpendMicrodollars: number
+): BriefingSafeguardInput {
+  return { kind: 'valid', limits: { maxDurationSeconds, maxSpendMicrodollars } };
+}
+
 describe('parseBriefingSafeguardInput', () => {
   it('reads the decimal separator of the active language', () => {
-    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual({
-      maxDurationSeconds: 150,
-      maxSpendMicrodollars: 2_500_000,
-    });
-    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 2_500_000,
-    });
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual(
+      validSafeguards(150, 2_500_000)
+    );
+    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual(validSafeguards(600, 2_500_000));
+  });
+
+  it('names the field that failed, duration before spend', () => {
+    expect(parseBriefingSafeguardInput('0', '2', 'en')).toEqual(invalidSafeguards('duration'));
+    // Readable, but above the server's 600-second ceiling.
+    expect(parseBriefingSafeguardInput('11', '2', 'en')).toEqual(invalidSafeguards('duration'));
+    expect(parseBriefingSafeguardInput('10', '0', 'en')).toEqual(invalidSafeguards('spend'));
+    expect(parseBriefingSafeguardInput('zwei', 'zwei', 'de')).toEqual(
+      invalidSafeguards('duration', 'spend')
+    );
   });
 
   it('rejects text the fields cannot turn into a server-valid limit', () => {
-    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toEqual(invalidSafeguards('duration'));
+    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toEqual(invalidSafeguards('spend'));
+    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toEqual(invalidSafeguards('duration'));
+    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toEqual(invalidSafeguards('spend'));
   });
 
   it('refuses a separator the active language does not read as a decimal point', () => {
     // Each case pairs the refused text with a valid value in the other field, so
-    // the grammar check is the only reason the result is null: without it the
+    // the grammar check is the only reason the result is invalid: without it the
     // text would still turn into a server-valid limit.
-    expect(parseBriefingSafeguardInput('5', '2.5', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('5', '2,5', 'en')).toBeNull();
+    expect(parseBriefingSafeguardInput('5', '2.5', 'de')).toEqual(invalidSafeguards('spend'));
+    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toEqual(invalidSafeguards('duration'));
+    expect(parseBriefingSafeguardInput('5', '2,5', 'en')).toEqual(invalidSafeguards('spend'));
   });
 
   it('refuses a group separator on the wrong side of the decimal separator', () => {
     // Pasted from another convention: German grammar reads the comma as the
     // decimal separator, so the trailing ".50" cannot be a group.
-    expect(parseBriefingSafeguardInput('10', '1,234.50', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('10', '1.234.5', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('10', '1,23.50', 'en')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1,234.50', 'de')).toEqual(invalidSafeguards('spend'));
+    expect(parseBriefingSafeguardInput('10', '1.234.5', 'de')).toEqual(invalidSafeguards('spend'));
+    expect(parseBriefingSafeguardInput('10', '1,23.50', 'en')).toEqual(invalidSafeguards('spend'));
   });
 
   it('accepts the language its own display writes', () => {
-    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 1_234_500_000,
-    });
-    expect(parseBriefingSafeguardInput('10', '1.234,5', 'de')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 1_234_500_000,
-    });
-    expect(parseBriefingSafeguardInput('10', '1,234.5', 'en')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 1_234_500_000,
-    });
+    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual(
+      validSafeguards(600, 1_234_500_000)
+    );
+    expect(parseBriefingSafeguardInput('10', '1.234,5', 'de')).toEqual(
+      validSafeguards(600, 1_234_500_000)
+    );
+    expect(parseBriefingSafeguardInput('10', '1,234.5', 'en')).toEqual(
+      validSafeguards(600, 1_234_500_000)
+    );
   });
 
   it('follows the grouping and separator the active language formats', () => {
     // Pairing groups of two then three is correct in these languages and wrong
     // in English, where the same text must be refused.
-    expect(parseBriefingSafeguardInput('10', '1,23,456.7', 'hi')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 123_456_700_000,
-    });
-    expect(parseBriefingSafeguardInput('10', '123,456.7', 'hi')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1,23,456.7', 'hi')).toEqual(
+      validSafeguards(600, 123_456_700_000)
+    );
+    expect(parseBriefingSafeguardInput('10', '123,456.7', 'hi')).toEqual(
+      invalidSafeguards('spend')
+    );
     // French formats a narrow no-break space; a typed plain space reads the same.
-    expect(parseBriefingSafeguardInput('10', '1 234,5', 'fr')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 1_234_500_000,
-    });
+    expect(parseBriefingSafeguardInput('10', '1 234,5', 'fr')).toEqual(
+      validSafeguards(600, 1_234_500_000)
+    );
     // A fraction long enough to round the integer up must not invalidate the
     // grouping the person typed.
-    expect(parseBriefingSafeguardInput('10', '9.999,9999', 'de')).toEqual({
-      maxDurationSeconds: 600,
-      maxSpendMicrodollars: 9_999_999_900,
-    });
+    expect(parseBriefingSafeguardInput('10', '9.999,9999', 'de')).toEqual(
+      validSafeguards(600, 9_999_999_900)
+    );
   });
 });
 

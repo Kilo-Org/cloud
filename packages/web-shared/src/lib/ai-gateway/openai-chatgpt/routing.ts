@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
+import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -11,6 +12,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
@@ -19,13 +21,24 @@ import {
 } from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
-import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
  * has an enabled connection, an eligible OpenAI model is served by api.openai.com
  * on the delegated token instead of a managed gateway.
  */
+
+/**
+ * Shown on the organization's shared connection card when the person recorded
+ * as its connector is gone: the account row is missing, the account is
+ * soft-deleted or being deleted, or it holds no usable email. The row belongs
+ * to the organization, so an organization owner or admin reconnects it instead
+ * of losing it. Routing never refuses on this: it skips the shared row and
+ * falls back to the caller's own connection.
+ */
+export const OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE =
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -193,8 +206,48 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
  * enable flag and a connected status must hold for the route to be eligible and
  * for the models list to carry the BYOK tag.
  */
-function isUsableStoredConnection(stored: OpenAiChatGptStoredConnection | null): boolean {
+function isUsableStoredConnection(
+  stored: OpenAiChatGptStoredConnection | null
+): stored is OpenAiChatGptStoredConnection {
   return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
+ * A shared connector that cannot serve stays in that state until an owner or
+ * admin reconnects it, so the report describes one standing fact rather than an
+ * event. The shared report window keeps that fact visible without repeating it
+ * on every request, and bounds the keys it remembers.
+ */
+function logSharedConnectorGone(organizationId: string, connectorId: string): void {
+  const key = `openai-chatgpt-shared-connector-gone:${organizationId}:${connectorId}`;
+  if (!claimReportWindow(key, Date.now())) return;
+  logExceptInTest(
+    JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId,
+      connectorId,
+    })
+  );
+}
+
+/**
+ * The owner's stored connection when it may serve traffic, or null. The shared-services
+ * connector rule applies here so routing and the models-list tag cannot disagree; only a
+ * caller that reports the condition passes `onSharedConnectorGone`.
+ */
+async function readServableStoredConnection(
+  owner: OpenAiChatGptOwner,
+  onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    onSharedConnectorGone?.(owner.organizationId, stored.createdBy);
+    return null;
+  }
+
+  return stored;
 }
 
 /**
@@ -211,39 +264,38 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  // The catalog can list an OpenAI model the plain API does not serve. A
-  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
-  // base model, not an API model id, so sending it upstream fails the request.
-  // Only a model this project actually serves may take the delegated route.
-  if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
+  if (!(await isOpenAiModelServed(upstreamModel))) {
     return null;
   }
 
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  return isUsableStoredConnection(stored) ? upstreamModel : null;
+  if (!(await readServableStoredConnection(owner, logSharedConnectorGone))) return null;
+
+  return upstreamModel;
 }
 
 /**
  * The catalog model ids an enabled ChatGPT connection can serve, for the models
- * list's BYOK tag. Returns null when the person has no usable connection, so the
- * caller leaves the list untouched. The served-model gate is the same one
- * routing uses, so a model is tagged only when the delegated route can carry it.
+ * list's BYOK tag. Returns null when the usable connection is not there, so the
+ * caller leaves the list untouched: a person with no usable connection, or an
+ * organization's shared connection whose recorded connector is gone. The
+ * served-model gate is the same one routing uses, so a model is tagged only when
+ * the delegated route can carry it.
  */
 export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (!isUsableStoredConnection(stored)) return null;
+  // Same order as routing: an unconfigured deployment cannot tag anything, so it
+  // must not read and decrypt the stored row to find that out.
+  if (readOpenAiChatGptPartnerKey() === null) return null;
 
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-  if (apiKey.trim().length === 0) return null;
+  if (!(await readServableStoredConnection(owner))) return null;
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {
       const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
       if (!upstreamModel) return null;
-      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+      return (await isOpenAiModelServed(upstreamModel)) ? modelId : null;
     })
   );
   return new Set(tagged.filter((id): id is string => id !== null));
@@ -251,11 +303,15 @@ export async function getOpenAiChatGptByokModelIds(
 
 /**
  * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
- * model picker and the extension show the BYOK badge like pasted BYOK keys. The
- * list is returned unchanged when the person has no usable connection.
+ * model picker and the extension show the BYOK badge like pasted BYOK keys. A
+ * marked model comes back with `hasUserByokAvailable: true` and `isFree: false`,
+ * including one that already carried the badge; the constraint names `isFree`
+ * because this helper is one of the places that rewrites it. The list is
+ * returned unchanged when the person has no usable connection. The caller runs
+ * it after `addUserByokAvailability`.
  */
 export async function tagOpenAiChatGptByokModels<
-  T extends { id: string; hasUserByokAvailable?: boolean },
+  T extends { id: string; hasUserByokAvailable?: boolean; isFree?: boolean },
 >(owner: OpenAiChatGptOwner, models: T[]): Promise<T[]> {
   const byokModelIds = await getOpenAiChatGptByokModelIds(
     owner,
@@ -263,9 +319,9 @@ export async function tagOpenAiChatGptByokModels<
   );
   if (!byokModelIds) return models;
   return models.map(model =>
-    model.hasUserByokAvailable !== true && !byokModelIds.has(model.id)
-      ? model
-      : { ...model, hasUserByokAvailable: true, isFree: false }
+    model.hasUserByokAvailable === true || byokModelIds.has(model.id)
+      ? markByokAvailable(model)
+      : model
   );
 }
 
@@ -283,6 +339,48 @@ function normalizeReasoningEffort(
   if (parsed.success) return parsed.data;
   normalizations.add('reasoning_effort_removed');
   return undefined;
+}
+
+type ToolNamespaceLookup = {
+  topLevelNames: Set<string>;
+  namespaceByCallType: Record<'function' | 'custom', Map<string, string | null>>;
+};
+
+function indexToolNamespaces(tools: unknown[]): ToolNamespaceLookup {
+  const topLevelNames = new Set<string>();
+  const namespaceByCallType: ToolNamespaceLookup['namespaceByCallType'] = {
+    function: new Map(),
+    custom: new Map(),
+  };
+
+  for (const tool of tools) {
+    if (!isRecord(tool)) continue;
+    if (tool.type !== 'namespace') {
+      if (typeof tool.name === 'string') topLevelNames.add(tool.name);
+      continue;
+    }
+    if (typeof tool.name !== 'string' || !Array.isArray(tool.tools)) continue;
+
+    const functionNames = new Set<string>();
+    const customNames = new Set<string>();
+    for (const nestedTool of tool.tools) {
+      if (!isRecord(nestedTool) || typeof nestedTool.name !== 'string') continue;
+      if (nestedTool.type === 'function') functionNames.add(nestedTool.name);
+      else if (nestedTool.type === 'custom') customNames.add(nestedTool.name);
+    }
+
+    for (const [callType, names] of [
+      ['function', functionNames],
+      ['custom', customNames],
+    ] as const) {
+      const lookup = namespaceByCallType[callType];
+      for (const name of names) {
+        lookup.set(name, lookup.has(name) ? null : tool.name);
+      }
+    }
+  }
+
+  return { topLevelNames, namespaceByCallType };
 }
 
 function normalizeInputItems(
@@ -306,6 +404,8 @@ function normalizeInputItems(
   });
   body.input = normalizedInput;
 
+  let toolNamespaces: ToolNamespaceLookup | undefined;
+
   for (const item of normalizedInput) {
     if (!isRecord(item)) continue;
 
@@ -320,28 +420,12 @@ function normalizeInputItems(
       typeof item.name === 'string' &&
       Array.isArray(body.tools)
     ) {
+      toolNamespaces ??= indexToolNamespaces(body.tools);
       const toolType = item.type === 'function_call' ? 'function' : 'custom';
-      if (
-        body.tools.some(
-          tool => isRecord(tool) && tool.type !== 'namespace' && tool.name === item.name
-        )
-      ) {
-        continue;
-      }
-      const namespaces = body.tools.flatMap(tool =>
-        isRecord(tool) &&
-        tool.type === 'namespace' &&
-        typeof tool.name === 'string' &&
-        Array.isArray(tool.tools) &&
-        tool.tools.some(
-          nestedTool =>
-            isRecord(nestedTool) && nestedTool.type === toolType && nestedTool.name === item.name
-        )
-          ? [tool.name]
-          : []
-      );
-      if (namespaces.length === 1) {
-        item.namespace = namespaces[0];
+      if (toolNamespaces.topLevelNames.has(item.name)) continue;
+      const namespace = toolNamespaces.namespaceByCallType[toolType].get(item.name);
+      if (namespace !== undefined && namespace !== null) {
+        item.namespace = namespace;
         normalizations.add('tool_namespace_added');
       }
     }
@@ -481,15 +565,24 @@ export function buildOpenAiChatGptProvider(
 /**
  * Resolves the ChatGPT connection as a provider, a reconnect requirement, or
  * null when the request is not eligible or cannot be served. A `reconnect`
- * result is returned when the person's enabled credential is terminally dead:
- * the request must fail readably instead of silently running on another billing
- * path. Callers keep the standard abuse and organization policy checks
+ * result is returned when the person's enabled credential is terminally dead
+ * and the deployment can serve the route at all: the request must fail readably
+ * instead of silently running on another billing path. Without the partner key
+ * the deployment is not configured for token sharing, so every request takes
+ * the ordinary gateway route instead and no stored credential is consulted.
+ * Callers keep the standard abuse and organization policy checks
  * (`bypassAccessCheck: false`), but skip the zero-balance paid-model block:
  * the ChatGPT plan pays for the request, not Kilo credits.
  */
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
 ): Promise<OpenAiChatGptRoutingResult | null> {
+  const apiKey = readOpenAiChatGptPartnerKey();
+  // Without the partner key the deployment cannot serve a delegated request at
+  // all, so the request takes the ordinary gateway route without reading or
+  // refreshing the stored connection.
+  if (apiKey === null) return null;
+
   const candidates = openAiChatGptOwnerCandidates(input);
 
   for (const owner of candidates) {
@@ -498,8 +591,6 @@ export async function checkOpenAiChatGptByok(
 
     const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
-    // A terminally dead credential must fail readably instead of falling back
-    // to the next connection or another billing path.
     if (outcome.kind === 'terminal') {
       return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
     }
@@ -507,9 +598,9 @@ export async function checkOpenAiChatGptByok(
     // and let a later candidate (the caller's own connection) be tried.
     if (outcome.kind !== 'access_token') continue;
 
-    const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+    // The key is present, so this never returns null; the guard stays because the
+    // builder's type admits it, and it keeps the ordinary route if that changes.
     const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
-    // A missing partner key is a deployment-wide misconfiguration.
     if (!provider) return null;
 
     return {

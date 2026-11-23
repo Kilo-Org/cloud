@@ -23,12 +23,11 @@
  * and the iOS interruption level from the same content field, so there is no
  * `Platform.OS` branch and no `.ios.`/`.android.` split.
  *
- * `planNeedsInputNotifications` is pure. `previous` is the caller's notified
- * set — the rows whose notification is currently posted — so a re-plan (on a
- * rows change or a route change) can tell a row that just raised from one that
- * was already raised, never re-posts a notification that is already on screen,
- * and still knows what to dismiss after a plan that publishes nothing. The
- * caller carries it forward as `previous - dismiss + publish`.
+ * `planNeedsInputNotifications` is pure. A re-plan (on a rows change or a route
+ * change) can tell a row that just raised from one already raised: an unchanged
+ * raise is not published again, and a raise whose shape changed is re-published
+ * in place under the same per-session identifier, not stacked as a second
+ * notification.
  */
 
 import * as Notifications from 'expo-notifications';
@@ -53,6 +52,7 @@ import {
   markNeedsInputPosted,
   needsInputSessionOfIdentifier,
   notificationIdentifierForSession,
+  retireNeedsInputReplyResult,
 } from './needs-input-presentation';
 
 /** The two raise kinds a cached row can be in. */
@@ -277,13 +277,6 @@ export function planNeedsInputNotifications({
       const notifiedRow = alreadyNotified.has(sessionId)
         ? previous.find(previousRow => previousRow.sessionId === sessionId)
         : undefined;
-      // An already-notified raise is still waiting under its standing
-      // notification. Re-publish in place only when the shape the notification
-      // carries changed: the kind moved, the associated PR appeared or changed,
-      // or the preview choice did. A raise posted before the PR link reached the
-      // cache would otherwise never offer Open PR, a kind flip would keep
-      // offering the wrong controls, and a preference change would wait for the
-      // raise's next status change to reach the notification.
       if (shouldPublishForSession({ appState, pathname, sessionId })) {
         const candidate = toNotificationRow(row, kind, copyPreviews);
         if (needsRepublish(notifiedRow, candidate)) {
@@ -292,10 +285,6 @@ export function planNeedsInputNotifications({
       }
     }
   }
-  // A post whose session is already in `previous` replaces the notification on
-  // screen, so it must update it quietly (see `updates`). A session this plan
-  // dismisses is not one of those: the dismissal runs before the first post, so
-  // the notification the post creates is new and must alert like any first post.
   const dismissed = new Set(dismiss);
   const updates = publish
     .filter(
@@ -315,7 +304,9 @@ export function planNeedsInputNotifications({
  * choice, or, under `full` previews, the title the notification displays. The
  * title is compared only where it is shown: a raise that first posted while the
  * backend default title was still in place keeps that fallback until something
- * else re-publishes it, unless the title counts here.
+ * else re-publishes it, unless the title counts here. Without these checks, a
+ * raise posted before the PR link reached the cache would never offer Open PR,
+ * and a kind flip would keep offering the wrong controls.
  */
 function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
@@ -345,12 +336,6 @@ function pushDataForRow(
   };
 }
 
-/**
- * The copy an app-owned post carries. It follows the user's preview choice the
- * way the server's attention push does, because both carriers land on one OS
- * notification: only `full` puts the session title in the notification, and
- * `generic` uses the shared generic copy the push sends in the same mode.
- */
 function notificationContentForRow(row: NeedsInputNotificationRow) {
   if (row.previews === 'full') {
     return { title: row.title, body: i18n.t('agentChat.questionCard.title') };
@@ -368,6 +353,10 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
     },
   });
 }
+
+const reportDismissFailure = (error: unknown): void => {
+  reportFailure('dismiss', error);
+};
 
 /**
  * Whether the OS lets the app post a notification now. The user can turn
@@ -392,11 +381,12 @@ async function canPostNotifications(): Promise<boolean> {
  * reached the OS, so the caller does not remember a raise that never appeared.
  *
  * `replacesPosted` marks a post that replaces a notification already on screen
- * (the plan's `updates`). It carries `sound: false`, and
- * `ExpoNotificationBuilder.applySoundsAndVibrations` then builds it silent —
- * which suppresses Android 8+'s channel sound too, since Android replays the
- * channel's sound on every `notify` of an existing notification. iOS reads the
- * same field and stays quiet as well.
+ * (the plan's `updates`). Such a post must update it quietly in every dimension
+ * the app controls, so it carries `sound: false` and drops the time-sensitive
+ * interruption level. `ExpoNotificationBuilder.applySoundsAndVibrations` then
+ * builds it silent — which suppresses Android 8+'s channel sound too, since
+ * Android replays the channel's sound on every `notify` of an existing
+ * notification. iOS reads the same field and stays quiet as well.
  */
 async function publishRow(
   row: NeedsInputNotificationRow,
@@ -404,6 +394,9 @@ async function publishRow(
 ): Promise<boolean> {
   const data = pushDataForRow(row);
   const content = notificationContentForRow(row);
+  // A reply's result left under a push's identifier belongs to the raise this
+  // post replaces, so it goes before the new raise is shown beside it.
+  await retireNeedsInputReplyResult(row.sessionId, reportDismissFailure);
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: notificationIdentifierForSession(row.sessionId),
@@ -412,8 +405,7 @@ async function publishRow(
         body: content.body,
         data,
         categoryIdentifier: needsInputCategoryId({ kind: row.kind, hasPr: row.prUrl !== null }),
-        interruptionLevel: 'timeSensitive',
-        ...(replacesPosted ? { sound: false } : {}),
+        ...(replacesPosted ? { sound: false } : { interruptionLevel: 'timeSensitive' as const }),
       },
       // A channel-aware trigger delivers immediately on both platforms: Android
       // routes to the shared attention channel, iOS reads it as a null trigger.
@@ -433,6 +425,7 @@ async function dismissIdentifier(identifier: string): Promise<boolean> {
     const postedSession = needsInputSessionOfIdentifier(identifier);
     if (postedSession !== null) {
       clearPostedNeedsInputNotification(postedSession);
+      await retireNeedsInputReplyResult(postedSession, reportDismissFailure);
     }
     return true;
   } catch (error) {

@@ -11,6 +11,10 @@ import {
   generateGitHubInstallationToken,
   checkExistingFork,
 } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -208,6 +212,11 @@ export async function getGitHubInstallationIdForUser(userId: string): Promise<st
     : undefined;
 }
 
+/**
+ * Aggregate the organization's GitHub installations into one repository list.
+ * A listing that passed the provider's pagination budget answers a permanent
+ * `PAYLOAD_TOO_LARGE` unless another installation could serve the read.
+ */
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
   forceRefresh: boolean = false,
@@ -231,7 +240,7 @@ type IntegrationRepositoriesOutcome =
       syncedAt: string | null;
     }
   | { status: 'unavailable'; reason: GitHubRepositoriesUnavailableReason }
-  | { status: 'failed' };
+  | { status: 'failed'; budget?: GitHubListingBudgetExceededError };
 
 async function readIntegrationRepositories(
   integration: PlatformIntegration,
@@ -286,7 +295,10 @@ async function fetchRepositoriesForIntegrations(
         }
         try {
           return await readIntegrationRepositories(integration, forceRefresh, purpose);
-        } catch {
+        } catch (error) {
+          if (error instanceof GitHubListingBudgetExceededError) {
+            return { status: 'failed', budget: error };
+          }
           return { status: 'failed' };
         }
       })
@@ -296,7 +308,20 @@ async function fetchRepositoriesForIntegrations(
       const unavailable = outcomes.find(outcome => outcome.status === 'unavailable');
       if (!unavailable) {
         // Every installation was configured but the provider rejected the read.
-        // The caller retries, so this stays an error rather than a state.
+        // An oversized listing is permanent for the retrying picker, so it
+        // answers the budget refusal instead of the generic retryable error;
+        // any other provider failure keeps the generic error.
+        const budget = outcomes.find(
+          (outcome): outcome is { status: 'failed'; budget: GitHubListingBudgetExceededError } =>
+            outcome.status === 'failed' && outcome.budget !== undefined
+        );
+        if (budget) {
+          throw new TRPCError({
+            code: 'PAYLOAD_TOO_LARGE',
+            message: GITHUB_LISTING_BUDGET_MESSAGE,
+            cause: budget.budget,
+          });
+        }
         throw new Error('All GitHub repository fetches failed');
       }
       return {
@@ -318,7 +343,13 @@ async function fetchRepositoriesForIntegrations(
       // unqualified success for the installations that answered.
       ...(readable.length < outcomes.length ? { partial: true } : {}),
     };
-  } catch (_error) {
+  } catch (error) {
+    // The aggregation throws `PAYLOAD_TOO_LARGE` itself for an oversized
+    // listing; rethrow it unchanged so the permanence of the refusal survives
+    // the retryable-looking generic wrapper below.
+    if (error instanceof TRPCError && error.code === 'PAYLOAD_TOO_LARGE') {
+      throw error;
+    }
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to fetch GitHub repositories',
@@ -326,6 +357,11 @@ async function fetchRepositoriesForIntegrations(
   }
 }
 
+/**
+ * Read the repositories a user's own GitHub installation can serve. A listing
+ * that passed the provider's pagination budget answers a permanent
+ * `PAYLOAD_TOO_LARGE`.
+ */
 export async function fetchGitHubRepositoriesForUser(
   userId: string,
   forceRefresh: boolean = false
@@ -375,7 +411,16 @@ export async function fetchGitHubRepositoriesForUser(
       repositories: mapRepositories(cachedRepositories ?? [], integration),
       syncedAt: integration.repositories_synced_at,
     };
-  } catch (_error) {
+  } catch (error) {
+    // An oversized listing can never succeed on retry, so it answers the
+    // permanent `PAYLOAD_TOO_LARGE` refusal instead of this generic error.
+    if (error instanceof GitHubListingBudgetExceededError) {
+      throw new TRPCError({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: error,
+      });
+    }
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to fetch GitHub repositories',

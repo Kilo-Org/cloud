@@ -6,15 +6,13 @@
  * CLI live, or CLI historical transport.
  */
 import type { ToolDisplayMode } from './tool-detail-marker';
-import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { NormalizedEvent, ServiceEvent } from './normalizer';
-import type { SuggestionAction } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
-import type { ServiceState } from './service-state';
+import type { ServiceState, ServiceStateConfig } from './service-state';
 import { createCloudAgentTransport, type CloudAgentTransportConfig } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
@@ -34,9 +32,7 @@ import type { SessionStorage } from './storage/types';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
-  MessageDeliveryState,
   ResolvedSession,
-  SessionInfo,
   SessionSnapshot,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
@@ -80,49 +76,24 @@ type CloudAgentSessionConfig = {
   transport: CloudAgentSessionTransport;
   websocketBaseUrl?: string;
   storage?: SessionStorage;
-  onError?: (message: string) => void;
-  onChildSessionError?: (sessionId: string, message: string) => void;
-  onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
-  onQuestionResolved?: (requestId: string) => void;
-  onPermissionAsked?: (
-    requestId: string,
-    permission?: string,
-    patterns?: string[],
-    metadata?: Record<string, unknown>,
-    always?: string[]
-  ) => void;
-  onPermissionResolved?: (requestId: string) => void;
-  onSuggestionAsked?: (
-    requestId: string,
-    text: string,
-    actions: SuggestionAction[],
-    callId?: string
-  ) => void;
-  onSuggestionResolved?: (requestId: string) => void;
-  onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onTransportCapabilityChange?: () => void;
-  onTransportCapabilitiesChange?:
+  /**
+   * Fired when composer readiness may have changed; the manager recomputes
+   * the canSend / canInterrupt gates.
+   */
+  onComposerCapabilityChange?: () => void;
+  /**
+   * Fired whenever the per-session capabilities the owning CLI advertises in
+   * `sessions.heartbeat` / `sessions.list` change. Drives the attachment gate
+   * (`supportsAttachments`).
+   */
+  onCliCapabilitiesReported?:
     | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
     | undefined;
-  onSessionCreated?: (info: SessionInfo) => void;
-  onSessionUpdated?: (info: SessionInfo) => void;
   onReplayComplete?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
-  onMessageQueued?: (messageId: string) => void;
-  onMessageCanceled?: (messageId: string) => void;
-  onMessageCompleted?: (messageId: string) => void;
-  onMessageFailed?: (
-    messageId: string,
-    state: Extract<MessageDeliveryState, { status: 'failed' }>
-  ) => void;
-  /**
-   * True when the user already retried this message's delivery failure, so a
-   * replayed `cloud.message.failed` must not restore the cleared footer.
-   */
-  isDeliveryFailureResolved?: (messageId: string) => boolean;
   /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
@@ -142,7 +113,29 @@ type CloudAgentSessionConfig = {
   onFilePart?:
     | ((partId: string, file: { mime: string; filename?: string; url: string }) => void)
     | undefined;
-};
+} &
+  // These forward unchanged to ServiceState, which documents them.
+  // `isDeliveryFailureResolved` is here so a replayed `cloud.message.failed`
+  // for an already-retried message cannot restore the cleared footer.
+  Pick<
+    ServiceStateConfig,
+    | 'onError'
+    | 'onChildSessionError'
+    | 'onQuestionAsked'
+    | 'onQuestionResolved'
+    | 'onPermissionAsked'
+    | 'onPermissionResolved'
+    | 'onSuggestionAsked'
+    | 'onSuggestionResolved'
+    | 'onBranchChanged'
+    | 'onSessionCreated'
+    | 'onSessionUpdated'
+    | 'onMessageQueued'
+    | 'onMessageCanceled'
+    | 'onMessageCompleted'
+    | 'onMessageFailed'
+    | 'isDeliveryFailureResolved'
+  >;
 
 /** The session sends straight through, so its input is the transport contract. */
 type CloudAgentSessionSendInput = TransportSendInput;
@@ -180,7 +173,12 @@ type CloudAgentSessionTransport = {
     | undefined;
   api?: CloudAgentApi | undefined;
 
-  fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
+  fetchSnapshot?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options?: { signal?: AbortSignal }
+      ) => Promise<SessionSnapshot>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
    * bounded read and any reconnect snapshot replays. Once per attach, with the
@@ -188,11 +186,17 @@ type CloudAgentSessionTransport = {
    * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
    * isn't reset to the latest 50.
+   *
+   * The live transport aborts `signal` once it stops gating live delivery on
+   * the read (deadline, teardown, or a full event buffer); a provider that
+   * ignores it still has its late result dropped.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?:
     | ((
         kiloSessionId: KiloSessionId,
-        options: { cursor?: string }
+        options: { cursor?: string; signal?: AbortSignal }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
   fetchCloudSnapshotPage?:
@@ -540,8 +544,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           onError: config.onError,
           onRemoteModelStateChange: config.onRemoteModelStateChange,
           onRemoteCommandStateChange: config.onRemoteCommandStateChange,
-          onCapabilityChange: config.onTransportCapabilityChange,
-          onCapabilitiesChange: config.onTransportCapabilitiesChange,
+          onComposerCapabilityChange: config.onComposerCapabilityChange,
+          onCliCapabilitiesReported: config.onCliCapabilitiesReported,
         });
       }
       case 'cloud-agent': {

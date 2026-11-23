@@ -19,7 +19,9 @@
     "presenceStatus": "Hos: {{connection}}",
     "commandStatus": "Penghantaran arahan: {{status}}",
     "delivered": "Dihantar",
-    "expired": "Tamat tempoh"
+    "expired": "Tamat tempoh",
+    "recoveryGaps_one": "{{displayCount}} bahagian transkrip ini tiada.",
+    "recoveryGaps_other": "{{displayCount}} bahagian transkrip ini tiada."
   },
   "common": {
     "manageOnWeb": "Urus di web",
@@ -57,6 +59,7 @@
     "link": "pautan",
     "takingLonger": "Proses ini mengambil masa lebih lama daripada jangkaan. Anda boleh menutup skrin ini dan menyemak semula kemudian.",
     "model": "Model AI",
+    "notSelected": "Tidak dipilih",
     "accessDenied": "Akses ditolak.",
     "allRepositories": "Semua repositori",
     "personal": "Peribadi",
@@ -88,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Imej",
     "imageUnavailable": "Imej tidak tersedia.",
     "loading": "Memuatkan…",
     "loadMore": "Muatkan lagi",
@@ -137,6 +141,7 @@
     "keepRunning": "Teruskan proses",
     "newSession": "Sesi baharu",
     "noModelsAvailable": "Tiada model tersedia",
+    "modelRetires": "Bersara pada {{date}}",
     "notFound": "Tidak ditemui.",
     "online": "Dalam talian",
     "open": "Buka {{name}}",
@@ -147,6 +152,7 @@
     "performance": "Prestasi",
     "preferences": "Keutamaan",
     "privacyPolicy": "Dasar privasi",
+    "termsOfService": "Terma perkhidmatan",
     "profile": "Profil",
     "reactions": "Reaksi",
     "recent": "Terkini",
@@ -158,7 +164,7 @@
     "retryLoadingMore": "Cuba lagi untuk memuatkan lebih banyak item",
     "reviewPr": "Semak PR",
     "role": "Peranan",
-    "searchModels": "Cari model...",
+    "searchModels": "Cari model…",
     "selectedRepositories": "Repositori yang dipilih",
     "selectRepositories": "Pilih repositori",
     "sendMessage": "Hantar mesej",
@@ -170,6 +176,7 @@
     "generating": "Menjana…",
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
+    "organizationRepositories": "Repositori organisasi",
     "dismissed": "Diketepikan",
     "agent": "ejen",
     "durationMinuteShort": "min",
@@ -178,7 +185,32 @@
     "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
     "privateRepositoryA11y": "{{name}}, repositori persendirian",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
-    "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi."
+    "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
+    "organizationTrialEndedBillingAtKiloAi": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin bulet",
+        "nestedBulletPoint": "Poin bulet bersarang",
+        "orderedItem": "Item senarai {n}",
+        "nestedOrderedItem": "Item senarai bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Petikan",
+        "nestedQuote": "Petikan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Tajuk",
+        "links": "Pautan",
+        "images": "Imej"
+      }
+    }
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -201,7 +233,7 @@
     "openSignInPageInBrowser": "Buka halaman log masuk dalam penyemak imbas",
     "copySignInLink": "Salin pautan log masuk",
     "cancelSignIn": "Batalkan log masuk",
-    "startingSignIn": "Memulakan log masuk...",
+    "startingSignIn": "Memulakan log masuk…",
     "organizationUsesSso": "Organisasi anda menggunakan log masuk tunggal (SSO).",
     "continueWithSso": "Teruskan dengan SSO",
     "useDifferentEmail": "Guna e-mel lain",
@@ -216,8 +248,8 @@
     "verifyCode": "Sahkan kod",
     "resendCode": "Hantar semula kod",
     "termsPrefix": "Dengan meneruskan, anda bersetuju dengan ",
+    "termsInSentence": "Terma perkhidmatan",
     "terms": "Terma",
-    "termsInSentence": "Terma",
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Pilihan log masuk lain",
@@ -272,9 +304,13 @@
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
     "balanceLoadFailed": "Gagal memuatkan baki",
+    "balanceUnreachable": "Tidak dapat menghubungi pelayan. Cuba lagi.",
+    "balanceAccessDenied": "Anda tiada kebenaran untuk melihat baki ini.",
+    "balanceUnavailable": "Baki tidak dapat dimuatkan.",
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
+    "availableToSpendInOrganization": "Tersedia untuk dibelanjakan dalam organisasi ini",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -311,9 +347,9 @@
     "passkeyVerifyDescription": "Demi keselamatan anda, sahkan bahawa ini anda sebelum menukar kunci laluan anda.",
     "passkeyVerifyWithPasskey": "Sahkan dengan kunci laluan",
     "passkeyVerifySendCode": "E-melkan saya kod",
-    "passkeyVerifySendingCode": "Menghantar kod...",
+    "passkeyVerifySendingCode": "Menghantar kod…",
     "passkeyVerifyPasskeyPrompt": "Sahkan dengan kunci laluan anda untuk meneruskan.",
-    "passkeyVerifyChecking": "Menyemak kod anda...",
+    "passkeyVerifyChecking": "Menyemak kod anda…",
     "passkeyVerifyCodeSent": "Masukkan kod yang kami hantar ke {{email}}.",
     "passkeyVerifyCodeRejected": "Kod itu tidak sepadan. Cuba lagi.",
     "passkeyVerifyPasskeyFailed": "Kunci laluan itu tidak disahkan. Cuba lagi.",
@@ -321,8 +357,8 @@
     "passkeyVerifyInProgress": "Kod itu sedang disemak. Cuba lagi sebentar kemudian.",
     "passkeyVerifyTooManyAttempts": "Terlalu banyak percubaan. Hantar kod baharu.",
     "passkeyVerifySsoRequired": "Organisasi anda memerlukan log masuk tunggal. Luluskan perubahan ini dalam penyemak imbas, kemudian kembali ke sini.",
-    "passkeyVerifySsoStarting": "Memulakan kelulusan...",
-    "passkeyVerifySsoWaiting": "Menunggu kelulusan...",
+    "passkeyVerifySsoStarting": "Memulakan kelulusan…",
+    "passkeyVerifySsoWaiting": "Menunggu kelulusan…",
     "passkeyVerifySsoOpen": "Buka halaman kelulusan",
     "passkeyVerifySsoExpired": "Kelulusan itu telah tamat tempoh atau dibatalkan. Cuba lagi.",
     "passkeyVerifySsoUnavailable": "Kelulusan log masuk tunggal tidak tersedia sekarang. Cuba lagi.",
@@ -416,6 +452,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "E-mel akaun perkhidmatan",
       "privateKey": "Kunci peribadi akaun perkhidmatan",
+      "privateKeyBlockRequired": "Tampal seluruh blok kunci, dari baris BEGIN hingga baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa laluan. Tampal kunci akaun perkhidmatan yang tiada frasa laluan.",
+      "names": {
+        "codestral": "Codestral legasi sahaja",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Log masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar mengikut penggunaan)",
+        "zai": "Z.ai (bayar mengikut penggunaan)",
+        "bedrockByok": "Amazon Bedrock (terus)",
+        "vertexByok": "Google Vertex AI (terus)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Halakan model gateway kepada nama deployment tersuai.",
       "mappingTitle": "Pemetaan {{number}}",
@@ -476,13 +523,14 @@
       "receiptLabel": "Resit",
       "copyReceiptId": "Salin ID resit",
       "appealLabel": "Rayuan",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Diterima",
       "triageOpen": "Dalam semakan",
       "triageActioned": "Disahkan",
       "triageRejected": "Tidak disahkan",
       "appealNone": "Tiada yang diserahkan",
       "appealSubmitted": "Sedang disemak",
-      "appealAccepted": "Diterima",
+      "appealAccepted": "Rayuan diterima",
       "appealRejected": "Ditolak",
       "appeal": "Rayu keputusan ini",
       "appealTitle": "Rayu keputusan ini?",
@@ -493,7 +541,25 @@
       "nextStepInReview": "Hasil semakan akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
       "nextStepAppeal": "Hasil rayuan akan dipaparkan pada skrin ini.",
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
-      "viewReceipt": "Lihat resit"
+      "viewReceipt": "Lihat resit",
+      "targetLabel": "Perkara dilaporkan",
+      "reasonLabel": "Sebab laporan",
+      "targetMessage": "Balasan AI",
+      "targetComment": "Komen permintaan tarik",
+      "targetUser": "Pengguna",
+      "reasonHarmful": "Kandungan berbahaya",
+      "reasonIllegal": "Kandungan menyalahi undang-undang",
+      "reasonHarassment": "Gangguan",
+      "reasonSpam": "Iklan tidak diingini",
+      "reasonOther": "Sebab lain"
+    },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang anda failkan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang anda failkan daripada ulasan dalam perbincangan pull request, atau daripada respons AI dalam sesi ejen, akan dipaparkan di sini bersama hasilnya.",
+      "couldNotLoad": "Tidak dapat memuatkan laporan anda",
+      "capped": "Memaparkan laporan terkini anda."
     },
     "changelog": "Yang baharu",
     "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
@@ -501,8 +567,11 @@
     "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
     "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Log masuk",
-      "profileOrganizations": "Profil dan organisasi"
+      "signIn": "log masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "sembang",
+      "notifications": "pemberitahuan",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -747,6 +816,9 @@
       "couldNotLoadMore": "Tidak dapat memuatkan lebih banyak komen.",
       "retryLoadingMore": "Cuba memuatkan lebih banyak komen semula",
       "loadMoreComments": "Muatkan lebih banyak komen",
+      "conversationTruncated": "Memaparkan {{displayCount}} komen pertama sahaja.",
+      "conversationTruncated_one": "Memaparkan {{displayCount}} komen pertama sahaja.",
+      "conversationTruncated_other": "Memaparkan {{displayCount}} komen pertama sahaja.",
       "addReaction": "Tambah reaksi",
       "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksi",
@@ -762,7 +834,6 @@
       "replyPlaceholder": "Balasan…",
       "replyBody": "Isi balasan",
       "submitReply": "Hantar balasan",
-      "termsTitle": "Terma perkhidmatan",
       "termsCopy": "Anda mesti berumur sekurang-kurangnya 13 tahun untuk menyiarkan kandungan.",
       "termsAcceptRetry": "Tidak dapat menerima terma. Semak sambungan anda dan cuba lagi.",
       "viewTerms": "Lihat terma",
@@ -820,7 +891,19 @@
         "fileComment": "Komen fail",
         "outdatedOnPathLines": "Tidak lagi terkini pada {{path}} {{lines}}",
         "outdatedOnLines": "Tidak lagi terkini pada {{lines}}",
-        "outdatedOnPath": "Tidak lagi terkini pada {{path}}"
+        "outdatedOnPath": "Tidak lagi terkini pada {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Sisi kiri",
+        "sideRight": "Sisi kanan",
+        "outdatedOnLinesSide": "Tidak lagi terkini pada {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Tidak lagi terkini pada {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Tidak lagi terkini ({{side}})",
+        "outdatedOnPathSide": "Tidak lagi terkini pada {{path}} ({{side}})"
       },
       "deletedUser": "pengguna yang telah dipadam",
       "replyForbiddenTerm": "Anda tidak mempunyai kebenaran untuk membalas {{term}} ini.",
@@ -865,7 +948,6 @@
       "noAccess": "Anda tidak mempunyai akses kepada pemeriksaan untuk repositori ini.",
       "couldNotLoad": "Tidak dapat memuatkan pemeriksaan.",
       "retryChecks": "Cuba pemeriksaan semula",
-      "viewOnGitHub": "Lihat PR di GitHub",
       "noChecksReported": "Tiada pemeriksaan dilaporkan",
       "passed": "{{displayCount}} lulus",
       "passed_one": "{{displayCount}} lulus",
@@ -930,9 +1012,10 @@
       "checkActiveConnection": "Sambungan aktif, tetapi item ini masih tidak dapat dimuatkan.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
-      "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "reconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
-      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "bitbucketAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
+      "adminOnlyConnectDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -949,6 +1032,8 @@
       "pendingComment": "komen belum dihantar",
       "pendingComment_other": "komen belum dihantar",
       "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_one": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_other": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
       "submitReview": "Hantar semakan",
       "partialPostedFresh": "{{displayFreshCount}} komen telah disiarkan. ",
       "partialPostedFresh_one": "{{displayFreshCount}} komen telah disiarkan. ",
@@ -1013,7 +1098,10 @@
     "tabs": {
       "overview": "Gambaran keseluruhan",
       "files": "Fail",
-      "discussion": "Perbincangan"
+      "discussion": "Perbincangan",
+      "discussionAccessibility_one": "{{title}}: 1 komen",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komen",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komen"
     },
     "fileStatus": {
       "modified": "Diubah suai",
@@ -1119,16 +1207,16 @@
     },
     "category": {
       "agentAttentionTitle": "Ejen memerlukan tindakan anda",
-      "agentAttentionSubtitle": "soalan, permintaan kebenaran dan maklumat yang diperlukan",
+      "agentAttentionSubtitle": "Soalan, permintaan kebenaran dan maklumat yang diperlukan",
       "agentUpdatesTitle": "Kemas kini ejen",
-      "agentUpdatesSubtitle": "mesej daripada ejen semasa tugasan berjalan",
+      "agentUpdatesSubtitle": "Mesej daripada ejen semasa tugasan berjalan",
       "sessionStatusTitle": "Status sesi",
-      "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
-      "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
+      "sessionStatusSubtitle": "Selesai / gagal / sedia untuk dikawal",
+      "balanceAlertsSubtitle": "Amaran baki rendah untuk organisasi",
       "balanceAlertsUnavailable": "Sertai organisasi untuk mendapatkan amaran baki.",
-      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
+      "securityFindingsSubtitle": "Penemuan baharu dan peringatan SLA",
       "securityFindingsUnavailable": "Dayakan Ejen keselamatan Kilo pada skop untuk mendapatkan penemuan keselamatan.",
-      "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
+      "spendAlertsSubtitle": "Melepasi ambang dan lonjakan setiap jam",
       "spendAlertsToggle": "Kategori amaran perbelanjaan"
     },
     "history": {
@@ -1139,6 +1227,8 @@
       "emptyTitle": "Belum ada pemberitahuan",
       "emptyCategoryTitle": "Tiada pemberitahuan dalam kategori ini",
       "emptyBody": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "emptyBody_one": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "emptyBody_other": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
       "capped": "Memaparkan pemberitahuan terkini.",
       "loadError": "Tidak dapat memuatkan sejarah pemberitahuan.",
       "openFailed": "Pemberitahuan ini tidak lagi boleh dibuka di mana-mana."
@@ -1149,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Permintaan diluluskan",
       "replied": "Balasan dihantar",
+      "empty": "Tulis balasan kemudian hantar.",
       "failed": "Tidak dapat menjawab. Ketik semula untuk mencuba lagi.",
       "unavailable": "Permintaan ini tidak lagi menunggu."
     }
@@ -1210,7 +1301,7 @@
     },
     "instructions": {
       "title": "Arahan tersuai",
-      "deprecation": "Ciri arahan tersuai akan dihentikan. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
+      "deprecation": "Ciri arahan tersuai akan dialih keluar. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
       "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…",
       "clearTitle": "Buang arahan tersuai?",
       "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
@@ -1219,6 +1310,7 @@
       "manageAccess": "Urus akses",
       "bitbucketNoRepositoriesDescription": "Tiada repositori tersedia dalam ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
+      "githubNoRepositoriesDescription": "Semak akses repositori untuk apl GitHub Kilo, kemudian muat semula.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
       "repositoryAccess": "akses repositori",
@@ -1248,11 +1340,11 @@
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
       "byline": "#{{number}} oleh {{author}}",
       "noFindings": "Tiada penemuan.",
-      "findingsUnavailable": "Keputusan tidak tersedia kerana semakan ini gagal.",
+      "findingsUnavailable": "Keputusan tidak tersedia.",
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",
       "findingsEndedWithoutResults": "Semakan ini tamat sebelum menghasilkan sebarang penemuan.",
       "serviceUnavailable": "Tidak dapat menghubungi perkhidmatan semakan kod. Cuba semakan semula apabila perkhidmatan tersedia.",
-      "reviewFailed": "Semakan gagal. Sila cuba lagi.",
+      "reviewFailed": "Semakan gagal.",
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",
@@ -1272,7 +1364,7 @@
       "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
       "transcriptLive": "Langsung",
       "agentIdle": "Ejen melahu",
-      "agentWorking": "Ejen bekerja...",
+      "agentWorking": "Ejen bekerja…",
       "anErrorOccurred": "Ralat berlaku",
       "errorWithMessage": "Ralat: {{message}}.",
       "executionStarted": "Pelaksanaan dimulakan",
@@ -1370,11 +1462,19 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
+      "notConnectedReadOnlyPlan": "Percubaan organisasi telah tamat, jadi pemilik mesti mengemas kini bil di kilo.ai."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
-      "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
+      "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
+      "deniedManagedByOwner": "Minta pemilik {{organization}} untuk menukar sambungan yang anda tidak boleh tukar.",
+      "deniedConnectRole": "Hanya pemilik, pentadbir dan pengurus pengebilan bagi {{organization}} boleh menyambungkannya.",
+      "deniedReconnectRole": "Minta pemilik, pentadbir atau pengurus pengebilan bagi {{organization}} untuk menyambungkannya semula.",
+      "managedOnWebTitle": "Diurus di web",
+      "managedOnWebShort": "Sambungan ini diurus di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web melalui komputer.",
+      "description": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya di bawah.",
+      "descriptionReconnect": "Cipta token akses ruang kerja baharu untuk {{organization}} dan tampalkannya di bawah.",
+      "descriptionOverview": "Cipta token akses ruang kerja dan tampalkannya pada skrin seterusnya.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token ruang kerja ini. Semak bahawa ia mempunyai skop di atas, kemudian cuba lagi."
@@ -1395,15 +1495,18 @@
     "platformList": {
       "checking": "Menyemak…",
       "statusUnavailable": "Status tidak tersedia",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "activity": "Aktiviti"
     },
     "providerConnect": {
-      "githubApp": "Apl GitHub",
+      "githubApp": "apl GitHub",
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
-      "gitlabAccount": "Akaun GitLab",
+      "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
+      "notConnectedTitle": "{{platform}} tidak disambungkan",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan pentadbir boleh menyambungkannya."
     },
     "overview": {
       "allAreas": "Semua bidang",
@@ -1505,7 +1608,9 @@
       "unavailablePersonallySwitchAction": "Tukar organisasi",
       "unavailableOrganizationTitle": "Semakan panel tidak tersedia",
       "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Organisasi ini tidak memilikinya sekarang.",
-      "unavailableForOrganizationNeutral": "Semakan panel tidak tersedia untuk organisasi ini sekarang. Cuba lagi kemudian.",
+      "unavailablePlanCheck": "Semakan panel tidak dapat menyemak pelan organisasi ini. Cuba lagi untuk menyemak semula.",
+      "unavailableFlagRollout": "Semakan panel belum tersedia untuk organisasi ini. Kemas kini aplikasi kepada versi terkini untuk mendapatkannya.",
+      "unavailableForOrganizationMember": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Pemilik organisasi boleh menukar pelan.",
       "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
       "specialists": "Pakar",
@@ -2075,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesi",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesi",
       "live": "LANGSUNG",
-      "updating": "Mengemas kini"
+      "updating": "Mengemas kini",
+      "retentionLimit": "Memaparkan sesi terkini."
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",
@@ -2145,9 +2251,11 @@
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
-      "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
+      "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
+      "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini buat sementara waktu tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
@@ -2224,6 +2332,7 @@
       "branchDefault": "Lalai",
       "branchAccessibility": "Cabang: {{label}}",
       "branchLoading": "Memuatkan cabang",
+      "branchInactive": "Pilih repositori untuk memuatkan cabangnya.",
       "branchLoadError": "Tidak dapat memuatkan cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Semak akses anda dengan penyedia, kemudian pilih repositori lain.",
       "branchEmpty": "Tiada cabang tersedia",
@@ -2276,7 +2385,7 @@
       "manageProfiles": "Urus profil",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
-      "saveAsProfile": "Simpan sebagai Profil",
+      "saveAsProfile": "Simpan sebagai profil",
       "saveProfileDescription": "Simpan pembolehubah persekitaran semasa dan arahan persediaan sebagai profil boleh guna semula.",
       "profileSaved": "Profil \"{{name}}\" disimpan",
       "organizationProfiles": "Profil Organisasi",
@@ -2456,7 +2565,8 @@
       "customModes": "Mod tersuai"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Mod tersuai"
     },
     "modeOptions": {
       "code": "Tulis kod",
@@ -2476,8 +2586,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tiada padanan",
       "noRepositories": "Tiada repositori tersedia",
-      "noRepositoriesDescription": "Tiada repositori disambungkan ke akaun anda.",
-      "loading": "Memuatkan...",
+      "noRepositoriesDescription": "Untuk memuatkan repositori, sambungkan akaun GitHub atau GitLab.",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2552,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Memuatkan imej",
       "imageUnavailableRetry": "Imej tidak tersedia, cuba muatkan semula",
+      "imageUnavailableRetryWithAlt": "Imej tidak tersedia, {{alt}}, cuba muatkan semula",
       "imagePreviewUnavailableInSession": "Pratonton imej tidak tersedia dalam sesi ini.",
       "viewImage": "Lihat imej",
       "viewImageWithAlt": "Lihat imej {{alt}}",
@@ -2683,7 +2793,9 @@
       "skip": "Langkau",
       "retrySkip": "Cuba langkau semula",
       "submitting": "Menghantar…",
-      "sendAnswers": "Hantar jawapan"
+      "sendAnswers": "Hantar jawapan",
+      "unreadableTitle": "Soalan ini tidak dapat dipaparkan",
+      "unreadableBody": "Ejen sedang menunggu soalan yang tidak dapat ditunjukkan oleh aplikasi ini. Jawab soalan itu dalam CLI untuk meneruskan."
     },
     "blockingCard": {
       "questionUnavailable": "Soalan ini tidak lagi tersedia.",
@@ -2710,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuatkan sesi subejen.",
+      "historyTooLarge": "Sejarah subejen ini terlalu besar untuk dimuatkan.",
+      "historyUnavailable": "Sejarah subejen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Sejarah subejen ini buat sementara waktu tidak tersedia.",
       "failed": "Sesi subejen gagal.",
       "noMessages": "Tiada mesej subejen",
       "noMessagesDescription": "Sesi subejen ini selesai tanpa menghasilkan transkrip.",
@@ -2761,6 +2876,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tiada model tersedia untuk dipilih.",
+      "allUnavailableTitle": "Tiada model yang boleh digunakan",
+      "allUnavailableDescription": "Tambah kunci pembekal dan cuba semula.",
       "favorites": "Kegemaran"
     },
     "modelSelector": {
@@ -2772,7 +2889,7 @@
       "thinkingEffortAccessibility": "Tahap pemikiran {{label}}",
       "thinkingEffortSelected": "Tahap pemikiran {{label}}, dipilih",
       "thinkingEffortWithModel": "{{model}}, tahap pemikiran {{variant}}",
-      "lockedByAgent": ", Dikunci oleh ejen \"{{agent}}\"",
+      "lockedByAgent": "Dikunci oleh ejen \"{{agent}}\"",
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
       "sessionModel": "Model sesi"
@@ -2808,8 +2925,8 @@
       "pasteFromClipboard": "Tampal daripada papan keratan",
       "stopGenerating": "Hentikan penjanaan",
       "selectModelBeforeSending": "Pilih model sebelum menghantar mesej.",
-      "preparingPlaceholder": "Menyediakan persekitaran...",
-      "finalizingPlaceholder": "Menyelesaikan tugasan...",
+      "preparingPlaceholder": "Menyediakan persekitaran…",
+      "finalizingPlaceholder": "Menyelesaikan tugasan…",
       "sessionLoadFailed": "Sesi tidak dapat dimuatkan. Cuba lagi dahulu.",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
@@ -2977,7 +3094,7 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; {{last}}",
       "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
@@ -2988,6 +3105,12 @@
     "contentReady": "Kandungan sedia",
     "retryLoadingAccount": "Cuba memuatkan akaun semula",
     "retryLoadingPrivacy": "Cuba memuatkan pilihan privasi semula"
+  },
+  "accountBlocked": {
+    "title": "Akaun disekat",
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
+    "domainDescription": "Kilo menyekat akaun pada domain e-mel ini, dan log masuk semula tidak akan mengubahnya. Sokongan boleh menyemak domain itu atas permintaan.",
+    "contactSupport": "Hubungi sokongan"
   },
   "addCredits": {
     "cta": "Tambah kredit",
@@ -3003,6 +3126,7 @@
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
     "signedIn": "Log masuk {{signedIn}} · Terakhir dilihat {{lastSeen}}",
+    "signedInThisDevice": "Log masuk {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Sesi log masuk daripada apl Kilo, Kilo CLI dan pelayar web dipaparkan di sini. Sesi log masuk penyunting tidak disenaraikan.",
     "thisDevice": "Peranti ini",
     "viewProfile": "Lihat profil",
@@ -3025,7 +3149,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif.",
     "agentSessions": "Sedang aktif",
     "newCodingTask": "Tugas pengekodan baharu",
     "newTaskFromPicture": "Tugas baharu daripada gambar",
@@ -3052,6 +3175,7 @@
   "queryError": {
     "neutralDescription": "Sila cuba lagi.",
     "offlineTitle": "Gagal memuatkan data.",
+    "offlineDescription": "Tidak dapat menghubungi pelayan.",
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
@@ -3060,8 +3184,7 @@
     "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
-    "openMenu": "Buka menu",
-    "openMenuFor": "Buka menu untuk {{title}}"
+    "openMenu": "Buka menu"
   },
   "picker": {
     "optionsExpired": "Pilihan tamat tempoh",
@@ -3072,7 +3195,7 @@
     "scheduled": "DIJADUALKAN"
   },
   "voiceInput": {
-    "listening": "Mendengar...",
+    "listening": "Mendengar…",
     "onlineTitle": "Pertuturan diproses dalam talian",
     "onlineMessage": "Peranti ini tidak boleh menukar pertuturan kepada teks di luar talian. Rakaman anda dihantar kepada {{provider}} untuk ditukar kepada teks. Kilo tidak menyimpan audio tersebut.",
     "allow": "Benarkan",
@@ -3094,7 +3217,7 @@
     "useOnlineTranscription": "Benarkan transkripsi dalam talian",
     "offlineModelDownloadScheduled": "Fail pertuturan luar talian akan dimuat turun di latar belakang. Cuba input suara lagi kemudian.",
     "listeningStopped": "Input suara telah dihentikan.",
-    "transcribing": "Mentranskripsi...",
+    "transcribing": "Mentranskripsi…",
     "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Semak sambungan anda dan cuba semula.",
     "gatewayTimeout": "Transkripsi mengambil masa terlalu lama. Cuba lagi.",
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain dalam Keutamaan.",
@@ -3134,6 +3257,11 @@
       "billingHistory": "Sejarah pengebilan",
       "billingHistoryEmpty": "Belum ada sejarah pengebilan.",
       "billingHistoryError": "Tidak dapat memuatkan sejarah pengebilan",
+      "billingRowInitial": "Caj pertama · {{tier}}",
+      "billingRowRenewal": "Pembaharuan · {{tier}}",
+      "billingRowSubscription": "Langganan · {{tier}}",
+      "billingRowTrial": "Percubaan percuma · {{tier}}",
+      "billingRowUpgrade": "Pertukaran pelan · {{tier}}",
       "cancel": "Batalkan langganan",
       "cancelDescription": "Kilo Pass anda kekal aktif sehingga akhir tempoh pengebilan dan tidak akan diperbaharui.",
       "cancelScheduled": "Dibatalkan pada {{date}}",
@@ -3159,6 +3287,8 @@
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia dalam aplikasi.",
+    "notAvailableTitle": "Kilo Pass tiada dalam aplikasi",
+    "noPassDescription": "Akaun ini tidak mempunyai Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Dalam percubaan",
     "statusPastDue": "Pembayaran tertunggak",
@@ -3229,6 +3359,7 @@
     "revokeConsent": "Tarik balik persetujuan",
     "revokeConsentTitle": "Tarik balik persetujuan perkongsian data?",
     "acceptAndContinue": "Terima dan teruskan",
+    "loadingConsentSettings": "Memuatkan tetapan persetujuan anda…",
     "decline": "Tolak",
     "declineAndSignOut": "Tolak dan log keluar",
     "declineTitle": "Tolak perkongsian data?",
@@ -3272,6 +3403,8 @@
     "voiceTranscriptionWho": "Peranti anda, Kilo Gateway dengan model transkripsi pilihan anda, atau Apple atau Google untuk pengecaman dalam talian.",
     "installAttributionPromptTitle": "Benarkan penjejakan sumber pemasangan?",
     "installAttributionPromptMessage": "Kilo menggunakan kebenaran penjejakan Apple hanya untuk mengetahui saluran mana yang membawa anda ke sini. Gesaan dan perbualan anda tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Gesaan penjejakan tidak dapat dipaparkan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat memaparkan gesaan sistem, jadi penjejakan sumber pemasangan kekal tidak aktif.",
     "what": "Apa",
     "why": "Mengapa",
     "who": "Siapa"
@@ -3287,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tiada peristiwa audit",
       "emptyDescription": "Tindakan yang diambil dalam organisasi ini dipaparkan di sini.",
       "truncated": "Memaparkan peristiwa terkini.",
@@ -3337,11 +3470,147 @@
         "guardrailUpdate": "Kawalan keselamatan dikemas kini",
         "guardrailRemove": "Kawalan keselamatan dibuang",
         "unknown": "Peristiwa audit"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "mod \"{{name}}\" (pengecam: {{slug}})",
+        "modeUpdate": "mod \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "penghalaan automatik",
+          "defaultModel": "Model AI lalai"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} ditambah sebagai {{role}}",
+        "memberRemoved": "{{email}} dikeluarkan",
+        "memberParentAdded": "{{email}} ditambah daripada organisasi induk {{parent}}",
+        "memberParentRemoved": "{{email}} dikeluarkan daripada organisasi induk {{parent}}",
+        "inviteSent": "{{email}} sebagai {{role}}",
+        "inviteRevoked": "jemputan untuk {{email}} dibatalkan",
+        "inviteAccepted": "{{email}} diterima",
+        "groupIdentity": "kumpulan \"{{name}}\"",
+        "groupMembers": "kumpulan \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} kumpulan",
+        "groupMemberGroups_one": "{{displayCount}} kumpulan",
+        "groupMemberGroups_other": "{{displayCount}} kumpulan",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} kumpulan",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} kumpulan",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} kumpulan",
+        "groupPolicySet": "kumpulan \"{{name}}\": dasar {{policy}} ditetapkan",
+        "groupPolicyRemoved": "kumpulan \"{{name}}\": dasar {{policy}} dibuang",
+        "groupDefaultPolicySet": "dasar lalai {{policy}} ditetapkan",
+        "groupDefaultPolicyRemoved": "dasar lalai {{policy}} dibuang",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "kawalan keselamatan AI {{state}}",
+        "guardrailConfigGroup": "{{state}} untuk kumpulan \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "domain SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (dahulunya {{previous}})",
+        "ssoDomainRemoved": "domain SSO {{domain}} dikosongkan",
+        "fundsPurchased": "{{amount}} melalui {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} kepada {{displayCount}} organisasi anak",
+        "fundsDistributed_one": "{{amount}} kepada {{displayCount}} organisasi anak",
+        "fundsDistributed_other": "{{amount}} kepada {{displayCount}} organisasi anak",
+        "fundsReceived": "{{amount}} daripada {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "konfigurasi {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: gaya {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} dikemas kini",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} dikemas kini",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} dikemas kini",
+        "reviewAgentSecretsFailed": "{{displayCount}} ralat",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} ralat",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} ralat",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "wilayah inferens: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "mod \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Lalai global",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "dibenarkan",
+          "denied": "ditolak",
+          "followSetting": "mengikut tetapan sambungan"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projek UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} kepada {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "ringkasan cadangan {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: tiada asal yang dibenarkan",
+        "settingName": "dinamakan semula daripada {{previous}} kepada {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "imbas sebelum guna aktif",
+        "scanBeforeUseOff": "imbas sebelum guna tidak aktif",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "dibuang: {{models}}",
+        "browserPolicyOff": "penggunaan pelayar disekat",
+        "browserPolicyAllow": "hanya asal yang dibenarkan",
+        "browserPolicyPlaywrightOnly": "penggunaan pelayar sahaja",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Model AI diubah: {{values}}",
+        "integrationConnected": "{{integration}} disambungkan",
+        "integrationDisconnected": "{{integration}} diputuskan sambungan",
+        "integrationRefreshed": "{{integration}} diperbaharui",
+        "integrationCancelled": "{{integration}} dibatalkan",
+        "integrationModelUpdated": "{{integration}}: model AI {{model}}",
+        "integrationKeyAdded": "Kunci ditambah untuk {{provider}}",
+        "integrationKeyUpdated": "Kunci dikemas kini untuk {{provider}}",
+        "integrationKeyDeleted": "Kunci dibuang untuk {{provider}}",
+        "integrationKeyToggled": "Kunci untuk {{provider}}: {{state}}",
+        "namedPolicyCreated": "Dasar {{kind}} {{id}} dicipta",
+        "namedPolicyUpdated": "Dasar {{kind}} {{id}} dikemas kini",
+        "namedPolicyDeleted": "Dasar {{kind}} {{id}} dibuang",
+        "namedPolicyLinked": "Dasar {{kind}} {{next}} dipautkan",
+        "webhookTriggerUpdated": "Pencetus {{trigger}}",
+        "organizationRenamed": "Organisasi dinamakan semula daripada {{previous}} kepada {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Kunci API anda sendiri"
+        }
       }
     },
     "billing": {
       "title": "Pengebilan",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tiada langganan",
@@ -3359,7 +3628,7 @@
       "manageOnWeb": "Tetapan pengebilan di web",
       "changePlan": "Tukar pelan",
       "buySeats": "Beli slot pengguna",
-      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di web.",
+      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di kilo.ai.",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
       "opensOnWeb": "Dibuka di web"
@@ -3371,7 +3640,7 @@
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
       "membershipLostNotice": "Anda tidak lagi mempunyai akses kepada organisasi ini. Ditukar kepada {{target}}.",
       "noOrganization": "Tiada organisasi",
-      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada mana-mana organisasi. Cipta satu untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah, atau buka web untuk menyertai organisasi yang anda telah dijemput.",
+      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada mana-mana organisasi. Cipta satu untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah, atau terima jemputan daripada e-mel yang dihantar oleh organisasi kepada anda.",
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Anda tergolong dalam satu atau lebih organisasi. Pilih akaun yang patut digunakan oleh skrin ini.",
       "selectOrganization": "Pilih organisasi",
@@ -3403,7 +3672,8 @@
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
       },
-      "truncated": "Aktiviti kredit terdahulu tersedia."
+      "truncated": "Aktiviti kredit terdahulu tersedia.",
+      "retentionLimit": "Memaparkan aktiviti kredit terkini."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah.",
@@ -3413,6 +3683,7 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
+      "organizationUnavailable": "Organisasi ini tidak lagi tersedia.",
       "sendError": "Tidak dapat menghantar jemputan.",
       "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
       "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini.",
@@ -3434,10 +3705,11 @@
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },
-      "truncated": "Invois terdahulu tersedia."
+      "truncated": "Invois terdahulu tersedia.",
+      "retentionLimit": "Memaparkan invois terkini."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Dayakan amaran baki rendah",
+      "subtitle": "Hantar amaran melalui e-mel kepada alamat yang anda senaraikan apabila baki organisasi ini jatuh di bawah jumlah yang anda tetapkan.",
       "notifyEmailsLabel": "Alamat e-mel penerima",
       "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran pengebilan.",
       "separateEmailsHint": "Pisahkan alamat e-mel dengan koma.",
@@ -3513,8 +3785,9 @@
       "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
       "emptyTitle": "Tiada permintaan dalam jam ini",
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal",
+      "emptyBoundDescription": "Log permintaan tidak tersedia lebih awal daripada ini",
       "loadError": "Tidak dapat memuatkan log permintaan.",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },
@@ -3537,13 +3810,14 @@
       "identifierLabel": "Pengecam",
       "identifierRequired": "Masukkan pengecam.",
       "identifierTaken": "Mod lain sudah menggunakan pengecam ini.",
+      "identifierTooLong": "Kekalkan pengecam kepada {{max}} aksara atau kurang.",
       "nameLabel": "Nama mod",
       "nameRequired": "Masukkan nama mod.",
       "notFound": "Mod ini tidak lagi wujud.",
-      "restrictionHint": "Hanya fail yang sepadan dengan corak ini boleh disunting. Biarkan kosong untuk membenarkan semua fail.",
-      "restrictionInvalid": "Masukkan corak yang sah.",
+      "restrictionHint": "Ungkapan nalar biasa memilih fail yang boleh disunting oleh mod ini, contohnya `\\.md$` untuk fail markdown sahaja. Biarkan kosong untuk membenarkan semua fail.",
+      "restrictionInvalid": "Masukkan ungkapan nalar biasa yang sah.",
       "restrictionLabel": "Label sekatan",
-      "restrictionPattern": "Corak fail",
+      "restrictionPattern": "Sekatan fail",
       "roleLabel": "Definisi peranan",
       "roleRequired": "Terangkan fungsi mod ini.",
       "tool": {
@@ -3581,10 +3855,9 @@
     },
     "hub": {
       "renameTitle": "Namakan semula organisasi",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "balance": "Baki",
-      "organizationSeats": "Slot pengguna organisasi",
-      "plan": "Pelan organisasi",
+      "plan": "Pelan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Tamat",
@@ -3618,7 +3891,8 @@
     "signupStepUp": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kod itu tidak betul. Sila cuba lagi.",
+    "signupStepUpBack": "Untuk melengkapkan penciptaan akaun anda, kembali dan gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kod itu tidak betul atau telah tamat tempoh. Gunakan '$t(login.resendCode)' atau '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kod anda sedang diproses. Tunggu seketika dan cuba lagi.",
     "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
     "invalidToken": "Log masuk gagal. Sila cuba lagi.",
@@ -3627,7 +3901,7 @@
     "emailDeliveryFailed": "E-mel tidak dapat dihantar buat sementara waktu. Sila cuba lagi kemudian.",
     "admissionRequired": "Peranti anda tidak dapat disahkan. Gunakan '$t(login.moreSignInOptions)' untuk log masuk pada peranti lain atau melalui web.",
     "default": "Berlaku ralat. Sila cuba lagi.",
-    "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi.",
+    "retryableAdmission": "Peranti ini tidak dapat disahkan. Cuba lagi.",
     "startSignInFailed": "Gagal memulakan log masuk. Sila cuba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka penyemak imbas. Sila cuba lagi.",
     "signInTimedOut": "Masa untuk log masuk telah tamat. Sila cuba lagi.",
@@ -3668,8 +3942,7 @@
     "imagesSectionEmpty": "Tiada hos imej yang dipercayai",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
-    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi.",
-    "backToPreferences": "Kembali ke keutamaan"
+    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi."
   },
   "glanceable": {
     "waiting": "Mengemas kini ejen",
@@ -3683,7 +3956,7 @@
     "newestSession": "Terkini: {{title}}",
     "noneWaiting": "Tiada ejen menunggu",
     "newAgent": "Ejen baharu",
-    "approving": "Meluluskan...",
+    "approving": "Meluluskan…",
     "couldNotApprove": "Gagal meluluskan",
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
@@ -3695,10 +3968,39 @@
     "lastKnown": "Terakhir diketahui",
     "awaitingUpdate": "Menunggu kemas kini",
     "nextRun": "Pelaksanaan seterusnya",
+    "wasDue": "Sepatutnya",
     "waitingForYou": "Menunggu anda",
     "nextScheduled": "Jadual seterusnya",
     "answerNeeded": "Perlu jawapan",
     "waitingToRetry": "Menunggu cubaan semula",
+    "countNoun": {
+      "needsInput_one": "Perlu input",
+      "needsInput_other": "Perlu input",
+      "running_one": "Memproses…",
+      "running_other": "Memproses…",
+      "scheduled_one": "Dijadualkan",
+      "scheduled_other": "Dijadualkan",
+      "idle_one": "Melahu",
+      "idle_other": "Melahu"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Perlu input",
+      "needsInput_other": "{{displayCount}} Perlu input",
+      "running_one": "{{displayCount}} Memproses…",
+      "running_other": "{{displayCount}} Memproses…",
+      "scheduled_one": "{{displayCount}} Dijadualkan",
+      "scheduled_other": "{{displayCount}} Dijadualkan",
+      "idle_one": "{{displayCount}} Melahu",
+      "idle_other": "{{displayCount}} Melahu"
+    },
+    "footer": {
+      "checked": "Disemak {{time}}",
+      "lastKnown": "Terakhir diketahui · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Pelaksanaan seterusnya {{time}}",
+      "wasDue": "Sepatutnya {{time}}"
+    },
     "step": {
       "editing": "Menyunting",
       "reading": "Membaca",
@@ -3747,6 +4049,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model ini memerlukan sambungan internet. Sambung dan cuba lagi, atau tukar kepada model pada peranti ini.",
+    "connectionLost": "Sambungan kepada model terputus. Semak sambungan anda dan cuba semula.",
     "empty": {
       "title": "Mulakan sembang",
       "description": "Hantar mesej untuk bercakap dengan model."
@@ -3754,7 +4057,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "deleteTitle": "Padam sembang ini?"
+      "deleteTitle": "Padam sembang ini?",
+      "resetNoticeTitle": "Sembang dan draf setempat telah dikosongkan",
+      "resetNoticeBody": "Kilo tidak dapat membuka sembang yang disimpan pada peranti ini. Sesi awan anda tidak terjejas.",
+      "resetNoticeDismiss": "Ketepikan notis"
     },
     "rename": {
       "title": "Namakan semula sembang",
@@ -3804,6 +4110,11 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
+      "fieldUrlCredentials": "Buang nama pengguna dan kata laluan daripada URL itu.",
+      "fieldUrlFragment": "Buang bahagian # daripada URL itu.",
+      "fieldUrlInsecure": "Masukkan URL https, atau http hanya untuk localhost.",
+      "duplicateUrl": "URL pelayan itu sudah disimpan.",
+      "serverNotFound": "Pelayan ini tidak lagi disimpan.",
       "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",
@@ -3827,6 +4138,7 @@
       "app": {
         "label": "Antara muka alat",
         "failed": "Antara muka alat ini tidak dapat dimuatkan.",
+        "tooLarge": "Antara muka alat ini lebih besar daripada had {{size}}.",
         "empty": "Antara muka alat ini tiada apa-apa untuk dipaparkan."
       }
     },
@@ -3884,6 +4196,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) menghantar permintaan inferens ringkas ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan caj untuk permintaan ini.",
       "connectionSucceeded": "Model berjaya menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL akar API, protokol, bukti kelayakan dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab dalam masa yang ditetapkan. Periksa URL akar API dan sambungan anda, kemudian cuba lagi.",
+      "requestUnauthorized": "Titik akhir menolak bukti kelayakan. Periksa kunci API dan pengepala tersuai, kemudian cuba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemui. Periksa URL akar API dan ID model.",
+      "requestRateLimited": "Titik akhir sedang mengehadkan permintaan. Tunggu sebentar dan cuba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia buat masa ini. Cuba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dihubungi. Periksa URL akar API dan sambungan anda.",
+      "requestInvalidResponse": "Titik akhir menjawab dengan format yang tidak dijangka. Periksa URL akar API dan protokol sepadan dengan pelayan, kemudian cuba lagi.",
+      "discoveryNoModels": "Titik akhir tidak menyenaraikan sebarang model. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak selesai. Cuba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama sistem pelayan, pengepala yang sah dan sekurang-kurangnya satu model dengan ID dan nama yang unik. Had token mestilah nombor bulat positif.",
       "invalidUrl": "Masukkan URL akar API HTTP atau HTTPS tanpa bukti kelayakan, pertanyaan atau fragmen.",
       "publicHttp": "Titik akhir HTTP awam tidak dibenarkan. Gunakan HTTPS atau titik akhir setempat persendirian.",
@@ -3913,6 +4234,8 @@
       "downloading": "Memuat turun: {{written}} daripada {{total}}",
       "downloadingUnknown": "Memuat turun: {{written}}",
       "paused": "Dijeda: {{written}} daripada {{total}}",
+      "retrying": "Mencuba semula: {{written}} daripada {{total}}",
+      "retryingUnknown": "Mencuba semula: {{written}}",
       "verifying": "Menyemak fail yang dimuat turun…",
       "downloaded": "Dimuat turun · {{size}}",
       "url": "Pautan muat turun terus",
@@ -3930,7 +4253,9 @@
         "space": "Ruang storan kosong tidak mencukupi untuk model ini. Kosongkan ruang dan cuba lagi.",
         "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
         "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang.",
-        "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi."
+        "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi.",
+        "unreadable": "Peranti ini tidak dapat menyemak fail yang dimuat turun, jadi ia telah dibuang. Cuba muat turun sekali lagi.",
+        "writeFailed": "Peranti ini tidak dapat menyimpan model. Cuba muat turun sekali lagi."
       }
     },
     "catalog": {
@@ -4003,7 +4328,9 @@
         "androidModelUnavailable": "Peranti ini tidak menyokong Gemini Nano, atau apl sistem AICore masih sedang disediakan. Cuba lagi kemudian.",
         "aicoreUpdateRequired": "Kemas kini apl AICore dan perisian sistem anda untuk menggunakan model ini.",
         "downloadable": "Model ini perlu dimuat turun sekali sebelum anda boleh menggunakannya.",
-        "downloading": "Model sedang dimuat turun. Ia akan sedia apabila muat turun selesai."
+        "downloading": "Model sedang dimuat turun. Ia akan sedia apabila muat turun selesai.",
+        "batteryQuota": "Model pada peranti telah menggunakan kuota baterinya buat masa ini. Cuba lagi kemudian.",
+        "checkFailed": "Apl tidak dapat menyemak model ini. Cuba lagi."
       },
       "unavailable": "Model pada peranti tidak tersedia buat masa ini. Semak statusnya dalam $t(modelChat.backends.title).",
       "busy": "Model pada peranti sedang sibuk dengan balasan lain. Cuba lagi apabila ia selesai.",
@@ -4013,15 +4340,33 @@
       "download": "Muat turun model pada peranti",
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",
-      "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi."
+      "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi.",
+      "cannotUse": "Tidak boleh dijalankan: {{items}}.",
+      "cannotUseOptions": "Tidak boleh diisi: sesetengah pilihan alat.",
+      "limitations": "Had",
+      "tools": {
+        "time": "Masa",
+        "settingsList": "Tunjuk tetapan",
+        "settingsSet": "Ubah tetapan"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini.",
+    "providerKeyRefused": "Penyedia menolak bukti kelayakan. Periksa kunci API-nya, kemudian hantar semula.",
+    "providerModelMissing": "Backend ini tidak lagi menyediakan model ini. Pilih yang lain.",
+    "providerRateLimited": "Penyedia sedang mengehadkan permintaan. Tunggu sebentar dan hantar semula.",
+    "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Sahkan perubahan ini?"
+    "confirmTitle": "Sahkan perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan makluman perbelanjaan? Anda tidak lagi akan menerima pemberitahuan tentang melepasi ambang perbelanjaan dan lonjakan setiap jam.",
+      "balanceAlertsOff": "Matikan makluman baki? Anda tidak lagi akan menerima pemberitahuan apabila kredit anda hampir habis.",
+      "securityFindingsOff": "Matikan penemuan keselamatan? Anda tidak lagi akan menerima pemberitahuan tentang penemuan keselamatan baharu.",
+      "hideBalanceOn": "Sembunyikan baki anda? Baki kredit tidak lagi akan dipaparkan pada skrin profil dan hab organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4096,7 +4441,7 @@
     "personalDefaultDescription": "Auto-muat apabila tiada repositori mempunyai profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat secara automatik untuk ahli yang tidak mempunyai lalai peribadi.",
     "setAsDefault": "Tetapkan sebagai lalai",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Cuba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan pentadbir boleh mengubah profil organisasi.",
     "deleteTitle": "Padam profil",
     "deleteMessage": "Ini mengalih keluar profil dan tetapannya secara kekal. Ini tidak boleh dibuat asal.",
@@ -4166,6 +4511,7 @@
     "instructionsHint": "Markdown peraturan digunakan pada setiap sesi yang menggunakan profil ini.",
     "instructionsEmpty": "Belum ada fail arahan",
     "instructionsEmptyDescription": "Tambah fail peraturan yang digunakan oleh setiap sesi dengan profil ini.",
+    "instructionsEmptyDescriptionReadOnly": "Fail peraturan yang ditambahkan di sini digunakan pada setiap sesi yang menggunakan profil ini.",
     "instructionNameRequired": "Masukkan nama fail",
     "instructionNameTooLong": "Nama fail mesti {{max}} aksara atau kurang",
     "instructionNameInvalid": "Mulakan dengan huruf atau digit dan gunakan hanya huruf kecil, digit dan sengkang",
@@ -4181,6 +4527,7 @@
     "instructionSaveFailed": "Tidak dapat menyimpan arahan",
     "instructionDeleteFailed": "Tidak dapat memadam arahan",
     "instructionToggleFailed": "Tidak dapat mengemas kini arahan",
+    "instructionViewTitle": "Fail arahan",
     "instructionLimitReached": "Profil boleh memuatkan sehingga {{max}} arahan. Padam satu untuk menambah yang lain.",
     "mcp": {
       "title": "pelayan MCP",
@@ -4241,9 +4588,10 @@
       "topPPlaceholder": "cth. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Ejen saya",
-      "promptPlaceholder": "Anda seorang...",
+      "promptPlaceholder": "Anda seorang…",
       "tools": "Alatan",
       "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
+      "toolRule": "Peraturan tersimpan: {{rule}}",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
@@ -4353,18 +4701,36 @@
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
+      "expiredGrant": "Tamat tempoh: {{description}}",
+      "expiredStatus": "Tamat tempoh",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
         "balanceNeutral": "Neutral baki",
         "deduction": "Potongan",
         "grant": "Pemberian kredit",
+        "promotionalCredits": "Kredit promosi",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit pentadbir",
+        "contributorChampion": "Kredit juara penyumbang",
+        "feedback": "Kredit maklum balas",
+        "influencer": "Kredit pempengaruh",
+        "ossMonthlyReset": "Pembaharuan penajaan OSS",
+        "ossSponsorship": "Kredit penajaan OSS",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit isu penggunaan",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Memaparkan sejarah kredit terkini.",
+      "voidedGrant": "Dibatalkan: {{description}}",
+      "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
@@ -4391,6 +4757,7 @@
     "pickPackToBuyAgain": "Pilih pek di atas untuk memulakan pembelian baharu.",
     "purchasePending": "Kedai masih memproses pembayaran ini. Kredit anda akan tiba sebaik sahaja kedai meluluskan caj tersebut.",
     "buyAgain": "Beli sekali lagi",
+    "checkPurchase": "Semak pembelian",
     "purchaseOwnedByAnotherAccount": "Kredit dalam Apple Account ini milik akaun Kilo yang lain. Log masuk ke akaun Kilo itu untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit pada Akaun Google Play ini kepunyaan akaun Kilo yang berbeza. Log masuk ke akaun Kilo itu untuk menggunakannya."
   },
@@ -4484,7 +4851,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke senarai",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tugasan tidak dapat disimpan. Semak sambungan anda dan cuba lagi.",
+      "saveRefused": "Tugasan tidak dapat disimpan ke senarai ini. Pilih senarai lain."
     }
   },
   "agentBriefing": {
@@ -4496,17 +4865,25 @@
     "empty": "Tiada aktiviti dalam tempoh laporan ini",
     "emptyHint": "Sesi pengekodan awan dan CLI anda muncul di sini apabila laporan berjadual mempunyai aktiviti.",
     "loadError": "Tidak dapat memuatkan laporan",
+    "estimateLoadError": "Tidak dapat memuatkan anggaran.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Tapis mengikut konteks",
+    "contextAll": "Semua konteks",
     "dismiss": "Ketepikan laporan",
+    "dismissFailed": "Laporan ini masih belum dapat diketepikan. Ia akan dicuba semula di latar belakang.",
+    "readMarkFailed": "Laporan ini tidak dapat ditanda sebagai dibaca. Ia akan dicuba semula apabila laporan dimuat semula.",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ia akan dilampirkan di sini apabila sedia.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan berstruktur anda masih tersedia.",
+    "summaryNotAdmitted": "Ringkasan AI tidak dijana untuk laporan ini. Laporan berstruktur anda masih tersedia.",
     "summaryCharge": "Caj AI {{cost}}",
     "summaryChargePending": "Caj AI menunggu penyelarasan",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Bukti dan artifak",
     "timezone": "Zon waktu laporan",
     "deviceTimezone": "Guna zon waktu peranti",
@@ -4517,23 +4894,28 @@
     "morningEnd": "Laporan tersedia sehingga",
     "timeHint": "Kad Utama memulihkan status langsung apabila tempoh laporan tamat, walaupun luar talian.",
     "invalidSchedule": "Pilih zon waktu yang sah dan tempoh laporan yang tidak kosong.",
+    "scheduleEmptyNight": "Tempoh laporan kosong. Pilih masa sedia yang lebih lewat daripada permulaan tempoh.",
+    "scheduleEmptyMorning": "Masa sedia dan masa tersedia sehingga adalah sama. Pilih berapa lama laporan kekal tersedia.",
+    "scheduleFullDay": "Kedua-dua tempoh meliputi satu hari penuh. Biarkan sebahagian hari di luar tempoh laporan.",
     "notificationsHint": "Satu pemberitahuan umum setiap laporan berjadual. Bebas daripada ringkasan AI berbayar.",
-    "notificationPermission": "Dayakan pemberitahuan peranti dalam $t(common.notifications) untuk menerima laporan anda.",
+    "notificationPermission": "Hidupkan pemberitahuan push untuk menerima laporan anda.",
     "defaultModel": "Guna model lalai Kilo",
     "duration": "Had masa (minit)",
     "spendLimit": "Had perbelanjaan (USD)",
-    "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
+    "invalidSafeguards": "Masukkan nombor positif dalam julat yang dibenarkan.",
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini.",
+    "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
+    "paidDisclosure_one": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
+    "paidDisclosure_other": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "enable": "Dayakan ringkasan berbayar",
     "allContexts": "Laporan peribadi dan organisasi kekal berasingan.",
     "emptyHistory": "Tiada laporan tersimpan",
-    "estimatePermissionUnavailable": "Anda tidak mempunyai kebenaran untuk menggunakan baki konteks ini.",
-    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
-    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringkasan berbayar.",
-    "estimateModelNotAllowed": "Model ini tidak dibenarkan di sini.",
+    "estimatePermissionUnavailable": "Anda tidak mempunyai kebenaran untuk menggunakan baki konteks ini. Minta pemilik organisasi untuk mendayakannya.",
+    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia. Pilih model lain.",
+    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringgisan berbayar. Tambah kredit pada baki konteks ini.",
+    "estimateModelNotAllowed": "Model ini tidak dibenarkan dalam konteks ini. Pilih model lain.",
     "estimateSpendLimitTooLow": "Naikkan had perbelanjaan untuk membenarkan ringkasan ini.",
     "saved": "Tetapan laporan disimpan",
     "selectedSessions": "Sesi terpilih",
@@ -4542,16 +4924,35 @@
     "capturedAt": "Dirakam {{time}}",
     "snapshotHint": "Syot kilat keadaan sesi terkini yang tersedia, dirakam sebaik mungkin pada waktu pagi yang dijadualkan. Bilangan merujuk kepada sesi terpilih, bukan keseluruhan aktiviti semalaman.",
     "snapshotTruncated": "Sesetengah sesi atau bukti tidak disertakan untuk mengehadkan saiz syot kilat ini.",
-    "snapshotSummaryFailed": "Ringkasan AI gagal. Syot kilat berstruktur anda masih tersedia.",
+    "snapshotSummaryFailed": "Ringkasan AI gagal. Laporan berstruktur anda masih tersedia.",
     "scheduledContextEnabled": "Laporan berjadual",
     "scheduledContextSettings": "Laporan berjadual · {{context}}",
     "scheduledContextHint": "Dayakan rakaman berjadual dan ringkasan AI berbayar untuk konteks ini sahaja. Petikan terpilih yang disunting untuk menyembunyikan maklumat sensitif dan fakta berstruktur dihantar ke model anda. Ringkasan menggunakan bahasa aplikasi yang disimpan apabila anda mengemas kini tetapan laporan. Caj menggunakan baki konteks ini. Syot kilat tanpa aktiviti tidak menggunakan AI.",
     "snapshotSafeguards": "Had masa dan perbelanjaan bagi setiap ringkasan dikenakan pada setiap syot kilat berjadual, bukan sebagai bajet harian.",
-    "snapshotEstimateInputTooLarge": "Syot kilat ini mempunyai terlalu banyak bukti untuk model yang dipilih.",
+    "snapshotEstimateInputTooLarge": "Syot kilat ini mempunyai terlalu banyak bukti untuk model yang dipilih. Pilih model dengan tetingkap input yang lebih besar.",
     "quietSnapshot": "Tiada aktiviti sesi dipilih untuk syot kilat ini. Tiada ringkasan AI diminta atau caj dikenakan.",
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
-    "sourceMetadata": "Metadata sesi yang dirakam"
+    "sourceMetadata": "Metadata sesi yang dirakam",
+    "metadataPlan_other": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataPlan": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_other": "{{displayCount}} fail diubah",
+    "metadataFiles": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_other": "{{displayCount}} baris ditambah",
+    "metadataLinesAdded": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_other": "{{displayCount}} baris dibuang",
+    "metadataLinesRemoved": "{{displayCount}} baris dibuang",
+    "metadataPlanCurrent": "Langkah semasa: {{current}}",
+    "metadataFailure": "Pusingan terakhir gagal: {{kind}}",
+    "sourceActivity": "Aktiviti tanpa tajuk",
+    "metadataFailureProvider": "ralat pembekal",
+    "metadataFailureTool": "ralat alat",
+    "metadataStopped": "Pusingan terakhir dihentikan",
+    "metadataFailureOther": "ralat tidak dinyatakan",
+    "metadataPlan_one": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_one": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_one": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_one": "{{displayCount}} baris dibuang"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
@@ -4569,28 +4970,35 @@
     "topFeatures": "Ciri teratas",
     "emptyTitle": "Tiada penggunaan dalam tempoh ini",
     "unavailableTitle": "Penggunaan tidak tersedia",
-    "unavailableDescription": "Ruang kerja ini tidak melaporkan penggunaan. Mencuba semula tidak akan membantu.",
+    "unavailableDescription": "Penggunaan belum disediakan untuk ruang kerja ini. Hubungi sokongan jika anda menjangkakan penggunaan dipaparkan di sini.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
-    "viewDetails": "Lihat butiran penggunaan"
+    "viewDetails": "Lihat butiran penggunaan",
+    "orgSelfEntryTitle": "Penggunaan anda"
   },
   "integrations": {
     "title": "Integrasi",
     "sectionTitle": "Perkhidmatan yang disambungkan",
     "entrySubtitle": "GitHub, Slack, Linear dan banyak lagi",
-    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo",
+    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo.",
     "disconnect": "Putuskan sambungan",
     "disconnectTitle": "Putuskan sambungan {{provider}}?",
     "disconnectMessage": "Kilo akan berhenti memberikan respons dalam {{provider}}. Anda boleh menyambung semula pada bila-bila masa.",
     "connectedTo": "Disambungkan kepada {{account}}",
     "disconnected": "Sambungan {{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
+    "disconnectRetry": "Slack tidak dapat mengesahkan pemutusan sambungan. Cuba lagi.",
+    "disconnectNeedsSupport": "Kilo tidak dapat membaca akses Slack yang disimpan untuk sambungan ini. Hubungi sokongan untuk melengkapkan pemutusan sambungan.",
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrAdmin": "Minta pemilik organisasi atau pentadbir untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrBilling": "Minta pemilik organisasi atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
-    "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."
+    "personalEmptyDescription": "Invois untuk pembelian anda sendiri dipaparkan di sini setelah anda dibilkan. Resit daripada App Store dan Google Play terdapat dalam Sejarah kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {
@@ -4622,7 +5030,7 @@
       "new": "Pencetus baharu",
       "create": "Cipta pencetus",
       "emptyTitle": "Belum ada pencetus",
-      "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
+      "emptyDescription": "Cipta pencetus pertama anda.",
       "loadFailedTitle": "Tidak dapat memuatkan pencetus",
       "loadFailedDescription": "Cuba lagi apabila anda mempunyai sambungan.",
       "detailLoadFailedTitle": "Tidak dapat memuatkan pencetus ini",
@@ -4645,7 +5053,6 @@
       "nameLocked": "Nama tidak boleh berubah selepas pencetus dicipta.",
       "repositoryLocked": "Repositori tidak boleh berubah selepas pencetus dicipta.",
       "environmentAutomatic": "Automatik mengikut repositori",
-      "notSelected": "Tidak dipilih",
       "profileDefaults": "Gunakan lalai",
       "profileHelp": "Tetapan profil digunakan apabila pencetus berjalan. Rahasianya diselesaikan ketika itu.",
       "customAgent": "Ejen tersuai",
@@ -4662,10 +5069,15 @@
       "autoCommit": "Komit perubahan apabila larian selesai",
       "condenseOnComplete": "Ringkaskan konteks apabila larian selesai",
       "activeTitle": "Pencetus aktif",
+      "activeSwitchA11y": "Pencetus aktif: {{name}}",
+      "copyLinkA11y": "Salin pautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap larian menggunakan akaun anda, jadi pengepala rahsia diperlukan.",
       "saveFailedTitle": "Tidak dapat menyimpan pencetus",
+      "nameTaken": "Pencetus bernama \"{{name}}\" sudah wujud.",
+      "saveFailedRetry": "Tidak dapat menghubungi pelayan. Semak sambungan anda dan cuba lagi.",
+      "saveFailedCheck": "Semak nilai dalam borang dan cuba lagi.",
       "deleteTitle": "Padamkan pencetus ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak boleh dibatalkan.",
       "deleteMessageScheduled": "Larian yang dijadualkan bagi pencetus {{name}} akan berhenti. Tindakan ini tidak boleh dibatalkan.",
@@ -4735,22 +5147,27 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Keselamatan AI",
-    "permissionDenied": "Hanya pemilik dan pentadbir organisasi boleh mengurus Pagar Keselamatan AI.",
-    "unavailable": "Pagar Keselamatan AI tidak tersedia untuk organisasi ini.",
+    "permissionDenied": "Hanya pemilik dan pentadbir organisasi boleh mengurus Pagar Keselamatan AI. $t(organization.boundary.accessDeniedDescription)",
+    "unavailableTitle": "Pagar Keselamatan AI tidak diaktifkan",
+    "unavailable": "Kilo mengaktifkan Pagar Keselamatan AI untuk sesebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan pasukan Kilo mengaktifkannya untuk organisasi anda.",
+    "contactSupport": "Hubungi sokongan",
     "loadError": "Pagar Keselamatan AI gagal dimuatkan",
     "statusSaving": "Menyimpan…",
     "statusSaved": "Disimpan",
     "statusFailed": "Tidak dapat menyimpan.",
     "inputTitle": "Pagar keselamatan input",
-    "inputDescription": "Mengimbas setiap input dengan Enkrypt AI, termasuk hasil alat. Pengesan yang menyekat menolak permintaan apabila Enkrypt tidak tersedia.",
+    "inputDescription": "Mengimbas setiap input dengan Enkrypt AI, termasuk hasil alat. Apabila Enkrypt tidak tersedia, permintaan dihantar tanpa diimbas dan bukannya ditolak.",
     "outputTitle": "Pagar keselamatan output",
     "outputDescription": "Mengimbas respons dengan Enkrypt AI sebelum ahli menerimanya. Dimatikan kecuali anda menghidupkannya.",
+    "outputUnavailable": "Kilo belum mengaktifkan pengimbasan output untuk organisasi ini, jadi respons tidak disemak dan tiada apa-apa untuk ditetapkan di sini. Hubungi {{supportEmail}} untuk memohonnya.",
     "detectorsHint": "Sekat menolak permintaan yang ditandakan. Rekod sahaja merekodkannya tanpa melengahkan permintaan.",
     "detectorsHintOutput": "Sekat menggagalkan respons yang ditandakan. Rekod sahaja merekodkannya tanpa melengahkan respons.",
     "choiceLog": "Rekod sahaja",
     "applyTo": "Gunakan pada",
     "applyToAllMembers": "Semua ahli",
     "applyKiloDefault": "Gunakan Lalai Kilo",
+    "applyKiloDefaultEnglishNote": "Teks dasar lalai Kilo adalah dalam bahasa Inggeris, kerana Kilo Gateway menggunakannya tepat seperti yang ditulis.",
+    "applyKiloDefaultReplaceMessage": "Dasar lalai Kilo ditulis dalam bahasa Inggeris dan menggantikan apa yang anda tetapkan dalam Pelanggaran dasar. Teks yang anda masukkan dalam medan teks dasar tidak boleh dipulihkan.",
     "invalidSavedTitle": "Tetapan pengesan input yang disimpan tidak dapat dibaca",
     "invalidSavedBody": "Permintaan disekat sehingga pengesan input disimpan semula. Pengesan di bawah bermula daripada Lalai Kilo.",
     "invalidSavedOutputTitle": "Tetapan pengesan output yang disimpan tidak dapat dibaca",
@@ -4871,7 +5288,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Ciri perusahaan",
-    "enterpriseOnly": "Ini ialah ciri khusus perusahaan.",
+    "enterpriseOnly": "Pembekal dan model tersedia pada pelan Enterprise.",
     "readOnly": "Hanya pemilik dan pentadbir organisasi boleh mengubah tetapan ini.",
     "loadError": "Pembekal dan model tidak dapat dimuatkan",
     "tabModels": "Model",
@@ -4885,6 +5302,8 @@
     "providersDescription": "Matikan pembekal untuk menghentikan Kilo daripada menghalakan permintaan kepadanya bagi organisasi ini.",
     "providersNeedCatalog": "Suis pembekal kekal baca sahaja sehingga katalog model penuh dimuatkan. Ketik Cuba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tiada pembekal sepadan dengan carian ini.",
+    "providersNone": "Tiada pembekal tersedia untuk organisasi ini.",
+    "providersUnavailable": "Senarai pembekal tidak dapat dimuatkan.",
     "allowAllShown": "Benarkan semua yang dipaparkan",
     "denyAllShown": "Tolak semua yang dipaparkan",
     "gatewaysDescription": "Kilo menghalakan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dimatikan menggagalkan permintaan tersebut.",
@@ -4903,6 +5322,20 @@
       "eu": "Kesatuan Eropah",
       "au": "Australia",
       "jp": "Jepun"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari keutamaan",
+    "noMatches": "Tiada keutamaan yang sepadan",
+    "emptyDescription": "Cuba nama keutamaan atau kata kunci lain.",
+    "resultsStatus": "Keutamaan ditemui: {{resultCount}}",
+    "keywords": {
+      "signOut": "log keluar|keluar akaun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|cap jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "makluman|amaran|pemberitahuan",
+      "privacy": "analitik|penjejakan"
     }
   }
 }

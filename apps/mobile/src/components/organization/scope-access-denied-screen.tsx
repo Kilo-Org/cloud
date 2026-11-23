@@ -1,10 +1,12 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { StateAction } from '@/components/empty-state';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
+import { RotateCcw } from '@/components/ui/icons';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -17,19 +19,21 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
  * Leaving leads: Back to profile drops the stale selection, exactly like the
  * shared organization boundary's absent-override state, so the reader lands on
  * a scope they can open. Retry only re-resolves the membership, for an owner
- * who restores access while the reader waits.
+ * who restores access while the reader waits. A deleted organization cannot
+ * come back, so the not-found state is the shared one with Back alone.
  */
 export function ScopeAccessDeniedScreen({
   title,
-  eyebrow,
+  subtitle,
   kind,
   onRetry,
   isRetrying = false,
   backFallback,
 }: Readonly<{
-  /** ScreenHeader's title: the product name, or the organization's name. */
+  /** ScreenHeader's title: the product's name. */
   title: string;
-  eyebrow?: string;
+  /** The line under the title: the organization the reader may not see. */
+  subtitle?: string;
   /** `'not-found'` for an organization that no longer exists. */
   kind: Exclude<OrganizationScopeAccess, 'granted'>;
   onRetry: () => void;
@@ -37,14 +41,26 @@ export function ScopeAccessDeniedScreen({
   /** Where the header's Back lands when this state has no history to pop. */
   backFallback?: Href;
 }>) {
-  const router = useRouter();
+  // Leaving for Profile swaps this denied state's route out, so it goes through
+  // the push-then-retire hook: a literal `router.replace` swaps both in one
+  // native-stack commit and crashes Android Fabric.
+  const { replace } = useStackSafeReplace();
   const { t } = useTranslation();
   const notFound = kind === 'not-found';
+  const backToProfile = (
+    <StateAction
+      label={t('organization.boundary.backToProfile')}
+      icon={DirectionalArrowLeft}
+      onPress={() => {
+        replace(PROFILE_TAB_HREF);
+      }}
+    />
+  );
 
   return (
     <PlatformErrorScreen
       title={title}
-      eyebrow={eyebrow}
+      subtitle={subtitle}
       backFallback={backFallback}
       variant={notFound ? 'not-found' : 'permission'}
       message={t(
@@ -52,38 +68,23 @@ export function ScopeAccessDeniedScreen({
           ? 'organization.boundary.unavailableDescription'
           : 'organization.boundary.accessDeniedDescription'
       )}
-      // The access-denied sentence runs just past the width the compact cell
-      // gives this state, so it wrapped with one word alone on its last line.
-      // At this measure it breaks into two lines that each carry a whole
-      // phrase. The longer unavailable sentence keeps the shared measure.
-      descriptionClassName={notFound ? undefined : 'max-w-[205px]'}
       action={
-        <View className="gap-3">
-          {/* Leaving is the recovery this surface leads with, so it holds the
-              one filled control: dark `--primary` is the brand yellow that
-              glares on the near-black page, so dark takes the muted olive
-              `--selection` with its own foreground ink. Retry only re-resolves
-              the membership, so it stays the outlined secondary. */}
-          <Button
-            className="bg-primary dark:bg-selection"
-            accessibilityLabel={t('organization.boundary.backToProfile')}
-            onPress={() => {
-              router.replace(PROFILE_TAB_HREF);
-            }}
-          >
-            <Text className="dark:text-selection-foreground">
-              {t('organization.boundary.backToProfile')}
-            </Text>
-          </Button>
-          <Button
-            variant="outline"
-            loading={isRetrying}
-            accessibilityLabel={t('common.retry')}
-            onPress={onRetry}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        </View>
+        notFound ? (
+          backToProfile
+        ) : (
+          <View className="gap-3">
+            {/* Leaving is the recovery this surface leads with, so it holds the
+                one filled control. Retry only re-resolves the membership, and
+                the state slot has one action shape for both. */}
+            {backToProfile}
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
+              loading={isRetrying}
+              onPress={onRetry}
+            />
+          </View>
+        )
       }
     />
   );

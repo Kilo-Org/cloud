@@ -1,7 +1,7 @@
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   buildAutoModelCatalogEntry,
   getEnhancedOpenRouterModels,
@@ -71,11 +71,18 @@ export async function getAvailableModelsForOrganization(
      * Null lists every custom LLM, for callers that do not serve a request. */
     countryCode: string | null;
   }
-): Promise<OpenRouterModelsResponse | null> {
+): Promise<OpenRouterModelsResponse> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
+  // `getOrganizationByokProviderIds` and `getAllowedDirectByokCatalogModelIds` read the
+  // replica on purpose even when the caller injects `fromDb`, so the returned catalog mixes
+  // connections: in the web app, where `fromDb` is the primary, a key that was just disabled
+  // can keep its model listed until the replica catches up. Both values only shape this list,
+  // and inference re-resolves the policy and the keys per request, so the lag cannot change
+  // what a request may use. Threading `fromDb` would instead put both reads on the primary for
+  // list data alone.
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),
@@ -107,7 +114,11 @@ export async function getAvailableModelsForOrganization(
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(
-    ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
+    ...(await listAvailableCustomLlms(
+      organizationId,
+      context.groups.map(group => group.id),
+      countryCode
+    ))
   );
 
   const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
@@ -137,14 +148,14 @@ export async function getAvailableModelsForOrganization(
  */
 async function applyModelPolicyToCatalog(
   policy: EffectiveOrganizationModelPolicy,
-  candidates: readonly OpenRouterModel[],
+  candidates: readonly OpenRouterCatalogModel[],
   byokProviderIds: readonly UserByokProviderId[],
   directByokCatalogModelIds: ReadonlySet<string>
 ): Promise<{
-  filteredModels: OpenRouterModel[];
+  filteredModels: OpenRouterCatalogModel[];
   allowedProvidersByModel: Map<string, ReadonlySet<string>>;
 }> {
-  const filteredModels: OpenRouterModel[] = [];
+  const filteredModels: OpenRouterCatalogModel[] = [];
   const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   if (policy.memberGrant.mode === 'unrestricted') {
     filteredModels.push(...candidates);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, removeItemIfValue, setItem } from '@/lib/persist/encrypted-kv';
 
 import { EFFORTS } from './effort';
 import { type ChatTarget, type Displaced, type Question } from './state';
@@ -56,6 +56,8 @@ const askedSchema = z.object({
   images: imagesSchema,
   // A question remembered before failures were kept says nothing about one.
   failureKey: z.string().nullable().default(null),
+  // The words a stopped or failed answer had reached; absent for every other question.
+  answer: z.string().optional(),
 });
 const keptEntrySchema = z.object({
   /* An identifier made by this version; an entry written while it was still a
@@ -71,6 +73,8 @@ const keptEntrySchema = z.object({
   /* Why it failed, so its bubble can state the same cause after the slot moved
      on. A question kept before this was written says nothing about one. */
   failureKey: z.string().nullable().default(null),
+  // The words its answer had reached when it was stopped or failed.
+  answer: z.string().optional(),
 });
 /** The stored list, before any entry is read: one broken entry is dropped alone. */
 const keptRecordsSchema = z.array(z.unknown());
@@ -104,6 +108,8 @@ export type Asked = Question &
     readonly after?: number;
     /** Why the last answer ended without one, or null when nothing says why. */
     readonly failureKey: string | null;
+    /** The words the answer had reached when it was stopped or failed, if any arrived. */
+    readonly answer?: string;
   };
 
 /** A question as it is remembered: no failure is known yet when it is asked. */
@@ -135,14 +141,62 @@ export async function recordAskedFailure(sessionId: string, failureKey: string):
   await rememberAsked(sessionId, { ...asked, failureKey });
 }
 
+/**
+ * Keeps the words a stopped or failed answer had reached beside the question, so a
+ * reopened chat still shows them under it. Like a failure, a question nobody
+ * remembers has nowhere to keep them.
+ */
+export async function recordAskedAnswer(sessionId: string, answer: string): Promise<void> {
+  const asked = await askedIn(sessionId);
+  if (asked === null || asked.answer === answer) {
+    return;
+  }
+  await rememberAsked(sessionId, { ...asked, answer });
+}
+
 export async function forgetAsked(sessionId: string): Promise<void> {
   await removeItem(SCOPE, sessionId);
   await removeItem(LEGACY_SCOPE, sessionId);
 }
 
+/**
+ * The question a chat is waiting on an answer to, or null when nothing is
+ * stored or what is stored cannot be read.
+ *
+ * A record written by another version, or one whose write was cut short, is
+ * answered absent rather than thrown out of: every open of the chat awaits
+ * this, and one value nothing can read would otherwise leave the chat
+ * unopenable for good.
+ */
 export async function askedIn(sessionId: string): Promise<Asked | null> {
-  const asked = await getItem(SCOPE, sessionId);
-  return asked === null ? null : askedSchema.parse(JSON.parse(asked));
+  const stored = await getItem(SCOPE, sessionId);
+  if (stored === null) {
+    return null;
+  }
+  let reason = 'it is not json';
+  try {
+    const read = askedSchema.safeParse(JSON.parse(stored));
+    if (read.success) {
+      return read.data;
+    }
+    reason = 'it is not written as a question';
+  } catch {
+    // Not JSON at all, which the reason already says.
+  }
+  /* The question's own words are not in the log, because they are the person's:
+     only what is wrong with the record is. It is dropped so the next open reads
+     a chat instead of failing on the same value again, and only the record this
+     reader owns is removed, since the legacy text is what upgrades the chat. */
+  // eslint-disable-next-line no-console -- the record is gone by the time a screen could mention it
+  console.warn(`[chat] a stored question could not be read: ${reason}`);
+  try {
+    /* Compared and deleted in one statement: a read followed by a delete is two
+       store calls, and a question written in the gap would be deleted here. */
+    await removeItemIfValue(SCOPE, sessionId, stored);
+  } catch {
+    // A store that refuses the delete is still read as absent.
+  }
+  return null;
 }
 
 /** Writes the questions a later send took the slot from, in the order they were asked. */

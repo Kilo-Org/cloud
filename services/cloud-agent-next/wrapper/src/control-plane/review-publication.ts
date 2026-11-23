@@ -6,7 +6,7 @@ import {
   type PublicationRecoverySignal,
 } from '../publication-recovery.js';
 import type { GitHubReviewTarget } from '../../../src/shared/github-review-target.js';
-import type { HarnessActivity } from './harness-activity.js';
+import type { ActivityMessage, HarnessActivity } from './harness-activity.js';
 
 export const REVIEW_PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -25,10 +25,11 @@ export function createReviewPublication(input: {
   let state: 'unused' | 'submitted' | 'running' | 'spent' | 'abandoned' = 'unused';
   let signal: PublicationRecoverySignal | null = null;
   let failure: unknown;
+  let assistantMessage: { id: string; created?: number } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const abort = new AbortController();
   const texts = new Map<string, string>();
-  const roles = new Map<string, string>();
+  const messages = new Map<string, { role: ActivityMessage['role']; created?: number }>();
 
   function clearTimer() {
     if (timer !== undefined) input.scheduler.clearTimeout(timer);
@@ -49,14 +50,38 @@ export function createReviewPublication(input: {
       if (state === 'abandoned') return;
       if (activity.type === 'message') {
         const message = activity.message;
-        roles.set(message.id, message.role);
-        if (roles.size > 128) roles.delete(roles.keys().next().value ?? '');
-        if (message.role === 'assistant' && messageInfoReportsAssistantError(message))
-          failure = message.error;
+        const created = messages.get(message.id)?.created ?? message.time?.created;
+        messages.set(message.id, { role: message.role, created });
+        if (messages.size > 128) {
+          const oldest = messages.keys().next();
+          if (!oldest.done) messages.delete(oldest.value);
+        }
+        if (message.role === 'assistant') {
+          if (message.id !== assistantMessage?.id) {
+            if (
+              created !== undefined &&
+              assistantMessage?.created !== undefined &&
+              created < assistantMessage.created
+            ) {
+              return;
+            }
+            assistantMessage = { id: message.id, created };
+            texts.clear();
+            failure = undefined;
+          } else if (assistantMessage.created === undefined) {
+            assistantMessage.created = created;
+          }
+          if (messageInfoReportsAssistantError(message)) failure = message.error;
+        }
         return;
       }
       const messageId = activity.type === 'part' ? activity.part.messageId : activity.messageId;
-      if (roles.get(messageId) !== 'assistant') return;
+      if (messages.get(messageId)?.role !== 'assistant') return;
+      if (signal?.kind !== 'verified' && activity.type === 'part' && activity.part.tool) {
+        const result = classifyPublicationToolPart(activity.part.tool);
+        if (result) signal = result;
+      }
+      if (messageId !== assistantMessage?.id) return;
       if (activity.type === 'delta') {
         texts.set(
           activity.partId,
@@ -64,8 +89,6 @@ export function createReviewPublication(input: {
         );
       } else {
         const part = activity.part;
-        const result = part.tool ? classifyPublicationToolPart(part.tool) : null;
-        if (result) signal = result;
         if (part.kind === 'text' && part.text !== undefined)
           texts.set(part.id, part.text.slice(-8192));
       }

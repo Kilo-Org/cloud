@@ -141,7 +141,14 @@ jobs:
           if [ -f wrapper/package.json ]; then
             filters+=(--filter '@kilocode/cloud-agent-wrapper...')
           fi
-          pnpm install --frozen-lockfile "${filters[@]}"
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Prepare downloaded Cloud Agent runtime
         if: inputs.worker == 'services/cloud-agent-next'
@@ -504,7 +511,14 @@ jobs:
           if [ -f wrapper/package.json ]; then
             filters+=(--filter '@kilocode/cloud-agent-wrapper...')
           fi
-          pnpm install --frozen-lockfile "${filters[@]}"
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Prepare downloaded Cloud Agent runtime
         if: matrix.worker == 'services/cloud-agent-next'
@@ -644,7 +658,14 @@ jobs:
           if [ -f wrapper/package.json ]; then
             filters+=(--filter '@kilocode/cloud-agent-wrapper...')
           fi
-          pnpm install --frozen-lockfile "${filters[@]}"
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -711,7 +732,14 @@ jobs:
           if [ -f wrapper/package.json ]; then
             filters+=(--filter '@kilocode/cloud-agent-wrapper...')
           fi
-          pnpm install --frozen-lockfile "${filters[@]}"
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Prepare downloaded Cloud Agent runtime
         id: runtime

@@ -18,6 +18,8 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
   TODO_LIST_NAME_MAX_LENGTH,
@@ -41,12 +43,17 @@ function FieldLabel({ children }: Readonly<{ children: string }>) {
 
 function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSettingsFormProps>) {
   const router = useRouter();
+  // The post-create hand-off swaps this sheet for the new list in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const headerTopInset = useFormSheetHeaderTopInset();
   const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
-  const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
+  const { models, isLoading: isLoadingModels, refetch: catalogRefetch } = useAvailableModels(scope);
 
   const nameRef = useRef(list?.name ?? '');
   const emojiRef = useRef(list?.emoji ?? '');
@@ -123,7 +130,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
         } else {
           // Replace the form sheet with the created list: Back from the list then
           // lands on the lists view the sheet was opened from.
-          router.replace(todoListPath(created.id));
+          stackSafeRouter.replace(todoListPath(created.id));
         }
       }
     } catch {
@@ -146,9 +153,14 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
         onCancel={requestClose}
         disabled={saving}
         doneDisabled={!hasName || saving}
+        topInset={headerTopInset}
       >
         <View className="gap-5 px-4 pt-2">
-          <View className="flex-row gap-3">
+          {/* The two boxes sit on one line. A translated label can wrap in the
+              80 pt emoji column (Arabic "الرموز التعبيرية" takes two lines), so
+              the columns are bottom-aligned: the boxes stay level with each
+              other whatever the label above them does. */}
+          <View className="flex-row items-end gap-3">
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input
@@ -158,7 +170,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                 }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
-                className="rounded-lg border border-border bg-secondary text-base text-foreground"
+                className="rounded-md border border-input bg-background text-base text-foreground"
               />
             </View>
             <View className="min-w-0 flex-1 gap-2">
@@ -213,9 +225,12 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             />
           </View>
 
-          <View className="flex-row items-center justify-between gap-3">
+          {/* One picker style for the form: the mode and model use the same
+              select box as the repository above, not the composer's chips. */}
+          <View className="gap-2">
             <FieldLabel>{t('todos.listSettings.mode')}</FieldLabel>
             <ModeSelector
+              presentation="field"
               value={normalizeAgentMode(mode ?? undefined)}
               onChange={next => {
                 setMode(next);
@@ -223,22 +238,21 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             />
           </View>
 
-          <View className="flex-row items-center justify-between gap-3">
-            <FieldLabel>{t('common.model')}</FieldLabel>
-            <View className="min-w-0 shrink">
-              <ModelSelector
-                value={model ?? ''}
-                variant={variant ?? ''}
-                options={models}
-                isLoading={isLoadingModels}
-                acceptsVariant
-                onSelect={(modelId, nextVariant) => {
-                  setModel(modelId);
-                  setVariant(nextVariant || null);
-                }}
-              />
-            </View>
-          </View>
+          <ModelSelector
+            presentation="field"
+            value={model ?? ''}
+            variant={variant ?? ''}
+            options={models}
+            isLoading={isLoadingModels}
+            onRetryModels={() => {
+              void catalogRefetch();
+            }}
+            acceptsVariant
+            onSelect={(modelId, nextVariant) => {
+              setModel(modelId);
+              setVariant(nextVariant || null);
+            }}
+          />
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
           <AccessibleStatus
             message={

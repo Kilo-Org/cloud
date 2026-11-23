@@ -135,12 +135,10 @@ function descriptionLines(root: TestRenderer.ReactTestInstance): string[] {
     .map(node => node.props.children as string);
 }
 
-/** The skill badge of every row: the one Text that carries `uppercase`. */
+/** The skill badge of every row: the one Text that carries the eyebrow variant. */
 function skillBadges(root: TestRenderer.ReactTestInstance): string[] {
   return findHost(root, 'Text')
-    .filter(
-      node => typeof node.props.className === 'string' && node.props.className.includes('uppercase')
-    )
+    .filter(node => node.props.variant === 'eyebrow')
     .map(node => node.props.children as string);
 }
 

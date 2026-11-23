@@ -34,12 +34,10 @@ export function needsInputSessionOfIdentifier(identifier: string): string | null
     : null;
 }
 
-// The sessions whose app-owned needs-input notification was posted. Only a fast
-// path: the OS is the authority on whether it is still on screen, because a swipe
-// never reaches the app. In-memory like the mount's notified set: a fresh process
-// posts nothing until the cached rows raise again, so a restart can only
-// under-report (a duplicate server push may show once), never suppress a raise
-// that has no notification.
+// The sessions whose app-owned needs-input notification was posted. In-memory
+// like the mount's notified set: a fresh process posts nothing until the cached
+// rows raise again, so a restart can only under-report (a duplicate server push
+// may show once), never suppress a raise that has no notification.
 const postedSessions = new Set<string>();
 
 /** Record that the app's own notification for this session reached the OS. */
@@ -50,6 +48,39 @@ export function markNeedsInputPosted(kiloSessionId: string): void {
 /** Drop the posted marker once the raise's presentation is gone (result or dismissal). */
 export function clearPostedNeedsInputNotification(kiloSessionId: string): void {
   postedSessions.delete(kiloSessionId);
+}
+
+// The result of an inline reply to a notification the app did not post (a
+// server push), by session. The result replaces that notification in place,
+// under its OS-assigned identifier, so the session's own identifier does not
+// name it. The plan retires it with the session's raise. In-memory like the
+// posted marker: a fresh process has none to retire.
+const replyResults = new Map<string, string>();
+
+/** Record that a reply's result is on screen under an identifier the session does not own. */
+export function markNeedsInputReplyResult(kiloSessionId: string, identifier: string): void {
+  replyResults.set(kiloSessionId, identifier);
+}
+
+/**
+ * Dismiss the session's recorded reply result, when it has one: it belongs to
+ * the session's raise, so it ends with it. A failure goes to `report` and the
+ * raise's own dismissal or post carries on.
+ */
+export async function retireNeedsInputReplyResult(
+  kiloSessionId: string,
+  report: (error: unknown) => void
+): Promise<void> {
+  const identifier = replyResults.get(kiloSessionId);
+  if (identifier === undefined) {
+    return;
+  }
+  replyResults.delete(kiloSessionId);
+  try {
+    await Notifications.dismissNotificationAsync(identifier);
+  } catch (error) {
+    report(error);
+  }
 }
 
 /**

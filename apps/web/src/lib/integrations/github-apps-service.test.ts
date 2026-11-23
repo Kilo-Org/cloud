@@ -3,6 +3,7 @@ const mockDeleteGitHubInstallation = jest.fn();
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   ...(jest.requireActual('@/lib/integrations/platforms/github/adapter') as object),
   deleteGitHubInstallation: (...args: unknown[]) => mockDeleteGitHubInstallation(...args),
+  fetchGitHubBranches: jest.fn(),
   fetchGitHubRepositories: jest.fn(),
 }));
 import {
@@ -14,7 +15,18 @@ import {
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
+import {
+  fetchGitHubBranches,
+  fetchGitHubRepositories,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
+import {
+  FORGE_FIXTURE_INSTALLATION_IDS_ENV,
+  GitHubAppInstallationProtectedError,
+} from '@/lib/integrations/platforms/github/protected-installation';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -25,6 +37,7 @@ import {
   checkUserPendingInstallation,
   getInstallation,
   isInstallationGoneError,
+  listBranches,
   listNativelyUninstallableIds,
   listRepositories,
   uninstallApp,
@@ -32,6 +45,7 @@ import {
 } from './github-apps-service';
 
 const mockFetchGitHubRepositories = jest.mocked(fetchGitHubRepositories);
+const mockFetchGitHubBranches = jest.mocked(fetchGitHubBranches);
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -434,9 +448,39 @@ describe('isInstallationGoneError', () => {
   });
 });
 
-describe('listRepositories', () => {
-  type IntegrationRow = typeof platform_integrations.$inferInsert;
+type IntegrationRow = typeof platform_integrations.$inferInsert;
 
+async function insertIntegration(overrides: Partial<IntegrationRow> = {}) {
+  const user = await insertTestUser();
+  const [row] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: user.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: crypto.randomUUID(),
+      integration_status: 'active',
+      repository_access: 'all',
+      ...overrides,
+    })
+    .returning();
+  return { user, row };
+}
+
+async function readRow(id: string) {
+  const [row] = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, id));
+  return row;
+}
+
+async function cleanup(userId: string) {
+  await db.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
+  await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+}
+
+describe('listRepositories', () => {
   beforeEach(() => {
     mockFetchGitHubRepositories.mockReset();
   });
@@ -448,38 +492,6 @@ describe('listRepositories', () => {
     private: false,
     created_at: '2026-05-01T00:00:00.000Z',
   };
-
-  async function insertIntegration(overrides: Partial<IntegrationRow> = {}) {
-    const user = await insertTestUser();
-    const [row] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: user.id,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: crypto.randomUUID(),
-        integration_status: 'active',
-        repository_access: 'all',
-        ...overrides,
-      })
-      .returning();
-    return { user, row };
-  }
-
-  async function readRow(id: string) {
-    const [row] = await db
-      .select()
-      .from(platform_integrations)
-      .where(eq(platform_integrations.id, id));
-    return row;
-  }
-
-  async function cleanup(userId: string) {
-    await db
-      .delete(platform_integrations)
-      .where(eq(platform_integrations.owned_by_user_id, userId));
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
-  }
 
   it('answers a synced empty snapshot without reading the provider or writing the row', async () => {
     const { user, row } = await insertIntegration({
@@ -556,6 +568,109 @@ describe('listRepositories', () => {
         syncedAt: row.repositories_synced_at,
       });
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE without writing the row', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: null,
+    });
+    mockFetchGitHubRepositories.mockRejectedValueOnce(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+      )
+    );
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).rejects.toMatchObject({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: expect.any(GitHubListingBudgetExceededError),
+      });
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual(row.repositories);
+      expect(after?.repositories_synced_at).toBeNull();
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('leaves another provider failure unchanged', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: null,
+    });
+    const failure = new Error('GitHub is unavailable');
+    mockFetchGitHubRepositories.mockRejectedValueOnce(failure);
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).rejects.toBe(failure);
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+});
+
+describe('listBranches', () => {
+  beforeEach(() => {
+    mockFetchGitHubBranches.mockReset();
+  });
+
+  it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
+    const { user, row } = await insertIntegration();
+    mockFetchGitHubBranches.mockRejectedValueOnce(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
+      )
+    );
+
+    try {
+      await expect(
+        listBranches({ type: 'user', id: user.id }, row.id, 'acme/widgets')
+      ).rejects.toMatchObject({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: expect.any(GitHubListingBudgetExceededError),
+      });
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('keeps the listing shape for a normal repository', async () => {
+    const { user, row } = await insertIntegration();
+    mockFetchGitHubBranches.mockResolvedValueOnce([
+      { name: 'main', isDefault: true },
+      { name: 'feature/z', isDefault: false },
+    ]);
+
+    try {
+      await expect(
+        listBranches({ type: 'user', id: user.id }, row.id, 'acme/widgets')
+      ).resolves.toEqual({
+        branches: [
+          { name: 'main', isDefault: true },
+          { name: 'feature/z', isDefault: false },
+        ],
+      });
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('leaves another provider failure unchanged', async () => {
+    const { user, row } = await insertIntegration();
+    const failure = new Error('GitHub is unavailable');
+    mockFetchGitHubBranches.mockRejectedValueOnce(failure);
+
+    try {
+      await expect(
+        listBranches({ type: 'user', id: user.id }, row.id, 'acme/widgets')
+      ).rejects.toBe(failure);
     } finally {
       await cleanup(user.id);
     }
@@ -681,6 +796,35 @@ describe('uninstallApp', () => {
     }
   });
 
+  it('refuses a forge fixture installation with a CONFLICT and keeps the connection', async () => {
+    const installationId = installationNumber();
+    const { user, row } = await insertWorkflowIntegration(installationId);
+    const previous = process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+    process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = ` ${installationId} `;
+
+    try {
+      await expect(
+        uninstallApp(
+          { type: 'user', id: user.id },
+          row.id,
+          'user-for-uninstall-test',
+          'user@example.com',
+          'Test User'
+        )
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: new GitHubAppInstallationProtectedError(installationId).message,
+      });
+      // The guard fires before any GitHub call, so the row stays connected.
+      expect(mockDeleteGitHubInstallation).not.toHaveBeenCalled();
+      expect(await readRow(row.id)).toEqual({ id: row.id });
+    } finally {
+      if (previous === undefined) delete process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+      else process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = previous;
+      await cleanup(user.id, [installationId]);
+    }
+  });
+
   it('removes the connection when the provider answers that it is already gone', async () => {
     const installationId = installationNumber();
     const { user, row } = await insertWorkflowIntegration(installationId);
@@ -794,6 +938,30 @@ describe('listNativelyUninstallableIds', () => {
       expect([...ids]).toEqual([alone.row.id]);
     } finally {
       await cleanup([blocked.user.id, legacySibling.user.id, alone.user.id]);
+    }
+  });
+
+  it('counts a forge fixture installation as not natively uninstallable', async () => {
+    const protectedId = installationNumber();
+    const previous = process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+    process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = `nope,${protectedId}`;
+    const fixture = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: protectedId,
+    });
+    const ordinary = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: installationNumber(),
+    });
+
+    try {
+      // The ordinary installation is alone, so only the fixture id is excluded.
+      const ids = await listNativelyUninstallableIds([fixture.row, ordinary.row]);
+      expect([...ids]).toEqual([ordinary.row.id]);
+    } finally {
+      if (previous === undefined) delete process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV];
+      else process.env[FORGE_FIXTURE_INSTALLATION_IDS_ENV] = previous;
+      await cleanup([fixture.user.id, ordinary.user.id]);
     }
   });
 

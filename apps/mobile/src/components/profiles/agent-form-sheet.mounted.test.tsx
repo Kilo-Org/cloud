@@ -52,7 +52,22 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
+// The choice row fires its own selection haptic; the wrapper's real module reaches
+// `expo-haptics` and then `expo`, whose async-require setup reads the app-only
+// `__DEV__` global. Mocking the wrapper keeps `expo` out of the suite.
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+// The choice row's selection mark reaches the icon barrel, whose lucide modules
+// this project cannot parse in the mounted environment; every sibling form suite
+// mocks it the same way.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {
@@ -308,6 +323,42 @@ describe('AgentFormSheet parity fields', () => {
     for (const node of switches) {
       expect(node.props.disabled).toBe(false);
     }
+
+    unmount();
+  });
+
+  it('names the stored rules a switch cannot show, on the row and on the switch', async () => {
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: {
+        ...base.config,
+        permission: { bash: { 'git *': 'allow', '*': 'ask' }, read: 'ask' },
+      },
+    });
+
+    const notePrefix = i18n.t('profiles.agents.toolRule', { rule: '' });
+    const notes = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter(
+        (child): child is string => typeof child === 'string' && child.startsWith(notePrefix)
+      );
+
+    expect(notes).toEqual([
+      i18n.t('profiles.agents.toolRule', { rule: 'ask' }),
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' }),
+    ]);
+
+    for (const node of toolSwitches(renderer.root)) {
+      expect(node.props.disabled).toBe(false);
+    }
+    const switchFor = (label: string): ReactTestInstance | undefined =>
+      toolSwitches(renderer.root).find(node => node.props.accessibilityLabel === label);
+    expect(switchFor('bash')?.props.accessibilityHint).toBe(
+      i18n.t('profiles.agents.toolRule', { rule: 'git *: allow · *: ask' })
+    );
+    // `edit` stores no rule, so neither its row nor its switch carries a note.
+    expect(switchFor('edit')?.props.accessibilityHint).toBeUndefined();
 
     unmount();
   });

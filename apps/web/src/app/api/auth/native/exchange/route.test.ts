@@ -7,11 +7,29 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
   requireAdmissionPayload: jest.fn(),
   verifyAdmissionAsync: jest.fn(),
 }));
+jest.mock('@/lib/auth/native-token-rate-limit', () => ({
+  isNativeTokenAddressRateLimited: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
+}));
+
+/**
+ * The admission aggregate flushes on wall-clock window boundaries, so refusal
+ * tests pin the clock and force a flush at a later instant.
+ */
+const now = jest.spyOn(Date, 'now');
 
 import { POST } from './route';
 import {
@@ -19,26 +37,47 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import {
-  createDeviceSession,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   issueSessionCredentials,
 } from '@/lib/auth/device-sessions';
 import {
   KeyCollisionError,
   requireAdmissionPayload,
   verifyAdmissionAsync,
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isNativeTokenAddressRateLimited } from '@/lib/auth/native-token-rate-limit';
+import { captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
-const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
+const mockAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
+
+/** The aggregate telemetry line the counter writes once per closed window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+};
+
+function aggregateLines(): AggregateLine[] {
+  return jest.mocked(warnExceptInTest).mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
 
 describe('POST /api/auth/native/exchange', () => {
   const createRequest = (headers: Record<string, string> = {}) =>
@@ -53,6 +92,8 @@ describe('POST /api/auth/native/exchange', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
     mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockRequireAdmissionPayload.mockReturnValue({
       platform: 'android',
@@ -61,6 +102,36 @@ describe('POST /api/auth/native/exchange', () => {
       payload: 'integrity-token',
     });
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
+    mockAddressRateLimited.mockResolvedValue(false);
+  });
+
+  it('answers 429 to a limited address before the admission gate and any credential read', async () => {
+    mockAddressRateLimited.mockResolvedValue(true);
+    const request = createRequest(bearerHeaders);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockAddressRateLimited).toHaveBeenCalledWith(request);
+    expect(mockRequireAdmissionPayload).not.toHaveBeenCalled();
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockGetUserFromSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('lets a limiter failure surface instead of reading a credential', async () => {
+    mockAddressRateLimited.mockRejectedValue(new Error('firewall transport failed'));
+
+    await expect(POST(createRequest(bearerHeaders))).rejects.toThrow('firewall transport failed');
+
+    expect(mockRequireAdmissionPayload).not.toHaveBeenCalled();
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   it('refuses a request with no proof before reading any credential', async () => {
@@ -73,11 +144,19 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
     expect(mockGetUserFromBearer).not.toHaveBeenCalled();
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   it('refuses a device the verifier rejects', async () => {
-    mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'challenge_unknown_or_expired',
+        source: 'challenge',
+        proofPlatform: 'android',
+      },
+    });
 
     const response = await POST(createRequest(bearerHeaders));
 
@@ -103,11 +182,11 @@ describe('POST /api/auth/native/exchange', () => {
       user: fakeUser,
       authFailedResponse: null,
     });
-    mockCreateDeviceSession.mockResolvedValue('session-1');
-    mockIssueSessionCredentials.mockResolvedValue({
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
+      sessionId: 'session-1',
     });
 
     const response = await POST(createRequest(bearerHeaders));
@@ -117,11 +196,13 @@ describe('POST /api/auth/native/exchange', () => {
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
     });
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockAddressRateLimited).toHaveBeenCalledTimes(1);
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: fakeUser.id,
       userAgent: undefined,
+      user: fakeUser,
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(mockGetUserFromBearer).toHaveBeenCalledWith(expect.any(Headers), {
       legacy: 'five-year-api',
@@ -138,7 +219,7 @@ describe('POST /api/auth/native/exchange', () => {
     const response = await POST(createRequest(bearerHeaders));
     expect(response.status).toBe(401);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -150,7 +231,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     const response = await POST(createRequest(bearerHeaders));
     expect(response.status).toBe(403);
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -159,7 +240,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -168,7 +249,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -203,12 +284,11 @@ describe('POST /api/auth/native/exchange', () => {
       expiresIn: 3600,
     });
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: fakeUser.id,
       userAgent: undefined,
       user: fakeUser,
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
     });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -226,8 +306,17 @@ describe('POST /api/auth/native/exchange', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
     expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+    // The ownership mismatch is an expected refusal: it is counted.
+    // The refusal lands in the pinned window; the next counted condition
+    // closes it with this refusal as one count on the metric's line.
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+    expect(
+      aggregateLines().filter(line => line.metric === 'native_admission_refused')
+    ).toHaveLength(1);
   });
 
   it('refuses when the key row collides with another account', async () => {
@@ -239,8 +328,22 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    // The collision is counted and reported once per interval, so the
+    // per-event report survives a window this instance never closes.
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    // The refusal lands in the pinned window; the next counted condition
+    // closes it with this refusal as one count on the metric's line.
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+    const collisionLine = aggregateLines().find(
+      line => line.metric === 'native_attested_key_cross_user_collision'
+    );
+    expect(collisionLine).toMatchObject({ count: 1 });
+    expect(
+      aggregateLines().filter(line => line.metric === 'native_admission_refused')
+    ).toHaveLength(1);
   });
 
   it('reports a key persistence failure instead of issuing an unbound credential', async () => {
@@ -252,17 +355,17 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
   it('issues credentials for a same-origin authenticated browser session', async () => {
     mockGetUserFromSession.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
-    mockCreateDeviceSession.mockResolvedValue('session-1');
-    mockIssueSessionCredentials.mockResolvedValue({
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
+      sessionId: 'session-1',
     });
 
     const response = await POST(createRequest(sessionHeaders));
@@ -270,10 +373,11 @@ describe('POST /api/auth/native/exchange', () => {
     expect(response.status).toBe(200);
     expect(mockGetUserFromSession).toHaveBeenCalledWith();
     expect(mockGetUserFromBearer).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: fakeUser.id,
       userAgent: undefined,
+      user: fakeUser,
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 });

@@ -275,6 +275,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       live: true,
       statusKind: glanceableStatusKind(session.status),
       needsInput,
+      status: session.status,
       totalCostMicrodollars: session.totalCostMicrodollars ?? null,
       onCopySessionId: () => {
         // Load the clipboard/action module at press time: the mounted row test

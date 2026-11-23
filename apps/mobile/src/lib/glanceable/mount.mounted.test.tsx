@@ -35,8 +35,13 @@ const attentionPhase = vi.hoisted(() => ({
 // organization input the module derives is not what it asserts.
 const sessionsKey = vi.hoisted(() => [['activeSessions', 'list'], { input: {}, type: 'query' }]);
 
+// The followed-card sync runs from the same derive as the publish, before the
+// hold returns, so it is this suite's positive proof that the derive really ran
+// while the store was loading.
+const followCardsMock = vi.hoisted(() => vi.fn());
+
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher: () => publisherMock }));
-vi.mock('./session-follow', () => ({ syncFollowedSessionCards: vi.fn() }));
+vi.mock('./session-follow', () => ({ syncFollowedSessionCards: followCardsMock }));
 vi.mock('./fixture-harness', () => ({ setGlanceableFixtureScope: vi.fn() }));
 // The restore pass reaches SecureStore and the native widget; this suite is
 // about the ack store's phase, so it settles immediately.
@@ -112,6 +117,7 @@ describe('GlanceablePublisherMount ack hydration hold', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     attentionPhase.current = 'ready';
+    followCardsMock.mockReset();
     publisherMock.handleSessions.mockReset();
     publisherMock.handleFetchStarted.mockReset();
     publisherMock.handleFetchError.mockReset();
@@ -134,7 +140,13 @@ describe('GlanceablePublisherMount ack hydration hold', () => {
     });
     mounts.push(result);
     result.queryClient.setQueryData(sessionsKey, { sessions: [RAISE] });
-    await waitFor(() => publisherMock.handleSessions.mock.calls.length === 0);
+
+    // The mount really saw the cache change while loading: the followed-card
+    // sync runs from the same derive, so it is the positive signal that the
+    // hold — not an absent subscribe — is what withheld the publish.
+    await waitFor(() => followCardsMock.mock.calls.length > 0);
+    expect(publisherMock.handleSessions).not.toHaveBeenCalled();
+    expect(followCardsMock).toHaveBeenCalled();
 
     // Settled: the phase change re-runs the ack effect, which derives from the
     // cache this mount already holds.
@@ -142,5 +154,7 @@ describe('GlanceablePublisherMount ack hydration hold', () => {
     rerender(result);
     await waitFor(() => publisherMock.handleSessions.mock.calls.length === 1);
     expect(publisherMock.handleSessions).toHaveBeenCalledTimes(1);
+    const [[rows]] = publisherMock.handleSessions.mock.calls as [[{ id: string }[]]];
+    expect(rows.map(row => row.id)).toEqual(['ses_wait']);
   });
 });

@@ -32,9 +32,11 @@ import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
  * their needs-input affordance while the phase is `loading`: an unloaded store
  * answers "not acked" for every raise, so drawing then would show a badge for
  * a raise the person already dismissed and withdraw it a moment later. A
- * `failed` phase is settled — it is never retried and never hangs — and fails
- * open: the affordance derives from the server status alone, so a missing ack
- * can add a badge but never suppress a genuine raise.
+ * `failed` phase is settled — it is never retried and never hangs — so
+ * consumers stop holding, and it answers exactly as `ready` does: an ack this
+ * run recorded still hides its raise, and with no ack the badge derives from
+ * the server status. Failing that way can add a badge the person dismissed,
+ * but it can never suppress a genuine raise.
  *
  * No backend or tRPC imports: this is a mobile-local module so the web client
  * can keep its own copy. The one shared import is the pure timestamp reader,

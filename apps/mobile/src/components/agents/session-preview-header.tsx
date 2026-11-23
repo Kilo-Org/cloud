@@ -51,13 +51,28 @@ export function SessionPreviewHeaderMeta({
   const hydration = useSessionAttentionHydration();
 
   const raiseId = liveRow ? (liveRow.status_updated_at ?? liveRow.status ?? null) : null;
+  // A live row is re-read every poll, so it re-derives on its own. A preview
+  // that outlives its row carries the row's own status, and re-derives from
+  // that: the snapshot it was opened with may be the `false` a held store
+  // reported, which would otherwise keep the state label hidden after the
+  // store hydrated and the answer became a real "needs input".
+  const previewStatus = target.status;
   const needsInput = liveRow
     ? shouldShowNeedsInput({
         status: liveRow.status,
         hydration,
         isAcked: isAttentionAcked(target.sessionId, { raiseId, status: liveRow.status }),
       })
-    : target.needsInput;
+    : previewStatus === undefined
+      ? target.needsInput
+      : shouldShowNeedsInput({
+          status: previewStatus,
+          hydration,
+          isAcked: isAttentionAcked(target.sessionId, {
+            raiseId: previewStatus,
+            status: previewStatus,
+          }),
+        });
   const liveStatus = liveRow?.status ?? null;
   const rowStatusKind: GlanceableStatusKind | null =
     liveStatus === null ? null : glanceableStatusKind(liveStatus);

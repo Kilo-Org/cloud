@@ -3323,7 +3323,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat ons begin",
-    "summaryTitle": "Voorkeure vir datadeling",
     "introDescription": "Kilo stuur jou boodskappe na AI-verskaffers om antwoorde te genereer. Hier sien jy wat ons deel en met wie.",
     "required": "Vereis om Kilo te gebruik",
     "promptsTitle": "Jou opdragte en gesprekke",
@@ -3338,7 +3337,7 @@
     "featureFlagsWhy": "Om te besluit watter funksies jy sien, insluitend dié wat ons nog uitrol.",
     "featureFlagsWho": "PostHog, die funksievlag-diens.",
     "helpImprove": "Help om Kilo te verbeter",
-    "helpImproveDescription": "Deel anonieme gebruiksontledings en jou installasiebron. Jy kan dit enige tyd in Instellings verander.",
+    "helpImproveDescription": "Deel anonieme gebruiksontledings en jou installasiebron. Jy kan dit enige tyd onder $t(common.profile) · $t(profile.privacyChoices) verander.",
     "seeFullDetails": "Bekyk volledige besonderhede",
     "privacyPolicyPrefix": "Jou data word hanteer volgens die",
     "privacyPolicy": "Kilo-privaatheidsbeleid",

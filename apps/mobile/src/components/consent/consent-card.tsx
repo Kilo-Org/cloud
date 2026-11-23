@@ -151,7 +151,9 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
 
   return (
     <View className="flex-1 bg-background">
-      {mode === 'review' ? <ScreenHeader title={t('consent.summaryTitle')} /> : null}
+      {/* The review header takes the entry row's own key, so the pushed screen
+          and the Profile row it came from cannot name the surface two ways. */}
+      {mode === 'review' ? <ScreenHeader title={t('profile.privacyChoices')} /> : null}
       {/* The body keeps the platform scroll indicator: at a compact window it
           is taller than the viewport, and the hidden thumb made the rest of
           it read as missing rather than as one scroll away. The target scope

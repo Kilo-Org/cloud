@@ -3323,7 +3323,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Mielőtt elkezdjük",
-    "summaryTitle": "Adatmegosztási beállítások",
     "introDescription": "A Kilo elküldi az üzeneteidet az AI-szolgáltatóknak, hogy válaszokat készítsenek. Az alábbiakban láthatod, milyen adatokat osztunk meg, és kikkel.",
     "required": "A Kilo használatához szükséges",
     "promptsTitle": "Az utasításaid és beszélgetéseid",
@@ -3338,7 +3337,7 @@
     "featureFlagsWhy": "Annak eldöntése, hogy mely funkciókat látod, beleértve azokat is, amelyeket még fokozatosan vezetünk be.",
     "featureFlagsWho": "PostHog, a funkciókapcsoló-szolgáltatás.",
     "helpImprove": "Segíts a Kilo fejlesztésében",
-    "helpImproveDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását. Ezt bármikor módosíthatod a beállításokban.",
+    "helpImproveDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását. Ezt bármikor módosíthatod a $t(common.profile) · $t(profile.privacyChoices) alatt.",
     "seeFullDetails": "Részletek megtekintése",
     "privacyPolicyPrefix": "Az adataid kezelésének alapja:",
     "privacyPolicy": "Kilo adatvédelmi szabályzata",

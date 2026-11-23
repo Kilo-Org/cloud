@@ -3269,7 +3269,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Tupu anyị amalite",
-    "summaryTitle": "Mmasị ịkekọrịta data",
     "introDescription": "Kilo na-ezigara ndị na-enye ọrụ AI ozi gị ka ha mepụta nzaghachi. Ihe ndị a na-egosi data a na-ekekọrịta na ndị na-anata ya.",
     "required": "Ihe achọrọ iji Kilo",
     "promptsTitle": "Ihe ị na-ede na mkparịta ụka gị",
@@ -3284,7 +3283,7 @@
     "featureFlagsWhy": "Iji kpebie njirimara ndị ị na-ahụ, gụnyere ndị anyị ka na-ewepụta nke nta nke nta.",
     "featureFlagsWho": "PostHog, ọrụ na-achịkwa njirimara.",
     "helpImprove": "Nyere aka melite Kilo",
-    "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala.",
+    "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla n'okpuru $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Hụ nkọwa zuru ezu",
     "privacyPolicyPrefix": "A na-ejikwa data gị dịka",
     "privacyPolicy": "Amụma nzuzo Kilo",

@@ -2761,7 +2761,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamadan önce",
-    "summaryTitle": "Veri paylaşımı tercihleri",
     "introDescription": "Kilo, yanıt üretmek için mesajlarını yapay zekâ sağlayıcılarına gönderir. Hangi verilerin kiminle paylaşıldığını aşağıda görebilirsin.",
     "required": "Kilo'yu kullanmak için gerekli",
     "promptsTitle": "İstemlerin ve konuşmaların",
@@ -2776,7 +2775,7 @@
     "featureFlagsWhy": "Hâlâ kademeli olarak sunduğumuz özellikler de dahil olmak üzere hangi özellikleri göreceğine karar vermek için.",
     "featureFlagsWho": "PostHog, özellik bayrağı hizmeti.",
     "helpImprove": "Kilo'yu iyileştirmeye yardımcı ol",
-    "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi ayarlardan istediğin zaman değiştirebilirsin.",
+    "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi $t(common.profile) · $t(profile.privacyChoices) satırından istediğin zaman değiştirebilirsin.",
     "seeFullDetails": "Tüm ayrıntıları gör",
     "privacyPolicyPrefix": "Verilerinin işlenmesinde esas alınan belge:",
     "privacyPolicy": "Kilo gizlilik politikası",

@@ -3386,7 +3386,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Abans de començar",
-    "summaryTitle": "Preferències de compartició de dades",
     "introDescription": "Kilo envia els teus missatges als proveïdors d'IA per generar respostes. A continuació es detalla què es comparteix i amb qui.",
     "required": "Obligatori per utilitzar Kilo",
     "promptsTitle": "Els teus missatges i converses",
@@ -3401,7 +3400,7 @@
     "featureFlagsWhy": "Per decidir quines funcions veus, incloses les que encara estem desplegant.",
     "featureFlagsWho": "PostHog, el servei d'indicadors de funcions.",
     "helpImprove": "Ajuda a millorar Kilo",
-    "helpImproveDescription": "Comparteix dades anònimes d'ús del producte i l'origen de la instal·lació. Pots canviar-ho en qualsevol moment a la configuració.",
+    "helpImproveDescription": "Comparteix dades anònimes d'ús del producte i l'origen de la instal·lació. Pots canviar-ho en qualsevol moment a la pestanya $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Mostra tots els detalls",
     "privacyPolicyPrefix": "Les teves dades es gestionen segons la",
     "privacyPolicy": "Política de privadesa de Kilo",

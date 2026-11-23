@@ -3272,7 +3272,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Kí a tó bẹ̀rẹ̀",
-    "summaryTitle": "Àwọn ìfẹ́ràn pínpín dátà",
     "introDescription": "Kilo máa ń fi àwọn ìfiránṣẹ́ rẹ ránṣẹ́ sí àwọn olùpèsè AI láti ṣe ìdáhùn. Níbí ni o ti lè rí ohun tí a ń pín àti àwọn tí a ń pín in pẹ̀lú.",
     "required": "Dandan láti lo Kilo",
     "promptsTitle": "Àwọn ọ̀rọ̀ ìtọ́ni àti ìjíròrò rẹ",
@@ -3287,7 +3286,7 @@
     "featureFlagsWhy": "Láti pinnu àwọn iṣẹ́ tí o máa rí, pẹ̀lú àwọn tí a ṣì ń fi lọ́lẹ̀ díẹ̀díẹ̀.",
     "featureFlagsWho": "PostHog, iṣẹ́ tí ń ṣàkóso àsíá àwọn iṣẹ́ ohun èlò.",
     "helpImprove": "Ṣèrànwọ́ láti mú Kilo dára sí i",
-    "helpImproveDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ. O lè yí èyí padà nígbàkigbà nínú Àwọn ètò.",
+    "helpImproveDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ. O lè yí èyí padà nígbàkigbà lábẹ́ $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Wo àlàyé kíkún",
     "privacyPolicyPrefix": "A ń bójú tó dátà rẹ ní ìbámu pẹ̀lú",
     "privacyPolicy": "Ìlànà àṣírí Kilo",

@@ -3323,7 +3323,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Osoo hin jalqabin",
-    "summaryTitle": "Filannoo qooda odeeffannoo",
     "introDescription": "Kilo deebii uumuuf ergaawwan kee dhiyeessitoota AI tiif erga. Odeeffannoo qoodamu fi eenyuuf akka qoodamu asitti ilaali.",
     "required": "Kilo fayyadamuuf kan barbaachisu",
     "promptsTitle": "Gaaffiiwwanii fi mariiwwan kee",
@@ -3338,7 +3337,7 @@
     "featureFlagsWhy": "Amaloota kam akka argitu murteessuuf, kanneen ammallee tartiibaan dhiyeessaa jirru dabalatee.",
     "featureFlagsWho": "PostHog, tajaajila mallattoo amalootaa (feature flag).",
     "helpImprove": "Kilo fooyyessuuf gargaari",
-    "helpImproveDescription": "Xiinxala fayyadama oomishaa eenyummaa kee hin mul'isnee fi madda fe'iinsaa qoodi. Kana yeroo kamiyyuu Qindaa'inoota keessatti jijjiiruu dandeessa.",
+    "helpImproveDescription": "Xiinxala fayyadama oomishaa eenyummaa kee hin mul'isnee fi madda fe'iinsaa qoodi. Kana yeroo kamiyyuu jalatti jijjiiruu dandeessa: $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Odeeffannoo guutuu ilaali",
     "privacyPolicyPrefix": "Odeeffannoon kee imaammata kanaan bulfama:",
     "privacyPolicy": "Imaammata iccitii Kilo",

@@ -267,7 +267,7 @@ describe('ConsentCard', () => {
     expect(t).toContain('Required to use Kilo');
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
-    expect(t).not.toContain('Data sharing preferences');
+    expect(t).not.toContain(i18n.t('profile.privacyChoices'));
     expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
@@ -297,15 +297,14 @@ describe('ConsentCard', () => {
   it('renders review wording in the screen header and revoke alone', () => {
     const renderer = mountCard('review');
     const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
-    expect(header.props.title).toBe(i18n.t('consent.summaryTitle'));
+    expect(header.props.title).toBe(i18n.t('profile.privacyChoices'));
     const t = texts(renderer.root);
-    // The title lives in the header, so the body does not repeat it as a large
-    // title beside it.
-    expect(t).not.toContain(i18n.t('consent.summaryTitle'));
-    // The optional section header is the headword alone: the toggle card's own
-    // description already says the choice can be changed in Settings.
+    // The header takes the entry row's key, and the body does not repeat the
+    // surface name as a large title beside it.
+    expect(t).not.toContain(i18n.t('profile.privacyChoices'));
+    // The optional section header is the headword alone: the toggle row's own
+    // description names where the choice is changed.
     expect(t).toContain('Optional');
-    expect(t).not.toContain('Optional — you can change this any time in Settings');
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
 
@@ -320,6 +319,13 @@ describe('ConsentCard', () => {
     expect(back).toHaveLength(0);
     const revoke = findButton(renderer.root, 'Revoke consent');
     expect(revoke.props.variant).toBe('outline-destructive');
+
+    // The guidance names the surface the entry and the header name, so a
+    // reader who returns later knows where to change the choice.
+    expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('common.profile'));
+    expect(i18n.t('consent.helpImproveDescription')).toContain(
+      i18n.t('profile.privacyChoices')
+    );
   });
 
   it('defaults the optional switch to on', async () => {

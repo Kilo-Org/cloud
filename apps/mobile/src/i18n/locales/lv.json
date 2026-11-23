@@ -3386,7 +3386,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Pirms sākam",
-    "summaryTitle": "Datu kopīgošanas preferences",
     "introDescription": "Kilo nosūta tavus ziņojumus AI pakalpojumu sniedzējiem, lai sagatavotu atbildes. Tālāk ir norādīts, kādi dati tiek kopīgoti un ar ko.",
     "required": "Nepieciešams Kilo lietošanai",
     "promptsTitle": "Tavas uzvednes un sarunas",
@@ -3401,7 +3400,7 @@
     "featureFlagsWhy": "Noteikt, kuras funkcijas tu redzi, tostarp tās, kuras vēl pakāpeniski ieviešam.",
     "featureFlagsWho": "PostHog, funkciju karogu pakalpojums.",
     "helpImprove": "Palīdzēt uzlabot Kilo",
-    "helpImproveDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu. To vari jebkurā laikā mainīt iestatījumos.",
+    "helpImproveDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu. To vari jebkurā laikā mainīt sadaļā $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Skatīt visu informāciju",
     "privacyPolicyPrefix": "Tavi dati tiek apstrādāti saskaņā ar",
     "privacyPolicy": "Kilo privātuma politiku",

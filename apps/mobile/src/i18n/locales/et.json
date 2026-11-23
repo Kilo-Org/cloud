@@ -3323,7 +3323,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Enne alustamist",
-    "summaryTitle": "Andmete jagamise eelistused",
     "introDescription": "Kilo saadab sinu sõnumid AI-pakkujatele vastuste genereerimiseks. Siin on kirjas, mida ja kellega jagatakse.",
     "required": "Kilo kasutamiseks nõutud",
     "promptsTitle": "Sinu viibad ja vestlused",
@@ -3338,7 +3337,7 @@
     "featureFlagsWhy": "Otsustamiseks, milliseid funktsioone sa näed, sealhulgas neid, mida alles järk-järgult kasutusele võtame.",
     "featureFlagsWho": "PostHog, funktsioonilippude teenus.",
     "helpImprove": "Aita Kilot paremaks muuta",
-    "helpImproveDescription": "Jaga anonüümseid tooteanalüütika andmeid ja paigaldusallikat. Saad seda igal ajal seadetes muuta.",
+    "helpImproveDescription": "Jaga anonüümseid tooteanalüütika andmeid ja paigaldusallikat. Saad seda igal ajal muuta vahekaardil $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Vaata kogu teavet",
     "privacyPolicyPrefix": "Sinu andmeid töödeldakse nii, nagu on kirjeldatud",
     "privacyPolicy": "Kilo privaatsuspoliitikas",

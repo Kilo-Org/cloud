@@ -3323,7 +3323,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Áður en við byrjum",
-    "summaryTitle": "Kjörstillingar fyrir deilingu gagna",
     "introDescription": "Kilo sendir skilaboðin þín til veitenda gervigreindarlíkana til að mynda svör. Hér sérðu hvaða gögnum er deilt og með hverjum.",
     "required": "Nauðsynlegt til að nota Kilo",
     "promptsTitle": "Skilaboð þín og samtöl",
@@ -3338,7 +3337,7 @@
     "featureFlagsWhy": "Til að ákveða hvaða eiginleika þú sérð, þar á meðal þá sem við erum enn að innleiða.",
     "featureFlagsWho": "PostHog, þjónusta fyrir eiginleikaflögg.",
     "helpImprove": "Hjálpa til við að bæta Kilo",
-    "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í stillingum.",
+    "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í flipanum $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Sjá allar upplýsingar",
     "privacyPolicyPrefix": "Farið er með gögnin þín samkvæmt",
     "privacyPolicy": "Persónuverndarstefnu Kilo",

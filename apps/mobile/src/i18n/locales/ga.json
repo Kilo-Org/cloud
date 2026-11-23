@@ -3512,7 +3512,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sula dtosóimid",
-    "summaryTitle": "Sainroghanna roinnte sonraí",
     "introDescription": "Seolann Kilo do theachtaireachtaí chuig soláthraithe AI le freagraí a ghiniúint. Seo an méid a roinntear agus cé leis.",
     "required": "Riachtanach chun Kilo a úsáid",
     "promptsTitle": "Do leideanna agus do chomhráite",
@@ -3527,7 +3526,7 @@
     "featureFlagsWhy": "Chun a chinneadh cé na gnéithe a fheiceann tú, lena n-áirítear gnéithe atá fós á rolladh amach againn.",
     "featureFlagsWho": "PostHog, an tseirbhís bratach gné.",
     "helpImprove": "Cuidigh le Kilo a fheabhsú",
-    "helpImproveDescription": "Roinn sonraí anailísíochta gan ainm faoin táirge agus foinse na suiteála. Is féidir leat é seo a athrú am ar bith sna socruithe.",
+    "helpImproveDescription": "Roinn sonraí anailísíochta gan ainm faoin táirge agus foinse na suiteála. Is féidir leat é seo a athrú am ar bith faoin ró ar an gcluaisín $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Féach ar na sonraí iomlána",
     "privacyPolicyPrefix": "Láimhseáiltear do shonraí de réir an pholasaí seo:",
     "privacyPolicy": "Polasaí príobháideachta Kilo",

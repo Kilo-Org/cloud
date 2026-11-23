@@ -2798,7 +2798,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "לפני שנתחיל",
-    "summaryTitle": "העדפות שיתוף נתונים",
     "introDescription": "Kilo שולח את ההודעות שלך לספקי AI כדי ליצור תשובות. כאן מפורט אילו נתונים נשלחים ולמי.",
     "required": "נדרש לשימוש ב-Kilo",
     "promptsTitle": "ההנחיות והשיחות שלך",
@@ -2813,7 +2812,7 @@
     "featureFlagsWhy": "כדי לקבוע אילו תכונות יוצגו לך, כולל תכונות שאנחנו עדיין משיקים בהדרגה.",
     "featureFlagsWho": "PostHog, שירות לניהול דגלי תכונות.",
     "helpImprove": "עזרה בשיפור Kilo",
-    "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת בהגדרות.",
+    "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת תחת $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "לפרטים המלאים",
     "privacyPolicyPrefix": "הנתונים שלך מטופלים לפי",
     "privacyPolicy": "מדיניות הפרטיות של Kilo",

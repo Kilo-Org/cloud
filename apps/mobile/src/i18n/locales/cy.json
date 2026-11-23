@@ -3575,7 +3575,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Cyn i ni ddechrau",
-    "summaryTitle": "Dewisiadau rhannu data",
     "introDescription": "Mae Kilo yn anfon eich negeseuon at ddarparwyr AI i gynhyrchu ymatebion. Dyma'r hyn sy'n cael ei rannu a gyda phwy.",
     "required": "Angenrheidiol i ddefnyddio Kilo",
     "promptsTitle": "Eich anogiadau a'ch sgyrsiau",
@@ -3590,7 +3589,7 @@
     "featureFlagsWhy": "Penderfynu pa nodweddion a welwch, gan gynnwys rhai rydyn ni'n dal i'w cyflwyno.",
     "featureFlagsWho": "PostHog, y gwasanaeth baneri nodweddion.",
     "helpImprove": "Helpu i wella Kilo",
-    "helpImproveDescription": "Rhannwch ddata dadansoddeg dienw am y cynnyrch a ffynhonnell y gosodiad. Gallwch newid hyn unrhyw bryd yn y gosodiadau.",
+    "helpImproveDescription": "Rhannwch ddata dadansoddeg dienw am y cynnyrch a ffynhonnell y gosodiad. Gallwch newid hyn unrhyw bryd o dan $t(common.profile) · $t(profile.privacyChoices).",
     "seeFullDetails": "Gweld y manylion llawn",
     "privacyPolicyPrefix": "Trinir eich data yn unol â",
     "privacyPolicy": "Polisi preifatrwydd Kilo",

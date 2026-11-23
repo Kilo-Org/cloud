@@ -428,6 +428,11 @@ const choiceWrites = vi.hoisted(() => ({
  * which is a move refused halfway rather than a write refused outright.
  */
 const moveChoiceFailure = vi.hoisted(() => ({ next: false }));
+/**
+ * Refuses the next delete of a chat's asked-question record, which is what the
+ * settle after an answer meets when the store has already closed.
+ */
+const askedDeleteFailure = vi.hoisted(() => ({ next: false }));
 /** Every session whose rows were deleted, so a copy left under no row is told. */
 const deletedSessions = vi.hoisted(() => [] as string[]);
 vi.mock('@/lib/persist/encrypted-kv', () => {
@@ -475,6 +480,10 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
       await Promise.resolve();
       if (signal?.aborted) {
         throw new Error('cancelled');
+      }
+      if (askedDeleteFailure.next && scope === 'chat-asked-target') {
+        askedDeleteFailure.next = false;
+        throw new Error('the question could not be forgotten');
       }
       storedQuestions.delete(`${scope}:${key}`);
     },
@@ -674,6 +683,7 @@ beforeEach(async () => {
   choiceWrites.gate = undefined;
   choiceWrites.refuse = 0;
   moveChoiceFailure.next = false;
+  askedDeleteFailure.next = false;
   deletedSessions.length = 0;
   clonedWith = undefined;
   clonesMade = 0;
@@ -1281,6 +1291,30 @@ describe('a second question while the first is being answered', () => {
     await settled();
 
     expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+
+  it('still settles and asks what waited when the asked-question delete is refused', async () => {
+    /* The record is stale once its answer lands, not needed: a store that
+       refuses the delete must not hold the chat on `working` with a question
+       the person already asked still queued behind it. */
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(waitingWords(opened)).toEqual(['second']);
+
+    const endFirst = finish;
+    askedDeleteFailure.next = true;
+    endFirst?.();
+    await settled();
+    // The answer landed, so the chat is free and the held question is asked.
+    expect(asked.map(one => one.text)).toEqual(['first', 'second']);
+    expect(waitingWords(opened)).toEqual([]);
+
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', asked: null });
   });
 });
 
@@ -2136,7 +2170,9 @@ describe('a question a later send took the slot from', () => {
       'trn_25',
       'other-newest:asked',
     ]);
-    expect((await askedIn('other-newest'))?.text).toBe('what is this');
+    expect(held.asked).toBe('what is this');
+    const written = await askedIn('other-newest');
+    expect(written?.text).toBe('what is this');
   });
 
   it('does not fold a plain record when the only stored question is a different one', async () => {

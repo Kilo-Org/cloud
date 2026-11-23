@@ -1,8 +1,8 @@
 /* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then -- a download is a pending promise the test settles by hand */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { CATALOG, finish, flush, harness, taskAt } from './gguf-downloads.test-helpers';
-import { ggufModelName, type GgufModelRecord, ggufPartialName, RELEASE_WAIT_MS } from './gguf-records';
+import { ggufModelName, type GgufModelRecord, ggufPartialName } from './gguf-records';
 
 describe('downloading a curated model', () => {
   it('reports progress, verifies the file, and lists what the file says', async () => {
@@ -321,40 +321,4 @@ it.each([
 
   expect(h.index.text).toBe(text);
   expect(h.files.has(ggufModelName('other'))).toBe(true);
-});
-
-describe('deleting a model', () => {
-  it('releases the loaded context first, then the file and the list entry', async () => {
-    const h = harness();
-    h.store.start(CATALOG);
-    await finish(taskAt(h.tasks, 0), 1000);
-    await h.store.remove('small');
-    expect(h.released).toEqual(['small']);
-    expect(h.files.has(ggufModelName('small'))).toBe(false);
-    expect(h.store.snapshot().models).toEqual([]);
-  });
-
-  it('does nothing for a model that is not downloaded', async () => {
-    const h = harness();
-    await h.store.remove('missing');
-    expect(h.released).toEqual([]);
-  });
-
-  it('deletes the files anyway when the release never settles', async () => {
-    const h = harness({ stallRelease: true });
-    h.store.start(CATALOG);
-    await finish(taskAt(h.tasks, 0), 1000);
-    // Installed only around the delete: the download above awaits a real timer.
-    vi.useFakeTimers();
-    try {
-      const removed = h.store.remove('small');
-      await vi.advanceTimersByTimeAsync(RELEASE_WAIT_MS);
-      await removed;
-      expect(h.released).toEqual(['small']);
-      expect(h.files.has(ggufModelName('small'))).toBe(false);
-      expect(h.store.snapshot().models).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 });

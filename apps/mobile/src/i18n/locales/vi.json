@@ -2623,6 +2623,8 @@
     "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
     "serverTitle": "Không thể tải dữ liệu.",
     "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại.",
+    "terminalDescription": "Không thể tải mục này và thử lại sẽ không giúp ích gì.",
+    "staleDescription": "Đang hiển thị nội dung đã tải trước đó. Không thể làm mới nội dung này.",
     "timeoutTitle": "Máy chủ phản hồi quá chậm",
     "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },

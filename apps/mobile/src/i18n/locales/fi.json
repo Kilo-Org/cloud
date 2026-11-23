@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Lataaminen ei onnistunut",
     "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen.",
+    "terminalDescription": "Tätä kohdetta ei voi ladata, eikä uudelleen yrittäminen auta.",
+    "staleDescription": "Näytetään aiemmin ladattu sisältö. Sitä ei voi päivittää.",
     "timeoutTitle": "Palvelin vastaa hitaasti",
     "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },

@@ -2658,6 +2658,8 @@
     "notFoundDescription": "Es posible que este elemento se haya eliminado o ya no esté disponible.",
     "serverTitle": "No se pudo cargar el contenido.",
     "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo.",
+    "terminalDescription": "Este elemento no se puede cargar y volver a intentarlo no ayudará.",
+    "staleDescription": "Se muestra lo que se cargó antes. No se puede actualizar.",
     "timeoutTitle": "El servidor está tardando demasiado",
     "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },

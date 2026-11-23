@@ -75,6 +75,33 @@ describe('QueryError retry action', () => {
     ).toHaveLength(0);
     mounted.unmount();
   });
+
+  it('renders no built-in Retry for the terminal state even when given one', async () => {
+    // No second identical request can change a terminal code, so the state
+    // must not paint the control that would send it.
+    const mounted = await renderWithProviders(
+      <QueryError variant="terminal" onRetry={vi.fn<() => void>()} />
+    );
+
+    expect(emptyStateProps(mounted).action).toBeFalsy();
+    expect(
+      mounted.renderer.root.findAllByProps({ accessibilityLabel: 'common.retry' })
+    ).toHaveLength(0);
+    mounted.unmount();
+  });
+
+  it('renders the caller action on the terminal state, its own way out', async () => {
+    const mounted = await renderWithProviders(
+      <QueryError
+        variant="terminal"
+        onRetry={vi.fn<() => void>()}
+        action={createElement('CallerAction')}
+      />
+    );
+
+    expect(emptyStateProps(mounted).action).toBeTruthy();
+    mounted.unmount();
+  });
 });
 
 describe('QueryError state emphasis', () => {

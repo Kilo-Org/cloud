@@ -175,6 +175,13 @@ export function BlockedPeopleScreen() {
       variant={staleVariant}
       placement="top"
       className="pt-0"
+      // A terminal failure leaves the cached rows on screen, so the state is a
+      // notice about what is shown, not a screen with nothing to load. The
+      // title says so too: the variant's own title names a failed load, which
+      // contradicts rows the reader can see, so it takes the generic notice
+      // title the reviewer screens use.
+      title={staleVariant === 'terminal' ? t('common.somethingWentWrong') : undefined}
+      message={staleVariant === 'terminal' ? t('queryError.staleDescription') : undefined}
       onRetry={
         hidden.isError && !isRetryableTrpcError(hidden.error)
           ? undefined

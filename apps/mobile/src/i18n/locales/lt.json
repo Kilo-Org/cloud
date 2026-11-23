@@ -3307,6 +3307,8 @@
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
     "serverTitle": "Nepavyko įkelti",
     "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą.",
+    "terminalDescription": "Šio elemento įkelti negalima, o bandymas dar kartą nepadės.",
+    "staleDescription": "Rodoma tai, kas įkelta anksčiau. To atnaujinti negalima.",
     "timeoutTitle": "Serveris per ilgai neatsako",
     "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },

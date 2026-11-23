@@ -3307,6 +3307,8 @@
     "notFoundDescription": "Ta element je bil morda odstranjen ali ni več na voljo.",
     "serverTitle": "Podatkov ni bilo mogoče naložiti.",
     "serverDescription": "Na naši strani je prišlo do napake. Poskusi znova.",
+    "terminalDescription": "Tega elementa ni mogoče naložiti in ponoven poskus ne bo pomagal.",
+    "staleDescription": "Prikazuje se, kar je bilo naloženo prej. Tega ni mogoče osvežiti.",
     "timeoutTitle": "Strežnik se odziva predolgo",
     "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },

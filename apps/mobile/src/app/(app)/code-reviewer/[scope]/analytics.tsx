@@ -185,6 +185,14 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             placement="top"
             className="px-0 pt-0"
             title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+            // The metrics stay on screen, so a terminal failure reads as a
+            // notice about what is shown rather than a screen that could not
+            // load.
+            message={
+              !stalePaused && trpcErrorVariant(dashboard.error) === 'terminal'
+                ? t('queryError.staleDescription')
+                : undefined
+            }
             onRetry={
               stalePaused || isRetryableTrpcError(dashboard.error)
                 ? () => void dashboard.refetch()

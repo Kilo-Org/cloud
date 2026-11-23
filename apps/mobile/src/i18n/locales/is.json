@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Efnið hefur hugsanlega verið fjarlægt eða er ekki lengur tiltækt.",
     "serverTitle": "Ekki tókst að sækja gögn.",
     "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur.",
+    "terminalDescription": "Ekki er hægt að sækja þetta atriði, og að reyna aftur mun ekki hjálpa.",
+    "staleDescription": "Sýnt er það sem hlaðið var fyrr. Ekki er hægt að endurnýja það.",
     "timeoutTitle": "Netþjónninn er að taka of langan tíma",
     "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },

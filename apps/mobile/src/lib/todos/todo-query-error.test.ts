@@ -33,9 +33,9 @@ describe('selectTodoQueryErrorView', () => {
     });
   });
 
-  it('keeps a terminal non-denial code on the server state without a retry', () => {
+  it('keeps a terminal non-denial code on the terminal state without a retry', () => {
     expect(selectTodoQueryErrorView(makeTrpcError('BAD_REQUEST'))).toEqual({
-      variant: 'server',
+      variant: 'terminal',
       showRetry: false,
     });
   });

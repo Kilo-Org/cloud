@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Baliteke elementu hau kendu izana edo jada eskuragarri ez egotea.",
     "serverTitle": "Ezin izan da kargatu.",
     "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro.",
+    "terminalDescription": "Ezin da elementu hau kargatu, eta berriro saiatzeak ez du lagunduko.",
+    "staleDescription": "Lehenago kargatutakoa erakusten ari da. Ezin da berritu.",
     "timeoutTitle": "Zerbitzariak denbora gehiegi behar du",
     "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },

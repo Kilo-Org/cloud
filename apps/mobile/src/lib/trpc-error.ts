@@ -185,6 +185,39 @@ export function isTerminalTrpcCode(code: string | undefined): boolean {
 }
 
 /**
+ * The terminal codes that reach {@link trpcErrorVariant}'s `terminal` state:
+ * every terminal code except the three that carry a more precise state of
+ * their own. `FORBIDDEN` and `UNAUTHORIZED` are access outcomes and reach
+ * `permission`; `NOT_FOUND` names a removed item and reaches `not-found`.
+ *
+ * The type is derived from `TERMINAL_TRPC_CODES`, and the map is checked
+ * against it, so a code added to the terminal list cannot be left out here:
+ * the new code makes this object's `satisfies` fail until it is given a state,
+ * and a key that is not a terminal code is an excess property.
+ */
+type NonAccessTerminalTrpcCode = Exclude<
+  (typeof TERMINAL_TRPC_CODES)[number],
+  'FORBIDDEN' | 'UNAUTHORIZED' | 'NOT_FOUND'
+>;
+
+const NON_ACCESS_TERMINAL_TRPC_CODES = {
+  BAD_REQUEST: true,
+  CONFLICT: true,
+  UNPROCESSABLE_CONTENT: true,
+} as const satisfies Record<NonAccessTerminalTrpcCode, true>;
+
+/**
+ * True only for the terminal codes that name a state of their own rather than
+ * an access outcome or a removed item: `BAD_REQUEST`, `CONFLICT` and
+ * `UNPROCESSABLE_CONTENT`. These are exactly the codes
+ * {@link trpcErrorVariant} maps to `terminal`, and the shared source for that
+ * set, so no reader has to restate the list.
+ */
+export function isNonAccessTerminalTrpcCode(code: string | undefined): boolean {
+  return code !== undefined && Object.hasOwn(NON_ACCESS_TERMINAL_TRPC_CODES, code);
+}
+
+/**
  * True when the error's tRPC message names the unconfigured usage source
  * (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`). The wire carries only the code and
  * message, so the string is the one signal a client has; the constant is
@@ -203,7 +236,7 @@ export function isRetryableTrpcError(error: unknown): boolean {
 }
 
 /** The user-facing state a tRPC call's failure maps to, shared by the screens. */
-export type TrpcErrorVariant = 'permission' | 'not-found' | 'server' | 'timeout';
+export type TrpcErrorVariant = 'permission' | 'not-found' | 'server' | 'terminal' | 'timeout';
 
 /** The deepest `cause` chain walked when looking for the client deadline. */
 const MAX_CAUSE_DEPTH = 5;
@@ -242,12 +275,25 @@ export function isControlPlaneTimeout(error: unknown): boolean {
 }
 
 /**
- * Maps a call failure to the state the screen must show. A request that ran
- * out its deadline is a retryable slow-response state: the server may answer
- * the next one, so it must not be reported as a server fault. A terminal code
- * that is not an access outcome (a bad request, an unprocessable payload)
- * stays a server state: it is a contract failure, not a permission one, and no
- * retry is offered for it either (`isTerminalTrpcCode`).
+ * Maps a call failure to the state the screen must show.
+ *
+ * A request that ran out its deadline is a retryable slow-response state: the
+ * server may answer the next one, so it must not be reported as a server fault.
+ *
+ * The two access outcomes keep their own state: `FORBIDDEN` and `UNAUTHORIZED`
+ * reach `permission`, since the reader may be able to regain access elsewhere,
+ * and `NOT_FOUND` reaches `not-found`, because the item itself is gone.
+ *
+ * Every other terminal code reaches `terminal`: a `BAD_REQUEST`, a `CONFLICT`
+ * or an `UNPROCESSABLE_CONTENT` names a state the same request cannot change —
+ * a payload the input contract refuses, a record that already exists under that
+ * name, an input the server will not accept. Retrying sends the identical
+ * request and gets the identical refusal, so the surface must explain what it
+ * is and offer no Retry (`isTerminalTrpcCode` decides the same set, and
+ * `isNonAccessTerminalTrpcCode` names this subset of it).
+ *
+ * Everything else stays `server`: an `INTERNAL_SERVER_ERROR`, an unknown code
+ * and a failure with no code at all may succeed on the next attempt.
  */
 export function trpcErrorVariant(error: unknown): TrpcErrorVariant {
   if (isControlPlaneTimeout(error)) {
@@ -259,6 +305,9 @@ export function trpcErrorVariant(error: unknown): TrpcErrorVariant {
   }
   if (code === 'NOT_FOUND') {
     return 'not-found';
+  }
+  if (isNonAccessTerminalTrpcCode(code)) {
+    return 'terminal';
   }
   return 'server';
 }

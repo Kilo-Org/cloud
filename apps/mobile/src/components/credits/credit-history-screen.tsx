@@ -118,19 +118,22 @@ export function PersonalCreditHistoryScreen() {
     purchasesFirstPageError || ((blocks.isError || grantHistory.isError) && items.length === 0);
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state, and anything else keeps the retryable neutral copy.
+  // permission state; a terminal code no retry can clear maps to the terminal
+  // state, and anything else keeps the retryable neutral copy.
   const classifiedError = trpcErrorVariant(
     purchases.query.error ?? blocks.error ?? grantHistory.error
   );
   const errorVariant: QueryErrorVariant =
     classifiedError === 'not-found' ||
     classifiedError === 'permission' ||
+    classifiedError === 'terminal' ||
     classifiedError === 'timeout'
       ? classifiedError
       : 'neutral';
-  // Those two variants come only from the thrown code, so they cannot be fixed
-  // by retrying; every other failure keeps its Retry.
-  const isPermanentError = errorVariant === 'not-found' || errorVariant === 'permission';
+  // A refusal, a removed item and a terminal code name states a retry cannot
+  // change; the slow-response and neutral states keep their Retry.
+  const isPermanentError =
+    errorVariant === 'not-found' || errorVariant === 'permission' || errorVariant === 'terminal';
 
   const isLoading =
     purchases.query.status === 'pending' || blocks.isPending || grantHistory.isPending;

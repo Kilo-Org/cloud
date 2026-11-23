@@ -133,14 +133,16 @@ export function InvoiceListScreen({
   const isFirstPageError = query.isError && !hasLoadedPages;
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state. A read that settled by failing on a confirmed-offline
-  // device is a connectivity failure, a request that ran out its deadline is a
-  // slow response, and `unknown` keeps the retryable neutral copy.
+  // permission state; a terminal code no retry can clear keeps the terminal
+  // state. A read that settled by failing on a confirmed-offline device is a
+  // connectivity failure, a request that ran out its deadline is a slow
+  // response, and `unknown` keeps the retryable neutral copy.
   const errorVariant = selectInvoiceErrorVariant(query.error, committedConnectivity);
-  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
-  // a permanent state with no Retry. Those two variants are the only ones the
-  // classifier takes from the thrown code, so they are the permanent set.
-  const isPermanentError = errorVariant === 'not-found' || errorVariant === 'permission';
+  // A thrown refusal, removal or terminal code can't be fixed by retrying — show
+  // a permanent state with no Retry. Those are the only variants the classifier
+  // takes from the thrown code, so they are the permanent set.
+  const isPermanentError =
+    errorVariant === 'not-found' || errorVariant === 'permission' || errorVariant === 'terminal';
 
   // A later-page failure must keep the already-loaded rows and offer an inline
   // retry instead of replacing the list. Read `isFetchNextPageError`, not

@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",
     "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi.",
+    "terminalDescription": "Le nto ayikwazi ukulayishwa, futhi ukuzama futhi ngeke kusize.",
+    "staleDescription": "Kuboniswa lokho okwalayishwe ngaphambilini. Akukwazi ukuvuselelwa.",
     "timeoutTitle": "Isiphakeli sithatha isikhathi eside",
     "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },

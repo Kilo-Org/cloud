@@ -2623,6 +2623,8 @@
     "notFoundDescription": "Bu öğe kaldırılmış veya artık kullanılamıyor olabilir.",
     "serverTitle": "Yüklenemedi.",
     "serverDescription": "Bizim tarafımızda bir sorun oluştu. Lütfen tekrar dene.",
+    "terminalDescription": "Bu öğe yüklenemiyor ve yeniden denemek işe yaramaz.",
+    "staleDescription": "Daha önce yüklenenler gösteriliyor. Bunlar yenilenemez.",
     "timeoutTitle": "Sunucu çok uzun sürüyor",
     "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },

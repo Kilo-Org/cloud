@@ -22,6 +22,7 @@ export type QueryErrorVariant =
   | 'permission'
   | 'not-found'
   | 'server'
+  | 'terminal'
   | 'timeout';
 
 const VARIANT_ICONS = {
@@ -30,7 +31,9 @@ const VARIANT_ICONS = {
   permission: Lock,
   'not-found': SearchX,
   server: ServerCrash,
-  // The slow-response state is named by its copy; it shares the generic icon.
+  // Two states are named by their copy rather than a distinct glyph, so they
+  // share the generic warning icon.
+  terminal: AlertCircle,
   timeout: AlertCircle,
 } satisfies Record<QueryErrorVariant, LucideIcon>;
 
@@ -46,6 +49,10 @@ const VARIANT_META_KEYS = {
     description: 'queryError.notFoundDescription',
   },
   server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },
+  terminal: {
+    title: 'queryError.serverTitle',
+    description: 'queryError.terminalDescription',
+  },
   timeout: {
     title: 'queryError.timeoutTitle',
     description: 'queryError.timeoutDescription',
@@ -61,6 +68,11 @@ type QueryErrorProps = {
   variant?: QueryErrorVariant;
   title?: string;
   message?: string;
+  /**
+   * Adds the built-in retry button. The `terminal` variant never renders it,
+   * because no second attempt can change that state; a caller that still needs
+   * a way out passes `action` instead.
+   */
   onRetry?: () => void;
   /**
    * The retry action's label. A caller whose refresh action has a more precise
@@ -93,6 +105,16 @@ type QueryErrorProps = {
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 
+/**
+ * The one tRPC failure state: an icon, a title and an announcement, with the
+ * caller's way out in the state's action slot.
+ *
+ * The `terminal` variant force-hides the built-in retry even when `onRetry` is
+ * passed, because that state names a failure a second identical request cannot
+ * change; a caller-supplied `action` still renders, since the terminal state's
+ * own way out (leaving the screen, or the one control that can fix the input)
+ * belongs there.
+ */
 export function QueryError({
   // Default to the generic "unknown" state — asserting 'offline' when we don't
   // actually know the cause is a false signal (a 500 is not a connectivity
@@ -146,7 +168,7 @@ export function QueryError({
       compactTitleClassName="text-destructive"
       action={
         action ??
-        (onRetry && (
+        (variant !== 'terminal' && onRetry && (
           <StateAction
             label={retryText}
             icon={RotateCcw}

@@ -175,6 +175,18 @@ describe('classifyReadFailureKind', () => {
     expect(kindFor({ errors: [serverError('UNPROCESSABLE_CONTENT')] })).toBe('terminal');
   });
 
+  it('lets a coded terminal answer outrank a confirmed-offline connection', () => {
+    // The answer proves the server was reachable, so blaming the connection
+    // would be false, and its state offers a Retry no second request justifies.
+    expect(kindFor({ errors: [serverError('BAD_REQUEST')], connectivity: 'offline' })).toBe(
+      'terminal'
+    );
+    // A transport failure carries no code: the connection is still the cause.
+    expect(
+      kindFor({ errors: [new TypeError('Network request failed')], connectivity: 'offline' })
+    ).toBe('offline');
+  });
+
   it('names a client-side deadline as a timeout, not the connection', () => {
     // The app's control-plane deadline rejects with no tRPC code and no HTTP
     // status; the server was reachable and slow, so the copy must say so.
@@ -221,7 +233,7 @@ describe('classifyReadFailureKind', () => {
     expect(readFailureKindVariant('timeout')).toBe('timeout');
     expect(readFailureKindVariant('permission')).toBe('permission');
     expect(readFailureKindVariant('not-found')).toBe('not-found');
-    expect(readFailureKindVariant('terminal')).toBe('server');
+    expect(readFailureKindVariant('terminal')).toBe('terminal');
     expect(readFailureKindVariant('retryable')).toBe('server');
   });
 });

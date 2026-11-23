@@ -2693,6 +2693,8 @@
     "notFoundDescription": "Este item pode ter sido removido ou não está mais disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
     "serverDescription": "Ocorreu um problema no nosso sistema. Tente novamente.",
+    "terminalDescription": "Este item não pode ser carregado, e tentar novamente não vai ajudar.",
+    "staleDescription": "Mostrando o que foi carregado antes. Não é possível atualizá-lo.",
     "timeoutTitle": "O servidor está demorando demais",
     "timeoutDescription": "A solicitação esgotou o tempo limite antes de ser concluída. Tente novamente."
   },

@@ -29,19 +29,15 @@ describe('selectOrgListErrorView', () => {
     });
   });
 
-  it('maps BAD_REQUEST to server with no retry (terminal code)', () => {
-    expect(selectOrgListErrorView(makeTrpcError('BAD_REQUEST'))).toEqual({
-      variant: 'server',
-      showRetry: false,
-    });
-  });
-
-  it('maps UNAUTHORIZED-style UNPROCESSABLE_CONTENT to server with no retry', () => {
-    expect(selectOrgListErrorView(makeTrpcError('UNPROCESSABLE_CONTENT'))).toEqual({
-      variant: 'server',
-      showRetry: false,
-    });
-  });
+  it.each(['BAD_REQUEST', 'CONFLICT', 'UNPROCESSABLE_CONTENT'] as const)(
+    'maps %s to terminal with no retry',
+    code => {
+      expect(selectOrgListErrorView(makeTrpcError(code))).toEqual({
+        variant: 'terminal',
+        showRetry: false,
+      });
+    }
+  );
 
   it('maps a 500-class code to server with retry', () => {
     expect(selectOrgListErrorView(makeTrpcError('INTERNAL_SERVER_ERROR'))).toEqual({

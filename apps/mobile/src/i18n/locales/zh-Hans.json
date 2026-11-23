@@ -2590,6 +2590,8 @@
     "notFoundDescription": "此内容可能已被移除或已无法访问。",
     "serverTitle": "无法加载内容",
     "serverDescription": "服务出现问题。请重试。",
+    "terminalDescription": "无法加载此内容，重试也不会有帮助。",
+    "staleDescription": "正在显示此前已加载的内容。无法刷新。",
     "timeoutTitle": "服务器响应缓慢",
     "timeoutDescription": "请求超时，未能完成。请重试。"
   },

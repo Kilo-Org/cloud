@@ -1,6 +1,7 @@
 import { type BannerState } from '@/lib/offline-banner-state';
 import {
   isControlPlaneTimeout,
+  isNonAccessTerminalTrpcCode,
   isPermissionDeniedError,
   isTerminalTrpcCode,
   isTrpcClientError,
@@ -40,24 +41,25 @@ const VARIANT_BY_KIND = {
   timeout: 'timeout',
   permission: 'permission',
   'not-found': 'not-found',
-  // A terminal code the app has no better sentence for keeps the server's
-  // copy: the read was answered, so neither the connection nor a missing item
-  // describes it.
-  terminal: 'server',
+  // A terminal code the app has no better sentence for keeps its own state:
+  // the server answered, so neither the connection nor a missing item describes
+  // it, and the state withholds the Retry no second request could justify.
+  terminal: 'terminal',
   retryable: 'server',
 } as const satisfies Record<
   ReadFailureKind,
-  'offline' | 'timeout' | 'permission' | 'not-found' | 'server'
+  'offline' | 'timeout' | 'permission' | 'not-found' | 'server' | 'terminal'
 >;
 
 /**
  * The `QueryError` variant that carries the kind's copy: the connection's own
- * wording, a deadline's own wording, the refusal, the removed item, or the
- * server's failure. Plain strings so this module stays free of components.
+ * wording, a deadline's own wording, the refusal, the removed item, the
+ * terminal state, or the server's failure. Plain strings so this module stays
+ * free of components.
  */
 export function readFailureKindVariant(
   kind: ReadFailureKind
-): 'offline' | 'timeout' | 'permission' | 'not-found' | 'server' {
+): 'offline' | 'timeout' | 'permission' | 'not-found' | 'server' | 'terminal' {
   return VARIANT_BY_KIND[kind];
 }
 
@@ -121,12 +123,19 @@ export function isReadPausedBeforeData(read: {
  * "no server answer" rule would call a slow-but-reachable server unreachable.
  * Its own copy names the wait, and a retry is the fix.
  *
+ * Then a coded terminal answer: `BAD_REQUEST`, `CONFLICT` and
+ * `UNPROCESSABLE_CONTENT` name a state no second request can change, and the
+ * answer itself proves the server was reachable, so blaming the connection
+ * would be false and its Retry could not succeed.
+ *
  * Then the connection, but only when no read reached the server: a coded
  * answer proves the server was reachable, so a refusal beside a transport
- * error is still a refusal. After that, a refusal outranks a terminal code (a
- * `FORBIDDEN` is itself terminal, and the refusal copy is the one that
- * explains it); `NOT_FOUND` is the one terminal code that has its own copy,
- * and every other terminal code keeps the server's.
+ * error is still a refusal. After that a refusal outranks the terminal
+ * fallback (a `FORBIDDEN` is itself terminal, and the refusal copy is the one
+ * that explains it); `NOT_FOUND` is the one terminal code that has its own
+ * copy, and every other terminal code is `terminal`, the state that says the
+ * read cannot be served and withholds the retry. Anything left is
+ * `retryable`.
  */
 export function classifyReadFailureKind({
   errors,
@@ -135,6 +144,14 @@ export function classifyReadFailureKind({
 }: SelectReadFailureVariantInput): ReadFailureKind {
   if (errors.some(error => isControlPlaneTimeout(error))) {
     return 'timeout';
+  }
+  // A coded terminal answer proves the server answered and names a state no
+  // second request can change. Presenting it as the connection would blame a
+  // cause the answer disproves, and the connection state offers a Retry that
+  // cannot succeed. Access outcomes and a missing item keep their order below:
+  // their own copy already outranks the connection in the screen selectors.
+  if (errors.some(error => isNonAccessTerminalTrpcCode(readTrpcErrorField(error, 'code')))) {
+    return 'terminal';
   }
   if (classifyReadFailureVariant({ errors, isPaused, connectivity }) === 'offline') {
     return 'offline';

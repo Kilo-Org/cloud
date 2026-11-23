@@ -2590,6 +2590,8 @@
     "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
     "serverTitle": "読み込めませんでした。",
     "serverDescription": "サービス側で問題が発生しました。もう一度お試しください。",
+    "terminalDescription": "この項目は読み込めません。もう一度試しても解決しません。",
+    "staleDescription": "先に読み込んだ内容を表示しています。更新できません。",
     "timeoutTitle": "サーバーの応答に時間がかかっています",
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },

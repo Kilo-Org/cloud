@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Mety nesorina ity zavatra ity na tsy misy intsony.",
     "serverTitle": "Tsy nety nampidirina ny angona.",
     "serverDescription": "Nisy olana avy aty aminay. Andramo indray azafady.",
+    "terminalDescription": "Tsy azo ampidirina ity zavatra ity, ary tsy hanampy ny fanandramana indray.",
+    "staleDescription": "Aseho ny zavatra efa nampidirina teo aloha. Tsy azo havaozina izy io.",
     "timeoutTitle": "Miadana loatra ny mpizara",
     "timeoutDescription": "Nitsahatra ny fangatahana alohan'ny hahavita azy. Andramo indray azafady."
   },

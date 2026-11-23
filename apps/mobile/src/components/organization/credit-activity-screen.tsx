@@ -31,7 +31,7 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useOrganization } from '@/lib/organization-context';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-import { trpcErrorVariant } from '@/lib/trpc-error';
+import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 // The cards carry the page gutter themselves. FlashList v2 positions every
@@ -181,19 +181,20 @@ export function OrganizationCreditActivityScreen() {
   const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
   const isFirstPageError = query.isError && !hasLoadedPages;
 
-  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
+  // A thrown refusal, removal or terminal code can't be fixed by retrying — show
   // a permanent state with no Retry. Any other first-page error stays retryable.
-  const errorCode = query.error?.data?.code;
-  const isPermanentError =
-    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+  const isPermanentError = isTerminalTrpcCode(readTrpcErrorField(query.error, 'code'));
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state, and a request that ran out its deadline keeps the
-  // retryable slow-response state. Any other error stays the retryable neutral
-  // state.
+  // permission state; a terminal code no retry can clear keeps the terminal
+  // state, and a request that ran out its deadline keeps the retryable
+  // slow-response state. Any other error stays the retryable neutral state.
   const classified = trpcErrorVariant(query.error);
   const errorVariant: QueryErrorVariant =
-    classified === 'not-found' || classified === 'permission' || classified === 'timeout'
+    classified === 'not-found' ||
+    classified === 'permission' ||
+    classified === 'terminal' ||
+    classified === 'timeout'
       ? classified
       : 'neutral';
 

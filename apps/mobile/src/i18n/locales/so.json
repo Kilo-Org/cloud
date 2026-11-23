@@ -3185,6 +3185,8 @@
     "notFoundDescription": "Waxaa dhici karta in shaygan la saaray ama aan mar dambe la heli karin.",
     "serverTitle": "Lama soo dejin karin.",
     "serverDescription": "Khalad ayaa ka dhacay dhankayaga. Fadlan mar kale isku day.",
+    "terminalDescription": "Shaygan lama soo dejin karo, mar kale isku dayguna wax ma tarayo.",
+    "staleDescription": "Waxaa la muujinayaa wixii hore loo soo dejiyay. Dib looma cusboonaysiin karo.",
     "timeoutTitle": "Adeegaha wuu waqti dheer qaaday",
     "timeoutDescription": "Codsigu wuu waqtiga ka baxay ka hor inta uu dhammaado. Fadlan mar kale isku day."
   },

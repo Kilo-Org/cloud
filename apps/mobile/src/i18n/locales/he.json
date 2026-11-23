@@ -2658,6 +2658,8 @@
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
     "serverTitle": "לא ניתן לטעון את הנתונים.",
     "serverDescription": "משהו השתבש אצלנו. נסה שוב.",
+    "terminalDescription": "לא ניתן לטעון את הפריט הזה, וניסיון חוזר לא יעזור.",
+    "staleDescription": "מוצג מה שנטען קודם. לא ניתן לרענן אותו.",
     "timeoutTitle": "השרת לוקח זמן רב מדי",
     "timeoutDescription": "הבקשה לא הספיקה להסתיים בזמן. נסה שוב."
   },

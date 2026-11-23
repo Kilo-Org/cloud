@@ -157,6 +157,99 @@ describe('recordSelectedAsk', () => {
     expect(getWaitingAsk()).toMatchObject({ boundPermissionId: 'perm_1' });
   });
 
+  it('keeps a per-ask window when two failing asks alternate', async () => {
+    const read = vi.fn(async (): Promise<string | null> => {
+      throw new Error('control plane unavailable');
+    });
+    _setAskBindingForTests({ read, now: () => clock });
+
+    recordSelectedAsk(askFor());
+    await whenAskBindingSettled();
+    // The refresh publisher can select a second ask between the mounted
+    // publisher's heartbeats; its failure must not restart the first window.
+    recordSelectedAsk(
+      askFor({ kiloSessionId: 'ses_2', statusUpdatedAt: '2026-01-01T00:02:00.000Z' })
+    );
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(2);
+
+    clock += ASK_BIND_RETRY_MS - 1;
+    recordSelectedAsk(askFor({ recordedAt: clock }));
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_1', boundPermissionId: null });
+
+    clock += 1;
+    recordSelectedAsk(askFor({ recordedAt: clock }));
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not clear another ask's window when a different bind lands", async () => {
+    const read = vi.fn(async (): Promise<string | null> => {
+      throw new Error('control plane unavailable');
+    });
+    _setAskBindingForTests({ read, now: () => clock });
+    recordSelectedAsk(askFor());
+    await whenAskBindingSettled();
+
+    read.mockResolvedValue('perm_2');
+    recordSelectedAsk(
+      askFor({ kiloSessionId: 'ses_2', statusUpdatedAt: '2026-01-01T00:02:00.000Z' })
+    );
+    await whenAskBindingSettled();
+    expect(getWaitingAsk()).toMatchObject({
+      kiloSessionId: 'ses_2',
+      boundPermissionId: 'perm_2',
+    });
+
+    clock += ASK_BIND_RETRY_MS - 1;
+    recordSelectedAsk(askFor({ recordedAt: clock }));
+    await whenAskBindingSettled();
+
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_1', boundPermissionId: null });
+  });
+
+  it('bounds the failed-bind windows it keeps', async () => {
+    const read = vi.fn(async (): Promise<string | null> => {
+      throw new Error('control plane unavailable');
+    });
+    _setAskBindingForTests({ read, now: () => clock });
+
+    for (let i = 1; i <= 16; i += 1) {
+      recordSelectedAsk(
+        askFor({
+          kiloSessionId: `ses_${i}`,
+          statusUpdatedAt: `2026-01-01T00:${String(i).padStart(2, '0')}:00.000Z`,
+        })
+      );
+      // eslint-disable-next-line no-await-in-loop -- each select settles its own bind
+      await whenAskBindingSettled();
+    }
+    expect(read).toHaveBeenCalledTimes(16);
+
+    recordSelectedAsk(
+      askFor({ kiloSessionId: 'ses_17', statusUpdatedAt: '2026-01-01T00:17:00.000Z' })
+    );
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(17);
+
+    // The cap keeps a stream of distinct asks from holding windows forever, so
+    // the entry a new failure evicts is the oldest window.
+    recordSelectedAsk(
+      askFor({ kiloSessionId: 'ses_16', statusUpdatedAt: '2026-01-01T00:16:00.000Z' })
+    );
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(17);
+
+    recordSelectedAsk(
+      askFor({ kiloSessionId: 'ses_1', statusUpdatedAt: '2026-01-01T00:01:00.000Z' })
+    );
+    await whenAskBindingSettled();
+    expect(read).toHaveBeenCalledTimes(18);
+  });
+
   it('treats an empty projection as unbound, like a failed read', async () => {
     const read = vi.fn(async () => null);
     _setAskBindingForTests({ read, now: () => clock });

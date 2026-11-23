@@ -15,9 +15,9 @@ import { getWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask'
  * One read per ask, not one per tray heartbeat: the publisher selects an ask on
  * every derive, and a select whose identity (session, status, status time) is
  * the recorded one keeps the binding it already has. A failed or empty read
- * leaves the ask unbound, which hides Approve; the next select after
- * `ASK_BIND_RETRY_MS` retries, so a transient control-plane failure repairs
- * itself without a timer of its own.
+ * leaves the ask unbound, which hides Approve; the next select of that ask
+ * after `ASK_BIND_RETRY_MS` retries, so a transient control-plane failure
+ * repairs itself without a timer of its own.
  */
 
 /** Wait before a failed bind may be read again, keyed by the ask identity. */
@@ -61,7 +61,45 @@ function askIdentity(ask: WaitingAsk): string {
 // awaited by a headless republish, which must not end while a read it started
 // could still record the binding its card draws.
 const inFlight = new Map<string, Promise<void>>();
-let lastFailed: { identity: string; at: number } | null = null;
+
+// The failed bind's window, keyed by the ask it failed for. The mounted
+// publisher and the post-answer refresh publisher (built with
+// `skipWaitingAskSessionId`) can select different asks between heartbeats, so
+// one shared slot would let an ask's failure, or another ask's success,
+// shorten this ask's window.
+const failedBinds = new Map<string, number>();
+// Bounded so a long stream of distinct asks cannot hold windows forever.
+const ASK_BIND_MAX_FAILED = 16;
+
+function noteFailedBind(identity: string, at: number): void {
+  for (const [key, failedAt] of failedBinds) {
+    if (at - failedAt >= ASK_BIND_RETRY_MS) {
+      failedBinds.delete(key);
+    }
+  }
+  // Insertion order is failure order: an expired entry is dropped above before
+  // it could be set again, so a re-set key always re-enters at the tail.
+  while (failedBinds.size >= ASK_BIND_MAX_FAILED) {
+    const oldest = failedBinds.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    failedBinds.delete(oldest);
+  }
+  failedBinds.set(identity, at);
+}
+
+function isCoolingDown(identity: string, now: number): boolean {
+  const failedAt = failedBinds.get(identity);
+  if (failedAt === undefined) {
+    return false;
+  }
+  if (now - failedAt >= ASK_BIND_RETRY_MS) {
+    failedBinds.delete(identity);
+    return false;
+  }
+  return true;
+}
 
 const boundListeners = new Set<() => void>();
 
@@ -104,7 +142,7 @@ async function bind(ask: WaitingAsk, identity: string): Promise<void> {
   if (permissionId === null) {
     // Unbound, not cleared: the ask still waits, and the next select after the
     // cooldown reads again.
-    lastFailed = { identity, at: clock() };
+    noteFailedBind(identity, clock());
     return;
   }
   const current = getWaitingAsk();
@@ -113,7 +151,7 @@ async function bind(ask: WaitingAsk, identity: string): Promise<void> {
     return;
   }
   recordWaitingAsk({ ...current, boundPermissionId: permissionId });
-  lastFailed = null;
+  failedBinds.delete(identity);
   notifyBound();
 }
 
@@ -122,7 +160,7 @@ function kickBind(ask: WaitingAsk): void {
   if (inFlight.has(identity)) {
     return;
   }
-  if (lastFailed?.identity === identity && clock() - lastFailed.at < ASK_BIND_RETRY_MS) {
+  if (isCoolingDown(identity, clock())) {
     return;
   }
   const settled = (async () => {
@@ -201,7 +239,7 @@ export function _setAskBindingForTests(deps: {
 
 export function _resetAskBindingForTests(): void {
   inFlight.clear();
-  lastFailed = null;
+  failedBinds.clear();
   boundListeners.clear();
   readForTests = null;
   clock = () => Date.now();

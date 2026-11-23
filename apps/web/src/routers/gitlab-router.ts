@@ -19,7 +19,11 @@ import {
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
+  rotationRepositorySelection,
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
@@ -284,13 +288,29 @@ export const gitlabRouter = createTRPCRouter({
 
     try {
       const accessToken = await getValidGitLabToken(integration, { userId: ctx.user.id });
-      const configuredRepoIds = Object.keys(configuredWebhooks)
-        .map(id => Number.parseInt(id, 10))
-        .filter(id => Number.isFinite(id));
 
-      // previous=[] → every currently-configured repo is treated as
-      // "added" by the sync helper, so the existing Kilo webhook is
-      // UPDATED in place with the new secret (nothing is deleted).
+      // A secret rotation re-signs only the stored hooks of the repositories the
+      // code-review configuration still selects. A stored hook whose project is no
+      // longer selected is left to the removal path: the sync treats anything
+      // stored but unselected as a removal, so a rotation retries that pending
+      // removal instead of re-signing it. A rotated secret never creates a hook
+      // (every project keeps its stored handle) and never removes every hook (the
+      // stored map supplies the ids when the configuration selects nothing), so
+      // the shared selection helper is the only place the two cases are derived.
+      const storedCodeReviewConfig = await getAgentConfigForOwner(
+        owner,
+        'code_review',
+        PLATFORM.GITLAB
+      );
+      const storedConfig = storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined;
+      const storedSelection =
+        storedConfig?.repository_selection_mode === 'selected'
+          ? storedConfig.selected_repository_ids?.filter(
+              (id): id is number => typeof id === 'number' && Number.isFinite(id)
+            )
+          : undefined;
+      const configuredRepoIds = rotationRepositorySelection(configuredWebhooks, storedSelection);
+
       const syncOutcome = await syncWebhooksForRepositories(
         accessToken,
         newSecret,

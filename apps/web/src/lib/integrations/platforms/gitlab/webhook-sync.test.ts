@@ -6,7 +6,7 @@ import {
   GitLabWebhookPermissionError,
   type GitLabWebhook,
 } from './adapter';
-import { syncWebhooksForRepositories } from './webhook-sync';
+import { rotationRepositorySelection, syncWebhooksForRepositories } from './webhook-sync';
 
 jest.mock('./adapter', () => ({
   ...jest.requireActual('./adapter'),
@@ -78,6 +78,7 @@ describe('syncWebhooksForRepositories', () => {
     });
 
     expect(mockCreateProjectWebhook).not.toHaveBeenCalled();
+    expect(mockDeleteProjectWebhook).not.toHaveBeenCalled();
     expect(result.created).toEqual([]);
     expect(result.updated).toEqual([]);
     expect(result.errors).toEqual([]);
@@ -97,6 +98,137 @@ describe('syncWebhooksForRepositories', () => {
     expect(mockDeleteProjectWebhook).toHaveBeenCalledTimes(1);
     expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
     expect(updatedWebhooks).toEqual({});
+  });
+
+  it('a delete failure keeps the stored handle and reports its hook id', async () => {
+    mockDeleteProjectWebhook.mockRejectedValueOnce(new Error('GitLab delete webhook failed: 403'));
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [123],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(result.deleted).toEqual([]);
+    expect(result.errors).toEqual([
+      {
+        projectId: 123,
+        operation: 'delete',
+        hookId: 42,
+        error: expect.stringContaining('403'),
+      },
+    ]);
+    expect(updatedWebhooks['123']).toEqual({
+      hook_id: 42,
+      created_at: '2025-12-01T00:00:00.000Z',
+    });
+  });
+
+  it('asks the user to reconnect when a delete is refused for the credential', async () => {
+    mockDeleteProjectWebhook.mockRejectedValueOnce(
+      new GitLabAuthenticationError(
+        123,
+        401,
+        'GitLab rejected the credential while deleting a webhook for project 123 (HTTP 401). Reconnect the GitLab integration and try again.'
+      )
+    );
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [123],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(result.deleted).toEqual([]);
+    expect(result.errors).toEqual([
+      {
+        projectId: 123,
+        operation: 'delete',
+        hookId: 42,
+        error:
+          'GitLab rejected the connected credential: reconnect the GitLab integration, then retry. You can still configure the webhook manually in GitLab.',
+      },
+    ]);
+    expect(updatedWebhooks['123']).toEqual({
+      hook_id: 42,
+      created_at: '2025-12-01T00:00:00.000Z',
+    });
+  });
+
+  it('keeps Maintainer-role guidance when a delete is refused for the role', async () => {
+    mockDeleteProjectWebhook.mockRejectedValueOnce(
+      new GitLabWebhookPermissionError(
+        123,
+        403,
+        'Insufficient permissions to delete webhook for project 123. Requires Maintainer role or higher.'
+      )
+    );
+
+    const { result } = await syncWebhooksForRepositories('token', 'webhook-secret', [], [123], {
+      '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' },
+    });
+
+    expect(result.errors).toEqual([
+      {
+        projectId: 123,
+        operation: 'delete',
+        hookId: 42,
+        error:
+          'Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.',
+      },
+    ]);
+  });
+
+  it('a later save retries the kept removal when only the stored map names the project', async () => {
+    mockDeleteProjectWebhook.mockResolvedValueOnce(undefined);
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(mockDeleteProjectWebhook).toHaveBeenCalledTimes(1);
+    expect(mockDeleteProjectWebhook).toHaveBeenCalledWith('token', 123, 42, 'https://gitlab.com');
+    expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
+    expect(result.errors).toEqual([]);
+    expect(updatedWebhooks).toEqual({});
+  });
+
+  it('a resolved removal drops the entry', async () => {
+    mockDeleteProjectWebhook.mockResolvedValueOnce(undefined);
+
+    const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [],
+      [],
+      { '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' } }
+    );
+
+    expect(updatedWebhooks['123']).toBeUndefined();
+    expect(result.deleted).toEqual([{ projectId: 123, hookId: 42 }]);
+  });
+
+  it('a stored entry for a project that stays selected is never deleted', async () => {
+    const stored = { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' };
+
+    const { updatedWebhooks } = await syncWebhooksForRepositories(
+      'token',
+      'webhook-secret',
+      [123],
+      [123],
+      { '123': stored }
+    );
+
+    expect(mockDeleteProjectWebhook).not.toHaveBeenCalled();
+    expect(updatedWebhooks['123']).toEqual(stored);
   });
 
   it('asks the user to reconnect when GitLab rejects the credential', async () => {
@@ -147,5 +279,35 @@ describe('syncWebhooksForRepositories', () => {
           'Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.',
       },
     ]);
+  });
+});
+
+describe('rotationRepositorySelection', () => {
+  const storedWebhooks: Record<string, { hook_id: number; created_at: string }> = {
+    '123': { hook_id: 42, created_at: '2025-12-01T00:00:00.000Z' },
+    '456': { hook_id: 43, created_at: '2025-12-02T00:00:00.000Z' },
+    '789': { hook_id: 44, created_at: '2025-12-03T00:00:00.000Z' },
+  };
+
+  it('rotates every stored hook when no stored selection is available', () => {
+    expect(rotationRepositorySelection(storedWebhooks, undefined)).toEqual([123, 456, 789]);
+  });
+
+  it('rotates only the stored hooks the selection names, in the given order', () => {
+    expect(rotationRepositorySelection(storedWebhooks, [789, 123])).toEqual([789, 123]);
+  });
+
+  it('falls back to every stored hook when the selection names only unstored projects', () => {
+    expect(rotationRepositorySelection(storedWebhooks, [111, 222])).toEqual([123, 456, 789]);
+  });
+
+  it('falls back to every stored hook when the selection is empty', () => {
+    expect(rotationRepositorySelection(storedWebhooks, [])).toEqual([123, 456, 789]);
+  });
+
+  it('ignores a stored key that is not a project id', () => {
+    const withUnusableKey = { ...storedWebhooks, 'not-a-project': storedWebhooks['123'] };
+
+    expect(rotationRepositorySelection(withUnusableKey, undefined)).toEqual([123, 456, 789]);
   });
 });

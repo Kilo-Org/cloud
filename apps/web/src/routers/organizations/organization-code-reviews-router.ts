@@ -45,6 +45,7 @@ import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
+  rotationRepositorySelection,
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
@@ -1364,12 +1365,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    *
    * Admin-gated (owner or billing_manager) — the previous shape leaked the
    * secret to every org member via `getGitLabStatus`. The new secret is
-   * returned ONCE, only to the caller, for manual reconfiguration. When
-   * Kilo-managed webhooks exist they are all UPDATED in place (the
-   * `previous = []` trick makes every currently-configured repo an
-   * "added" repo, which the sync helper handles as an update of the
-   * existing webhook). When no webhooks are configured (manual-only
-   * setup) the sync is skipped and the secret is still returned once.
+   * returned ONCE, only to the caller, for manual reconfiguration. A
+   * rotation re-signs the stored hooks of the repositories the code-review
+   * configuration still selects; a stored hook whose project is no longer
+   * selected is left to the removal path, so a rotation retries that pending
+   * removal instead of re-signing it. A rotated secret never creates a hook
+   * (every project keeps its stored handle) and never removes every hook
+   * (the stored map supplies the ids when the configuration selects
+   * nothing). When no webhooks are configured (manual-only setup) the sync
+   * is skipped and the secret is still returned once.
    *
    * Scope is per-org: only this integration's metadata is touched. See
    * P1-D-32.
@@ -1441,13 +1445,29 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           userId: ctx.user.id,
           organizationId,
         });
-        const configuredRepoIds = Object.keys(configuredWebhooks)
-          .map(id => Number.parseInt(id, 10))
-          .filter(id => Number.isFinite(id));
+        // A secret rotation re-signs only the stored hooks of the repositories
+        // the code-review configuration still selects. A stored hook whose
+        // project is no longer selected is left to the removal path: the sync
+        // treats anything stored but unselected as a removal, so a rotation
+        // retries that pending removal instead of re-signing it. A rotated
+        // secret never creates a hook (every project keeps its stored handle)
+        // and never removes every hook (the stored map supplies the ids when
+        // the configuration selects nothing), so the shared selection helper
+        // is the only place the two cases are derived.
+        const storedCodeReviewConfig = await getAgentConfig(
+          organizationId,
+          'code_review',
+          PLATFORM.GITLAB
+        );
+        const storedConfig = storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined;
+        const storedSelection =
+          storedConfig?.repository_selection_mode === 'selected'
+            ? storedConfig.selected_repository_ids?.filter(
+                (id): id is number => typeof id === 'number' && Number.isFinite(id)
+              )
+            : undefined;
+        const configuredRepoIds = rotationRepositorySelection(configuredWebhooks, storedSelection);
 
-        // Pass `previous = []` so the sync helper treats every currently
-        // configured repo as newly added and UPDATES its existing Kilo
-        // webhook in place with the new secret — nothing is deleted.
         const syncOutcome = await syncWebhooksForRepositories(
           accessToken,
           newSecret,

@@ -61,8 +61,16 @@ public class HomeWidgetRefreshModule: Module {
         throw NSError(domain: HomeWidgetRefreshStore.service, code: 2, userInfo: [NSLocalizedDescriptionKey: "Missing widget operation epoch"])
       }
       var retired: HomeWidgetRetiredScope?
-      let applied = try self.performOperation(epoch) {
-        retired = try HomeWidgetRefreshStore.configure(config)
+      var applied = false
+      var failure: Error?
+      do {
+        applied = try self.performOperation(epoch) {
+          retired = try HomeWidgetRefreshStore.configure(config)
+        }
+      } catch {
+        // Retirement is independent of the store: a replaced scope is retired
+        // whether or not storing the new one succeeds.
+        failure = error
       }
       // A registration belongs to the scope that created it. When this
       // configure replaces a scope, unregister that scope's token with its own
@@ -71,6 +79,7 @@ public class HomeWidgetRefreshModule: Module {
         await HomeWidgetRefreshStore.unregisterPushToken(retired.token, config: retired.config)
       }
       if applied { await HomeWidgetRefreshStore.registerStoredPushToken() }
+      if let failure { throw failure }
     }
     AsyncFunction("clear") { (epoch: Int) in
       guard let captured = self.admitClear(epoch) else { return }

@@ -268,28 +268,26 @@ describe('secure backend profiles', () => {
     }
   );
 
-  it('reports a wrong-typed header object, a wrong-typed key and a blank name as invalidInput', async () => {
-    const store = await import('./backend-store');
-    const wrongHeaders = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, headers: 'Authorization: secret' })
-    );
-    expect((wrongHeaders as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidInput'
-    );
+  it.each([{ headers: 'Authorization: secret' }, { apiKey: 42 }, { name: ' ' }])(
+    'reports a failure that names no field as invalidInput: %j',
+    async patch => {
+      const store = await import('./backend-store');
+      const failure = captureError(() => store.validateChatBackendDraft({ ...draft, ...patch }));
+      expect(failure).toBeInstanceOf(store.BackendInputError);
+      expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidInput'
+      );
+      expect(failure.message).toBe('invalidInput');
+    }
+  );
 
-    const wrongKey = captureError(() => store.validateChatBackendDraft({ ...draft, apiKey: 42 }));
-    expect((wrongKey as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
-
-    const blankName = captureError(() => store.validateChatBackendDraft({ ...draft, name: ' ' }));
-    expect(blankName).toBeInstanceOf(store.BackendInputError);
-    expect((blankName as InstanceType<typeof store.BackendInputError>).problem).toBe(
-      'invalidInput'
-    );
-    expect(blankName.message).toBe('invalidInput');
-
-    expect(() => store.parseChatBackendHeaders('{"Authorization": 42}')).toThrow(/^invalidInput$/u);
-    expect(() => store.parseChatBackendHeaders('not-json-secret')).toThrow(/^invalidInput$/u);
-  });
+  it.each(['{"Authorization": 42}', 'not-json-secret'])(
+    'reports an unparseable or wrongly typed header object as invalidInput: %s',
+    async input => {
+      const store = await import('./backend-store');
+      expect(() => store.parseChatBackendHeaders(input)).toThrow(/^invalidInput$/u);
+    }
+  );
 
   it('keeps a printable Latin-1 letter in the API key intact', async () => {
     const store = await import('./backend-store');

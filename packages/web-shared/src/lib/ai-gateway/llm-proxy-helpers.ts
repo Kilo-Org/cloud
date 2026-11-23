@@ -183,7 +183,7 @@ export async function usageLimitExceededResponse(
         error: {
           title: 'Organization Credits Required',
           message:
-            'Your organization pays for this request and has no credits left. Ask an organization owner to add credits.',
+            'Your organization cannot fund this request. Ask an organization owner to add credits.',
           balance,
           buyCreditsUrl: `${APP_URL}/organizations/${organizationId}`,
         },

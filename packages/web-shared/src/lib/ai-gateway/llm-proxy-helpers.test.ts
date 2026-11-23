@@ -186,7 +186,7 @@ describe('usageLimitExceededResponse', () => {
     expect(body.error_type).toBe(ProxyErrorType.usage_limit_exceeded);
     expect(body.error.title).toBe('Organization Credits Required');
     expect(body.error.message).toBe(
-      'Your organization pays for this request and has no credits left. Ask an organization owner to add credits.'
+      'Your organization cannot fund this request. Ask an organization owner to add credits.'
     );
     expect(body.error.balance).toBe(0);
     expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/organizations/${organizationId}`);

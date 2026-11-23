@@ -49,11 +49,13 @@ function codingPlanNameOf(
 /**
  * Why a negative row drew credit and, for a coding-plan charge, the plan it
  * charged, read from the row's own category so a client titles the row in the
- * reader's language instead of printing the stored English description. Null
- * where the category carries no reason the app can name: expiry and void rows
- * point at a grant that the row already shows, internal and legacy
- * reconciliation rows never funded the balance, and an unknown writer must keep
- * its stored description rather than borrow another writer's wording.
+ * reader's language instead of printing the stored English description. A
+ * reconciliation row is mapped whenever it carries one of the known
+ * categories, including the legacy billing system's names for them. The null
+ * reason covers expiry and void rows, which point at a grant the row already
+ * shows, categories with no user-facing meaning the app can name, and
+ * categories no writer has classified, which must keep their stored
+ * description rather than borrow another writer's wording.
  */
 function deductionOf(
   creditCategory: string | null,
@@ -75,7 +77,15 @@ function deductionOf(
   if (creditCategory === 'manual_decrement') {
     return { reason: 'admin_debit', planName: null };
   }
+  // The legacy billing system recorded the same manual debit and accounting
+  // correction under its own category names.
+  if (creditCategory === 'orb_manual_decrement') {
+    return { reason: 'admin_debit', planName: null };
+  }
   if (creditCategory === 'accounting_adjustment') {
+    return { reason: 'correction', planName: null };
+  }
+  if (creditCategory === 'orb_migration_accounting_adjustment') {
     return { reason: 'correction', planName: null };
   }
   if (creditCategory.startsWith('admin-cancel-')) {
@@ -90,8 +100,7 @@ function deductionOf(
   if (refundProvider === 'google_play') {
     return { reason: 'refund_google_play', planName: null };
   }
-  // Expiries, voids, internal reconciliation rows, legacy migration rows, and
-  // categories no writer has classified all land here.
+  // Expiries, voids, and categories no writer has classified all land here.
   return { reason: null, planName: null };
 }
 

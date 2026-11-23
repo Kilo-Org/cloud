@@ -400,7 +400,9 @@ describe('getCreditBlocks', () => {
       { creditCategory: 'stripe-dispute-enforcement', reason: 'dispute' },
       { creditCategory: 'admin-cancel-kilo-pass-no-refund', reason: 'admin_cancel' },
       { creditCategory: 'manual_decrement', reason: 'admin_debit' },
+      { creditCategory: 'orb_manual_decrement', reason: 'admin_debit' },
       { creditCategory: 'accounting_adjustment', reason: 'correction' },
+      { creditCategory: 'orb_migration_accounting_adjustment', reason: 'correction' },
       { creditCategory: 'credits_expired', reason: null },
     ];
 

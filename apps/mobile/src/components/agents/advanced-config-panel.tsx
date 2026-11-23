@@ -318,10 +318,12 @@ export function AdvancedConfigPanel({
           return { saved: true };
         }
       }
-      // No answer arrived, so this attempt may have committed: remember what it
-      // submitted and what the scope held before it, for a later collision.
+      // No answer arrived, so this attempt may have committed: remember the
+      // account it wrote into, what it submitted and what that account held
+      // before it, for a later collision. `recoverLostSave` reads the record only
+      // in that account.
       if (refusal === '') {
-        lostSaveAttemptRef.current = { name, knownIds, content };
+        lostSaveAttemptRef.current = { scope: savedUnder, name, knownIds, content };
       }
       return { saved: false, refusal: refusal === '' ? null : refusal };
     }

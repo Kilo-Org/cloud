@@ -938,6 +938,59 @@ describe('AdvancedConfigPanel', () => {
     expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
   });
 
+  it('reads a recorded save only in the account that recorded it', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const lost = Promise.withResolvers<never>();
+    // The first attempt never answers; its rejection arrives after the move.
+    mocks.create.mutateAsync.mockReturnValueOnce(lost.promise).mockRejectedValueOnce(
+      Object.assign(new Error(refusal), {
+        name: 'TRPCClientError',
+        data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+      })
+    );
+    const other: ProfileSelectorProfile = {
+      id: 'org2-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'organization',
+    };
+    // Org-2's list holds a row of that name.
+    const refetch = vi
+      .fn()
+      .mockResolvedValue({ data: { orgProfiles: [other], personalProfiles: [] } });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'prod');
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The account moves while the write is still unanswered.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    await act(async () => {
+      lost.reject(Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retry in org-2 collides on the name.
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The record belongs to org-1, so org-2's rows complete no save here.
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+  });
+
   it('converges a retry that collides on the name onto the lost attempt that created it', async () => {
     const mocks = mutations();
     const refusal = 'A profile with this name already exists';

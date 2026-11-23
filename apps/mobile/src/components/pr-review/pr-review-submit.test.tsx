@@ -70,6 +70,17 @@ const footerPreferenceMock = vi.hoisted(() => ({
   prReviewFooter: false,
 }));
 
+// The real summary field is an uncontrolled multiline input: it paints no
+// seeded content, so what it starts with is the body ref's value at mount.
+// The mock records that once, plus the props a test drives text through.
+const summaryFieldMock = vi.hoisted(() => ({
+  initialBody: null as string | null,
+  props: null as null | {
+    bodyRef: { current: string };
+    onChange: () => void;
+  },
+}));
+
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   usePrReviewFooterPreference: () => footerPreferenceMock,
 }));
@@ -137,7 +148,11 @@ vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
   focusAfterPendingCommentRemoval: vi.fn(),
   PendingQueueHint: 'PendingQueueHint',
   PrReviewPendingCommentRow: 'PrReviewPendingCommentRow',
-  ReviewSummaryField: 'ReviewSummaryField',
+  ReviewSummaryField: (props: { bodyRef: { current: string }; onChange: () => void }): null => {
+    summaryFieldMock.props = props;
+    summaryFieldMock.initialBody ??= props.bodyRef.current;
+    return null;
+  },
 }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -268,12 +283,42 @@ function findSubmitButton(renderer: TestRenderer.ReactTestRenderer): Record<stri
   return button.props as Record<string, unknown>;
 }
 
-function findSummaryField(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
-  const summary = renderer.root.findAll(node => Object.hasOwn(node.props, 'defaultValue'))[0];
-  if (!summary) {
+function findSummaryField(): { defaultValue: string } {
+  if (summaryFieldMock.props === null) {
     throw new Error('Summary field not found');
   }
-  return summary.props as Record<string, unknown>;
+  // The field's initial content: the mocked field paints null, so the value it
+  // would show is whatever the body ref held when it first rendered.
+  return { defaultValue: summaryFieldMock.initialBody ?? '' };
+}
+
+/** Drive the mocked field the way a reader typing would: set the ref, then notify. */
+function typeSummary(text: string): void {
+  const field = summaryFieldMock.props;
+  if (field === null) {
+    throw new Error('Summary field not found');
+  }
+  act(() => {
+    field.bodyRef.current = text;
+    field.onChange();
+  });
+}
+
+/** The muted attribution line under the summary field, when the preference shows it. */
+function findFooterHint(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const hint = renderer.root.findAll(
+    node => node.props.testID === 'pr-review-submit-footer-hint'
+  )[0];
+  return hint ? (hint.props as Record<string, unknown>) : {};
+}
+
+/** The mocked event-chip row, whose props carry the chip selection callback. */
+function findEventChips(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const chips = renderer.root.findAll(node => String(node.type) === 'ReviewEventChips')[0];
+  if (!chips) {
+    throw new Error('Event chips not found');
+  }
+  return chips.props as Record<string, unknown>;
 }
 
 beforeEach(() => {
@@ -292,6 +337,8 @@ beforeEach(() => {
   feedbackMock.maybeAskAfterSuccessfulOutcome.mockResolvedValue(undefined);
   footerPreferenceMock.hasLoaded = true;
   footerPreferenceMock.prReviewFooter = false;
+  summaryFieldMock.initialBody = null;
+  summaryFieldMock.props = null;
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -368,27 +415,29 @@ describe('PrReviewSubmit queue retention', () => {
 });
 
 describe('PrReviewSubmit footer preference', () => {
-  it('prefills the platform footer and enables submit when the setting is on', () => {
+  it('starts the summary empty, shows the footer hint, and stays blocked when the setting is on', () => {
     footerPreferenceMock.prReviewFooter = true;
     const renderer = mount();
 
-    expect(findSummaryField(renderer).defaultValue).toBe(
-      '\n\n---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)'
-    );
+    // The field is never seeded with the attribution footer; the hint explains
+    // that it is added at submit instead.
+    expect(findSummaryField().defaultValue).toBe('');
+    expect(findFooterHint(renderer).children).toBe('Reviewed via Kilo is added when you submit.');
 
-    // hasSummary was set from the prefilled footer, so a comment review with no
-    // queued comments is not blocked: the submit button is enabled.
-    expect(findSubmitButton(renderer).disabled).toBe(false);
+    // The gate tracks only typed text: a comment review with nothing queued
+    // is blocked even though the footer will be appended.
+    expect(findSubmitButton(renderer).disabled).toBe(true);
   });
 
-  it('leaves the body empty and blocks submit when the setting is off', () => {
+  it('shows no hint and blocks submit when the setting is off', () => {
     footerPreferenceMock.prReviewFooter = false;
     const renderer = mount();
 
-    expect(findSummaryField(renderer).defaultValue).toBe('');
+    expect(findSummaryField().defaultValue).toBe('');
+    expect(findFooterHint(renderer)).toEqual({});
 
-    // No prefilled footer and no queued comments: the comment review is
-    // blocked, so the submit button is disabled.
+    // No footer and no queued comments: the comment review is blocked, so the
+    // submit button is disabled.
     expect(findSubmitButton(renderer).disabled).toBe(true);
   });
 });
@@ -448,10 +497,11 @@ describe('PrReviewSubmit provider arm (c3)', () => {
     });
   });
 
-  it('posts the summary alone when nothing is queued (empty state, no comments key)', async () => {
+  it('appends the footer to a typed summary with nothing queued', async () => {
     footerPreferenceMock.prReviewFooter = true;
     const renderer = mount(GITLAB_REF);
 
+    typeSummary('Looks good');
     act(() => {
       submitOnPress(renderer, 'Submit review')();
     });
@@ -459,7 +509,7 @@ describe('PrReviewSubmit provider arm (c3)', () => {
 
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
       event: 'comment',
-      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+      body: 'Looks good\n\n---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
     });
   });
 
@@ -470,6 +520,7 @@ describe('PrReviewSubmit provider arm (c3)', () => {
     act(() => {
       addCommentFn?.(ITEM_FRESH_A);
     });
+    typeSummary('Looks good');
     act(() => {
       submitOnPress(renderer, 'Submit review')();
     });
@@ -477,8 +528,28 @@ describe('PrReviewSubmit provider arm (c3)', () => {
 
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
       event: 'comment',
-      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+      body: 'Looks good\n\n---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
       comments: [{ path: 'src/a.ts', side: 'RIGHT', line: 1, body: 'A' }],
+    });
+  });
+
+  it('submits the footer alone for an approve with nothing typed', async () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      (findEventChips(renderer).onChange as (next: string) => void)('APPROVE');
+    });
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    // An approve needs no summary, so the preference alone posts the trimmed
+    // footer body with no leading blank line.
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'approve',
+      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
     });
   });
 });

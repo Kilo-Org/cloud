@@ -77,7 +77,7 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
-import { buildReviewFooter } from '@/lib/pr-review/review-footer';
+import { appendReviewFooter } from '@/lib/pr-review/review-footer';
 import {
   selectPartialSubmitMessage,
   selectSubmitCtaLabel,
@@ -221,19 +221,6 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const bodyInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
 
-  // Seed the summary refs from the default-on footer preference once it
-  // resolves, in the render that first sees the loaded preference and before
-  // the summary field mounts: the body below paints only after that, so its
-  // first frame already carries the prefilled footer and the settled hint.
-  const footerSeededRef = useRef(false);
-  const initialFooter =
-    prReviewFooterLoaded && prReviewFooter ? buildReviewFooter(Platform.OS) : '';
-  if (prReviewFooterLoaded && !footerSeededRef.current) {
-    footerSeededRef.current = true;
-    bodyRef.current = initialFooter;
-    setHasSummary(initialFooter.trim().length > 0);
-  }
-
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
   // The provider platform as a stable primitive: the error effect words a
@@ -331,7 +318,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       return;
     }
     try {
-      const body = bodyRef.current.trim();
+      const typed = bodyRef.current.trim();
+      const body = prReviewFooter ? appendReviewFooter(typed, Platform.OS) : typed;
       // Provider arms post one event with a real inline batch (c3): every
       // fresh pending comment rides `comments` anchored at its tapped diff
       // position, and the summary stays the review body. An item without an
@@ -430,12 +418,12 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const keyboardVisible = useFormSheetKeyboardVisible();
 
   // The body paints only once both device reads it is built from have settled:
-  // the stored footer preference seeds the summary (and with it the summary
-  // field's height and whether the queue card shows the block reason or the
-  // hint) and the stored pending queue decides the card's rows. A provisional
-  // body painted first moved the queue card 8.4 dp and the submit CTA 5.7 dp
-  // under the reader when the preference arrived. The header stays, so the
-  // sheet keeps its frame while the reads resolve.
+  // the stored footer preference decides whether the hint line under the
+  // summary field renders (and with it the field block's height) and the
+  // stored pending queue decides the card's rows. A provisional body painted
+  // first moved the queue card 8.4 dp and the submit CTA 5.7 dp under the
+  // reader when the preference arrived. The header stays, so the sheet keeps
+  // its frame while the reads resolve.
   if (!pending.hydrated || !prReviewFooterLoaded) {
     return (
       <>
@@ -500,12 +488,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               bodyRef={bodyRef}
               inputRef={bodyInputRef}
               isDisabled={isSubmitting}
-              defaultValue={initialFooter}
               onChange={() => {
                 setHasSummary(bodyRef.current.trim().length > 0);
                 clearRecoverableError();
               }}
             />
+            {prReviewFooter ? (
+              <Text variant="muted" className="text-xs" testID="pr-review-submit-footer-hint">
+                {t('prReview.submit.footerHint')}
+              </Text>
+            ) : null}
           </View>
 
           <Card className="gap-1">

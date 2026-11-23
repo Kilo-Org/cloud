@@ -1126,6 +1126,7 @@
       "deletePendingTitle": "Delete pending comment?",
       "deletePendingMessage": "This comment will be removed from the review queue.",
       "summaryOptional": "Summary (optional)",
+      "footerHint": "Reviewed via Kilo is added when you submit.",
       "pendingComment_one": "pending comment",
       "pendingComment": "pending comments",
       "pendingComment_other": "pending comments",

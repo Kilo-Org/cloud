@@ -23,6 +23,7 @@ import {
   type OpenChildSession,
   type RenderPartFn,
 } from './child-session-section';
+import { describeChildHistoryFailure } from './child-session-history-failure';
 import { getChildSessionModelLabel } from './child-session-model';
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
@@ -32,11 +33,8 @@ import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
 import { SessionPageSheet } from './session-page-sheet';
 import { SessionStatusIndicator } from './session-status-indicator';
-import {
-  buildTerminalErrorCopyText,
-  describeChildHistoryFailure,
-  describeSessionRuntimeFailure,
-} from './session-terminal-error';
+import { describeSessionRuntimeFailure } from './session-terminal-error';
+import { buildTerminalErrorCopyText } from './terminal-error-copy-text';
 import { performCopy } from './use-message-copy';
 import { WorkingIndicator } from './working-indicator';
 
@@ -177,7 +175,7 @@ export function ChildSessionSheet({
   }, [onRetry]);
   useEffect(() => {
     if (!heldFailedLoad) {
-      return;
+      return undefined;
     }
     const timer = setTimeout(() => {
       onRetryRef.current();

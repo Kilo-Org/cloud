@@ -7,15 +7,15 @@ import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
 import {
-  buildTerminalErrorCopyText,
   classifyTerminalError,
-  describeChildHistoryFailure,
   describeSessionRuntimeFailure,
   describeTerminalFailure,
   resolveSessionTerminalError,
   sessionStatusErrorMessage,
   statusIndicatorDuplicatesMessageFailure,
 } from './session-terminal-error';
+import { describeChildHistoryFailure } from './child-session-history-failure';
+import { buildTerminalErrorCopyText } from './terminal-error-copy-text';
 
 describe('classifyTerminalError', () => {
   it.each([

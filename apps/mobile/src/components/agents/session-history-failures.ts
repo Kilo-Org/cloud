@@ -75,6 +75,21 @@ export function sessionHistoryFailureCopyKey(
 }
 
 /**
+ * The reader's copy and retryability for a typed transcript-read failure. The
+ * retryable kind names this app's own temporary outage and keeps its Retry;
+ * a terminal kind names a stored page a retry re-reads unchanged. The raw
+ * string stays in `detail` for Copy.
+ */
+export function sessionHistoryFailureCopy(kind: SessionHistoryFailureKind): {
+  copyKey: string;
+  retryable: boolean;
+} {
+  return kind === 'retryable_failure'
+    ? { copyKey: 'agentChat.session.historyTemporarilyUnavailable', retryable: true }
+    : { copyKey: sessionHistoryFailureCopyKey(kind), retryable: false };
+}
+
+/**
  * A typed worker failure, carrying the `code` the query error readers classify
  * on.
  *

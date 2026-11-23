@@ -9,10 +9,7 @@ import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
 import { isSafeFailureMessage } from './safe-failure-messages';
-import {
-  isTerminalSessionHistoryFailure,
-  sessionHistoryFailureCopyKey,
-} from './session-history-failures';
+import { sessionHistoryFailureCopy } from './session-history-failures';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -357,53 +354,6 @@ export function describeTerminalFailure(message: string): SessionTerminalError {
 }
 
 /**
- * The reader's copy and retryability for a child session's failed first-page
- * load. The typed history kind decides both: a retryable failure names the
- * outage and keeps its Retry, while a terminal kind — an oversize or unreadable
- * stored page — states its own reason and never offers one, because the same
- * read answers the same way every time. A null kind is a failure the read never
- * typed (a dropped transport, or a worker 404 for a gone child), so it
- * classifies from its sentence like any other error. The untranslated original
- * stays in `detail` for Copy.
- *
- * The copy names the child as a sub-agent, matching the child sheet's own
- * surface, instead of borrowing the root transcript's session wording. The
- * title still comes from the session keys: the sheet is a session that failed
- * to open, whatever the reader calls the thing they tapped.
- */
-export function describeChildHistoryFailure(state: {
-  kind: SessionSnapshotFailureKind | null;
-  message: string;
-}): SessionTerminalError {
-  const { kind, message } = state;
-  if (kind === null) {
-    return describeTerminalFailure(message);
-  }
-  if (kind === 'retryable_failure') {
-    return {
-      variant: 'server',
-      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-      message: i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable'),
-      retryable: true,
-      retryWith: 'session',
-      detail: message,
-    };
-  }
-  return {
-    variant: 'server',
-    title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-    message: i18n.t(
-      kind === 'too_large'
-        ? 'agentChat.childSessionSheet.historyTooLarge'
-        : 'agentChat.childSessionSheet.historyUnavailable'
-    ),
-    retryable: false,
-    retryWith: 'session',
-    detail: message,
-  };
-}
-
-/**
  * Whether a terminal failure can recover by retrying. A coded failure names
  * its class directly; an uncoded one is classified from its message. The
  * composer's reason line uses this so a non-retryable failure on an empty
@@ -490,28 +440,17 @@ export function resolveSessionTerminalError(input: {
   }
   if (input.error !== null) {
     // The atom carries the transport's own English text: an SDK fixed string,
-    // or a server failure the transport forwards. Show the reader translated
-    // copy and keep the original for the clipboard. The class decides the
-    // Retry for a transport failure; a typed transcript-read failure is decided
-    // by its kind instead, ahead of the classification: the retryable kind is
-    // this app's own temporary outage, while a terminal kind names a stored
-    // page a retry re-reads unchanged.
-    if (input.historyFailureKind === 'retryable_failure') {
+    // or a server failure the transport forwards. The class decides the Retry
+    // for a transport failure; a typed transcript-read failure is decided by
+    // its kind instead, ahead of the classification.
+    if (input.historyFailureKind != null) {
+      const { copyKey, retryable } = sessionHistoryFailureCopy(input.historyFailureKind);
+      const title = i18n.t('agentChat.session.couldNotLoadThisSession');
       return {
         variant: 'server',
-        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-        message: i18n.t('agentChat.session.historyTemporarilyUnavailable'),
-        retryable: true,
-        retryWith: 'session',
-        detail: input.error,
-      };
-    }
-    if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
-      return {
-        variant: 'server',
-        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-        message: i18n.t(sessionHistoryFailureCopyKey(input.historyFailureKind)),
-        retryable: false,
+        title,
+        message: i18n.t(copyKey),
+        retryable,
         retryWith: 'session',
         detail: input.error,
       };
@@ -566,19 +505,4 @@ export function resolveSessionTerminalError(input: {
     };
   }
   return null;
-}
-
-/**
- * Build the clipboard text for a terminal error: session id, then what the
- * reader saw, then the untranslated original that support needs.
- */
-export function buildTerminalErrorCopyText(input: {
-  sessionId: string;
-  title: string;
-  message: string;
-  /** The untranslated original. Omitted when the message already is it. */
-  detail?: string;
-}): string {
-  const { sessionId, title, message, detail } = input;
-  return [sessionId, title, message, detail === message ? '' : detail].filter(Boolean).join('\n');
 }

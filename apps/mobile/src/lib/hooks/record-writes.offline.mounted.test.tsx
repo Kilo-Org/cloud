@@ -191,13 +191,6 @@ async function mountProbe(Probe: ProbeComponent) {
   return { view, holder };
 }
 
-/** Let TanStack Query's scheduler and the transport's promise chain run. */
-async function flushQueryUpdates(): Promise<void> {
-  // A predicate that never holds is the point: the helper yields to the
-  // macrotask queue between attempts, which flushes the observer notifications
-  // this suite reads, then throws, so the throw is swallowed here.
-  await waitFor(() => false, 8).catch(() => undefined);
-}
 
 /** Consume a write's rejection without awaiting it; the hook announces it. */
 function ignoreRejection(attempt: Promise<unknown> | null): void {
@@ -216,9 +209,26 @@ function ignoreRejection(attempt: Promise<unknown> | null): void {
 type OfflineWrite = Readonly<{
   /** Requests the transport saw for this procedure while offline. */
   attempted: number;
+  /** Whether the mutation left its pending state, as a Save button reads it. */
+  settled: boolean;
   /** The hook's `isPending` after the flush: what a Save button renders. */
   stillPending: boolean;
 }>;
+
+/**
+ * Let TanStack Query's scheduler and the transport's promise chain run.
+ *
+ * Polling `holder.pending` cannot replace this: that flag is the property under
+ * test, so on the code without the option the poll never holds and the case
+ * would fail in the helper instead of on the attempt it is checking.
+ */
+async function flushQueryUpdates(): Promise<void> {
+  // A predicate that never holds is the point: the helper yields to the
+  // macrotask queue between attempts, which flushes the observer notifications
+  // this suite reads, then throws, so the throw is swallowed here.
+  await waitFor(() => false, 8).catch(() => undefined);
+}
+
 
 /**
  * Runs one write while the device reports itself offline. The caller has
@@ -239,6 +249,7 @@ async function runOfflineWrite(Probe: ProbeComponent, procedure: string): Promis
   await flushQueryUpdates();
   const write: OfflineWrite = {
     attempted: callsTo(procedure),
+    settled: !holder.pending,
     stillPending: holder.pending,
   };
   view.unmount();
@@ -264,7 +275,8 @@ describe('record writes while the device reports itself offline', () => {
     // The attempt is the fix: a paused mutation sends nothing and never settles,
     // which leaves the form's Save busy with no failure copy.
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -274,7 +286,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordModeUpdateProbe, 'organizations.modes.update');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -284,7 +297,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordGroupCreateProbe, 'organizations.groups.create');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -294,7 +308,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordInviteProbe, 'organizations.members.invite');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
   });
 
@@ -303,7 +318,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordTodoCreateProbe, 'todos.lists.create');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
   });
 
@@ -312,7 +328,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordBitbucketProbe, 'organizations.bitbucket.connect');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
   });
 
@@ -321,7 +338,8 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordDisconnectProbe, 'githubApps.uninstallApp');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves this true forever.
+    // Save is usable again: a paused mutation leaves both of these stuck.
+    expect(write.settled).toBe(true);
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });

@@ -49,7 +49,7 @@
     "openInBrowser": "ब्राउज़र में खोलें",
     "openSettings": "सेटिंग खोलें",
     "copiedToClipboard": "क्लिपबोर्ड पर कॉपी किया गया",
-    "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका।",
+    "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका",
     "required": "आवश्यक",
     "error": "त्रुटि: {{error}}",
     "back": "वापस",
@@ -81,7 +81,7 @@
     "close": "बंद करें",
     "codeReviewer": "कोड समीक्षक",
     "connected": "जुड़ा हुआ",
-    "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
+    "couldNotLoadModels": "मॉडल लोड नहीं हो सके",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
     "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
     "critical": "अति गंभीर",
@@ -696,8 +696,8 @@
       "renamePlaceholder": "नया नाम"
     },
     "attachment": {
-      "attachFailed": "फ़ाइल संलग्न नहीं हो सकी।",
-      "classificationDenied": "एक्ज़ीक्यूटेबल फ़ाइलें संलग्न नहीं की जा सकतीं।",
+      "attachFailed": "फ़ाइल संलग्न नहीं हो सकी",
+      "classificationDenied": "एक्ज़ीक्यूटेबल फ़ाइलें संलग्न नहीं की जा सकतीं",
       "classificationEmpty": "फ़ाइल खाली है।",
       "classificationTooLarge": "फ़ाइल का आकार 20 MB या उससे कम होना चाहिए।",
       "classificationUnreadable": "यह फ़ाइल पढ़ी नहीं जा सकी।",
@@ -769,7 +769,7 @@
       "notConnectedReadOnlyPlan": "संगठन का परीक्षण समाप्त हो गया है, इसलिए मालिक को kilo.ai पर बिलिंग अपडेट करनी होगी।"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
       "deniedManagedByOwner": "जिस कनेक्शन को आप नहीं बदल सकते, उसे बदलने के लिए {{organization}} के किसी मालिक से कहें।",
       "deniedConnectRole": "केवल {{organization}} के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
       "deniedReconnectRole": "इसे फिर से कनेक्ट करने के लिए {{organization}} के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
@@ -786,14 +786,14 @@
     "followReviewMd": "REVIEW.md का पालन करें",
     "followReviewMdSubtitle": "हर रिपॉज़िटरी की REVIEW.md फ़ाइल के निर्देशों का पालन करें",
     "manualReview": {
-      "invalidMergeRequestUrl": "मर्ज रिक्वेस्ट का मान्य URL दर्ज करें।",
+      "invalidMergeRequestUrl": "मर्ज रिक्वेस्ट का मान्य URL दर्ज करें",
       "mergeRequestUrl": "मर्ज रिक्वेस्ट का URL",
       "instructionsAtLimit": "निर्देश {{max}} अक्षरों तक सीमित हैं।",
-      "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी।",
+      "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी",
       "couldNotLoadProviders": "आपके कनेक्ट किए गए प्रदाताओं की जानकारी लोड नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "instructions": "निर्देश (वैकल्पिक)",
       "instructionsPlaceholder": "वे खास बातें जिन पर समीक्षक ध्यान दे…",
-      "invalidUrl": "पुल रिक्वेस्ट का मान्य URL दर्ज करें।",
+      "invalidUrl": "पुल रिक्वेस्ट का मान्य URL दर्ज करें",
       "pullRequestUrl": "पुल रिक्वेस्ट का URL",
       "start": "समीक्षा शुरू करें",
       "starting": "समीक्षा शुरू हो रही है…",
@@ -834,14 +834,14 @@
       "cancelTitle": "समीक्षा रद्द करें?",
       "checkRun": "जाँच का रन",
       "couldNotGetLatest": "ताज़ा जानकारी नहीं मिल सकी।",
-      "couldNotLoad": "समीक्षा लोड नहीं हो सकी।",
+      "couldNotLoad": "समीक्षा लोड नहीं हो सकी",
       "council": "परिषद",
       "created": "बनाया गया",
       "decision": "निर्णय",
       "gate": "गुणवत्ता जाँच",
       "gateHidden": "छिपा हुआ",
       "gateNone": "कोई नहीं",
-      "noFindings": "कोई समस्या नहीं मिली।",
+      "noFindings": "कोई समस्या नहीं मिली",
       "findingsUnavailable": "परिणाम उपलब्ध नहीं हैं।",
       "findingsInProgress": "यह समीक्षा अभी चल रही है। पूरा होने पर निष्कर्ष यहाँ दिखाई देंगे।",
       "findingsEndedWithoutResults": "यह समीक्षा कोई निष्कर्ष दिए बिना ही समाप्त हो गई।",
@@ -886,7 +886,7 @@
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
       "connectOwnerOnly": "संगठन के मालिक या एडमिन से प्रदाता कनेक्ट करने का अनुरोध करें।",
-      "couldNotLoad": "समीक्षाएँ लोड नहीं हो सकीं।",
+      "couldNotLoad": "समीक्षाएँ लोड नहीं हो सकीं",
       "noReviews": "अभी कोई समीक्षा नहीं",
       "noReviewsDescription": "कोड समीक्षक के किसी पुल रिक्वेस्ट की समीक्षा करने के बाद समीक्षाएँ यहाँ दिखाई देंगी।",
       "startManualReview": "मैन्युअल समीक्षा शुरू करें",
@@ -934,8 +934,8 @@
         "noFeedback": "इस रिपॉज़िटरी के लिए हाल का कोई फ़ीडबैक नहीं मिला",
         "noPattern": "बार-बार दोहराया गया कोई साफ़ पैटर्न नहीं मिला"
       },
-      "off": "समीक्षा मेमोरी बंद है।",
-      "on": "समीक्षा मेमोरी चालू है।",
+      "off": "समीक्षा मेमोरी बंद है",
+      "on": "समीक्षा मेमोरी चालू है",
       "offDescription": "इसे चालू करें ताकि Kilo मेंटेनर के जवाबों से सीखकर REVIEW.md के लिए दिशानिर्देश सुझा सके।",
       "readOnlyDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही समीक्षा मेमोरी बदल सकते हैं।",
       "title": "समीक्षा से सीखी बातें"
@@ -962,8 +962,8 @@
       "set": "सेट है",
       "notSet": "सेट नहीं है"
     },
-    "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
-    "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकी।",
+    "updateFailed": "समीक्षक अपडेट नहीं हो सका",
+    "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकी",
     "status": {
       "interrupted": "बाधित"
     },
@@ -1006,7 +1006,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "आज तीन बार रिपॉज़िटरी क्लोन करने की समय सीमा बीतने के बाद कोड समीक्षक बंद कर दिया गया। मदद के लिए {{supportEmail}} से संपर्क करें, फिर कोड समीक्षक दोबारा चालू करें।"
       },
-      "title": "कोड समीक्षक पर ध्यान देना ज़रूरी है।",
+      "title": "कोड समीक्षक पर ध्यान देना ज़रूरी है",
       "recoveryLabel": "सहायता टीम से संपर्क करें"
     },
     "unknownError": "अज्ञात त्रुटि",
@@ -1606,9 +1606,9 @@
     },
     "sessionList": {
       "completedWillAppear": "पूरे हो चुके सत्र यहाँ दिखाई देंगे।",
-      "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके।",
+      "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके",
       "couldNotRefresh": "रीफ़्रेश नहीं हो सका",
-      "couldNotSearch": "सत्र खोजे नहीं जा सके।",
+      "couldNotSearch": "सत्र खोजे नहीं जा सके",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछला सत्र नहीं",
       "pastSessions": "पिछले सत्र",
@@ -1629,7 +1629,7 @@
       "deleteSession": "सत्र हटाएँ",
       "deleteTitle": "सत्र हटाएँ?",
       "idCopied": "सत्र की ID कॉपी हो गई",
-      "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें।",
+      "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें",
       "untitled": "बिना शीर्षक वाला सत्र",
       "actions": "सत्र के विकल्प",
       "sessionDeleted": "सत्र हटाया गया",
@@ -2539,8 +2539,8 @@
     }
   },
   "bootstrap": {
-    "couldNotLoadAccount": "आपका खाता लोड नहीं हो सका।",
-    "couldNotLoadPrivacy": "गोपनीयता के विकल्प लोड नहीं हो सके।",
+    "couldNotLoadAccount": "आपका खाता लोड नहीं हो सका",
+    "couldNotLoadPrivacy": "गोपनीयता के विकल्प लोड नहीं हो सके",
     "couldNotLoadPrivacyDescription": "अपने डिवाइस की सुरक्षा सेटिंग जाँचें और फिर से कोशिश करें।",
     "contentReady": "सामग्री तैयार",
     "retryLoadingAccount": "खाता फिर से लोड करें",
@@ -4378,7 +4378,7 @@
       "confirmTitle": "यह एजेंट शुरू करें?",
       "promptRequired": "एजेंट शुरू करने के लिए प्रॉम्प्ट चाहिए। एक प्रॉम्प्ट जोड़ें और इसे फिर से चलाएँ।",
       "repositoryRequired": "एजेंट शुरू करने के लिए रिपॉज़िटरी चाहिए। Kilo खोलें और एक चुनें, फिर इसे दोबारा चलाएँ।",
-      "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
+      "repositoryUnknown": "Kilo {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
       "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — ‘एजेंट शुरू करें’ अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
     }
   },

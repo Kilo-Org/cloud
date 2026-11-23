@@ -117,6 +117,14 @@ function parseItem<T>(raw: string | null | undefined, schema: z.ZodType<T>): T |
 export type SessionSnapshotRows = {
   preparationAttempts?: PreparationAttempt[];
   queuedMessages?: QueuedMessageSnapshot[];
+  /**
+   * How many turns this session ever admitted, counted from its durable
+   * `control_plane_messages` rows. Settlement rewrites a row and a refused send
+   * writes none, so a settled run keeps its count while `queuedMessages` drops
+   * the completed non-command turn. A page with no transcript beside a positive
+   * count is an import or hydration gap, not a session that never ran.
+   */
+  admittedMessages?: number;
 };
 
 type V1SessionMessagesPage = {

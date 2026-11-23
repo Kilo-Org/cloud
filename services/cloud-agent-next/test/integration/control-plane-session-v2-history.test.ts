@@ -1516,6 +1516,44 @@ describe('workspace DO history and mutation cursors', () => {
     expect((await stub.getSessionMessagesPage())?.messages.map(item => item.info.id)).toEqual([
       'msg_ingest',
     ]);
+
+    // The history page carries the imported transcript, but nothing was admitted
+    // through this session, so the count states "never ran" rather than a gap.
+    const pageBeforeSend = await stub.getSessionMessagesPage();
+    expect(pageBeforeSend).toMatchObject({ admittedMessages: 0 });
+
+    const peer = new FakeSandboxPeer();
+    peer.prepareView = peer.view('preparing');
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    await expect(
+      stub.send({
+        messageId: 'msg_admitted',
+        turn: { type: 'prompt', prompt: 'Run the workflow' },
+        agent: { mode: 'code', model: 'test/model' },
+      })
+    ).resolves.toEqual({ type: 'ok' });
+
+    // A queued turn still counts as admitted, so the page that shows its row and
+    // the count agree; after settlement the row stays durable while the queued
+    // snapshot drops it, and only this count still reports the admitted turn.
+    const pageAfterSend = await stub.getSessionMessagesPage();
+    expect(pageAfterSend).toMatchObject({
+      admittedMessages: 1,
+      queuedMessages: [expect.objectContaining({ messageId: 'msg_admitted' })],
+    });
+
+    // Settle the turn and re-read from storage: a completed non-command turn
+    // leaves `queuedMessages`, so the count is the only page field through which
+    // this page still states that the session admitted a turn.
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'msg_admitted' });
+    await evictAllDurableObjects();
+
+    const settled = await stub.getSessionMessagesPage();
+    expect(settled).toMatchObject({ admittedMessages: 1, queuedMessages: [] });
   });
 
   it('hydrates only v1 sessions from session-ingest', async () => {

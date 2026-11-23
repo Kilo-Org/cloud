@@ -398,6 +398,8 @@ export type SessionSnapshotPage = {
    * opened without a socket still shows the question row and its failure.
    */
   queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
+  /** The turns the session ever admitted; a positive count with no transcript is a gap. */
+  admittedMessages?: number | undefined;
 };
 
 export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;

@@ -2878,6 +2878,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       ...page,
       preparationAttempts: snapshotRows.preparationAttempts,
       queuedMessages: snapshotRows.queuedMessages,
+      admittedMessages: snapshotRows.admittedMessages,
     };
   }
 
@@ -4751,10 +4752,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * own budget is reduced by that size so the response stays inside
    * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
    * always keeps the question row it is answering; preparation attempts give way.
+   * The admitted count is a page field rather than a row, so it is not trimmed.
    */
   private readSnapshotRows(): {
     preparationAttempts: PreparationAttempt[];
     queuedMessages: QueuedMessageSnapshot[];
+    admittedMessages: number;
     bytes: number;
   } {
     const encoder = new TextEncoder();
@@ -4777,6 +4780,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       preparationAttempts,
       queuedMessages,
+      // Every admitted turn keeps its durable row through settlement and a
+      // refused send never writes one, so the stored count is the admission
+      // count rather than the queue depth the rows above are trimmed to.
+      admittedMessages: this.messages.length,
       bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
     };
   }

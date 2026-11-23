@@ -47,9 +47,10 @@ export type SyncBanner =
 
 const banners = new Map<string, SyncBanner>();
 const bannerListeners = new Set<() => void>();
+const NO_BANNER: SyncBanner = { kind: 'none' };
 
 export function bannerOf(sessionId: string): SyncBanner {
-  return banners.get(sessionId) ?? { kind: 'none' };
+  return banners.get(sessionId) ?? NO_BANNER;
 }
 
 export function watchBanners(listener: () => void): () => void {

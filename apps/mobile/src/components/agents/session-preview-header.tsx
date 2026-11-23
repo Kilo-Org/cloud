@@ -51,13 +51,15 @@ export function SessionPreviewHeaderMeta({
   const hydration = useSessionAttentionHydration();
 
   const raiseId = liveRow ? (liveRow.status_updated_at ?? liveRow.status ?? null) : null;
-  /* Which status this header decides from. A live row is re-read every poll, so
-     it re-derives on its own. A preview that outlives its row carries the row's
-     own status and status time, and re-derives from those: the flag it was
-     opened with may be the `false` a held store reported, which would otherwise
-     keep the state label hidden after the store hydrated. A target that carries
-     no status has nothing to re-derive from and keeps its flag. */
-  const previewStatus = liveRow?.status ?? target.status;
+  /* Which status this header decides from. A live row is re-read every poll and
+     wins outright, including when it reports no status: a finished row has no
+     raise, so the header must not fall back to the status the target was opened
+     with. A preview that outlives its row carries the row's own status and
+     status time, and re-derives from those: the flag it was opened with may be
+     the `false` a held store reported, which would otherwise keep the state
+     label hidden after the store hydrated. A target that carries no status has
+     nothing to re-derive from and keeps its flag. */
+  const previewStatus = liveRow ? liveRow.status : target.status;
   // The same raise identity the row uses: its own status time when it has one,
   // so an ack naming that exact raise is honoured here too.
   const previewRaiseId = liveRow

@@ -4,6 +4,7 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 
 import {
+  attentionPhase,
   BASE_TARGET,
   mountOverlay,
   openPreview,
@@ -266,6 +267,40 @@ describe('SessionPreviewOverlay', () => {
     resetPreviewStore();
 
     expect(isModalSurfacePresented()).toBe(false);
+  });
+
+  it('derives a stored preview state from the row status it was opened with', () => {
+    const renderer = mountOverlay();
+    // A stored (non-live) target: no polled row, so the header decides from the
+    // status the preview carries. The flag it was opened with is the `false` a
+    // held ack store reports, and the header must not keep it.
+    attentionPhase.current = 'loading';
+    openPreview(targetWith({ live: false, status: 'question', needsInput: false }));
+
+    // Held: an unloaded store is not an answer, so no state label is drawn.
+    expect(textWith(renderer, i18n.t('agents.sessionRow.needsInput'))).toHaveLength(0);
+
+    // Settled with no ack for this raise: the header re-derives from the status
+    // it carries, so the label appears even though the opened flag was false.
+    attentionPhase.current = 'ready';
+    attentionPhase.acked = false;
+    openPreview(targetWith({ live: false, status: 'question', needsInput: false }));
+
+    expect(textWith(renderer, i18n.t('agents.sessionRow.needsInput')).length).toBeGreaterThan(0);
+  });
+
+  it('does not fall back to the opened status when the live row reports none', () => {
+    // A finished live row reports `status: null`. The header must read that as
+    // "no raise", not fall back to the status the preview was opened with.
+    previewState.row.data = { status: null, status_updated_at: null, total_cost_microdollars: null };
+    const renderer = mountOverlay();
+    attentionPhase.current = 'ready';
+    attentionPhase.acked = false;
+    openPreview(
+      targetWith({ live: true, status: 'question', statusUpdatedAt: 'R1', needsInput: true })
+    );
+
+    expect(textWith(renderer, i18n.t('agents.sessionRow.needsInput'))).toHaveLength(0);
   });
 
   it('moves accessibility focus to the first menu row once the portal mounts it', () => {

@@ -104,7 +104,7 @@ describe('Switch', () => {
     expect(props.accessibilityState?.disabled).toBe(false);
   });
 
-  it('paints the palette on the track and the grip', () => {
+  it('paints the palette on the track and the light off grip', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({}).root);
@@ -112,7 +112,10 @@ describe('Switch', () => {
       false: lightColors.mutedForeground,
       true: lightColors.primary,
     });
-    expect(props.thumbColor).toBe(lightColors.foreground);
+    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    // The ink grip on the mid neutral track carried the darkest mark in the
+    // row on a switch that says off, and stopped matching the dark cell.
+    expect(props.thumbColor).not.toBe(lightColors.foreground);
   });
 
   it('paints the light grip on the on track', () => {

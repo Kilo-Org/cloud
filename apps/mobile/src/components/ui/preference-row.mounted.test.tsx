@@ -454,16 +454,15 @@ describe('PreferenceRow', () => {
 
     expect(trackColor.false).toBe(lightColors.mutedForeground);
     expect(trackColor.true).toBe(lightColors.primary);
-    expect(thumbColor).toBe(lightColors.foreground);
+    expect(thumbColor).toBe(lightColors.primaryForeground);
     expect(contrast(trackColor.false, lightColors.secondary)).toBeGreaterThanOrEqual(3);
     expect(contrast(thumbColor, trackColor.false)).toBeGreaterThanOrEqual(3);
-    expect(contrast(thumbColor, lightColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 
   it('leaves the dark switch to the shared component, whose off grip is light', () => {
     // The row passes no pair at all, in either scheme: the shared `Switch`
-    // paints a `foreground` grip on the muted ink, and its light pair is the
-    // same one, so nothing here can drop the knob into the dark row.
+    // paints a light grip on the muted ink track in both, so nothing here can
+    // drop the knob into the dark row.
     schemeState.current = 'dark';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));

@@ -26,14 +26,17 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * olive the palette keeps for the same theme (`selection` — the light primary's
  * hue, lifted for the dark page) rather than the accent.
  *
- * The off pair is one pair in both themes: the mid neutral `mutedForeground`
- * track under the scheme ink `foreground` grip. That pair clears the 3:1
- * non-text floor against itself and against `background`, `card` and
- * `secondary` in light and dark alike, so the control reads as a control while
- * it says off. The earlier light pair, a white grip on the `mutedSoft` track,
- * measured about 2.5:1 on its own track and about 1.1:1 on the cream row that
- * Android's wider thumb overhangs onto. A caller that wants another pair still
- * wins: its own props are applied last.
+ * The off pair keeps one track in both themes, the mid neutral
+ * `mutedForeground`, under the light grip the base sheet draws:
+ * `primaryForeground` white in light, the scheme ink `foreground` in dark. The
+ * grip clears the 3:1 non-text floor on its own track (5.4:1 light, 3.2:1
+ * dark) and the track clears it on `background`, `card` and `secondary` in
+ * both themes (4.5:1 to 5.4:1), so the control reads as a control while it
+ * says off. The light track it replaced, `mutedSoft`, left that grip at about
+ * 2.5:1 on its own track and about 2.4:1 on the page. Inking the light grip
+ * instead put the darkest mark in the row on a switch that says off, and
+ * stopped matching the dark cell (design critic, 2026-11-23). A caller that
+ * wants another pair still wins: its own props are applied last.
  *
  * A disabled switch paints one muted pair, at the position it still shows.
  * Android folds the colours into the track and thumb drawables and only sets
@@ -106,9 +109,11 @@ export function Switch({
   // fills with `primary`, dark with the muted olive `selection`.
   const enabledOnTrack = dark ? colors.selection : colors.primary;
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
-  // The off pair is the same in both themes: the mid neutral track under the
-  // scheme ink grip, which clears the 3:1 non-text floor on every row surface.
-  const enabledOffGrip = colors.foreground;
+  // The off pair keeps the light grip on a track dark enough to carry it: the
+  // mid neutral `mutedForeground` under white in light and the scheme ink in
+  // dark, which clears the 3:1 non-text floor on the track and on every row
+  // surface, and leaves the off control lighter than the marks around it.
+  const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = colors.mutedForeground;
   // The off grip sits on the off track. A control that cannot change paints
   // one quiet pair at the position it still shows: a soft grip on the

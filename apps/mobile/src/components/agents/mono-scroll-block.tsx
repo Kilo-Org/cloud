@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
@@ -103,9 +103,9 @@ export function MonoScrollBlock({
   const { t } = useTranslation();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
-  const { displayText, isTruncated } = prepareMonoScrollContent(
-    content,
-    resolveMonoScrollMaxLength(maxLength)
+  const { displayText, isTruncated } = useMemo(
+    () => prepareMonoScrollContent(content, resolveMonoScrollMaxLength(maxLength)),
+    [content, maxLength]
   );
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);

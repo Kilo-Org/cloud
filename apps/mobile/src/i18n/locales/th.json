@@ -108,7 +108,6 @@
     "agents": "เอเจนต์",
     "all": "ทั้งหมด",
     "allModels": "โมเดลทั้งหมด",
-    "balanced": "สมดุล",
     "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
     "branch": "บรานช์",
     "cameraAccessDisabled": "ไม่ได้อนุญาตให้ใช้กล้อง",
@@ -1265,7 +1264,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ประเด็นที่เน้น",
       "hint": "หากต้องการตรวจสอบทุกด้าน ให้เว้นทุกตัวเลือกไว้โดยไม่เลือก"
     },
@@ -1297,10 +1296,18 @@
     },
     "style": {
       "title": "รูปแบบการตรวจสอบ",
-      "balanced": "รายงานข้อค้นพบที่สำคัญโดยไม่แจ้งเรื่องเล็กน้อยเกินจำเป็น",
-      "lenient": "เฉพาะปัญหาร้ายแรง",
-      "roast": "วิจารณ์ตรงและแรงแบบขำ ๆ",
-      "strict": "รายงานทุกข้อค้นพบตามมาตรฐานที่เข้มงวด"
+      "labels": {
+        "balanced": "สมดุล",
+        "lenient": "ผ่อนปรน",
+        "roast": "วิจารณ์แบบแซวแรง",
+        "strict": "เข้มงวด"
+      },
+      "descriptions": {
+        "balanced": "รายงานข้อค้นพบที่สำคัญโดยไม่แจ้งเรื่องเล็กน้อยเกินจำเป็น",
+        "lenient": "เฉพาะปัญหาร้ายแรง",
+        "roast": "วิจารณ์ตรงและแรงแบบขำ ๆ",
+        "strict": "รายงานทุกข้อค้นพบตามมาตรฐานที่เข้มงวด"
+      }
     },
     "reviewDetail": {
       "title": "การตรวจสอบ",
@@ -1504,12 +1511,7 @@
     "status": {
       "interrupted": "ถูกขัดจังหวะ"
     },
-    "reviewStyle": {
-      "strict": "เข้มงวด",
-      "lenient": "ผ่อนปรน",
-      "roast": "วิจารณ์แบบแซวแรง"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ความปลอดภัย",
       "bugs": "บั๊ก",
       "style": "รูปแบบโค้ด",
@@ -1788,7 +1790,7 @@
       "cannotDismissDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถละเว้นข้อค้นพบได้",
       "alreadyResolvedDescription": "ข้อค้นพบนี้ได้รับการแก้ไขแล้ว จึงไม่สามารถละเว้นได้อีก"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "มีข้อค้นพบใหม่มาแทนที่แล้ว",
       "supersededByDescription": "แตะเพื่อเปิดรายการปัจจุบันและดูสถานะ ผลวิเคราะห์ และการแก้ไข",
       "dismissedOn": "ละเว้นแล้ว เมื่อ",
@@ -1876,7 +1878,7 @@
       "enableTrackingSubtitle": "กำหนดเวลาแก้ไขตามระดับความรุนแรงของข้อค้นพบ",
       "deadlinesHeading": "ระยะเวลาแก้ไข (วัน)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ข้อค้นพบ",
       "tabAnalysis": "การวิเคราะห์",
       "tabRemediation": "การแก้ไข"

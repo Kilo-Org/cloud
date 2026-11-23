@@ -109,7 +109,6 @@
     "agents": "Գործակալներ",
     "all": "Բոլորը",
     "allModels": "Բոլոր մոդելները",
-    "balanced": "Հավասարակշռված",
     "bitbucketConnected": "Bitbucket-ը միացված է",
     "branch": "Ճյուղ",
     "cameraAccessDisabled": "Տեսախցիկի օգտագործումն արգելված է",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Ստուգման ոլորտներ",
       "hint": "Ամբողջը ստուգելու համար ոչ մի ոլորտ մի ընտրիր։"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Ստուգման ոճ",
-      "balanced": "Կարևոր խնդիրներ՝ առանց ավելորդ նկատողությունների",
-      "lenient": "Միայն լուրջ խնդիրներ",
-      "roast": "Անխնա անկեղծ՝ հումորով",
-      "strict": "Նշել բոլոր խնդիրները, կիրառել խիստ չափանիշներ"
+      "labels": {
+        "balanced": "Հավասարակշռված",
+        "lenient": "Մեղմ",
+        "roast": "Սուր հումոր",
+        "strict": "Խիստ"
+      },
+      "descriptions": {
+        "balanced": "Կարևոր խնդիրներ՝ առանց ավելորդ նկատողությունների",
+        "lenient": "Միայն լուրջ խնդիրներ",
+        "roast": "Անխնա անկեղծ՝ հումորով",
+        "strict": "Նշել բոլոր խնդիրները, կիրառել խիստ չափանիշներ"
+      }
     },
     "reviewDetail": {
       "title": "Ստուգում",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Ընդհատված"
     },
-    "reviewStyle": {
-      "strict": "Խիստ",
-      "lenient": "Մեղմ",
-      "roast": "Սուր հումոր"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Անվտանգություն",
       "bugs": "Սխալներ",
       "style": "Ոճ",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են մերժել խնդիրները։",
       "alreadyResolvedDescription": "Այս խնդիրն արդեն լուծված է, և այն այլևս հնարավոր չէ մերժել։"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Փոխարինվել է խնդրի արդի գրառմամբ",
       "supersededByDescription": "Հպիր՝ արդի գրառումը բացելու և կարգավիճակը, վերլուծությունն ու շտկումը դիտելու համար։",
       "dismissedOn": "Մերժված լինելու ամսաթիվ",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Սահմանել շտկման վերջնաժամկետերը՝ ըստ խնդրի վտանգավորության։",
       "deadlinesHeading": "Շտկման վերջնաժամկետեր (օր)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Խնդիր",
       "tabAnalysis": "Վերլուծություն",
       "tabRemediation": "Շտկում"

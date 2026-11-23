@@ -111,7 +111,6 @@
     "agents": "Агенти",
     "all": "Усі",
     "allModels": "Усі моделі",
-    "balanced": "Збалансований",
     "bitbucketConnected": "Bitbucket підключено",
     "branch": "Гілка",
     "cameraAccessDisabled": "Доступ до камери вимкнено",
@@ -732,7 +731,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Напрями перевірки",
       "hint": "Щоб перевірити все, не вибирайте жодного напряму."
     },
@@ -764,10 +763,18 @@
     },
     "style": {
       "title": "Стиль перевірки",
-      "balanced": "Суттєві зауваження без зайвих дрібниць",
-      "lenient": "Лише серйозні проблеми",
-      "roast": "Безжально чесно й кумедно",
-      "strict": "Виявляти всі недоліки та вимагати високої якості"
+      "labels": {
+        "balanced": "Збалансований",
+        "lenient": "Поблажливий",
+        "roast": "Нищівний",
+        "strict": "Суворий"
+      },
+      "descriptions": {
+        "balanced": "Суттєві зауваження без зайвих дрібниць",
+        "lenient": "Лише серйозні проблеми",
+        "roast": "Безжально чесно й кумедно",
+        "strict": "Виявляти всі недоліки та вимагати високої якості"
+      }
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
@@ -974,12 +981,7 @@
     "status": {
       "interrupted": "Перервано"
     },
-    "reviewStyle": {
-      "strict": "Суворий",
-      "lenient": "Поблажливий",
-      "roast": "Нищівний"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Безпека",
       "bugs": "Помилки",
       "style": "Стиль",
@@ -1351,12 +1353,12 @@
       "reasonTolerableRisk": "Ризик прийнятний",
       "title": "Відхилити виявлену проблему"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Аналіз",
       "tabRemediation": "Виправлення",
       "title": "Проблема безпеки"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Виявлено",
       "dismissedOn": "Дата відхилення",

@@ -109,7 +109,6 @@
     "agents": "Agentlər",
     "all": "Hamısı",
     "allModels": "Bütün modellər",
-    "balanced": "Balanslı",
     "bitbucketConnected": "Bitbucket qoşulub",
     "branch": "Budaq",
     "cameraAccessDisabled": "Kameraya giriş bağlıdır",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Əsas yoxlama sahələri",
       "hint": "Hər şeyi yoxlamaq üçün heç bir seçim etmə."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Yoxlama üslubu",
-      "balanced": "Lazımsız qeydlərsiz əhəmiyyətli tapıntılar",
-      "lenient": "Yalnız ciddi problemlər",
-      "roast": "Acı həqiqətlər, yumorla",
-      "strict": "Hər problemi qeyd et, yüksək standart tələb et"
+      "labels": {
+        "balanced": "Balanslı",
+        "lenient": "Yumşaq",
+        "roast": "İstehza",
+        "strict": "Sərt"
+      },
+      "descriptions": {
+        "balanced": "Lazımsız qeydlərsiz əhəmiyyətli tapıntılar",
+        "lenient": "Yalnız ciddi problemlər",
+        "roast": "Acı həqiqətlər, yumorla",
+        "strict": "Hər problemi qeyd et, yüksək standart tələb et"
+      }
     },
     "reviewDetail": {
       "title": "Yoxlama",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Yarımçıq qalıb"
     },
-    "reviewStyle": {
-      "strict": "Sərt",
-      "lenient": "Yumşaq",
-      "roast": "İstehza"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Təhlükəsizlik",
       "bugs": "Səhvlər",
       "style": "Stil",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri rədd edə bilər.",
       "alreadyResolvedDescription": "Bu tapıntı artıq həll edilib və onu rədd etmək mümkün deyil."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Cari tapıntı ilə əvəz edilib",
       "supersededByDescription": "Cari qeydin statusuna, təhlilinə və düzəlişinə baxmaq üçün toxun.",
       "dismissedOn": "Rədd edilmə tarixi",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
       "deadlinesHeading": "Düzəliş müddətləri (gün)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Tapıntı",
       "tabAnalysis": "Təhlil",
       "tabRemediation": "Düzəliş"

@@ -244,9 +244,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerChatgpt',
   'profile.providerClaude',
   'consent.kilo',
-  'securityAgent.findingDetails.cve',
-  'securityAgent.findingDetails.ghsa',
-  'securityAgent.findingDetails.sourceDependabot',
+  'securityAgent.findingDetailFields.cve',
+  'securityAgent.findingDetailFields.ghsa',
+  'securityAgent.findingDetailFields.sourceDependabot',
   // The audit report's change lines hold no prose of their own: a `$t()` label
   // reference, one separator, and two placeholders the catalog's own status or
   // severity words fill. A catalog that keeps the English connector reads in

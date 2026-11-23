@@ -82,7 +82,7 @@ export function FindingDetailUndeliveredBody({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.findingDetail.title')}
+        title={t('securityAgent.findingDetailScreen.title')}
         reserveSubtitle
         subtitlePlaceholder={
           showSubtitlePlaceholder ? <Skeleton className="h-3.5 w-28 rounded-full" /> : undefined

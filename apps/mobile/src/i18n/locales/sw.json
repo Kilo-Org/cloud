@@ -109,7 +109,6 @@
     "agents": "Mawakala",
     "all": "Zote",
     "allModels": "Modeli zote",
-    "balanced": "Ya wastani",
     "bitbucketConnected": "Bitbucket imeunganishwa",
     "branch": "Tawi",
     "cameraAccessDisabled": "Ruhusa ya kutumia kamera imezimwa",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Maeneo ya kuzingatia",
       "hint": "Usichague eneo lolote ili ukaguzi uhusishe kila kitu."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Mtindo wa ukaguzi",
-      "balanced": "Matatizo ya maana bila maelezo yasiyo muhimu",
-      "lenient": "Matatizo makubwa tu",
-      "roast": "Ukweli mkali wenye ucheshi",
-      "strict": "Bainisha kila tatizo na udai ubora wa juu"
+      "labels": {
+        "balanced": "Ya wastani",
+        "lenient": "Mpole",
+        "roast": "Kejeli",
+        "strict": "Mkali"
+      },
+      "descriptions": {
+        "balanced": "Matatizo ya maana bila maelezo yasiyo muhimu",
+        "lenient": "Matatizo makubwa tu",
+        "roast": "Ukweli mkali wenye ucheshi",
+        "strict": "Bainisha kila tatizo na udai ubora wa juu"
+      }
     },
     "reviewDetail": {
       "title": "Ukaguzi",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Umekatizwa"
     },
-    "reviewStyle": {
-      "strict": "Mkali",
-      "lenient": "Mpole",
-      "roast": "Kejeli"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Usalama",
       "bugs": "Hitilafu",
       "style": "Mtindo",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuondoa matatizo.",
       "alreadyResolvedDescription": "Tatizo hili tayari limetatuliwa na haliwezi kuondolewa tena."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nafasi yake imechukuliwa na tatizo la sasa",
       "supersededByDescription": "Gusa ili ufungue rekodi ya sasa na uone hali, uchambuzi na urekebishaji.",
       "dismissedOn": "Tarehe ya kupuuzwa",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Weka muda wa mwisho wa urekebishaji kulingana na ukali wa tatizo.",
       "deadlinesHeading": "Muda wa mwisho wa urekebishaji (siku)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Tatizo lililogunduliwa",
       "tabAnalysis": "Uchambuzi",
       "tabRemediation": "Urekebishaji"

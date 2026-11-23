@@ -111,7 +111,6 @@
     "agents": "Agenti",
     "all": "Vse",
     "allModels": "Vsi modeli",
-    "balanced": "Uravnoteženo",
     "bitbucketConnected": "Bitbucket je povezan",
     "branch": "Veja",
     "cameraAccessDisabled": "Dostop do kamere je onemogočen",
@@ -1346,7 +1345,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Prednostna področja",
       "hint": "Za pregled vseh področij pusti vsa polja neizbrana."
     },
@@ -1378,10 +1377,18 @@
     },
     "style": {
       "title": "Slog pregleda",
-      "balanced": "Pomembne ugotovitve brez nepotrebnih opozoril",
-      "lenient": "Samo resne težave",
-      "roast": "Brezkompromisno iskren in zabaven",
-      "strict": "Označi vse in zahtevaj visoko kakovost"
+      "labels": {
+        "balanced": "Uravnoteženo",
+        "lenient": "Prizanesljiv",
+        "roast": "Zbadljiv",
+        "strict": "Strog"
+      },
+      "descriptions": {
+        "balanced": "Pomembne ugotovitve brez nepotrebnih opozoril",
+        "lenient": "Samo resne težave",
+        "roast": "Brezkompromisno iskren in zabaven",
+        "strict": "Označi vse in zahtevaj visoko kakovost"
+      }
     },
     "reviewDetail": {
       "title": "Pregled",
@@ -1588,12 +1595,7 @@
     "status": {
       "interrupted": "Prekinjeno"
     },
-    "reviewStyle": {
-      "strict": "Strog",
-      "lenient": "Prizanesljiv",
-      "roast": "Zbadljiv"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Varnost",
       "bugs": "Hrošči",
       "style": "Slog",
@@ -1907,7 +1909,7 @@
       "cannotDismissDescription": "Ugotovitve lahko zavrnejo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "alreadyResolvedDescription": "Ta ugotovitev je že razrešena, zato je ni več mogoče zavrniti."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nadomeščeno z aktualno ugotovitvijo",
       "supersededByDescription": "Tapni za prikaz aktualnega zapisa s stanjem, analizo in podatki o odpravljanju.",
       "dismissedOn": "Datum zavrženja",
@@ -1997,7 +1999,7 @@
       "enableTrackingSubtitle": "Nastavi roke za odpravljanje glede na resnost ugotovitev.",
       "deadlinesHeading": "Roki za odpravljanje (v dneh)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Ugotovitev",
       "tabAnalysis": "Analiza",
       "tabRemediation": "Odpravljanje"

@@ -109,7 +109,6 @@
     "agents": "ਏਜੰਟ",
     "all": "ਸਾਰੇ",
     "allModels": "ਸਾਰੇ ਮਾਡਲ",
-    "balanced": "ਸੰਤੁਲਿਤ",
     "bitbucketConnected": "Bitbucket ਜੁੜ ਗਿਆ",
     "branch": "ਬ੍ਰਾਂਚ",
     "cameraAccessDisabled": "ਕੈਮਰੇ ਦੀ ਵਰਤੋਂ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ਧਿਆਨ ਦੇਣ ਵਾਲੇ ਖੇਤਰ",
       "hint": "ਸਭ ਕੁਝ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਕੋਈ ਵੀ ਖੇਤਰ ਨਾ ਚੁਣੋ।"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "ਸਮੀਖਿਆ ਦਾ ਢੰਗ",
-      "balanced": "ਬੇਲੋੜੀਆਂ ਟਿੱਪਣੀਆਂ ਤੋਂ ਬਿਨਾਂ ਅਹਿਮ ਸਮੱਸਿਆਵਾਂ",
-      "lenient": "ਸਿਰਫ਼ ਗੰਭੀਰ ਸਮੱਸਿਆਵਾਂ",
-      "roast": "ਤਿੱਖੀ ਪਰ ਮਜ਼ੇਦਾਰ ਆਲੋਚਨਾ",
-      "strict": "ਹਰ ਸਮੱਸਿਆ ਦੱਸੋ, ਉੱਚੇ ਮਿਆਰ ਰੱਖੋ"
+      "labels": {
+        "balanced": "ਸੰਤੁਲਿਤ",
+        "lenient": "ਨਰਮ",
+        "roast": "ਤਿੱਖੀ ਆਲੋਚਨਾ",
+        "strict": "ਸਖ਼ਤ"
+      },
+      "descriptions": {
+        "balanced": "ਬੇਲੋੜੀਆਂ ਟਿੱਪਣੀਆਂ ਤੋਂ ਬਿਨਾਂ ਅਹਿਮ ਸਮੱਸਿਆਵਾਂ",
+        "lenient": "ਸਿਰਫ਼ ਗੰਭੀਰ ਸਮੱਸਿਆਵਾਂ",
+        "roast": "ਤਿੱਖੀ ਪਰ ਮਜ਼ੇਦਾਰ ਆਲੋਚਨਾ",
+        "strict": "ਹਰ ਸਮੱਸਿਆ ਦੱਸੋ, ਉੱਚੇ ਮਿਆਰ ਰੱਖੋ"
+      }
     },
     "reviewDetail": {
       "title": "ਸਮੀਖਿਆ",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "ਵਿਚਕਾਰ ਰੁਕਿਆ"
     },
-    "reviewStyle": {
-      "strict": "ਸਖ਼ਤ",
-      "lenient": "ਨਰਮ",
-      "roast": "ਤਿੱਖੀ ਆਲੋਚਨਾ"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ਸੁਰੱਖਿਆ",
       "bugs": "ਬੱਗ",
       "style": "ਸ਼ੈਲੀ",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਸਮੱਸਿਆਵਾਂ ਖਾਰਜ ਕਰ ਸਕਦੇ ਹਨ।",
       "alreadyResolvedDescription": "ਇਹ ਸਮੱਸਿਆ ਪਹਿਲਾਂ ਹੀ ਹੱਲ ਹੋ ਚੁੱਕੀ ਹੈ ਅਤੇ ਹੁਣ ਇਸ ਨੂੰ ਖਾਰਜ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "ਇਸ ਦੀ ਥਾਂ ਨਵੀਂ ਸਮੱਸਿਆ ਦਰਜ ਹੈ",
       "supersededByDescription": "ਸਥਿਤੀ, ਵਿਸ਼ਲੇਸ਼ਣ ਅਤੇ ਸੁਧਾਰ ਦੇ ਵੇਰਵੇ ਦੇਖਣ ਲਈ ਮੌਜੂਦਾ ਰਿਕਾਰਡ 'ਤੇ ਟੈਪ ਕਰੋ।",
       "dismissedOn": "ਖਾਰਜ ਹੋਣ ਦੀ ਤਾਰੀਖ",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "ਸਮੱਸਿਆ ਦੀ ਗੰਭੀਰਤਾ ਮੁਤਾਬਕ ਸੁਧਾਰ ਦੀ ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਕਰੋ।",
       "deadlinesHeading": "ਸੁਧਾਰ ਦੀਆਂ ਸਮਾਂ ਸੀਮਾਵਾਂ (ਦਿਨ)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ਸਮੱਸਿਆ",
       "tabAnalysis": "ਵਿਸ਼ਲੇਸ਼ਣ",
       "tabRemediation": "ਸੁਧਾਰ"

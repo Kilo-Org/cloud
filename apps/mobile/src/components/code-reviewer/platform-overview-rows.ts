@@ -16,20 +16,21 @@ import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 
-const reviewStyleLabels = {
-  strict: 'codeReviewer.reviewStyle.strict',
-  balanced: 'common.balanced',
-  lenient: 'codeReviewer.reviewStyle.lenient',
-  roast: 'codeReviewer.reviewStyle.roast',
+// `codeReviewer.style.labels` is the single owner of the review-style labels.
+const styleLabels = {
+  strict: 'codeReviewer.style.labels.strict',
+  balanced: 'codeReviewer.style.labels.balanced',
+  lenient: 'codeReviewer.style.labels.lenient',
+  roast: 'codeReviewer.style.labels.roast',
 } as const;
 
 const focusAreaLabels = {
-  security: 'codeReviewer.focusArea.security',
+  security: 'codeReviewer.focusAreaOptions.security',
   performance: 'common.performance',
-  bugs: 'codeReviewer.focusArea.bugs',
-  style: 'codeReviewer.focusArea.style',
-  testing: 'codeReviewer.focusArea.testing',
-  documentation: 'codeReviewer.focusArea.documentation',
+  bugs: 'codeReviewer.focusAreaOptions.bugs',
+  style: 'codeReviewer.focusAreaOptions.style',
+  testing: 'codeReviewer.focusAreaOptions.testing',
+  documentation: 'codeReviewer.focusAreaOptions.documentation',
 } as const;
 
 const gateThresholdLabels = {
@@ -86,12 +87,12 @@ export function buildOverviewRows({
       field: 'style',
       icon: MessageSquareText,
       title: i18n.t('codeReviewer.style.title'),
-      subtitle: i18n.t(reviewStyleLabels[data.reviewStyle]),
+      subtitle: i18n.t(styleLabels[data.reviewStyle]),
     },
     {
       field: 'focus-areas',
       icon: ShieldCheck,
-      title: i18n.t('codeReviewer.focusAreas.title'),
+      title: i18n.t('codeReviewer.focusAreaSection.title'),
       subtitle:
         data.focusAreas.length > 0
           ? formatList(
@@ -100,7 +101,7 @@ export function buildOverviewRows({
               data.focusAreas.map(area =>
                 Object.hasOwn(focusAreaLabels, area)
                   ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
-                  : i18n.t('codeReviewer.focusArea.unknown', { area })
+                  : i18n.t('codeReviewer.focusAreaOptions.unknown', { area })
               ),
               i18n.language
             )

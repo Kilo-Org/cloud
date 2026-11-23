@@ -109,7 +109,6 @@
     "agents": "اجنټان",
     "all": "ټول",
     "allModels": "ټول ماډلونه",
-    "balanced": "متوازن",
     "bitbucketConnected": "Bitbucket ونښلول شو",
     "branch": "څانګه",
     "cameraAccessDisabled": "کامرې ته لاسرسی بند دی",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "د تمرکز ساحې",
       "hint": "د هر څه د بیاکتنې لپاره هېڅ برخه مه غوره کوئ."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "د بیاکتنې بڼه",
-      "balanced": "ګټورې موندنې، بې له بېځایه جزیاتو",
-      "lenient": "یوازې جدي ستونزې",
-      "roast": "بې پردې رښتیا، له خندا سره",
-      "strict": "هره ستونزه په نښه کړئ او لوړ معیار وساتئ"
+      "labels": {
+        "balanced": "متوازن",
+        "lenient": "نرم",
+        "roast": "طنزي نیوکې",
+        "strict": "سخت"
+      },
+      "descriptions": {
+        "balanced": "ګټورې موندنې، بې له بېځایه جزیاتو",
+        "lenient": "یوازې جدي ستونزې",
+        "roast": "بې پردې رښتیا، له خندا سره",
+        "strict": "هره ستونزه په نښه کړئ او لوړ معیار وساتئ"
+      }
     },
     "reviewDetail": {
       "title": "بیاکتنه",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "نیمګړی درېدلی"
     },
-    "reviewStyle": {
-      "strict": "سخت",
-      "lenient": "نرم",
-      "roast": "طنزي نیوکې"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "امنیت",
       "bugs": "تېروتنې",
       "style": "د لیکلو بڼه",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي موندنې له پامه وغورځوي.",
       "alreadyResolvedDescription": "دا موندنه لا دمخه حل شوې ده او نور له پامه نه شي غورځول کېدای."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "اوسنۍ موندنه یې ځایناستې ده",
       "supersededByDescription": "د حالت، تحلیل او اصلاح د لیدلو لپاره پر اوسني ریکارډ ټک وکړئ.",
       "dismissedOn": "د پامه غورځولو نېټه",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح مهلتونه وټاکئ.",
       "deadlinesHeading": "د اصلاح مهلتونه (ورځې)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "موندنه",
       "tabAnalysis": "تحلیل",
       "tabRemediation": "اصلاح"

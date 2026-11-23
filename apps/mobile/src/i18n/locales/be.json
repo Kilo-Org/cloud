@@ -111,7 +111,6 @@
     "agents": "Агенты",
     "all": "Усё",
     "allModels": "Усе мадэлі",
-    "balanced": "Збалансаваны",
     "bitbucketConnected": "Bitbucket падключаны",
     "branch": "Галіна",
     "cameraAccessDisabled": "Доступ да камеры адключаны",
@@ -1346,7 +1345,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Асноўныя напрамкі",
       "hint": "Каб праверыць усё, не выбірайце ніводнага напрамку."
     },
@@ -1378,10 +1377,18 @@
     },
     "style": {
       "title": "Стыль праверкі",
-      "balanced": "Істотныя праблемы без лішніх заўваг",
-      "lenient": "Толькі сур'ёзныя праблемы",
-      "roast": "Бязлітасна шчыра і з гумарам",
-      "strict": "Выяўляць усе праблемы і патрабаваць высокай якасці"
+      "labels": {
+        "balanced": "Збалансаваны",
+        "lenient": "Паблажлівы",
+        "roast": "З'едлівая крытыка",
+        "strict": "Строгі"
+      },
+      "descriptions": {
+        "balanced": "Істотныя праблемы без лішніх заўваг",
+        "lenient": "Толькі сур'ёзныя праблемы",
+        "roast": "Бязлітасна шчыра і з гумарам",
+        "strict": "Выяўляць усе праблемы і патрабаваць высокай якасці"
+      }
     },
     "reviewDetail": {
       "title": "Праверка",
@@ -1588,12 +1595,7 @@
     "status": {
       "interrupted": "Перапынена"
     },
-    "reviewStyle": {
-      "strict": "Строгі",
-      "lenient": "Паблажлівы",
-      "roast": "З'едлівая крытыка"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Бяспека",
       "bugs": "Памылкі",
       "style": "Стыль",
@@ -1907,7 +1909,7 @@
       "cannotDismissDescription": "Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць адхіляць праблемы.",
       "alreadyResolvedDescription": "Гэтая праблема ўжо вырашана, таму яе нельга адхіліць."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Заменена актуальнай праблемай",
       "supersededByDescription": "Націсніце, каб адкрыць актуальны запіс са станам, аналізам і выпраўленнем.",
       "dismissedOn": "Дата адхілення",
@@ -1997,7 +1999,7 @@
       "enableTrackingSubtitle": "Задаваць тэрміны выпраўлення паводле ўзроўню небяспекі праблемы.",
       "deadlinesHeading": "Тэрміны выпраўлення (дні)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Праблема",
       "tabAnalysis": "Аналіз",
       "tabRemediation": "Выпраўленне"

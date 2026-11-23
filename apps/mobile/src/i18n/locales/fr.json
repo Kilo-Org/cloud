@@ -110,7 +110,6 @@
     "agents": "Agents",
     "all": "Tout",
     "allModels": "Tous les modèles",
-    "balanced": "Équilibré",
     "bitbucketConnected": "Bitbucket connecté",
     "branch": "Branche",
     "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
@@ -696,7 +695,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Domaines d'analyse",
       "hint": "Ne sélectionnez aucun domaine pour tout examiner."
     },
@@ -728,10 +727,18 @@
     },
     "style": {
       "title": "Style de revue",
-      "balanced": "Des signalements pertinents, sans détails superflus",
-      "lenient": "Uniquement les problèmes graves",
-      "roast": "Une franchise mordante, avec humour",
-      "strict": "Tout signaler, sans compromis sur la qualité"
+      "labels": {
+        "balanced": "Équilibré",
+        "lenient": "Indulgent",
+        "roast": "Sarcastique",
+        "strict": "Exigeant"
+      },
+      "descriptions": {
+        "balanced": "Des signalements pertinents, sans détails superflus",
+        "lenient": "Uniquement les problèmes graves",
+        "roast": "Une franchise mordante, avec humour",
+        "strict": "Tout signaler, sans compromis sur la qualité"
+      }
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
@@ -937,12 +944,7 @@
     "status": {
       "interrupted": "Interrompue"
     },
-    "reviewStyle": {
-      "strict": "Exigeant",
-      "lenient": "Indulgent",
-      "roast": "Sarcastique"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sécurité",
       "bugs": "Bogues",
       "style": "Style du code",
@@ -1300,12 +1302,12 @@
       "reasonTolerableRisk": "Risque acceptable",
       "title": "Exclure le signalement"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analyse",
       "tabRemediation": "Correction",
       "title": "Signalement"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Détecté",
       "dismissedOn": "Ignoré le",

@@ -110,7 +110,6 @@
     "agents": "סוכנים",
     "all": "הכול",
     "allModels": "כל המודלים",
-    "balanced": "מאוזן",
     "bitbucketConnected": "Bitbucket מחובר",
     "branch": "ענף",
     "cameraAccessDisabled": "אין הרשאת גישה למצלמה",
@@ -730,7 +729,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "תחומי מיקוד",
       "hint": "כדי לסקור את הכול, השאר את כל האפשרויות לא מסומנות."
     },
@@ -762,10 +761,18 @@
     },
     "style": {
       "title": "סגנון סקירה",
-      "balanced": "ממצאים משמעותיים בלי הערות מיותרות",
-      "lenient": "רק בעיות חמורות",
-      "roast": "ביקורת נוקבת עם הומור",
-      "strict": "סימון כל בעיה והקפדה על רף גבוה"
+      "labels": {
+        "balanced": "מאוזן",
+        "lenient": "מקל",
+        "roast": "ביקורת עוקצנית",
+        "strict": "מחמיר"
+      },
+      "descriptions": {
+        "balanced": "ממצאים משמעותיים בלי הערות מיותרות",
+        "lenient": "רק בעיות חמורות",
+        "roast": "ביקורת נוקבת עם הומור",
+        "strict": "סימון כל בעיה והקפדה על רף גבוה"
+      }
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
@@ -971,12 +978,7 @@
     "status": {
       "interrupted": "הופסקה"
     },
-    "reviewStyle": {
-      "strict": "מחמיר",
-      "lenient": "מקל",
-      "roast": "ביקורת עוקצנית"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "אבטחה",
       "bugs": "באגים",
       "style": "סגנון",
@@ -1334,12 +1336,12 @@
       "reasonTolerableRisk": "הסיכון נסבל",
       "title": "התעלמות מהממצא"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "ניתוח",
       "tabRemediation": "תיקון",
       "title": "ממצא"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "זוהה",
       "dismissedOn": "תאריך ההתעלמות",

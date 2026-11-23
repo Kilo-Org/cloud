@@ -109,7 +109,6 @@
     "agents": "Агенттер",
     "all": "Барлығы",
     "allModels": "Барлық модельдер",
-    "balanced": "Теңгерімді",
     "bitbucketConnected": "Bitbucket қосылды",
     "branch": "Тармақ",
     "cameraAccessDisabled": "Камераны пайдалануға рұқсат жоқ",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Басым бағыттар",
       "hint": "Барлығын тексеру үшін ешбір бағытты таңдамаңыз."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Тексеру мәнері",
-      "balanced": "Артық ескертусіз, тек маңызды мәселелер",
-      "lenient": "Тек елеулі мәселелер",
-      "roast": "Аямай, әзілмен сынау",
-      "strict": "Әр мәселені атап, жоғары талап қою"
+      "labels": {
+        "balanced": "Теңгерімді",
+        "lenient": "Жұмсақ",
+        "roast": "Әзілмен сынау",
+        "strict": "Қатаң"
+      },
+      "descriptions": {
+        "balanced": "Артық ескертусіз, тек маңызды мәселелер",
+        "lenient": "Тек елеулі мәселелер",
+        "roast": "Аямай, әзілмен сынау",
+        "strict": "Әр мәселені атап, жоғары талап қою"
+      }
     },
     "reviewDetail": {
       "title": "Тексеру",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Үзілді"
     },
-    "reviewStyle": {
-      "strict": "Қатаң",
-      "lenient": "Жұмсақ",
-      "roast": "Әзілмен сынау"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Қауіпсіздік",
       "bugs": "Қателер",
       "style": "Стиль",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Мәселелерді тек ұйым иелері, әкімшілері мен төлем менеджерлері елемей қоя алады.",
       "alreadyResolvedDescription": "Бұл мәселе шешілген, сондықтан оны енді елемеуге болмайды."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Жаңа мәселемен ауыстырылған",
       "supersededByDescription": "Күйін, талдауын және түзетуін көру үшін жаңа жазбаны түртіп ашыңыз.",
       "dismissedOn": "Еленбеу күні",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Мәселенің қауіп деңгейіне қарай түзету мерзімдерін белгілеңіз.",
       "deadlinesHeading": "Түзету мерзімдері (күн)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Мәселе",
       "tabAnalysis": "Талдау",
       "tabRemediation": "Түзету"

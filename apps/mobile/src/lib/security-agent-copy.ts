@@ -175,7 +175,7 @@ export function isOpenDeadline(state: FindingDeadlineState): boolean {
 // label/detail the shared module built (web still reads those). Dates use the
 // active app language via formatDate. A deadline that is still open reads as
 // its date alone: the row that shows it is labelled with the deadline itself
-// (`securityAgent.findingDetails.slaDeadline`), so a value that also says "Due"
+// (`securityAgent.findingDetailFields.slaDeadline`), so a value that also says "Due"
 // repeats the label.
 export function getDeadlineCopy(state: FindingDeadlineState): DeadlineCopy {
   switch (state.kind) {

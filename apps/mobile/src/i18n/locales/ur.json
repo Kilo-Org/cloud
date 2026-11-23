@@ -109,7 +109,6 @@
     "agents": "ایجنٹس",
     "all": "تمام",
     "allModels": "تمام ماڈلز",
-    "balanced": "متوازن",
     "bitbucketConnected": "Bitbucket منسلک ہو گیا",
     "branch": "برانچ",
     "cameraAccessDisabled": "کیمرے تک رسائی غیر فعال ہے",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "توجہ کے شعبے",
       "hint": "ہر چیز کا جائزہ لینے کے لیے کوئی بھی شعبہ منتخب نہ کریں۔"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "جائزے کا انداز",
-      "balanced": "غیر ضروری تفصیلات کے بغیر اہم مسائل",
-      "lenient": "صرف سنگین مسائل",
-      "roast": "بے لاگ تنقید، مزاح کے ساتھ",
-      "strict": "ہر مسئلے کی نشاندہی کریں، معیار بلند رکھیں"
+      "labels": {
+        "balanced": "متوازن",
+        "lenient": "نرم",
+        "roast": "مزاحیہ تنقید",
+        "strict": "سخت"
+      },
+      "descriptions": {
+        "balanced": "غیر ضروری تفصیلات کے بغیر اہم مسائل",
+        "lenient": "صرف سنگین مسائل",
+        "roast": "بے لاگ تنقید، مزاح کے ساتھ",
+        "strict": "ہر مسئلے کی نشاندہی کریں، معیار بلند رکھیں"
+      }
     },
     "reviewDetail": {
       "title": "جائزہ",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "رک گیا"
     },
-    "reviewStyle": {
-      "strict": "سخت",
-      "lenient": "نرم",
-      "roast": "مزاحیہ تنقید"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "سکیورٹی",
       "bugs": "خرابیاں",
       "style": "انداز",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر مسائل خارج کر سکتے ہیں۔",
       "alreadyResolvedDescription": "یہ مسئلہ پہلے ہی حل ہو چکا ہے اور اب اسے خارج نہیں کیا جا سکتا۔"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "اس کی جگہ نیا مسئلہ درج ہو چکا ہے",
       "supersededByDescription": "حالت، تجزیے اور اصلاح کی تفصیلات دیکھنے کے لیے موجودہ ریکارڈ پر ٹیپ کریں۔",
       "dismissedOn": "نظر اندازی کی تاریخ",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "مسئلے کی شدت کے لحاظ سے اصلاح کی آخری تاریخ مقرر کریں۔",
       "deadlinesHeading": "اصلاح کی مہلت (دن)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "مسئلہ",
       "tabAnalysis": "تجزیہ",
       "tabRemediation": "اصلاح"

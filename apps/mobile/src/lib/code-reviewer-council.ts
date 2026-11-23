@@ -12,7 +12,7 @@ const SPECIALIST_COPY = [
     // The focus-area label already names this concern, and the catalog keeps
     // one wording per identical English string.
     id: 'security',
-    nameKey: 'codeReviewer.focusArea.security',
+    nameKey: 'codeReviewer.focusAreaOptions.security',
     descriptionKey: 'codeReviewer.council.specialist.security',
   },
   {

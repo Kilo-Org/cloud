@@ -106,7 +106,7 @@ describe('catalog copy', () => {
   it('names the missing record the same way as the screen title in Arabic', async () => {
     await i18n.changeLanguage('ar');
     expect(i18n.t('securityAgent.dismiss.notFoundTitle')).toContain(
-      i18n.t('securityAgent.findingDetail.title')
+      i18n.t('securityAgent.findingDetailScreen.title')
     );
   });
 
@@ -140,7 +140,7 @@ describe('catalog copy', () => {
     for (const key of [
       'agentChat.toolCard.toolEdit',
       'agentChat.toolCard.toolTask',
-      'securityAgent.findingDetails.reasonAfterReview',
+      'securityAgent.findingDetailFields.reasonAfterReview',
     ] as const) {
       expect(i18n.t(key), key).not.toMatch(/^\p{Lu}/u);
     }

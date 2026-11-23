@@ -109,7 +109,6 @@
     "agents": "Erindrekar",
     "all": "Allt",
     "allModels": "Öll líkön",
-    "balanced": "Í jafnvægi",
     "bitbucketConnected": "Bitbucket tengt",
     "branch": "Kvistur",
     "cameraAccessDisabled": "Aðgangur að myndavél ekki leyfður",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Áherslusvið",
       "hint": "Ef ekkert er valið verður allt yfirfarið."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Rýnistíll",
-      "balanced": "Mikilvæg frávik án óþarfa athugasemda",
-      "lenient": "Aðeins alvarleg vandamál",
-      "roast": "Miskunnarlaust heiðarlegt með húmor",
-      "strict": "Benda á allt og gera miklar kröfur"
+      "labels": {
+        "balanced": "Í jafnvægi",
+        "lenient": "Umburðarlynt",
+        "roast": "Háð",
+        "strict": "Strangt"
+      },
+      "descriptions": {
+        "balanced": "Mikilvæg frávik án óþarfa athugasemda",
+        "lenient": "Aðeins alvarleg vandamál",
+        "roast": "Miskunnarlaust heiðarlegt með húmor",
+        "strict": "Benda á allt og gera miklar kröfur"
+      }
     },
     "reviewDetail": {
       "title": "Rýni",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Rofið"
     },
-    "reviewStyle": {
-      "strict": "Strangt",
-      "lenient": "Umburðarlynt",
-      "roast": "Háð"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Öryggi",
       "bugs": "Gallar",
       "style": "Stíll",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta vísað frávikum frá.",
       "alreadyResolvedDescription": "Þetta frávik hefur þegar verið leyst og því er ekki lengur hægt að vísa því frá."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nýrra frávik kemur í staðinn",
       "supersededByDescription": "Ýttu til að opna nýjustu færsluna og sjá stöðu, greiningu og úrbætur.",
       "dismissedOn": "Vísað frá þann",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Úrbótafrestir eru ákveðnir út frá alvarleika frávika.",
       "deadlinesHeading": "Úrbótafrestir (dagar)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Frávik",
       "tabAnalysis": "Greining",
       "tabRemediation": "Úrbætur"

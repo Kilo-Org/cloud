@@ -109,7 +109,6 @@
     "agents": "Agenten",
     "all": "Alles",
     "allModels": "Alle modellen",
-    "balanced": "Evenwichtig",
     "bitbucketConnected": "Bitbucket gekoppeld",
     "branch": "Codetak",
     "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
@@ -728,7 +727,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Aandachtspunten",
       "hint": "Selecteer niets om alles te laten beoordelen."
     },
@@ -760,10 +759,18 @@
     },
     "style": {
       "title": "Beoordelingsstijl",
-      "balanced": "Relevante bevindingen zonder onnodige meldingen",
-      "lenient": "Alleen ernstige problemen",
-      "roast": "Onverbloemd eerlijk, met humor",
-      "strict": "Alles signaleren, strenge eisen stellen"
+      "labels": {
+        "balanced": "Evenwichtig",
+        "lenient": "Soepel",
+        "roast": "Onverbloemd",
+        "strict": "Streng"
+      },
+      "descriptions": {
+        "balanced": "Relevante bevindingen zonder onnodige meldingen",
+        "lenient": "Alleen ernstige problemen",
+        "roast": "Onverbloemd eerlijk, met humor",
+        "strict": "Alles signaleren, strenge eisen stellen"
+      }
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
@@ -968,12 +975,7 @@
     "status": {
       "interrupted": "Onderbroken"
     },
-    "reviewStyle": {
-      "strict": "Streng",
-      "lenient": "Soepel",
-      "roast": "Onverbloemd"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Beveiliging",
       "bugs": "Programmeerfouten",
       "style": "Stijl",
@@ -1317,12 +1319,12 @@
       "reasonTolerableRisk": "Het risico is aanvaardbaar",
       "title": "Bevinding negeren"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analyse",
       "tabRemediation": "Herstel",
       "title": "Bevinding"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Gedetecteerd",
       "dismissedOn": "Genegeerd op",

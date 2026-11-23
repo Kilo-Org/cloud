@@ -109,7 +109,6 @@
     "agents": "Ajan",
     "all": "Tout",
     "allModels": "Tout modèl yo",
-    "balanced": "Ekilibre",
     "bitbucketConnected": "Bitbucket konekte",
     "branch": "Branch kòd",
     "cameraAccessDisabled": "Aksè nan kamera a dezaktive",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Aspè pou konsantre sou yo",
       "hint": "Pa chwazi okenn domèn si ou vle revize tout bagay."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Estil revizyon",
-      "balanced": "Konsta itil san detay initil",
-      "lenient": "Pwoblèm grav sèlman",
-      "roast": "Franchiz san pitye ak imè",
-      "strict": "Siyale tout pwoblèm, egzije bon kalite"
+      "labels": {
+        "balanced": "Ekilibre",
+        "lenient": "Toleran",
+        "roast": "Kritik piman bouk",
+        "strict": "Sevè"
+      },
+      "descriptions": {
+        "balanced": "Konsta itil san detay initil",
+        "lenient": "Pwoblèm grav sèlman",
+        "roast": "Franchiz san pitye ak imè",
+        "strict": "Siyale tout pwoblèm, egzije bon kalite"
+      }
     },
     "reviewDetail": {
       "title": "Revizyon",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Entèwonp"
     },
-    "reviewStyle": {
-      "strict": "Sevè",
-      "lenient": "Toleran",
-      "roast": "Kritik piman bouk"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sekirite",
       "bugs": "Defo lojisyèl",
       "style": "Estil",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka rejte konsta yo.",
       "alreadyResolvedDescription": "Konsta sa a deja rezoud. Ou pa ka rejte li ankò."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Yon konsta aktyèl ranplase li",
       "supersededByDescription": "Peze pou ouvri dosye aktyèl la epi wè estati, analiz ak koreksyon yo.",
       "dismissedOn": "Rejte sou",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Fikse dat limit koreksyon yo selon gravite konsta yo.",
       "deadlinesHeading": "Delè koreksyon (jou)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Konsta",
       "tabAnalysis": "Analiz",
       "tabRemediation": "Koreksyon"

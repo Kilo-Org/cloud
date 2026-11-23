@@ -109,7 +109,6 @@
     "agents": "Agenter",
     "all": "Alle",
     "allModels": "Alle modeller",
-    "balanced": "Afbalanceret",
     "bitbucketConnected": "Bitbucket tilknyttet",
     "branch": "Gren",
     "cameraAccessDisabled": "Ingen adgang til kameraet",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fokusområder",
       "hint": "Undlad at vælge områder for at gennemgå alt."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Gennemgangsstil",
-      "balanced": "Relevante fund uden støj",
-      "lenient": "Kun alvorlige problemer",
-      "roast": "Brutalt ærlig og underholdende",
-      "strict": "Markér alt, og stil høje krav"
+      "labels": {
+        "balanced": "Afbalanceret",
+        "lenient": "Mild",
+        "roast": "Spydig",
+        "strict": "Streng"
+      },
+      "descriptions": {
+        "balanced": "Relevante fund uden støj",
+        "lenient": "Kun alvorlige problemer",
+        "roast": "Brutalt ærlig og underholdende",
+        "strict": "Markér alt, og stil høje krav"
+      }
     },
     "reviewDetail": {
       "title": "Gennemgang",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Afbrudt"
     },
-    "reviewStyle": {
-      "strict": "Streng",
-      "lenient": "Mild",
-      "roast": "Spydig"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sikkerhed",
       "bugs": "Fejl",
       "style": "Stil",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan afvise fund.",
       "alreadyResolvedDescription": "Dette fund er allerede løst og kan ikke længere afvises."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Erstattet af et aktuelt fund",
       "supersededByDescription": "Tryk for at se det aktuelle funds status, analyse og udbedring.",
       "dismissedOn": "Afvist den",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Angiv frister for udbedring ud fra fundets alvorlighed.",
       "deadlinesHeading": "Frister for udbedring (dage)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Fund",
       "tabAnalysis": "Analyse",
       "tabRemediation": "Udbedring"

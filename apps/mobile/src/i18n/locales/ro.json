@@ -110,7 +110,6 @@
     "agents": "Agenți",
     "all": "Toate",
     "allModels": "Toate modelele",
-    "balanced": "Echilibrat",
     "bitbucketConnected": "Bitbucket conectat",
     "branch": "Ramură",
     "cameraAccessDisabled": "Acces la cameră dezactivat",
@@ -1318,7 +1317,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Aspecte prioritare",
       "hint": "Nu selecta niciun domeniu pentru a revizui totul."
     },
@@ -1350,10 +1349,18 @@
     },
     "style": {
       "title": "Stil de revizuire",
-      "balanced": "Constatări relevante, fără detalii inutile",
-      "lenient": "Doar probleme grave",
-      "roast": "Sincer fără menajamente, dar cu umor",
-      "strict": "Semnalează toate problemele și aplică standarde exigente"
+      "labels": {
+        "balanced": "Echilibrat",
+        "lenient": "Îngăduitor",
+        "roast": "Critică acidă",
+        "strict": "Exigent"
+      },
+      "descriptions": {
+        "balanced": "Constatări relevante, fără detalii inutile",
+        "lenient": "Doar probleme grave",
+        "roast": "Sincer fără menajamente, dar cu umor",
+        "strict": "Semnalează toate problemele și aplică standarde exigente"
+      }
     },
     "reviewDetail": {
       "title": "Revizuire",
@@ -1559,12 +1566,7 @@
     "status": {
       "interrupted": "Întreruptă"
     },
-    "reviewStyle": {
-      "strict": "Exigent",
-      "lenient": "Îngăduitor",
-      "roast": "Critică acidă"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Securitate",
       "bugs": "Erori",
       "style": "Stil",
@@ -1866,7 +1868,7 @@
       "cannotDismissDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot respinge constatări.",
       "alreadyResolvedDescription": "Această constatare a fost deja rezolvată și nu mai poate fi respinsă."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Înlocuită de o constatare actuală",
       "supersededByDescription": "Atinge pentru a deschide înregistrarea actuală și a vedea starea, analiza și remedierea.",
       "dismissedOn": "Ignorată la",
@@ -1955,7 +1957,7 @@
       "enableTrackingSubtitle": "Stabilește termene limită de remediere în funcție de gravitatea constatării.",
       "deadlinesHeading": "Termene limită de remediere (zile)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Constatare",
       "tabAnalysis": "Analiză",
       "tabRemediation": "Remediere"

@@ -109,7 +109,6 @@
     "agents": "Ama-ejenti",
     "all": "Konke",
     "allModels": "Wonke amamodeli",
-    "balanced": "Okulingene",
     "bitbucketConnected": "I-Bitbucket ixhunyiwe",
     "branch": "Igatsha",
     "cameraAccessDisabled": "Ukusebenzisa ikhamera akuvunyelwe",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Izindawo okugxilwa kuzo",
       "hint": "Shiya zonke izindawo zingakhethiwe ukuze kuhlolwe konke."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Indlela yokuhlola",
-      "balanced": "Okutholakele okubalulekile ngaphandle kwemininingwane engadingekile",
-      "lenient": "Izinkinga ezinkulu kuphela",
-      "roast": "Ukugxeka okuqondile, ngendlela ehlekisayo",
-      "strict": "Phawula konke, gcina izinga eliphezulu"
+      "labels": {
+        "balanced": "Okulingene",
+        "lenient": "Okungaqinile",
+        "roast": "Ukugxeka ngokuhlekisa",
+        "strict": "Okungqongqo"
+      },
+      "descriptions": {
+        "balanced": "Okutholakele okubalulekile ngaphandle kwemininingwane engadingekile",
+        "lenient": "Izinkinga ezinkulu kuphela",
+        "roast": "Ukugxeka okuqondile, ngendlela ehlekisayo",
+        "strict": "Phawula konke, gcina izinga eliphezulu"
+      }
     },
     "reviewDetail": {
       "title": "Ukuhlola",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Kuphazamisekile"
     },
-    "reviewStyle": {
-      "strict": "Okungqongqo",
-      "lenient": "Okungaqinile",
-      "roast": "Ukugxeka ngokuhlekisa"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Ukuphepha",
       "bugs": "Amaphutha",
       "style": "Isitayela",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangachitha okutholakele.",
       "alreadyResolvedDescription": "Lokhu okutholakele sekuxazululiwe futhi akusakwazi ukuchithwa."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Kuthathelwe indawo okutholakele kwamanje",
       "supersededByDescription": "Thepha ukuze uvule irekhodi lamanje ubone isimo, ukuhlaziywa nokulungisa.",
       "dismissedOn": "Usuku lokuchithwa",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Beka iminqamulajuqu yokulungisa ngokobucayi bokutholakele.",
       "deadlinesHeading": "Iminqamulajuqu yokulungisa (izinsuku)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Okutholakele",
       "tabAnalysis": "Ukuhlaziywa",
       "tabRemediation": "Ukulungisa"

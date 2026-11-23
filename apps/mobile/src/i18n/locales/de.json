@@ -109,7 +109,6 @@
     "agents": "Agenten",
     "all": "Alle",
     "allModels": "Alle Modelle",
-    "balanced": "Ausgewogen",
     "bitbucketConnected": "Bitbucket verbunden",
     "branch": "Zweig",
     "cameraAccessDisabled": "Kamerazugriff deaktiviert",
@@ -728,7 +727,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Schwerpunkte",
       "hint": "Wähle keinen Bereich aus, um alles prüfen zu lassen."
     },
@@ -760,10 +759,18 @@
     },
     "style": {
       "title": "Art der Prüfung",
-      "balanced": "Relevante Befunde ohne unnötige Hinweise",
-      "lenient": "Nur schwerwiegende Probleme",
-      "roast": "Schonungslos ehrlich und unterhaltsam",
-      "strict": "Alles beanstanden, strenge Maßstäbe anlegen"
+      "labels": {
+        "balanced": "Ausgewogen",
+        "lenient": "Nachsichtig",
+        "roast": "Bissig",
+        "strict": "Streng"
+      },
+      "descriptions": {
+        "balanced": "Relevante Befunde ohne unnötige Hinweise",
+        "lenient": "Nur schwerwiegende Probleme",
+        "roast": "Schonungslos ehrlich und unterhaltsam",
+        "strict": "Alles beanstanden, strenge Maßstäbe anlegen"
+      }
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
@@ -968,12 +975,7 @@
     "status": {
       "interrupted": "Unterbrochen"
     },
-    "reviewStyle": {
-      "strict": "Streng",
-      "lenient": "Nachsichtig",
-      "roast": "Bissig"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sicherheit",
       "bugs": "Fehler",
       "style": "Stil",
@@ -1317,12 +1319,12 @@
       "reasonTolerableRisk": "Risiko vertretbar",
       "title": "Befund verwerfen"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analyse",
       "tabRemediation": "Behebung",
       "title": "Befund"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Erkannt",
       "dismissedOn": "Verworfen am",

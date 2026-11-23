@@ -109,7 +109,6 @@
     "agents": "এজেন্ট",
     "all": "সব",
     "allModels": "সব মডেল",
-    "balanced": "সুষম",
     "bitbucketConnected": "Bitbucket সংযুক্ত",
     "branch": "ব্রাঞ্চ",
     "cameraAccessDisabled": "ক্যামেরা ব্যবহারের অনুমতি বন্ধ",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "গুরুত্বের বিষয়",
       "hint": "সবকিছু পর্যালোচনা করতে কোনোটি নির্বাচন করবেন না।"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "পর্যালোচনার ধরন",
-      "balanced": "অপ্রয়োজনীয় মন্তব্য ছাড়া গুরুত্বপূর্ণ ত্রুটি শনাক্তকরণ",
-      "lenient": "শুধুমাত্র গুরুতর সমস্যা",
-      "roast": "মজার ছলে কঠিন সত্য বলা",
-      "strict": "সব ত্রুটি চিহ্নিত করুন, মানের ক্ষেত্রে ছাড় দেবেন না"
+      "labels": {
+        "balanced": "সুষম",
+        "lenient": "নমনীয়",
+        "roast": "ব্যঙ্গাত্মক সমালোচনা",
+        "strict": "কঠোর"
+      },
+      "descriptions": {
+        "balanced": "অপ্রয়োজনীয় মন্তব্য ছাড়া গুরুত্বপূর্ণ ত্রুটি শনাক্তকরণ",
+        "lenient": "শুধুমাত্র গুরুতর সমস্যা",
+        "roast": "মজার ছলে কঠিন সত্য বলা",
+        "strict": "সব ত্রুটি চিহ্নিত করুন, মানের ক্ষেত্রে ছাড় দেবেন না"
+      }
     },
     "reviewDetail": {
       "title": "পর্যালোচনা",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "বাধাগ্রস্ত"
     },
-    "reviewStyle": {
-      "strict": "কঠোর",
-      "lenient": "নমনীয়",
-      "roast": "ব্যঙ্গাত্মক সমালোচনা"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "নিরাপত্তা",
       "bugs": "বাগ",
       "style": "কোডের ধরন",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা ত্রুটি খারিজ করতে পারেন।",
       "alreadyResolvedDescription": "এই ত্রুটির সমাধান হয়ে গেছে, তাই এটি আর খারিজ করা যাবে না।"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "নতুন ত্রুটির রেকর্ড দিয়ে প্রতিস্থাপিত",
       "supersededByDescription": "অবস্থা, বিশ্লেষণ ও সমাধান দেখতে বর্তমান রেকর্ডটি ট্যাপ করে খুলুন।",
       "dismissedOn": "খারিজের তারিখ",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "ত্রুটির তীব্রতা অনুযায়ী সমাধানের সময়সীমা নির্ধারণ করুন।",
       "deadlinesHeading": "সমাধানের সময়সীমা (দিন)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ত্রুটি",
       "tabAnalysis": "বিশ্লেষণ",
       "tabRemediation": "সমাধান"

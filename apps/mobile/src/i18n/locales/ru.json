@@ -111,7 +111,6 @@
     "agents": "Агенты",
     "all": "Все",
     "allModels": "Все модели",
-    "balanced": "Сбалансированный режим",
     "bitbucketConnected": "Bitbucket подключён",
     "branch": "Ветка",
     "cameraAccessDisabled": "Доступ к камере отключён",
@@ -732,7 +731,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Приоритеты проверки",
       "hint": "Не выбирайте ни одного пункта, чтобы проверить всё."
     },
@@ -764,10 +763,18 @@
     },
     "style": {
       "title": "Стиль проверки",
-      "balanced": "Только существенные замечания",
-      "lenient": "Только серьезные проблемы",
-      "roast": "Беспощадная честность с юмором",
-      "strict": "Отмечать все проблемы и требовать высокого качества"
+      "labels": {
+        "balanced": "Сбалансированный режим",
+        "lenient": "Мягкий",
+        "roast": "Прожарка",
+        "strict": "Строгий"
+      },
+      "descriptions": {
+        "balanced": "Только существенные замечания",
+        "lenient": "Только серьезные проблемы",
+        "roast": "Беспощадная честность с юмором",
+        "strict": "Отмечать все проблемы и требовать высокого качества"
+      }
     },
     "autoReviews": "Автоматические проверки",
     "bitbucket": {
@@ -974,12 +981,7 @@
     "status": {
       "interrupted": "Прервано"
     },
-    "reviewStyle": {
-      "strict": "Строгий",
-      "lenient": "Мягкий",
-      "roast": "Прожарка"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Безопасность",
       "bugs": "Ошибки",
       "style": "Стиль",
@@ -1351,12 +1353,12 @@
       "reasonTolerableRisk": "Риск приемлем",
       "title": "Отклонить замечание"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Анализ",
       "tabRemediation": "Исправление",
       "title": "Уязвимость"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Обнаружено",
       "dismissedOn": "Дата отклонения",

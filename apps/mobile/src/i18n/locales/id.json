@@ -108,7 +108,6 @@
     "agents": "Agen",
     "all": "Semua",
     "allModels": "Semua model",
-    "balanced": "Seimbang",
     "bitbucketConnected": "Bitbucket terhubung",
     "branch": "Cabang",
     "cameraAccessDisabled": "Akses kamera dinonaktifkan",
@@ -726,7 +725,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Area fokus",
       "hint": "Jangan pilih area apa pun untuk meninjau semuanya."
     },
@@ -758,10 +757,18 @@
     },
     "style": {
       "title": "Gaya tinjauan",
-      "balanced": "Temuan penting tanpa hal yang tidak relevan",
-      "lenient": "Hanya masalah serius",
-      "roast": "Jujur tanpa basa-basi, tetapi tetap menghibur",
-      "strict": "Tandai semuanya, pertahankan standar tinggi"
+      "labels": {
+        "balanced": "Seimbang",
+        "lenient": "Longgar",
+        "roast": "Sindiran pedas",
+        "strict": "Ketat"
+      },
+      "descriptions": {
+        "balanced": "Temuan penting tanpa hal yang tidak relevan",
+        "lenient": "Hanya masalah serius",
+        "roast": "Jujur tanpa basa-basi, tetapi tetap menghibur",
+        "strict": "Tandai semuanya, pertahankan standar tinggi"
+      }
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
@@ -965,12 +972,7 @@
     "status": {
       "interrupted": "Terputus"
     },
-    "reviewStyle": {
-      "strict": "Ketat",
-      "lenient": "Longgar",
-      "roast": "Sindiran pedas"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Keamanan",
       "bugs": "Kesalahan kode",
       "style": "Gaya",
@@ -1301,12 +1303,12 @@
       "reasonTolerableRisk": "Risikonya dapat diterima",
       "title": "Abaikan temuan"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analisis",
       "tabRemediation": "Perbaikan",
       "title": "Temuan"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Terdeteksi",
       "dismissedOn": "Diabaikan pada",

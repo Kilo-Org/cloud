@@ -109,7 +109,6 @@
     "agents": "Ngā kaiāwhina",
     "all": "Katoa",
     "allModels": "Ngā tauira katoa",
-    "balanced": "Taurite",
     "bitbucketConnected": "Kua hono a Bitbucket",
     "branch": "Peka",
     "cameraAccessDisabled": "Kua monokia te uru ki te kāmera",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Ngā wāhanga arotahi",
       "hint": "Kia arotakehia ngā mea katoa, kaua e kōwhiri i tētahi wāhanga."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Te āhua arotake",
-      "balanced": "Ngā kitenga whaihua, kāore he kōrero kāore e hiahiatia",
-      "lenient": "Ngā raruraru nui anake",
-      "roast": "He kōrero pono, he koi, he whakakatakata hoki",
-      "strict": "Tohua ngā mea katoa, kia teitei te paerewa"
+      "labels": {
+        "balanced": "Taurite",
+        "lenient": "Ngāwari",
+        "roast": "Tāunu",
+        "strict": "Pakari"
+      },
+      "descriptions": {
+        "balanced": "Ngā kitenga whaihua, kāore he kōrero kāore e hiahiatia",
+        "lenient": "Ngā raruraru nui anake",
+        "roast": "He kōrero pono, he koi, he whakakatakata hoki",
+        "strict": "Tohua ngā mea katoa, kia teitei te paerewa"
+      }
     },
     "reviewDetail": {
       "title": "Arotake",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "I haukotia"
     },
-    "reviewStyle": {
-      "strict": "Pakari",
-      "lenient": "Ngāwari",
-      "roast": "Tāunu"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Haumarutanga",
       "bugs": "Ngā hapa",
       "style": "Kāhua",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te whakakore i ngā kitenga.",
       "alreadyResolvedDescription": "Kua whakatauria kētia tēnei kitenga, ā, kāore e taea te whakakore ināianei."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Kua whakakapia e tētahi kitenga o nāianei",
       "supersededByDescription": "Patoa kia whakatuwhera i te pūkete o nāianei mō te tūnga, te tātari me te whakatika.",
       "dismissedOn": "Kua whakakorea i te",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Whakaritea ngā wā kati whakatika e ai ki te taumata kino o te kitenga.",
       "deadlinesHeading": "Ngā wā kati whakatika (rā)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Kitenga",
       "tabAnalysis": "Tātaritanga",
       "tabRemediation": "Whakatika"

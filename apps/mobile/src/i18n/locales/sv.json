@@ -109,7 +109,6 @@
     "agents": "Agenter",
     "all": "Alla",
     "allModels": "Alla modeller",
-    "balanced": "Balanserad",
     "bitbucketConnected": "Bitbucket är anslutet",
     "branch": "Gren",
     "cameraAccessDisabled": "Ingen åtkomst till kameran",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fokusområden",
       "hint": "Lämna alla omarkerade för att granska allt."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Granskningsstil",
-      "balanced": "Relevanta fynd utan onödiga anmärkningar",
-      "lenient": "Endast allvarliga problem",
-      "roast": "Brutalt ärlig med humor",
-      "strict": "Flagga allt och ställ höga krav"
+      "labels": {
+        "balanced": "Balanserad",
+        "lenient": "Mild",
+        "roast": "Svidande kritik",
+        "strict": "Strikt"
+      },
+      "descriptions": {
+        "balanced": "Relevanta fynd utan onödiga anmärkningar",
+        "lenient": "Endast allvarliga problem",
+        "roast": "Brutalt ärlig med humor",
+        "strict": "Flagga allt och ställ höga krav"
+      }
     },
     "reviewDetail": {
       "title": "Granskning",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Avbruten"
     },
-    "reviewStyle": {
-      "strict": "Strikt",
-      "lenient": "Mild",
-      "roast": "Svidande kritik"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Säkerhet",
       "bugs": "Buggar",
       "style": "Stil",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan avfärda fynd.",
       "alreadyResolvedDescription": "Fyndet har redan åtgärdats och kan inte längre avfärdas."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Ersatt av ett aktuellt fynd",
       "supersededByDescription": "Tryck för att öppna den aktuella posten med status, analys och åtgärd.",
       "dismissedOn": "Avfärdad den",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Ange tidsfrister för åtgärder utifrån fyndens allvarlighetsgrad.",
       "deadlinesHeading": "Tidsfrister för åtgärder (dagar)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Fynd",
       "tabAnalysis": "Analys",
       "tabRemediation": "Åtgärd"

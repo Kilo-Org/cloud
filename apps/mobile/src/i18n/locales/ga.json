@@ -112,7 +112,6 @@
     "agents": "Gníomhairí",
     "all": "Gach ceann",
     "allModels": "Gach samhail",
-    "balanced": "Cothrom",
     "bitbucketConnected": "Bitbucket nasctha",
     "branch": "Brainse",
     "cameraAccessDisabled": "Rochtain ar an gceamara díchumasaithe",
@@ -1374,7 +1373,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Réimsí béime",
       "hint": "Ná roghnaigh aon réimse más mian leat gach rud a athbhreithniú."
     },
@@ -1406,10 +1405,18 @@
     },
     "style": {
       "title": "Stíl athbhreithnithe",
-      "balanced": "Torthaí fiúntacha gan sonraí gan tábhacht",
-      "lenient": "Fadhbanna tromchúiseacha amháin",
-      "roast": "Macánta gan trócaire, ar bhealach siamsúil",
-      "strict": "Marcáil gach rud agus éiligh ardchaighdeán"
+      "labels": {
+        "balanced": "Cothrom",
+        "lenient": "Éadrom",
+        "roast": "Magadh géar",
+        "strict": "Dian"
+      },
+      "descriptions": {
+        "balanced": "Torthaí fiúntacha gan sonraí gan tábhacht",
+        "lenient": "Fadhbanna tromchúiseacha amháin",
+        "roast": "Macánta gan trócaire, ar bhealach siamsúil",
+        "strict": "Marcáil gach rud agus éiligh ardchaighdeán"
+      }
     },
     "reviewDetail": {
       "title": "Athbhreithniú",
@@ -1617,12 +1624,7 @@
     "status": {
       "interrupted": "Idirbhriste"
     },
-    "reviewStyle": {
-      "strict": "Dian",
-      "lenient": "Éadrom",
-      "roast": "Magadh géar"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Slándáil",
       "bugs": "Fabhtanna",
       "style": "Stíl",
@@ -1948,7 +1950,7 @@
       "cannotDismissDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta torthaí a dhíbhe.",
       "alreadyResolvedDescription": "Tá an toradh seo réitithe cheana agus ní féidir é a dhíbhe a thuilleadh."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Toradh reatha curtha ina ionad",
       "supersededByDescription": "Tapáil chun an taifead reatha a oscailt agus an stádas, an anailís agus an leasú a fheiceáil.",
       "dismissedOn": "Curtha as an áireamh ar",
@@ -2039,7 +2041,7 @@
       "enableTrackingSubtitle": "Socraigh spriocdhátaí leasaithe bunaithe ar dhéine an toraidh.",
       "deadlinesHeading": "Spriocdhátaí leasaithe (laethanta)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Toradh",
       "tabAnalysis": "Anailís",
       "tabRemediation": "Leasú"

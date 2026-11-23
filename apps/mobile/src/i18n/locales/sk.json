@@ -111,7 +111,6 @@
     "agents": "Agenti",
     "all": "Všetko",
     "allModels": "Všetky modely",
-    "balanced": "Vyvážený",
     "bitbucketConnected": "Bitbucket pripojený",
     "branch": "Vetva",
     "cameraAccessDisabled": "Prístup k fotoaparátu je zakázaný",
@@ -1346,7 +1345,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Oblasti zamerania",
       "hint": "Ak chcete skontrolovať všetko, nechajte všetky oblasti nevybraté."
     },
@@ -1378,10 +1377,18 @@
     },
     "style": {
       "title": "Štýl kontroly",
-      "balanced": "Podstatné nálezy bez zbytočných upozornení",
-      "lenient": "Iba vážne problémy",
-      "roast": "Nemilosrdne úprimný, no zábavný",
-      "strict": "Upozorniť na každý problém a trvať na vysokej kvalite"
+      "labels": {
+        "balanced": "Vyvážený",
+        "lenient": "Zhovievavý",
+        "roast": "Ostrá kritika",
+        "strict": "Prísny"
+      },
+      "descriptions": {
+        "balanced": "Podstatné nálezy bez zbytočných upozornení",
+        "lenient": "Iba vážne problémy",
+        "roast": "Nemilosrdne úprimný, no zábavný",
+        "strict": "Upozorniť na každý problém a trvať na vysokej kvalite"
+      }
     },
     "reviewDetail": {
       "title": "Kontrola",
@@ -1588,12 +1595,7 @@
     "status": {
       "interrupted": "Prerušené"
     },
-    "reviewStyle": {
-      "strict": "Prísny",
-      "lenient": "Zhovievavý",
-      "roast": "Ostrá kritika"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Bezpečnosť",
       "bugs": "Chyby",
       "style": "Štýl",
@@ -1907,7 +1909,7 @@
       "cannotDismissDescription": "Nálezy môžu zamietať iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "alreadyResolvedDescription": "Tento nález je už vyriešený a nemožno ho zamietnuť."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nahradené aktuálnym nálezom",
       "supersededByDescription": "Klepnutím otvoríte aktuálny záznam s údajmi o stave, analýze a náprave.",
       "dismissedOn": "Ignorované dňa",
@@ -1997,7 +1999,7 @@
       "enableTrackingSubtitle": "Nastavuje termíny nápravy podľa závažnosti nálezu.",
       "deadlinesHeading": "Lehoty na nápravu (dni)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Nález",
       "tabAnalysis": "Analýza",
       "tabRemediation": "Náprava"

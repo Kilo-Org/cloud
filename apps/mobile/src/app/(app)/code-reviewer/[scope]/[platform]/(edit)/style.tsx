@@ -32,16 +32,16 @@ function ReviewStyleScreen({
   const title = t('codeReviewer.style.title');
   const failure = queryBodyFailure(configBody, config.isFetching);
   const labels = {
-    strict: t('codeReviewer.reviewStyle.strict'),
-    balanced: t('common.balanced'),
-    lenient: t('codeReviewer.reviewStyle.lenient'),
-    roast: t('codeReviewer.reviewStyle.roast'),
+    strict: t('codeReviewer.style.labels.strict'),
+    balanced: t('codeReviewer.style.labels.balanced'),
+    lenient: t('codeReviewer.style.labels.lenient'),
+    roast: t('codeReviewer.style.labels.roast'),
   } as const;
   const descriptions = {
-    strict: t('codeReviewer.style.strict'),
-    balanced: t('codeReviewer.style.balanced'),
-    lenient: t('codeReviewer.style.lenient'),
-    roast: t('codeReviewer.style.roast'),
+    strict: t('codeReviewer.style.descriptions.strict'),
+    balanced: t('codeReviewer.style.descriptions.balanced'),
+    lenient: t('codeReviewer.style.descriptions.lenient'),
+    roast: t('codeReviewer.style.descriptions.roast'),
   } as const;
 
   if (failure) {

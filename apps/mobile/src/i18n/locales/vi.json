@@ -109,7 +109,6 @@
     "agents": "Trợ lý",
     "all": "Tất cả",
     "allModels": "Tất cả các mô hình",
-    "balanced": "Cân bằng",
     "bitbucketConnected": "Đã kết nối Bitbucket",
     "branch": "Nhánh",
     "cameraAccessDisabled": "Quyền truy cập máy ảnh đã tắt",
@@ -728,7 +727,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Nội dung trọng tâm",
       "hint": "Không chọn mục nào để rà soát toàn bộ mã."
     },
@@ -760,10 +759,18 @@
     },
     "style": {
       "title": "Cách rà soát",
-      "balanced": "Chỉ nêu vấn đề có giá trị, bỏ qua chi tiết không cần thiết",
-      "lenient": "Chỉ các vấn đề nghiêm trọng",
-      "roast": "Thẳng thắn không nể nang nhưng vẫn hài hước",
-      "strict": "Chỉ ra mọi vấn đề, áp dụng tiêu chuẩn cao"
+      "labels": {
+        "balanced": "Cân bằng",
+        "lenient": "Nới lỏng",
+        "roast": "Châm biếm",
+        "strict": "Nghiêm ngặt"
+      },
+      "descriptions": {
+        "balanced": "Chỉ nêu vấn đề có giá trị, bỏ qua chi tiết không cần thiết",
+        "lenient": "Chỉ các vấn đề nghiêm trọng",
+        "roast": "Thẳng thắn không nể nang nhưng vẫn hài hước",
+        "strict": "Chỉ ra mọi vấn đề, áp dụng tiêu chuẩn cao"
+      }
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
@@ -968,12 +975,7 @@
     "status": {
       "interrupted": "Bị gián đoạn"
     },
-    "reviewStyle": {
-      "strict": "Nghiêm ngặt",
-      "lenient": "Nới lỏng",
-      "roast": "Châm biếm"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Bảo mật",
       "bugs": "Lỗi",
       "style": "Phong cách viết mã",
@@ -1317,12 +1319,12 @@
       "reasonTolerableRisk": "Rủi ro có thể chấp nhận được",
       "title": "Bỏ qua vấn đề"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Phân tích",
       "tabRemediation": "Khắc phục",
       "title": "Vấn đề"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Đã phát hiện",
       "dismissedOn": "Đã bỏ qua vào",

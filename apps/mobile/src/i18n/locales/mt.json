@@ -112,7 +112,6 @@
     "agents": "Aġenti",
     "all": "Kollha",
     "allModels": "Il-mudelli kollha",
-    "balanced": "Bilanċjat",
     "bitbucketConnected": "Bitbucket imqabbad",
     "branch": "Fergħa",
     "cameraAccessDisabled": "Aċċess għall-kamera diżattivat",
@@ -1374,7 +1373,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Oqsma ta' attenzjoni",
       "hint": "Tagħżel l-ebda qasam biex tirrevedi kollox."
     },
@@ -1406,10 +1405,18 @@
     },
     "style": {
       "title": "Stil ta' reviżjoni",
-      "balanced": "Sejbiet utli mingħajr dettalji żejda",
-      "lenient": "Problemi serji biss",
-      "roast": "Onest bla ħniena, iżda b'umoriżmu",
-      "strict": "Immarka kollox u żomm standard għoli"
+      "labels": {
+        "balanced": "Bilanċjat",
+        "lenient": "Permissiv",
+        "roast": "Kritika satirika",
+        "strict": "Strett"
+      },
+      "descriptions": {
+        "balanced": "Sejbiet utli mingħajr dettalji żejda",
+        "lenient": "Problemi serji biss",
+        "roast": "Onest bla ħniena, iżda b'umoriżmu",
+        "strict": "Immarka kollox u żomm standard għoli"
+      }
     },
     "reviewDetail": {
       "title": "Reviżjoni",
@@ -1617,12 +1624,7 @@
     "status": {
       "interrupted": "Interrotta"
     },
-    "reviewStyle": {
-      "strict": "Strett",
-      "lenient": "Permissiv",
-      "roast": "Kritika satirika"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sigurtà",
       "bugs": "Żbalji fil-kodiċi",
       "style": "Stil",
@@ -1948,7 +1950,7 @@
       "cannotDismissDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jwarrbu s-sejbiet.",
       "alreadyResolvedDescription": "Din is-sejba diġà ġiet solvuta u ma tistax titwarrab aktar."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Sostitwita minn sejba attwali",
       "supersededByDescription": "Tektek biex tiftaħ ir-rekord attwali u tara l-istat, l-analiżi u r-rimedju.",
       "dismissedOn": "Imwarrba fi",
@@ -2039,7 +2041,7 @@
       "enableTrackingSubtitle": "Issettja skadenzi ta' rimedju bbażati fuq is-severità tas-sejba.",
       "deadlinesHeading": "Skadenzi tar-rimedju (jiem)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Sejba",
       "tabAnalysis": "Analiżi",
       "tabRemediation": "Rimedju"

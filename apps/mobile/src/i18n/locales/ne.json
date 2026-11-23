@@ -109,7 +109,6 @@
     "agents": "एजेन्टहरू",
     "all": "सबै",
     "allModels": "सबै मोडेलहरू",
-    "balanced": "सन्तुलित",
     "bitbucketConnected": "Bitbucket जडान भयो",
     "branch": "ब्रान्च",
     "cameraAccessDisabled": "क्यामेरा प्रयोग गर्ने अनुमति छैन",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ध्यान दिनुपर्ने क्षेत्रहरू",
       "hint": "सबै कुरा समीक्षा गर्न कुनै पनि विकल्प नछान्नुहोस्।"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "समीक्षा शैली",
-      "balanced": "अनावश्यक कुराबिना महत्त्वपूर्ण समस्या मात्र",
-      "lenient": "गम्भीर समस्या मात्र",
-      "roast": "रमाइलो पारामा कडा र स्पष्ट आलोचना",
-      "strict": "सबै समस्या औंल्याउने, उच्च मापदण्ड कायम राख्ने"
+      "labels": {
+        "balanced": "सन्तुलित",
+        "lenient": "नरम",
+        "roast": "व्यङ्ग्यात्मक आलोचना",
+        "strict": "कडा"
+      },
+      "descriptions": {
+        "balanced": "अनावश्यक कुराबिना महत्त्वपूर्ण समस्या मात्र",
+        "lenient": "गम्भीर समस्या मात्र",
+        "roast": "रमाइलो पारामा कडा र स्पष्ट आलोचना",
+        "strict": "सबै समस्या औंल्याउने, उच्च मापदण्ड कायम राख्ने"
+      }
     },
     "reviewDetail": {
       "title": "समीक्षा",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "बीचमै रोकिएको"
     },
-    "reviewStyle": {
-      "strict": "कडा",
-      "lenient": "नरम",
-      "roast": "व्यङ्ग्यात्मक आलोचना"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "सुरक्षा",
       "bugs": "बगहरू",
       "style": "शैली",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र सुरक्षा समस्याहरू खारेज गर्न सक्छन्।",
       "alreadyResolvedDescription": "यो सुरक्षा समस्या पहिले नै समाधान भइसकेकाले अब खारेज गर्न सकिँदैन।"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "हालको सुरक्षा समस्याले प्रतिस्थापन गरेको",
       "supersededByDescription": "स्थिति, विश्लेषण र सुधार हेर्न हालको अभिलेख खोल्न ट्याप गर्नुहोस्।",
       "dismissedOn": "खारेजी मिति",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "सुरक्षा समस्याको गम्भीरताका आधारमा सुधारको म्याद तोक्नुहोस्।",
       "deadlinesHeading": "सुधारको म्याद (दिन)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "सुरक्षा समस्या",
       "tabAnalysis": "विश्लेषण",
       "tabRemediation": "सुधार"

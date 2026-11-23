@@ -110,7 +110,6 @@
     "agents": "Agenti",
     "all": "Sve",
     "allModels": "Svi modeli",
-    "balanced": "Uravnoteženo",
     "bitbucketConnected": "Bitbucket povezan",
     "branch": "Grana",
     "cameraAccessDisabled": "Pristup kameri onemogućen",
@@ -1318,7 +1317,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Oblasti pregleda",
       "hint": "Ako želiš pregled svega, nemoj izabrati nijednu oblast."
     },
@@ -1350,10 +1349,18 @@
     },
     "style": {
       "title": "Stil pregleda",
-      "balanced": "Važni nalazi bez suvišnih primedbi",
-      "lenient": "Samo ozbiljni problemi",
-      "roast": "Brutalno iskreno, na zabavan način",
-      "strict": "Označi sve i primeni stroge kriterijume"
+      "labels": {
+        "balanced": "Uravnoteženo",
+        "lenient": "Blago",
+        "roast": "Bez milosti",
+        "strict": "Strogo"
+      },
+      "descriptions": {
+        "balanced": "Važni nalazi bez suvišnih primedbi",
+        "lenient": "Samo ozbiljni problemi",
+        "roast": "Brutalno iskreno, na zabavan način",
+        "strict": "Označi sve i primeni stroge kriterijume"
+      }
     },
     "reviewDetail": {
       "title": "Pregled",
@@ -1559,12 +1566,7 @@
     "status": {
       "interrupted": "Prekinuto"
     },
-    "reviewStyle": {
-      "strict": "Strogo",
-      "lenient": "Blago",
-      "roast": "Bez milosti"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Bezbednost",
       "bugs": "Greške",
       "style": "Stil",
@@ -1866,7 +1868,7 @@
       "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da odbace nalaze.",
       "alreadyResolvedDescription": "Ovaj nalaz je već rešen i više se ne može odbaciti."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Zamenjen novijim nalazom",
       "supersededByDescription": "Dodirni da otvoriš noviji zapis i vidiš status, analizu i otklanjanje.",
       "dismissedOn": "Datum odbacivanja",
@@ -1955,7 +1957,7 @@
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za otklanjanje (u danima)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Nalaz",
       "tabAnalysis": "Analiza",
       "tabRemediation": "Otklanjanje"

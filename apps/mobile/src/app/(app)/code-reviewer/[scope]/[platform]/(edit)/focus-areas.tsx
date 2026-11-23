@@ -41,12 +41,12 @@ function FocusAreasScreen({
   const disabled = configBody.body.status !== 'ready';
   const { t } = useTranslation();
   const areaLabels = {
-    security: 'codeReviewer.focusArea.security',
+    security: 'codeReviewer.focusAreaOptions.security',
     performance: 'common.performance',
-    bugs: 'codeReviewer.focusArea.bugs',
-    style: 'codeReviewer.focusArea.style',
-    testing: 'codeReviewer.focusArea.testing',
-    documentation: 'codeReviewer.focusArea.documentation',
+    bugs: 'codeReviewer.focusAreaOptions.bugs',
+    style: 'codeReviewer.focusAreaOptions.style',
+    testing: 'codeReviewer.focusAreaOptions.testing',
+    documentation: 'codeReviewer.focusAreaOptions.documentation',
   } as const;
 
   // A stored area outside REVIEW_FOCUS_AREAS has no enum row of its own; show
@@ -69,7 +69,7 @@ function FocusAreasScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={t('codeReviewer.focusAreas.title')} />
+      <ReviewerHeader title={t('codeReviewer.focusAreaSection.title')} />
       {failure ? (
         // A config read that failed, or one that stayed pending with nothing
         // in flight even after its automatic restart, would otherwise leave
@@ -84,7 +84,7 @@ function FocusAreasScreen({
         />
       ) : (
         <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-          <Text variant="muted">{t('codeReviewer.focusAreas.hint')}</Text>
+          <Text variant="muted">{t('codeReviewer.focusAreaSection.hint')}</Text>
           <RowGroup>
             {REVIEW_FOCUS_AREAS.map(area => (
               <ChoiceRow
@@ -101,7 +101,7 @@ function FocusAreasScreen({
             {unknownAreas.map(area => (
               <ChoiceRow
                 key={area}
-                label={t('codeReviewer.focusArea.unknown', { area })}
+                label={t('codeReviewer.focusAreaOptions.unknown', { area })}
                 multi
                 selected
                 disabled={disabled}

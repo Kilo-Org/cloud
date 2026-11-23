@@ -110,7 +110,6 @@
     "agents": "Agentes",
     "all": "Todos",
     "allModels": "Todos los modelos",
-    "balanced": "Equilibrado",
     "bitbucketConnected": "Bitbucket conectado",
     "branch": "Rama",
     "cameraAccessDisabled": "Acceso a la cámara desactivado",
@@ -730,7 +729,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Aspectos de la revisión",
       "hint": "Para revisarlo todo, no selecciones ninguna área."
     },
@@ -762,10 +761,18 @@
     },
     "style": {
       "title": "Estilo de revisión",
-      "balanced": "Hallazgos relevantes, sin distracciones",
-      "lenient": "Solo problemas graves",
-      "roast": "Sin filtros y con humor",
-      "strict": "Señala todos los problemas con un alto nivel de exigencia"
+      "labels": {
+        "balanced": "Equilibrado",
+        "lenient": "Flexible",
+        "roast": "Sin filtros",
+        "strict": "Estricto"
+      },
+      "descriptions": {
+        "balanced": "Hallazgos relevantes, sin distracciones",
+        "lenient": "Solo problemas graves",
+        "roast": "Sin filtros y con humor",
+        "strict": "Señala todos los problemas con un alto nivel de exigencia"
+      }
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
@@ -971,12 +978,7 @@
     "status": {
       "interrupted": "Interrumpida"
     },
-    "reviewStyle": {
-      "strict": "Estricto",
-      "lenient": "Flexible",
-      "roast": "Sin filtros"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Seguridad",
       "bugs": "Errores",
       "style": "Estilo",
@@ -1334,12 +1336,12 @@
       "reasonTolerableRisk": "Riesgo aceptable",
       "title": "Descartar hallazgo"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Análisis",
       "tabRemediation": "Corrección",
       "title": "Hallazgo"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Detectado",
       "dismissedOn": "Descartado el",

@@ -109,7 +109,6 @@
     "agents": "ወኪሎች",
     "all": "ሁሉም",
     "allModels": "ሁሉም ሞዴሎች",
-    "balanced": "ሚዛናዊ",
     "bitbucketConnected": "Bitbucket ተገናኝቷል",
     "branch": "ቅርንጫፍ",
     "cameraAccessDisabled": "ካሜራውን የመጠቀም ፈቃድ የለም",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "የትኩረት መስኮች",
       "hint": "ሁሉንም ለመገምገም ምንም አይምረጡ።"
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "የግምገማ ዘይቤ",
-      "balanced": "አላስፈላጊ ዝርዝር የሌላቸው ጠቃሚ ግኝቶች",
-      "lenient": "ከባድ ችግሮች ብቻ",
-      "roast": "ያለ ማስመሰል፣ በቀልድ የታጀበ ትችት",
-      "strict": "ሁሉንም ችግሮች ይለዩ፣ ጥብቅ መስፈርቶችን ይተግብሩ"
+      "labels": {
+        "balanced": "ሚዛናዊ",
+        "lenient": "ልል",
+        "roast": "ቀልድና ትችት",
+        "strict": "ጥብቅ"
+      },
+      "descriptions": {
+        "balanced": "አላስፈላጊ ዝርዝር የሌላቸው ጠቃሚ ግኝቶች",
+        "lenient": "ከባድ ችግሮች ብቻ",
+        "roast": "ያለ ማስመሰል፣ በቀልድ የታጀበ ትችት",
+        "strict": "ሁሉንም ችግሮች ይለዩ፣ ጥብቅ መስፈርቶችን ይተግብሩ"
+      }
     },
     "reviewDetail": {
       "title": "ግምገማ",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "ተቋርጧል"
     },
-    "reviewStyle": {
-      "strict": "ጥብቅ",
-      "lenient": "ልል",
-      "roast": "ቀልድና ትችት"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ደህንነት",
       "bugs": "ሳንካዎች",
       "style": "የአጻጻፍ ዘይቤ",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "ግኝቶችን ማስወገድ የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "alreadyResolvedDescription": "ይህ ግኝት አስቀድሞ መፍትሄ ስላገኘ ከእንግዲህ ማስወገድ አይቻልም።"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "በአሁኑ ግኝት ተተክቷል",
       "supersededByDescription": "ሁኔታውን፣ ትንታኔውን እና ጥገናውን ለማየት የአሁኑን መዝገብ ይንኩ።",
       "dismissedOn": "የተወገደበት ቀን",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "በግኝት ክብደት ላይ በመመስረት የጥገና ጊዜ ገደቦችን ያዘጋጁ።",
       "deadlinesHeading": "የጥገና ጊዜ ገደቦች (ቀናት)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ግኝት",
       "tabAnalysis": "ትንታኔ",
       "tabRemediation": "ጥገና"

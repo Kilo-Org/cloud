@@ -110,7 +110,6 @@
     "agents": "Agents d'IA",
     "all": "Tots",
     "allModels": "Tots els models",
-    "balanced": "Equilibrat",
     "bitbucketConnected": "Bitbucket connectat",
     "branch": "Branca",
     "cameraAccessDisabled": "Accés a la càmera desactivat",
@@ -1318,7 +1317,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Àrees de revisió",
       "hint": "Per revisar-ho tot, no seleccionis cap àrea."
     },
@@ -1350,10 +1349,18 @@
     },
     "style": {
       "title": "Estil de revisió",
-      "balanced": "Incidències rellevants sense detalls innecessaris",
-      "lenient": "Només problemes greus",
-      "roast": "Sinceritat implacable amb un toc d'humor",
-      "strict": "Assenyala-ho tot amb el màxim rigor"
+      "labels": {
+        "balanced": "Equilibrat",
+        "lenient": "Flexible",
+        "roast": "Sarcàstic",
+        "strict": "Estricte"
+      },
+      "descriptions": {
+        "balanced": "Incidències rellevants sense detalls innecessaris",
+        "lenient": "Només problemes greus",
+        "roast": "Sinceritat implacable amb un toc d'humor",
+        "strict": "Assenyala-ho tot amb el màxim rigor"
+      }
     },
     "reviewDetail": {
       "title": "Revisió",
@@ -1559,12 +1566,7 @@
     "status": {
       "interrupted": "Interrompuda"
     },
-    "reviewStyle": {
-      "strict": "Estricte",
-      "lenient": "Flexible",
-      "roast": "Sarcàstic"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Seguretat",
       "bugs": "Errors",
       "style": "Estil",
@@ -1866,7 +1868,7 @@
       "cannotDismissDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden descartar incidències.",
       "alreadyResolvedDescription": "Aquesta incidència ja s'ha resolt i no es pot descartar."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Substituïda per una incidència actual",
       "supersededByDescription": "Toca per obrir el registre actual i consultar-ne l'estat, l'anàlisi i la correcció.",
       "dismissedOn": "Descartat el",
@@ -1955,7 +1957,7 @@
       "enableTrackingSubtitle": "Estableix terminis de correcció segons la gravetat de la incidència.",
       "deadlinesHeading": "Terminis de correcció (dies)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Incidència",
       "tabAnalysis": "Anàlisi",
       "tabRemediation": "Correcció"

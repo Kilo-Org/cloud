@@ -60,7 +60,7 @@ const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.deadline.superseded',
   fixed: 'securityAgent.filter.fixed',
   dismissed: 'common.dismissed',
-  open: 'securityAgent.findingDetails.statusOpen',
+  open: 'securityAgent.findingDetailFields.statusOpen',
 } satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -71,7 +71,7 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 function getDismissalReasonLabel(reason: string | null): string {
   const code = storedText(reason);
   if (code === null) {
-    return i18n.t('securityAgent.findingDetails.reasonAfterReview');
+    return i18n.t('securityAgent.findingDetailFields.reasonAfterReview');
   }
   const key = lookup(DISMISSAL_REASON_LABEL_KEYS, code);
   return key ? i18n.t(key) : code.replaceAll('_', ' ');
@@ -79,7 +79,7 @@ function getDismissalReasonLabel(reason: string | null): string {
 
 function getFindingSourceLabel(source: string): string {
   if (source === 'dependabot') {
-    return i18n.t('securityAgent.findingDetails.sourceDependabot');
+    return i18n.t('securityAgent.findingDetailFields.sourceDependabot');
   }
   return storedText(source)?.replaceAll('_', ' ') ?? i18n.t('common.unknown');
 }
@@ -106,10 +106,10 @@ function DismissalOrSupersessionNote({
           }}
         >
           <Text className="text-sm font-medium text-foreground">
-            {t('securityAgent.findingDetails.supersededBy')}
+            {t('securityAgent.findingDetailFields.supersededBy')}
           </Text>
           <Text variant="muted" className="mt-0.5 text-xs">
-            {t('securityAgent.findingDetails.supersededByDescription')}
+            {t('securityAgent.findingDetailFields.supersededByDescription')}
           </Text>
         </RowFrame>
       </RowGroup>
@@ -185,7 +185,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const dateRows: FindingDateRow[] = [
     {
       key: 'detected',
-      label: t('securityAgent.findingDetails.detected'),
+      label: t('securityAgent.findingDetailFields.detected'),
       value: timeAgo(parseTimestamp(finding.first_detected_at), undefined, now),
     },
     ...(dismissedAt
@@ -193,8 +193,8 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           {
             key: 'dismissed',
             label: supersedingFindingId
-              ? t('securityAgent.findingDetails.supersededOn')
-              : t('securityAgent.findingDetails.dismissedOn'),
+              ? t('securityAgent.findingDetailFields.supersededOn')
+              : t('securityAgent.findingDetailFields.dismissedOn'),
             value: formatDate(dismissedAt, i18n.language),
           },
         ]
@@ -218,7 +218,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       ? [
           {
             key: 'sla',
-            label: t('securityAgent.findingDetails.slaDeadline'),
+            label: t('securityAgent.findingDetailFields.slaDeadline'),
             value: deadlineCopy.detail,
             tone: FINDING_TONE_TO_KV_ROW_TONE[deadline.tone],
           },
@@ -232,10 +232,10 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   // whichever row ends it.
   const advisoryRows = [
     ...(finding.cve_id
-      ? [{ label: t('securityAgent.findingDetails.cve'), value: finding.cve_id }]
+      ? [{ label: t('securityAgent.findingDetailFields.cve'), value: finding.cve_id }]
       : []),
     ...(finding.ghsa_id
-      ? [{ label: t('securityAgent.findingDetails.ghsa'), value: finding.ghsa_id }]
+      ? [{ label: t('securityAgent.findingDetailFields.ghsa'), value: finding.ghsa_id }]
       : []),
   ];
 
@@ -251,7 +251,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[severity.tone])}>
-            {t('securityAgent.findingDetails.severityLabel', { severity: severityLabel })}
+            {t('securityAgent.findingDetailFields.severityLabel', { severity: severityLabel })}
           </Text>
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
             {statusLabel}
@@ -282,22 +282,22 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
 
       <RowGroup>
         <KvRow
-          label={t('securityAgent.findingDetails.package')}
+          label={t('securityAgent.findingDetailFields.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
           valueDirection="ltr"
         />
         <KvRow
-          label={t('securityAgent.findingDetails.vulnerableVersions')}
+          label={t('securityAgent.findingDetailFields.vulnerableVersions')}
           value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
           valueFace={finding.vulnerable_version_range ? 'mono' : 'text'}
           valueDirection={finding.vulnerable_version_range ? 'ltr' : undefined}
           selectable
         />
         <KvRow
-          label={t('securityAgent.findingDetails.patchedVersion')}
+          label={t('securityAgent.findingDetailFields.patchedVersion')}
           value={firstNonEmpty(
             finding.patched_version,
-            t('securityAgent.findingDetails.noPatchAvailable')
+            t('securityAgent.findingDetailFields.noPatchAvailable')
           )}
           valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection={finding.patched_version ? 'ltr' : undefined}
@@ -314,7 +314,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         ))}
         {finding.manifest_path ? (
           <KvRow
-            label={t('securityAgent.findingDetails.manifest')}
+            label={t('securityAgent.findingDetailFields.manifest')}
             value={finding.manifest_path}
             valueDirection="ltr"
             selectable
@@ -334,15 +334,15 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         ))}
       </RowGroup>
 
-      <CollapsibleSection title={t('securityAgent.findingDetails.sourceRecord')}>
+      <CollapsibleSection title={t('securityAgent.findingDetailFields.sourceRecord')}>
         <RowGroup>
           <KvRow
-            label={t('securityAgent.findingDetails.source')}
+            label={t('securityAgent.findingDetailFields.source')}
             value={getFindingSourceLabel(finding.source)}
             valueFace="text"
           />
           <KvRow
-            label={t('securityAgent.findingDetails.sourceId')}
+            label={t('securityAgent.findingDetailFields.sourceId')}
             value={finding.source_id}
             valueDirection="ltr"
             selectable
@@ -354,11 +354,15 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <RowGroup leadingTile>
           <RowFrame
             icon={ExternalLink}
-            title={t('securityAgent.findingDetails.viewAdvisory')}
+            title={t('securityAgent.findingDetailFields.viewAdvisory')}
             trailing={{ kind: 'chevron' }}
             accessibilityRole="link"
             onPress={() => {
-              openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
+              openFindingLink(
+                router,
+                advisoryUrl,
+                t('securityAgent.findingDetailFields.viewAdvisory')
+              );
             }}
           />
         </RowGroup>

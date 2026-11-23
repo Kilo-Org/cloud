@@ -109,7 +109,6 @@
     "agents": "Eejentoota",
     "all": "Hunda",
     "allModels": "Modeeloota hundumaa",
-    "balanced": "Madaalawaa",
     "bitbucketConnected": "Bitbucket walitti hidhameera",
     "branch": "Damee",
     "cameraAccessDisabled": "Kaameraa fayyadamuun dhorkame",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Dhimmoota xiyyeeffannoo",
       "hint": "Hunda sakatta'uuf filannoo tokkollee hin filatin."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Haala sakatta'aa",
-      "balanced": "Argamoota barbaachisoo, odeeffannoo hin barbaachisne malee",
-      "lenient": "Rakkoolee cimaa qofa",
-      "roast": "Dhugaa osoo hin laaffisin, haala nama kolfisiisuun",
-      "strict": "Hunda mallatteessi, sadarkaa olaanaa gaafadhu"
+      "labels": {
+        "balanced": "Madaalawaa",
+        "lenient": "Laafaa",
+        "roast": "Qoosaan qeequu",
+        "strict": "Cimaa"
+      },
+      "descriptions": {
+        "balanced": "Argamoota barbaachisoo, odeeffannoo hin barbaachisne malee",
+        "lenient": "Rakkoolee cimaa qofa",
+        "roast": "Dhugaa osoo hin laaffisin, haala nama kolfisiisuun",
+        "strict": "Hunda mallatteessi, sadarkaa olaanaa gaafadhu"
+      }
     },
     "reviewDetail": {
       "title": "Sakatta'a",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Addaan cite"
     },
-    "reviewStyle": {
-      "strict": "Cimaa",
-      "lenient": "Laafaa",
-      "roast": "Qoosaan qeequu"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Nageenya",
       "bugs": "Dogoggoroota koodii",
       "style": "Akkaataa barreessuu",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa argamoota dhiisuu danda'u.",
       "alreadyResolvedDescription": "Argamni kun duraan furameera; kana booda dhiisuun hin danda'amu."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Argamni ammaa bakka isaa bu'eera",
       "supersededByDescription": "Haala, xiinxalaa fi sirreeffama ilaaluuf galmee ammaa tuqiitii bani.",
       "dismissedOn": "Guyyaa itti dhiifame",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Cimina argamootaa irratti hundaa'ii daangaa yeroo sirreeffamaa murteessi.",
       "deadlinesHeading": "Daangaa yeroo sirreeffamaa (guyyaa)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Argama",
       "tabAnalysis": "Xiinxala",
       "tabRemediation": "Sirreeffama"

@@ -109,7 +109,6 @@
     "agents": "Agendid",
     "all": "Kõik",
     "allModels": "Kõik mudelid",
-    "balanced": "Tasakaalustatud",
     "bitbucketConnected": "Bitbucket on ühendatud",
     "branch": "Haru",
     "cameraAccessDisabled": "Juurdepääs kaamerale on keelatud",
@@ -1290,7 +1289,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fookusvaldkonnad",
       "hint": "Kõige ülevaatamiseks jäta kõik valikud märkimata."
     },
@@ -1322,10 +1321,18 @@
     },
     "style": {
       "title": "Ülevaatuse stiil",
-      "balanced": "Olulised leiud ilma liigsete märkusteta",
-      "lenient": "Ainult tõsised probleemid",
-      "roast": "Halastamatult aus ja samas lõbus",
-      "strict": "Märgi kõik puudused ja nõua kõrget kvaliteeti"
+      "labels": {
+        "balanced": "Tasakaalustatud",
+        "lenient": "Leebe",
+        "roast": "Pilkav",
+        "strict": "Range"
+      },
+      "descriptions": {
+        "balanced": "Olulised leiud ilma liigsete märkusteta",
+        "lenient": "Ainult tõsised probleemid",
+        "roast": "Halastamatult aus ja samas lõbus",
+        "strict": "Märgi kõik puudused ja nõua kõrget kvaliteeti"
+      }
     },
     "reviewDetail": {
       "title": "Ülevaatus",
@@ -1530,12 +1537,7 @@
     "status": {
       "interrupted": "Katkestatud"
     },
-    "reviewStyle": {
-      "strict": "Range",
-      "lenient": "Leebe",
-      "roast": "Pilkav"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Turvalisus",
       "bugs": "Vead",
       "style": "Stiil",
@@ -1825,7 +1827,7 @@
       "cannotDismissDescription": "Leide saavad kõrvale jätta ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "alreadyResolvedDescription": "See leid on juba lahendatud ja seda ei saa enam kõrvale jätta."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Asendatud praeguse leiuga",
       "supersededByDescription": "Puuduta, et avada praeguse kirje ning vaadata selle olekut, analüüsi ja parandamise andmeid.",
       "dismissedOn": "Kõrvale jätmise kuupäev",
@@ -1913,7 +1915,7 @@
       "enableTrackingSubtitle": "Määrab parandamise tähtajad leiu raskusastme järgi.",
       "deadlinesHeading": "Parandamise tähtajad (päevades)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Leid",
       "tabAnalysis": "Analüüs",
       "tabRemediation": "Parandamine"

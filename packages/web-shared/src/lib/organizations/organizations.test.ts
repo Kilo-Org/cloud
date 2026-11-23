@@ -1080,6 +1080,53 @@ describe('Organizations', () => {
         [parent.id, child.id].sort()
       );
     });
+
+    test("keeps the invited role for a child organization that inherits its parent's SSO", async () => {
+      const owner = await insertTestUser();
+      const invitee = await insertTestUser({ google_user_email: 'child-sso-invite@example.com' });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, parent.id));
+      await addUserToOrganization(parent.id, invitee.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const invitation = await inviteUserToOrganization(
+        child.id,
+        owner.id,
+        invitee.google_user_email,
+        'admin'
+      );
+      expect(invitation).toMatchObject({
+        authentication_requirement: 'workos',
+        sso_source_organization_id: parent.id,
+      });
+
+      expect(
+        await addSsoUserToOrganization(child.id, invitee.id, {
+          invitationToken: invitation.token,
+        })
+      ).toBe(false);
+      expect(await isOrganizationMember(db, child.id, invitee.id)).toBe(false);
+
+      const result = await acceptOrganizationInvite(invitee.id, invitation.token, {
+        provider: 'workos',
+        ssoSourceOrganizationId: parent.id,
+      });
+      expect(result.success).toBe(true);
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, child.id),
+          eq(organization_memberships.kilo_user_id, invitee.id)
+        ),
+      });
+      expect(membership).toMatchObject({ role: 'admin', invited_by: owner.id });
+    });
   });
 
   describe('updateUserRoleInOrganization', () => {

@@ -159,10 +159,6 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
  * narrow to the caller, and the picker renders that as its empty state.
  */
 export function useTranscriptionModels(organizationId?: string) {
-  // `fetchTranscriptionModels` orders the rows with the active language's
-  // collator, so the memo follows the language as well as the payload: the
-  // LTR language switch applies in place (no remount) and leaves the cached
-  // `data` identity unchanged.
   const { i18n: translation } = useTranslation();
   const language = translation.language;
   const { data, isLoading, isError, isFetching, error, refetch } = useQuery({
@@ -174,7 +170,7 @@ export function useTranscriptionModels(organizationId?: string) {
 
   // The cached `data` was collated for the language that fetched it, and a
   // change does not refetch; the sort re-runs here so an in-place LTR switch
-  // re-sorts the mounted picker with the new locale.
+  // (no remount) re-sorts the mounted picker with the new locale.
   const models = useMemo(() => sortModelOptions(data ?? [], language), [data, language]);
 
   return { models, isLoading, isError, isFetching, error, refetch };

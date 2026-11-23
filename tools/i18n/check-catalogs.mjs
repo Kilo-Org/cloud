@@ -62,6 +62,9 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
+      // The app renders on Hermes, which has no `Intl.PluralRules`, so the
+      // FormatJS polyfill data the bundle ships decides the suffix.
+      selectableCategoriesOf: tag => selectablePluralCategories(root, tag),
       englishCopyRules: [
         checkEnglishCopies,
         checkMobileEnglishIdentical,
@@ -77,6 +80,10 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
+      // Push copy renders on a Worker, whose runtime brings its own
+      // `Intl.PluralRules` and ships no polyfill data.
+      selectableCategoriesOf: tag =>
+        new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']),
       englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
@@ -2183,6 +2190,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
 function checkKeyParity({
   label,
   tag,
+  selectableCategories,
   english,
   translated,
   englishFamilies,
@@ -2190,7 +2198,7 @@ function checkKeyParity({
   localeFamilies,
 }) {
   const problems = [];
-  const selectable = selectablePluralCategories(tag);
+  const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
     if (translated.has(key)) {
       continue;
@@ -2245,9 +2253,12 @@ function checkPluralCategories({ label, tag, english, translated }) {
  * zero lookup aside. Such a form is unreachable text — a translator's work that
  * ships to nobody — so the rule names one line per family and category.
  */
-function checkUnselectablePluralCategories({ label, tag, translated }) {
+function checkUnselectablePluralCategories({ label, tag, translated, selectableCategories }) {
   const problems = [];
-  for (const [family, categories] of unselectablePluralCategories(translated, tag)) {
+  for (const [family, categories] of unselectablePluralCategories(
+    translated,
+    selectableCategories(tag)
+  )) {
     for (const category of categories) {
       problems.push(
         `${label}: plural family "${family}" declares a ${category} form that ${tag} never selects`
@@ -2661,6 +2672,7 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
  */
 function checkCatalogLocales({
   catalog,
+  selectableCategories,
   present,
   supported,
   english,
@@ -2720,10 +2732,13 @@ function checkCatalogLocales({
         englishFamilies,
         englishCountedBases,
         localeFamilies,
+        selectableCategories,
       })
     );
     problems.push(...checkPluralCategories({ label, tag, english, translated }));
-    problems.push(...checkUnselectablePluralCategories({ label, tag, translated }));
+    problems.push(
+      ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
+    );
     problems.push(
       ...checkTranslatedValues({
         label,
@@ -3054,6 +3069,7 @@ export function checkCatalogs(root = ROOT) {
 
     const locales = checkCatalogLocales({
       catalog,
+      selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
       english,

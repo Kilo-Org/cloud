@@ -12,8 +12,9 @@
  * wording and exit behavior, including what it does with a key that is not a
  * plural category.
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import vm from 'node:vm';
 
 import { regularFileState } from './fs-entries.mjs';
 
@@ -138,32 +139,122 @@ export function declaresPluralFamily(messages, base) {
 }
 
 /**
- * The plural categories a catalog of `tag` can ever render: every category
- * `Intl.PluralRules` selects, plus `zero`, which i18next looks up on its own at
- * count 0 before it asks the plural rule (i18next's `resolve()` pushes
- * `<key>_zero` into the lookup candidates when `count === 0`), so a `_zero`
- * form renders in every language.
+ * The FormatJS data file each mobile language loads, read from the app's own
+ * loader map, so a language that maps to a shared file (`zh-Hans` and `zh-Hant`
+ * both read `zh`) or to another language's data (`ht` reads `en`) is judged by
+ * exactly what it loads.
+ */
+const LOADER_MAP_SOURCE = 'apps/mobile/src/lib/formatjs-locale-data.ts';
+const LOADER_MAP_ENTRY =
+  /^\s*(?:'([^']+)'|([A-Za-z-]+)):\s*\(\) => void require\('@formatjs\/intl-pluralrules\/locale-data\/([^']+)\.js'\)/gm;
+
+/** The polyfill data directory, below the app's own dependency tree. */
+const PLURAL_DATA_DIR = 'apps/mobile/node_modules/@formatjs/intl-pluralrules/locale-data';
+
+/** The loader map read from one repository root, parsed once per audit. */
+const loaderMaps = new Map();
+
+/** The category lists already read, per root and tag. */
+const shippedCategoryCache = new Map();
+
+function loaderMapOf(root) {
+  if (loaderMaps.has(root)) {
+    return loaderMaps.get(root);
+  }
+  let map = null;
+  try {
+    const block = /const PLURAL_RULES_LOCALE_LOADERS = \{([\s\S]*?)\n\} satisfies/.exec(
+      readFileSync(join(root, LOADER_MAP_SOURCE), 'utf8')
+    );
+    if (block !== null) {
+      map = new Map();
+      for (const match of block[1].matchAll(LOADER_MAP_ENTRY)) {
+        map.set(match[1] ?? match[2], match[3]);
+      }
+    }
+  } catch {
+    // A tree without the app (a checker test fixture) has no polyfill data.
+    map = null;
+  }
+  loaderMaps.set(root, map);
+  return map;
+}
+
+/**
+ * The cardinal categories one FormatJS data file declares. The file is the
+ * generated module the polyfill itself evaluates: it calls
+ * `Intl.PluralRules.__addLocaleData` when that exists, and otherwise buffers
+ * its data on `globalThis`. A sandbox with no `__addLocaleData` takes the
+ * second path, so the file's own code says what the data is rather than a
+ * second parser here.
+ */
+function readPluralDataFile(file) {
+  const sandbox = { Intl: { PluralRules: undefined } };
+  vm.createContext(sandbox);
+  vm.runInContext(readFileSync(file, 'utf8'), sandbox, { timeout: 2000 });
+  const data = sandbox.__FORMATJS_PLURALRULES_DATA__;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(`no plural data in ${file}`);
+  }
+  return data[0].data.categories.cardinal;
+}
+
+/**
+ * The cardinal categories `tag` can select in the runtime that renders the
+ * mobile catalogs: the app's shipped FormatJS data, because Hermes has no
+ * `Intl.PluralRules` of its own and the bundle's polyfill data therefore
+ * decides the suffix.
+ *
+ * The host's `Intl.PluralRules` is NOT that answer. The two disagree — a host
+ * on a newer CLDR reads `vi` as `other`-only while the shipped data still
+ * selects `one` for a count of one — so judging by the host would call
+ * reachable Vietnamese copy dead. A tree without the app's loader map (a
+ * checker fixture, or a catalog the polyfill does not render) falls back to
+ * the host's rules.
+ */
+export function shippedPluralCategories(root, tag) {
+  const key = `${root}\u0000${tag}`;
+  const cached = shippedCategoryCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const dataFile = loaderMapOf(root)?.get(tag);
+  const categories =
+    dataFile === undefined
+      ? new Intl.PluralRules(tag).resolvedOptions().pluralCategories
+      : readPluralDataFile(join(root, PLURAL_DATA_DIR, `${dataFile}.js`));
+  shippedCategoryCache.set(key, categories);
+  return categories;
+}
+
+/**
+ * The plural categories a catalog of `tag` can ever render: the categories the
+ * runtime selects, plus `zero`, which i18next looks up on its own at count 0
+ * before it asks the plural rule (`resolve()` pushes `<key>_zero` into the
+ * lookup candidates when `count === 0`), so a `_zero` form renders in every
+ * language.
  *
  * Any other category is unreachable: i18next picks its suffix from
  * `rule.select(count)` alone, so a form outside this set is copy no user of
  * that language can see.
  */
-export function selectablePluralCategories(tag) {
-  return new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']);
+export function selectablePluralCategories(root, tag) {
+  return new Set([...shippedPluralCategories(root, tag), 'zero']);
 }
 
 /**
- * The plural forms a locale declares whose category it can never select, by
- * family base, in catalog order: a Map from the family base to the categories,
- * in key order, that `tag` cannot reach.
+ * The plural forms a locale declares whose category the runtime never selects,
+ * by family base, in catalog order: a Map from the family base to the
+ * categories, in key order, that the catalog cannot reach. `selectable` is the
+ * category set the rendering runtime answers with, so the caller decides what
+ * "selectable" means for the catalog it audits.
  *
  * The walk is over the locale's own keys, so a family is judged by the member
  * forms the catalog actually ships rather than by what English declares. A
  * family whose every member is selectable is absent from the Map, so an empty
  * Map means every plural form of this locale renders somewhere.
  */
-export function unselectablePluralCategories(locale, tag) {
-  const selectable = selectablePluralCategories(tag);
+export function unselectablePluralCategories(locale, selectable) {
   const unselectable = new Map();
   for (const key of locale.keys()) {
     const parts = pluralParts(key);

@@ -60,21 +60,6 @@ const CREDIT_STORE_UNREACHABLE_KEY = 'credits.storeUnreachable';
 const CREDIT_STORE_UNREACHABLE_PLAY_KEY = 'credits.storeUnreachablePlay';
 
 /**
- * The catalog key for a store refusal that never reached the store: the billing
- * client has no live connection, so the purchase can start again unchanged once
- * it reconnects.
- *
- * The screen's inline tile is one `text-sm` band beside the pack rows, and the
- * store-unavailable card's own connection sentence is too long to hold one line
- * there on a compact window, where it would cover the last row it reports on.
- * These keys are that sentence at tile length, and they belong to this flow
- * alone: the card keeps its longer body.
- */
-export function creditStoreUnreachableKey(storefront: 'app_store' | 'play'): string {
-  return storefront === 'play' ? CREDIT_STORE_UNREACHABLE_PLAY_KEY : CREDIT_STORE_UNREACHABLE_KEY;
-}
-
-/**
  * Catalog keys, never translated copy: the screen translates them. The keys
  * that name Kilo Pass in their copy are reused where the sentence is
  * product-agnostic (a failure, an unlinked purchase, a missing store token);
@@ -399,9 +384,13 @@ export function getStoreCreditPurchaseErrorMessageKey(
 
   // The store has no live billing connection, so nothing reached the store and
   // the same tap succeeds after `reconnect()`. Name the connection, not the
-  // purchase.
+  // purchase. The inline tile is one `text-sm` band beside the pack rows, and
+  // the store-unavailable card's connection sentence is too long to hold one
+  // line there on a compact window, where it would cover the last row it
+  // reports on, so this flow owns these shorter keys and the card keeps its
+  // longer body.
   if (isStoreNotReadyError(error)) {
-    return creditStoreUnreachableKey(storefront);
+    return storefront === 'play' ? CREDIT_STORE_UNREACHABLE_PLAY_KEY : CREDIT_STORE_UNREACHABLE_KEY;
   }
 
   const ownedByAnotherAccountKey =

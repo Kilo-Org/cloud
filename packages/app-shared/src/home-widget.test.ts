@@ -8,6 +8,7 @@ import {
   glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
+  homeWidgetPresentationSchema,
   homeWidgetResponseSchema,
 } from './home-widget';
 import { GLANCEABLE_STALE_MS, GLANCEABLE_TITLE_LIMIT } from './glanceable-agents-snapshot';
@@ -95,6 +96,53 @@ describe('Home-only widget policy', () => {
     expect(
       buildHomeWidgetDetails([{ status: 'permission', title: placeholder }]).waitingAgents[0]?.title
     ).toBe(placeholder);
+  });
+
+  it('applies the shared title rule to the presentation and keeps the plain cut in the details', () => {
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        {
+          status: 'permission',
+          title: placeholder,
+          statusUpdatedAt: '2026-10-09T08:00:00Z',
+        },
+        { status: 'permission', title: ' \n ', statusUpdatedAt: '2026-10-09T08:30:00Z' },
+        {
+          status: 'permission',
+          title: 'Dashboard polish',
+          statusUpdatedAt: '2026-10-09T09:00:00Z',
+        },
+        {
+          status: 'scheduled',
+          title: placeholder,
+          scheduledAt: '2026-10-09T11:00:00Z',
+        },
+      ],
+    });
+    // The oldest wait is the placeholder row, so the primary title is the one a
+    // surface would otherwise draw as the backend's name for the session.
+    expect(data.details.primaryTitle).toBe(placeholder);
+    expect(data.details.waitingAgents.map(row => row.title)).toEqual([
+      placeholder,
+      '',
+      'Dashboard polish',
+    ]);
+    expect(data.details.scheduledAgents[0]?.title).toBe(placeholder);
+
+    const home = buildHomeWidgetPresentation(data, now);
+    expect(home.primaryTitle).toBeNull();
+    expect(home.waitingAgents).toEqual([
+      { title: null, kind: 'permission' },
+      { title: null, kind: 'permission' },
+      { title: 'Dashboard polish', kind: 'permission' },
+    ]);
+    expect(home.scheduledAgents).toEqual([
+      { title: null, scheduledAt: '2026-10-09T11:00:00.000Z' },
+    ]);
+    // A presentation carrying null titles is the shape every surface parses.
+    expect(homeWidgetPresentationSchema.safeParse(home).success).toBe(true);
   });
 
   it('carries only printed characters in a title', () => {

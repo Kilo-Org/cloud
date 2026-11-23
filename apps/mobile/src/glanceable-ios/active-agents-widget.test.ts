@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { buildHomeWidgetData, type HomeWidgetSessionRow } from '@kilocode/app-shared/home-widget';
+import {
+  buildHomeWidgetData,
+  buildHomeWidgetPresentation,
+  type HomeWidgetSessionRow,
+} from '@kilocode/app-shared/home-widget';
 
 import { type GlanceableActionFeedback, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
@@ -859,6 +863,31 @@ describe('stress', () => {
     );
     expect(texts(tree)).toContain('Agent');
     expect(texts(tree)).not.toContain(placeholder);
+  });
+
+  it('draws its generic label for a presentation whose titles are already null', () => {
+    const placeholder = `New session - ${new Date(NOW - 40 * MINUTE).toISOString()}`;
+    const sessions: HomeWidgetSessionRow[] = [
+      {
+        status: 'permission',
+        title: placeholder,
+        statusUpdatedAt: new Date(NOW - 30 * MINUTE).toISOString(),
+      },
+      {
+        status: 'permission',
+        title: '   ',
+        statusUpdatedAt: new Date(NOW - 20 * MINUTE).toISOString(),
+      },
+    ];
+    const input = { sessions, userId: 'u1', organizationId: null, now: NOW };
+    const home = buildHomeWidgetPresentation(buildHomeWidgetData(input), NOW);
+    // The shared presentation already applied the title rule, so the layout
+    // reads null and maps each row to its own generic agent label.
+    expect(home.primaryTitle).toBeNull();
+    expect(home.waitingAgents.map(row => row.title)).toEqual([null, null]);
+    const tree = render({ ...propsFor(sessions), home }, 'systemMedium');
+    expect(texts(tree)).toContain('Agent');
+    expect(texts(tree).join(' ')).not.toContain('New session');
   });
 
   it.each(HOME_FAMILIES)('draws no name for persisted props with no Home data in %s', family => {

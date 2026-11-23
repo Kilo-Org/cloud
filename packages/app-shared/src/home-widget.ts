@@ -33,6 +33,19 @@ import { epochMsToIso, timestampMs, timestampToIso } from './utils';
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 const titleSchema = z.string().max(GLANCEABLE_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
+/**
+ * A presented row: the same shape a surface draws, with `glanceableSessionTitle`
+ * already applied, so a null title means the surface draws its own generic
+ * agent label. The stored details keep the plain cut for older app builds.
+ */
+const presentedWaitingRowSchema = z.object({
+  title: titleSchema.nullable(),
+  kind: z.enum(GLANCEABLE_NEEDS_INPUT_STATUSES),
+});
+const presentedScheduledRowSchema = z.object({
+  title: titleSchema.nullable(),
+  scheduledAt: z.string().nullable(),
+});
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({
@@ -86,6 +99,11 @@ export const homeWidgetDataSchema = z.object({
 });
 export type HomeWidgetData = z.infer<typeof homeWidgetDataSchema>;
 
+/**
+ * The presentation every surface draws: each title already carries
+ * `glanceableSessionTitle`, so null stands for the surface's own generic agent
+ * label. The stored details keep the plain cut, so every app build reads them.
+ */
 export const homeWidgetPresentationSchema = z.object({
   status: z.enum(['waiting', 'unavailable', 'empty', 'signed_out', 'privacy', 'content']),
   primaryKind: kindSchema.nullable(),
@@ -98,8 +116,8 @@ export const homeWidgetPresentationSchema = z.object({
   scheduledAt: z.string().nullable(),
   awaitingUpdate: z.boolean(),
   primaryTitle: titleSchema.nullable(),
-  waitingAgents: homeWidgetDetailsSchema.shape.waitingAgents,
-  scheduledAgents: homeWidgetDetailsSchema.shape.scheduledAgents,
+  waitingAgents: z.array(presentedWaitingRowSchema).max(HOME_WIDGET_DETAIL_LIMIT),
+  scheduledAgents: z.array(presentedScheduledRowSchema).max(HOME_WIDGET_DETAIL_LIMIT),
   canCreate: z.boolean(),
   canApprove: z.boolean(),
   approvalKey: approvalKeySchema,
@@ -197,9 +215,9 @@ export function glanceableTitle(value: string | null | undefined): string {
 /**
  * The one title rule every drawing surface applies: the shared display cut, or
  * null for an empty title and for the backend `New session - <ISO>`
- * placeholder. Each surface maps null to its own generic agent label. The
- * stored Home details keep the plain cut, so every app build can still read a
- * payload.
+ * placeholder. Each surface maps null to its own generic agent label. The Home
+ * widget presentation carries this rule; the stored details keep the plain cut,
+ * so every app build can still read a payload.
  */
 export function glanceableSessionTitle(value: string | null | undefined): string | null {
   const title = glanceableTitle(value);
@@ -402,9 +420,21 @@ export function buildHomeWidgetPresentation(
     primaryTitle:
       terminal !== null || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
-        : details.primaryTitle,
-    waitingAgents: terminal !== null || snapshot.needsInput === 0 ? [] : details.waitingAgents,
-    scheduledAgents: terminal !== null || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
+        : glanceableSessionTitle(details.primaryTitle),
+    waitingAgents:
+      terminal !== null || snapshot.needsInput === 0
+        ? []
+        : details.waitingAgents.map(row => ({
+            title: glanceableSessionTitle(row.title),
+            kind: row.kind,
+          })),
+    scheduledAgents:
+      terminal !== null || snapshot.scheduled === 0
+        ? []
+        : details.scheduledAgents.map(row => ({
+            title: glanceableSessionTitle(row.title),
+            scheduledAt: row.scheduledAt,
+          })),
     canCreate: status === 'content' || status === 'empty' || status === 'unavailable',
     canApprove: approvalAvailable,
   };

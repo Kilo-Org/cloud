@@ -91,6 +91,7 @@
     "draft": "Drög",
     "enabled": "Virkt",
     "github": "GitHub",
+    "image": "Mynd",
     "imageUnavailable": "Myndin er ekki tiltæk.",
     "loading": "Hleðsla í gangi…",
     "loadMore": "Sækja meira",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Hleður myndinni",
       "imageUnavailableRetry": "Myndin er ekki tiltæk, reyna að hlaða henni aftur",
+      "imageUnavailableRetryWithAlt": "Myndin er ekki tiltæk, {{alt}}, reyna að hlaða henni aftur",
       "imagePreviewUnavailableInSession": "Ekki er hægt að forskoða myndir í þessari lotu.",
       "viewImage": "Skoða mynd",
       "viewImageWithAlt": "Skoða mynd {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Endapunkturinn skilaði engum líkönum. Sláðu inn líkön handvirkt.",
       "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",
+      "invalidApiKey": "API-lykillinn inniheldur staf sem ekki er hægt að senda. Notaðu aðeins bókstafi, tölustafi og venjuleg tákn, án línubrota.",
+      "invalidHeaders": "Ekki er hægt að senda sérsniðinn haus. Athugaðu heiti hans og notaðu aðeins bókstafi, tölustafi og venjuleg tákn, án línubrota.",
       "invalidUrl": "Sláðu inn HTTP- eða HTTPS-grunnslóð API án auðkenningarupplýsinga, fyrirspurnarhluta eða brotahluta.",
       "publicHttp": "Opinberir HTTP-endapunktar eru ekki leyfðir. Notaðu HTTPS eða einkarekinn endapunkt á staðarneti.",
       "httpApprovalRequired": "Samþykktu þennan staðbundna HTTP-endapunkt áður en þú vistar eða tengist.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",
       "expiredGrant": "Útrunnið: {{description}}",
+      "expiredStatus": "Útrunnið",
       "googlePlayReceipt": "Kvittun frá Google Play",
       "kind": {
         "adjustment": "Leiðrétting",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
       "retentionLimit": "Nýjasti inneignarferillinn er sýndur.",
-      "voidedGrant": "Ógilt: {{description}}"
+      "voidedGrant": "Ógilt: {{description}}",
+      "voidedStatus": "Ógilt"
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",

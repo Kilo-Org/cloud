@@ -94,6 +94,7 @@
     "draft": "Dréacht",
     "enabled": "Cumasaithe",
     "github": "GitHub",
+    "image": "Íomhá",
     "imageUnavailable": "Níl an íomhá ar fáil.",
     "loading": "Ag lódáil…",
     "loadMore": "Lódáil tuilleadh",
@@ -2819,6 +2820,7 @@
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",
       "imageUnavailableRetry": "Níl an íomhá ar fáil, bain triail eile as í a lódáil",
+      "imageUnavailableRetryWithAlt": "Níl an íomhá ar fáil, {{alt}}, bain triail eile as í a lódáil",
       "imagePreviewUnavailableInSession": "Níl réamhamharc na híomhá ar fáil sa seisiún seo.",
       "viewImage": "Féach ar an íomhá",
       "viewImageWithAlt": "Féach ar an íomhá {{alt}}",
@@ -4441,6 +4443,8 @@
       "discoveryNoModels": "Níor liostaigh an críochphointe aon samhail. Cuir isteach samhlacha de láimh.",
       "connectionIncomplete": "D'fhreagair an tsamhail ach níor chríochnaigh sí. Bain triail eile as, nó seiceáil aitheantas na samhla agus an prótacal.",
       "invalidInput": "Cuir isteach ainm cúlchórais, ceanntásca bailí agus samhail amháin ar a laghad a bhfuil aitheantas agus ainm uathúil aici. Ní mór gur slánuimhreacha deimhneacha iad na teorainneacha comharthaí.",
+      "invalidApiKey": "Tá carachtar san eochair API nach féidir a sheoladh. Ná húsáid ach litreacha, digití agus siombailí caighdeánacha, gan aon bhriseadh líne.",
+      "invalidHeaders": "Ní féidir ceanntásc saincheaptha a sheoladh. Seiceáil a ainm agus ná húsáid ach litreacha, digití agus siombailí caighdeánacha, gan aon bhriseadh líne.",
       "invalidUrl": "Cuir fréamh API HTTP nó HTTPS isteach gan dintiúir, teaghrán fiosrúcháin ná blúire.",
       "publicHttp": "Ní cheadaítear críochphointí poiblí HTTP. Úsáid HTTPS nó críochphointe áitiúil príobháideach.",
       "httpApprovalRequired": "Ceadaigh an críochphointe áitiúil HTTP seo sula sábhálann tú nó sula nascann tú leis.",
@@ -4955,6 +4959,7 @@
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
       "expiredGrant": "Imithe in éag: {{description}}",
+      "expiredStatus": "Imithe in éag",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
         "adjustment": "Coigeartú",
@@ -4981,7 +4986,8 @@
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
       "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
-      "voidedGrant": "Cealaithe: {{description}}"
+      "voidedGrant": "Cealaithe: {{description}}",
+      "voidedStatus": "Cealaithe"
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",

@@ -189,6 +189,7 @@
     "draft": "Draft",
     "enabled": "Enabled",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Image unavailable",
     "loading": "Loading…",
     "loadMore": "Load more",
@@ -2769,6 +2770,7 @@
     "filePart": {
       "loadingImage": "Loading image",
       "imageUnavailableRetry": "Image unavailable, retry loading",
+      "imageUnavailableRetryWithAlt": "Image unavailable, {{alt}}, retry loading",
       "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",
@@ -4230,6 +4232,8 @@
       "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
       "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
+      "invalidApiKey": "The API key contains a character that cannot be sent. Use letters, digits, and standard symbols only, with no line breaks.",
+      "invalidHeaders": "A custom header cannot be sent. Check its name and use letters, digits, and standard symbols only, with no line breaks.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
       "httpApprovalRequired": "Approve this local HTTP endpoint before saving or connecting.",
@@ -4798,6 +4802,7 @@
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
       "expiredGrant": "Expired: {{description}}",
+      "expiredStatus": "Expired",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4824,7 +4829,8 @@
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
       "retentionLimit": "Showing the most recent credit history.",
-      "voidedGrant": "Voided: {{description}}"
+      "voidedGrant": "Voided: {{description}}",
+      "voidedStatus": "Voided"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",

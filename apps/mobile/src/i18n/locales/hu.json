@@ -91,6 +91,7 @@
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
     "github": "GitHub",
+    "image": "Kép",
     "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",
     "loadMore": "Továbbiak betöltése",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "A kép nem érhető el, próbáld újra a betöltést",
+      "imageUnavailableRetryWithAlt": "A kép nem érhető el, {{alt}}, próbáld újra a betöltést",
       "imagePreviewUnavailableInSession": "A kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése: {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "A végpont nem sorolt fel modelleket. Add meg a modelleket kézzel.",
       "connectionIncomplete": "A modell válaszolt, de nem fejezte be. Próbáld újra, vagy ellenőrizd a modellazonosítót és a protokollt.",
       "invalidInput": "Adj meg egy háttérrendszernevet, érvényes fejléceket és legalább egy modellt egyedi azonosítóval és névvel. A tokenkorlátoknak pozitív egész számoknak kell lenniük.",
+      "invalidApiKey": "Az API-kulcs olyan karaktert tartalmaz, amelyet nem lehet elküldeni. Csak betűket, számjegyeket és szabványos szimbólumokat használj, sortörések nélkül.",
+      "invalidHeaders": "Egy egyéni fejlécet nem lehet elküldeni. Ellenőrizd a nevét, és csak betűket, számjegyeket és szabványos szimbólumokat használj, sortörések nélkül.",
       "invalidUrl": "Adj meg egy HTTP vagy HTTPS API alap-URL-címet hitelesítési adatok, lekérdezési paraméterek és töredékazonosító nélkül.",
       "publicHttp": "Nyilvános HTTP-végpontok nem engedélyezettek. Használj HTTPS-t vagy privát helyi végpontot.",
       "httpApprovalRequired": "Mentés vagy csatlakozás előtt hagyd jóvá ezt a helyi HTTP-végpontot.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
       "expiredGrant": "Lejárt: {{description}}",
+      "expiredStatus": "Lejárt",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
       "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
-      "voidedGrant": "Érvénytelenítve: {{description}}"
+      "voidedGrant": "Érvénytelenítve: {{description}}",
+      "voidedStatus": "Érvénytelenítve"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",

@@ -10,8 +10,9 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { type LiveSessionManagerHandle } from '@/components/agents/live-session-manager-registry';
 
-import { type FrontApprovableRow, pickFrontApprovableSession } from './front-approval';
+import { whenGlanceableAckHydrationSettled } from './ack-hydration';
 import { resolveAnsweredRaises } from './attention-rows';
+import { type FrontApprovableRow, pickFrontApprovableSession } from './front-approval';
 
 /**
  * One waiting ask replayed by the wrapper. Only the id matters: the wrist
@@ -236,6 +237,52 @@ async function refreshSurfaces(deps: FrontApprovalDeps, scope: FrontApprovalScop
 }
 
 /**
+ * Derive the glanceable snapshot from the rows a caller already read and hand
+ * it to the push sink loop. Wired as the default `refreshGlanceableSurfaces`
+ * dep, so the wrist control and the needs-input action share one derive.
+ *
+ * The derive waits (bounded) for the session-attention ack store to hydrate
+ * before it resolves the rows: this runs in a fresh headless process that did
+ * not necessarily answer the raise, so before hydrating the store reads every
+ * raise an earlier launch answered as unanswered — and would republish it as
+ * waiting. The wait races the persisted-snapshot restore, so it costs nothing
+ * when that read is the slower of the two.
+ */
+export async function refreshGlanceableSurfacesFromRows(input: {
+  rows: readonly FrontApprovableRow[];
+  scope: FrontApprovalScope;
+  now: number;
+}): Promise<void> {
+  const { rows, scope, now } = input;
+  if (scope.userId === null) {
+    // No confirmed account: the push fence would reject the snapshot, so
+    // there is nothing honest to publish.
+    return;
+  }
+  // Loaded here, not imported statically: `notifications` pulls the expo
+  // notification runtime and `react-native` into its graph, and node-only
+  // suites and the headless approval graph import this module.
+  const { applyGlanceablePushData } = await import('@/lib/notifications');
+  const { restorePersistedGlanceable } = await import('@/lib/glanceable/persist');
+  await Promise.all([
+    // A freshly launched (headless) process has no in-memory fence yet; the
+    // persisted one is what every pushed snapshot is fenced against.
+    restorePersistedGlanceable(),
+    whenGlanceableAckHydrationSettled(),
+  ]);
+  const snapshot = buildGlanceableSnapshot({
+    // A raise the user answered from the needs-input notification is no
+    // longer waiting: count it the way the in-app list does, or the
+    // republished surface contradicts the result notification.
+    sessions: resolveAnsweredRaises(rows),
+    userId: scope.userId,
+    organizationId: scope.organizationId,
+    now,
+  });
+  await applyGlanceablePushData({ type: 'active_agents_glanceable', ...snapshot });
+}
+
+/**
  * Rebuild the glanceable surfaces from the tray without approving anything.
  *
  * The needs-input notification's headless Approve/Reply runs with no screen
@@ -278,8 +325,6 @@ async function defaultFrontApprovalDeps(): Promise<FrontApprovalDeps> {
   const { getLiveSessionManager } =
     await import('@/components/agents/live-session-manager-registry');
   const { ackSessionAttention } = await import('@/lib/session-attention');
-  const { applyGlanceablePushData } = await import('@/lib/notifications');
-  const { restorePersistedGlanceable } = await import('@/lib/glanceable/persist');
   const { getActiveToken } = await import('@/lib/auth/token-owner');
   const { confirmAuthenticatedOwner, getAuthenticatedOwner, isCurrentOwner } =
     await import('@/lib/context-scope');
@@ -361,26 +406,7 @@ async function defaultFrontApprovalDeps(): Promise<FrontApprovalDeps> {
       }
     },
     ackSessionAttention,
-    refreshGlanceableSurfaces: async ({ rows, scope: surfaceScope, now }) => {
-      if (surfaceScope.userId === null) {
-        // No confirmed account: the push fence would reject the snapshot, so
-        // there is nothing honest to publish.
-        return;
-      }
-      // A freshly launched (headless) process has no in-memory fence yet; the
-      // persisted one is what every pushed snapshot is fenced against.
-      await restorePersistedGlanceable();
-      const snapshot = buildGlanceableSnapshot({
-        // A raise the user answered from the needs-input notification is no
-        // longer waiting: count it the way the in-app list does, or the
-        // republished surface contradicts the result notification.
-        sessions: resolveAnsweredRaises(rows),
-        userId: surfaceScope.userId,
-        organizationId: surfaceScope.organizationId,
-        now,
-      });
-      await applyGlanceablePushData({ type: 'active_agents_glanceable', ...snapshot });
-    },
+    refreshGlanceableSurfaces: refreshGlanceableSurfacesFromRows,
     readPendingAsks: handle => handle.store.get(handle.manager.atoms.pendingPermissions),
     isSessionStillWaiting: isManagerStillWaitingForApproval,
     classifyFailure: classifyFrontApprovalFailure,

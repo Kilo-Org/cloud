@@ -91,6 +91,7 @@
     "draft": "Hukihuki",
     "enabled": "Kua whakahohea",
     "github": "GitHub",
+    "image": "Atahanga",
     "imageUnavailable": "Kāore te whakaahua i te wātea",
     "loading": "Kei te uta…",
     "loadMore": "Utaina ētahi atu",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",
       "imageUnavailableRetry": "Kāore e wātea ana te atahanga, whakamātau anō ki te uta",
+      "imageUnavailableRetryWithAlt": "Kāore e wātea ana te atahanga, {{alt}}, whakamātau anō ki te uta",
       "imagePreviewUnavailableInSession": "Kāore e wātea ana te arokite o te atahanga i tēnei wātū.",
       "viewImage": "Tirohia te atahanga",
       "viewImageWithAlt": "Tirohia te atahanga {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Kāore te pūwāhi i whakarārangi tauira. Whakaurua ā-ringa ngā tauira.",
       "connectionIncomplete": "I whakautu te tauira, engari kāore i oti te tono. Ngana anō, tirohia rānei te tautuhi tauira me te kawa.",
       "invalidInput": "Whakaurua he ingoa pūnaha tuarā, he pane tika, me tētahi tauira neke atu rānei, he tautuhi me te ingoa ahurei tō ia tauira. Me tau tōpū nui ake i te kore ngā tepe waeine kupu.",
+      "invalidApiKey": "Kei roto i te kī API tētahi pūāhua kāore e taea te tuku. Whakamahia ngā reta, ngā mati, me ngā tohu paerewa anake, kāore he whati raina.",
+      "invalidHeaders": "Kāore e taea te tuku i tētahi pane ritenga. Tirohia tōna ingoa, ā, whakamahia ngā reta, ngā mati, me ngā tohu paerewa anake, kāore he whati raina.",
       "invalidUrl": "Whakaurua he pūtake API HTTP, HTTPS rānei, kāore he taipitopito motuhēhēnga, he uiui, he wāhanga URL rānei.",
       "publicHttp": "Kāore e whakaaetia ngā pūwāhi HTTP tūmatanui. Whakamahia te HTTPS, tētahi pūwāhi paetata tūmataiti rānei.",
       "httpApprovalRequired": "Whakaaetia tēnei pūwāhi HTTP paetata i mua i te tiaki, te hono rānei.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Ka puta mai ki konei ngā hoko whiwhinga, ngā rihīti, me te whakamahinga.",
       "emptyTitle": "Kāore he hītori whiwhinga",
       "expiredGrant": "Kua pau te wā: {{description}}",
+      "expiredStatus": "Kua pau te wā",
       "googlePlayReceipt": "Rihīti mai i Google Play",
       "kind": {
         "adjustment": "Whakatikatika",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kāore he rihīti mō tēnei hoko.",
       "retentionLimit": "E whakaatu ana i te hītori whiwhinga tino hou.",
-      "voidedGrant": "Kua whakakorea: {{description}}"
+      "voidedGrant": "Kua whakakorea: {{description}}",
+      "voidedStatus": "Kua whakakorea"
     },
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",

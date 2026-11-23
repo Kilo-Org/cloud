@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已启用",
     "github": "GitHub",
+    "image": "图片",
     "imageUnavailable": "无法显示图片",
     "loading": "加载中…",
     "loadMore": "加载更多",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "正在加载图片",
       "imageUnavailableRetry": "无法加载图片，重新加载",
+      "imageUnavailableRetryWithAlt": "无法加载图片，{{alt}}，重新加载",
       "imagePreviewUnavailableInSession": "无法在此会话中预览图片。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "端点未列出任何模型。请手动输入模型。",
       "connectionIncomplete": "模型已响应但未完成。请重试，或检查模型 ID 和协议。",
       "invalidInput": "请输入后端名称、有效的请求头，以及至少一个具有唯一 ID 和名称的模型。词元数限制必须为正整数。",
+      "invalidApiKey": "API 密钥包含无法发送的字符。请仅使用字母、数字和标准符号，且不要包含换行符。",
+      "invalidHeaders": "无法发送自定义请求头。请检查其名称，并仅使用字母、数字和标准符号，且不要包含换行符。",
       "invalidUrl": "请输入 HTTP 或 HTTPS API 根地址，且不包含凭据、查询参数或片段。",
       "publicHttp": "不允许使用公共 HTTP 端点。请使用 HTTPS 或私有本地端点。",
       "httpApprovalRequired": "保存或连接前，请先批准使用此本地 HTTP 端点。",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
       "expiredGrant": "已过期：{{description}}",
+      "expiredStatus": "已过期",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
         "adjustment": "调整",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
       "retentionLimit": "仅显示最近的积分记录。",
-      "voidedGrant": "已作废：{{description}}"
+      "voidedGrant": "已作废：{{description}}",
+      "voidedStatus": "已作废"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",

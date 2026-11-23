@@ -91,6 +91,7 @@
     "draft": "Bwouyon",
     "enabled": "Aktive",
     "github": "GitHub",
+    "image": "Imaj",
     "imageUnavailable": "Imaj la pa disponib.",
     "loading": "Ap chaje…",
     "loadMore": "Chaje plis",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ap chaje imaj la",
       "imageUnavailableRetry": "Imaj la pa disponib, eseye chaje li ankò",
+      "imageUnavailableRetryWithAlt": "Imaj la pa disponib, {{alt}}, eseye chaje li ankò",
       "imagePreviewUnavailableInSession": "Apèsi imaj la pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj la",
       "viewImageWithAlt": "Gade imaj {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Pwen aksè a pa t bay okenn modèl. Antre modèl yo alamen.",
       "connectionIncomplete": "Modèl la reponn men li pa t fini. Eseye ankò, oswa verifye ID modèl la ak pwotokòl la.",
       "invalidInput": "Antre yon non sèvis, antèt ki valab ak omwen yon modèl ki gen yon ID ak yon non ki pa repete. Limit jeton yo dwe nonb antye ki pi gran pase zewo.",
+      "invalidApiKey": "Kle API a gen yon karaktè ki pa ka voye. Sèvi sèlman ak lèt, chif, ak senbòl estanda, san okenn kase liy.",
+      "invalidHeaders": "Yon antèt pèsonalize pa ka voye. Tcheke non l epi sèvi sèlman ak lèt, chif, ak senbòl estanda, san okenn kase liy.",
       "invalidUrl": "Antre yon rasin API HTTP oswa HTTPS san enfòmasyon pou otantifikasyon, paramèt rechèch oswa fragman.",
       "publicHttp": "Pwen aksè HTTP piblik yo pa otorize. Sèvi ak HTTPS oswa yon pwen aksè lokal prive.",
       "httpApprovalRequired": "Apwouve pwen aksè HTTP lokal sa a anvan ou sove oswa konekte.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
       "expiredGrant": "Ekspire: {{description}}",
+      "expiredStatus": "Ekspire",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
       "retentionLimit": "Sa yo se istorik kredi ki pi resan an.",
-      "voidedGrant": "Anile: {{description}}"
+      "voidedGrant": "Anile: {{description}}",
+      "voidedStatus": "Anile"
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",

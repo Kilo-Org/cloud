@@ -93,6 +93,7 @@
     "draft": "Osnutek",
     "enabled": "Omogočeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika ni na voljo.",
     "loading": "Nalaganje…",
     "loadMore": "Naloži več",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",
@@ -4362,6 +4364,8 @@
       "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
       "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
+      "invalidApiKey": "Ključ API vsebuje znak, ki ga ni mogoče poslati. Uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
+      "invalidHeaders": "Glave po meri ni mogoče poslati. Preveri njeno ime in uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
       "httpApprovalRequired": "Pred shranjevanjem ali povezovanjem odobri to lokalno končno točko HTTP.",
@@ -4870,6 +4874,7 @@
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
       "expiredGrant": "Poteklo: {{description}}",
+      "expiredStatus": "Poteklo",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
@@ -4896,7 +4901,8 @@
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
       "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
-      "voidedGrant": "Razveljavljeno: {{description}}"
+      "voidedGrant": "Razveljavljeno: {{description}}",
+      "voidedStatus": "Razveljavljeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",

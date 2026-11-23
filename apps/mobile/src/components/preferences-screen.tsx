@@ -72,10 +72,15 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
               />
             </SettingsTarget>
             <SettingsTarget item={PREFERENCES_HUB_SETTINGS.toolSummaryTranslation}>
+              {/* This subtitle is a sentence whose tail names the failure
+                  behaviour, and the English copy already fills three lines at
+                  the compact column: a two-line cap cuts that tail off, so no
+                  fixed count bounds the copy. */}
               <ConfigureRow
                 icon={WandSparkles}
                 title={t(PREFERENCES_HUB_SETTINGS.toolSummaryTranslation.label)}
                 subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+                subtitleNumberOfLines="all"
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
                 }}
@@ -112,6 +117,7 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
               icon={Globe}
               title={t(PREFERENCES_HUB_SETTINGS.account.label)}
               subtitle={t('preferences.accountSubtitle')}
+              subtitleNumberOfLines={2}
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/account' as Href);
               }}

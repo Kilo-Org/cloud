@@ -91,6 +91,7 @@
     "draft": "Utkast",
     "enabled": "Aktivert",
     "github": "GitHub",
+    "image": "Bilde",
     "imageUnavailable": "Bildet er ikke tilgjengelig.",
     "loading": "Laster inn…",
     "loadMore": "Last inn flere",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Laster inn bilde",
       "imageUnavailableRetry": "Bildet er ikke tilgjengelig. Prøv å laste det inn på nytt",
+      "imageUnavailableRetryWithAlt": "Bildet er ikke tilgjengelig. {{alt}}. Prøv å laste det inn på nytt",
       "imagePreviewUnavailableInSession": "Bildet kan ikke forhåndsvises i denne økten.",
       "viewImage": "Vis bilde",
       "viewImageWithAlt": "Vis bilde: {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Endepunktet listet ingen modeller. Legg inn modeller manuelt.",
       "connectionIncomplete": "Modellen svarte, men fullførte ikke. Prøv igjen, eller sjekk modell-ID-en og protokollen.",
       "invalidInput": "Skriv inn et navn på baksystemet, gyldige meldingshoder og minst én modell med unik ID og unikt navn. Tokengrensene må være positive heltall.",
+      "invalidApiKey": "API-nøkkelen inneholder et tegn som ikke kan sendes. Bruk bare bokstaver, tall og standardtegn, uten linjeskift.",
+      "invalidHeaders": "En egendefinert meldingshode kan ikke sendes. Kontroller navnet, og bruk bare bokstaver, tall og standardtegn, uten linjeskift.",
       "invalidUrl": "Skriv inn en HTTP- eller HTTPS-rotadresse for API-et uten påloggingsinformasjon, spørring eller fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tillatt. Bruk HTTPS eller et privat, lokalt endepunkt.",
       "httpApprovalRequired": "Godkjenn dette lokale HTTP-endepunktet før du lagrer eller kobler til.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",
       "expiredGrant": "Utløpt: {{description}}",
+      "expiredStatus": "Utløpt",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
       "retentionLimit": "Viser den nyeste kreditthistorikken.",
-      "voidedGrant": "Annullert: {{description}}"
+      "voidedGrant": "Annullert: {{description}}",
+      "voidedStatus": "Annullert"
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",

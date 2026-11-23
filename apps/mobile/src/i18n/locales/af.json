@@ -91,6 +91,7 @@
     "draft": "Konsep",
     "enabled": "Aangeskakel",
     "github": "GitHub",
+    "image": "Afbeelding",
     "imageUnavailable": "Die prent is nie beskikbaar nie.",
     "loading": "Laai…",
     "loadMore": "Laai meer",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Laai afbeelding",
       "imageUnavailableRetry": "Afbeelding onbeskikbaar, probeer weer om dit te laai",
+      "imageUnavailableRetryWithAlt": "Afbeelding onbeskikbaar, {{alt}}, probeer weer om dit te laai",
       "imagePreviewUnavailableInSession": "'N Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
       "viewImage": "Bekyk afbeelding",
       "viewImageWithAlt": "Bekyk afbeelding {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Die eindpunt het geen modelle gelys nie. Voer modelle handmatig in.",
       "connectionIncomplete": "Die model het geantwoord maar nie klaargemaak nie. Probeer weer of kontroleer die model-ID en protokol.",
       "invalidInput": "Voer 'n agtergrondstelselnaam, geldige kopvelde en minstens een model met 'n unieke ID en naam in. Die perke vir tekseenhede moet positiewe heelgetalle wees.",
+      "invalidApiKey": "Die API-sleutel bevat 'n karakter wat nie gestuur kan word nie. Gebruik slegs letters, syfers en standaardsimbole, sonder reëlbreuke.",
+      "invalidHeaders": "'n Pasgemaakte kopveld kan nie gestuur word nie. Kontroleer die naam en gebruik slegs letters, syfers en standaardsimbole, sonder reëlbreuke.",
       "invalidUrl": "Voer 'n HTTP- of HTTPS-API-basis-URL sonder aanmeldbesonderhede, 'n navraag of 'n fragment in.",
       "publicHttp": "Openbare HTTP-eindpunte word nie toegelaat nie. Gebruik HTTPS of 'n private plaaslike eindpunt.",
       "httpApprovalRequired": "Keur hierdie plaaslike HTTP-eindpunt goed voordat jy stoor of koppel.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
       "expiredGrant": "Verval: {{description}}",
+      "expiredStatus": "Verval",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
       "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
-      "voidedGrant": "Nietig gemaak: {{description}}"
+      "voidedGrant": "Nietig gemaak: {{description}}",
+      "voidedStatus": "Nietig gemaak"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",

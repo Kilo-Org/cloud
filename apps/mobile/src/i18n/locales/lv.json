@@ -92,6 +92,7 @@
     "draft": "Melnraksts",
     "enabled": "Iespējots",
     "github": "GitHub",
+    "image": "Attēls",
     "imageUnavailable": "Attēls nav pieejams.",
     "loading": "Ielādē…",
     "loadMore": "Ielādēt vairāk",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
+      "imageUnavailableRetryWithAlt": "Attēls nav pieejams, {{alt}}, mēģināt ielādēt vēlreiz",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",
@@ -4283,6 +4285,8 @@
       "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
       "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
+      "invalidApiKey": "API atslēga satur rakstzīmi, kuru nevar nosūtīt. Izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
+      "invalidHeaders": "Pielāgotu galveni nevar nosūtīt. Pārbaudi tās nosaukumu un izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
       "httpApprovalRequired": "Pirms saglabāšanas vai savienošanās apstiprini šo lokālo HTTP galapunktu.",
@@ -4785,6 +4789,7 @@
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
       "expiredGrant": "Termiņš beidzies: {{description}}",
+      "expiredStatus": "Termiņš beidzies",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
@@ -4811,7 +4816,8 @@
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
       "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
-      "voidedGrant": "Anulēts: {{description}}"
+      "voidedGrant": "Anulēts: {{description}}",
+      "voidedStatus": "Anulēts"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",

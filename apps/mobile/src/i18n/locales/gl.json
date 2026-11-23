@@ -91,6 +91,7 @@
     "draft": "Borrador",
     "enabled": "Activado",
     "github": "GitHub",
+    "image": "Imaxe",
     "imageUnavailable": "A imaxe non está dispoñible.",
     "loading": "Cargando…",
     "loadMore": "Cargar máis",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Cargando a imaxe",
       "imageUnavailableRetry": "Imaxe non dispoñible, volver tentar cargala",
+      "imageUnavailableRetryWithAlt": "Imaxe non dispoñible, {{alt}}, volver tentar cargala",
       "imagePreviewUnavailableInSession": "A vista previa da imaxe non está dispoñible nesta sesión.",
       "viewImage": "Ver imaxe",
       "viewImageWithAlt": "Ver imaxe {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "O punto de acceso non listou ningún modelo. Introduce os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu pero non rematou. Téntao de novo ou comproba o ID do modelo e o protocolo.",
       "invalidInput": "Introduce un nome de servizo, cabeceiras válidas e polo menos un modelo cun ID único e un nome. Os límites de tókens deben ser números enteiros positivos.",
+      "invalidApiKey": "A clave da API contén un carácter que non se pode enviar. Usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
+      "invalidHeaders": "Non se pode enviar unha cabeceira personalizada. Comproba o seu nome e usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
       "invalidUrl": "Introduce un URL raíz da API con HTTP ou HTTPS, sen credenciais, parámetros de consulta nin un fragmento.",
       "publicHttp": "Non se permiten puntos de acceso HTTP públicos. Usa HTTPS ou un punto de acceso local privado.",
       "httpApprovalRequired": "Autoriza este punto de acceso HTTP local antes de gardar ou conectar.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
       "expiredGrant": "Caducado: {{description}}",
+      "expiredStatus": "Caducado",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Axuste",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
       "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
       "retentionLimit": "Mostrando o historial de créditos máis recente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",

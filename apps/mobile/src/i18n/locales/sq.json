@@ -91,6 +91,7 @@
     "draft": "Paraprake",
     "enabled": "Aktivizuar",
     "github": "GitHub",
+    "image": "Imazh",
     "imageUnavailable": "Imazhi nuk është i disponueshëm.",
     "loading": "Duke u ngarkuar…",
     "loadMore": "Ngarko më shumë",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Duke u ngarkuar imazhi",
       "imageUnavailableRetry": "Imazhi nuk është i disponueshëm, provo ta ngarkosh përsëri",
+      "imageUnavailableRetryWithAlt": "Imazhi nuk është i disponueshëm, {{alt}}, provo ta ngarkosh përsëri",
       "imagePreviewUnavailableInSession": "Parapamja e imazhit nuk është e disponueshme në këtë seancë.",
       "viewImage": "Shiko imazhin",
       "viewImageWithAlt": "Shiko imazhin {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
       "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",
+      "invalidApiKey": "Çelësi API përmban një karakter që nuk mund të dërgohet. Përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
+      "invalidHeaders": "Një kryefushë e personalizuar nuk mund të dërgohet. Kontrollo emrin e saj dhe përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
       "invalidUrl": "Fut një URL bazë API me HTTP ose HTTPS, pa të dhëna hyrjeje, parametra kërkimi ose fragment.",
       "publicHttp": "Pikat fundore publike HTTP nuk lejohen. Përdor HTTPS ose një pikë fundore lokale private.",
       "httpApprovalRequired": "Mirato këtë pikë fundore lokale HTTP përpara se ta ruash ose të lidhesh me të.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
       "expiredGrant": "Skaduar: {{description}}",
+      "expiredStatus": "Skaduar",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
       "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
-      "voidedGrant": "Anuluar: {{description}}"
+      "voidedGrant": "Anuluar: {{description}}",
+      "voidedStatus": "Anuluar"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",

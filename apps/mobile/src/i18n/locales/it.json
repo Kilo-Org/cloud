@@ -92,6 +92,7 @@
     "draft": "Bozza",
     "enabled": "Attivo",
     "github": "GitHub",
+    "image": "Immagine",
     "imageUnavailable": "L'immagine non è disponibile.",
     "loading": "Caricamento…",
     "loadMore": "Carica altro",
@@ -2092,6 +2093,7 @@
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",
       "imageUnavailableRetry": "Immagine non disponibile, riprova a caricarla",
+      "imageUnavailableRetryWithAlt": "Immagine non disponibile, {{alt}}, riprova a caricarla",
       "imagePreviewUnavailableInSession": "L'anteprima dell'immagine non è disponibile in questa sessione.",
       "viewImage": "Visualizza l'immagine",
       "viewImageWithAlt": "Visualizza l'immagine {{alt}}",
@@ -4283,6 +4285,8 @@
       "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
       "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",
+      "invalidApiKey": "La chiave API contiene un carattere che non può essere inviato. Usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
+      "invalidHeaders": "Non è possibile inviare un'intestazione personalizzata. Controlla il suo nome e usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
       "invalidUrl": "Inserisci un URL di base dell'API HTTP o HTTPS senza credenziali, parametri di ricerca o un frammento.",
       "publicHttp": "Gli indirizzi di accesso HTTP pubblici non sono consentiti. Usa HTTPS o un indirizzo di accesso locale privato.",
       "httpApprovalRequired": "Approva questo indirizzo di accesso HTTP locale prima di salvare o connetterti.",
@@ -4785,6 +4789,7 @@
       "emptyDescription": "Qui appariranno acquisti, ricevute e utilizzo dei crediti.",
       "emptyTitle": "Nessuna cronologia crediti",
       "expiredGrant": "Scaduto: {{description}}",
+      "expiredStatus": "Scaduto",
       "googlePlayReceipt": "Ricevuta da Google Play",
       "kind": {
         "adjustment": "Rettifica",
@@ -4811,7 +4816,8 @@
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
       "retentionLimit": "Viene mostrata la cronologia crediti più recente.",
-      "voidedGrant": "Annullato: {{description}}"
+      "voidedGrant": "Annullato: {{description}}",
+      "voidedStatus": "Annullato"
     },
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",

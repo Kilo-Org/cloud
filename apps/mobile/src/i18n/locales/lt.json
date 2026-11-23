@@ -93,6 +93,7 @@
     "draft": "Juodraštis",
     "enabled": "Įjungta",
     "github": "GitHub",
+    "image": "Paveikslėlis",
     "imageUnavailable": "Paveikslėlis nepasiekiamas",
     "loading": "Įkeliama…",
     "loadMore": "Įkelti daugiau",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",
       "imageUnavailableRetry": "Paveikslėlis nepasiekiamas, bandyti įkelti iš naujo",
+      "imageUnavailableRetryWithAlt": "Paveikslėlis nepasiekiamas, {{alt}}, bandyti įkelti iš naujo",
       "imagePreviewUnavailableInSession": "Paveikslėlio peržiūra šioje sesijoje nepasiekiama.",
       "viewImage": "Peržiūrėti paveikslėlį",
       "viewImageWithAlt": "Peržiūrėti paveikslėlį „{{alt}}“",
@@ -4362,6 +4364,8 @@
       "discoveryNoModels": "Prieigos taškas nepateikė nė vieno modelio. Įveskite modelius rankiniu būdu.",
       "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",
+      "invalidApiKey": "API rakte yra simbolis, kurio negalima išsiųsti. Naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
+      "invalidHeaders": "Pasirinktinės antraštės išsiųsti negalima. Patikrinkite jos pavadinimą ir naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
       "invalidUrl": "Įveskite bazinį HTTP arba HTTPS API URL be prisijungimo duomenų, užklausos parametrų ar fragmento.",
       "publicHttp": "Viešieji HTTP prieigos taškai neleidžiami. Naudokite HTTPS arba privatų vietinį prieigos tašką.",
       "httpApprovalRequired": "Prieš išsaugodami ar prisijungdami patvirtinkite šį vietinį HTTP prieigos tašką.",
@@ -4870,6 +4874,7 @@
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
       "expiredGrant": "Galiojimas baigėsi: {{description}}",
+      "expiredStatus": "Galiojimas baigėsi",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
         "adjustment": "Koregavimas",
@@ -4896,7 +4901,8 @@
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra.",
       "retentionLimit": "Rodoma naujausia kreditų istorija.",
-      "voidedGrant": "Anuliuota: {{description}}"
+      "voidedGrant": "Anuliuota: {{description}}",
+      "voidedStatus": "Anuliuota"
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",

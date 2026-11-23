@@ -91,6 +91,7 @@
     "draft": "Burador",
     "enabled": "Naka-enable",
     "github": "GitHub",
+    "image": "Larawan",
     "imageUnavailable": "Hindi maipakita ang larawan.",
     "loading": "Naglo-load…",
     "loadMore": "Magpakita pa",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi maipakita ang larawan, subukang i-load muli",
+      "imageUnavailableRetryWithAlt": "Hindi maipakita ang larawan, {{alt}}, subukang i-load muli",
       "imagePreviewUnavailableInSession": "Hindi maipakita ang paunang tingin sa larawan sa sesyong ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan: {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
       "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",
+      "invalidApiKey": "Ang susi ng API ay naglalaman ng karakter na hindi maipapadala. Gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
+      "invalidHeaders": "Hindi maipadala ang isang pasadyang header. Suriin ang pangalan nito at gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
       "invalidUrl": "Maglagay ng pangunahing URL ng API na gumagamit ng HTTP o HTTPS at walang mga kredensyal, mga parameter ng query, o fragment.",
       "publicHttp": "Hindi pinapayagan ang mga pampublikong HTTP endpoint. Gumamit ng HTTPS o isang pribadong lokal na endpoint.",
       "httpApprovalRequired": "Aprubahan ang lokal na HTTP endpoint na ito bago mag-save o kumonekta.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
       "expiredGrant": "Nag-expire: {{description}}",
+      "expiredStatus": "Nag-expire",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
       "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
-      "voidedGrant": "Kinansela: {{description}}"
+      "voidedGrant": "Kinansela: {{description}}",
+      "voidedStatus": "Kinansela"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

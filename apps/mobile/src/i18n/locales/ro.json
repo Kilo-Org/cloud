@@ -92,6 +92,7 @@
     "draft": "Ciornă",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imagine",
     "imageUnavailable": "Imaginea nu este disponibilă.",
     "loading": "Se încarcă…",
     "loadMore": "Încarcă mai multe",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -4283,6 +4285,8 @@
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
+      "invalidApiKey": "Cheia API conține un caracter care nu poate fi trimis. Folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
+      "invalidHeaders": "Un antet personalizat nu poate fi trimis. Verifică-i numele și folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
       "httpApprovalRequired": "Aprobă acest endpoint HTTP local înainte de a salva sau de a te conecta.",
@@ -4785,6 +4789,7 @@
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
       "expiredGrant": "Expirat: {{description}}",
+      "expiredStatus": "Expirat",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
@@ -4811,7 +4816,8 @@
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
       "retentionLimit": "Se afișează cel mai recent istoric de credite.",
-      "voidedGrant": "Anulat: {{description}}"
+      "voidedGrant": "Anulat: {{description}}",
+      "voidedStatus": "Anulat"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",

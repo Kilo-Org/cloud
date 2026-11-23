@@ -91,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Imej",
     "imageUnavailable": "Imej tidak tersedia.",
     "loading": "Memuatkan…",
     "loadMore": "Muatkan lagi",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Memuatkan imej",
       "imageUnavailableRetry": "Imej tidak tersedia, cuba muatkan semula",
+      "imageUnavailableRetryWithAlt": "Imej tidak tersedia, {{alt}}, cuba muatkan semula",
       "imagePreviewUnavailableInSession": "Pratonton imej tidak tersedia dalam sesi ini.",
       "viewImage": "Lihat imej",
       "viewImageWithAlt": "Lihat imej {{alt}}",
@@ -4204,6 +4206,8 @@
       "discoveryNoModels": "Titik akhir tidak menyenaraikan sebarang model. Masukkan model secara manual.",
       "connectionIncomplete": "Model menjawab tetapi tidak selesai. Cuba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama sistem pelayan, pengepala yang sah dan sekurang-kurangnya satu model dengan ID dan nama yang unik. Had token mestilah nombor bulat positif.",
+      "invalidApiKey": "Kunci API mengandungi aksara yang tidak boleh dihantar. Gunakan huruf, digit dan simbol standard sahaja, tanpa pemisah baris.",
+      "invalidHeaders": "Pengepala tersuai tidak boleh dihantar. Semak namanya dan gunakan huruf, digit dan simbol standard sahaja, tanpa pemisah baris.",
       "invalidUrl": "Masukkan URL akar API HTTP atau HTTPS tanpa bukti kelayakan, pertanyaan atau fragmen.",
       "publicHttp": "Titik akhir HTTP awam tidak dibenarkan. Gunakan HTTPS atau titik akhir setempat persendirian.",
       "httpApprovalRequired": "Luluskan titik akhir HTTP setempat ini sebelum menyimpan atau menyambung.",
@@ -4700,6 +4704,7 @@
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
       "expiredGrant": "Tamat tempoh: {{description}}",
+      "expiredStatus": "Tamat tempoh",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
@@ -4726,7 +4731,8 @@
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Memaparkan sejarah kredit terkini.",
-      "voidedGrant": "Dibatalkan: {{description}}"
+      "voidedGrant": "Dibatalkan: {{description}}",
+      "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",

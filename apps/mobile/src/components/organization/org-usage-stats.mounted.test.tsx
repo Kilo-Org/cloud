@@ -186,3 +186,95 @@ describe('Organization usage availability', () => {
     unmount();
   });
 });
+
+describe('Organization usage stats accessibility', () => {
+  it('makes each informational tile one element reading its caption then its value', async () => {
+    query.data = {
+      totalCost: 2_000_000,
+      totalRequestCount: 12,
+      totalInputTokens: 34,
+      totalOutputTokens: 56,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1' })
+    );
+
+    const tiles = renderer.root
+      .findAllByType('View')
+      .filter(node => node.props.accessible === true);
+    expect(tiles.map(tile => tile.props.accessibilityLabel)).toEqual([
+      'Cost, \u2066$2\u2069',
+      'Requests, 12',
+      'Input tokens, compact:34',
+      'Output tokens, compact:56',
+    ]);
+    // The painted lines read through no tree of their own: the tile says them.
+    for (const tile of tiles) {
+      const lines = tile.findAllByType('Text');
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        expect(line.props.accessible).toBe(false);
+        expect(line.props.importantForAccessibility).toBe('no');
+      }
+    }
+    unmount();
+  });
+
+  it('keeps a loading tile to its caption alone', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1' })
+    );
+
+    const tiles = renderer.root
+      .findAllByType('View')
+      .filter(node => node.props.accessible === true);
+    expect(tiles.map(tile => tile.props.accessibilityLabel)).toEqual([
+      'Cost',
+      'Requests',
+      'Input tokens',
+      'Output tokens',
+    ]);
+    unmount();
+  });
+
+  it('makes the pressable grid one button that names every tile in grid order', async () => {
+    query.data = {
+      totalCost: 2_000_000,
+      totalRequestCount: 12,
+      totalInputTokens: 34,
+      totalOutputTokens: 56,
+    };
+    const onPress = vi.fn<() => void>();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
+    );
+
+    const [button] = renderer.root.findAllByType('Pressable');
+    if (button === undefined) {
+      throw new Error('the grid is not one pressable');
+    }
+    expect(button.props.accessibilityRole).toBe('button');
+    expect(button.props.accessibilityHint).toBe(i18n.t('usage.viewDetails'));
+    // The button names the four totals alone: the section eyebrow names the
+    // scope beside it, so the scope must not lead the button's name.
+    expect(button.props.accessibilityLabel).toBe(
+      'Cost, \u2066$2\u2069, Requests, 12, Input tokens, compact:34, Output tokens, compact:56'
+    );
+    // That eyebrow is a sibling of the button, not its child: the reader hears
+    // the scope once as a heading, then the button's totals.
+    const scope = i18n.t('organization.usageStats.orgLast30Days');
+    expect(button.findAllByType('Text').some(node => node.props.children === scope)).toBe(false);
+    expect(renderer.root.findAllByType('Text').some(node => node.props.children === scope)).toBe(
+      true
+    );
+    // The enclosing button speaks the tiles, so no tile is an element itself.
+    expect(
+      button.findAllByType('View').filter(node => node.props.accessible === true)
+    ).toHaveLength(0);
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledOnce();
+    unmount();
+  });
+});

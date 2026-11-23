@@ -1365,6 +1365,11 @@ async function settle(
   if (chat === undefined) {
     return;
   }
+  /* Both reads are `Ref` reads on the session this chat holds — `history` maps
+     the live state and `usageByModel` the live totals — so neither can reject,
+     and `countCall` already absorbs its own store write. What can reject here is
+     the record write below, which is why that one is guarded: a store that
+     refuses it must not keep the chat from leaving `working`. */
   const turns = await runtime.runPromise(chat.handle.history);
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;

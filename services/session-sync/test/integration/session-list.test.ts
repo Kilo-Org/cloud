@@ -1,6 +1,7 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { isNull } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
 import { listMetadata } from '../../src/db/sqlite-schema';
@@ -404,5 +405,47 @@ describe('index maintenance', () => {
     const listed = (await listing(api)).items.find(item => item.sessionID === id);
     expect(listed?.updatedAt).toBeGreaterThanOrEqual(now);
     expect(listed?.updatedAt).toBeLessThanOrEqual(Date.now() + 6 * 60_000);
+  });
+});
+
+describe('index backfill pages', () => {
+  it('folds every legacy page before the pass is marked done', async () => {
+    const userID = `usr-${crypto.randomUUID()}`;
+    const api = client(personal(userID));
+    const tenant = getTenantStub(testEnv, { type: 'user', id: userID });
+    const target = (index: number) =>
+      JSON.stringify(['user', userID, `ses_legacy_${String(index).padStart(3, '0')}`]);
+    await runInDurableObject(tenant, async (_instance, state) => {
+      const db = drizzle(state.storage);
+      for (let index = 0; index < 70; index++) {
+        db.insert(createdSessions)
+          .values({
+            target: target(index),
+            tenant_type: 'user',
+            tenant_id: userID,
+            session_id: `ses_legacy_${String(index).padStart(3, '0')}`,
+            created_at: 1000 + index,
+            title: `École ${index}`,
+            updated_at: 1000 + index,
+          })
+          .run();
+      }
+      state.storage.sql.exec('UPDATE created_sessions SET title_folded = NULL');
+      await state.storage.delete('listMetadataBackfilled');
+    });
+
+    // Drive the boot pass directly; it must fold across pages, not just one.
+    await runInDurableObject(tenant, instance => {
+      (instance as unknown as { foldLegacyTitles(): void }).foldLegacyTitles();
+    });
+    await runInDurableObject(tenant, (_instance, state) => {
+      const unfolded = drizzle(state.storage)
+        .select({ target: createdSessions.target })
+        .from(createdSessions)
+        .where(isNull(createdSessions.title_folded))
+        .all();
+      expect(unfolded).toEqual([]);
+    });
+    expect((await listing(api, `?q=${encodeURIComponent('ecole 6')}`)).items).toHaveLength(11);
   });
 });

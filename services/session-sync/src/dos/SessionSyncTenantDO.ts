@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -61,27 +61,45 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
           .set({ updated_at: sql`${createdSessions.created_at}` })
           .where(and(eq(createdSessions.updated_at, 0), sql`${createdSessions.created_at} > 0`))
           .run();
-        this.repairFoldedTitles();
+        this.foldLegacyTitles();
         await ctx.storage.put('listMetadataBackfilled', true);
       }
       await erasure.schedule(this.db, ctx);
     });
   }
 
-  /** Folds titles written before the folded column existed; a page per call. */
-  private repairFoldedTitles(): void {
-    const page = this.db
+  /** Folds one keyset page of titles written before the folded column existed. */
+  private foldTitlesPage(after?: string): { next: string | undefined; more: boolean } {
+    const rows = this.db
       .select({ target: createdSessions.target, title: createdSessions.title })
       .from(createdSessions)
-      .where(and(isNotNull(createdSessions.title), isNull(createdSessions.title_folded)))
+      .where(
+        and(
+          isNotNull(createdSessions.title),
+          isNull(createdSessions.title_folded),
+          after === undefined ? undefined : gt(createdSessions.target, after)
+        )
+      )
+      .orderBy(asc(createdSessions.target))
       .limit(BACKFILL_PAGE)
       .all();
-    for (const row of page) {
+    for (const row of rows) {
       this.db
         .update(createdSessions)
         .set({ title_folded: foldTitle(row.title ?? '') })
         .where(eq(createdSessions.target, row.target))
         .run();
+    }
+    return { next: rows.at(-1)?.target, more: rows.length === BACKFILL_PAGE };
+  }
+
+  /** Folds every page of legacy titles; the caller marks the pass done afterwards. */
+  private foldLegacyTitles(): void {
+    let after: string | undefined;
+    for (;;) {
+      const page = this.foldTitlesPage(after);
+      if (!page.more || page.next === undefined) return;
+      after = page.next;
     }
   }
 
@@ -208,8 +226,9 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     if (this.db.select().from(userErasure).get()) {
       return ok({ items: [], next: null });
     }
-    // A row written before folding still has to match a folded search term.
-    if (parsed.data.q !== undefined) this.repairFoldedTitles();
+    // A row written after the boot pass still has to match a folded search term;
+    // each query folds one more page, so repeated searches converge.
+    if (parsed.data.q !== undefined) this.foldTitlesPage();
     const { before, limit, q, client, directory, archived } = parsed.data;
     const escaped =
       q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);

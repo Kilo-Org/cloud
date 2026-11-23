@@ -182,12 +182,13 @@ const makeDownloads = (): FakeDownloads => {
   };
 };
 
-/** The `storage.session` fake: one value per key, plus a switch that holds its read open. */
+/** The `storage.session` fake: one value per key, plus a switch that holds its read open and one that refuses it. */
 interface FakeStorage {
   readonly getItem: (key: string) => Promise<unknown>;
   readonly keys: string[];
   /** The session names the last written record holds: what a restart would restore. */
   readonly recordKeys: () => string[];
+  readonly refuseReads: () => void;
   readonly release: () => void;
   readonly setItem: (key: string, value: unknown) => Promise<void>;
   readonly store: () => unknown;
@@ -204,6 +205,7 @@ const makeStorage = ({
   const keys: string[] = [];
   const values = new Map<string, unknown>();
   const { promise, resolve } = Promise.withResolvers<void>();
+  let reading = false;
 
   if (initial !== undefined) {
     values.set(DOWNLOAD_HOLD_STATE_KEY, initial);
@@ -212,6 +214,11 @@ const makeStorage = ({
   return {
     getItem: async (key: string): Promise<unknown> => {
       keys.push(key);
+
+      if (reading) {
+        // The area itself refused the read: what it holds is unknown to the caller, exactly as a woken worker finds it.
+        throw new Error('session storage is unavailable');
+      }
 
       if (deferred) {
         await promise;
@@ -228,6 +235,9 @@ const makeStorage = ({
         .safeParse(value ?? {});
 
       return parsed.success ? Object.keys(parsed.data) : [];
+    },
+    refuseReads: (): void => {
+      reading = true;
     },
     release: (): void => {
       resolve();
@@ -989,6 +999,51 @@ describe('the recorded state', () => {
       secondHold.drain('session-1').map(report => `${String(report.kept)}:${report.filename}`)
     ).toEqual(['false:other.pdf']);
     expect(secondHold.drain('session-1')).toEqual([]);
+  });
+
+  /**
+   * The behaviour this covers: the record is written whole, so a worker that did not get an answer from the area
+   * leaves the stored value as its writer left it, and both the tabs and the approvals a live session holds stay in it
+   * for the next boot. The live hold is still complete for the calls this worker answers.
+   */
+  it('leaves the stored record untouched when the area refuses the read', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        need: armedNeed({ url: attachment }),
+        owed: [
+          {
+            filename: 'earlier.txt',
+            kept: false,
+            since: 1,
+            step,
+            tabId: 9,
+            url: 'https://app.example/reports/earlier.txt',
+          },
+        ],
+        tabs: [{ page, session: 'session-1', step, tabId: 9 }],
+      },
+    };
+    const storage = makeStorage({ initial: record });
+    storage.refuseReads();
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    // The call that woke this worker registers its tab and arms an approval, and each of those queues a write.
+    hold.tab(agentTab());
+    hold.arm(armedNeed({ url: attachment }));
+    hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The record is exactly what the previous worker stored: a value this worker never read is not replaced.
+    expect(storage.store()).toStrictEqual(record);
+    expect(storage.recordKeys()).toStrictEqual(['session-1']);
+
+    // The loss is the mirror's alone: the live hold still armed the approval and kept the file the call asked for.
+    expect(downloads.order).toContain('suggest');
+    expect(hold.tracked(1)?.kind).toBe('allowed');
   });
 
   /**

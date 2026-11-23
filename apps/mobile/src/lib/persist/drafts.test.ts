@@ -187,10 +187,6 @@ describe('draft scope and entity keys', () => {
     expect(resolvePrefillOverDraft('', '')).toBeUndefined();
   });
 
-  // b911 spot check p7-nav.png: a draft that holds only whitespace survives
-  // sign-out, restores as the uncontrolled input's defaultValue, and hides the
-  // placeholder while showing nothing — the prompt reads as blank. A draft
-  // with no visible content must never seed the input.
   it('resolvePrefillOverDraft never seeds a whitespace-only stored draft', () => {
     expect(resolvePrefillOverDraft(null, ' ')).toBeUndefined();
     expect(resolvePrefillOverDraft(undefined, '   ')).toBeUndefined();
@@ -434,8 +430,6 @@ describe('flushAllDrafts', () => {
     saveDraft('u1', 'A', 'va');
     saveDraft('u1', 'B', 'vb');
 
-    // Discard robs the pending entry of its timer, so the flush must not find
-    // it and resurrect the text the person dropped.
     await clearDraft('u1', 'A');
     await flushAllDrafts();
 

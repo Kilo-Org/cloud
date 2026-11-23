@@ -9,7 +9,7 @@ import { createdSessions } from '../../src/db/tenant-sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
-import { LIMITS } from '../../src/protocol';
+import { LIMITS, type Tenant } from '../../src/protocol';
 import { batch, client, member, newSessionID, personal, testEnv, type Client } from '../helpers';
 
 /** Makes the next `updateCreatedSession` call fail without reaching the tenant. */
@@ -61,9 +61,17 @@ async function listing(api: Client, query = '') {
   return response.json<{ version: 1; items: Item[]; cursor: string | null }>();
 }
 
+/** Runs the index push an accepted batch scheduled in the background. */
+async function settle(principal: { tenant: Tenant }, sessionID: string) {
+  await runDurableObjectAlarm(
+    getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID })
+  );
+}
+
 /** Registers a session and commits the session entity its list metadata comes from. */
 async function seed(
   api: Client,
+  principal: { tenant: Tenant },
   options: {
     client?: 'cli' | 'mobile' | 'cloud-agent';
     title: string;
@@ -97,6 +105,7 @@ async function seed(
     ])
   );
   expect(applied.status).toBe(200);
+  await settle(principal, id);
   return id;
 }
 
@@ -136,23 +145,24 @@ describe('creator session list', () => {
   });
 
   it('orders by the session update time and filters on indexed metadata', async () => {
-    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const api = client(principal);
     // Producers send epoch milliseconds; the index never moves backwards, so
     // the fixture seeds times ahead of its own registration clock.
     const base = Date.now() + 5_000;
-    const parser = await seed(api, {
+    const parser = await seed(api, principal, {
       client: 'cli',
       title: 'Fix Parser Bug',
       directory: '/repo/a',
       updated: base + 2000,
     });
-    const mobile = await seed(api, {
+    const mobile = await seed(api, principal, {
       client: 'mobile',
       title: 'Mobile chat about parsers',
       directory: '',
       updated: base,
     });
-    const release = await seed(api, {
+    const release = await seed(api, principal, {
       client: 'cli',
       title: 'Release notes',
       directory: '/repo/a',
@@ -195,7 +205,8 @@ describe('creator session list', () => {
   });
 
   it('follows renames and falls back to the commit time without an update time', async () => {
-    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const userID = `usr-${crypto.randomUUID()}`;
+    const api = client(personal(userID));
     const id = newSessionID();
     const sourceID = crypto.randomUUID();
     expect((await api.register(id, sourceID)).status).toBe(201);
@@ -219,6 +230,7 @@ describe('creator session list', () => {
         )
       ).status
     ).toBe(200);
+    await settle(personal(userID), id);
     expect((await listing(api, '?q=old')).items.map(item => item.sessionID)).toEqual([id]);
 
     const before = Date.now();
@@ -232,6 +244,7 @@ describe('creator session list', () => {
         )
       ).status
     ).toBe(200);
+    await settle(personal(userID), id);
 
     expect((await listing(api, '?q=old')).items).toEqual([]);
     const renamed = (await listing(api, '?q=new')).items;
@@ -292,6 +305,8 @@ describe('creator index retries', () => {
       ).status
     ).toBe(200);
 
+    // The owed push runs from the alarm; the first attempt is refused.
+    await settle(personal(userID), id);
     // The refused push is owed, so the list still shows the unindexed session.
     expect((await listing(api)).items[0]).toMatchObject({
       sessionID: id,
@@ -326,8 +341,9 @@ describe('creator index retries', () => {
 
 describe('session list search folding', () => {
   it('matches an accented title regardless of case or accents', async () => {
-    const api = client(personal(`usr-${crypto.randomUUID()}`));
-    const id = await seed(api, {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const api = client(principal);
+    const id = await seed(api, principal, {
       client: 'cli',
       title: 'École normale',
       directory: '/repo/fr',
@@ -360,7 +376,7 @@ describe('index maintenance', () => {
   it('folds titles of rows created before the folded column existed', async () => {
     const userID = `usr-${crypto.randomUUID()}`;
     const api = client(personal(userID));
-    const id = await seed(api, {
+    const id = await seed(api, personal(userID), {
       client: 'cli',
       title: 'Legacy École',
       directory: '/repo/old',
@@ -378,7 +394,8 @@ describe('index maintenance', () => {
   });
 
   it('clamps an absurd producer update time instead of pinning the row', async () => {
-    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const api = client(principal);
     const id = newSessionID();
     const sourceID = crypto.randomUUID();
     expect((await api.register(id, sourceID)).status).toBe(201);
@@ -402,7 +419,9 @@ describe('index maintenance', () => {
         )
       ).status
     ).toBe(200);
+    await settle(principal, id);
     const listed = (await listing(api)).items.find(item => item.sessionID === id);
+    expect(listed?.title).toBe('Clocked');
     expect(listed?.updatedAt).toBeGreaterThanOrEqual(now);
     expect(listed?.updatedAt).toBeLessThanOrEqual(Date.now() + 6 * 60_000);
   });

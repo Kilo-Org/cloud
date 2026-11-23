@@ -685,8 +685,8 @@ export class SessionSyncDO extends DurableObject<Env> {
       });
       if (!applied.ok) return applied;
       this.notify(principal.userID, applied.value.notification);
-      // A refused index push stays owed and is retried from this object's alarm.
-      await this.flushListMetadata();
+      // The debt is already durable in the batch's transaction; the sweep below
+      // schedules its push, so no tenant call delays this response.
       await phase(
         this.env,
         'applyBatch',

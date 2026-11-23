@@ -19,6 +19,9 @@ import {
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
@@ -284,13 +287,28 @@ export const gitlabRouter = createTRPCRouter({
 
     try {
       const accessToken = await getValidGitLabToken(integration, { userId: ctx.user.id });
-      const configuredRepoIds = Object.keys(configuredWebhooks)
-        .map(id => Number.parseInt(id, 10))
-        .filter(id => Number.isFinite(id));
 
-      // previous=[] → every currently-configured repo is treated as
-      // "added" by the sync helper, so the existing Kilo webhook is
-      // UPDATED in place with the new secret (nothing is deleted).
+      // A secret rotation must re-sign the hooks of the repositories the code-review
+      // configuration still selects. The stored webhook map is not the selection: it
+      // also retains a handle whose removal is still pending, and re-signing that one
+      // would keep a hook alive for a project that is no longer selected. The sync
+      // treats anything stored but unselected as a removal, so passing the selection
+      // here retries those removals while every selected project is re-signed.
+      const storedCodeReviewConfig = await getAgentConfigForOwner(
+        owner,
+        'code_review',
+        PLATFORM.GITLAB
+      );
+      const storedSelection = (storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined)
+        ?.selected_repository_ids;
+      const configuredRepoIds = Array.isArray(storedSelection)
+        ? storedSelection.filter(
+            (id): id is number => typeof id === 'number' && Number.isFinite(id)
+          )
+        : Object.keys(configuredWebhooks)
+            .map(id => Number.parseInt(id, 10))
+            .filter(id => Number.isFinite(id));
+
       const syncOutcome = await syncWebhooksForRepositories(
         accessToken,
         newSecret,

@@ -298,7 +298,15 @@ describe('GET /api/integrations/slack/callback', () => {
 
       expect(deleteInstallation).toHaveBeenCalledTimes(1);
       expect(deleteInstallation).toHaveBeenCalledWith('T0PRIOR');
-      expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'slack', 'T0PRIOR');
+      // The retirement hands the identity scan a signal that ends it at its budget.
+      expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(
+        expect.anything(),
+        'slack',
+        'T0PRIOR',
+        {
+          signal: expect.any(AbortSignal),
+        }
+      );
       expect(mockedUnlinkTeamKiloUsers.mock.calls[0]![0]).toEqual({ kind: 'state' });
       expectRedirectLocation(response, '/integrations/slack?success=installed');
     } finally {

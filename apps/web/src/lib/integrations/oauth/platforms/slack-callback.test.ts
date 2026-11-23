@@ -72,6 +72,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { SlackWorkspaceRebindUnsettledError } from '@/lib/integrations/slack-service';
 import { handleSlackOAuthCallback } from './slack-callback';
 
@@ -307,6 +308,30 @@ describe('handleSlackOAuthCallback replaced workspace settlement', () => {
     expect(new URL(response.headers.get('location') ?? '').searchParams.get('success')).toBe(
       'installed'
     );
+  });
+
+  it('forwards the settlement signal into the identity-cache removal it hands the retirement', async () => {
+    mockUpsertSlackInstallation.mockResolvedValue({
+      integration: { id: 'integration-1' },
+      previousWorkspace: { teamId: 'T_OLD', botToken: 'xoxb-old' },
+    });
+
+    await callCallback(`user_${USER_ID}`);
+
+    const [, options] = mockRetirePreviousSlackWorkspace.mock.calls[0] as [
+      { teamId: string },
+      {
+        deleteChatSdkIdentityCache: (teamId: string, signal?: AbortSignal) => Promise<void>;
+      },
+    ];
+    const signal = new AbortController().signal;
+    await options.deleteChatSdkIdentityCache('T_OLD', signal);
+
+    // The scan stops on the retirement's deadline rather than running past it.
+    const mockedUnlinkTeamKiloUsers = jest.mocked(unlinkTeamKiloUsers);
+    expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'slack', 'T_OLD', {
+      signal,
+    });
   });
 
   it('asks for another attempt when the replaced workspace token cannot be read', async () => {

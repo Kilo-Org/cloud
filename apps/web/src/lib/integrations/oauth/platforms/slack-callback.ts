@@ -37,8 +37,11 @@ async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
   await bot.getAdapter('slack').deleteInstallation(teamId);
 }
 
-async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
-  await unlinkTeamKiloUsers(bot.getState(), PLATFORM.SLACK, teamId);
+async function deleteChatSdkSlackIdentityCache(
+  teamId: string,
+  signal?: AbortSignal
+): Promise<void> {
+  await unlinkTeamKiloUsers(bot.getState(), PLATFORM.SLACK, teamId, { signal });
 }
 
 /**

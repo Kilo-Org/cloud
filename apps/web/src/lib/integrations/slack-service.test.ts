@@ -444,12 +444,60 @@ describe('slack-service revokeSlackToken', () => {
     expect(MockWebClient).toHaveBeenCalledTimes(1);
     const [token, options] = MockWebClient.mock.calls[0] as [
       string,
-      { retryConfig: { retries: number }; rejectRateLimitedCalls: boolean },
+      { retryConfig: { retries: number }; rejectRateLimitedCalls: boolean; timeout?: number },
     ];
     expect(token).toBe('xoxb-token');
     expect(options.retryConfig.retries).toBe(1);
     expect(options.rejectRateLimitedCalls).toBe(true);
+    // Without a budget the client keeps its own request timeout.
+    expect(options).not.toHaveProperty('timeout');
   });
+
+  it('bounds one attempt by the budget it is handed, without a retry', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+
+    await revokeSlackToken('xoxb-token', { timeoutMs: 900 });
+
+    const [, options] = MockWebClient.mock.calls[0] as [
+      string,
+      { retryConfig: { retries: number }; timeout?: number },
+    ];
+    expect(options.timeout).toBe(900);
+    expect(options.retryConfig.retries).toBe(0);
+  });
+
+  it('aborts the real request at the budget it is handed', async () => {
+    const { WebClient: ActualWebClient } = jest.requireActual<{
+      WebClient: new (token: string, options: WebClientOptions) => unknown;
+    }>('@slack/web-api');
+    // A server that accepts the request and never answers, so only the client's own
+    // timeout can end it.
+    const server = createServer(() => {});
+    const listening = Promise.withResolvers<void>();
+    server.listen(0, '127.0.0.1', () => listening.resolve());
+    await listening.promise;
+    const { port } = server.address() as AddressInfo;
+    const originalImplementation = MockWebClient.getMockImplementation();
+    MockWebClient.mockImplementation(
+      (token: string, options: WebClientOptions) =>
+        new ActualWebClient(token, { ...options, slackApiUrl: `http://127.0.0.1:${port}/` })
+    );
+
+    try {
+      const startedAt = Date.now();
+      const result = await revokeSlackToken('xoxb-token', { timeoutMs: 300 });
+      const elapsedMs = Date.now() - startedAt;
+
+      expect(elapsedMs).toBeLessThan(2_000);
+      expect(result).toEqual({ status: 'temporary_failure', reason: 'network' });
+    } finally {
+      MockWebClient.mockImplementation(originalImplementation);
+      server.closeAllConnections();
+      const closed = Promise.withResolvers<void>();
+      server.close(() => closed.resolve());
+      await closed.promise;
+    }
+  }, 20_000);
 
   it('reports revoked when Slack accepts the revoke', async () => {
     mockAuthRevoke.mockResolvedValue({ ok: true });
@@ -546,6 +594,22 @@ describe('slack-service revokeSlackToken', () => {
       reason: 'network',
     });
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['an axios timeout', { code: 'ECONNABORTED', message: 'timeout of 300ms exceeded' }],
+    ['a cancelled request', { name: 'CanceledError', code: 'ERR_CANCELED' }],
+    [
+      'a wrapped timeout',
+      { code: 'slack_webapi_request_error', original: { code: 'ECONNABORTED' } },
+    ],
+  ])('reports a temporary failure with the transport reason for %s', async (_label, rejection) => {
+    mockAuthRevoke.mockRejectedValue(rejection);
+
+    await expect(revokeSlackToken('xoxb-token', { timeoutMs: 300 })).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'network',
+    });
   });
 
   it('reports a temporary failure when a platform error is not a terminal token code', async () => {
@@ -1253,6 +1317,8 @@ describe('retirePreviousSlackWorkspace', () => {
     mockAuthRevoke.mockReset();
     mockCaptureException.mockReset();
     mockTxLimit.mockReset();
+    // Each test reads the client options its own revoke was built with.
+    MockWebClient.mockClear();
     // No row records the previous workspace unless a test scripts one.
     mockTxLimit.mockResolvedValue([]);
     onSectionEnter = () => {};
@@ -1330,7 +1396,9 @@ describe('retirePreviousSlackWorkspace', () => {
     ).resolves.toBeUndefined();
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T_OLD');
-    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T_OLD');
+    // The identity scan is the one removal that can outlast the budget, so the
+    // settlement hands it a signal that stops it at the deadline.
+    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T_OLD', expect.any(AbortSignal));
     // revokeSlackToken reports the failed revocation, and the retire reports that
     // the replaced workspace's token was not settled.
     expect(mockCaptureException).toHaveBeenCalledWith(
@@ -1432,45 +1500,113 @@ describe('retirePreviousSlackWorkspace', () => {
     });
   });
 
-  it('resolves and reports when a removal does not finish within its budget', async () => {
+  it('bounds the revoke by what is left of the budget, then skips both removals and reports the timeout', async () => {
     jest.useFakeTimers();
-    mockAuthRevoke.mockResolvedValue({ ok: true });
-    const deleteChatSdkInstallation = jest.fn(
-      (_teamId: string): Promise<void> => new Promise<void>(() => {})
-    );
+    // The client's own request timeout is what ends the real call. A stand-in that
+    // answers only after the budget stands in for that abort here.
+    const revocation = Promise.withResolvers<{ ok: true }>();
+    mockAuthRevoke.mockImplementation(() => revocation.promise);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
     const retirement = retirePreviousSlackWorkspace(
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
-      { deleteChatSdkInstallation }
+      { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
-    // Let the section and the revoke settle before the budget expires.
+    // Let the section open and hand the revoke to the client before the budget expires.
     await jest.advanceTimersByTimeAsync(0);
+    expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
+
+    // The budget runs out while the revoke is still open, and the request then ends.
     await jest.advanceTimersByTimeAsync(SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+    revocation.resolve({ ok: true });
+    await jest.advanceTimersByTimeAsync(0);
 
     await expect(retirement).resolves.toBeUndefined();
-    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T_OLD');
+    // The revoke's turn is over, and the budget with it: neither removal runs.
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { component: 'slack-service', op: 'retire-previous-workspace' },
       extra: { teamId: 'T_OLD', outcome: 'settlement_timed_out' },
     });
   });
 
-  it('bounds a revoke that never settles by the settlement budget', async () => {
+  it('hands the revoke the remaining settlement budget as its request timeout', async () => {
     jest.useFakeTimers();
-    mockAuthRevoke.mockImplementation(() => new Promise<never>(() => {}));
-    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+
+    const retirement = retirePreviousSlackWorkspace({
+      teamId: 'T_OLD',
+      botToken: 'xoxb-old',
+    });
+    await jest.advanceTimersByTimeAsync(0);
+
+    await expect(retirement).resolves.toBeUndefined();
+    const [, revocationOptions] = MockWebClient.mock.calls[0] as [
+      string,
+      { timeout?: number; retryConfig: { retries: number } },
+    ];
+    // No step precedes the revoke, so the whole budget is left when it starts.
+    expect(revocationOptions.timeout).toBe(SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+    // One attempt only: a retry would start after the abort.
+    expect(revocationOptions.retryConfig.retries).toBe(0);
+  });
+
+  it('hands the identity-cache removal a signal that fires at the deadline', async () => {
+    jest.useFakeTimers();
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+    const scan = Promise.withResolvers<void>();
+    const abortedAtScan: boolean[] = [];
+    const deleteChatSdkIdentityCache = jest.fn(
+      async (_teamId: string, signal?: AbortSignal): Promise<void> => {
+        abortedAtScan.push(signal?.aborted === true);
+        // The scan is still running when the budget ends; the signal is what stops it.
+        await scan.promise;
+        abortedAtScan.push(signal?.aborted === true);
+      }
+    );
 
     const retirement = retirePreviousSlackWorkspace(
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
-      { deleteChatSdkInstallation }
+      { deleteChatSdkIdentityCache }
     );
-    // Let the section open and hand its lookup to the revoke before the budget expires.
     await jest.advanceTimersByTimeAsync(0);
+    expect(abortedAtScan).toEqual([false]);
+
     await jest.advanceTimersByTimeAsync(SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+    scan.resolve();
+    await jest.advanceTimersByTimeAsync(0);
 
     await expect(retirement).resolves.toBeUndefined();
-    expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
-    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T_OLD', expect.any(AbortSignal));
+    expect(abortedAtScan).toEqual([false, true]);
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: 'T_OLD', outcome: 'settlement_timed_out' },
+    });
+  });
+
+  it('skips a removal whose turn comes after the budget is spent', async () => {
+    jest.useFakeTimers();
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+    const installation = Promise.withResolvers<void>();
+    const deleteChatSdkInstallation = jest.fn(() => installation.promise);
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    const retirement = retirePreviousSlackWorkspace(
+      { teamId: 'T_OLD', botToken: 'xoxb-old' },
+      { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
+    );
+    await jest.advanceTimersByTimeAsync(0);
+    // The installation command is the one running when the budget ends.
+    await jest.advanceTimersByTimeAsync(SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+    installation.resolve();
+    await jest.advanceTimersByTimeAsync(0);
+
+    await expect(retirement).resolves.toBeUndefined();
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T_OLD');
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { component: 'slack-service', op: 'retire-previous-workspace' },
       extra: { teamId: 'T_OLD', outcome: 'settlement_timed_out' },

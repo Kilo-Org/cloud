@@ -97,8 +97,10 @@ export function getMissingSlackScopes(installedScopes: string[] | null): string[
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 type SlackUninstallOptions = {
+  /** One Redis command that removes the workspace's Chat SDK installation. */
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
-  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
+  /** Clears the workspace's identity cache and stops when `signal` aborts. */
+  deleteChatSdkIdentityCache?: (teamId: string, signal?: AbortSignal) => Promise<void>;
 };
 
 function getOwnershipConditions(owner: Owner) {
@@ -247,6 +249,33 @@ function getRevocationFailureReason(code: string | null): SlackTokenRevocationFa
   }
 }
 
+/**
+ * Whether a thrown value is a request the client cut short instead of one Slack
+ * answered. Axios reports a request timeout as `ECONNABORTED` and a cancelled
+ * request as `ERR_CANCELED`; the SDK wraps the first as a request error, whose code
+ * already maps to the transport reason, and keeps the axios error on `original`.
+ */
+function isAbortedRequest(error: unknown): boolean {
+  const candidates: unknown[] = [error];
+  if (typeof error === 'object' && error !== null && 'original' in error) {
+    candidates.push(error.original);
+  }
+
+  return candidates.some(candidate => {
+    if (typeof candidate !== 'object' || candidate === null) {
+      return false;
+    }
+    const code = 'code' in candidate ? candidate.code : undefined;
+    const name = 'name' in candidate ? candidate.name : undefined;
+    return (
+      code === 'ECONNABORTED' ||
+      code === 'ERR_CANCELED' ||
+      name === 'AbortError' ||
+      name === 'CanceledError'
+    );
+  });
+}
+
 function reportRevocationFailure(
   reason: SlackTokenRevocationFailureReason,
   slackError: string | null
@@ -264,15 +293,35 @@ function reportRevocationFailure(
  * Revoke Slack access token.
  * Never throws: a Slack refusal is reported in the result, because the caller has to tell
  * "Slack says the token is already dead" apart from "Slack did not answer".
+ *
+ * `timeoutMs` bounds the HTTP request itself: the client aborts the request at that
+ * budget and makes no further attempt, so the call resolves within it. A caller that
+ * needs the call inside a locked section passes its remaining budget; without the
+ * option the call keeps the one bounded retry described below.
  */
-export async function revokeSlackToken(accessToken: string): Promise<SlackTokenRevocation> {
+export async function revokeSlackToken(
+  accessToken: string,
+  { timeoutMs }: { timeoutMs?: number } = {}
+): Promise<SlackTokenRevocation> {
   // The SDK's default policy retries for about thirty minutes, well past the tRPC
   // route's 800 s budget; one bounded retry covers a single blip, and a 429 answers
   // at once as a rate-limit result instead of sleeping out the retry-after.
-  const client = new WebClient(accessToken, {
-    retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
-    rejectRateLimitedCalls: true,
-  });
+  //
+  // A caller that hands a budget gets one attempt bounded by that budget instead:
+  // `timeout` is the request timeout, and `retries: 0` keeps the SDK from starting
+  // a second attempt after the first one was aborted. `timeout: 0` disables the
+  // timeout in the SDK, so an exhausted budget is clamped to the smallest one.
+  const client =
+    timeoutMs === undefined
+      ? new WebClient(accessToken, {
+          retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
+          rejectRateLimitedCalls: true,
+        })
+      : new WebClient(accessToken, {
+          timeout: Math.max(1, Math.round(timeoutMs)),
+          retryConfig: { retries: 0 },
+          rejectRateLimitedCalls: true,
+        });
 
   try {
     const result = await client.auth.revoke();
@@ -290,6 +339,13 @@ export async function revokeSlackToken(accessToken: string): Promise<SlackTokenR
       SLACK_TOKEN_ALREADY_INVALID_ERRORS[slackError] === true
     ) {
       return { status: 'already_invalid', slackError };
+    }
+
+    // An expired budget ends the attempt as an aborted request. The SDK reports its
+    // axios timeout as `slack_webapi_request_error`, and a caller's own abort arrives
+    // as an `AbortError`; both are a transport failure, so they share its reason.
+    if (isAbortedRequest(error)) {
+      return reportRevocationFailure('network', slackError);
     }
 
     return reportRevocationFailure(getRevocationFailureReason(code), slackError);
@@ -825,8 +881,8 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 /**
  * Budget for the settlement of a retirement section: the token revoke and the
  * two Chat SDK removals. The section's `statement_timeout` bounds only its SQL,
- * so those external calls race this budget instead. The section runs one lookup
- * at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its worst case is
+ * so every step of the settlement carries this deadline. The section runs one
+ * lookup at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its worst case is
  * `1 statement x 1s + 3s settlement = 4s < 5s wait`.
  */
 export const SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS = 3_000;
@@ -835,8 +891,8 @@ export const SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS = 3_000;
  * What the retirement settled on, for the report that follows it: `released`
  * when it revoked the previous workspace's token and removed its Chat SDK state,
  * `recorded_by_another_row` when a row records that workspace so the token and
- * state stay, `settlement_timed_out` when the settlement did not finish within
- * its budget.
+ * state stay, `settlement_timed_out` when a step did not finish inside the
+ * settlement budget.
  */
 type SlackWorkspaceRetirement = 'released' | 'recorded_by_another_row' | 'settlement_timed_out';
 
@@ -879,22 +935,43 @@ function reportSlackRetirementOutcome(teamId: string, outcome: SlackWorkspaceRet
 
 /**
  * Revoke the previous workspace's token and remove its Chat SDK installation and
- * identity cache within {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}. Every
- * step is an external call, so the section that holds the workspace lock leaves
- * it when this budget is spent rather than waiting for them. A settlement still
- * running at that point keeps the handlers the race installed, so its later
- * failure is not unhandled.
+ * identity cache inside one settlement budget,
+ * {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}.
  *
- * The revoke is skipped when the previous workspace stored no token; a revoke
- * Slack does not confirm is reported and the removals still run.
+ * Every step is bounded by what is left of that budget, and every step is awaited:
+ *
+ * - the revoke hands the remaining budget to the Slack client as its request
+ *   timeout, and the client makes no second attempt, so the request aborts there;
+ * - the identity-cache removal gets a signal that fires at the deadline: it starts
+ *   no further SCAN round and no further delete batch after that, and the batch in
+ *   flight is awaited before the removal resolves;
+ * - the installation removal is one Redis command, and it runs only while the
+ *   budget is unspent.
+ *
+ * A step whose turn comes after the budget is spent is skipped. The revoke is
+ * skipped too when the previous workspace stored no token; a revoke Slack does
+ * not confirm is reported and the removals still run. A settlement whose steps
+ * did not all finish inside the budget reports `timed_out`; the steps that did
+ * finish stay done, and nothing is still running when it returns.
  */
 async function settleSlackWorkspace(
   previous: PreviousSlackWorkspace,
   options: SlackUninstallOptions
 ): Promise<'settled' | 'timed_out'> {
-  const settlement = (async (): Promise<'settled'> => {
-    if (previous.botToken) {
-      const revocation = await revokeSlackToken(previous.botToken);
+  const deadline = Date.now() + SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS;
+  // Aborts at the deadline, which stops the identity scan there; the timer is
+  // cleared when the section ends so a settlement leaves no timer behind.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+  // Reads the clock as well as the signal, so the budget counts as spent from the
+  // instant the deadline passes, not from the timer's next callback.
+  const budgetSpent = () => controller.signal.aborted || Date.now() >= deadline;
+
+  try {
+    if (previous.botToken && !budgetSpent()) {
+      const revocation = await revokeSlackToken(previous.botToken, {
+        timeoutMs: deadline - Date.now(),
+      });
       if (revocation.status === 'temporary_failure') {
         captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
           tags: { component: 'slack-service', op: 'retire-previous-workspace' },
@@ -902,17 +979,16 @@ async function settleSlackWorkspace(
         });
       }
     }
-    await options.deleteChatSdkInstallation?.(previous.teamId);
-    await options.deleteChatSdkIdentityCache?.(previous.teamId);
-    return 'settled';
-  })();
-  const expired = Promise.withResolvers<'timed_out'>();
-  const timer = setTimeout(
-    () => expired.resolve('timed_out'),
-    SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS
-  );
-  try {
-    return await Promise.race([settlement, expired.promise]);
+
+    if (!budgetSpent()) {
+      await options.deleteChatSdkInstallation?.(previous.teamId);
+    }
+
+    if (!budgetSpent()) {
+      await options.deleteChatSdkIdentityCache?.(previous.teamId, controller.signal);
+    }
+
+    return budgetSpent() ? 'timed_out' : 'settled';
   } finally {
     clearTimeout(timer);
   }
@@ -934,9 +1010,13 @@ async function settleSlackWorkspace(
  * owner key, so a retirement in flight never delays another connection of this
  * owner.
  *
- * The section's `statement_timeout` bounds its SQL only, so the revoke and both
- * removals race one settlement budget and the section leaves the lock when that
- * budget is spent.
+ * Every step of the settlement is bounded by
+ * {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}, because the section's
+ * `statement_timeout` bounds its SQL only: the revoke by the Slack client's
+ * request timeout, the identity scan by an abort signal, the installation removal
+ * is a single Redis command. Nothing continues after the section returns. A step
+ * that did not finish inside the budget is skipped or cut short at its deadline,
+ * and the retirement reports `settlement_timed_out` with the team id.
  *
  * A token Slack does not confirm as revoked, a workspace a row records, and a
  * settlement past its budget are reported with the team id rather than thrown:

@@ -136,6 +136,18 @@ describe('formatProfileCountItems', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+
+    // Italian takes the partitive in its `many` category, as the sibling
+    // counted nouns do, so a large count reads `di agenti`, not `agenti`.
+    await i18n.changeLanguage('it');
+    try {
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 2 }])).toEqual(['2 agenti']);
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 1_000_000 }])).toEqual([
+        '1000000 di agenti',
+      ]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('summarizes a draft profile with each count agreed', async () => {

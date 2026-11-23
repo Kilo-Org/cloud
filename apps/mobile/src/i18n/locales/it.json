@@ -4510,7 +4510,7 @@
       "setupCommands_many": "{{count}} comandi di impostazione",
       "setupCommands_other": "{{count}} comandi di impostazione",
       "agents_one": "{{count}} agente",
-      "agents_many": "{{count}} agenti",
+      "agents_many": "{{count}} di agenti",
       "agents_other": "{{count}} agenti"
     },
     "nameLabel": "Nome del profilo",

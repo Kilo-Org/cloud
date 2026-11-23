@@ -64,11 +64,11 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * walk no longer parses. The layout allowlist and exempt trees are written
  * under the same base, so the prefix the layout rules test and the slice they
  * take are one path, not two spellings of it. The compiler pins resolve
- * `react-native-css/compiler` from the app's `package.json` under this base too,
- * so that resolution moves with the rest.
+ * `react-native-css/compiler` from the app's `package.json` under this base too:
+ * the compiler is the app's dependency, not the repo root's, so that resolution
+ * moves with the rest.
  */
 const APP_RELATIVE = 'apps/mobile';
-// Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(join(ROOT, APP_RELATIVE, 'package.json'));
 const APP_SRC_RELATIVE = `${APP_RELATIVE}/src`;
 const APP_SRC = join(ROOT, APP_SRC_RELATIVE);

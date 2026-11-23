@@ -445,7 +445,7 @@ describe('PreferenceRow', () => {
     expect(tiles[0]?.findAll(node => Object.is(node.type, Icon))).toHaveLength(0);
   });
 
-  it('keeps the light off switch at 3:1 against the row it sits on', () => {
+  it('keeps the light off track at 3:1 on the row and the grip on the track', () => {
     schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
@@ -454,14 +454,15 @@ describe('PreferenceRow', () => {
 
     expect(trackColor.false).toBe(lightColors.mutedForeground);
     expect(trackColor.true).toBe(lightColors.primary);
+    expect(thumbColor).toBe(lightColors.primaryForeground);
     expect(contrast(trackColor.false, lightColors.secondary)).toBeGreaterThanOrEqual(3);
     expect(contrast(thumbColor, trackColor.false)).toBeGreaterThanOrEqual(3);
   });
 
   it('leaves the dark switch to the shared component, whose off grip is light', () => {
-    // The dark pair belongs to the shared `Switch`: a `foreground` grip on the
-    // muted ink. Passing the light scheme's pair here would paint a near-black
-    // grip on the off track and lose the knob in the dark row.
+    // The row passes no pair at all, in either scheme: the shared `Switch`
+    // paints a light grip on the muted ink track in both, so nothing here can
+    // drop the knob into the dark row.
     schemeState.current = 'dark';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
@@ -479,8 +480,8 @@ describe('PreferenceRow', () => {
   it('paints an unavailable row with the quiet pair instead of the accent', () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on, and Android folds the colours into the switch
-    // drawables with no unavailable appearance of its own. The row therefore
-    // yields the light override and lets the shared switch paint its quiet pair.
+    // drawables with no unavailable appearance of its own. The shared switch
+    // paints its quiet pair while the row is disabled, so the row passes none.
     schemeState.current = 'light';
     platformState.os = 'android';
     const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });

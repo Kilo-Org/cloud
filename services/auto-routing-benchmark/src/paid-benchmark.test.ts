@@ -2772,15 +2772,19 @@ describe('paid request staging liveness', () => {
     expect(requestState(wide!).staged_cases).toBeGreaterThan(SLOTS * 0.9);
   }, 120_000);
 
-  it('survives one unreadable plan and still drains the billing outbox', async () => {
-    // Two staging requests; the second's stored plan is not valid JSON.
+  it('closes one unreadable plan, frees its live slot and still drains the outbox', async () => {
+    // Two staging requests on different pools; the second's stored plan is not valid JSON.
     const ids = seedPreparingRequests(2);
+    const broken = ids[1]!;
+    const brokenQuote = (
+      sqlite.prepare('SELECT quote_id FROM paid_benchmark_requests WHERE id = ?').get(broken) as {
+        quote_id: string;
+      }
+    ).quote_id;
     sqlite
-      .prepare(
-        'UPDATE paid_benchmark_quotes SET plan = ? WHERE id = (SELECT quote_id FROM paid_benchmark_requests WHERE id = ?)'
-      )
-      .run('{not json', ids[1]!);
-    // A delivered-after-completion intent proves the drain still runs at the end of the pass.
+      .prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?')
+      .run('{not json', brokenQuote);
+    // A pending outbox intent proves the drain still runs at the end of the pass.
     sqlite
       .prepare(
         `INSERT INTO paid_benchmark_billing_outbox (id, kind, request_id, owner_type, owner_id,
@@ -2796,17 +2800,78 @@ describe('paid request staging liveness', () => {
       );
 
     const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
-    // The good request staged; the unreadable one is left alone (not failed, not charged), and
-    // the pass completed instead of aborting.
+    // The good request stages; the unreadable one closes with a retryable reason and no charge.
     expect(requestState(ids[0]!).staged_cases).toBeGreaterThan(0);
-    expect(requestState(ids[1]!).status).toBe('preparing');
-    expect(summary.closed).toEqual([]);
-    expect(billing).toHaveLength(0);
+    expect(summary.failed).toEqual([broken]);
+    expect(requestState(broken)).toMatchObject({
+      status: 'failed',
+      failure_reason: 'The benchmark plan could not be read; request a new estimate.',
+      failure_retryable: 1,
+    });
+    // No charge was written for it.
+    expect(
+      sqlite
+        .prepare('SELECT charged_microdollars FROM paid_benchmark_requests WHERE id = ?')
+        .get(broken)
+    ).toEqual({ charged_microdollars: 0 });
+    // Its live-request slot is free: a new start on that same pool and router succeeds.
+    const brokenLive = sqlite
+      .prepare('SELECT router_id FROM paid_benchmark_requests WHERE id = ?')
+      .get(broken) as { router_id: string };
+    expect(
+      sqlite
+        .prepare(
+          `SELECT COUNT(*) AS live FROM paid_benchmark_requests
+          WHERE router_id = ? AND status IN ('preparing', 'active')`
+        )
+        .get(brokenLive.router_id)
+    ).toEqual({ live: 0 });
+    // A fresh request on that same pool and router is accepted: the partial unique index would
+    // reject it while the failed row still counted as live.
+    const freshId = crypto.randomUUID();
+    const freshQuote = crypto.randomUUID();
+    const plan = singlePairPlan();
+    const freshAt = new Date().toISOString();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', 'user-0', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+          '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+      )
+      .run(
+        freshQuote,
+        brokenLive.router_id,
+        ENGINE,
+        JSON.stringify(plan),
+        SLOTS,
+        freshId,
+        freshAt,
+        freshAt
+      );
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_requests
+            (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+              engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+              charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+              context, created_at, updated_at)
+          VALUES (?, 'user', 'user-0', NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0,
+            0, ?, 0, NULL, 'user-0', '{}', ?, ?)`
+        )
+        .run(freshId, brokenLive.router_id, ENGINE, freshQuote, SLOTS, freshAt, freshAt)
+    ).not.toThrow();
+    expect(requestState(freshId).status).toBe('preparing');
+    // The pass reached its end: the pending intent is still pending, i.e. the drain ran.
     expect(
       countRows(
         "SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox WHERE status = 'pending'"
       )
     ).toBe(1);
+    expect(billing).toHaveLength(0);
   }, 120_000);
 
   it('answers a second start with the live request on its own plan, not the second quote', async () => {

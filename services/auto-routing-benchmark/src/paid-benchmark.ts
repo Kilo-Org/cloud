@@ -209,8 +209,19 @@ async function readLiveRequest(
     .first<PaidBenchmarkRequestRow>();
 }
 
+/**
+ * A stored plan, or null when it is not readable. The text is a durable column that can be
+ * corrupted independently of this code, so a parse failure is a value (`null`), not a throw:
+ * the caller closes that one request instead of aborting the pass.
+ */
 function decodePlan(plan: string): PaidBenchmarkPlan | null {
-  const parsed = PaidBenchmarkPlanSchema.safeParse(JSON.parse(plan));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(plan);
+  } catch {
+    return null;
+  }
+  const parsed = PaidBenchmarkPlanSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }
 
@@ -1457,7 +1468,30 @@ async function reconcileOnePaidRequest(
   const db = env.BENCH_DB;
   const { now, summary } = input;
   const plan = input.plan;
-  if (!plan) return;
+  if (!plan) {
+    // An unreadable frozen plan can never be staged, activated or settled, and it is not a
+    // stall a waiting tick can fix. Leaving it `preparing` would hold the pool's single live
+    // request slot forever and block the owner from starting again, so it closes here — with a
+    // retryable reason, carrying no charge — and the pass moves on to the other requests.
+    await db.batch(
+      failPaidBenchmarkRequestStatements(db, {
+        requestId: request.id,
+        reason: 'The benchmark plan could not be read; request a new estimate.',
+        retryable: true,
+        now,
+      })
+    );
+    summary.failed.push(request.id);
+    console.error(
+      JSON.stringify({
+        event: 'benchmark_paid_plan_unreadable',
+        requestId: request.id,
+        quoteId: request.quote_id,
+        status: request.status,
+      })
+    );
+    return;
+  }
   let current = request;
   if (current.status === 'active') {
     // An active request must have its (deterministic, idempotent) paid run. A crash between

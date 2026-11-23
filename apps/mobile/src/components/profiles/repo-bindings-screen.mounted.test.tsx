@@ -480,7 +480,9 @@ describe('RepoBindingsScreen', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => h.now);
 
     const { renderer, unmount } = await mountScreen();
-    const pressUnbind = (): void => pressPressable(renderer.root, 'Unbind acme/api');
+    const pressUnbind = (): void => {
+      pressPressable(renderer.root, 'Unbind acme/api');
+    };
 
     // The router focuses a fresh screen once on mount, and that first focus
     // must not deaden the row's action.

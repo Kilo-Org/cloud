@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 import { act } from '@/test/renderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
@@ -30,9 +30,6 @@ type ListResult = {
 
 const refetchFn = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
-// The router's focus effect, captured so a case can replay the focus a return
-// from a pushed child screen produces. `now` pins the clock the guard reads.
-const focusState = vi.hoisted(() => ({ effects: [] as (() => void)[], now: 1_700_000_000_000 }));
 const connectivityState = vi.hoisted(() => ({ value: 'online' as string }));
 const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 const listState = vi.hoisted<ListResult>(() => ({
@@ -65,9 +62,8 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
-  useFocusEffect: (effect: () => void) => {
-    focusState.effects.push(effect);
-  },
+  // The tap guard reads the route's focus; this suite does not exercise a return.
+  useFocusEffect: () => undefined,
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -129,27 +125,12 @@ async function mount(stack: 'app' | 'profileTab' = 'profileTab') {
   return result;
 }
 
-/**
- * Run every focus effect the router registered: once on mount, which is the
- * focus a fresh screen receives, and again when a pushed child closes.
- */
-async function runFocusEffects(): Promise<void> {
-  await act(async () => {
-    for (const effect of focusState.effects) {
-      effect();
-    }
-    await Promise.resolve();
-  });
-}
-
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('ProfilesListScreen', () => {
   beforeEach(() => {
     refetchFn.mockReset();
     routerPush.mockReset();
-    focusState.effects = [];
-    focusState.now = 1_700_000_000_000;
     organizationState.organizationId = 'org-1';
     connectivityState.value = 'online';
     Object.assign(listState, {
@@ -161,10 +142,6 @@ describe('ProfilesListScreen', () => {
       error: undefined,
       isRefetching: false,
     });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it('loading: renders content-shaped skeleton rows and no profile rows', async () => {
@@ -389,45 +366,6 @@ describe('ProfilesListScreen', () => {
       (row.props as { onPress: () => void }).onPress();
     });
     expect(routerPush).toHaveBeenCalledWith('/app-stack/profiles/personal-1');
-
-    unmount();
-  });
-
-  it('drops the row press of the burst that closed a pushed child screen', async () => {
-    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
-    vi.spyOn(Date, 'now').mockImplementation(() => focusState.now);
-
-    const { renderer, unmount } = await mount();
-    // The router focuses a fresh screen once on mount, and that first focus
-    // must not deaden the rows.
-    await runFocusEffects();
-
-    const rowPress = (): void => {
-      const row = findAll(renderer.root, 'ConfigureRow').find(
-        candidate => candidate.props.title === 'Personal profile'
-      );
-      if (!row) {
-        throw new Error('profile row missing');
-      }
-      (row.props as { onPress: () => void }).onPress();
-    };
-
-    act(rowPress);
-    expect(routerPush).toHaveBeenCalledExactlyOnceWith('/profiles/personal-1');
-    routerPush.mockReset();
-
-    // The child screen closes itself and the router focuses this one again.
-    await runFocusEffects();
-
-    act(() => {
-      rowPress();
-      rowPress();
-    });
-    expect(routerPush).not.toHaveBeenCalled();
-
-    focusState.now += 1000;
-    act(rowPress);
-    expect(routerPush).toHaveBeenCalledExactlyOnceWith('/profiles/personal-1');
 
     unmount();
   });

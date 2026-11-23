@@ -92,19 +92,19 @@ vi.mock('@/lib/chat/use-chat', async () => {
         isError: false,
         isSuccess: true,
         refetch: () => undefined,
-        remove: async () => {
-          await Promise.resolve();
-        },
-        rename: async () => {
-          await Promise.resolve();
-        },
+        remove: () => Promise.resolve(undefined),
+        rename: () => Promise.resolve(undefined),
       };
     },
   };
 });
 vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
 vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
-  useChatSyncGate: () => ({ state: { kind: 'off' }, enabled: false, decide: async () => undefined }),
+  useChatSyncGate: () => ({
+    state: { kind: 'off' },
+    enabled: false,
+    decide: () => Promise.resolve(undefined),
+  }),
   useChatSyncUploader: () => undefined,
   useSyncBanner: () => ({ kind: 'none' }),
   useDeletedElsewhere: () => undefined,
@@ -119,25 +119,25 @@ vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
   }),
 }));
 vi.mock('@/lib/chat/sync/sync-send', () => ({
-  prepareSend: async () => ({ kind: 'local' }),
+  prepareSend: () => Promise.resolve({ kind: 'local' }),
 }));
 vi.mock('@/lib/chat/sync/sync-backfill-run', () => ({
-  startBackfill: async () => undefined,
+  startBackfill: () => Promise.resolve(undefined),
 }));
 vi.mock('@/lib/chat/sync/sync-service', () => ({
-  prepareSend: async () => ({ kind: 'local' }),
-  pullOpenedChat: async () => undefined,
-  discardAndReload: async () => '',
+  prepareSend: () => Promise.resolve({ kind: 'local' }),
+  pullOpenedChat: () => Promise.resolve(undefined),
+  discardAndReload: () => Promise.resolve(''),
   registerSyncUploader: () => () => undefined,
   bannerOf: () => ({ kind: 'none' }),
   watchBanners: () => () => undefined,
   onDeletedElsewhere: () => () => undefined,
-  uploadSettledChat: async () => undefined,
-  uploadRenamedChat: async () => undefined,
-  deleteEverywhere: async () => ({ kind: 'local-only' }),
-  deleteServerSession: async () => true,
-  importServerSession: async () => null,
-  startBackfill: async () => undefined,
+  uploadSettledChat: () => Promise.resolve(undefined),
+  uploadRenamedChat: () => Promise.resolve(undefined),
+  deleteEverywhere: () => Promise.resolve({ kind: 'local-only' }),
+  deleteServerSession: () => Promise.resolve(true),
+  importServerSession: () => Promise.resolve(null),
+  startBackfill: () => Promise.resolve(undefined),
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({

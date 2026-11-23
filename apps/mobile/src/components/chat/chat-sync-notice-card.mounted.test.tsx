@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatSyncNoticeCard } from '@/components/chat/chat-sync-notice-card';
 import { i18n } from '@/i18n';
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 /**
@@ -28,16 +28,19 @@ afterEach(() => {
 
 const press = async (tree: TestRenderer.ReactTestRenderer, label: string) => {
   const node = tree.root.findAllByProps({ accessibilityLabel: label }).at(0);
+  if (node === undefined) {
+    throw new Error(`the card drew no control named ${label}`);
+  }
   await act(async () => {
-    (node?.props.onPress as () => void)();
+    (node.props.onPress as () => void)();
     await Promise.resolve();
   });
 };
 
 describe('ChatSyncNoticeCard', () => {
   it('names the new behaviour and opens the setting from its second sentence', async () => {
-    const onDismiss = vi.fn();
-    const onOpenSettings = vi.fn();
+    const onDismiss = vi.fn<() => void>();
+    const onOpenSettings = vi.fn<() => void>();
     view = await renderWithProviders(
       createElement(ChatSyncNoticeCard, { onDismiss, onOpenSettings })
     );
@@ -52,9 +55,9 @@ describe('ChatSyncNoticeCard', () => {
   });
 
   it('dismisses once when the person closes it', async () => {
-    const onDismiss = vi.fn();
+    const onDismiss = vi.fn<() => void>();
     view = await renderWithProviders(
-      createElement(ChatSyncNoticeCard, { onDismiss, onOpenSettings: () => undefined })
+      createElement(ChatSyncNoticeCard, { onDismiss, onOpenSettings: (): void => undefined })
     );
     await press(view.renderer, i18n.t('modelChat.list.resetNoticeDismiss'));
     expect(onDismiss).toHaveBeenCalledOnce();

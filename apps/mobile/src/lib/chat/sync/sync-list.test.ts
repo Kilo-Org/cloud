@@ -1,14 +1,14 @@
-import  { type ListedSession } from '@kilocode/cloud-agent-sdk';
+import { type ListedSession } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import  { type ChatSummary } from '../store';
+import { type ChatSummary } from '../store';
 import {
   DEFAULT_CHAT_FILTERS,
   mergeChatRows,
   selectSyncedListSurface,
   serverListParams,
 } from './sync-list';
-import  { type SyncRecord } from './sync-store';
+import { type SyncRecord } from './sync-store';
 
 const chat = (over: Partial<ChatSummary> = {}): ChatSummary => ({
   sessionId: 'ses_local1',
@@ -130,9 +130,10 @@ describe('mergeChatRows', () => {
 describe('serverListParams', () => {
   it('names the server filters one set asks for', () => {
     expect(serverListParams(DEFAULT_CHAT_FILTERS)).toEqual({ archived: false });
-    expect(
-      serverListParams({ q: ' bug ', origin: 'cli', includeArchived: true })
-    ).toEqual({ q: 'bug', client: 'cli' });
+    expect(serverListParams({ q: ' bug ', origin: 'cli', includeArchived: true })).toEqual({
+      q: 'bug',
+      client: 'cli',
+    });
   });
 });
 
@@ -141,14 +142,25 @@ describe('selectSyncedListSurface', () => {
 
   it('is off without the gate, even with a failed read', () => {
     expect(
-      selectSyncedListSurface({ enabled: false, isPending: true, isError: true, isPaused: true, rows: [] })
+      selectSyncedListSurface({
+        enabled: false,
+        isPending: true,
+        isError: true,
+        isPaused: true,
+        rows: [],
+      })
     ).toEqual({ kind: 'off' });
   });
 
   it('is loading, retryable or failed with nothing to draw', () => {
     expect(
-      selectSyncedListSurface({ enabled: true, isPending: true, isError: false, isPaused: false, rows: [] })
-        .kind
+      selectSyncedListSurface({
+        enabled: true,
+        isPending: true,
+        isError: false,
+        isPaused: false,
+        rows: [],
+      }).kind
     ).toBe('loading');
     expect(
       selectSyncedListSurface({
@@ -160,8 +172,13 @@ describe('selectSyncedListSurface', () => {
       }).kind
     ).toBe('retryable-error');
     expect(
-      selectSyncedListSurface({ enabled: true, isPending: false, isError: true, isPaused: false, rows: [] })
-        .kind
+      selectSyncedListSurface({
+        enabled: true,
+        isPending: false,
+        isError: true,
+        isPaused: false,
+        rows: [],
+      }).kind
     ).toBe('failed');
   });
 
@@ -182,8 +199,13 @@ describe('selectSyncedListSurface', () => {
       },
     ];
     expect(
-      selectSyncedListSurface({ enabled: true, isError: true, isPaused: true, isPending: false, rows })
-        .kind
+      selectSyncedListSurface({
+        enabled: true,
+        isError: true,
+        isPaused: true,
+        isPending: false,
+        rows,
+      }).kind
     ).toBe('ready');
     expect(selectSyncedListSurface({ enabled: true, rows: [], ...ready })).toEqual({
       kind: 'ready',

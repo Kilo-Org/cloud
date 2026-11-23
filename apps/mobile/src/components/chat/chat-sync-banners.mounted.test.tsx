@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatSyncBanner } from '@/components/chat/chat-sync-banners';
 import { i18n } from '@/i18n';
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 /**
@@ -39,7 +39,9 @@ describe('ChatSyncBanner', () => {
       createElement(ChatSyncBanner, { banner: { kind: 'none' }, onDiscard: () => undefined })
     );
     expect(view.renderer.root.findAllByProps({ testID: 'chat-sync-banner-busy' })).toHaveLength(0);
-    expect(view.renderer.root.findAllByProps({ testID: 'chat-sync-banner-diverged' })).toHaveLength(0);
+    expect(view.renderer.root.findAllByProps({ testID: 'chat-sync-banner-diverged' })).toHaveLength(
+      0
+    );
   });
 
   it('names the busy tail read-only', async () => {
@@ -53,15 +55,18 @@ describe('ChatSyncBanner', () => {
   });
 
   it('offers discard-and-reload on a diverged chat and calls it', async () => {
-    const onDiscard = vi.fn();
+    const onDiscard = vi.fn<() => void>();
     view = await renderWithProviders(
       createElement(ChatSyncBanner, { banner: { kind: 'diverged' }, onDiscard })
     );
     const button = view.renderer.root
       .findAllByProps({ accessibilityLabel: i18n.t('modelChat.sync.divergedAction') })
       .at(0);
+    if (button === undefined) {
+      throw new Error('the diverged banner drew no discard control');
+    }
     await act(async () => {
-      (button?.props.onPress as () => void)();
+      (button.props.onPress as () => void)();
       await Promise.resolve();
     });
     expect(onDiscard).toHaveBeenCalledOnce();

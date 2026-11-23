@@ -240,7 +240,11 @@ vi.mock('@/lib/chat/use-chat', () => ({
 vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
   // Sync off: the switch row still draws (unchecked), so the appearance
   // control stays the scene's only checked option.
-  useChatSyncGate: () => ({ state: { kind: 'off' }, enabled: false, decide: async () => undefined }),
+  useChatSyncGate: () => ({
+    state: { kind: 'off' },
+    enabled: false,
+    decide: () => Promise.resolve(undefined),
+  }),
 }));
 describe('settings screens announce every control', () => {
   it('labels the back control and every Account settings row', async () => {

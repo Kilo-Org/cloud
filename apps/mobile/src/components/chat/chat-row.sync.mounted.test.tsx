@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatRow } from '@/components/chat/chat-row';
 import { i18n } from '@/i18n';
-import type { ChatSummary } from '@/lib/chat/store';
-import { act, TestRenderer } from '@/test/renderer';
+import { type ChatSummary } from '@/lib/chat/store';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 /**
@@ -81,7 +81,7 @@ type RowProps = {
   deleteEverywhere?: boolean;
 };
 
-async function mount(over: RowProps, onDelete = vi.fn()) {
+async function mount(over: RowProps, onDelete = vi.fn<(sessionId: string) => void>()) {
   view = await renderWithProviders(
     createElement(ChatRow, {
       chat,
@@ -89,7 +89,7 @@ async function mount(over: RowProps, onDelete = vi.fn()) {
       last: true,
       onPress: () => undefined,
       onDelete,
-      onRename: async () => undefined,
+      onRename: () => Promise.resolve(undefined),
       ...over,
     })
   );

@@ -1,5 +1,5 @@
-import  { type PulledMessage } from '@kilocode/cloud-agent-sdk';
-import  { type Turn } from '@kilocode/harness-sdk';
+import { type PulledMessage } from '@kilocode/cloud-agent-sdk';
+import { type Turn } from '@kilocode/harness-sdk';
 import { monotonicFactory } from 'ulid';
 import { describe, expect, it } from 'vitest';
 
@@ -78,7 +78,11 @@ describe('turnsToPortable', () => {
         type: 'tool',
         id: 'call_1',
         name: 'search',
-        state: { status: 'completed', input: { q: 'weather' }, content: [{ type: 'text', text: 'sunny' }] },
+        state: {
+          status: 'completed',
+          input: { q: 'weather' },
+          content: [{ type: 'text', text: 'sunny' }],
+        },
       });
     }
   });

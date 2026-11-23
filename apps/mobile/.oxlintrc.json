@@ -448,6 +448,7 @@
         "src/components/ui/icons.test.ts",
         "src/lib/chat/chat-fixture.test.ts",
         "src/lib/chat/store.test.ts",
+        "src/lib/chat/sync/sync-test-helpers.ts",
         "src/lib/expo-router-linking.mounted.test.tsx",
         "src/test/renderer.mounted.test.tsx"
       ],

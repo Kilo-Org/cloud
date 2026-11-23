@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { runBackfill } from './sync-backfill';
-import  { type UploadOutcome } from './sync-engine';
+import { type UploadOutcome } from './sync-engine';
 
 /**
  * Backfill under upgrade: existing chats upload in the background, one at a
@@ -17,18 +17,19 @@ const make = (script: {
   const requested: string[] = [];
   const waits: number[] = [];
   let on = true;
-  const stillOn = vi.fn(async () => script.on?.() ?? on);
+  const stillOn = vi.fn((): Promise<boolean> => script.on?.() ?? Promise.resolve(on));
   const result = () =>
     runBackfill({
       pending: () => script.chats,
-      upload: async sessionId => {
+      upload: sessionId => {
         requested.push(sessionId);
         const queue = script.outcomes[sessionId] ?? [{ kind: 'synced', position: 1 }];
-        return queue.shift() ?? { kind: 'synced', position: 1 };
+        return Promise.resolve(queue.shift() ?? { kind: 'synced', position: 1 });
       },
       stillOn,
-      wait: async ms => {
+      wait: ms => {
         waits.push(ms);
+        return Promise.resolve();
       },
     });
   return {
@@ -61,7 +62,7 @@ describe('runBackfill', () => {
 
   it('stops before the next request once sync is off, leaving the rest local', async () => {
     const run = make({ chats: ['a', 'b', 'c'], outcomes: {} });
-    run.stillOn.mockImplementation(async () => run.requested.length === 0);
+    run.stillOn.mockImplementation(() => Promise.resolve(run.requested.length === 0));
     expect(await run.result()).toEqual({ kind: 'stopped', uploaded: 1 });
     expect(run.requested).toEqual(['a']);
   });

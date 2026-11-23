@@ -32,9 +32,11 @@ describe('selectChatSyncSettingState', () => {
     expect(
       selectChatSyncSettingState({ ...base, isError: true, isPaused: true, setting: undefined })
     ).toEqual({ kind: 'failed', retryable: true, retry });
-    expect(
-      selectChatSyncSettingState({ ...base, isError: true, setting: undefined })
-    ).toEqual({ kind: 'failed', retryable: false, retry });
+    expect(selectChatSyncSettingState({ ...base, isError: true, setting: undefined })).toEqual({
+      kind: 'failed',
+      retryable: false,
+      retry,
+    });
   });
 
   it('cannot read a setting without an account, and says so instead of guessing on', () => {

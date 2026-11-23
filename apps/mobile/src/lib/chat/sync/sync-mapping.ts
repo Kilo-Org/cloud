@@ -1,5 +1,6 @@
-import  { type PortableMessage, type PulledMessage } from '@kilocode/cloud-agent-sdk';
-import  { type Turn } from '@kilocode/harness-sdk';
+import { type PortableMessage, type PulledMessage } from '@kilocode/cloud-agent-sdk';
+import { type Turn } from '@kilocode/harness-sdk';
+import { z } from 'zod';
 
 import { idleMsgIdForTurn, importedPartId, importedTurnId, msgIdForTurn, ulidTimeMs } from './sync-ids';
 
@@ -70,12 +71,13 @@ function toolResultsByCallId(turns: readonly Turn[]): ReadonlyMap<string, Part> 
   return results;
 }
 
+const toolInputSchema = z.record(z.string(), z.unknown());
+
+/** A tool call's arguments as the object the model wrote, else the raw text. */
 function toolInput(body: string): Record<string, unknown> | string {
   try {
-    const parsed: unknown = JSON.parse(body);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : body;
+    const parsed = toolInputSchema.safeParse(JSON.parse(body));
+    return parsed.success ? parsed.data : body;
   } catch {
     return body;
   }
@@ -112,13 +114,12 @@ export function turnsToPortable(
         .filter(part => part.kind === 'text' || part.kind === 'summary')
         .map(part => part.body)
         .join('');
-      const files = turn.parts.flatMap(part => {
-        if (part.kind !== 'image') {
-          return [];
-        }
-        const blob = options.blobs.get(part.id);
-        return blob === undefined ? [] : [{ mime: part.media, blob }];
-      });
+      const files = turn.parts
+        .filter((part): part is Extract<Part, { kind: 'image' }> => part.kind === 'image')
+        .flatMap(part => {
+          const blob = options.blobs.get(part.id);
+          return blob === undefined ? [] : [{ mime: part.media, blob }];
+        });
       if (text === '' && files.length === 0) {
         continue;
       }

@@ -399,9 +399,16 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   // same skeleton the wrapper uses for a loading draft, so the form never paints
   // before its cap state and then shifts the fields as they disable. An errored
   // read is not pending, so that create paints with no notice and a working
-  // Save, and the server refuses it with the toast that explains why.
+  // Save, and the server refuses it with the toast that explains why. The
+  // guard's dialog ships with the skeleton, since the guard is already armed by
+  // the mount effect and a held Back press must still show its prompt.
   if (group === undefined && groupsQuery.isPending) {
-    return <GroupFormSkeleton />;
+    return (
+      <>
+        <GroupFormSkeleton />
+        {guard.dialog}
+      </>
+    );
   }
 
   return (

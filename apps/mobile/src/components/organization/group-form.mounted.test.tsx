@@ -70,13 +70,17 @@ const stackSafeReplace = vi.hoisted(() => ({ replace: vi.fn<(href: unknown) => v
 const guard = vi.hoisted(
   (): {
     leave: (() => void)[];
-    handleDirtyChange: (dirty: boolean) => void;
+    handleDirtyChange: Mock<(dirty: boolean) => void>;
     // The props the form handed the guard, so the suite reads its `onDiscard`.
     props: Record<string, unknown>;
+    // The node the guard renders as its prompt: a test that asserts the form
+    // mounts it while another shape paints sets a marker here.
+    dialog: unknown;
   } => ({
     leave: [],
     handleDirtyChange: vi.fn<(dirty: boolean) => void>(),
     props: {},
+    dialog: null,
   })
 );
 // The durable draft the wrapper reads: its state is swapped per test, and its
@@ -124,7 +128,7 @@ vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
       leaveWithoutAsking: (leave: () => void) => {
         guard.leave.push(leave);
       },
-      dialog: null,
+      dialog: guard.dialog,
     };
   },
 }));
@@ -456,6 +460,7 @@ beforeEach(() => {
   // its fields at once; a case that needs the loading phase sets it first.
   draft.state = { kind: 'ready', value: null, save: draft.save, clear: draft.clear };
   guard.props = {};
+  guard.dialog = null;
 });
 
 describe('GroupForm create path', () => {
@@ -602,6 +607,35 @@ describe('GroupForm create at the group cap', () => {
     expect(saveControl(errored.renderer.root).disabled).toBe(false);
 
     errored.unmountOnce();
+  });
+
+  it('ships the leave prompt with the skeleton of a dirty create draft', async () => {
+    // The guard arms from the mount effect, and a restored draft carrying a name
+    // is dirty at once, so a Back press held while the count is pending is
+    // prevented. The prompt must therefore paint with the skeleton, not only
+    // with the fields it replaces.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = true;
+    guard.dialog = createElement('GuardDialog');
+    guard.handleDirtyChange.mockClear();
+    draft.state = {
+      kind: 'ready',
+      value: restoredDraft({ name: 'Drafted' }),
+      save: draft.save,
+      clear: draft.clear,
+    };
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))).toBeUndefined();
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(guard.handleDirtyChange).toHaveBeenCalledWith(true);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'GuardDialog').length
+    ).toBeGreaterThan(0);
+
+    unmountOnce();
   });
 });
 

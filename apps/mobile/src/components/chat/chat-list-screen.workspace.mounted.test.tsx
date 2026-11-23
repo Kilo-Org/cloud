@@ -108,6 +108,7 @@ vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
   useChatSyncUploader: () => undefined,
   useSyncBanner: () => ({ kind: 'none' }),
   useDeletedElsewhere: () => undefined,
+  useChatSyncNotice: () => ({ visible: false, dismiss: () => undefined }),
   useMergedChatList: () => ({
     surface: { kind: 'off' },
     rows: [],
@@ -130,6 +131,7 @@ vi.mock('@/lib/chat/sync/sync-service', () => ({
   deleteEverywhere: async () => ({ kind: 'local-only' }),
   deleteServerSession: async () => true,
   importServerSession: async () => null,
+  startBackfill: async () => undefined,
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({

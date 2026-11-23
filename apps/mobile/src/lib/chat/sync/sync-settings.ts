@@ -12,6 +12,7 @@ export type ChatSyncSetting = 'on' | 'off';
 
 const SETTING_KEY = 'chat-sync-setting';
 const SOURCE_KEY = 'chat-sync-source-id';
+const NOTICE_KEY = 'chat-sync-notice-seen';
 
 /** The account scope sync settings live under, from a chat scope's user half. */
 export function syncSettingsScope(chatScope: string): string {
@@ -45,4 +46,13 @@ export async function chatSyncSourceId(chatScope: string): Promise<string> {
   const minted = randomUUID();
   await encryptedKv.setItem(scope, SOURCE_KEY, minted);
   return minted;
+}
+
+/** Whether this account has already seen the "chats now sync" notice. */
+export async function readSyncNoticeSeen(chatScope: string): Promise<boolean> {
+  return (await encryptedKv.getItem(syncSettingsScope(chatScope), NOTICE_KEY)) === 'seen';
+}
+
+export async function markSyncNoticeSeen(chatScope: string): Promise<void> {
+  await encryptedKv.setItem(syncSettingsScope(chatScope), NOTICE_KEY, 'seen');
 }

@@ -112,6 +112,21 @@ export function syncedRecordsOfScope(db: ChatDatabase, scope: string): SyncRecor
     .map(recordOf);
 }
 
+/**
+ * The chats of one scope that have never reached the server: the backfill's
+ * work list, oldest first, so an upgrade uploads in the order the person
+ * made them.
+ */
+export function unsyncedChatIdsOfScope(db: ChatDatabase, scope: string): string[] {
+  return db
+    .getAllSync<{ session_id: string }>(
+      'select session_id from chats where scope = ? and server_session_id is null ' +
+        'and sync_state != ? order by coalesce(created_at, updated_at) asc',
+      [scope, 'deleted']
+    )
+    .map(row => row.session_id);
+}
+
 /** The fields one write of the record may change. `serverSessionId` is set once, apart. */
 export type SyncRecordPatch = Partial<{
   readonly sourceId: string | null;

@@ -16,6 +16,7 @@ import {
   rememberChat,
   type ChatDatabase,
 } from '../store';
+import { runBackfill } from './sync-backfill';
 import { syncClientFor, type SyncClient } from './sync-client';
 import {
   uploadChat,
@@ -32,6 +33,7 @@ import {
   stampServerSessionId,
   syncRecordByServerId,
   syncRecordOf,
+  unsyncedChatIdsOfScope,
 } from './sync-store';
 
 /**
@@ -160,17 +162,17 @@ function reflect(sessionId: string, outcome: UploadOutcome): void {
   }
 }
 
-/** Uploads one settled chat. Callers hold the gate; this never throws. */
-export async function uploadSettledChat(
+/** Uploads one settled chat and answers what happened. Never throws. */
+async function uploadNow(
   place: ChatPlace,
   sessionId: string,
   turns: readonly Turn[]
-): Promise<void> {
+): Promise<UploadOutcome> {
   try {
     const { deps, db } = await depsFor(place);
     const record = syncRecordOf(db, sessionId);
     if (record === null) {
-      return;
+      return { kind: 'unknown-chat' };
     }
     const modelId = modelOfSession(db, sessionId) ?? '';
     const outcome = await uploadChat(deps, {
@@ -184,10 +186,21 @@ export async function uploadSettledChat(
       createdAt: recordOfChat(db, sessionId).createdAt ?? Date.now(),
     });
     reflect(sessionId, outcome);
+    return outcome;
   } catch {
     // Sync is a background mirror: a failed upload stays pending in the
     // record and the next settled exchange retries it.
+    return { kind: 'pending' };
   }
+}
+
+/** Uploads one settled chat. Callers hold the gate; this never throws. */
+export async function uploadSettledChat(
+  place: ChatPlace,
+  sessionId: string,
+  turns: readonly Turn[]
+): Promise<void> {
+  await uploadNow(place, sessionId, turns);
 }
 
 /** A rename writes the shared session entity (H3), turns or none. */
@@ -401,4 +414,60 @@ export async function deleteServerSession(
   const client = syncClientFor(organizationIdOf(place.org));
   const result = await client.deleteSession(serverSessionId);
   return result.type === 'deleted' || result.type === 'not_found';
+}
+
+const backfills = new Set<string>();
+
+/**
+ * Uploads the chats that existed before this device started syncing: in the
+ * background, one at a time, re-reading the setting before every request so
+ * turning sync off stops it. A second ask for the same scope joins the run
+ * that is already going instead of starting a parallel one.
+ */
+async function loadTurns(place: ChatPlace, sessionId: string): Promise<readonly Turn[]> {
+  try {
+    const database = await encryptedDatabase();
+    const runtime = runtimeFor(place, database);
+    return await runtime.runPromise(
+      Effect.gen(function* loading() {
+        const store = yield* SessionStore;
+        const held = yield* store.load(sessionId);
+        return [...held] as readonly Turn[];
+      }) as Effect.Effect<readonly Turn[], unknown, never>
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function startBackfill(place: ChatPlace): Promise<void> {
+  if (backfills.has(place.chatScope)) {
+    return;
+  }
+  backfills.add(place.chatScope);
+  try {
+    const database = await encryptedDatabase();
+    const db = database as unknown as ChatDatabase;
+    for (;;) {
+      const pending = unsyncedChatIdsOfScope(db, place.chatScope);
+      if (pending.length === 0) {
+        return;
+      }
+      const outcome = await runBackfill({
+        pending: () => pending,
+        upload: async sessionId => uploadNow(place, sessionId, await loadTurns(place, sessionId)),
+        stillOn: () => syncSettingOn(place),
+        wait: ms => new Promise<void>(resolve => setTimeout(resolve, ms)),
+      });
+      if (outcome.kind !== 'parked') {
+        return;
+      }
+      // Parked: try the rest of the queue later rather than now.
+      await new Promise<void>(resolve => setTimeout(resolve, 60_000));
+    }
+  } catch {
+    // The next app foreground or exchange asks again.
+  } finally {
+    backfills.delete(place.chatScope);
+  }
 }

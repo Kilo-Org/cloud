@@ -36,9 +36,11 @@ import {
   deleteEverywhere,
   deleteServerSession,
   importServerSession,
+  startBackfill,
 } from '@/lib/chat/sync/sync-service';
 import {
   useChatSyncGate,
+  useChatSyncNotice,
   useChatSyncUploader,
   useDeletedElsewhere,
   useMergedChatList,
@@ -50,6 +52,7 @@ import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { LocalResetNoticeCard } from './local-reset-notice';
 import { ChatSyncListControls } from './chat-sync-list-controls';
+import { ChatSyncNoticeCard } from './chat-sync-notice-card';
 
 /**
  * The chats a person has, newest first.
@@ -115,6 +118,14 @@ function ScopedChatListScreen() {
   // exactly the device's chats, as before; on, server sessions merge in.
   const gate = useChatSyncGate(place);
   useChatSyncUploader(place, gate.enabled);
+  const notice = useChatSyncNotice(place);
+  // Existing chats upload in the background once sync is on; the run stops
+  // itself if the setting is turned off.
+  useEffect(() => {
+    if (place !== null && gate.enabled) {
+      void startBackfill(place);
+    }
+  }, [place, gate.enabled]);
   const [filters, setFilters] = useState<ChatListFilters>(DEFAULT_CHAT_FILTERS);
   const merged = useMergedChatList({ place, enabled: gate.enabled, chats, filters });
   const rows: readonly MergedChatRow[] = gate.enabled
@@ -450,6 +461,14 @@ function ScopedChatListScreen() {
             ordinary empty state, so the explanation outranks what remains. */}
         {localResetNotice.kind === 'present' ? (
           <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
+        ) : null}
+        {gate.enabled && notice.visible ? (
+          <ChatSyncNoticeCard
+            onDismiss={notice.dismiss}
+            onOpenSettings={() => {
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
         ) : null}
         {gate.enabled ? <ChatSyncListControls filters={filters} onChange={setFilters} /> : null}
         <View className="flex-1">{renderBody()}</View>

@@ -194,6 +194,7 @@ vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
   useChatSyncUploader: () => undefined,
   useSyncBanner: () => ({ kind: 'none' }),
   useDeletedElsewhere: () => undefined,
+  useChatSyncNotice: () => ({ visible: false, dismiss: () => undefined }),
 }));
 vi.mock('@/lib/chat/sync/sync-service', () => ({
   prepareSend: async () => ({ kind: 'local' }),
@@ -208,6 +209,7 @@ vi.mock('@/lib/chat/sync/sync-service', () => ({
   deleteEverywhere: async () => ({ kind: 'local-only' }),
   deleteServerSession: async () => true,
   importServerSession: async () => null,
+  startBackfill: async () => undefined,
 }));
 vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));
 vi.mock('@/lib/chat/gguf-models', () => ({

@@ -4182,7 +4182,9 @@
       "deleteEverywhereTitle": "Delete this chat everywhere?",
       "deleteEverywhereBody": "It is deleted on every device and cannot be recovered.",
       "deletedElsewhere": "This chat was deleted on another device.",
-      "listLoadFailed": "Could not load synced chats."
+      "listLoadFailed": "Could not load synced chats.",
+      "noticeBody": "Your chats now sync across your devices.",
+      "noticeAction": "You can turn this off in Settings."
     },
     "beta": "Beta",
     "details": {

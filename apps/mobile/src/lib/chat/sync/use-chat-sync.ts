@@ -23,7 +23,9 @@ import {
   type SyncBanner,
 } from './sync-service';
 import {
+  markSyncNoticeSeen,
   readChatSyncSetting,
+  readSyncNoticeSeen,
   writeChatSyncSetting,
   type ChatSyncSetting,
 } from './sync-settings';
@@ -203,4 +205,29 @@ export function useMergedChatList(input: {
     },
     nextPageFailed: query.isFetchNextPageError,
   };
+}
+
+/** The one-time upgrade notice: shown until this account dismisses it. */
+export function useChatSyncNotice(place: ChatPlace | null): {
+  readonly visible: boolean;
+  readonly dismiss: () => void;
+} {
+  const client = useQueryClient();
+  const scope = place?.chatScope ?? '';
+  const query = useQuery({
+    queryKey: ['chat-sync-notice', scope],
+    enabled: place !== null,
+    networkMode: 'always',
+    queryFn: async () => (place === null ? true : readSyncNoticeSeen(place.chatScope)),
+  });
+  const dismiss = useCallback(() => {
+    if (place === null) {
+      return;
+    }
+    void (async () => {
+      await markSyncNoticeSeen(place.chatScope);
+      await client.invalidateQueries({ queryKey: ['chat-sync-notice', scope] });
+    })();
+  }, [client, place, scope]);
+  return { visible: place !== null && query.data === false, dismiss };
 }

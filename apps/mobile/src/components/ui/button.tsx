@@ -181,8 +181,14 @@ const buttonLabelClasses = Object.fromEntries(
  * variant's ink, so no two colour utilities compete. A caller that paints its
  * own mark on this fill takes `useMutedDisabledInk` from
  * `@/lib/hooks/use-theme-colors`.
+ *
+ * The dark muted fill equals the dark card surface (`--secondary`), so on a dark
+ * card a disabled primary would paint no plate at all. The dark-only `--input`
+ * hairline gives it a 3.2:1 control edge; the light theme, the enabled brand
+ * fill, the busy face and the muted label ink stay unchanged.
  */
 const MUTED_DISABLED_FILL_CLASS = 'bg-muted';
+const MUTED_DISABLED_EDGE_CLASS = 'dark:border dark:border-input';
 const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
@@ -324,6 +330,7 @@ function Button({
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
           isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
+          isMutedDisabled && MUTED_DISABLED_EDGE_CLASS,
           className
         )}
         role="button"

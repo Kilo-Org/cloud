@@ -247,6 +247,19 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
     const separation = contrastRatio(darkColors.primary, darkColors.muted);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
+
+  it('dark theme: the input edge separates the disabled fill on both dark surfaces', () => {
+    // The dark disabled fill equals the dark card surface, so the fill alone
+    // paints nothing on a card and the `--input` edge is what makes the control
+    // visible. Both surfaces are checked because a disabled primary sits on a
+    // card and on the plain secondary fill alike.
+    for (const surface of [darkColors.card, darkColors.secondary]) {
+      const edge = compositeToken(darkColors.input, surface);
+      expect(contrastRatio(edge, surface), `input edge vs ${surface}`).toBeGreaterThanOrEqual(
+        MIN_NON_TEXT_RATIO
+      );
+    }
+  });
 });
 
 describe('selected tab pill contrast (WCAG AA text)', () => {

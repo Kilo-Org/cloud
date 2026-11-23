@@ -7,6 +7,7 @@ import {
   CLAUDE_BILLING_PROVIDER_NAME,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import {
+  ClaudeBillingLockBusyError,
   ClaudeBillingShareError,
   claudeBillingEffectiveConnection,
   claudeBillingOwnerKey,
@@ -203,6 +204,15 @@ async function executeShare(
             : 'Link a Claude organization first, then share it here.',
       });
     }
+    if (error instanceof ClaudeBillingLockBusyError) {
+      // A distinct code from the unlink retry below, so the card's Anthropic
+      // unlink copy stays attached to that case only.
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Claude billing is busy. Try again.',
+        cause: error,
+      });
+    }
     throw error;
   }
 }
@@ -247,7 +257,16 @@ export const claudeBillingRouter = createTRPCRouter({
           message: 'Only an organization owner or admin can remove the organization link.',
         });
       }
-      const removal = await unlinkAndRemoveClaudeBillingGrant(owner);
+      const removal = await unlinkAndRemoveClaudeBillingGrant(owner).catch(error => {
+        if (error instanceof ClaudeBillingLockBusyError) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Claude billing is busy. Try again.',
+            cause: error,
+          });
+        }
+        throw error;
+      });
       if (removal.unlink.kind === 'retry') {
         throw new TRPCError({
           code: 'SERVICE_UNAVAILABLE',

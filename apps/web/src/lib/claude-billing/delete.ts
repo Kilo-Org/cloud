@@ -14,6 +14,7 @@ import {
   findRetiringClaudeBillingPayer,
   liveClaudeBillingGrantWhere,
   removeClaudeBillingGrant,
+  removeClaudeBillingGrantWithin,
   withClaudeBillingPayerLock,
   type ClaudeBillingOwner,
   type UnreferencedClaudeBillingPayer,
@@ -125,7 +126,7 @@ export async function unlinkAndRemoveClaudeBillingGrant(
   if (!operatorConfigured()) {
     return { unlink: NO_UNLINK, unreferencedPayer: await removeClaudeBillingGrant(owner) };
   }
-  return await withClaudeBillingPayerLock(owner, async tx => {
+  return await withClaudeBillingPayerLock(owner, async (tx, granted, heldLockKeys) => {
     const retiring = await findRetiringClaudeBillingPayer(owner, tx);
     const unlink = retiring
       ? await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs)
@@ -133,8 +134,16 @@ export async function unlinkAndRemoveClaudeBillingGrant(
     if (unlink.kind === 'retry' || unlink.kind === 'needs_console') {
       return { unlink, unreferencedPayer: null };
     }
-    // `unlinked` and `missing` both leave nothing to end at Anthropic.
-    return { unlink, unreferencedPayer: await removeClaudeBillingGrant(owner, tx) };
+    // `unlinked` and `missing` both leave nothing to end at Anthropic. The retry
+    // and its key set belong to the helper that owns this transaction: a payer
+    // below a held key restarts the whole attempt, which repeats this unlink.
+    // The unlink is idempotent, and the restart is bounded by the retry bound.
+    // `heldLockKeys` is that transaction's one set, and the removal adds the keys
+    // it takes to it.
+    return {
+      unlink,
+      unreferencedPayer: await removeClaudeBillingGrantWithin(tx, owner, granted, heldLockKeys),
+    };
   });
 }
 

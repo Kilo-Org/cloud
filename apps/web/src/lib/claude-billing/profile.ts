@@ -6,7 +6,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createClaudeUserProfile } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { resolveConnectionConnector } from '@kilocode/web-shared/lib/ai-gateway/connector';
 import {
-  claudeBillingOwnerKey,
+  claudeBillingProfileLockKey,
   getGrantedClaudeBillingConnection,
   insertClaudeBillingProfile,
   type ClaudeBillingOwner,
@@ -52,11 +52,13 @@ export async function ensureClaudeBillingProfile(
   await cleanupRemovedClaudeProfilesForUser(createdBy, { limit: 3, timeoutMs: 3_000 }).catch(
     () => undefined
   );
-  const lockKey = claudeBillingOwnerKey(owner);
 
   return await db.transaction(async tx => {
+    // This key sits outside the module's ascending payer order: it is taken
+    // here, before any claim or payer key, and no other path ever waits on it.
+    // Keep that order if another path coordinates profile creation.
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_profile:${lockKey}`}))`
+      sql`select pg_advisory_xact_lock(hashtext(${claudeBillingProfileLockKey(owner)}))`
     );
     const active = await getGrantedClaudeBillingConnection(owner, tx);
     if (active && active.connection.status !== ClaudeBillingConnectionStatus.Removed) {

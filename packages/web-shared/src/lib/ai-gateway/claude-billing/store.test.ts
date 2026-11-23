@@ -1,5 +1,5 @@
-import { describe, expect, it } from '@jest/globals';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { describe, expect, it, jest } from '@jest/globals';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
@@ -218,6 +218,67 @@ describe('Claude billing refusal transitions', () => {
       kiloUserId: user.id,
     });
     expect(committed?.last_refusal_code).toBe('permission_error');
+  });
+
+  it('skips the clear when the row records no refusal', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-06-01T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+    await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+    await clearClaudeBillingRefusal(profileId, connectedAt);
+
+    const update = jest.spyOn(db, 'update');
+    try {
+      await clearClaudeBillingRefusal(profileId, connectedAt);
+      // Control: the spy does see this module's write path, so "no update" means
+      // the clear skipped the write and not that the spy missed it.
+      expect(update).not.toHaveBeenCalled();
+      await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+      expect(update).toHaveBeenCalledTimes(1);
+    } finally {
+      update.mockRestore();
+    }
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected', last_refusal_code: 'permission_error' });
+  });
+
+  it('still clears a refusal when the replica pre-check fails', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-07-01T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+    await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+
+    const select = jest.spyOn(readDb, 'select').mockImplementation(() => {
+      throw new Error('replica unavailable');
+    });
+    const update = jest.spyOn(db, 'update');
+    try {
+      await clearClaudeBillingRefusal(profileId, connectedAt);
+      // The failed pre-check must fall through to the guarded primary update
+      // instead of leaving the refusal in place.
+      expect(update).toHaveBeenCalledTimes(1);
+    } finally {
+      update.mockRestore();
+      select.mockRestore();
+    }
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected', last_refusal_code: null });
   });
 
   it.each([

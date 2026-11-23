@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -71,10 +71,10 @@ export type AgentProfileSave = Readonly<{
  * sentence, or never arrives.
  *
  * Every write into the record is an event or an async transition that carries
- * the account it was produced in, and every read is derived from the live
- * account instead of being reset when that account moves. A render React throws
- * away therefore drops nothing: the record still describes the account that
- * produced it, and the next committed render reads it by tag.
+ * the account it was produced in, every read is derived from the live account,
+ * and the committed transition to another account drops the record. A render
+ * React throws away therefore drops nothing: the record still describes the
+ * account that produced it, and the next committed render reads it by tag.
  */
 export function useAgentProfileSave({
   organizationId,
@@ -106,6 +106,21 @@ export function useAgentProfileSave({
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
 
+  // The record describes one account, so the committed transition away from that
+  // account drops it: a profile saved in A may be deleted by the time the panel
+  // returns to A, and A's lost attempt described the ids A held on that visit.
+  // Returning `previous` unchanged while the tags agree is what keeps this
+  // effect from running on its own write.
+  //
+  // The read below still derives from the live tag during render, so the frame
+  // between the move and this effect reads `NO_SAVE_RECORD` on its own, and no
+  // state is written during render.
+  useEffect(() => {
+    setStoredRecord(previous =>
+      previous.scope === scope ? previous : { scope, savedProfile: null, lostAttempt: null }
+    );
+  }, [scope]);
+
   const record = storedRecord.scope === scope ? storedRecord : NO_SAVE_RECORD;
   const savedProfile = record.savedProfile;
   const lostAttempt = record.lostAttempt;
@@ -117,7 +132,8 @@ export function useAgentProfileSave({
    * would run them twice.
    */
   const finishSave = (profile: ProfileSelectorProfile, savedUnder: string | null) => {
-    setStoredRecord({ scope: savedUnder, savedProfile: profile, lostAttempt: null });
+    // The confirmation describes a write this panel made in the account that
+    // received it, so it is not withheld once the account on screen has moved.
     toast.success(t('agentChat.newSession.profileSaved', { name: profile.name }));
     // A profile belongs to the account it was created in. A save that completes
     // after the account moved publishes nothing here: the form keeps the
@@ -126,6 +142,10 @@ export function useAgentProfileSave({
     if (savedUnder !== scopeRef.current) {
       return;
     }
+    // Only the live account writes the one record slot. A settlement for an
+    // account the panel has left would replace the row and counts the account on
+    // screen owns, hiding its summary until the invalidated list refetch lands.
+    setStoredRecord({ scope: savedUnder, savedProfile: profile, lostAttempt: null });
     // Keep resource counts current before the invalidated list refetch lands.
     onSelectProfile(profile.id);
     onManualVarsChange([]);

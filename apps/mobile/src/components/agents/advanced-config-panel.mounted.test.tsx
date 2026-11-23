@@ -748,6 +748,85 @@ describe('AdvancedConfigPanel', () => {
     expect(toast.success).toHaveBeenCalledTimes(1);
   });
 
+  it('re-offers no saved row after returning to the account it was saved in', async () => {
+    const mocks = mutations();
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    // Neither account's list holds a row, so the only thing an account could
+    // offer here is the record this panel wrote there.
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [] },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'My Setup');
+
+    // The saved row publishes in the account that saved it.
+    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
+
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+
+    rerenderWithScope(renderer, 'org-1', onSelectProfile);
+
+    // The record described that visit only: the profile may have been deleted
+    // since, so a return to the account starts from the account's own list.
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the account on screen's own saved row when a later settlement belongs to another account", async () => {
+    const mocks = mutations();
+    const firstWrite = Promise.withResolvers<{ id: string }>();
+    mocks.create.mutateAsync
+      .mockReturnValueOnce(firstWrite.promise)
+      .mockResolvedValue({ id: 'org2-1' });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [] },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'My Setup');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The account moves while the write is still unanswered.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    // Org-2 saves a profile of its own, with a draft that counts differently so
+    // the two rows are distinguishable: its save settles first.
+    addVariable(renderer, 'SECOND', 'xyz');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'Second Setup');
+
+    expect(onSelectProfile).toHaveBeenCalledWith('org2-1');
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+
+    // Org-1's write settles now, into an account the panel has left: it
+    // publishes nothing here, so org-2's row and counts stay on screen.
+    await act(async () => {
+      firstWrite.resolve({ id: 'new-1' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+    expect(onSelectProfile).not.toHaveBeenCalledWith('new-1');
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+    // The write did complete in the account that received it, so both saves are
+    // reported.
+    expect(toast.success).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the save sheet open and the typed name when the save fails', async () => {
     const mocks = mutations();
     mocks.create.mutateAsync.mockRejectedValue(new Error('nope'));

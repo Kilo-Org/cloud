@@ -93,6 +93,7 @@ export function ProfilesListScreen({
   const listError = selectProfileReadErrorView({
     error: isError ? error : undefined,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.loadFailed',
   });
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });

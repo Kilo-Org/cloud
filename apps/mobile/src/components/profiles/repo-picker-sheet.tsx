@@ -123,7 +123,11 @@ export function RepoPickerSheet({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const connectivity = useCommittedConnectivityStatus();
-  const readError = selectProfileReadErrorView({ error, connectivity });
+  const readError = selectProfileReadErrorView({
+    error,
+    connectivity,
+    loadFailedTitleKey: 'common.couldNotLoadRepositories',
+  });
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   // The sheet presents in place and the caller unmounts it from `onClose`, so
@@ -170,9 +174,7 @@ export function RepoPickerSheet({
         variant={readError.variant}
         placement="top"
         inset="gutter"
-        // This sheet lists repositories, so the read's own load-failure title
-        // names the repository list instead of the profiles one it defaults to.
-        title={readError.titleKey === null ? undefined : t('common.couldNotLoadRepositories')}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
         message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? onRetry : undefined}
       />

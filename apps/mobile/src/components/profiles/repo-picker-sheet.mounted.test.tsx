@@ -234,9 +234,6 @@ describe('RepoPickerSheet empty state', () => {
     }
     const { title } = error.props as { title?: string };
     expect(title).toBe(i18n.t('common.couldNotLoadRepositories'));
-    // The sheet lists repositories; the profile catalog's sentence describes a
-    // different list and must not head this failure.
-    expect(title).not.toBe(i18n.t('profiles.loadFailed'));
   });
 
   it('renders the loading state with no failure body', () => {

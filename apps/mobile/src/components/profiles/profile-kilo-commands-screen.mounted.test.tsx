@@ -1108,7 +1108,7 @@ describe('ProfileKiloCommandsScreen load errors', () => {
       | RenderedQueryError
       | undefined;
     expect(queryError?.variant).toBe('server');
-    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(queryError?.title).toBe("Couldn't load slash commands");
     expect(typeof queryError?.onRetry).toBe('function');
     act(() => {
       queryError?.onRetry?.();

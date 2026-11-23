@@ -30,7 +30,11 @@ export function selectProfileOverviewErrorView(
   error: unknown,
   connectivity: Connectivity
 ): ProfileOverviewErrorView {
-  const read = selectProfileReadErrorView({ error, connectivity });
+  const read = selectProfileReadErrorView({
+    error,
+    connectivity,
+    loadFailedTitleKey: 'profiles.loadFailed',
+  });
   return {
     // Only the fields the Overview renders: the load-failure title is decided
     // by the screen itself, so the selector's `titleKey` is not carried here.

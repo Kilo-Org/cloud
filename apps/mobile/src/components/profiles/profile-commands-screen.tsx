@@ -69,6 +69,7 @@ export function ProfileCommandsScreen({
   const readError = selectProfileReadErrorView({
     error: commandsQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.commandsLoadFailed',
   });
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';

@@ -214,7 +214,7 @@ describe('ProfileCommandsScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('server');
-    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.title).toBe("Couldn't load setup commands");
     // The server variant's own description already says what to do, so the
     // screen adds no second sentence.
     expect(queryError.message).toBeUndefined();

@@ -77,6 +77,7 @@ export function ProfileRepoPinsSection({
   const readError = selectProfileReadErrorView({
     error: bindingsQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.repoBindingsLoadFailed',
   });
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const [pickerOpen, setPickerOpen] = useState(false);

@@ -80,6 +80,7 @@ export function ProfileVariablesScreen({
   const readError = selectProfileReadErrorView({
     error: varsQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.variablesLoadFailed',
   });
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);

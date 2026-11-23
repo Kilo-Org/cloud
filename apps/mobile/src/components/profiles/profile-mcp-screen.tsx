@@ -75,6 +75,7 @@ export function ProfileMcpScreen({
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.mcpLoadFailed',
   });
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);

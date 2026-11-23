@@ -51,6 +51,39 @@ function deductionTypeLabel(t: TFunction, kind: CreditDeduction['kind']): string
   return key ? t(key) : kind;
 }
 
+/** The row title each machine-readable deduction reason renders, in the reader's language. */
+const DEDUCTION_TITLE_KEYS = {
+  usage: 'usage.title',
+  coding_plan: 'credits.history.deduction.codingPlan',
+  refund_app_store: 'credits.history.deduction.refundAppStore',
+  refund_google_play: 'credits.history.deduction.refundGooglePlay',
+  dispute: 'credits.history.deduction.dispute',
+  admin_cancel: 'credits.history.deduction.adminCancel',
+  admin_debit: 'credits.history.deduction.adminDebit',
+  correction: 'credits.history.deduction.correction',
+} satisfies Record<NonNullable<CreditDeduction['reason']>, string>;
+
+function deductionTitle(t: TFunction, deduction: CreditDeduction): string | null {
+  const reason = deduction.reason;
+  if (reason == null) {
+    return null;
+  }
+  const key = lookup(DEDUCTION_TITLE_KEYS, reason);
+  if (key == null) {
+    return null;
+  }
+  // The coding plan is the row's own reason plus the plan it charged: the
+  // provider and plan names are proper nouns, kept as data and isolated
+  // left-to-right inside a right-to-left sentence. A row whose plan the
+  // server did not name keeps the ledger's sentence instead.
+  if (reason === 'coding_plan') {
+    return deduction.planName == null
+      ? null
+      : t(key, { plan: isolateLtrBidiText(deduction.planName) });
+  }
+  return t(key);
+}
+
 /**
  * The grant line's type, following the web credits page: the recorded channel
  * decides, and only a grant with none falls back to its free flag.
@@ -299,7 +332,7 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
         );
   // A paid grant keeps the description its receipt records, but an empty one
   // still names the row.
-  const rowTitle = firstNonEmpty(grantName, storedDescription);
+  const rowTitle = firstNonEmpty(grantName, deductionTitle(t, deduction), storedDescription);
   // Alone, the expiry line is the whole event: the grant it ended already has
   // its own purchase row above.
   const mainTitle = purchase != null ? rowTitle : (expiryTitle ?? rowTitle);

@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "ခရက်ဒစ် လှုပ်ရှားမှုကို ဖွင့်၍ မရပါ။",
       "appStoreReceipt": "App Store မှ ပြေစာ",
+      "deduction": {
+        "adminCancel": "စီမံခန့်ခွဲသူမှ လက်ကျန် ပိတ်သိမ်းမှု",
+        "adminDebit": "စီမံခန့်ခွဲသူမှ ခရက်ဒစ် ဖယ်ရှားမှု",
+        "codingPlan": "ကုဒ်ရေးခြင်း အစီအစဉ်: {{plan}}",
+        "correction": "လက်ကျန် ချိန်ညှိမှု",
+        "dispute": "ငွေပေးချေမှု အငြင်းပွားမှု",
+        "refundAppStore": "App Store မှ ခရက်ဒစ် ပက်ကေ့ချ် ပြန်အမ်းငွေ",
+        "refundGooglePlay": "Google Play မှ ခရက်ဒစ် ပက်ကေ့ချ် ပြန်အမ်းငွေ"
+      },
       "deductionFallback": "ခရက်ဒစ် နုတ်ယူမှု",
       "emptyDescription": "ခရက်ဒစ် ဝယ်ယူမှုများ၊ ပြေစာများနှင့် အသုံးပြုမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",
       "emptyTitle": "ခရက်ဒစ် မှတ်တမ်း မရှိပါ",

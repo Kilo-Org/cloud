@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
       "appStoreReceipt": "App Storeରୁ ରସିଦ",
+      "deduction": {
+        "adminCancel": "ପ୍ରଶାସକ ଦ୍ୱାରା ବନ୍ଦ ହୋଇଥିବା ବ୍ୟାଲାନ୍ସ",
+        "adminDebit": "ପ୍ରଶାସକ ଦ୍ୱାରା ହଟାଯାଇଥିବା କ୍ରେଡିଟ୍",
+        "codingPlan": "କୋଡିଂ ପ୍ଲାନ୍: {{plan}}",
+        "correction": "ବ୍ୟାଲାନ୍ସ ସମାୟୋଜନ",
+        "dispute": "ଦେୟ ବିବାଦ",
+        "refundAppStore": "App Storeରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ",
+        "refundGooglePlay": "Google Playରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ"
+      },
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",

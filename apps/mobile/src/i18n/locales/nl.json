@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Kan tegoedactiviteit niet laden.",
       "appStoreReceipt": "Bon in de App Store",
+      "deduction": {
+        "adminCancel": "Saldo gesloten door een beheerder",
+        "adminDebit": "Tegoed verwijderd door een beheerder",
+        "codingPlan": "Codeerabonnement: {{plan}}",
+        "correction": "Saldocorrectie",
+        "dispute": "Geschil over betaling",
+        "refundAppStore": "Terugbetaling van tegoedpakket uit de App Store",
+        "refundGooglePlay": "Terugbetaling van tegoedpakket uit Google Play"
+      },
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",

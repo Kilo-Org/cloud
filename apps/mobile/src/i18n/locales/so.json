@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Dhaqdhaqaaqa kireditka lama rari karin.",
       "appStoreReceipt": "Rasiid ka yimid App Store",
+      "deduction": {
+        "adminCancel": "Hadhaaga waxaa xidhay maamule",
+        "adminDebit": "Kiredit waxaa ka saaray maamule",
+        "codingPlan": "Qorshaha codeynta: {{plan}}",
+        "correction": "Hagaajinta haraaga",
+        "dispute": "Muranka lacag-bixinta",
+        "refundAppStore": "Lacag celin xirmo kiredit oo ka timid App Store",
+        "refundGooglePlay": "Lacag celin xirmo kiredit oo ka timid Google Play"
+      },
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",

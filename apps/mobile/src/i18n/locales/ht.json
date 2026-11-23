@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Pa t ka chaje aktivite kredi.",
       "appStoreReceipt": "Resi ki nan App Store",
+      "deduction": {
+        "adminCancel": "Administratè fèmen balans lan",
+        "adminDebit": "Administratè retire kredi yo",
+        "codingPlan": "Plan kodaj: {{plan}}",
+        "correction": "Koreksyon balans",
+        "dispute": "Diskisyon peman",
+        "refundAppStore": "Ranbousman pake kredi nan App Store",
+        "refundGooglePlay": "Ranbousman pake kredi nan Google Play"
+      },
       "deductionFallback": "Dediksyon kredi",
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",

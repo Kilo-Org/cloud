@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "ບໍ່ສາມາດໂຫລດກິດຈະກຳເຄຣດິດໄດ້.",
       "appStoreReceipt": "ໃບຮັບເງິນຈາກ App Store",
+      "deduction": {
+        "adminCancel": "ຍອດເງິນຖືກປິດໂດຍຜູ້ດູແລລະບົບ",
+        "adminDebit": "ເຄຣດິດຖືກຖອນໂດຍຜູ້ດູແລລະບົບ",
+        "codingPlan": "ແຜນການຂຽນໂຄດ: {{plan}}",
+        "correction": "ການແກ້ໄຂຍອດເງິນ",
+        "dispute": "ຂໍ້ຂັດແຍ່ງການຊຳລະ",
+        "refundAppStore": "ການຄືນເງິນແພັກເຄຣດິດຈາກ App Store",
+        "refundGooglePlay": "ການຄືນເງິນແພັກເຄຣດິດຈາກ Google Play"
+      },
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",

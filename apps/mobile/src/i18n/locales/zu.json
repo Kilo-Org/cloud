@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Ayikwazanga ukulayisha umsebenzi wamakhredithi.",
       "appStoreReceipt": "Irisidi evela ku-App Store",
+      "deduction": {
+        "adminCancel": "Ibhalansi ivalwe umlawuli",
+        "adminDebit": "Amakhredithi asuswe umlawuli",
+        "codingPlan": "Uhlelo lokukhoda: {{plan}}",
+        "correction": "Ulungiso lwebhalansi",
+        "dispute": "Ingxabano yokukhokha",
+        "refundAppStore": "Ukubuyiselwa kwemali kwephakethe lamakhredithi ku-App Store",
+        "refundGooglePlay": "Ukubuyiselwa kwemali kwephakethe lamakhredithi ku-Google Play"
+      },
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",

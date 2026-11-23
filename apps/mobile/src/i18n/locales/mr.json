@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "क्रेडिट क्रियाकलाप लोड होऊ शकला नाही.",
       "appStoreReceipt": "App Store कडून पावती",
+      "deduction": {
+        "adminCancel": "प्रशासकाकडून शिल्लक बंद",
+        "adminDebit": "प्रशासकाकडून क्रेडिट वजावट",
+        "codingPlan": "कोडिंग प्लॅन: {{plan}}",
+        "correction": "शिलकीतील दुरुस्ती",
+        "dispute": "पेमेंटविषयी वाद",
+        "refundAppStore": "App Store कडून क्रेडिट्स पॅक परतावा",
+        "refundGooglePlay": "Google Play कडून क्रेडिट्स पॅक परतावा"
+      },
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",

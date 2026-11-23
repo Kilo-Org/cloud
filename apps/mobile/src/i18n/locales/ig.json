@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Enweghị ike ibudata mmemme kredit.",
       "appStoreReceipt": "Rịsịt sitere na App Store",
+      "deduction": {
+        "adminCancel": "Onye nchịkwa mechiri nguzozi",
+        "adminDebit": "Onye nchịkwa wepụrụ kredit",
+        "codingPlan": "Atụmatụ koodu: {{plan}}",
+        "correction": "Ndozi nguzozi",
+        "dispute": "Esemokwu ịkwụ ụgwọ",
+        "refundAppStore": "Nkwụghachi ngwugwu kredit site na App Store",
+        "refundGooglePlay": "Nkwụghachi ngwugwu kredit site na Google Play"
+      },
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",

@@ -4866,6 +4866,15 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
       "appStoreReceipt": "Doklad v obchode App Store",
+      "deduction": {
+        "adminCancel": "Zostatok uzavretý správcom",
+        "adminDebit": "Kredity odobral správca",
+        "codingPlan": "Plán programovania: {{plan}}",
+        "correction": "Úprava zostatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrátenie peňazí za balík kreditov v obchode App Store",
+        "refundGooglePlay": "Vrátenie peňazí za balík kreditov v obchode Google Play"
+      },
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",

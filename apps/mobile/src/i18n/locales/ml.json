@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "ക്രെഡിറ്റ് പ്രവർത്തനം ലോഡ് ചെയ്യാനായില്ല.",
       "appStoreReceipt": "App Store-ൽ നിന്നുള്ള രസീത്",
+      "deduction": {
+        "adminCancel": "അഡ്മിൻ അടച്ച ബാലൻസ്",
+        "adminDebit": "അഡ്മിൻ നീക്കം ചെയ്ത ക്രെഡിറ്റുകൾ",
+        "codingPlan": "കോഡിംഗ് പ്ലാൻ: {{plan}}",
+        "correction": "ബാലൻസ് തിരുത്തൽ",
+        "dispute": "പേയ്മെന്റ് തർക്കം",
+        "refundAppStore": "App Store-ൽ നിന്നുള്ള ക്രെഡിറ്റ് പാക്ക് റീഫണ്ട്",
+        "refundGooglePlay": "Google Play-ൽ നിന്നുള്ള ക്രെഡിറ്റ് പാക്ക് റീഫണ്ട്"
+      },
       "deductionFallback": "ക്രെഡിറ്റ് കിഴിവ്",
       "emptyDescription": "ക്രെഡിറ്റ് വാങ്ങലുകൾ, രസീതുകൾ, ഉപയോഗം എന്നിവ ഇവിടെ ദൃശ്യമാകും.",
       "emptyTitle": "ക്രെഡിറ്റ് ചരിത്രമില്ല",

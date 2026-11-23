@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "クレジットアクティビティを読み込めませんでした。",
       "appStoreReceipt": "領収書は App Store にあります",
+      "deduction": {
+        "adminCancel": "管理者による残高の停止",
+        "adminDebit": "管理者によるクレジットの削除",
+        "codingPlan": "コーディングプラン: {{plan}}",
+        "correction": "残高の修正",
+        "dispute": "支払いに関する異議",
+        "refundAppStore": "App Store からのクレジットパックの返金",
+        "refundGooglePlay": "Google Play からのクレジットパックの返金"
+      },
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",

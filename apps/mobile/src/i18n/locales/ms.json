@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Aktiviti kredit tidak dapat dimuatkan.",
       "appStoreReceipt": "Resit daripada App Store",
+      "deduction": {
+        "adminCancel": "Baki ditutup oleh pentadbir",
+        "adminDebit": "Kredit dialih keluar oleh pentadbir",
+        "codingPlan": "Pelan pengekodan: {{plan}}",
+        "correction": "Pembetulan baki",
+        "dispute": "Pertikaian pembayaran",
+        "refundAppStore": "Bayaran balik pek kredit daripada App Store",
+        "refundGooglePlay": "Bayaran balik pek kredit daripada Google Play"
+      },
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",

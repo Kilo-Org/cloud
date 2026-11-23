@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆಯನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
       "appStoreReceipt": "App Store ನಿಂದ ರಸೀದಿ",
+      "deduction": {
+        "adminCancel": "ನಿರ್ವಾಹಕರಿಂದ ಬ್ಯಾಲೆನ್ಸ್ ಮುಚ್ಚಲಾಗಿದೆ",
+        "adminDebit": "ನಿರ್ವಾಹಕರಿಂದ ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+        "codingPlan": "ಕೋಡಿಂಗ್ ಪ್ಲಾನ್: {{plan}}",
+        "correction": "ಬ್ಯಾಲೆನ್ಸ್ ಹೊಂದಾಣಿಕೆ",
+        "dispute": "ಪಾವತಿ ವಿವಾದ",
+        "refundAppStore": "App Store ನಿಂದ ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ ಮರುಪಾವತಿ",
+        "refundGooglePlay": "Google Play ನಿಂದ ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ ಮರುಪಾವತಿ"
+      },
       "deductionFallback": "ಕ್ರೆಡಿಟ್ ಕಡಿತ",
       "emptyDescription": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಗಳು, ರಸೀದಿಗಳು ಮತ್ತು ಬಳಕೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "emptyTitle": "ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸವಿಲ್ಲ",

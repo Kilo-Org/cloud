@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
       "appStoreReceipt": "ደረሰኝ ከApp Store",
+      "deduction": {
+        "adminCancel": "ቀሪ ሂሳቡ በአስተዳዳሪ ተዘግቷል",
+        "adminDebit": "ክሬዲቶች በአስተዳዳሪ ተወግደዋል",
+        "codingPlan": "የኮድ እቅድ፦ {{plan}}",
+        "correction": "የቀሪ ሂሳብ ማስተካከያ",
+        "dispute": "የክፍያ ክርክር",
+        "refundAppStore": "የክሬዲት ጥቅል ተመላሽ ከApp Store",
+        "refundGooglePlay": "የክሬዲት ጥቅል ተመላሽ ከGoogle Play"
+      },
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",

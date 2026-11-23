@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Non se puido cargar a actividade de crédito.",
       "appStoreReceipt": "Recibo da App Store",
+      "deduction": {
+        "adminCancel": "Saldo pechado por un administrador",
+        "adminDebit": "Créditos eliminados por un administrador",
+        "codingPlan": "Plan de programación: {{plan}}",
+        "correction": "Corrección do saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso dun paquete de créditos da App Store",
+        "refundGooglePlay": "Reembolso dun paquete de créditos de Google Play"
+      },
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",

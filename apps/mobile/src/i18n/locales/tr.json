@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Kredi hareketleri yüklenemedi.",
       "appStoreReceipt": "Makbuz App Store'da",
+      "deduction": {
+        "adminCancel": "Bakiye bir yönetici tarafından kapatıldı",
+        "adminDebit": "Krediler bir yönetici tarafından kaldırıldı",
+        "codingPlan": "Kodlama planı: {{plan}}",
+        "correction": "Bakiye düzeltmesi",
+        "dispute": "Ödeme itirazı",
+        "refundAppStore": "App Store'dan kredi paketi iadesi",
+        "refundGooglePlay": "Google Play'den kredi paketi iadesi"
+      },
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",

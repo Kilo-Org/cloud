@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
+      "deduction": {
+        "adminCancel": "Balans administrator tomonidan yopilgan",
+        "adminDebit": "Kreditlar administrator tomonidan olib tashlangan",
+        "codingPlan": "Kodlash tarifi: {{plan}}",
+        "correction": "Balansni tuzatish",
+        "dispute": "To‘lov bo‘yicha nizo",
+        "refundAppStore": "App Store’dan kredit paketi qaytarilishi",
+        "refundGooglePlay": "Google Play’dan kredit paketi qaytarilishi"
+      },
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",

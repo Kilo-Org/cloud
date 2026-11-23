@@ -4794,6 +4794,15 @@
     "history": {
       "activityUnavailable": "Couldn't load credit activity.",
       "appStoreReceipt": "Receipt from the App Store",
+      "deduction": {
+        "adminCancel": "Balance closed by an administrator",
+        "adminDebit": "Credits removed by an administrator",
+        "codingPlan": "Coding plan: {{plan}}",
+        "correction": "Balance correction",
+        "dispute": "Payment dispute",
+        "refundAppStore": "Credit pack refund from the App Store",
+        "refundGooglePlay": "Credit pack refund from Google Play"
+      },
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",

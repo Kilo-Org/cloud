@@ -4781,6 +4781,15 @@
     "history": {
       "activityUnavailable": "Impossible de charger l'activité de crédits.",
       "appStoreReceipt": "Reçu disponible sur l'App Store",
+      "deduction": {
+        "adminCancel": "Solde clôturé par un administrateur",
+        "adminDebit": "Crédits retirés par un administrateur",
+        "codingPlan": "Formule de codage : {{plan}}",
+        "correction": "Correction du solde",
+        "dispute": "Litige de paiement",
+        "refundAppStore": "Remboursement d'un pack de crédits sur l'App Store",
+        "refundGooglePlay": "Remboursement d'un pack de crédits sur Google Play"
+      },
       "deductionFallback": "Déduction de crédits",
       "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
       "emptyTitle": "Aucun historique de crédits",

@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Imeshindwa kupakia shughuli za salio.",
       "appStoreReceipt": "Risiti kutoka App Store",
+      "deduction": {
+        "adminCancel": "Salio limefungwa na msimamizi",
+        "adminDebit": "Salio limeondolewa na msimamizi",
+        "codingPlan": "Mpango wa kuandika msimbo: {{plan}}",
+        "correction": "Marekebisho ya salio",
+        "dispute": "Mgogoro wa malipo",
+        "refundAppStore": "Marejesho ya fedha kwa pakiti ya salio kutoka App Store",
+        "refundGooglePlay": "Marejesho ya fedha kwa pakiti ya salio kutoka Google Play"
+      },
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",

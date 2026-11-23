@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Kò lè gbé ìgbòkègbodò kírẹ́dítì wọ̀.",
       "appStoreReceipt": "Ìwé ẹ̀rí ìsanwó láti App Store",
+      "deduction": {
+        "adminCancel": "Alákòóso ti tì owó tó kù",
+        "adminDebit": "Alákòóso ti yọ kírẹ́dítì kúrò",
+        "codingPlan": "Ètò kóòdù: {{plan}}",
+        "correction": "Àtúnṣe owó tó kù",
+        "dispute": "Àríyànjiyàn ìsanwó",
+        "refundAppStore": "Ìdápadà owó àpò kírẹ́dítì láti App Store",
+        "refundGooglePlay": "Ìdápadà owó àpò kírẹ́dítì láti Google Play"
+      },
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",

@@ -82,6 +82,7 @@ import {
   getCreditBlocks,
   creditGrantReasonOf,
   CreditGrantReasonSchema,
+  CreditDeductionReasonSchema,
 } from '@/lib/getCreditBlocks';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
@@ -250,6 +251,10 @@ const CreditDeductionSchema = z.object({
       kind: CreditGrantReasonSchema,
     })
     .nullable(),
+  /** Why the row drew credit, from its own category: a usage charge, a coding plan, a store refund, a dispute, an administrator action or a balance correction. Null when the row's category carries no reason the app can name, so a client keeps the stored description. */
+  reason: CreditDeductionReasonSchema.nullable(),
+  /** The coding plan this row charged, verbatim from the plan catalog, so the client can name it inside its own template. Null for every other reason. */
+  planName: z.string().nullable(),
 });
 
 const CreditGrantSchema = z.object({
@@ -340,6 +345,8 @@ type RawDeduction = {
   credit_category: string | null;
   amount_mUsd: number;
   expiry: 'expired' | 'voided' | null;
+  reason: z.infer<typeof CreditDeductionReasonSchema> | null;
+  planName: string | null;
   purchase: {
     id: string;
     date: string;
@@ -471,6 +478,8 @@ async function enrichDeductionsWithInstanceNames(
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
     expiry: RawDeduction['expiry'];
+    reason: RawDeduction['reason'];
+    planName: RawDeduction['planName'];
     purchase: RawDeduction['purchase'];
   }[]
 > {
@@ -563,6 +572,8 @@ async function enrichDeductionsWithInstanceNames(
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
       expiry: d.expiry,
+      reason: d.reason,
+      planName: d.planName,
       purchase: d.purchase,
     };
   });

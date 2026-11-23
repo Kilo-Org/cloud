@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Կրեդիտների ակտիվությունը չհաջողվեց բեռնել։",
       "appStoreReceipt": "Անդորրագիր App Store-ից",
+      "deduction": {
+        "adminCancel": "Մնացորդը փակվել է ադմինիստրատորի կողմից",
+        "adminDebit": "Կրեդիտները հեռացվել են ադմինիստրատորի կողմից",
+        "codingPlan": "Կոդավորման պլան՝ {{plan}}",
+        "correction": "Մնացորդի ուղղում",
+        "dispute": "Վճարման վեճ",
+        "refundAppStore": "Կրեդիտային փաթեթի վերադարձ App Store-ից",
+        "refundGooglePlay": "Կրեդիտային փաթեթի վերադարձ Google Play-ից"
+      },
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
       "emptyTitle": "Կրեդիտների պատմություն չկա",

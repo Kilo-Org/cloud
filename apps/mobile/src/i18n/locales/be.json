@@ -4866,6 +4866,15 @@
     "history": {
       "activityUnavailable": "Не ўдалося загрузіць крэдытную актыўнасць.",
       "appStoreReceipt": "Чэк у App Store",
+      "deduction": {
+        "adminCancel": "Баланс закрыты адміністратарам",
+        "adminDebit": "Крэдыты выдалены адміністратарам",
+        "codingPlan": "План праграмавання: {{plan}}",
+        "correction": "Карэкціроўка балансу",
+        "dispute": "Спрэчка аб плацяжы",
+        "refundAppStore": "Вяртанне набору крэдытаў з App Store",
+        "refundGooglePlay": "Вяртанне набору крэдытаў з Google Play"
+      },
       "deductionFallback": "Спісанне крэдытаў",
       "emptyDescription": "Тут будуць адлюстроўвацца пакупкі крэдытаў, чэкі і выкарыстанне.",
       "emptyTitle": "Гісторыі крэдытаў няма",

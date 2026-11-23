@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "無法載入點數活動。",
       "appStoreReceipt": "App Store 收據",
+      "deduction": {
+        "adminCancel": "管理員已關閉餘額",
+        "adminDebit": "管理員已移除點數",
+        "codingPlan": "程式設計方案：{{plan}}",
+        "correction": "餘額調整",
+        "dispute": "付款爭議",
+        "refundAppStore": "App Store 點數包退款",
+        "refundGooglePlay": "Google Play 點數包退款"
+      },
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",

@@ -4951,6 +4951,15 @@
     "history": {
       "activityUnavailable": "Níorbh fhéidir gníomhaíocht chreidmheasa a lódáil.",
       "appStoreReceipt": "Admháil ón App Store",
+      "deduction": {
+        "adminCancel": "Iarmhéid dúnta ag riarthóir",
+        "adminDebit": "Creidmheasanna bainte ag riarthóir",
+        "codingPlan": "Plean códaithe: {{plan}}",
+        "correction": "Ceartú iarmhéid",
+        "dispute": "Aighneas íocaíochta",
+        "refundAppStore": "Aisíocaíocht pacáiste creidmheasa ón App Store",
+        "refundGooglePlay": "Aisíocaíocht pacáiste creidmheasa ó Google Play"
+      },
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",

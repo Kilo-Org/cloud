@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "មិនអាចផ្ទុកសកម្មភាពក្រេឌីតបានទេ។",
       "appStoreReceipt": "បង្កាន់ដៃពី App Store",
+      "deduction": {
+        "adminCancel": "សមតុល្យត្រូវបានបិទដោយអ្នកគ្រប់គ្រង",
+        "adminDebit": "ក្រេឌីតត្រូវបានដកចេញដោយអ្នកគ្រប់គ្រង",
+        "codingPlan": "គម្រោងសរសេរកូដ៖ {{plan}}",
+        "correction": "ការកែតម្រូវសមតុល្យ",
+        "dispute": "វិវាទការទូទាត់",
+        "refundAppStore": "ការសងប្រាក់វិញសម្រាប់កញ្ចប់ក្រេឌីតពី App Store",
+        "refundGooglePlay": "ការសងប្រាក់វិញសម្រាប់កញ្ចប់ក្រេឌីតពី Google Play"
+      },
       "deductionFallback": "ការកាត់ក្រេឌីត",
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",

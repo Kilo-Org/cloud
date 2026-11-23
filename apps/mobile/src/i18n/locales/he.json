@@ -4781,6 +4781,15 @@
     "history": {
       "activityUnavailable": "לא ניתן לטעון פעילות קרדיט.",
       "appStoreReceipt": "קבלה מ-App Store",
+      "deduction": {
+        "adminCancel": "היתרה נסגרה על ידי מנהל",
+        "adminDebit": "קרדיטים הוסרו על ידי מנהל",
+        "codingPlan": "תוכנית קידוד: {{plan}}",
+        "correction": "תיקון יתרה",
+        "dispute": "מחלוקת תשלום",
+        "refundAppStore": "החזר על חבילת קרדיטים מ-App Store",
+        "refundGooglePlay": "החזר על חבילת קרדיטים מ-Google Play"
+      },
       "deductionFallback": "ניכוי קרדיטים",
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",

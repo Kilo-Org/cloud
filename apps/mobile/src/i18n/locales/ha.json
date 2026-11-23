@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Ba a iya loda ayyukan kiredit ba.",
       "appStoreReceipt": "Rasiti daga App Store",
+      "deduction": {
+        "adminCancel": "Mai gudanarwa ya rufe ma'auni",
+        "adminDebit": "Mai gudanarwa ya cire kiredit",
+        "codingPlan": "Tsarin coding: {{plan}}",
+        "correction": "Gyaran ma'auni",
+        "dispute": "Jayayya kan biya",
+        "refundAppStore": "Mayar da kuɗin fakitin kiredit daga App Store",
+        "refundGooglePlay": "Mayar da kuɗin fakitin kiredit daga Google Play"
+      },
       "deductionFallback": "Cire kiredit",
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",

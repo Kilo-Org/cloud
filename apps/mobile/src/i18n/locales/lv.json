@@ -4781,6 +4781,15 @@
     "history": {
       "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
       "appStoreReceipt": "Kvīts veikalā App Store",
+      "deduction": {
+        "adminCancel": "Administratora slēgta bilance",
+        "adminDebit": "Administratora noņemti kredīti",
+        "codingPlan": "Kodēšanas plāns: {{plan}}",
+        "correction": "Bilances korekcija",
+        "dispute": "Maksājuma strīds",
+        "refundAppStore": "Kredītu paketes atmaksa no App Store",
+        "refundGooglePlay": "Kredītu paketes atmaksa no Google Play"
+      },
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",

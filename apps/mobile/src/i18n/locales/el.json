@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Δεν ήταν δυνατή η φόρτωση της δραστηριότητας μονάδων.",
       "appStoreReceipt": "Απόδειξη από το App Store",
+      "deduction": {
+        "adminCancel": "Το υπόλοιπο έκλεισε από διαχειριστή",
+        "adminDebit": "Μονάδες αφαιρέθηκαν από διαχειριστή",
+        "codingPlan": "Πρόγραμμα coding: {{plan}}",
+        "correction": "Διόρθωση υπολοίπου",
+        "dispute": "Αμφισβήτηση πληρωμής",
+        "refundAppStore": "Επιστροφή πακέτου μονάδων από το App Store",
+        "refundGooglePlay": "Επιστροφή πακέτου μονάδων από το Google Play"
+      },
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
       "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",

@@ -80,6 +80,8 @@ function deduction(overrides: Partial<CreditDeduction> = {}): CreditDeduction {
     amount_mUsd: -10_000_000,
     kind: 'deduction',
     expiry: null,
+    reason: null,
+    planName: null,
     purchase: null,
     ...overrides,
   };
@@ -450,6 +452,121 @@ describe('LedgerHistoryRow', () => {
     expect(painted).toContain('Credit purchase');
     expect(painted).toContain('Expired: Credit purchase');
     expect(painted.some(text => text.trim() === 'Expired:')).toBe(false);
+    renderer.unmount();
+  });
+});
+
+describe('LedgerHistoryRow titles from the catalog', () => {
+  it('titles a usage charge from the catalog instead of the stored sentence', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({ reason: 'usage', description: 'Usage charge', expiry: null, purchase: null })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The ledger stores an English sentence; a row whose category the server
+    // names reads the catalog instead, in whatever language the reader chose.
+    expect(painted).toContain(i18n.t('usage.title'));
+    expect(painted).not.toContain('Usage charge');
+    renderer.unmount();
+  });
+
+  it('titles a usage charge in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderLedgerRow(
+        deduction({ reason: 'usage', description: 'Usage charge', expiry: null, purchase: null })
+      );
+
+      const painted = texts(renderer).map(text => readable(text));
+      expect(painted).toContain('الاستخدام');
+      expect(painted).not.toContain('Usage charge');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('names the coding plan a charge drew from, with the plan as a proper noun', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        reason: 'coding_plan',
+        planName: 'MiniMax Token Plan Plus',
+        description: 'Coding plan: MiniMax Token Plan Plus',
+        expiry: null,
+        purchase: null,
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    expect(painted).toContain('Coding plan: MiniMax Token Plan Plus');
+    renderer.unmount();
+  });
+
+  it('keeps the coding plan name intact inside the Arabic template', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderLedgerRow(
+        deduction({
+          reason: 'coding_plan',
+          planName: 'MiniMax Token Plan Plus',
+          description: 'Coding plan: MiniMax Token Plan Plus',
+          expiry: null,
+          purchase: null,
+        })
+      );
+
+      const painted = texts(renderer).map(text => readable(text));
+      const title = painted.find(text => text.includes('MiniMax Token Plan Plus'));
+      if (title === undefined) {
+        throw new Error('The row did not paint the coding plan name');
+      }
+      // The plan is a proper noun kept as data inside the Arabic frame, so the
+      // sentence cannot be the English one with a translated prefix.
+      expect(title).toBe(
+        readable(
+          i18n.t('credits.history.deduction.codingPlan', { plan: 'MiniMax Token Plan Plus' })
+        )
+      );
+      expect(title).not.toBe('Coding plan: MiniMax Token Plan Plus');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('keeps the ledger sentence on a row the server gave no reason', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({ reason: null, description: 'Ledger sentence', expiry: null, purchase: null })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    expect(painted).toContain('Ledger sentence');
+    renderer.unmount();
+  });
+
+  it('keeps the ledger sentence on a coding plan charge whose plan is not named', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        reason: 'coding_plan',
+        planName: null,
+        description: 'Coding plan renewal',
+        expiry: null,
+        purchase: null,
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // A renewal charge names no plan, so a template with an empty placeholder
+    // would read as a broken row; the ledger's own sentence stays.
+    expect(painted).toContain('Coding plan renewal');
     renderer.unmount();
   });
 });

@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Kāore i taea te uta i ngā mahi whiwhinga.",
       "appStoreReceipt": "Rihīti mai i te App Store",
+      "deduction": {
+        "adminCancel": "Kua katia te toenga e te kaiwhakahaere",
+        "adminDebit": "Kua tangohia ngā whiwhinga e te kaiwhakahaere",
+        "codingPlan": "Mahere waehere: {{plan}}",
+        "correction": "Whakatikatika toenga",
+        "dispute": "Taupatupatu utu",
+        "refundAppStore": "Whakahokinga pākete whiwhinga mai i te App Store",
+        "refundGooglePlay": "Whakahokinga pākete whiwhinga mai i Google Play"
+      },
       "deductionFallback": "Tangohanga whiwhinga",
       "emptyDescription": "Ka puta mai ki konei ngā hoko whiwhinga, ngā rihīti, me te whakamahinga.",
       "emptyTitle": "Kāore he hītori whiwhinga",

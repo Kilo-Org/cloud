@@ -5036,6 +5036,15 @@
     "history": {
       "activityUnavailable": "Methwyd llwytho gweithgarwch credyd.",
       "appStoreReceipt": "Derbynneb gan yr App Store",
+      "deduction": {
+        "adminCancel": "Balans wedi'i gau gan weinyddwr",
+        "adminDebit": "Credydau wedi'u tynnu gan weinyddwr",
+        "codingPlan": "Cynllun codio: {{plan}}",
+        "correction": "Cywiriad balans",
+        "dispute": "Anghydfod talu",
+        "refundAppStore": "Ad-daliad pecyn credyd o'r App Store",
+        "refundGooglePlay": "Ad-daliad pecyn credyd o Google Play"
+      },
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",

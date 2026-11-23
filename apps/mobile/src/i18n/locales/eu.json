@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "Ezin izan da kreditu-jarduera kargatu.",
       "appStoreReceipt": "App Store-ko ordainagiria",
+      "deduction": {
+        "adminCancel": "Administratzaileak itxitako saldoa",
+        "adminDebit": "Administratzaileak kendutako kredituak",
+        "codingPlan": "Programazio-plana: {{plan}}",
+        "correction": "Saldoaren zuzenketa",
+        "dispute": "Ordainketari buruzko eztabaida",
+        "refundAppStore": "Kreditu-pakete baten itzulketa App Store-tik",
+        "refundGooglePlay": "Kreditu-pakete baten itzulketa Google Play-tik"
+      },
       "deductionFallback": "Kreditu-kenketa",
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",

@@ -4696,6 +4696,15 @@
     "history": {
       "activityUnavailable": "نەتوانرا چالاکیی کرێدیت باربکرێت.",
       "appStoreReceipt": "پسوولە لە App Store",
+      "deduction": {
+        "adminCancel": "باڵانس لەلایەن بەڕێوەبەرێکەوە داخرا",
+        "adminDebit": "کرێدیتەکان لەلایەن بەڕێوەبەرێکەوە لابران",
+        "codingPlan": "پلانی کۆدنووسین: {{plan}}",
+        "correction": "ڕێکخستنەوەی باڵانس",
+        "dispute": "ناکۆکی پارەدان",
+        "refundAppStore": "گەڕاندنەوەی پاکێجی کرێدیت لە App Store",
+        "refundGooglePlay": "گەڕاندنەوەی پاکێجی کرێدیت لە Google Play"
+      },
       "deductionFallback": "لێبڕینی کرێدیت",
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",

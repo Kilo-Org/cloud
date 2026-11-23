@@ -1,0 +1,111 @@
+import { classifyConflict, type NativeSyncPacket } from '@kilocode/cloud-agent-sdk';
+
+import { applyPulled } from './sync-import';
+import { freeze, type FrozenPacket, sessionOf } from './sync-protocol';
+import type { SyncDeps, UploadChatInput, UploadOutcome } from './sync-protocol';
+import { saveSyncRecord, syncRecordOf } from './sync-store';
+
+/**
+ * Committing a frozen packet: the receipt path, and what happens when the CAS
+ * is lost (H4/H5). Split from the upload builder so each half is one story.
+ */
+
+export async function commitFrozen(
+  deps: SyncDeps,
+  input: UploadChatInput,
+  serverId: string,
+  frozen: FrozenPacket,
+  mayRebatch: boolean
+): Promise<UploadOutcome> {
+  const result = await deps.transport.commit(serverId, frozen.packet);
+  switch (result.type) {
+    case 'committed': {
+      saveSyncRecord(deps.db, input.sessionId, {
+        phase: 'synced',
+        outbox: null,
+        acknowledged: result.receipt.through,
+        ackBatch: result.receipt.batchID,
+        ackDigest: result.receipt.digest,
+        ackedSeq: frozen.maxSeq,
+        maxSeq: frozen.maxSeq,
+      });
+      return { kind: 'synced', position: result.receipt.through };
+    }
+    case 'deleted': {
+      saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
+      await deps.forgetLocal(input.sessionId);
+      return { kind: 'deleted' };
+    }
+    case 'retryable': {
+      saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
+      return { kind: 'pending' };
+    }
+    case 'failed': {
+      saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
+      return { kind: 'failed', code: result.code };
+    }
+    case 'superseded':
+    case 'conflict': {
+      return resolveConflict(deps, input, serverId, frozen, mayRebatch);
+    }
+  }
+}
+
+/** H5: pull, import, then fast-forward above the pulled max seq or park diverged. */
+async function resolveConflict(
+  deps: SyncDeps,
+  input: UploadChatInput,
+  serverId: string,
+  frozen: FrozenPacket,
+  mayRebatch: boolean
+): Promise<UploadOutcome> {
+  const pulled = await deps.transport.pull(serverId);
+  switch (pulled.type) {
+    case 'deleted': {
+      saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
+      await deps.forgetLocal(input.sessionId);
+      return { kind: 'deleted' };
+    }
+    case 'not_found':
+    case 'retryable': {
+      return { kind: 'pending' };
+    }
+    case 'failed': {
+      return { kind: 'failed', code: pulled.code };
+    }
+    case 'pulled': {
+      break;
+    }
+  }
+  const snapshot = pulled.snapshot;
+  const record = syncRecordOf(deps.db, input.sessionId);
+  if (record === null) {
+    return { kind: 'unknown-chat' };
+  }
+  const unacked = Object.values(record.messageMap)
+    .filter(entry => entry.seq > record.ackedSeq && entry.seq > 0)
+    .map(entry => ({ seq: entry.seq }));
+  const verdict = classifyConflict(unacked, snapshot.maxSeq);
+  await applyPulled(deps, input.sessionId, serverId, snapshot, input.modelId);
+  if (verdict === 'diverged' || !mayRebatch) {
+    saveSyncRecord(deps.db, input.sessionId, {
+      phase: verdict === 'diverged' ? 'diverged' : 'pending',
+      outbox: verdict === 'diverged' ? null : record.outbox,
+    });
+    return verdict === 'diverged' ? { kind: 'diverged' } : { kind: 'pending' };
+  }
+  // Fast-forward: the same changes above the pulled position, under a new
+  // batch id, since `after` is part of what the receipt digests.
+  const rebatched: NativeSyncPacket = {
+    ...frozen.packet,
+    batchID: deps.newBatchId(),
+    after: snapshot.position,
+    through: snapshot.position + frozen.packet.changes.length,
+  };
+  saveSyncRecord(deps.db, input.sessionId, {
+    phase: 'pending',
+    outbox: freeze(rebatched, frozen.maxSeq),
+  });
+  return commitFrozen(deps, input, serverId, { packet: rebatched, maxSeq: frozen.maxSeq }, false);
+}
+

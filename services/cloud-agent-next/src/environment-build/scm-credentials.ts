@@ -201,7 +201,6 @@ export async function resolveBuildScmCredential(input: {
       entry.repository,
       input.outboundContainerId,
       now,
-      false,
       entry.scm
     );
     const grant = buildScmGrantSchema.parse({

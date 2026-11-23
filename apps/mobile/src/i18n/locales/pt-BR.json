@@ -4025,6 +4025,7 @@
         "passLine_many": "{{passes}} passes · {{credits}} créditos mensais",
         "passLine_one": "{{passes}} passe · {{credits}} créditos mensais",
         "passLine_other": "{{passes}} passes · {{credits}} créditos mensais",
+        "passLine_zero": "{{passes}} passes · {{credits}} créditos mensais",
         "proratedNote": "Inclui créditos proporcionais para passes adicionados no meio do período. Um mês completo é {{credits}} por passe.",
         "title": "Uso do Kilo Pass",
         "unavailable": "O uso do Kilo Pass não está disponível para esta organização."

@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilisation",
+    "personalTitle": "Utilisation du compte personnel",
     "orgTitle": "Utilisation de l'organisation",
     "entrySubtitle": "Dépenses, requêtes et jetons",
     "rangePicker": "Période",

@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "वापर",
+    "personalTitle": "वैयक्तिक खात्याचा वापर",
     "orgTitle": "संस्थेचा वापर",
     "entrySubtitle": "खर्च, विनंत्या आणि टोकन",
     "rangePicker": "कालावधी",

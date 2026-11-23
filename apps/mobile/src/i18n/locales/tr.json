@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Kullanım",
+    "personalTitle": "Kişisel hesap kullanımı",
     "orgTitle": "Organizasyon kullanımı",
     "entrySubtitle": "Harcama, istekler ve tokenlar",
     "rangePicker": "Zaman aralığı",

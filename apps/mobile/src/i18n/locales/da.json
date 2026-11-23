@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Forbrug",
+    "personalTitle": "Personligt forbrug",
     "orgTitle": "Organisationens forbrug",
     "entrySubtitle": "Udgifter, anmodninger og tokens",
     "rangePicker": "Tidsperiode",

@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Kasutus",
+    "personalTitle": "Isikliku konto kasutus",
     "orgTitle": "Organisatsiooni kasutus",
     "entrySubtitle": "Kulu, päringud ja tokenid",
     "rangePicker": "Ajavahemik",

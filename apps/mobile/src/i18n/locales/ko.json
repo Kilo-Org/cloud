@@ -4881,6 +4881,7 @@
   },
   "usage": {
     "title": "사용량",
+    "personalTitle": "개인 사용량",
     "orgTitle": "조직 사용량",
     "entrySubtitle": "비용, 요청, 토큰",
     "rangePicker": "기간",

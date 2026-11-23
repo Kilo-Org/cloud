@@ -4882,6 +4882,7 @@
   },
   "usage": {
     "title": "用量",
+    "personalTitle": "个人用量",
     "orgTitle": "组织用量",
     "entrySubtitle": "费用、请求和词元",
     "rangePicker": "时间范围",

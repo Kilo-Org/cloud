@@ -4884,6 +4884,7 @@
   },
   "usage": {
     "title": "Penggunaan",
+    "personalTitle": "Penggunaan peribadi",
     "orgTitle": "Penggunaan organisasi",
     "entrySubtitle": "Perbelanjaan, permintaan dan token",
     "rangePicker": "Julat masa",

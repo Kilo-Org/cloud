@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilizzo",
+    "personalTitle": "Utilizzo dell'account personale",
     "orgTitle": "Utilizzo dell'organizzazione",
     "entrySubtitle": "Spesa, richieste e token",
     "rangePicker": "Intervallo di tempo",

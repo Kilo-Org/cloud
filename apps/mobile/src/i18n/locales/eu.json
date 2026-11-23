@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Erabilera",
+    "personalTitle": "Kontu pertsonalaren erabilera",
     "orgTitle": "Erakundearen erabilera",
     "entrySubtitle": "Gastua, eskaerak eta tokenak",
     "rangePicker": "Denbora-tartea",

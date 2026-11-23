@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Potrošnja",
+    "personalTitle": "Potrošnja osobnog računa",
     "orgTitle": "Potrošnja organizacije",
     "entrySubtitle": "Troškovi, zahtjevi i tokeni",
     "rangePicker": "Vremenski raspon",

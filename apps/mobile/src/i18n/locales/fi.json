@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Käyttö",
+    "personalTitle": "Henkilökohtaisen tilin käyttö",
     "orgTitle": "Organisaation käyttö",
     "entrySubtitle": "Kulut, pyynnöt ja tokenit",
     "rangePicker": "Aikaväli",

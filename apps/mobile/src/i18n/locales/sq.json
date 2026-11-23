@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Përdorimi",
+    "personalTitle": "Përdorimi i llogarisë personale",
     "orgTitle": "Përdorimi i organizatës",
     "entrySubtitle": "Shpenzimet, kërkesat dhe tokenët",
     "rangePicker": "Periudha kohore",

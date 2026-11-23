@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Ús",
+    "personalTitle": "Ús del compte personal",
     "orgTitle": "Ús de l'organització",
     "entrySubtitle": "Despesa, sol·licituds i tòkens",
     "rangePicker": "Període",

@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Forbruk",
+    "personalTitle": "Personlig forbruk",
     "orgTitle": "Organisasjonens forbruk",
     "entrySubtitle": "Kostnader, forespørsler og tokener",
     "rangePicker": "Tidsperiode",

@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Mức sử dụng",
+    "personalTitle": "Mức sử dụng cá nhân",
     "orgTitle": "Mức sử dụng của tổ chức",
     "entrySubtitle": "Chi tiêu, yêu cầu và token",
     "rangePicker": "Khoảng thời gian",

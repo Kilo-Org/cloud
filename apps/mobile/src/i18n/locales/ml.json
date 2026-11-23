@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "ഉപയോഗം",
+    "personalTitle": "വ്യക്തിഗത ഉപയോഗം",
     "orgTitle": "ഓർഗനൈസേഷൻ ഉപയോഗം",
     "entrySubtitle": "ചെലവ്, അഭ്യർത്ഥനകൾ, ടോക്കണുകൾ",
     "rangePicker": "സമയപരിധി",

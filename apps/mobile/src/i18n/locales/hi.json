@@ -4971,6 +4971,7 @@
   },
   "usage": {
     "title": "उपयोग",
+    "personalTitle": "व्यक्तिगत खाते का उपयोग",
     "orgTitle": "संगठन का उपयोग",
     "entrySubtitle": "खर्च, अनुरोध और टोकन",
     "rangePicker": "समय अवधि",

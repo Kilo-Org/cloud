@@ -5158,6 +5158,7 @@
   },
   "usage": {
     "title": "Użycie",
+    "personalTitle": "Użycie osobiste",
     "orgTitle": "Użycie organizacji",
     "entrySubtitle": "Wydatki, żądania i tokeny",
     "rangePicker": "Zakres czasu",

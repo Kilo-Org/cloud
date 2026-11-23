@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Használat",
+    "personalTitle": "Személyes használat",
     "orgTitle": "Szervezeti használat",
     "entrySubtitle": "Költség, kérések és tokenek",
     "rangePicker": "Időtartomány",

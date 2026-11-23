@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Nutzung",
+    "personalTitle": "Persönliche Nutzung",
     "orgTitle": "Organisationsnutzung",
     "entrySubtitle": "Kosten, Anfragen und Tokens",
     "rangePicker": "Zeitraum",

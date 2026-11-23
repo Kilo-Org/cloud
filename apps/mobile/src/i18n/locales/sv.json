@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Användning",
+    "personalTitle": "Personlig användning",
     "orgTitle": "Organisationens användning",
     "entrySubtitle": "Utgifter, begäranden och token",
     "rangePicker": "Tidsperiod",

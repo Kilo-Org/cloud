@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Uso",
+    "personalTitle": "Uso da conta persoal",
     "orgTitle": "Uso da organización",
     "entrySubtitle": "Gasto, solicitudes e tokens",
     "rangePicker": "Intervalo de tempo",

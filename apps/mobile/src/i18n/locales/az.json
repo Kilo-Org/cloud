@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "İstifadə",
+    "personalTitle": "Şəxsi hesabın istifadəsi",
     "orgTitle": "Təşkilatın istifadəsi",
     "entrySubtitle": "Xərc, sorğular və tokenlər",
     "rangePicker": "Zaman aralığı",

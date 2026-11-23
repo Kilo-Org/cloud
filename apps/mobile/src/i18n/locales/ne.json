@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "प्रयोग",
+    "personalTitle": "व्यक्तिगत प्रयोग",
     "orgTitle": "संगठनको प्रयोग",
     "entrySubtitle": "खर्च, अनुरोधहरू र टोकनहरू",
     "rangePicker": "समय अवधि",

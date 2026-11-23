@@ -5158,6 +5158,7 @@
   },
   "usage": {
     "title": "Utilização",
+    "personalTitle": "Utilização pessoal",
     "orgTitle": "Utilização da organização",
     "entrySubtitle": "Gastos, pedidos e tokens",
     "rangePicker": "Período",

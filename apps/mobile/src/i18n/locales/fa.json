@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "مصرف",
+    "personalTitle": "مصرف حساب شخصی",
     "orgTitle": "مصرف سازمان",
     "entrySubtitle": "هزینه، درخواست‌ها و توکن‌ها",
     "rangePicker": "بازه زمانی",

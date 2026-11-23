@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Gebruik",
+    "personalTitle": "Persoonlijk gebruik",
     "orgTitle": "Organisatiegebruik",
     "entrySubtitle": "Kosten, verzoeken en tokens",
     "rangePicker": "Periode",

@@ -12,17 +12,21 @@ import type { AuthProvider } from './LoginMethodsCard';
 import { UnlinkAccountDialog } from './UnlinkAccountDialog';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById } from '@/lib/auth/provider-metadata';
+import { signInMethodChangeError } from '@/lib/auth/sign-in-method-change-codes';
 
 type ConnectedAccountsCardProps = {
   providers: AuthProvider[];
   onRefetch: () => Promise<unknown>;
   onError: (error: string) => void;
+  /** Lists the accounts without the unlink action; see `LoginMethodsCard`. */
+  readOnly?: boolean;
 };
 
 export function ConnectedAccountsCard({
   providers,
   onRefetch,
   onError,
+  readOnly = false,
 }: ConnectedAccountsCardProps) {
   const [unlinkingProvider, setUnlinkingProvider] = useState<AuthProviderId | null>(null);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState<AuthProviderId | null>(null);
@@ -39,8 +43,8 @@ export function ConnectedAccountsCard({
         setUnlinkingProvider(null);
         setShowConfirmUnlink(null);
       },
-      onError: () => {
-        onError('LINKING-FAILED');
+      onError: error => {
+        onError(signInMethodChangeError(error) ?? 'LINKING-FAILED');
         setUnlinkingProvider(null);
         setShowConfirmUnlink(null);
       },
@@ -88,7 +92,7 @@ export function ConnectedAccountsCard({
                       <div className="text-muted-foreground text-sm">{provider.email}</div>
                     </div>
                   </div>
-                  {providers.length > 1 && (
+                  {!readOnly && providers.length > 1 && (
                     <Button
                       variant="outline"
                       size="sm"

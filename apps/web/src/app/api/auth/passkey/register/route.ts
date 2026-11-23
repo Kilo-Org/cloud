@@ -20,9 +20,8 @@ import {
   getUserFromAuth,
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
-import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import { isRecentlyProvenSession } from '@/lib/auth/sign-in-method-change';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { captureException } from '@sentry/nextjs';
 
@@ -101,27 +100,13 @@ async function refuseStaleEnrollment(params: {
   webSessionId?: string;
   authenticatedAt?: number;
 }): Promise<NextResponse | null> {
-  if (
-    typeof params.authenticatedAt === 'number' &&
-    Date.now() - params.authenticatedAt * 1000 <= STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS
-  ) {
-    return null;
-  }
-
-  if (params.webSessionId) {
-    try {
-      const evaluation = await evaluateStepUp({
-        userId: params.userId,
-        webSessionId: params.webSessionId,
-        actionClass: 'platform_read',
-      });
-      if (evaluation.state.status === 'fresh') return null;
-    } catch (error) {
-      // The freshness rule is a security control, so an unknown answer fails
-      // closed for this request. The original Drizzle error is not reported.
-      reportStepUpFailure('passkey_enrollment', error);
-      return NextResponse.json({ error: 'STEP_UP_UNAVAILABLE' }, { status: 503 });
-    }
+  try {
+    if (await isRecentlyProvenSession(params)) return null;
+  } catch (error) {
+    // The freshness rule is a security control, so an unknown answer fails
+    // closed for this request. The original Drizzle error is not reported.
+    reportStepUpFailure('passkey_enrollment', error);
+    return NextResponse.json({ error: 'STEP_UP_UNAVAILABLE' }, { status: 503 });
   }
 
   return NextResponse.json({ error: 'REAUTH_REQUIRED' }, { status: 401 });

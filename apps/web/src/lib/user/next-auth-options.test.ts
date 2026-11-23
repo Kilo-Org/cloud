@@ -13,7 +13,7 @@ jest.mock('@/lib/user', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
-  getUserFromSession: jest.fn(),
+  getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
   ...jest.requireActual<typeof domainGatesModule>('@kilocode/web-shared/lib/user/domain-gates'),
@@ -737,27 +737,25 @@ describe('WorkOS sign-in callback', () => {
     expect(redirect.searchParams.get('callbackPath')).toBe(callbackPath);
   });
 
-  test('does not forward the invitation or tracking context during account linking', async () => {
+  test('refuses an SSO link callback instead of signing in again', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `workos-link-${crypto.randomUUID()}@workos-link.example`,
+    });
     jest.mocked(getAccountLinkingSession).mockResolvedValue({
-      existingUserId: 'existing-user',
+      existingUserId: owner.id,
       targetProvider: 'workos',
       createdAt: Date.now(),
     });
     jest
-      .mocked(userServer.getUserFromSession)
-      .mockResolvedValue({ id: 'existing-user' } as Awaited<
-        ReturnType<typeof userServer.getUserFromSession>
+      .mocked(userServer.getUserFromSessionForCredentialIssuance)
+      .mockResolvedValue({ user: owner, authFailedResponse: null } as Awaited<
+        ReturnType<typeof userServer.getUserFromSessionForCredentialIssuance>
       >);
 
-    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
-    expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
-    expect(processSSOUserLogin).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: 'workos' }),
-      requestHeaders,
-      null,
-      {},
-      undefined
+    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(
+      '/connected-accounts?error=LINKING-FAILED'
     );
+    expect(processSSOUserLogin).not.toHaveBeenCalled();
   });
 });
 

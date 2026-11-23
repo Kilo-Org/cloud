@@ -13,6 +13,10 @@ import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitD
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
+import {
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  signInMethodChangeError,
+} from '@/lib/auth/sign-in-method-change-codes';
 
 /**
  * The organization's shared-services ChatGPT connection. It is one connection
@@ -133,7 +137,9 @@ function CardBody({
   if (authErrorCode) {
     return (
       <>
-        <p className="type-body text-muted-foreground">{CONNECT_ERROR_MESSAGE}</p>
+        <p className="type-body text-muted-foreground">
+          {SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[authErrorCode] ?? CONNECT_ERROR_MESSAGE}
+        </p>
         <ConnectAction label={TRY_AGAIN_LABEL} onConnect={onConnect} isConnecting={isConnecting} />
       </>
     );
@@ -287,9 +293,9 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
           chatGptScope: 'shared_services',
         }),
       organizationId
-    ).catch(() => {
+    ).catch((error: unknown) => {
       setIsConnecting(false);
-      setAuthErrorCode(CONNECT_FAILED_CODE);
+      setAuthErrorCode(signInMethodChangeError(error) ?? CONNECT_FAILED_CODE);
     });
   };
 

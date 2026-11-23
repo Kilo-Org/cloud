@@ -9,6 +9,7 @@ import {
   useOrganizationWithMembers,
   useUpdateSuppressTrialMessaging,
   useUpdateKiloEncrypt,
+  useUpdateAllowNonSsoSignInMethods,
 } from '@/app/api/organizations/hooks';
 import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
@@ -183,6 +184,7 @@ function Inner(props: InnerProps) {
   const updateCompanyDomain = useUpdateCompanyDomain();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
   const updateKiloEncrypt = useUpdateKiloEncrypt();
+  const updateAllowNonSsoSignInMethods = useUpdateAllowNonSsoSignInMethods();
 
   const expiringCreditGroups = useExpiringCredits(id);
 
@@ -303,6 +305,17 @@ function Inner(props: InnerProps) {
       });
     } catch (error) {
       console.error('Failed to toggle AI Guardrails:', error);
+    }
+  };
+
+  const handleAllowNonSsoSignInMethodsToggle = async () => {
+    try {
+      await updateAllowNonSsoSignInMethods.mutateAsync({
+        organizationId: id,
+        allow_non_sso_sign_in_methods: !info.settings?.allow_non_sso_sign_in_methods,
+      });
+    } catch (error) {
+      console.error('Failed to toggle non-SSO sign-in methods:', error);
     }
   };
 
@@ -561,6 +574,25 @@ function Inner(props: InnerProps) {
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   title="Toggle AI Guardrails for this organization"
                   aria-label="Toggle AI Guardrails for this organization"
+                >
+                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-muted-foreground text-sm font-medium">
+                Non-SSO Sign-in Methods for SSO Members
+              </label>
+              <div className="mt-1 flex items-center gap-2">
+                <BooleanBadge positive={info.settings?.allow_non_sso_sign_in_methods ?? false}>
+                  {info.settings?.allow_non_sso_sign_in_methods ? 'Allowed' : 'Not allowed'}
+                </BooleanBadge>
+                <button
+                  onClick={handleAllowNonSsoSignInMethodsToggle}
+                  disabled={updateAllowNonSsoSignInMethods.isPending}
+                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Toggle whether members of this organization's SSO domain can link other sign-in methods"
+                  aria-label="Toggle whether members of this organization's SSO domain can link other sign-in methods"
                 >
                   <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
                 </button>

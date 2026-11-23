@@ -32,6 +32,17 @@ import {
 import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import {
+  authorizeSignInMethodChange,
+  recordSignInMethodChange,
+  type SignInMethodChange,
+} from '@/lib/auth/sign-in-method-change';
+import {
+  SIGN_IN_METHOD_CHANGE_REFUSAL_CODES,
+  type SignInMethodChangeRefusal,
+} from '@/lib/auth/sign-in-method-change-codes';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
@@ -712,6 +723,53 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
   };
 }
 
+const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Record<SignInMethodChangeRefusal, string> = {
+  browserSessionRequired:
+    'Sign-in methods can only be changed from a browser signed in to app.kilo.ai.',
+  reauthRequired:
+    'Sign in again on app.kilo.ai, then change your sign-in methods within 10 minutes.',
+  ssoLinkNotAllowed:
+    'Your organization requires single sign-on, so other sign-in methods can not be linked.',
+};
+
+function signInMethodChangeRefused(refusal: SignInMethodChangeRefusal): TRPCError {
+  return new TRPCError({
+    code: 'FORBIDDEN',
+    message: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES[refusal],
+    cause: new UpstreamApiError(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES[refusal]),
+  });
+}
+
+// A sign-in method is a way into the account, so adding or removing one needs
+// the browser session of a person who proved who they are just now. A bearer
+// credential (API key, CLI or app session) or an app-shell session is refused,
+// and so is a browser session that did not sign in recently: a copied session
+// cookie alone can not change how the account signs in.
+async function assertSignInMethodChangeAllowed(
+  ctx: TRPCContext,
+  change: SignInMethodChange
+): Promise<void> {
+  if (ctx.credential !== 'session') {
+    throw signInMethodChangeRefused('browserSessionRequired');
+  }
+  const session = await getUserFromSessionForCredentialIssuance();
+  if (!session.user || session.user.id !== ctx.user.id) {
+    throw signInMethodChangeRefused('browserSessionRequired');
+  }
+  const refusal = await authorizeSignInMethodChange({
+    user: session.user,
+    session: {
+      webSessionId: session.webSessionId,
+      authenticatedAt: session.authenticatedAt,
+      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
+    },
+    change,
+  });
+  if (refusal) {
+    throw signInMethodChangeRefused(refusal);
+  }
+}
+
 // Passkey enrollment and management change which authenticators can sign in
 // as this account, so they are never authorized by a bare bearer token. A
 // browser session keeps its existing rules; a native app session must present
@@ -942,6 +1000,8 @@ export const userRouter = createTRPCRouter({
         });
       }
 
+      await assertSignInMethodChangeAllowed(ctx, 'link');
+
       try {
         // Create a secure linking session
         await createAccountLinkingSession(
@@ -964,7 +1024,17 @@ export const userRouter = createTRPCRouter({
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      return assertNoTrpcError(await unlinkAuthProviderFromUser(ctx.user.id, input.provider));
+      await assertSignInMethodChangeAllowed(ctx, 'unlink');
+      const result = assertNoTrpcError(
+        await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
+      );
+      await recordSignInMethodChange({
+        user: ctx.user,
+        change: 'unlink',
+        provider: input.provider,
+        request: { ip: ctx.ip, route: ctx.trpcPath },
+      });
+      return result;
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {

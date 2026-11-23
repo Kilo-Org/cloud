@@ -157,6 +157,7 @@ import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
+import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -1033,6 +1034,14 @@ export async function linkAccountToExistingUser(
     authProviderData.provider_account_id,
     existingKiloUserId
   );
+
+  if (!isNoOpRelink) {
+    await recordSignInMethodChange({
+      user: existingUser,
+      change: 'link',
+      provider: authProviderData.provider,
+    });
+  }
 
   if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
     // Sent after the response: the notice must never delay or fail the sign-in.

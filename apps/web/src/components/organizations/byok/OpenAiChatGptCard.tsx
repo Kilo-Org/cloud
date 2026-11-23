@@ -13,6 +13,10 @@ import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/ope
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
+import {
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  signInMethodChangeError,
+} from '@/lib/auth/sign-in-method-change-codes';
 
 /**
  * The BYOK entry for a delegated "Sign in with ChatGPT" connection. It is not a
@@ -96,6 +100,12 @@ const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
 function openAiChatGptAuthErrorMessage(code: string): string {
+  // A refused connect start (no recent sign-in) or callback (single sign-on
+  // required) names what the person can do about it.
+  const signInMethodChangeMessage = SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[code];
+  if (signInMethodChangeMessage) {
+    return signInMethodChangeMessage;
+  }
   if (code === 'access_denied') {
     return 'ChatGPT was not connected. Try again.';
   }
@@ -444,11 +454,11 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
           organizationId ? { provider: 'openai', organizationId } : { provider: 'openai' }
         ),
       organizationId
-    ).catch(() => {
+    ).catch((error: unknown) => {
       // Only a failed attempt releases the busy state; a successful one
       // navigates away with the label still pending.
       setIsConnecting(false);
-      setAuthErrorCode(CONNECT_FAILED_CODE);
+      setAuthErrorCode(signInMethodChangeError(error) ?? CONNECT_FAILED_CODE);
     });
   };
 

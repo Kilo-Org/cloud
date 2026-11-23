@@ -197,11 +197,13 @@ export function LoginMethodsWrapper({
           providers={providers}
           onError={setErrorMessage}
           callbackPath={callbackPath}
+          readOnly={shell}
         />
         <ConnectedAccountsCard
           providers={providers}
           onRefetch={refetchProviders}
           onError={setErrorMessage}
+          readOnly={shell}
         />
         {/* Passkeys are managed by the app's own Passkeys screen. Enrolling one
             needs the web session's step-up route, which the shell cookie cannot

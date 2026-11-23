@@ -5,6 +5,12 @@ import { BlockedNotification } from '@/components/auth/BlockedNotification';
 import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 import { parseSignupStepUpMethodsParam } from '@/lib/auth/redirect-urls';
+import { StepUpSignInAgainButton } from '@/components/admin/step-up/StepUpSignInAgainButton';
+import {
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR,
+  SIGN_IN_METHOD_SSO_REQUIRED_ERROR,
+} from '@/lib/auth/sign-in-method-change-codes';
 
 export function AuthErrorNotification({
   error,
@@ -89,6 +95,29 @@ export function AuthErrorNotification({
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Linking Failed">
           Account linking failed. Please try again or contact support if the problem persists.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR)
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Sign In Again">
+          {SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR]}
+        </ErrorNotificationBox>
+        {shell ? null : (
+          <div className="mx-auto -mt-4 mb-8 w-full max-w-sm">
+            <StepUpSignInAgainButton />
+          </div>
+        )}
+      </div>
+    );
+
+  if (error === SIGN_IN_METHOD_SSO_REQUIRED_ERROR)
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Single Sign-on Required">
+          {SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[SIGN_IN_METHOD_SSO_REQUIRED_ERROR]}
         </ErrorNotificationBox>
       </div>
     );

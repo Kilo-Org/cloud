@@ -11,7 +11,6 @@
 export const ORGANIZATION_MODEL_AUDIENCES = ['member', 'shared_services'] as const;
 export type OrganizationModelAudience = (typeof ORGANIZATION_MODEL_AUDIENCES)[number];
 
-/** Path of the organization model list endpoint for `audience`. */
 export function organizationModelsPath(
   organizationId: string,
   audience: OrganizationModelAudience

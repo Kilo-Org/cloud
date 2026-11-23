@@ -112,8 +112,6 @@ export type NotificationHistoryEntry = {
 };
 
 /**
- * Resolve the history entry for a push, or `null` when the kind is not recorded.
- *
  * The category must match the preference that gates the dispatch, or a row
  * would sit under a switch that never controlled it.
  */

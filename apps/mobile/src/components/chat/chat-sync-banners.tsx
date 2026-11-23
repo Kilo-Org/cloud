@@ -1,9 +1,10 @@
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import  { type SyncBanner } from '@/lib/chat/sync/sync-service';
+import { type SyncBanner } from '@/lib/chat/sync/sync-service';
 
 /**
  * The strip a synced chat wears while another device owns its next turn:
@@ -12,6 +13,20 @@ import  { type SyncBanner } from '@/lib/chat/sync/sync-service';
  * discards it for the server log). One card, three wordings, so the three
  * states can never stack.
  */
+
+/** The one wording a banner kind draws, in the words that kind needs. */
+type BannerCopy = { readonly title: string; readonly body: string };
+
+function bannerCopy(kind: Exclude<SyncBanner['kind'], 'none'>, t: TFunction): BannerCopy {
+  if (kind === 'busy') {
+    return { title: t('modelChat.sync.busyTitle'), body: t('modelChat.sync.busyBody') };
+  }
+  if (kind === 'live') {
+    return { title: t('modelChat.sync.liveTitle'), body: t('modelChat.sync.liveBody') };
+  }
+  return { title: t('modelChat.sync.divergedTitle'), body: t('modelChat.sync.divergedBody') };
+}
+
 export function ChatSyncBanner({
   banner,
   onDiscard,
@@ -23,12 +38,7 @@ export function ChatSyncBanner({
   if (banner.kind === 'none') {
     return null;
   }
-  const copy =
-    banner.kind === 'busy'
-      ? { title: t('modelChat.sync.busyTitle'), body: t('modelChat.sync.busyBody') }
-      : (banner.kind === 'live'
-        ? { title: t('modelChat.sync.liveTitle'), body: t('modelChat.sync.liveBody') }
-        : { title: t('modelChat.sync.divergedTitle'), body: t('modelChat.sync.divergedBody') });
+  const copy = bannerCopy(banner.kind, t);
   return (
     <View
       accessibilityRole="alert"
@@ -36,7 +46,11 @@ export function ChatSyncBanner({
       className="mx-4 mt-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-4"
     >
       <Text className="text-base font-medium text-warn">{copy.title}</Text>
-      <AccessibleStatus message={copy.body} tone="status" className="mt-2 text-base text-foreground" />
+      <AccessibleStatus
+        message={copy.body}
+        tone="status"
+        className="mt-2 text-base text-foreground"
+      />
       {banner.kind === 'diverged' ? (
         <Pressable
           accessibilityRole="button"

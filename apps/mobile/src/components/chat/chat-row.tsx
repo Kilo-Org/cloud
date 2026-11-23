@@ -16,6 +16,21 @@ import { CHAT_TITLE_MAX_LENGTH, type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
 import { timeAgo } from '@/lib/utils';
 
+type ChatOrigin = 'mobile' | 'cli' | 'cloud-agent';
+
+/** The badge a row wears for where its session started, and the name it reads. */
+const ORIGIN_LABELS = {
+  mobile: 'modelChat.sync.originMobile',
+  cli: 'agentChat.sessionFilter.platformCli',
+  'cloud-agent': 'agentChat.sessionFilter.platformCloud',
+} as const;
+
+const ORIGIN_ICONS = {
+  mobile: Smartphone,
+  cli: Terminal,
+  'cloud-agent': Cloud,
+} as const;
+
 /**
  * One chat in the list.
  *
@@ -35,7 +50,7 @@ type ChatRowProps = {
   onDelete: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<void>;
   /** Where the session started, when sync knows it: the badge beside the row. */
-  origin?: 'mobile' | 'cli' | 'cloud-agent' | null;
+  origin?: ChatOrigin | null;
   /** A runner is live on this session on another device. */
   liveRemote?: boolean;
   /** Deleting this chat deletes it everywhere, and the confirm says so. */
@@ -68,6 +83,9 @@ export function ChatRow({
   // message in each tells them apart, and repeating one that is already the
   // title would say nothing.
   const preview = chat.preview.trim() === chat.title.trim() ? '' : chat.preview;
+  // The badge beside the title: which platform the session started on.
+  const OriginIcon = origin === null ? null : ORIGIN_ICONS[origin];
+  const originLabel = origin === null ? '' : t(ORIGIN_LABELS[origin]);
 
   function confirmDelete() {
     notificationHaptic(Haptics.NotificationFeedbackType.Warning);
@@ -124,23 +142,9 @@ export function ChatRow({
           live={working || liveRemote}
           metaWhileLive
           platformIcon={
-            origin === null ? undefined : (
-              <View
-                accessibilityLabel={t(
-                  origin === 'cli'
-                    ? 'agentChat.sessionFilter.platformCli'
-                    : (origin === 'cloud-agent'
-                      ? 'agentChat.sessionFilter.platformCloud'
-                      : 'modelChat.sync.originMobile')
-                )}
-              >
-                {origin === 'cli' ? (
-                  <Terminal size={14} color={colors.mutedForeground} />
-                ) : (origin === 'cloud-agent' ? (
-                  <Cloud size={14} color={colors.mutedForeground} />
-                ) : (
-                  <Smartphone size={14} color={colors.mutedForeground} />
-                ))}
+            OriginIcon === null ? undefined : (
+              <View accessibilityLabel={originLabel}>
+                <OriginIcon size={14} color={colors.mutedForeground} />
               </View>
             )
           }

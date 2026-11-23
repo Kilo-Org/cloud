@@ -1,24 +1,18 @@
-import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
-import { EmptyState, StateAction } from '@/components/empty-state';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
-import { MessageCircle, MessageCirclePlus } from '@/components/ui/icons';
-import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
 import { rememberModelFacts } from '@/lib/chat/layers';
-import { type ChatSummary } from '@/lib/chat/store';
-import { newChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
+import { useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
@@ -34,11 +28,6 @@ import {
 } from '@/lib/chat/sync/sync-list';
 import { startBackfill } from '@/lib/chat/sync/sync-backfill-run';
 import {
-  deleteEverywhere,
-  deleteServerSession,
-  importServerSession,
-} from '@/lib/chat/sync/sync-service';
-import {
   useChatSyncGate,
   useChatSyncNotice,
   useChatSyncUploader,
@@ -48,6 +37,8 @@ import {
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
+import { ChatListBody } from './chat-list-body';
+import { useChatListActions } from './chat-list-actions';
 import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { LocalResetNoticeCard } from './local-reset-notice';
@@ -66,8 +57,6 @@ import { ChatSyncNoticeCard } from './chat-sync-notice-card';
  * button in the same corner for starting one.
  */
 
-const SKELETON_ROW_COUNT = 8;
-
 export function ChatListScreen() {
   const { organizationId } = useOrganization();
   const { authEpoch } = useAuth();
@@ -81,7 +70,7 @@ function ScopedChatListScreen() {
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
   const connectivity = useCommittedConnectivityStatus();
-  const { notice: localResetNotice, dismiss: dismissLocalResetNotice } = useLocalResetNotice();
+  const { notice: localResetNotice, dismiss: handleLocalResetDismiss } = useLocalResetNotice();
 
   const {
     models,
@@ -119,6 +108,7 @@ function ScopedChatListScreen() {
   const gate = useChatSyncGate(place);
   useChatSyncUploader(place, gate.enabled);
   const notice = useChatSyncNotice(place);
+  const handleSyncNoticeDismiss = notice.dismiss;
   // Existing chats upload in the background once sync is on; the run stops
   // itself if the setting is turned off.
   useEffect(() => {
@@ -169,130 +159,25 @@ function ScopedChatListScreen() {
     [options]
   );
 
-  /* Starting a chat discovers the Kilo MCP server before the session opens, and
-     a slow or offline one takes up to four seconds to give up. The button says
-     it is working for that whole time, so a tap never reads as one that was
-     ignored — and the second tap a silent wait invites cannot open a second
-     chat. The ref is the guard, not the state: two presses in one frame both
-     read the state as it was before the first one re-rendered. */
-  const [starting, setStarting] = useState(false);
-  const startingRef = useRef(false);
-
-  const start = useCallback(() => {
-    if (startingRef.current) {
-      return;
-    }
-    const model = selectedModel;
-    if (place === null || model === undefined) {
-      return;
-    }
-    startingRef.current = true;
-    setStarting(true);
-    void (async () => {
-      try {
-        const sessionId = await newChat(place, {
-          model,
-          effort: null,
-        });
-        // Whatever the last attempt failed with is moot once a chat starts.
-        toast.dismiss('chat-start-failed');
-        router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
-      } catch (error) {
-        /* Starting the chat or opening its session failed. Saying nothing would
-           read as a button that does not work, and a toast that dismissed itself
-           four seconds later was missed by whoever looked away. The reason stays
-           until it is dismissed, at the top so it never covers the tab bar. */
-        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'), {
-          id: 'chat-start-failed',
-          position: 'top-center',
-          duration: Infinity,
-          closeButton: true,
-        });
-      } finally {
-        startingRef.current = false;
-        setStarting(false);
-      }
-    })();
-  }, [selectedModel, place, router, t]);
-
-  const open = useCallback(
-    (key: string) => {
-      const row = rowsByKey.get(key);
-      if (row === undefined) {
-        return;
-      }
-      if (row.localSessionId !== null) {
-        router.push(`/(app)/(tabs)/(4_chat)/${row.localSessionId}` as Href);
-        return;
-      }
-      if (place === null || row.serverSessionId === null) {
-        return;
-      }
-      void (async () => {
-        const sessionId = await importServerSession(
-          place,
-          row.serverSessionId as string,
-          selectedModel ?? ''
-        );
-        if (sessionId !== null) {
-          refetch();
-          router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
-        } else {
-          toast.error(t('modelChat.sync.deletedElsewhere'), { position: 'top-center' });
-          merged.refetch();
-        }
-      })();
+  const openChat = useCallback(
+    (sessionId: string) => {
+      router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
     },
-    [merged, place, refetch, router, rowsByKey, selectedModel, t]
+    [router]
   );
 
-  const drop = useCallback(
-    (key: string) => {
-      const row = rowsByKey.get(key);
-      if (row === undefined) {
-        return;
-      }
-      void (async () => {
-        if (gate.enabled && place !== null && row.serverSessionId !== null) {
-          if (row.localSessionId !== null) {
-            await deleteEverywhere(place, row.localSessionId);
-          } else {
-            await deleteServerSession(place, row.serverSessionId);
-          }
-          refetch();
-          merged.refetch();
-          return;
-        }
-        if (row.localSessionId !== null) {
-          await remove(row.localSessionId);
-        }
-      })();
-    },
-    [gate.enabled, merged, place, refetch, remove, rowsByKey]
-  );
-
-  const renameRow = useCallback(
-    async (key: string, title: string) => {
-      const row = rowsByKey.get(key);
-      if (row === undefined) {
-        return;
-      }
-      if (row.localSessionId !== null) {
-        await rename(row.localSessionId, title);
-        return;
-      }
-      if (place === null || row.serverSessionId === null) {
-        return;
-      }
-      const sessionId = await importServerSession(place, row.serverSessionId, selectedModel ?? '');
-      if (sessionId !== null) {
-        await rename(sessionId, title);
-        refetch();
-        merged.refetch();
-      }
-    },
-    [merged, place, refetch, rename, rowsByKey, selectedModel]
-  );
+  const { starting, start, open, drop, renameRow } = useChatListActions({
+    place,
+    enabled: gate.enabled,
+    rowsByKey,
+    selectedModel,
+    t,
+    openChat,
+    refetchList: refetch,
+    refetchMerged: merged.refetch,
+    remove,
+    rename,
+  });
 
   const renderItem = useCallback(
     ({ item, index }: { item: MergedChatRow; index: number }) => (
@@ -325,8 +210,7 @@ function ScopedChatListScreen() {
   // `selectChatListSurface`), so an unanswered read can never read as "no
   // chats": the corner button follows the same body.
   const serverFailed =
-    gate.enabled &&
-    (merged.surface.kind === 'failed' || merged.surface.kind === 'retryable-error');
+    gate.enabled && (merged.surface.kind === 'failed' || merged.surface.kind === 'retryable-error');
   const surface = selectChatListSurface({
     chatCount: rows.length,
     listAnswered:
@@ -363,87 +247,6 @@ function ScopedChatListScreen() {
     [showFab, tabBarHeight]
   );
 
-  function renderBody() {
-    if (surface.kind === 'list-error') {
-      return (
-        <QueryError
-          variant="server"
-          // i18n-dup-ok: 'modelChat.list.loadFailed' was renamed from the base catalog's
-          // quickChat.historyRetry in the harness-chat rebuild; no other live key carries it.
-          title={t(serverFailed ? 'modelChat.sync.listLoadFailed' : 'modelChat.list.loadFailed')}
-          onRetry={() => {
-            refetch();
-            merged.refetch();
-          }}
-        />
-      );
-    }
-    if (surface.kind === 'catalog-error') {
-      return (
-        <QueryError
-          // Offline names the connection; anything else is the catalog's own
-          // failure. Retry asks either read again.
-          variant={surface.offline ? 'offline' : 'server'}
-          title={surface.offline ? undefined : t('common.couldNotLoadModels')}
-          onRetry={() => {
-            void refetchModels();
-          }}
-        />
-      );
-    }
-    if (surface.kind === 'loading') {
-      return (
-        <View className="pt-1">
-          {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <RowSkeleton
-              key={index}
-              variant="session"
-              subtitle
-              last={index === SKELETON_ROW_COUNT - 1}
-            />
-          ))}
-        </View>
-      );
-    }
-    if (surface.kind === 'empty') {
-      return (
-        <EmptyState
-          icon={MessageCircle}
-          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
-          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.empty.title')}
-          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
-          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
-          description={t('modelChat.empty.description')}
-          action={
-            <StateAction
-              label={t('modelChat.list.new')}
-              icon={MessageCirclePlus}
-              onPress={start}
-              loading={starting}
-              disabled={selectedModel === undefined}
-            />
-          }
-        />
-      );
-    }
-    return (
-      <FlashList
-        data={[...rows]}
-        keyExtractor={row => row.key}
-        renderItem={renderItem}
-        maintainVisibleContentPosition={{ disabled: true }}
-        contentContainerStyle={listStyle}
-        onEndReached={() => {
-          if (merged.hasNextPage) {
-            merged.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-      />
-    );
-  }
-
   return (
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
@@ -460,18 +263,35 @@ function ScopedChatListScreen() {
         {/* Above every body kind: an emptied list must never read as an
             ordinary empty state, so the explanation outranks what remains. */}
         {localResetNotice.kind === 'present' ? (
-          <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
+          <LocalResetNoticeCard onDismiss={handleLocalResetDismiss} />
         ) : null}
         {gate.enabled && notice.visible ? (
           <ChatSyncNoticeCard
-            onDismiss={notice.dismiss}
+            onDismiss={handleSyncNoticeDismiss}
             onOpenSettings={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
             }}
           />
         ) : null}
         {gate.enabled ? <ChatSyncListControls filters={filters} onChange={setFilters} /> : null}
-        <View className="flex-1">{renderBody()}</View>
+        <View className="flex-1">
+          <ChatListBody
+            surface={surface}
+            serverFailed={serverFailed}
+            rows={rows}
+            renderItem={renderItem}
+            listStyle={listStyle}
+            hasNextPage={merged.hasNextPage}
+            fetchNextPage={merged.fetchNextPage}
+            refetchList={refetch}
+            refetchMerged={merged.refetch}
+            refetchModels={() => void refetchModels()}
+            t={t}
+            start={start}
+            starting={starting}
+            selectedModel={selectedModel}
+          />
+        </View>
         {showFab && (
           <Fab
             label={t('modelChat.list.new')}

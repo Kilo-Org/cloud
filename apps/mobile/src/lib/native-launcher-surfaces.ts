@@ -69,14 +69,16 @@ export function consumePendingLaunchUrl(): string | null {
 }
 
 /**
- * Read-and-clear the parked launch URL when it names a destination that belongs
- * to no account.
+ * Read-and-clear the parked launch URL, returning only the destination that
+ * names no account.
  *
- * A Quick Action tapped while the app is signed out parks its URL natively, and
- * the signed-in launcher mount is the only reader. The value is read and
- * cleared here so the caller owns it; only the destination that names no
- * account is returned, and every other value is left to the surfaces it came
- * from.
+ * A Quick Action tapped while the app is signed out parks its URL natively.
+ * This call reads and clears the parked value unconditionally, so the sign-in
+ * path that calls it owns the slot whether or not a destination is returned.
+ * `LAUNCHER_NEW_AGENT_URL` names no account and is handed back; any other
+ * destination belongs to the account that published the shortcut, so it is
+ * consumed and discarded here rather than handed back or left for a later
+ * reader.
  */
 export function takeAccountIndependentLaunchUrl(): string | null {
   const url = consumePendingLaunchUrl();

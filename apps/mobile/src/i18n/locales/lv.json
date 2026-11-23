@@ -3242,6 +3242,7 @@
     "serverTitle": "Neizdevās ielādēt.",
     "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz.",
     "terminalDescription": "Šo vienumu nevar ielādēt, un atkārtots mēģinājums nepalīdzēs.",
+    "staleDescription": "Tiek rādīts iepriekš ielādētais. To nevar atsvaidzināt.",
     "timeoutTitle": "Serveris pārāk ilgi neatbild",
     "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },

@@ -3181,6 +3181,7 @@
     "serverTitle": "Nem sikerült betölteni",
     "serverDescription": "Nálunk hiba történt. Próbáld újra.",
     "terminalDescription": "Ez az elem nem tölthető be, és az újrapróbálkozás nem segít.",
+    "staleDescription": "A korábban betöltött tartalom látható. Ez nem frissíthető.",
     "timeoutTitle": "A szerver túl sokáig tart",
     "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },

@@ -3242,6 +3242,7 @@
     "serverTitle": "Učitavanje nije moguće.",
     "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno.",
     "terminalDescription": "Ova se stavka ne može učitati i ponovni pokušaj neće pomoći.",
+    "staleDescription": "Prikazuje se ono što je ranije učitano. To se ne može osvježiti.",
     "timeoutTitle": "Poslužitelj predugo odgovara",
     "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },

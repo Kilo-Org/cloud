@@ -2619,6 +2619,7 @@
     "serverTitle": "Die Daten konnten nicht geladen werden.",
     "serverDescription": "Bei uns ist ein Fehler aufgetreten. Bitte versuche es erneut.",
     "terminalDescription": "Dieses Element kann nicht geladen werden, und ein erneuter Versuch hilft nicht weiter.",
+    "staleDescription": "Angezeigt wird, was zuvor geladen wurde. Es kann nicht aktualisiert werden.",
     "timeoutTitle": "Der Server braucht zu lange",
     "timeoutDescription": "Die Anfrage wurde nicht rechtzeitig abgeschlossen. Bitte versuche es erneut."
   },

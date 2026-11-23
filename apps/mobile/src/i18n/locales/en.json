@@ -3291,6 +3291,7 @@
     "serverTitle": "Could not load",
     "serverDescription": "Something went wrong on our end. Please try again.",
     "terminalDescription": "This item cannot be loaded, and trying again will not help.",
+    "staleDescription": "Showing what was loaded earlier. It cannot be refreshed.",
     "timeoutTitle": "The server is taking too long",
     "timeoutDescription": "The request timed out before it finished. Try again."
   },

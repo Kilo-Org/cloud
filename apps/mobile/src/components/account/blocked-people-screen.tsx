@@ -175,6 +175,9 @@ export function BlockedPeopleScreen() {
       variant={staleVariant}
       placement="top"
       className="pt-0"
+      // A terminal failure leaves the cached rows on screen, so the state is a
+      // notice about what is shown, not a screen with nothing to load.
+      message={staleVariant === 'terminal' ? t('queryError.staleDescription') : undefined}
       onRetry={
         hidden.isError && !isRetryableTrpcError(hidden.error)
           ? undefined

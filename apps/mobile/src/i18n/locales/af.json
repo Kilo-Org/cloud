@@ -3181,6 +3181,7 @@
     "serverTitle": "Die inhoud kon nie gelaai word nie.",
     "serverDescription": "Iets het aan ons kant verkeerd gegaan. Probeer asseblief weer.",
     "terminalDescription": "Hierdie item kan nie gelaai word nie, en weer probeer sal nie help nie.",
+    "staleDescription": "Wat vroeër gelaai is, word gewys. Dit kan nie verfris word nie.",
     "timeoutTitle": "Die bediener neem te lank",
     "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },

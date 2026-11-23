@@ -3181,6 +3181,7 @@
     "serverTitle": "Yuklab bo'lmadi.",
     "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring.",
     "terminalDescription": "Bu elementni yuklab bo'lmaydi va qayta urinish yordam bermaydi.",
+    "staleDescription": "Avval yuklangan narsa ko'rsatilmoqda. Uni yangilab bo'lmaydi.",
     "timeoutTitle": "Server juda uzoq javob bermoqda",
     "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },

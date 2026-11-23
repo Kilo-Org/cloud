@@ -2586,6 +2586,7 @@
     "serverTitle": "불러올 수 없습니다.",
     "serverDescription": "서비스에 문제가 발생했습니다. 다시 시도하세요.",
     "terminalDescription": "이 항목은 불러올 수 없으며 다시 시도해도 도움이 되지 않습니다.",
+    "staleDescription": "이전에 불러온 내용을 표시하고 있습니다. 새로 고칠 수 없습니다.",
     "timeoutTitle": "서버 응답이 지연되고 있습니다",
     "timeoutDescription": "요청 시간이 초과되었습니다. 다시 시도하세요."
   },

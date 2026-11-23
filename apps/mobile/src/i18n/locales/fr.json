@@ -2578,6 +2578,7 @@
     "serverTitle": "Impossible de charger les données",
     "serverDescription": "Une erreur s'est produite de notre côté. Réessayez.",
     "terminalDescription": "Impossible de charger cet élément, et réessayer n'y changera rien.",
+    "staleDescription": "Affichage de ce qui a été chargé plus tôt. Impossible de l'actualiser.",
     "timeoutTitle": "Le serveur met trop de temps à répondre",
     "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },

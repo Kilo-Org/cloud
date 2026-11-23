@@ -2587,6 +2587,7 @@
     "serverTitle": "無法載入。",
     "serverDescription": "我們的服務發生錯誤。請再試一次。",
     "terminalDescription": "無法載入此項目，重試也不會有幫助。",
+    "staleDescription": "正在顯示先前已載入的內容。無法重新整理。",
     "timeoutTitle": "伺服器回應時間過長",
     "timeoutDescription": "請求逾時，未能完成。請再試一次。"
   },

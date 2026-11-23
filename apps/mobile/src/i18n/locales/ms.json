@@ -3127,6 +3127,7 @@
     "serverTitle": "Tidak dapat memuatkan data.",
     "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi.",
     "terminalDescription": "Item ini tidak dapat dimuatkan dan cuba lagi tidak akan membantu.",
+    "staleDescription": "Memaparkan kandungan yang dimuatkan sebelum ini. Ia tidak boleh dimuat semula.",
     "timeoutTitle": "Pelayan terlalu lambat bertindak balas",
     "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },

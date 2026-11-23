@@ -3181,6 +3181,7 @@
     "serverTitle": "Non se puido cargar.",
     "serverDescription": "Produciuse un erro no noso sistema. Téntao de novo.",
     "terminalDescription": "Non se pode cargar este elemento e intentalo de novo non axudará.",
+    "staleDescription": "Amósase o que se cargou antes. Non se pode actualizar.",
     "timeoutTitle": "O servidor está tardando demasiado",
     "timeoutDescription": "A solicitude excedeu o tempo de espera antes de rematar. Téntao de novo."
   },

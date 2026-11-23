@@ -3364,6 +3364,7 @@
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",
     "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís.",
     "terminalDescription": "Ní féidir an mhír seo a lódáil, agus ní chabhróidh triail a bhaint as arís.",
+    "staleDescription": "Tá an méid a lódáiltear níos luaithe á thaispeáint. Ní féidir é a athnuachan.",
     "timeoutTitle": "Tá an freastalaí ag glacadh rófhada",
     "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },

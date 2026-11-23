@@ -2619,6 +2619,7 @@
     "serverTitle": "Het laden is mislukt.",
     "serverDescription": "Er is aan onze kant iets misgegaan. Probeer het opnieuw.",
     "terminalDescription": "Dit item kan niet worden geladen en opnieuw proberen zal niet helpen.",
+    "staleDescription": "Er wordt getoond wat eerder is geladen. Dat kan niet worden vernieuwd.",
     "timeoutTitle": "De server doet er te lang over",
     "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },

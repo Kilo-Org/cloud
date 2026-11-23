@@ -3364,6 +3364,7 @@
     "serverTitle": "Ma setax jitgħabba l-kontenut.",
     "serverDescription": "Xi ħaġa marret ħażin min-naħa tagħna. Jekk jogħġbok erġa' pprova.",
     "terminalDescription": "Dan l-oġġett ma jistax jitgħabba, u tentattiv ieħor ma se jgħin.",
+    "staleDescription": "Qed jintwera dak li tella' qabel. Ma jistax jiġi aġġornat.",
     "timeoutTitle": "Is-server qed jieħu żmien wisq",
     "timeoutDescription": "It-talba ma tlestietx fiż-żmien tagħha. Jekk jogħġbok erġa' pprova."
   },

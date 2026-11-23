@@ -3242,6 +3242,7 @@
     "serverTitle": "No s'ha pogut carregar.",
     "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar.",
     "terminalDescription": "Aquest element no es pot carregar i tornar-ho a provar no servirà de res.",
+    "staleDescription": "Es mostra el que es va carregar abans. No es pot actualitzar.",
     "timeoutTitle": "El servidor triga massa",
     "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },

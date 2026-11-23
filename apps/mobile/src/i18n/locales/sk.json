@@ -3303,6 +3303,7 @@
     "serverTitle": "Údaje sa nepodarilo načítať.",
     "serverDescription": "Na našej strane sa vyskytla chyba. Skúste to znova.",
     "terminalDescription": "Túto položku nie je možné načítať a opakovaný pokus nepomôže.",
+    "staleDescription": "Zobrazuje sa to, čo bolo načítané skôr. Obnoviť to nie je možné.",
     "timeoutTitle": "Server odpovedá príliš pomaly",
     "timeoutDescription": "Požiadavka trvala príliš dlho. Skúste to znova."
   },

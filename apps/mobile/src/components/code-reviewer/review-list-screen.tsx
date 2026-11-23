@@ -160,6 +160,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       placement="top"
       inset="gutter"
       title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+      // The rows stay on screen, so a terminal failure reads as a notice about
+      // what is shown rather than a screen that could not load.
+      message={
+        !stalePaused && trpcErrorVariant(error) === 'terminal'
+          ? t('queryError.staleDescription')
+          : undefined
+      }
       onRetry={stalePaused || isRetryableTrpcError(error) ? () => void refetch() : undefined}
       isRetrying={isFetching}
     />

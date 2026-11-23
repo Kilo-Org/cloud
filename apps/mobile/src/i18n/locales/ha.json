@@ -3181,6 +3181,7 @@
     "serverTitle": "An kasa loda bayanai.",
     "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa.",
     "terminalDescription": "Ba za a iya loda wannan abun ba, kuma sake gwadawa ba zai taimaka ba.",
+    "staleDescription": "Ana nuna abin da aka loda a baya. Ba za a iya sabunta shi ba.",
     "timeoutTitle": "Sabar uwar garka na ɗaukar lokaci mai tsawo",
     "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },

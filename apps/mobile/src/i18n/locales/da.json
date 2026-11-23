@@ -3181,6 +3181,7 @@
     "serverTitle": "Indholdet kunne ikke indlæses.",
     "serverDescription": "Der opstod en fejl hos os. Prøv igen.",
     "terminalDescription": "Dette element kan ikke indlæses, og et nyt forsøg vil ikke hjælpe.",
+    "staleDescription": "Der vises det, som blev indlæst tidligere. Det kan ikke opdateres.",
     "timeoutTitle": "Serveren svarer for langsomt",
     "timeoutDescription": "Anmodningen fik timeout, før den blev gennemført. Prøv igen."
   },

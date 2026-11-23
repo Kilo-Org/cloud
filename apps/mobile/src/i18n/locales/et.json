@@ -3181,6 +3181,7 @@
     "serverTitle": "Laadimine ei õnnestunud",
     "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
     "terminalDescription": "Seda üksust ei saa laadida ja uuesti proovimine ei aita.",
+    "staleDescription": "Kuvatakse varem laaditud sisu. Seda ei saa värskendada.",
     "timeoutTitle": "Server vastab liiga aeglaselt",
     "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },

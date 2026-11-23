@@ -3181,6 +3181,7 @@
     "serverTitle": "Nou pa t ka chaje done yo.",
     "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò.",
     "terminalDescription": "Eleman sa a pa ka chaje, epi eseye ankò p ap chanje anyen.",
+    "staleDescription": "N ap montre sa ki te chaje davans lan. Li pa ka rafrechi.",
     "timeoutTitle": "Sèvè a pran twò tan",
     "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },

@@ -3181,6 +3181,7 @@
     "serverTitle": "Kunne ikke laste inn innholdet.",
     "serverDescription": "Noe gikk galt hos oss. Prøv igjen.",
     "terminalDescription": "Dette elementet kan ikke lastes inn, og å prøve igjen vil ikke hjelpe.",
+    "staleDescription": "Det som ble lastet inn tidligere, vises. Det kan ikke oppdateres.",
     "timeoutTitle": "Serveren bruker for lang tid",
     "timeoutDescription": "Forespørselen tok for lang tid og ble avbrutt. Prøv igjen."
   },

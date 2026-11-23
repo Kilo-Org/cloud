@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "دلته اضافه شوي د قواعدو فایلونه په هر هغه سېشن کې چې دا پروفایل کاروي تطبیقېږي.",
     "instructionNameRequired": "د فایل نوم ولیکه",
     "instructionNameTooLong": "د فایل نوم باید {{max}} توري یا لږ وي",
-    "instructionNameInvalid": "د توري یا عدد سره پیل کړه او یوازې کوچني لاتیني توري، عددونه او ډشونه وکاروه",
+    "instructionNameInvalid": "د یوه کوچني ASCII توري یا عدد سره پیل کړه او یوازې کوچني لاتیني توري، عددونه او ډشونه وکاروه",
     "instructionNameReserved": "دا فایل نوم ساتل شوی. بل وټاکه.",
     "instructionContentRequired": "د اصولو markdown ولیکه",
     "instructionNamePreview": "د {{name}} په نوم ساتل کېږي",

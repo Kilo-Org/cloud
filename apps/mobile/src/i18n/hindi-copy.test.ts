@@ -202,8 +202,10 @@ describe('Hindi instruction file-name rule', () => {
   it('names the Latin letters a rules file name may use', () => {
     // The rule is shown before Save, so it must say which alphabet the name
     // takes rather than only naming "small letters", which Devanagari also has.
+    // Both the opening clause and the "use only" clause name the alphabet, so a
+    // Devanagari letter at the start does not read as allowed.
     expect(i18n.t('profiles.instructionNameInvalid')).toBe(
-      'अक्षर या अंक से शुरू करें और केवल छोटे ASCII अक्षर, अंक और डैश रखें'
+      'छोटे ASCII अक्षर या अंक से शुरू करें और केवल छोटे ASCII अक्षर, अंक और डैश रखें'
     );
   });
 });

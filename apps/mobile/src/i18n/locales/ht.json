@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Fichye règ ki ajoute isit la yo aplike nan chak sesyon ki sèvi ak pwofil sa a.",
     "instructionNameRequired": "Antre yon non fichye",
     "instructionNameTooLong": "Non fichye a dwe gen {{max}} karaktè oswa mwens",
-    "instructionNameInvalid": "Kòmanse ak yon lèt oswa yon chif epi sèvi sèlman ak miniskil ASCII, chif ak tirè",
+    "instructionNameInvalid": "Kòmanse ak yon lèt miniskil ASCII oswa yon chif epi sèvi sèlman ak miniskil ASCII, chif ak tirè",
     "instructionNameReserved": "Non fichye sa a rezève. Chwazi yon lòt.",
     "instructionContentRequired": "Antre règ markdown yo",
     "instructionNamePreview": "Sovgade kòm {{name}}",

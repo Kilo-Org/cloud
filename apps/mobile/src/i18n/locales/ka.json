@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "აქ დამატებული წესების ფაილები გამოიყენება ყველა იმ სესიაზე, რომელიც ამ პროფილს იყენებს.",
     "instructionNameRequired": "შეიყვანეთ ფაილის სახელი",
     "instructionNameTooLong": "ფაილის სახელი უნდა იყოს {{max}} სიმბოლო ან ნაკლები",
-    "instructionNameInvalid": "დაიწყეთ ასოთი ან ციფრით და გამოიყენეთ მხოლოდ პატარა ლათინური ასოები, ციფრები და დეფისები",
+    "instructionNameInvalid": "დაიწყეთ ASCII მცირე ასოთი ან ციფრით და გამოიყენეთ მხოლოდ პატარა ლათინური ასოები, ციფრები და დეფისები",
     "instructionNameReserved": "ეს ფაილის სახელი დაცულია. აირჩიეთ სხვა.",
     "instructionContentRequired": "შეიყვანეთ წესების markdown",
     "instructionNamePreview": "შეინახება როგორც {{name}}",

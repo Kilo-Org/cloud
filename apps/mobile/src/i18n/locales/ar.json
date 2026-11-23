@@ -4648,7 +4648,7 @@
     "instructionsEmptyDescriptionReadOnly": "تُطبَّق ملفات القواعد المضافة هنا على كل جلسة تستخدم هذا الملف الشخصي.",
     "instructionNameRequired": "أدخل اسم ملف",
     "instructionNameTooLong": "يجب ألا يتجاوز اسم الملف {{max}} حرفًا",
-    "instructionNameInvalid": "ابدأ بحرف أو رقم واستخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط",
+    "instructionNameInvalid": "ابدأ بحرف ASCII صغير أو رقم واستخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط",
     "instructionNameReserved": "اسم الملف هذا محجوز. اختر اسمًا آخر.",
     "instructionContentRequired": "أدخل قواعد Markdown",
     "instructionNamePreview": "يُحفظ باسم {{name}}",

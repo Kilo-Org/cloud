@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Buraya eklenen kural dosyaları, bu profili kullanan her oturuma uygulanır.",
     "instructionNameRequired": "Bir dosya adı girin",
     "instructionNameTooLong": "Dosya adı en fazla {{max}} karakter olabilir",
-    "instructionNameInvalid": "Bir harf veya rakamla başlayın; yalnızca küçük ASCII harf, rakam ve tire kullanın",
+    "instructionNameInvalid": "Bir küçük ASCII harfiyle veya rakamla başlayın; yalnızca küçük ASCII harf, rakam ve tire kullanın",
     "instructionNameReserved": "Bu dosya adı ayrılmış. Başka bir ad seçin.",
     "instructionContentRequired": "Kural markdown'unu girin",
     "instructionNamePreview": "{{name}} olarak kaydedilir",

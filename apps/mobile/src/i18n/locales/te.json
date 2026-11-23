@@ -4334,7 +4334,7 @@
     "instructionsEmptyDescriptionReadOnly": "ఇక్కడ జోడించిన రూల్స్ ఫైల్స్ ఈ ప్రొఫైల్‌ను ఉపయోగించే ప్రతి సెషన్‌కు వర్తిస్తాయి.",
     "instructionNameRequired": "ఫైల్ పేరు నమోదు చేయండి",
     "instructionNameTooLong": "ఫైల్ పేరు {{max}} అక్షరాలకు మించకూడదు",
-    "instructionNameInvalid": "అక్షరం లేదా అంకెతో మొదలుపెట్టండి; చిన్న ASCII అక్షరాలు, అంకెలు, డాష్‌లు మాత్రమే వాడండి",
+    "instructionNameInvalid": "చిన్న ASCII అక్షరం లేదా అంకెతో మొదలుపెట్టండి; చిన్న ASCII అక్షరాలు, అంకెలు, డాష్‌లు మాత్రమే వాడండి",
     "instructionNameReserved": "ఆ ఫైల్ పేరు రిజర్వ్ చేయబడింది. మరొకటి ఎంచుకోండి.",
     "instructionContentRequired": "రూల్స్ మార్క్‌డౌన్ నమోదు చేయండి",
     "instructionNamePreview": "{{name}}గా సేవ్ అవుతుంది",

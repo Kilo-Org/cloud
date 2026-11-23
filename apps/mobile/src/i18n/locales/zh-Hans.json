@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "此处添加的规则文件会应用于使用此配置文件的每个会话。",
     "instructionNameRequired": "请输入文件名",
     "instructionNameTooLong": "文件名不得超过 {{max}} 个字符",
-    "instructionNameInvalid": "以字母或数字开头，仅使用 ASCII 小写字母、数字和连字符",
+    "instructionNameInvalid": "以 ASCII 小写字母或数字开头，仅使用 ASCII 小写字母、数字和连字符",
     "instructionNameReserved": "该文件名已被保留，请另选一个。",
     "instructionContentRequired": "请输入规则 markdown",
     "instructionNamePreview": "保存为 {{name}}",

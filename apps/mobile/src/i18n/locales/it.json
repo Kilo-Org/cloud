@@ -4411,7 +4411,7 @@
     "instructionsEmptyDescriptionReadOnly": "I file di regole aggiunti qui vengono applicati a ogni sessione che utilizza questo profilo.",
     "instructionNameRequired": "Inserisci un nome file",
     "instructionNameTooLong": "Il nome file deve avere massimo {{max}} caratteri",
-    "instructionNameInvalid": "Inizia con una lettera o un numero e usa solo lettere ASCII minuscole, numeri e trattini",
+    "instructionNameInvalid": "Inizia con una lettera ASCII minuscola o un numero e usa solo lettere ASCII minuscole, numeri e trattini",
     "instructionNameReserved": "Questo nome file è riservato. Scegline un altro.",
     "instructionContentRequired": "Inserisci il markdown delle regole",
     "instructionNamePreview": "Salvato come {{name}}",

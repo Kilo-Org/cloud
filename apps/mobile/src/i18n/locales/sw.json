@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "Faili za kanuni zilizoongezwa hapa hutumika kwa kila kipindi kinachotumia wasifu huu.",
     "instructionNameRequired": "Weka jina la faili",
     "instructionNameTooLong": "Jina la faili lazima liwe na herufi {{max}} au chini yake",
-    "instructionNameInvalid": "Anza na herufi au tarakimu na tumia herufi ndogo za ASCII, tarakimu, na vistari pekee",
+    "instructionNameInvalid": "Anza na herufi ndogo ya ASCII au tarakimu na tumia herufi ndogo za ASCII, tarakimu, na vistari pekee",
     "instructionNameReserved": "Jina hilo la faili limehifadhiwa. Chagua lingine.",
     "instructionContentRequired": "Weka kanuni za markdown",
     "instructionNamePreview": "Itahifadhiwa kama {{name}}",

@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "ឯកសារក្បួនដែលបានបន្ថែមនៅទីនេះ ត្រូវបានអនុវត្តចំពោះរាល់សេសសិនដែលប្រើប្រវត្តិរូបនេះ។",
     "instructionNameRequired": "បញ្ចូលឈ្មោះឯកសារ",
     "instructionNameTooLong": "ឈ្មោះឯកសារត្រូវតែមាន {{max}} តួអក្សរ ឬតិចជាងនេះ",
-    "instructionNameInvalid": "ចាប់ផ្តើមដោយអក្សរ ឬលេខ ហើយប្រើតែអក្សរតូចរបស់ ASCII លេខ និងសញ្ញាដក",
+    "instructionNameInvalid": "ចាប់ផ្តើមដោយអក្សរតូចរបស់ ASCII ឬលេខ ហើយប្រើតែអក្សរតូចរបស់ ASCII លេខ និងសញ្ញាដក",
     "instructionNameReserved": "ឈ្មោះឯកសារនេះត្រូវបានបម្រុងទុក។ សូមជ្រើសរើសឈ្មោះផ្សេង។",
     "instructionContentRequired": "បញ្ចូលច្បាប់ markdown",
     "instructionNamePreview": "រក្សាទុកជា {{name}}",

@@ -1113,6 +1113,52 @@ describe('scheduler (production migrations and real SQLite)', () => {
     ).toEqual({ started_at: NOW });
   });
 
+  it('allows the same number of lease losses and no-model-call waits before failing', async () => {
+    // Both paths are re-attempts for work that never reached the model, so they share one
+    // boundary: SCHEDULER_MAX_USER_LEASE_RECLAIMS are allowed and the next one fails the block.
+    const config = schedulerConfig('{"slots":1}');
+    const waits: Array<'deferred' | 'failed'> = [];
+    insertRun(sqlite, 'wait-bound', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'wait-bound',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `wait-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected wait claim ${attempt}`);
+      waits.push(await deferNoModelCallChunk(db, claim.id, claim.token, NOW + attempt));
+    }
+
+    const reclaims: Array<'failed' | 'claimed'> = [];
+    insertRun(sqlite, 'lease-bound', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'lease-bound',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    let now = NOW;
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `lease-${attempt}`, now);
+      if (!claim) {
+        reclaims.push('claimed');
+        break;
+      }
+      now += SCHEDULER_QUEUE_LEASE_MS;
+      // Only this lane's terminal rows count: the sweep also reports the earlier run's.
+      const failed = await recoverChunks(db, now);
+      reclaims.push(failed.some(row => row.run_id === 'lease-bound') ? 'failed' : 'claimed');
+    }
+
+    // Allowed three times, failed on the fourth, on both paths.
+    expect(waits).toEqual(['deferred', 'deferred', 'deferred', 'failed']);
+    expect(reclaims).toEqual(['claimed', 'claimed', 'claimed', 'failed']);
+  });
+
   it('does not spend a platform attempt on a wait that never reached the model', async () => {
     insertRun(sqlite, 'platform-wait');
     await scheduleRunChunks(db, {

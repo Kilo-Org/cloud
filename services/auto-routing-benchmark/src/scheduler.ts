@@ -151,8 +151,8 @@ export const SCHEDULER_MAX_USER_ATTEMPTS = 1;
  * that keeps a block from looping: the paid ledger fence (`getPaidCaseStartedAt` raising
  * `AmbiguousBenchmarkExecutionError`) is what stops a second billed call, and an expired lease
  * whose invocation never opened a generation is retried without touching the user's single
- * billed attempt. Three rides out a deploy or a container restart; a fourth lease loss fails
- * the block into the manual requeue.
+ * billed attempt. Three rides out a deploy or a container restart; a fourth fails the block
+ * into the manual requeue. A wait that made no model call shares this exact boundary.
  */
 export const SCHEDULER_MAX_USER_LEASE_RECLAIMS = 3;
 /**
@@ -883,13 +883,14 @@ export async function deferNoModelCallChunk(
   onlyQueued = false
 ): Promise<'deferred' | 'failed'> {
   // The wait is counted on `lease_reclaims`, the counter that already bounds automatic
-  // re-attempts for a platform block's lease losses and a user block's. A wait that made no
-  // model call is exactly as retryable as a lease loss and must end the same way; without the
-  // bound, a generation attached to a lost executor or a permanently unreachable gateway would
-  // re-queue the block forever at the constant backoff.
+  // re-attempts for a block's lease losses. A wait that made no model call is exactly as
+  // retryable as a lease loss, so it uses the same boundary: `SCHEDULER_MAX_USER_LEASE_RECLAIMS`
+  // re-attempts are allowed and the next one fails the block. Without the bound, a generation
+  // attached to a lost executor or a permanently unreachable gateway would re-queue the block
+  // forever at the constant backoff.
   const row = await db
     .prepare(`UPDATE scheduler_chunks SET
-    status = CASE WHEN lease_reclaims + 1 >= ${SCHEDULER_MAX_USER_LEASE_RECLAIMS}
+    status = CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_USER_LEASE_RECLAIMS}
       THEN 'failed' ELSE 'pending' END,
     attempts = MAX(attempts - 1, 0),
     lease_reclaims = lease_reclaims + 1,
@@ -989,11 +990,6 @@ export async function failScheduledEntry(
 }
 
 /**
- * Failed chunks of running runs whose lane death is not recorded yet. Starts from the
- * running runs, so it reads only their failed chunks rather than every failed chunk kept
- * until pruning. Exported, like the prune statements below, for the query-plan test.
- */
-/**
  * A block whose attempts already reached its cap but is still `pending` can never be claimed
  * again (`claimScheduledChunks` refuses it), so nothing would retire it: its run stays
  * `running`, holds a queue slot and leaves a paid request pending. Lowering the cap makes
@@ -1001,13 +997,25 @@ export async function failScheduledEntry(
  * terminalizes them. They land in `failed`, where the unrecorded-failed select below records
  * the lane failure and dispatch finalizes the run — the same terminal state the cap path
  * produces.
+ *
+ * Bounded per pass: the remaining rows are swept on the next one, so a large backlog cannot
+ * hold the recovery pass open. The rows are not read back here — the select below finds them
+ * by status.
  */
 export const SCHEDULER_EXHAUSTED_PENDING_CHUNKS_SQL = `
   UPDATE scheduler_chunks SET status = 'failed', slot = NULL, token = NULL, lease_until = 0
-  WHERE status = 'pending' AND attempts >= ${chunkAttemptCapSql('scheduler_chunks')}
-  RETURNING *
+  WHERE rowid IN (
+    SELECT rowid FROM scheduler_chunks
+    WHERE status = 'pending' AND attempts >= ${chunkAttemptCapSql('scheduler_chunks')}
+    LIMIT 250
+  )
 `;
 
+/**
+ * Failed chunks of running runs whose lane death is not recorded yet. Starts from the
+ * running runs, so it reads only their failed chunks rather than every failed chunk kept
+ * until pruning. Exported, like the prune statements below, for the query-plan test.
+ */
 export const SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL = `
   SELECT chunk.* FROM benchmark_runs AS run
   CROSS JOIN scheduler_chunks AS chunk

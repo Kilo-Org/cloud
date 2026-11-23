@@ -3340,7 +3340,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * resolved. The DO's stored-event replay usually applies those footers before
    * the durable read lands, so hiding later failures is not enough: the ones
    * already applied for this session are dropped here. A dropped failure goes
-   * whole, so the terminal error it set cannot outlive it. A failure whose id
+   * whole — pending entry, terminal error, and the client-materialised row —
+   * while a confirmed user row is server history and stays. A failure whose id
    * this process minted for its own send is kept. It cannot be a stored-event
    * replay, so its footer and terminal error stay.
    */
@@ -3351,6 +3352,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (delivery.status !== 'failed') continue;
       if (locallySentMessageIds.has(messageId)) continue;
       if (state.clearFailedMessage(messageId)) {
+        // The replayed `cloud.message.queued` materialised this row locally.
+        // Without the footer it would render as an ordinary sent bubble for a
+        // prompt that was never delivered, so the row goes with the failure.
+        // A confirmed row (`synthetic` undefined) is server history and stays.
+        const info = currentSession?.storage.getMessageInfo(messageId);
+        if (info?.role === 'user' && info.synthetic === true) {
+          currentSession?.storage.deleteMessage(messageId);
+        }
         store.set(errorAtom, null);
         store.set(failedHistoryKindAtom, null);
       }

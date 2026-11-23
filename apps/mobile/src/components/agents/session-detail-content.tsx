@@ -1488,6 +1488,13 @@ export function SessionDetailContent({
     cancelQueuedUpgradeRequiredRef.current = null;
     setExitFailure(null);
     setIsRetryingExit(false);
+    // The attribution names a send in the session being left, and its read has
+    // not run for the new one. The composer remounts on this render, so it must
+    // see "nothing to attribute, not read yet" rather than the previous
+    // session's answer: a stale id would arm the new draft and refuse the id
+    // that arrives for it.
+    setRestoredDraftSend(null);
+    setRestoredDraftSendSettled(false);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {

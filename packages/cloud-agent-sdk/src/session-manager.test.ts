@@ -9180,6 +9180,67 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
     });
 
+    it('deletes the client-materialised row of a failure the replay applied', async () => {
+      // The dropped failure leaves no footer, so the row its replayed
+      // `cloud.message.queued` materialised must go too: left behind it reads
+      // as an ordinary sent bubble for a prompt that was never delivered.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      jest
+        .spyOn(storage, 'getMessageInfo')
+        .mockReturnValue(
+          stubUserMessage({ id: 'm-resolved', sessionID: 'ses-1', synthetic: true })
+        );
+      const deleteMessage = jest.spyOn(storage, 'deleteMessage').mockImplementation(() => {});
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(deleteMessage).toHaveBeenCalledWith('m-resolved');
+    });
+
+    it('keeps a server-confirmed row of a failure the replay applied', async () => {
+      // A confirmed row is server history: only the client ghost the replay
+      // created is this path's to delete.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      jest
+        .spyOn(storage, 'getMessageInfo')
+        .mockReturnValue(stubUserMessage({ id: 'm-resolved', sessionID: 'ses-1' }));
+      const deleteMessage = jest.spyOn(storage, 'deleteMessage').mockImplementation(() => {});
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(deleteMessage).not.toHaveBeenCalled();
+    });
+
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
       // A relaunch: the row a retry superseded is server history and comes back
       // with the snapshot, so the transcript filter needs the durable record.

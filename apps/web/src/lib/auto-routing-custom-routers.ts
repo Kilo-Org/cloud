@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import {
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   CreateCustomRouterRequestSchema,
@@ -19,16 +21,22 @@ import {
   type CustomRouterErrorCode,
   type CustomRouterErrorResponse,
   type CustomRouterListEntry,
+  type CustomRouterBenchmarkContext,
   type OwnerType,
   type CustomRouterSummary,
   type CustomRouterVariantStatus,
 } from '@kilocode/auto-routing-contracts';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { auto_routing_custom_routers, type User } from '@kilocode/db/schema';
+import {
+  auto_routing_custom_routers,
+  type AutoRoutingCustomRouter,
+  type User,
+} from '@kilocode/db/schema';
 import {
   getCustomRouterStatus,
   getPlatformMeasurements,
-  registerOwnerBenchmarkProfiles,
+  lookupCustomRouterBlockedModels,
+  pausePoolBenchmark,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   customRouterOwnerCondition,
@@ -44,22 +52,14 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
 
-const BENCHMARK_REGISTER_BATCH_SIZE = 10;
-const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
 // The entry bounds count UTF-16 code units while this limit counts UTF-8 bytes, so it carries
 // headroom above the ASCII size of a maximal router.
 export const MAX_CUSTOM_ROUTER_BODY_BYTES = 1024 * 1024;
-// 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
-// that predates frontier owner profiles, or one without a saved config for that router.
-const UNSUPPORTED_BASE_ROUTER_ERRORS = [
-  'only supported by the efficient router',
-  'benchmark config not set',
-];
 
 export class CustomRouterApiError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -383,6 +383,62 @@ function validateNewGatewayEntries(params: {
   });
 }
 
+/**
+ * Models this write adds to the pool. A client entry and a `measuredAs` link are measured by the
+ * owner's CLI or by the platform measurement they name, so the platform registry says nothing
+ * about whether they can be added.
+ */
+function newlyAddedGatewayModels(
+  entries: readonly CustomRouterEntry[],
+  existingKeys: ReadonlySet<string>
+): Set<string> {
+  const models = new Set<string>();
+  for (const entry of entries) {
+    if (entry.kind !== 'gateway' || entry.measuredAs !== undefined) continue;
+    if (existingKeys.has(customRouterEntryKey(entry))) continue;
+    models.add(entry.model);
+  }
+  return models;
+}
+
+/**
+ * Refuses a new gateway model when any of its supported variant pairs is permanently unavailable
+ * at the target base router: this router benchmarks the whole model, so a partially blocked model
+ * could never be measured. A model the pool already had keeps its row; the editor shows the
+ * reason instead of deleting it.
+ *
+ * The check fails closed: an unavailable registry lookup refuses the add with a retryable error.
+ * Saves that add no gateway model make no lookup, so they keep working through a Worker rollout.
+ */
+async function validateNewGatewayModels(params: {
+  models: Set<string>;
+  entries: readonly CustomRouterEntry[];
+  baseRouter: AutoRouter;
+}): Promise<void> {
+  if (params.models.size === 0) return;
+  const blocked = await lookupCustomRouterBlockedModels({
+    router: params.baseRouter,
+    models: [...params.models],
+  }).catch(error => {
+    captureException(error, { tags: { source: 'auto_routing_custom_router_blocked_models' } });
+    throw new CustomRouterApiError(
+      'internal_error',
+      `Could not verify that the new ${params.baseRouter} pool models can be benchmarked. Try again.`
+    );
+  });
+  const first = blocked.blocked.find(item => params.models.has(item.model));
+  if (!first) return;
+  const index = params.entries.findIndex(
+    entry => entry.kind === 'gateway' && entry.model === first.model
+  );
+  const variant = first.pair.variant ? ` (variant ${first.pair.variant})` : '';
+  const reason = first.failure.reason ?? first.failure.failureClass;
+  throw new CustomRouterApiError(
+    'invalid_request',
+    `entries.${index}: ${first.model} cannot be benchmarked at the ${params.baseRouter} base router: ${first.pair.model}${variant} is permanently unavailable (${reason})`
+  );
+}
+
 export async function platformMeasurements(baseRouter: AutoRouter) {
   try {
     const result = await getPlatformMeasurements(baseRouter);
@@ -423,132 +479,185 @@ async function validateLinkedEntries(
   });
 }
 
-type BenchmarkAdmissionPlan = {
-  baseRouter: AutoRouter;
-  models: string[];
-};
-
-function benchmarkAdmissionPlan(
-  baseRouter: AutoRouter,
-  entries: readonly CustomRouterEntry[]
-): BenchmarkAdmissionPlan {
-  return {
-    baseRouter,
-    models: entries.flatMap(entry =>
-      entry.kind === 'gateway' && !requiresClientEval(entry) ? [entry.model] : []
-    ),
-  };
+export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerLockKey(owner)}, 0))`);
 }
 
-function sameAdmissionPlan(a: BenchmarkAdmissionPlan, b: BenchmarkAdmissionPlan): boolean {
-  return (
-    a.baseRouter === b.baseRouter &&
-    a.models.length === b.models.length &&
-    a.models.every((model, index) => model === b.models[index])
+function ownerLockKey(owner: CustomRouterOwner): string {
+  return `auto-routing-custom-routers:${owner.type}:${owner.id}`;
+}
+
+/**
+ * Serializes an alias promotion against every pool entry writer. A promotion takes this key
+ * exclusively while it snapshots the affected pools and commits their observed pins; create,
+ * update, delete and pin publication take it shared first, so their committed rows either precede
+ * the snapshot or land after the alias config already moved. Always before `lockOwner`.
+ */
+const ALIAS_PROMOTION_LOCK_KEY = 'auto-routing-custom-routers:alias-promotion';
+
+export async function lockAliasPromotionWrite(tx: DrizzleTransaction): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${ALIAS_PROMOTION_LOCK_KEY}, 0))`
   );
 }
 
-// One in-flight admission per owner: concurrent saves from the same owner queue here instead of on
-// an owner-locked database connection, and two saves never register the same owner's models twice.
-const ownerAdmissionSlots = new Map<string, Promise<void>>();
-
-async function withOwnerAdmissionSlot<T>(
-  owner: CustomRouterOwner,
-  run: () => Promise<T>
-): Promise<T> {
-  const key = `${owner.type}:${owner.id}`;
-  const previous = ownerAdmissionSlots.get(key) ?? Promise.resolve();
-  const current = previous.then(run);
-  const settled = current.then(
-    () => undefined,
-    () => undefined
+export async function lockAliasPromotionExclusive(tx: DrizzleTransaction): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${ALIAS_PROMOTION_LOCK_KEY}, 0))`
   );
-  ownerAdmissionSlots.set(key, settled);
-  try {
-    return await current;
-  } finally {
-    if (ownerAdmissionSlots.get(key) === settled) ownerAdmissionSlots.delete(key);
-  }
 }
-async function requestPlatformBenchmarks(params: {
-  owner: CustomRouterOwner;
-  plan: BenchmarkAdmissionPlan;
-}): Promise<void> {
-  const models = params.plan.models.map(model => ({ model }));
-  if (models.length === 0) return;
-  const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
-  for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
-    const registration = {
-      router: params.plan.baseRouter,
-      ownerType: params.owner.type,
-      ownerId: params.owner.id,
-      entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
-    };
-    const register = () => registerOwnerBenchmarkProfiles(registration, signal);
-    // Registration is idempotent for pending, running, and ready profiles, so one retry is safe.
-    const result = await register()
-      .then(
-        first => (!first.ok && first.status >= 500 && !signal.aborted ? register() : first),
-        error => {
-          if (signal.aborted) throw error;
-          return register();
-        }
-      )
-      .catch(error => {
-        captureException(error, {
-          tags: { source: 'auto_routing_custom_router_admission' },
-          extra: { ownerType: params.owner.type, baseRouter: params.plan.baseRouter },
-        });
-        throw new CustomRouterApiError('internal_error', 'Could not request benchmarks');
-      });
-    if (result.ok) continue;
-    if ('quota' in result) {
-      throw new CustomRouterApiError(
-        'quota_exceeded',
-        `${result.quota.error} New benchmarks can be requested after ${result.quota.retryAt}.`,
-        result.quota.retryAt
-      );
-    }
-    if (
-      result.status === 400 &&
-      UNSUPPORTED_BASE_ROUTER_ERRORS.some(fragment => result.error.error.includes(fragment))
-    ) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        `baseRouter: Benchmarks for the ${params.plan.baseRouter} benchmark difficulty are not available yet. Choose another benchmark difficulty.`
-      );
-    }
-    if (result.status === 400) {
-      throw new CustomRouterApiError('invalid_request', result.error.error);
-    }
-    throw new CustomRouterApiError(
-      'internal_error',
-      `Could not request benchmarks: ${result.error.error}`
-    );
+
+/**
+ * Takes every pool owner's lock, in the order every writer takes them, so an ordinary pool save
+ * cannot interleave a read of the row with the promotion's rewrite of it.
+ *
+ * A deployed instance of the previous release takes only `lockOwner`, then re-reads the pool inside
+ * its transaction and saves that read. If a promotion rewrote `entries` between that read and the
+ * save, the save would erase the new pin. Taking the same keys keeps the promotion ordered against
+ * it in both directions without any new protocol on the writer's side, and a writer that lands
+ * first still gets pinned, because the promotion re-reads the row under the lock it just took.
+ */
+export async function lockPoolOwners(
+  tx: DrizzleTransaction,
+  owners: readonly CustomRouterOwner[]
+): Promise<void> {
+  const keys = [...new Set(owners.map(ownerLockKey))].sort();
+  for (const key of keys) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
   }
 }
 
 /**
- * Registers the owner's platform-servable models before the write transaction opens, so a save
- * never holds a pooled database connection across the outbound call. Registration is idempotent,
- * so a save that later loses a race only repeats profiles that already exist.
+ * The immutable pool a benchmark request measures. Paid benchmarks derive it from the saved row,
+ * so a request can never benchmark a pool an editor has not persisted, and the Worker needs no
+ * PostgreSQL access of its own.
+ *
+ * It is the full saved pool, including a gateway entry's `servingPin`: the routing table and the
+ * per-entry status must keep serving the pinned target. Pin publication therefore changes this
+ * context, so a paid start must compare the pool *identity* (`customRouterPoolVersion`), never this
+ * object's text.
  */
-async function admitPlatformBenchmarks(params: {
-  owner: CustomRouterOwner;
-  baseRouter: AutoRouter;
-  entries: readonly CustomRouterEntry[];
-}): Promise<BenchmarkAdmissionPlan> {
-  const plan = benchmarkAdmissionPlan(params.baseRouter, params.entries);
-  if (plan.models.length === 0) return plan;
-  await withOwnerAdmissionSlot(params.owner, () =>
-    requestPlatformBenchmarks({ owner: params.owner, plan })
-  );
-  return plan;
+export function customRouterBenchmarkContext(
+  router: CustomRouterDefinition
+): CustomRouterBenchmarkContext {
+  return {
+    ownerType: router.ownerType,
+    ownerId: router.ownerId,
+    baseRouter: router.baseRouter,
+    entries: router.entries,
+    clientEvalEntryKeys: router.entries.filter(requiresClientEval).map(customRouterEntryKey),
+  };
 }
 
-export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
-  const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+/**
+ * The measurement identity of a saved pool: which cases run, never how they are served. A
+ * `servingPin` is routing state, so publishing one must neither invalidate a valid quote nor reset
+ * a settlement's version, while a concrete model, link, default, or base-router change must.
+ * Entry keys are sorted, so entry order is not identity.
+ *
+ * This is the only value a paid quote needs: the Worker compares `pool_version`, never the context
+ * text, because a context has no default entry key and would gain/lose a pin over time.
+ */
+function customRouterPoolIdentity(router: CustomRouterDefinition): string {
+  const entries = router.entries
+    .map(entry => ({
+      key: customRouterEntryKey(entry),
+      entry:
+        entry.kind === 'gateway'
+          ? { kind: 'gateway' as const, model: entry.model, measuredAs: entry.measuredAs ?? null }
+          : {
+              kind: 'client' as const,
+              provider: entry.provider,
+              model: entry.model,
+              variants: entry.variants,
+              // A client link changes which measurement serves the entry, so it is identity too.
+              measuredAs: entry.measuredAs ?? null,
+            },
+    }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return JSON.stringify({
+    baseRouter: router.baseRouter,
+    defaultEntryKey: router.defaultEntryKey,
+    entries,
+  });
+}
+
+/**
+ * Names one saved pool state. A quote is bound to it, and a start carries the version of the
+ * authorized row it read, so a quote issued for an older pool can never be spent after the pool
+ * changes in a way that decides which cases run.
+ *
+ * The version is the measurement identity only — base router, default entry, and each entry's
+ * model/`measuredAs` (client entries also keep their variant list). It deliberately excludes
+ * `updated_at`, serving pins, pricing, and capabilities: a no-op client re-registration or a pin
+ * publication must not invalidate an outstanding quote, nor reset a settlement's version.
+ *
+ * A genuine link change is identity in both directions: gaining, moving, or dropping `measuredAs`
+ * on a saved entry changes which measurement serves it, so it must invalidate the quote.
+ */
+export function customRouterPoolVersion(router: CustomRouterDefinition): string {
+  return createHash('sha256').update(customRouterPoolIdentity(router)).digest('hex');
+}
+
+export type CustomRouterBenchmarkSubject = {
+  router: CustomRouterDefinition;
+  context: CustomRouterBenchmarkContext;
+  poolVersion: string;
+};
+
+async function findRouterRow(
+  executor: DrizzleTransaction | typeof db,
+  owner: CustomRouterOwner,
+  slug: string
+): Promise<AutoRoutingCustomRouter> {
+  const [row] = await executor
+    .select()
+    .from(auto_routing_custom_routers)
+    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
+    .limit(1);
+  if (!row) throw routerNotFound();
+  return row;
+}
+
+function benchmarkSubjectFromRow(row: AutoRoutingCustomRouter): CustomRouterBenchmarkSubject {
+  const router = toCustomRouterDefinition(row);
+  return {
+    router,
+    context: customRouterBenchmarkContext(router),
+    poolVersion: customRouterPoolVersion(router),
+  };
+}
+
+/**
+ * Resolves the owner and router from the caller's authorized scope and reads the current saved
+ * row from the primary, never a replica: a benchmark quote or start must fence on the pool an
+ * editor just wrote.
+ */
+export async function loadCustomRouterBenchmarkSubject(params: {
+  owner: CustomRouterOwner;
+  slug: string;
+}): Promise<CustomRouterBenchmarkSubject> {
+  return benchmarkSubjectFromRow(await findRouterRow(db, params.owner, params.slug));
+}
+
+/**
+ * Serializes a paid start against pool edits and deletes, which take the same owner lock. The
+ * locked row is the only state `run` may act on, so an edit or delete can never commit between
+ * the read and the Worker's durable admission.
+ *
+ * `run` holds a pooled connection for one bounded Worker call. The Worker start must therefore not
+ * call back synchronously into this lock (the web pool-pins route takes it): serving-pin
+ * publication stays in the Worker's async outbox, never in the start response path.
+ */
+export async function withLockedCustomRouterBenchmarkSubject<T>(
+  params: { owner: CustomRouterOwner; slug: string },
+  run: (subject: CustomRouterBenchmarkSubject) => Promise<T>
+): Promise<T> {
+  return db.transaction(async tx => {
+    await lockOwner(tx, params.owner);
+    const row = await findRouterRow(tx, params.owner, params.slug);
+    return run(benchmarkSubjectFromRow(row));
+  });
 }
 
 async function findRouter(
@@ -640,13 +749,11 @@ async function ownerRouterSlugs(
 }
 
 /**
- * Catalog I/O and benchmark admission stay outside the owner lock. The transaction serializes the
- * final validation and the write only, so queued saves never hold a pooled connection across an
- * outbound benchmark request. `registerClientEntryResponse` looks a client entry's link up before
- * the lock for the same reason, and refuses when the base router changed meanwhile, because a link
- * for the new difficulty cannot be checked without that request. The other exception is
- * `updateCustomRouterResponse`, which admits the locked definition inside the transaction when a
- * concurrent save changed it after the pre-lock read.
+ * Catalog I/O stays outside the owner lock. The transaction serializes the final validation and
+ * the write only, so queued saves never hold a pooled connection across an outbound catalog or
+ * measurement request. `registerClientEntryResponse` looks a client entry's link up before the
+ * lock for the same reason, and refuses when the base router changed meanwhile, because a link
+ * for the new difficulty cannot be checked without that request.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,
@@ -663,14 +770,15 @@ export async function createCustomRouterResponse(
     entries: input.entries,
   });
   validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
-  await validateLinkedEntries(input.entries, input.baseRouter);
-  await admitPlatformBenchmarks({
-    owner,
-    baseRouter: input.baseRouter,
+  await validateNewGatewayModels({
+    models: newlyAddedGatewayModels(input.entries, new Set()),
     entries: input.entries,
+    baseRouter: input.baseRouter,
   });
+  await validateLinkedEntries(input.entries, input.baseRouter);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
     validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
@@ -699,12 +807,26 @@ function applyUpdate(
   current: CustomRouterDefinition,
   input: z.infer<typeof UpdateCustomRouterRequestSchema>
 ): CustomRouterDefinition {
+  // The write schema strips a client-sent serving pin, and only the benchmark settlement writes
+  // one. An edit must keep the stored pin, or a moved alias would stop ranking the target the
+  // owner already paid to measure.
+  const entries = (input.entries ?? current.entries).map(entry => {
+    const stored = current.entries.find(
+      candidate => customRouterEntryKey(candidate) === customRouterEntryKey(entry)
+    );
+    return stored?.kind === 'gateway' &&
+      entry.kind === 'gateway' &&
+      stored.model === entry.model &&
+      stored.servingPin
+      ? { ...entry, servingPin: stored.servingPin }
+      : entry;
+  });
   const next: CustomRouterDefinition = {
     ...current,
     name: input.name ?? current.name,
     baseRouter: input.baseRouter ?? current.baseRouter,
     mode: input.mode ?? current.mode,
-    entries: input.entries ?? current.entries,
+    entries,
     defaultEntryKey: input.defaultEntryKey ?? current.defaultEntryKey,
   };
   if (!next.entries.some(entry => customRouterEntryKey(entry) === next.defaultEntryKey)) {
@@ -736,37 +858,39 @@ export async function updateCustomRouterResponse(
 
   const existing = await findRouter(db, owner, slug);
   const planned = applyUpdate(existing, input);
+  const existingKeys = new Set(existing.entries.map(customRouterEntryKey));
   validateNewGatewayEntries({
     entries: planned.entries,
-    existingKeys: new Set(existing.entries.map(customRouterEntryKey)),
+    existingKeys,
     rejections,
   });
-  const changesAdmittedPlan = input.entries !== undefined || input.baseRouter !== undefined;
-  if (changesAdmittedPlan) {
+  const plannedAdditions = newlyAddedGatewayModels(planned.entries, existingKeys);
+  await validateNewGatewayModels({
+    models: plannedAdditions,
+    entries: planned.entries,
+    baseRouter: planned.baseRouter,
+  });
+  const changesPoolOrBase = input.entries !== undefined || input.baseRouter !== undefined;
+  if (changesPoolOrBase) {
     await validateLinkedEntries(
       planned.entries,
       planned.baseRouter,
       planned.baseRouter === existing.baseRouter ? existing.entries : []
     );
   }
-  const admitted = changesAdmittedPlan
-    ? await admitPlatformBenchmarks({
-        owner,
-        baseRouter: planned.baseRouter,
-        entries: planned.entries,
-      })
-    : null;
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     const next = applyUpdate(current, input);
+    const currentKeys = new Set(current.entries.map(customRouterEntryKey));
     validateNewGatewayEntries({
       entries: next.entries,
-      existingKeys: new Set(current.entries.map(customRouterEntryKey)),
+      existingKeys: currentKeys,
       rejections,
     });
-    if (changesAdmittedPlan) {
+    if (changesPoolOrBase) {
       // Links the pre-lock check did not see (a concurrent save or base router change) are checked
       // again; unchanged links cost no request.
       await validateLinkedEntries(
@@ -774,23 +898,74 @@ export async function updateCustomRouterResponse(
         next.baseRouter,
         next.baseRouter === planned.baseRouter ? planned.entries : []
       );
-    }
-    if (
-      admitted !== null &&
-      !sameAdmissionPlan(admitted, benchmarkAdmissionPlan(next.baseRouter, next.entries))
-    ) {
-      // A concurrent save changed the base router or pool between the pre-lock read and the lock.
-      // Admission is idempotent, so registering the locked plan keeps the persisted router measured.
-      await admitPlatformBenchmarks({
-        owner,
-        baseRouter: next.baseRouter,
-        entries: next.entries,
-      });
+      // A risky edit (removal, relink, or base move) stops the live request under this same lock,
+      // before the write commits, so no confirmed request keeps measuring a pool that lost a model.
+      // Additions alone change nothing in flight and start no work.
+      if (requiresPauseBeforeEdit(current, next)) {
+        await pausePoolBeforeMutation(owner, current.id);
+      }
+      // A concurrent save can change which entries this write adds, or move the base router. The
+      // blocked-model lookup then runs against the locked definition; a save that adds nothing new
+      // repeats no request.
+      const lockedAdditions = newlyAddedGatewayModels(next.entries, currentKeys);
+      const additionsMoved = [...lockedAdditions].some(model => !plannedAdditions.has(model));
+      if (next.baseRouter !== planned.baseRouter || additionsMoved) {
+        await validateNewGatewayModels({
+          models: lockedAdditions,
+          entries: next.entries,
+          baseRouter: next.baseRouter,
+        });
+      }
     }
     return saveRouter(tx, next);
   });
 
   return singleRouterResponse(router, true);
+}
+
+/**
+ * An edit keeps or drops money already in flight: removing or relinking a gateway model the pool
+ * already had, or moving the base router, would leave a confirmed request measuring a pool that no
+ * longer exists. Additions are not risky — they start no work.
+ */
+function requiresPauseBeforeEdit(
+  current: CustomRouterDefinition,
+  next: CustomRouterDefinition
+): boolean {
+  if (next.baseRouter !== current.baseRouter) return true;
+  const nextLinks = new Map(
+    next.entries.flatMap(entry =>
+      entry.kind === 'gateway' ? [[customRouterEntryKey(entry), entry.measuredAs] as const] : []
+    )
+  );
+  return current.entries.some(entry => {
+    if (entry.kind !== 'gateway') return false;
+    const key = customRouterEntryKey(entry);
+    return !nextLinks.has(key) || nextLinks.get(key) !== entry.measuredAs;
+  });
+}
+
+/**
+ * Stops the pool's live request before the caller commits a risky edit or a delete. It runs inside
+ * the owner advisory lock that `start` takes, so a start cannot be admitted against the pool after
+ * the pause and before the commit. The Worker resolves and pauses the latest request itself: a
+ * progress read could stage the next plan, and this fence may only stop work.
+ *
+ * Anything but a confirmed pause refuses the mutation. The one exception is a Worker that predates
+ * the paid path (404): it holds no request state, which is only reachable during the controlled
+ * deploy overlap.
+ */
+async function pausePoolBeforeMutation(owner: CustomRouterOwner, routerId: string): Promise<void> {
+  const paused = await pausePoolBenchmark({
+    ownerType: owner.type,
+    ownerId: owner.id,
+    routerId,
+  });
+  if (paused.ok || paused.status === 404) return;
+  throw new CustomRouterApiError(
+    'internal_error',
+    'Could not stop the running benchmark before changing this pool. Nothing was changed; try again.'
+  );
 }
 
 export async function deleteCustomRouterResponse(
@@ -800,8 +975,10 @@ export async function deleteCustomRouterResponse(
   const { scope, slug } = parseRouterParams(params);
   const owner = await resolveEditableOwner(context, scope);
   await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
+    await pausePoolBeforeMutation(owner, current.id);
     await tx
       .delete(auto_routing_custom_routers)
       .where(eq(auto_routing_custom_routers.id, current.id));
@@ -828,6 +1005,7 @@ export async function registerClientEntryResponse(
   await validateLinkedEntries([incoming], planned.baseRouter, planned.entries);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     if (incoming.measuredAs !== undefined && current.baseRouter !== planned.baseRouter) {
@@ -878,6 +1056,7 @@ export async function removeClientEntryResponse(
   const owner = await resolveEditableOwner(context, scope);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     if (!current.entries.some(entry => customRouterEntryKey(entry) === key)) return current;

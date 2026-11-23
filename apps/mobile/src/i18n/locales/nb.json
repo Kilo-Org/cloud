@@ -3837,6 +3837,7 @@
       "emptyDescription": "En gruppe samler medlemmer slik at én retningslinje kan gjelde for alle.",
       "emptyTitle": "Ingen grupper ennå",
       "enterpriseOnly": "Grupper er tilgjengelige på Enterprise-planen.",
+      "limitReached": "Denne organisasjonen har nådd grensen på 100 grupper. Slett en gruppe før du oppretter en ny.",
       "memberCount": "{{displayCount}} medlem(mer)",
       "memberCount_one": "{{displayCount}} medlem",
       "memberCount_other": "{{displayCount}} medlemmer",

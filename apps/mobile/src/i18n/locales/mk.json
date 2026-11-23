@@ -3837,6 +3837,7 @@
       "emptyDescription": "Групата собира членови за да може една политика да се примени на сите.",
       "emptyTitle": "Сè уште нема групи",
       "enterpriseOnly": "Групите се достапни во планот Enterprise.",
+      "limitReached": "Оваа организација го достигна својот лимит од 100 групи. Избриши група пред да создадеш друга.",
       "memberCount": "{{displayCount}} членови",
       "memberCount_one": "{{displayCount}} член",
       "memberCount_other": "{{displayCount}} членови",

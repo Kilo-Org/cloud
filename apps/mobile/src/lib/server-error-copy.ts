@@ -11,7 +11,10 @@ import {
   SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
 } from '@kilocode/app-shared/integrations-errors';
-import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_GROUP_LIMIT_MESSAGE,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+} from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
 import { type TrialRefusalBillingStep, trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
@@ -99,6 +102,10 @@ function copyKeyFor(
     }
     case ORGANIZATION_INVITE_SEAT_LIMIT_REACHED: {
       return 'organization.inviteMember.noSeatsAvailable';
+    }
+    case ORGANIZATION_GROUP_LIMIT_MESSAGE: {
+      // The group create is refused at the organization's group cap.
+      return 'organization.groups.limitReached';
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';

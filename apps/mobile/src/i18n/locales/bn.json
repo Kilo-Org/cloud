@@ -3837,6 +3837,7 @@
       "emptyDescription": "একটি গ্রুপ সদস্যদের একত্র করে যাতে একটি পলিসি তাদের সবার ক্ষেত্রে প্রযোজ্য হয়।",
       "emptyTitle": "এখনও কোনো গ্রুপ নেই",
       "enterpriseOnly": "গ্রুপ এন্টারপ্রাইজ প্ল্যানে উপলব্ধ।",
+      "limitReached": "এই সংস্থাটি ১০০টি গ্রুপের সীমায় পৌঁছে গেছে। আরেকটি তৈরি করার আগে একটি গ্রুপ মুছুন।",
       "memberCount": "{{displayCount}} জন সদস্য",
       "memberCount_one": "{{displayCount}} জন সদস্য",
       "memberCount_other": "{{displayCount}} জন সদস্য",

@@ -4041,6 +4041,7 @@
       "emptyDescription": "Grupp jiġbor il-membri biex politika waħda tapplika għalihom kollha.",
       "emptyTitle": "Għad m'hemmx gruppi",
       "enterpriseOnly": "Il-gruppi huma disponibbli fil-pjan Enterprise.",
+      "limitReached": "Din l-organizzazzjoni laħqet il-limitu tagħha ta' 100 grupp. Ħassar grupp qabel ma toħloq ieħor.",
       "memberCount": "Membri: {{displayCount}}",
       "memberCount_few": "{{displayCount}} membri",
       "memberCount_many": "{{displayCount}} membru",

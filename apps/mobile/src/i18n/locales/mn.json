@@ -3837,6 +3837,7 @@
       "emptyDescription": "Бүлэг нь гишүүдийг нэгтгэснээр нэг бодлого тэдний бүгдэд үйлчилнэ.",
       "emptyTitle": "Одоогоор бүлэг байхгүй",
       "enterpriseOnly": "Бүлгүүд Enterprise төлөвлөгөөнд боломжтой.",
+      "limitReached": "Энэ байгууллага 100 бүлгийн хязгаарт хүрсэн. Өөр бүлэг үүсгэхийн өмнө бүлгийг устгана уу.",
       "memberCount": "{{displayCount}} гишүүн",
       "memberCount_one": "{{displayCount}} гишүүн",
       "memberCount_other": "{{displayCount}} гишүүн",

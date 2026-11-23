@@ -3776,6 +3776,7 @@
       "emptyDescription": "กลุ่มใช้รวมสมาชิกเพื่อให้นโยบายเดียวมีผลกับทุกคน",
       "emptyTitle": "ยังไม่มีกลุ่ม",
       "enterpriseOnly": "กลุ่มพร้อมใช้งานในแพ็กเกจ Enterprise",
+      "limitReached": "องค์กรนี้ถึงขีดจำกัด 100 กลุ่มแล้ว ลบกลุ่มก่อนสร้างกลุ่มใหม่",
       "memberCount": "{{displayCount}} สมาชิก",
       "memberCount_other": "{{displayCount}} สมาชิก",
       "memberViewEmpty": "คุณไม่ได้อยู่ในกลุ่มใดขององค์กรนี้",

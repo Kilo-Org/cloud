@@ -3973,6 +3973,7 @@
       "emptyDescription": "Skupina združuje člane, da lahko en pravilnik velja za vse.",
       "emptyTitle": "Skupin še ni",
       "enterpriseOnly": "Skupine so na voljo v paketu Enterprise.",
+      "limitReached": "Ta organizacija je dosegla omejitev 100 skupin. Izbriši skupino, preden ustvariš novo.",
       "memberCount": "Člani: {{displayCount}}",
       "memberCount_few": "{{displayCount}} člani",
       "memberCount_one": "{{displayCount}} član",

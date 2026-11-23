@@ -4113,6 +4113,7 @@
       "emptyDescription": "تجمع المجموعة الأعضاء لتطبيق سياسة واحدة عليهم جميعًا.",
       "emptyTitle": "لا توجد مجموعات بعد",
       "enterpriseOnly": "المجموعات متاحة في خطة Enterprise.",
+      "limitReached": "بلغت هذه المؤسسة حدها الأقصى البالغ 100 مجموعة. احذف مجموعة قبل إنشاء مجموعة أخرى.",
       "memberCount": "{{displayCount}} عضو",
       "memberCount_few": "{{displayCount}} أعضاء",
       "memberCount_many": "{{displayCount}} عضوًا",

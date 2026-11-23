@@ -3841,6 +3841,7 @@
       "emptyDescription": "ग्रुप सदस्यों को इकट्ठा करता है ताकि एक नीति उन सभी पर लागू हो सके।",
       "emptyTitle": "अभी कोई ग्रुप नहीं",
       "enterpriseOnly": "ग्रुप एंटरप्राइज़ प्लान पर उपलब्ध हैं।",
+      "limitReached": "इस संगठन की 100 ग्रुप की सीमा पूरी हो गई है। दूसरा ग्रुप बनाने से पहले एक ग्रुप हटाएँ।",
       "memberCount": "{{displayCount}} सदस्य",
       "memberCount_one": "{{displayCount}} सदस्य",
       "memberCount_other": "{{displayCount}} सदस्य",

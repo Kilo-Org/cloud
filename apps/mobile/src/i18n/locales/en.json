@@ -3947,6 +3947,7 @@
       "emptyDescription": "A group gathers members so one policy can apply to all of them.",
       "emptyTitle": "No groups yet",
       "enterpriseOnly": "Groups are available on the Enterprise plan.",
+      "limitReached": "This organization has reached its limit of 100 groups. Delete a group before creating another.",
       "memberCount": "{{displayCount}} members",
       "memberCount_one": "{{displayCount}} member",
       "memberCount_other": "{{displayCount}} members",

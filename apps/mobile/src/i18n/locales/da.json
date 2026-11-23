@@ -3837,6 +3837,7 @@
       "emptyDescription": "En gruppe samler medlemmer, så én politik kan gælde for dem alle.",
       "emptyTitle": "Ingen grupper endnu",
       "enterpriseOnly": "Grupper er tilgængelige på Enterprise-planen.",
+      "limitReached": "Denne organisation har nået sin grænse på 100 grupper. Slet en gruppe, før du opretter en ny.",
       "memberCount": "{{displayCount}} medlem(mer)",
       "memberCount_one": "{{displayCount}} medlem",
       "memberCount_other": "{{displayCount}} medlemmer",

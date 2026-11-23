@@ -3837,6 +3837,7 @@
       "emptyDescription": "En grupp samlar medlemmar så att en policy kan gälla för alla.",
       "emptyTitle": "Inga grupper ännu",
       "enterpriseOnly": "Grupper är tillgängliga på Enterprise-planen.",
+      "limitReached": "Den här organisationen har nått sin gräns på 100 grupper. Ta bort en grupp innan du skapar en ny.",
       "memberCount": "{{displayCount}} medlemmar",
       "memberCount_one": "{{displayCount}} medlem",
       "memberCount_other": "{{displayCount}} medlemmar",

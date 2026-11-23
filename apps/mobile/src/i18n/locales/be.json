@@ -3973,6 +3973,7 @@
       "emptyDescription": "Група аб’ядноўвае ўдзельнікаў, каб адна палітыка прымянялася да ўсіх іх.",
       "emptyTitle": "Груп пакуль няма",
       "enterpriseOnly": "Групы даступныя ў плане Enterprise.",
+      "limitReached": "Гэтая арганізацыя дасягнула свайго ліміту ў 100 груп. Выдаліце групу, перш чым стварыць іншую.",
       "memberCount": "Удзельнікаў: {{displayCount}}",
       "memberCount_few": "{{displayCount}} удзельнікі",
       "memberCount_many": "{{displayCount}} удзельнікаў",

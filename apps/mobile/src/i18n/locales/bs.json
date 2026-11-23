@@ -3905,6 +3905,7 @@
       "emptyDescription": "Grupa okuplja članove kako bi se jedna politika primijenila na sve njih.",
       "emptyTitle": "Još nema grupa",
       "enterpriseOnly": "Grupe su dostupne na Enterprise planu.",
+      "limitReached": "Ova organizacija je dostigla svoj limit od 100 grupa. Obriši grupu prije nego što kreiraš drugu.",
       "memberCount": "Članova: {{displayCount}}",
       "memberCount_few": "{{displayCount}} člana",
       "memberCount_one": "{{displayCount}} član",

@@ -3837,6 +3837,7 @@
       "emptyDescription": "ಒಂದು ನೀತಿ ಎಲ್ಲರಿಗೂ ಅನ್ವಯವಾಗುವಂತೆ ಗುಂಪು ಸದಸ್ಯರನ್ನು ಒಟ್ಟುಗೂಡಿಸುತ್ತದೆ.",
       "emptyTitle": "ಇನ್ನೂ ಗುಂಪುಗಳಿಲ್ಲ",
       "enterpriseOnly": "ಗುಂಪುಗಳು ಎಂಟರ್‌ಪ್ರೈಸ್ ಯೋಜನೆಯಲ್ಲಿ ಲಭ್ಯವಿರುತ್ತವೆ.",
+      "limitReached": "ಈ ಸಂಸ್ಥೆಯು 100 ಗುಂಪುಗಳ ಮಿತಿಯನ್ನು ತಲುಪಿದೆ. ಇನ್ನೊಂದನ್ನು ರಚಿಸುವ ಮೊದಲು ಗುಂಪು ಅಳಿಸಿ.",
       "memberCount": "{{displayCount}} ಸದಸ್ಯರು",
       "memberCount_one": "{{displayCount}} ಸದಸ್ಯ",
       "memberCount_other": "{{displayCount}} ಸದಸ್ಯರು",

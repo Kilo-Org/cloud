@@ -1701,7 +1701,6 @@ const OrganizationSettingsSchema = z.object({
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
 
-export const MAX_ORGANIZATION_GROUPS = 100;
 export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 
 // Persisted shape of organization group policies. The runtime Zod contracts,

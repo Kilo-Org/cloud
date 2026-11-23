@@ -3837,6 +3837,7 @@
       "emptyDescription": "Hópur safnar meðlimum svo ein stefna geti átt við þá alla.",
       "emptyTitle": "Engir hópar ennþá",
       "enterpriseOnly": "Hópar eru í boði með Enterprise-áskrift.",
+      "limitReached": "Þessi stofnun hefur náð 100 hópa hámarki sínu. Eyða hópi áður en annar er búinn til.",
       "memberCount": "Fjöldi meðlima: {{displayCount}}",
       "memberCount_one": "{{displayCount}} meðlimur",
       "memberCount_other": "{{displayCount}} meðlimir",

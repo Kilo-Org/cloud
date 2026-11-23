@@ -3837,6 +3837,7 @@
       "emptyDescription": "ჯგუფი აერთიანებს წევრებს, რათა ერთი პოლიტიკა ყველა მათგანზე გავრცელდეს.",
       "emptyTitle": "ჯგუფები ჯერ არ არის",
       "enterpriseOnly": "ჯგუფები ხელმისაწვდომია Enterprise გეგმაზე.",
+      "limitReached": "ამ ორგანიზაციამ 100 ჯგუფის ლიმიტს მიაღწია. სხვა ჯგუფის შექმნამდე წაშალეთ ჯგუფი.",
       "memberCount": "{{displayCount}} წევრი",
       "memberCount_one": "{{displayCount}} წევრი",
       "memberCount_other": "{{displayCount}} წევრი",

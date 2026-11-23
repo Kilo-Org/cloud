@@ -1,5 +1,5 @@
 import type { OrganizationGroupAgentPermissionsPolicy } from '@kilocode/db/schema-types';
-import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
+import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import * as z from 'zod';
 
 export const PERMISSION_POLICY_MAX_AGE_SECONDS = 300;

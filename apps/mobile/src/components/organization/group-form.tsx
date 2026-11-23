@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one form: the wrapper that owns the durable draft, the loading shape it gates a create on, and the body that seeds from it */
+import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { type Href, useNavigation, useRouter } from 'expo-router';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,9 +29,14 @@ import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SearchField } from '@/components/ui/search-field';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
-import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
+import {
+  type OrgGroup,
+  useOrgGroupMutations,
+  useOrgGroups,
+} from '@/lib/hooks/use-org-groups-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type ActiveOrgMember,
@@ -158,6 +164,15 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   const { t } = useTranslation();
   const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
+  // A create can only be refused by the group count, so only a create reads the
+  // list; the query is off for an edit, which never needs the count.
+  const groupsQuery = useOrgGroups(organizationId, group === undefined);
+  // Only the manager shape carries the organization's whole list, so a member
+  // shape (or no answer yet) is not a count. The form keeps painting while the
+  // read is pending and settles to a disabled Save once it lands.
+  const limitGroups = groupsQuery.data?.access === 'manager' ? groupsQuery.data.groups : null;
+  const atGroupLimit =
+    group === undefined && limitGroups !== null && limitGroups.length >= MAX_ORGANIZATION_GROUPS;
   const initial =
     group === undefined
       ? null
@@ -334,6 +349,13 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
     }
     const payload = { name, description: description.length === 0 ? null : description };
     if (group === undefined) {
+      // At the cap nothing can be created, and the notice above the actions
+      // already says why. A list that landed under the cap before the server
+      // counted the last group still sends the create, and the refusal lands as
+      // the localized toast.
+      if (atGroupLimit) {
+        return;
+      }
       mutations.create.mutate(payload, {
         onSuccess: created => {
           draft.clear();
@@ -466,10 +488,15 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
           )}
         </Fragment>
 
+        {atGroupLimit ? (
+          <Text variant="muted" testID="org-group-limit">
+            {t('organization.groups.limitReached')}
+          </Text>
+        ) : null}
         <OrgFormActions
           saving={saving}
           removing={removing}
-          disabled={busy || !dirty}
+          disabled={busy || !dirty || atGroupLimit}
           deleteLabel={group === undefined ? undefined : t('organization.groups.deleteAction')}
           onSave={save}
           onDelete={remove}

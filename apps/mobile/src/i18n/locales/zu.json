@@ -3837,6 +3837,7 @@
       "emptyDescription": "Iqembu lihlanganisa amalungu ukuze inqubomgomo eyodwa isebenze kuwo wonke.",
       "emptyTitle": "Awekho amaqembu okwamanje",
       "enterpriseOnly": "Amaqembu ayatholakala kuhlelo lwe-Enterprise.",
+      "limitReached": "Le nhlangano isifinyelele emkhawulweni wayo wamaqembu angu-100. Susa iqembu ngaphambi kokudala elinye.",
       "memberCount": "Inani lamalungu: {{displayCount}}",
       "memberCount_one": "{{displayCount}} ilungu",
       "memberCount_other": "{{displayCount}} amalungu",

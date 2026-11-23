@@ -3837,6 +3837,7 @@
       "emptyDescription": "ቡድን አባላትን ያሰባስባል፣ ስለዚህ አንድ ፖሊሲ ለሁሉም ሊተገበር ይችላል።",
       "emptyTitle": "እስካሁን ቡድኖች የሉም",
       "enterpriseOnly": "ቡድኖች በኢንተርፕራይዝ ፕላን ይገኛሉ።",
+      "limitReached": "ይህ ድርጅት የ100 ቡድኖች ገደቡ ላይ ደርሷል። ሌላ ቡድን ከመፍጠር በፊት ቡድንን ሰርዝ።",
       "memberCount": "{{displayCount}} አባል",
       "memberCount_one": "{{displayCount}} አባል",
       "memberCount_other": "{{displayCount}} አባላት",

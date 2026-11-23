@@ -3837,6 +3837,7 @@
       "emptyDescription": "Mampivondrona mpikambana ny vondrona mba hahafahan'ny fitsipika iray mihatra amin'izy rehetra.",
       "emptyTitle": "Mbola tsy misy vondrona",
       "enterpriseOnly": "Misy amin'ny drafitra Enterprise ny vondrona.",
+      "limitReached": "Efa nahatratra ny fetran'ny vondrona 100 ity fikambanana ity. Fafao ny vondrona iray alohan'ny hamoronana vondrona hafa.",
       "memberCount": "mpikambana {{displayCount}}",
       "memberCount_one": "mpikambana {{displayCount}}",
       "memberCount_other": "mpikambana {{displayCount}}",

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- the form's create swap, both leave exits and the delete path share one mock harness. */
+import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -48,6 +49,23 @@ const router = vi.hoisted(() => ({
 }));
 
 const popOnce = vi.hoisted(() => vi.fn());
+// The list the create form reads for the group cap. Its answer is swapped per
+// test: a manager shape counts, a member shape or no answer does not.
+const groupsQuery = vi.hoisted(
+  (): {
+    data: unknown;
+    isPending: boolean;
+    isError: boolean;
+    isFetching: boolean;
+    refetch: () => void;
+  } => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn<() => void>(),
+  })
+);
 const stackSafeReplace = vi.hoisted(() => ({ replace: vi.fn<(href: unknown) => void>() }));
 const guard = vi.hoisted(
   (): {
@@ -115,6 +133,7 @@ vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
 // group only through the props the form hands on.
 vi.mock('@/lib/hooks/use-org-groups-queries', () => ({
   useOrgGroupMutations: () => mutations,
+  useOrgGroups: () => groupsQuery,
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgWithMembers: () => members,
@@ -295,15 +314,27 @@ function textHandler(value: unknown): (text: string) => void {
   return value as (text: string) => void;
 }
 
-async function pressSave(root: ReactTestInstance): Promise<void> {
+/** The Save control's props: the create form's only button. */
+function saveControl(root: ReactTestInstance): WidgetProps {
   const save = root
     .findAll(node => node.type === PRESSABLE && (node.props as WidgetProps).role === 'button')
     .at(0);
   if (save === undefined) {
     throw new Error('the save button was not rendered');
   }
+  return save.props as WidgetProps;
+}
+
+/** The visible text of the block carrying `testID`, or undefined while it is absent. */
+function textWithTestID(root: ReactTestInstance, testID: string): string | undefined {
+  const found = root.findAll(node => (node.props as WidgetProps).testID === testID).at(0);
+  const children: unknown = found?.props.children;
+  return typeof children === 'string' ? children : undefined;
+}
+
+async function pressSave(root: ReactTestInstance): Promise<void> {
   await act(async () => {
-    pressHandler((save.props as WidgetProps).onPress)();
+    pressHandler(saveControl(root).onPress)();
     await Promise.resolve();
   });
 }
@@ -416,6 +447,10 @@ beforeEach(() => {
   members.isError = false;
   router.canGoBack.mockReturnValue(true);
   nav.isFocused = true;
+  groupsQuery.data = undefined;
+  groupsQuery.isPending = false;
+  groupsQuery.isError = false;
+  groupsQuery.isFetching = false;
   listThenForm({ key: 'form-1', name: 'group-form' });
   // Every case starts with the store answering no draft, so the form renders
   // its fields at once; a case that needs the loading phase sets it first.
@@ -449,6 +484,91 @@ describe('GroupForm create path', () => {
     });
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(popOnce).not.toHaveBeenCalled();
+
+    unmountOnce();
+  });
+});
+
+describe('GroupForm create at the group cap', () => {
+  /** The manager list shape the create form counts, holding `count` groups. */
+  function managerList(count: number) {
+    return {
+      access: 'manager',
+      groups: Array.from({ length: count }, (_, index) => storedGroup({ id: `group-${index}` })),
+    };
+  }
+
+  const limitCopy = i18n.t('organization.groups.limitReached');
+
+  it('disables Save and states the cap', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBe(limitCopy);
+    expect(saveControl(renderer.root).disabled).toBe(true);
+
+    unmountOnce();
+  });
+
+  it('leaves Save enabled below the cap and shows no notice', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS - 1);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(saveControl(renderer.root).disabled).toBe(false);
+
+    unmountOnce();
+  });
+
+  it('does not fire the create while the cap stands', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS + 1);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+    await pressSave(renderer.root);
+
+    expect(mutations.create.mutate).not.toHaveBeenCalled();
+
+    unmountOnce();
+  });
+
+  it('leaves an edit form unaffected by the cap', async () => {
+    // An edit never creates, so the cap must not reach it: the notice stays
+    // absent and Save follows the form's own dirtiness.
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS);
+    members.data = {
+      members: [{ id: 'user-1', name: 'Amira', email: 'amira@example.com', status: 'active' }],
+    };
+    const { renderer, unmountOnce } = await mountForm(storedGroup());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    selectMember('user-1');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(saveControl(renderer.root).disabled).toBe(false);
+
+    unmountOnce();
+  });
+
+  it('paints a create form while the list is still pending', async () => {
+    // A pending list must not hold the form back: the fields paint at once and
+    // the Save settles to its cap state when the list answers.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = true;
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))).toBeDefined();
+
+    changeName(renderer.root, 'Workshop');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(saveControl(renderer.root).disabled).toBe(false);
 
     unmountOnce();
   });

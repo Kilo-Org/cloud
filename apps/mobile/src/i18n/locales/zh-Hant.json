@@ -3780,6 +3780,7 @@
       "emptyDescription": "群組會彙整成員，讓同一項政策套用至所有成員。",
       "emptyTitle": "尚無群組",
       "enterpriseOnly": "群組僅適用於 Enterprise 方案。",
+      "limitReached": "此組織已達到 100 個群組的上限。請先刪除一個群組，再建立新的群組。",
       "memberCount": "{{displayCount}} 位成員",
       "memberCount_other": "{{displayCount}} 位成員",
       "memberViewEmpty": "你不在此組織的任何群組中。",

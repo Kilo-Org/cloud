@@ -106,3 +106,33 @@ describe.each(locales)('$tag briefing plan progress', ({ tag, render, renderOne 
     expect(plan(1, 1, 1)).toBe(single(formatNumber(1, tag), formatNumber(1, tag)));
   });
 });
+
+/**
+ * Latvian puts totals of 0, 10-19 and whole tens in the `zero` category, which
+ * takes the genitive plural `soļu`. The three-step and single-step plans above
+ * only reach `other` and `one`, so a plan of twelve steps pins `metadataPlan_zero`.
+ */
+
+const zeroLocales: readonly LocaleCase[] = [
+  { tag: 'lv', render: (done, total) => `Plāns: ${done}/${total} soļu pabeigti` },
+];
+
+describe.each(zeroLocales)(
+  '$tag briefing plan progress in the zero category',
+  ({ tag, render }) => {
+    beforeAll(async () => {
+      await i18n.changeLanguage(tag);
+    });
+
+    const plan = (count: number, done: number, total: number) =>
+      i18n.t('agentBriefing.metadataPlan', {
+        count,
+        displayDone: formatNumber(done, tag),
+        displayTotal: formatNumber(total, tag),
+      });
+
+    it('states a partly finished plan of twelve steps in the genitive plural', () => {
+      expect(plan(12, 5, 12)).toBe(render(formatNumber(5, tag), formatNumber(12, tag)));
+    });
+  }
+);

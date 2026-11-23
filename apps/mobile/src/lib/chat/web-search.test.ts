@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- one suite pins the search budget (question counters, a parallel turn, refusal and timeout charges) and the setting on the same mock harness. */
 import { onlineManager } from '@tanstack/react-query';
-import { type ToolFailure } from '@kilocode/harness-sdk';
+import { ToolFailure } from '@kilocode/harness-sdk';
 import { Effect, Result } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,7 +9,7 @@ import { i18n } from '@/i18n';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, localTargetId } from './backend-target';
 import { webSearchTool } from './web-search';
-import { questionSearches } from './web-search-budget';
+import { type QuestionSearches, questionSearches } from './web-search-budget';
 import {
   moveWebSearchEnabled,
   setWebSearchEnabled,
@@ -114,11 +114,12 @@ beforeEach(() => {
 });
 
 /**
- * One question's searches as the chat runs them: the same tool call repeated,
- * against a counter this helper owns, so the test can read what was charged.
+ * One question's searches as the chat runs them one after another: the same
+ * tool call repeated, against a counter this helper owns, so the test can read
+ * what was charged. A later round of the same question passes the counter back.
  */
-function askQuestion(calls: number) {
-  const spent = { used: 0, attempts: 0 };
+function askQuestion(calls: number, shared?: QuestionSearches) {
+  const spent = shared ?? { used: 0, attempts: 0 };
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
@@ -133,8 +134,8 @@ function askQuestion(calls: number) {
  * One question whose turn issues its searches together, as the chat's tool
  * runner does: every call reads the same counter before any of them settles.
  */
-function askQuestionAtOnce(calls: number) {
-  const spent = { used: 0, attempts: 0 };
+function askQuestionAtOnce(calls: number, shared?: QuestionSearches) {
+  const spent = shared ?? { used: 0, attempts: 0 };
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
@@ -238,8 +239,9 @@ describe('a web search', () => {
 
     expect(outcome.every(answer => Result.isFailure(answer))).toBe(true);
     expect(world.requests).toEqual([]);
-    // A signed-out call never reaches the proxy, so it reserves no attempt.
+    // A signed-out call never reaches the proxy, so it reserves no attempt and no search.
     expect(spent.attempts).toBe(0);
+    expect(spent.used).toBe(0);
   });
 
   it('keeps no attempt when the token read rejects and no search is sent', async () => {
@@ -287,6 +289,20 @@ describe('a web search', () => {
     expect(refused.spent.attempts).toBe(1);
   });
 
+  it('spends only the attempt when a failing status has no readable body', async () => {
+    world.response = { status: 500, body: '{"error":"upstream exploded"}' };
+    world.unreadable = true;
+
+    const { spent, answers } = askQuestion(1);
+    const [answer] = await answers;
+
+    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+    // Whatever escapes the attempt is a search that reached Kilo and answered nothing.
+    expect(reasonOf(answer)).toContain('Web search failed: ');
+    expect(spent.used).toBe(0);
+    expect(spent.attempts).toBe(1);
+  });
+
   it('charges a search Kilo answered whose body is not the results shape', async () => {
     world.response = { status: 200, body: '{"unexpected":true}' };
 
@@ -308,6 +324,9 @@ describe('a web search', () => {
     expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
     // Kilo billed the account for the search, so a body lost mid-stream still counts.
     expect(spent.used).toBe(1);
+    // The model is told the search came back unreadable, not the reader's own error.
+    expect(reasonOf(answer)).toContain('results could not be read');
+    expect(reasonOf(answer)).not.toContain('stream closed');
   });
 
   it('bounds a failing loop at fifteen attempts and spends no allowance', async () => {
@@ -325,19 +344,63 @@ describe('a web search', () => {
     expect(spent.attempts).toBe(15);
   });
 
-  it('holds the attempt cap when a turn issues twenty searches at once', async () => {
+  it('holds the answered-search cap for a parallel burst that never answers', async () => {
     world.transportFailures = 20;
 
     const { spent, answers } = askQuestionAtOnce(20);
     const outcome = await answers;
 
-    // All twenty calls read the counter before any of them reserved an attempt,
-    // so only a charge made before the token await keeps the cap at fifteen.
-    expect(world.requests).toHaveLength(15);
-    expect(outcome.slice(0, 15).every(answer => Result.isFailure(answer))).toBe(true);
-    expect(reasonOf(outcome[15])).toContain('all 15 of its web search attempts');
+    // Both slots are taken before the first await, so the calls of a turn that
+    // have not learned their outcome yet stop at the five answered searches,
+    // stricter than the fifteen attempts a failing loop is allowed one at a time.
+    expect(world.requests).toHaveLength(5);
+    expect(outcome.slice(0, 5).every(answer => Result.isFailure(answer))).toBe(true);
+    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(spent.used).toBe(0);
-    expect(spent.attempts).toBe(15);
+    expect(spent.attempts).toBe(5);
+  });
+
+  it('holds the answered-search cap when a turn issues twenty searches at once', async () => {
+    world.response = { status: 200, body: '{"results":[]}' };
+
+    const { spent, answers } = askQuestionAtOnce(20);
+    const outcome = await answers;
+
+    // Every call of the turn reserves before it awaits, so five answered
+    // searches are taken before the sixth call looks at the counter.
+    expect(world.requests).toHaveLength(5);
+    expect(outcome.slice(0, 5).every(answer => Result.isSuccess(answer))).toBe(true);
+    const refused = outcome[5];
+    if (refused === undefined || Result.isSuccess(refused)) {
+      throw new Error('the sixth search of the turn was not refused');
+    }
+    // A refusal reaches the model as a failed tool result, not as a body.
+    expect(refused.failure).toBeInstanceOf(ToolFailure);
+    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
+    expect(spent.used).toBe(5);
+    expect(spent.attempts).toBe(5);
+  });
+
+  it('gives the answered slots back after a parallel burst that all fails', async () => {
+    world.transportFailures = 5;
+
+    const first = askQuestionAtOnce(5);
+    const failed = await first.answers;
+
+    expect(failed.every(answer => Result.isFailure(answer))).toBe(true);
+    expect(world.requests).toHaveLength(5);
+    // Nothing answered, so the searches come back; the five attempts stay spent.
+    expect(first.spent.used).toBe(0);
+    expect(first.spent.attempts).toBe(5);
+
+    const next = await askQuestion(1, first.spent).answers;
+    const [answered] = next;
+
+    expect(Result.isSuccess(answered ?? Result.fail(undefined))).toBe(true);
+    expect(world.requests).toHaveLength(6);
+    // The same question may still search, and the answered search now counts.
+    expect(first.spent.used).toBe(1);
+    expect(first.spent.attempts).toBe(6);
   });
 
   it('does not reach the attempt cap while a question still gets answered searches', async () => {

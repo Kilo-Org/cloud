@@ -1448,16 +1448,22 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         // longer selected. The sync treats anything stored but unselected as a
         // removal, so passing the selection here retries those removals while
         // every selected project is re-signed.
+        //
+        // The stored selection is authoritative only in `selected` mode. Without a
+        // stored configuration, or in any other mode, rotation re-signs every
+        // stored entry as before: a rotation must never become a bulk removal.
         const storedCodeReviewConfig = await getAgentConfig(
           organizationId,
           'code_review',
           PLATFORM.GITLAB
         );
-        const storedSelection = (
-          storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined
-        )?.selected_repository_ids;
-        const configuredRepoIds = Array.isArray(storedSelection)
-          ? storedSelection.filter(
+        const storedConfig = storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined;
+        const selectedRepositoryIds =
+          storedConfig?.repository_selection_mode === 'selected'
+            ? storedConfig.selected_repository_ids
+            : undefined;
+        const configuredRepoIds = Array.isArray(selectedRepositoryIds)
+          ? selectedRepositoryIds.filter(
               (id): id is number => typeof id === 'number' && Number.isFinite(id)
             )
           : Object.keys(configuredWebhooks)

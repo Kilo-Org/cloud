@@ -75,11 +75,13 @@ export async function syncWebhooksForRepositories(
 
   // A removal is any stored handle whose project left the selection. A delete
   // that failed keeps its stored handle so the next save retries it, and the
-  // stored map is then the only place that still names the project.
-  const selectedRepositoryIdSet = new Set(selectedRepositoryIds);
-  const removedRepos = Object.keys(configuredWebhooks)
-    .map(projectId => Number.parseInt(projectId, 10))
-    .filter(projectId => Number.isFinite(projectId) && !selectedRepositoryIdSet.has(projectId));
+  // stored map is then the only place that still names the project. The entry
+  // key travels with its handle, so the handle is read without a second lookup.
+  const removedRepos = Object.entries(configuredWebhooks).flatMap(([key, webhook]) => {
+    const projectId = Number.parseInt(key, 10);
+    if (!Number.isFinite(projectId) || selectedRepositoryIds.includes(projectId)) return [];
+    return [{ key, projectId, webhook }];
+  });
 
   logExceptInTest('[syncWebhooksForRepositories] Starting sync', {
     selectedCount: selectedRepositoryIds.length,
@@ -164,19 +166,12 @@ export async function syncWebhooksForRepositories(
     }
   }
 
-  for (const projectId of removedRepos) {
-    const webhookInfo = configuredWebhooks[String(projectId)];
-
-    if (!webhookInfo) {
-      logExceptInTest('[syncWebhooksForRepositories] No webhook to delete', { projectId });
-      continue;
-    }
-
+  for (const { key, projectId, webhook: webhookInfo } of removedRepos) {
     try {
       await deleteProjectWebhook(accessToken, projectId, webhookInfo.hook_id, instanceUrl);
 
       result.deleted.push({ projectId, hookId: webhookInfo.hook_id });
-      delete updatedWebhooks[String(projectId)];
+      delete updatedWebhooks[key];
 
       logExceptInTest('[syncWebhooksForRepositories] Deleted webhook', {
         projectId,

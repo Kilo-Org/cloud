@@ -144,7 +144,7 @@ describe('syncWebhooksForRepositories', () => {
     expect(updatedWebhooks).toEqual({});
   });
 
-  it('a 404 removal drops the entry because the adapter treats an absent hook as removed', async () => {
+  it('a resolved removal drops the entry', async () => {
     mockDeleteProjectWebhook.mockResolvedValueOnce(undefined);
 
     const { result, updatedWebhooks } = await syncWebhooksForRepositories(

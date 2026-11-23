@@ -615,5 +615,46 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
         'https://gitlab.example.com'
       );
     });
+
+    it('re-signs every stored entry when the configuration does not select repositories', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      const configured = {
+        '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+        '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      // An `all`-mode row carries no usable selection, so a rotation must not
+      // treat its stored entries as removed.
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organization.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        config: {
+          focus_areas: [],
+          model_slug: 'kilo/fake-deterministic',
+          repository_selection_mode: 'all',
+          review_style: 'balanced',
+          selected_repository_ids: [],
+        },
+        created_by: owner.id,
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+        'gitlab-access-token',
+        expect.any(String),
+        [101, 202],
+        [],
+        configured,
+        'https://gitlab.example.com'
+      );
+    });
   });
 });

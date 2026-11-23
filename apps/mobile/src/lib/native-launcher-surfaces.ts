@@ -73,8 +73,8 @@ export function consumePendingLaunchUrl(): string | null {
  * names no account.
  *
  * A Quick Action tapped while the app is signed out parks its URL natively.
- * This call reads and clears the parked value unconditionally, so the sign-in
- * path that calls it owns the slot whether or not a destination is returned.
+ * This call reads and clears the parked value unconditionally, so the auth
+ * paths that call it own the slot whether or not a destination is returned.
  * `LAUNCHER_NEW_AGENT_URL` names no account and is handed back; any other
  * destination belongs to the account that published the shortcut, so it is
  * consumed and discarded here rather than handed back or left for a later

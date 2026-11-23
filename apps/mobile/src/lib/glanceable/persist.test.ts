@@ -561,8 +561,6 @@ describe('mirror writes', () => {
     persistGlanceableSink.publish(snapshot);
     await _flushGlanceableMirrorForTests();
 
-    // The mirror is written AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked
-    // device keeps it current instead of waiting for the next unlock.
     expect(getLastGlanceableSnapshot()).toEqual(snapshot);
     expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
       SNAPSHOT_KEY,

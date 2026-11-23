@@ -82,7 +82,10 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
    * this set holds never becomes live again.
    */
   const closed = new Set<string>();
-  /** Tabs this worker forgot before its record was read: restoring one would re-register a page that is gone. */
+  /**
+   * Tabs this worker forgot. Kept for the worker's life, because the record is merged more than once: at the boot
+   * read, and again on a spend whose read answers. A merge never re-registers a tab in this set.
+   */
   const detached = new Set<number>();
   /** A registration made before the record was read; a close or detach since then wins over it (see `applyPending`). */
   const pending: { apply: () => void; session: string; tabId?: number }[] = [];
@@ -90,12 +93,17 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   const { promise: hydration, resolve: hydrated } = Promise.withResolvers<void>();
 
   /**
-   * Whether a decision may read the hold: `restoring` until the record is applied, so no decision and no write is
-   * taken against the partial view a woken worker starts with.
+   * Where the mirror stands: `restoring` until the record read lands, `unread` when the area did not answer, `ready`
+   * once the record is part of this worker's view.
+   *
+   * A decision may read the hold from `ready` or `unread`, so a waking download waits no longer than the read. A write
+   * stores the mirror only from `ready`: every write replaces the record whole, so it lands only once the record it
+   * extends is here.
    */
-  let decision:
+  let mirror:
     | { readonly kind: 'restoring'; readonly record: Promise<void> }
-    | { readonly kind: 'ready' } = { kind: 'restoring', record: hydration };
+    | { readonly kind: 'ready' }
+    | { readonly kind: 'unread' } = { kind: 'restoring', record: hydration };
 
   /**
    * The session's mirror entry, created empty: what a report, a spend or a registration is recorded into. A session
@@ -121,8 +129,54 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   };
 
   const write = async (): Promise<void> => {
-    // A write before the record is read would replace it with this worker's partial view of it.
+    // A write stores the mirror only once the record it extends is here: before the read, and when the area did not
+    // Answer, the stored value stays as its writer left it.
     await hydration;
+
+    if (mirror.kind !== 'ready') {
+      return;
+    }
+
+    await writeState(storageOf(), state);
+  };
+
+  /**
+   * The read a spend in an `unread` worker makes once, so the mirror it writes extends the record already stored.
+   * `restoring` means a read already runs and will store this worker's mirror; `ready` means the record is here.
+   */
+  let reread: 'none' | 'running' | 'done' = 'none';
+
+  /**
+   * Stores a spend. An `unread` worker reads the record once and merges it under its own mirror, then writes both
+   * together, so the stored value carries the approval this worker spent. An area that does not answer leaves the
+   * stored value untouched, and no other write is retried.
+   */
+  const storeSpend = async (): Promise<void> => {
+    await hydration;
+
+    if (mirror.kind === 'ready' || reread !== 'none') {
+      await write();
+
+      return;
+    }
+
+    reread = 'running';
+
+    const read = await readState(storageOf()).catch(() => ({ kind: 'unread' }) as const);
+
+    if (read.kind !== 'read') {
+      reread = 'done';
+
+      return;
+    }
+
+    // The record merges under this worker's mirror, so `mergeSession` keeps the live entry's need: the approval this
+    // Worker spent is the value written. A registration that arrived since the boot lands first, as at hydration, and
+    // A tab in `detached` is not put back, because that set now outlives the boot read.
+    applyPending();
+    restoreSessions({ closed, detached, hold, state, stored: read.state });
+    reread = 'done';
+    mirror = { kind: 'ready' };
     await writeState(storageOf(), state);
   };
 
@@ -131,7 +185,7 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
    * same fact cannot replace it, and dropped when a close or a detach has since ended what it names.
    */
   const register = (session: string, apply: () => void, tabId?: number): void => {
-    if (decision.kind === 'restoring') {
+    if (mirror.kind === 'restoring') {
       pending.push(tabId === undefined ? { apply, session } : { apply, session, tabId });
     } else {
       apply();
@@ -179,18 +233,20 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       // The record keeps the approval exactly as the hold now holds it: spent. A worker that restarts inside the
       // Token's lifetime then refuses the second file instead of arming the approval the first file already spent.
       record.need = need;
-      void write();
+      void storeSpend();
     },
     search: async itemId => (await globals.downloads()?.search?.({ id: itemId })) ?? [],
   });
 
   /** How a download is answered: at once once the record is read, or owed until it is (Chrome holds the item 15 s). */
   const decide = (item: DownloadHoldItem, suggest: SuggestFilename): boolean => {
-    if (decision.kind === 'ready') {
+    if (mirror.kind !== 'restoring') {
+      // `ready` reads the record this worker applied, and `unread` reads the live hold alone: either way the answer is
+      // Not owed, because no later read is coming.
       return hold.handle(item, suggest);
     }
 
-    const restored = decision.record;
+    const restored = mirror.record;
 
     void (async (): Promise<void> => {
       await restored;
@@ -210,26 +266,30 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   });
 
   void (async (): Promise<void> => {
-    try {
-      const stored = await readState(storageOf());
+    let applied = false;
 
-      // A registration that arrived while the record was being read is this worker's newest fact, so it lands first
-      // And the record merges into it — never over it. The drain reads `closed`/`detached` again, so a close or a
-      // Detach during the read still wins over a call that started before it.
-      applyPending();
-      restoreSessions({ closed, detached, hold, state, stored });
+    try {
+      const read = await readState(storageOf());
+
+      if (read.kind === 'read') {
+        // A registration that arrived while the record was being read is this worker's newest fact, so it lands first
+        // And the record merges into it — never over it. The drain reads `closed`/`detached` again, so a close or a
+        // Detach during the read still wins over a call that started before it.
+        applyPending();
+        restoreSessions({ closed, detached, hold, state, stored: read.state });
+        applied = true;
+      }
     } catch {
       // A record that cannot be applied leaves the live hold: fewer tabs are owned, never more.
     } finally {
       // Whatever was registered while the record was applied lands last, over the record's older copy.
       applyPending();
-      void write();
-      detached.clear();
 
-      // Whatever the record said, the hold is answerable now: a decision may wait no longer than the read, and never
-      // Hangs on one that threw.
-      decision = { kind: 'ready' };
+      // The hold is answerable now, whatever the read answered: a decision may wait no longer than the read. An area
+      // That did not answer leaves the mirror `unread`, so no write here stores over the record; the next boot reads it.
+      mirror = applied ? { kind: 'ready' } : { kind: 'unread' };
       hydrated();
+      void write();
     }
   })();
 

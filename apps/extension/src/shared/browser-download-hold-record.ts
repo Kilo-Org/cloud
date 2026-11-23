@@ -186,17 +186,29 @@ export interface SessionStorageApi {
   readonly setItem: (key: typeof DOWNLOAD_HOLD_STATE_KEY, value: unknown) => Promise<void> | void;
 }
 
-export const readState = async (api: SessionStorageApi | undefined): Promise<HoldState> => {
+/**
+ * What `storage.session` answered: the record, or the fact that it could not be read. Every write stores the mirror
+ * whole, so a caller merges only a record it has, and a record it could not read stays as its writer left it.
+ */
+export type ReadState =
+  | { readonly kind: 'read'; readonly state: HoldState }
+  | { readonly kind: 'unread' };
+
+export const readState = async (api: SessionStorageApi | undefined): Promise<ReadState> => {
   if (api === undefined) {
-    return {};
+    // No session storage at all: there is no record to preserve, and a write is already a no-op in the same place.
+    return { kind: 'read', state: {} };
   }
 
   try {
     const parsed = stateSchema.safeParse(await api.getItem(DOWNLOAD_HOLD_STATE_KEY));
 
-    return parsed.success ? parsed.data : {};
+    // The area answered, so a value the schema rejects is an empty record: the mirror that replaces it holds nothing a
+    // Decision could have used.
+    return { kind: 'read', state: parsed.success ? parsed.data : {} };
   } catch {
-    return {};
+    // An area that will not answer leaves its value unknown here, so nothing in this worker may store over it.
+    return { kind: 'unread' };
   }
 };
 

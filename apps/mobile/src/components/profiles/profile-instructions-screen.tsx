@@ -144,12 +144,7 @@ function InstructionRow({
       accessibilityLabel={rowAccessibilityLabel}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
-      <Text
-        variant="mono"
-        numberOfLines={nameLines}
-        ellipsizeMode="middle"
-        {...HIDDEN_LABEL_PROPS}
-      >
+      <Text variant="mono" numberOfLines={nameLines} ellipsizeMode="middle" {...HIDDEN_LABEL_PROPS}>
         {contentIsPress ? instruction.name : isolateLtrBidiText(instruction.name)}
       </Text>
     </RowFrame>

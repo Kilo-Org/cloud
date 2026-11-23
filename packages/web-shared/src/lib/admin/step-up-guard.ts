@@ -56,15 +56,35 @@ export function stepUpErrorCodeForState(state: AdminStepUpState): StepUpErrorCod
 }
 
 /**
+ * The binding a refusal carries, which the admin UI echoes back to mint and
+ * verify the proof. The client parses it with `stepUpOperationSchema` before it
+ * sends it, and the challenge endpoint parses it again, so build it through the
+ * same schema: a refusal whose descriptor the boundary rejects would prompt for
+ * an operation the caller cannot confirm.
+ */
+function refusalBinding(
+  actionClass: PrivilegedActionClass,
+  operation: StepUpOperation
+): StepUpOperationBinding {
+  const parsed = stepUpOperationSchema.safeParse(
+    stepUpBindingFromOperation(actionClass, operation)
+  );
+  if (!parsed.success) {
+    throw new Error('An operation step-up binding must be one the client can submit');
+  }
+  return parsed.data;
+}
+
+/**
  * The operation a guard call authorizes. An operation-class refusal carries
  * this value so the admin UI mints a proof for the same action instead of a
  * generic one.
  *
- * An operation-class request that cannot name its route and method is a wiring
- * error, not a refusal: the refusal binding the admin UI echoes back is bounded
- * by `stepUpOperationSchema` (non-empty route and method), so a value built from
- * a missing one can never be submitted and no proof could ever match it. Throw
- * before anything is measured, exactly as a missing operation itself does.
+ * An operation-class request whose operation does not yield a submittable
+ * binding is a wiring error, not a refusal: the admin UI echoes the refusal
+ * binding back and the boundary schema bounds it, so no proof could ever be
+ * minted for it and no retried request could ever match one. Throw before
+ * anything is measured, exactly as a missing operation itself does.
  */
 export function stepUpOperationFor(params: {
   actionClass: PrivilegedActionClass;
@@ -73,17 +93,16 @@ export function stepUpOperationFor(params: {
   surface: StepUpSurface;
   target: PrivilegedTarget;
 }): StepUpOperation {
-  const route = params.route ?? '';
-  const method = params.method ?? '';
-  if (isOperationStepUpClass(params.actionClass) && (route === '' || method.trim() === '')) {
-    throw new Error('An operation step-up request requires the route and method it authorizes');
-  }
-  return {
+  const operation: StepUpOperation = {
     surface: params.surface,
-    route,
-    method: normalizeStepUpMethod(method),
+    route: params.route ?? '',
+    method: normalizeStepUpMethod(params.method ?? ''),
     target: params.target,
   };
+  if (isOperationStepUpClass(params.actionClass)) {
+    refusalBinding(params.actionClass, operation);
+  }
+  return operation;
 }
 
 /**
@@ -107,26 +126,6 @@ export function stepUpDecisionCovers(
   if (target.kind === 'none' && target.id === null) return true;
   if (decision.target.kind !== target.kind) return false;
   return decision.target.id === target.id;
-}
-
-/**
- * The binding a refusal carries, which the admin UI echoes back to mint and
- * verify the proof. The client parses it with `stepUpOperationSchema` before it
- * sends it (and drops a malformed one), so build it through the same schema: a
- * refusal whose descriptor the boundary rejects would prompt for an operation
- * the caller cannot confirm.
- */
-function refusalBinding(
-  actionClass: PrivilegedActionClass,
-  operation: StepUpOperation
-): StepUpOperationBinding {
-  const parsed = stepUpOperationSchema.safeParse(
-    stepUpBindingFromOperation(actionClass, operation)
-  );
-  if (!parsed.success) {
-    throw new Error('A step-up refusal requires a binding the client can submit');
-  }
-  return parsed.data;
 }
 
 function deny(params: {

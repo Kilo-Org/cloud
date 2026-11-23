@@ -212,14 +212,15 @@ describe('runStepUpGuard', () => {
     ['route', { route: null }],
     ['method', { method: null }],
     ['route', { route: '' }],
-    ['method', { method: '   ' }],
+    ['route', { route: 'x'.repeat(1025) }],
+    ['method', { method: 'y'.repeat(17) }],
   ] as const)(
     'fails closed when an operation class cannot name its %s',
     async (_field, override) => {
       // A refusal binding is echoed back by the admin UI and parsed with the
-      // binding schema, which requires a non-empty route and method. A request
-      // that cannot name both would leave the caller with a prompt it can never
-      // satisfy, so the request is a wiring error instead of a refusal.
+      // binding schema, which bounds the route and the method. A request whose
+      // operation cannot produce a submittable binding would leave the caller
+      // with a prompt it can never satisfy, so it is a wiring error.
       mockEvaluateStepUp.mockResolvedValue({
         state: { status: 'required' },
         proof: null,
@@ -234,7 +235,7 @@ describe('runStepUpGuard', () => {
             ...override,
           })
         )
-      ).rejects.toThrow('An operation step-up request requires the route and method it authorizes');
+      ).rejects.toThrow('An operation step-up binding must be one the client can submit');
       expect(mockEvaluateStepUp).not.toHaveBeenCalled();
       expect(mockReportStepUpFailure).not.toHaveBeenCalled();
     }

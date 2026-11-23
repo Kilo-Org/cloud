@@ -2,13 +2,15 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { RenameModal } from '@/components/rename-modal';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { Cloud, Smartphone, Terminal } from '@/components/ui/icons';
 import { SessionRow } from '@/components/ui/session-row';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { CHAT_TITLE_MAX_LENGTH, type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
@@ -32,6 +34,12 @@ type ChatRowProps = {
   onPress: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<void>;
+  /** Where the session started, when sync knows it: the badge beside the row. */
+  origin?: 'mobile' | 'cli' | 'cloud-agent' | null;
+  /** A runner is live on this session on another device. */
+  liveRemote?: boolean;
+  /** Deleting this chat deletes it everywhere, and the confirm says so. */
+  deleteEverywhere?: boolean;
 };
 
 export function ChatRow({
@@ -41,8 +49,12 @@ export function ChatRow({
   onPress,
   onDelete,
   onRename,
+  origin = null,
+  liveRemote = false,
+  deleteEverywhere = false,
 }: Readonly<ChatRowProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   // The answer may be arriving on another screen: the chat says so, not the row.
   const working = useChatStatus(chat.sessionId) === 'working';
   const { showActionSheetWithOptions } = useActionSheet();
@@ -60,8 +72,10 @@ export function ChatRow({
   function confirmDelete() {
     notificationHaptic(Haptics.NotificationFeedbackType.Warning);
     confirm({
-      title: t('modelChat.list.deleteTitle'),
-      message: title,
+      title: t(
+        deleteEverywhere ? 'modelChat.sync.deleteEverywhereTitle' : 'modelChat.list.deleteTitle'
+      ),
+      message: deleteEverywhere ? `${title}\n${t('modelChat.sync.deleteEverywhereBody')}` : title,
       confirmLabel: t('common.delete'),
       onConfirm: () => {
         onDelete(chat.sessionId);
@@ -107,8 +121,29 @@ export function ChatRow({
           subtitle={preview}
           subtitleVariant="default"
           meta={timeAgo(new Date(chat.updatedAt), undefined, now)}
-          live={working}
+          live={working || liveRemote}
           metaWhileLive
+          platformIcon={
+            origin === null ? undefined : (
+              <View
+                accessibilityLabel={t(
+                  origin === 'cli'
+                    ? 'modelChat.sync.originCli'
+                    : origin === 'cloud-agent'
+                      ? 'modelChat.sync.originCloud'
+                      : 'modelChat.sync.originMobile'
+                )}
+              >
+                {origin === 'cli' ? (
+                  <Terminal size={14} color={colors.mutedForeground} />
+                ) : origin === 'cloud-agent' ? (
+                  <Cloud size={14} color={colors.mutedForeground} />
+                ) : (
+                  <Smartphone size={14} color={colors.mutedForeground} />
+                )}
+              </View>
+            )
+          }
           last={last}
         />
       </Pressable>

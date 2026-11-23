@@ -34,6 +34,16 @@ import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat
 import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { cn } from '@/lib/utils';
+import {
+  discardAndReload,
+  prepareSend,
+  pullOpenedChat,
+} from '@/lib/chat/sync/sync-service';
+import {
+  useChatSyncGate,
+  useChatSyncUploader,
+  useSyncBanner,
+} from '@/lib/chat/sync/use-chat-sync';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
@@ -45,6 +55,7 @@ import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { useChatMessageActions } from './use-chat-message-actions';
 import { useChatAddCredits } from './use-chat-add-credits';
+import { ChatSyncBanner } from './chat-sync-banners';
 import { useWebSearchSetting } from './web-search-row';
 
 /**
@@ -115,6 +126,15 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
   const { chats, rename } = useChatList(place);
+  const gate = useChatSyncGate(place);
+  useChatSyncUploader(place, gate.enabled);
+  const banner = useSyncBanner(state.sessionId);
+  const syncSessionId = state.sessionId;
+  useEffect(() => {
+    if (gate.enabled && place !== null) {
+      void pullOpenedChat(place, syncSessionId);
+    }
+  }, [gate.enabled, place, syncSessionId]);
   // A chat is listed once its session is written. Until then it has no row to name.
   const summary = chats.find(chat => chat.sessionId === state.sessionId);
   const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
@@ -228,7 +248,21 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [followTailNonce, setFollowTailNonce] = useState(0);
 
   const handleSend = useCallback(
-    (text: string, options?: ChatComposerSendOptions) => {
+    async (text: string, options?: ChatComposerSendOptions) => {
+      // A synced chat pulls before its turn (H6): the turn runs here, goes
+      // to a live runner elsewhere, or waits behind the busy banner. A
+      // blocked send throws, which is how the composer keeps the draft.
+      if (gate.enabled && place !== null) {
+        const decision = await prepareSend(place, state.sessionId, text);
+        if (decision.kind === 'blocked') {
+          throw new Error(t('modelChat.sync.busyBody'));
+        }
+        if (decision.kind === 'relayed') {
+          options?.onOptimisticSend?.();
+          setFollowTailNonce(count => count + 1);
+          return;
+        }
+      }
       // Before the stored profiles load, every custom target looks deleted. The
       // registry waits for the load and validates the target itself.
       try {
@@ -239,19 +273,16 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         Alert.alert(
           t('modelChat.backends.title'),
           error instanceof Error ? error.message : t('modelChat.backends.invalidTarget'),
-          // Android back dismisses the error; the composer keeps the draft.
           undefined,
           { cancelable: true }
         );
         throw error;
       }
-      // The question is on screen the moment it is asked, so the composer
-      // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
       setFollowTailNonce(count => count + 1);
       void send(text, { model, effort }, options?.images ?? []);
     },
-    [backends, effort, model, send, t]
+    [backends, effort, gate.enabled, model, place, send, state.sessionId, t]
   );
 
   const handleStop = useCallback(() => {
@@ -329,6 +360,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     return (
       <>
         <View className="flex-1">{renderTranscript()}</View>
+        <ChatSyncBanner
+          banner={banner}
+          onDiscard={() => {
+            if (place === null) {
+              return;
+            }
+            void (async () => {
+              const restored = await discardAndReload(place, state.sessionId, state.turns);
+              if (restored !== '') {
+                actions.composerControlRef.current?.setText(restored);
+              }
+            })();
+          }}
+        />
 
         {/* A failure with no transcript owns the screen: there is no chat to
             type into, so the composer would offer a question the state cannot
@@ -353,7 +398,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             onRetryModels={() => void refetchModels()}
             attachmentsEnabled={imagesSupported}
             organizationId={organizationId ?? undefined}
-            disabled={modelsFailed && availableOptions.length === 0}
+            disabled={
+              (modelsFailed && availableOptions.length === 0) ||
+              banner.kind === 'busy' ||
+              banner.kind === 'diverged'
+            }
           />
         ) : null}
       </>

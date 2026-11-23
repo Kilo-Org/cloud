@@ -26,6 +26,7 @@ import { mintServerSessionId } from './sync-ids';
 import { portableModelRef } from './sync-mapping';
 import { admitTurn, discardDiverged, pullChat } from './sync-pull';
 import { chatSyncSourceId, readChatSyncSetting } from './sync-settings';
+import { onChatSettled } from './sync-hooks';
 import {
   saveSyncRecord,
   stampServerSessionId,
@@ -360,4 +361,44 @@ export async function importServerSession(
   }
   await enterChat(place, sessionId);
   return sessionId;
+}
+
+const uploaderScopes = new Map<string, number>();
+let uploaderOff: (() => void) | null = null;
+
+/**
+ * Registers the settled-exchange uploader for one place, once however many
+ * screens ask: the list and an open chat both outlive an exchange, and two
+ * registrations would upload every exchange twice.
+ */
+export function registerSyncUploader(place: ChatPlace): () => void {
+  const count = (uploaderScopes.get(place.chatScope) ?? 0) + 1;
+  uploaderScopes.set(place.chatScope, count);
+  if (uploaderOff === null) {
+    uploaderOff = onChatSettled((sessionId, turns) => {
+      void uploadSettledChat(place, sessionId, turns);
+    });
+  }
+  return () => {
+    const next = (uploaderScopes.get(place.chatScope) ?? 1) - 1;
+    if (next <= 0) {
+      uploaderScopes.delete(place.chatScope);
+      if (uploaderScopes.size === 0) {
+        uploaderOff?.();
+        uploaderOff = null;
+      }
+    } else {
+      uploaderScopes.set(place.chatScope, next);
+    }
+  };
+}
+
+/** Deletes a server session this device holds no local chat for. */
+export async function deleteServerSession(
+  place: ChatPlace,
+  serverSessionId: string
+): Promise<boolean> {
+  const client = syncClientFor(organizationIdOf(place.org));
+  const result = await client.deleteSession(serverSessionId);
+  return result.type === 'deleted' || result.type === 'not_found';
 }

@@ -27,12 +27,30 @@ import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useOrganization } from '@/lib/organization-context';
 import { useLocalResetNotice } from '@/lib/persist/use-local-reset-notice';
+import {
+  DEFAULT_CHAT_FILTERS,
+  type ChatListFilters,
+  type MergedChatRow,
+} from '@/lib/chat/sync/sync-list';
+import {
+  deleteEverywhere,
+  deleteServerSession,
+  importServerSession,
+} from '@/lib/chat/sync/sync-service';
+import {
+  useChatSyncGate,
+  useChatSyncUploader,
+  useDeletedElsewhere,
+  useMergedChatList,
+} from '@/lib/chat/sync/use-chat-sync';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
 import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { LocalResetNoticeCard } from './local-reset-notice';
+import { ChatSyncListControls } from './chat-sync-list-controls';
+import { ChatSyncPromptCard } from './chat-sync-prompt-card';
 
 /**
  * The chats a person has, newest first.
@@ -93,6 +111,36 @@ function ScopedChatListScreen() {
     remove,
     rename,
   } = useChatList(place);
+
+  // Sync: the flag and the per-account setting together. Off, the list is
+  // exactly the device's chats, as before; on, server sessions merge in.
+  const gate = useChatSyncGate(place);
+  useChatSyncUploader(place, gate.enabled);
+  const [filters, setFilters] = useState<ChatListFilters>(DEFAULT_CHAT_FILTERS);
+  const merged = useMergedChatList({ place, enabled: gate.enabled, chats, filters });
+  const rows: readonly MergedChatRow[] = gate.enabled
+    ? merged.rows
+    : chats.map(chat => ({
+        key: chat.sessionId,
+        title: chat.title,
+        preview: chat.preview,
+        model: chat.model,
+        updatedAt: chat.updatedAt,
+        live: false,
+        archived: false,
+        origin: null,
+        localSessionId: chat.sessionId,
+        serverSessionId: null,
+        chat,
+      }));
+  const rowsByKey = useMemo(() => new Map(rows.map(row => [row.key, row])), [rows]);
+  useDeletedElsewhere(
+    useCallback(() => {
+      toast.error(t('modelChat.sync.deletedElsewhere'), { position: 'top-center' });
+      refetch();
+      merged.refetch();
+    }, [merged, refetch, t])
+  );
 
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
@@ -158,31 +206,107 @@ function ScopedChatListScreen() {
   }, [selectedModel, place, router, t]);
 
   const open = useCallback(
-    (sessionId: string) => {
-      router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
+    (key: string) => {
+      const row = rowsByKey.get(key);
+      if (row === undefined) {
+        return;
+      }
+      if (row.localSessionId !== null) {
+        router.push(`/(app)/(tabs)/(4_chat)/${row.localSessionId}` as Href);
+        return;
+      }
+      if (place === null || row.serverSessionId === null) {
+        return;
+      }
+      void (async () => {
+        const sessionId = await importServerSession(
+          place,
+          row.serverSessionId as string,
+          selectedModel ?? ''
+        );
+        if (sessionId !== null) {
+          refetch();
+          router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
+        } else {
+          toast.error(t('modelChat.sync.deletedElsewhere'), { position: 'top-center' });
+          merged.refetch();
+        }
+      })();
     },
-    [router]
+    [merged, place, refetch, router, rowsByKey, selectedModel, t]
   );
 
   const drop = useCallback(
-    (sessionId: string) => {
-      void remove(sessionId);
+    (key: string) => {
+      const row = rowsByKey.get(key);
+      if (row === undefined) {
+        return;
+      }
+      void (async () => {
+        if (gate.enabled && place !== null && row.serverSessionId !== null) {
+          if (row.localSessionId !== null) {
+            await deleteEverywhere(place, row.localSessionId);
+          } else {
+            await deleteServerSession(place, row.serverSessionId);
+          }
+          refetch();
+          merged.refetch();
+          return;
+        }
+        if (row.localSessionId !== null) {
+          await remove(row.localSessionId);
+        }
+      })();
     },
-    [remove]
+    [gate.enabled, merged, place, refetch, remove, rowsByKey]
+  );
+
+  const renameRow = useCallback(
+    async (key: string, title: string) => {
+      const row = rowsByKey.get(key);
+      if (row === undefined) {
+        return;
+      }
+      if (row.localSessionId !== null) {
+        await rename(row.localSessionId, title);
+        return;
+      }
+      if (place === null || row.serverSessionId === null) {
+        return;
+      }
+      const sessionId = await importServerSession(place, row.serverSessionId, selectedModel ?? '');
+      if (sessionId !== null) {
+        await rename(sessionId, title);
+        refetch();
+        merged.refetch();
+      }
+    },
+    [merged, place, refetch, rename, rowsByKey, selectedModel]
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ChatSummary; index: number }) => (
+    ({ item, index }: { item: MergedChatRow; index: number }) => (
       <ChatRow
-        chat={item}
+        chat={
+          item.chat ?? {
+            sessionId: item.key,
+            model: item.model,
+            title: item.title,
+            preview: item.preview,
+            updatedAt: item.updatedAt,
+          }
+        }
         modelName={nameOf(item.model)}
-        last={index === chats.length - 1}
+        last={index === rows.length - 1}
         onPress={open}
         onDelete={drop}
-        onRename={rename}
+        onRename={renameRow}
+        origin={item.origin}
+        liveRemote={item.live}
+        deleteEverywhere={gate.enabled && item.serverSessionId !== null}
       />
     ),
-    [chats.length, drop, nameOf, open, rename]
+    [drop, gate.enabled, nameOf, open, renameRow, rows.length]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty
@@ -190,11 +314,16 @@ function ScopedChatListScreen() {
   // body is decided by the two reads' own provenance (see
   // `selectChatListSurface`), so an unanswered read can never read as "no
   // chats": the corner button follows the same body.
+  const serverFailed =
+    gate.enabled &&
+    (merged.surface.kind === 'failed' || merged.surface.kind === 'retryable-error');
   const surface = selectChatListSurface({
-    chatCount: chats.length,
-    listAnswered,
-    listFailed: isError,
-    listLoading: isLoading,
+    chatCount: rows.length,
+    listAnswered:
+      listAnswered &&
+      (!gate.enabled || merged.surface.kind === 'ready' || merged.surface.kind === 'off'),
+    listFailed: isError || serverFailed,
+    listLoading: isLoading || (gate.enabled && merged.surface.kind === 'loading'),
     hasPlace: place !== null,
     catalogAnswered: modelsFetched && !modelsFailed,
     catalogLoading: modelsLoading,
@@ -231,8 +360,11 @@ function ScopedChatListScreen() {
           variant="server"
           // i18n-dup-ok: 'modelChat.list.loadFailed' was renamed from the base catalog's
           // quickChat.historyRetry in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.list.loadFailed')}
-          onRetry={refetch}
+          title={t(serverFailed ? 'modelChat.sync.listLoadFailed' : 'modelChat.list.loadFailed')}
+          onRetry={() => {
+            refetch();
+            merged.refetch();
+          }}
         />
       );
     }
@@ -287,13 +419,17 @@ function ScopedChatListScreen() {
     }
     return (
       <FlashList
-        data={[...chats]}
-        keyExtractor={chat => chat.sessionId}
+        data={[...rows]}
+        keyExtractor={row => row.key}
         renderItem={renderItem}
-        // Newest first: a chat that just arrived belongs on screen, and holding
-        // the old scroll position would put it above the top of the list.
         maintainVisibleContentPosition={{ disabled: true }}
         contentContainerStyle={listStyle}
+        onEndReached={() => {
+          if (merged.hasNextPage) {
+            merged.fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.5}
       />
     );
   }
@@ -316,6 +452,14 @@ function ScopedChatListScreen() {
         {localResetNotice.kind === 'present' ? (
           <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
         ) : null}
+        {gate.flagOn && gate.setting.kind === 'undecided' ? (
+          <ChatSyncPromptCard
+            onDecide={choice => {
+              void gate.decide(choice);
+            }}
+          />
+        ) : null}
+        {gate.enabled ? <ChatSyncListControls filters={filters} onChange={setFilters} /> : null}
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Fab

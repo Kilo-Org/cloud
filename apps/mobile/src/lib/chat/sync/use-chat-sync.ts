@@ -9,7 +9,6 @@ import { organizationIdOf } from '../layers';
 import type { ChatPlace } from '../scope';
 import type { ChatSummary } from '../store';
 import { syncClientFor } from './sync-client';
-import { onChatSettled } from './sync-hooks';
 import {
   mergeChatRows,
   selectSyncedListSurface,
@@ -21,7 +20,7 @@ import {
 import {
   bannerOf,
   onDeletedElsewhere,
-  uploadSettledChat,
+  registerSyncUploader,
   watchBanners,
   type SyncBanner,
 } from './sync-service';
@@ -77,9 +76,7 @@ export function useChatSyncUploader(place: ChatPlace | null, enabled: boolean): 
     if (place === null || !enabled) {
       return;
     }
-    return onChatSettled((sessionId, turns) => {
-      void uploadSettledChat(place, sessionId, turns);
-    });
+    return registerSyncUploader(place);
   }, [place, enabled]);
 }
 

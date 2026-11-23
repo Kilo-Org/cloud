@@ -54,7 +54,7 @@ export async function organizationBouncerAccountId(
 /**
  * The credit-event wire fields that describe the attributed account's client: its address, its
  * TLS/HTTP fingerprint, and the card it used. An organization row publishes them only while its
- * attributed account is active.
+ * attributed account is active; an absent account row counts as gone.
  */
 export const CREDIT_EVENT_CLIENT_FIELDS = [
   'ip',
@@ -87,7 +87,8 @@ export const CREDIT_EVENT_CLIENT_FIELDS = [
  * gone/deleting is skipped with a visible log. An organization event is reported against the root of
  * the organization family, with the family's totals, so a sub-organization lands on the payer its
  * family is known by; its `userId` is attribution, so the attributed account's state does not decide
- * the report.
+ * the report. An absent attributed account row counts as gone for field withholding: it names no
+ * client in this deployment, so there are no client fields to publish.
  */
 export async function enqueueCreditEvent(
   database: BouncerCreditEventOutboxTransaction,
@@ -97,8 +98,8 @@ export async function enqueueCreditEvent(
   // in `userId`, so the `FOR UPDATE` lock serializes the insert against a concurrent soft delete.
   // An organization event's subject is the organization, which `withOrganizationPayer` resolves
   // to the family payer; its `userId` is attribution only, so the row is always enqueued and the
-  // attributed client's fields are withheld while that account is gone or deleting. That branch
-  // takes `FOR SHARE` for the same serialization: a concurrent soft delete of the attributed
+  // attributed client's fields are withheld while that account is gone, deleting, or absent. That
+  // branch takes `FOR SHARE` for the same serialization: a concurrent soft delete of the attributed
   // account waits for this transaction, so the state read below cannot be overtaken by the cleanup
   // that deletes the account's outbox rows. Shared locks do not conflict with each other, so two
   // organization enqueues attributed to one account still run together.
@@ -124,9 +125,10 @@ export async function enqueueCreditEvent(
       .where(eq(kilocode_users.id, event.userId))
       .limit(1)
       .for('share');
-    attributedAccountGone = Boolean(
-      attributedAccount && isGoneOrDeletingBlockedReason(attributedAccount.blockedReason)
-    );
+    // An absent row means this deployment holds no client for the attributed account, so it has
+    // no client fields to publish either.
+    attributedAccountGone =
+      !attributedAccount || isGoneOrDeletingBlockedReason(attributedAccount.blockedReason);
   }
   const payerEvent = await withOrganizationPayer(database, event);
   const payload = creditEventWireBody(payerEvent);

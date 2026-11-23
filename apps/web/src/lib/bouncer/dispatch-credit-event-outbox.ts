@@ -159,9 +159,9 @@ async function dispatchCreditEvent(
   // A row whose subject is a personal account is delivered only while that account is active: the
   // owner is rechecked here and a gone/deleting account's row is dropped. An organization row is
   // delivered, because the organization is its subject, and it publishes the client-derived fields
-  // only while its attributed account is active; it keeps the account id, which is a required field
-  // of the credit-event contract and attribution rather than client data. The delete is fenced on
-  // this claim, so it never removes a row a newer claim owns.
+  // only while its attributed account is present and active; it keeps the account id, which is a
+  // required field of the credit-event contract and attribution rather than client data. The delete
+  // is fenced on this claim, so it never removes a row a newer claim owns.
   const organizationEvent = isOrganizationCreditEvent(row);
   const [owner] = await db
     .select({ blockedReason: kilocode_users.blocked_reason })
@@ -174,6 +174,8 @@ async function dispatchCreditEvent(
     await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
     return 'failed';
   }
+  // The personal drop above needs a real gone row; withholding also covers an absent one.
+  const attributedAccountGone = organizationEvent && (!owner || ownerGone);
 
   // Persisted JSON is untrusted at this boundary; fail a malformed row visibly, never silently.
   const body = parseBouncerCreditEventBody(row.payload);
@@ -186,8 +188,9 @@ async function dispatchCreditEvent(
     });
     return failed ? 'failed' : 'retried';
   }
-  if (organizationEvent && ownerGone) {
+  if (attributedAccountGone) {
     for (const field of CREDIT_EVENT_CLIENT_FIELDS) delete body[field];
+    logWarning('Withheld client fields of an organization credit event', outboxLogFields(row));
   }
 
   const result = await deliverCreditEventWireBody(body);

@@ -270,6 +270,53 @@ describe('bouncer credit-event outbox (integration)', () => {
     await db.delete(organizations).where(eq(organizations.id, org.id));
   });
 
+  it('enqueues an organization event whose attributed account row is absent, withholding fields', async () => {
+    const userId = `oauth/absent-org-actor-${randomUUID()}`;
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization with an absent billing actor',
+        microdollars_used: 2_000,
+        total_microdollars_acquired: 60_000,
+      })
+      .returning();
+
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-absent-actor',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 50_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      })
+    );
+
+    expect(result.enqueued).toBe(true);
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-absent-actor'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payload.orgId).toBe(org.id);
+    expect(rows[0]?.payload.userId).toBe(userId);
+    expect(rows[0]?.payload.ip).toBeUndefined();
+    expect(rows[0]?.payload.ipCountry).toBeUndefined();
+    expect(rows[0]?.payload.ja4).toBeUndefined();
+    expect(rows[0]?.payload.cardFingerprint).toBeUndefined();
+    expect(rows[0]?.payload.cardCountry).toBeUndefined();
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  });
+
   it('keeps the client fields of an organization event for an active attributed account', async () => {
     const user = await insertTestUser();
     const [org] = await db

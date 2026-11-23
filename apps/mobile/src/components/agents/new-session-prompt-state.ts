@@ -21,6 +21,34 @@ export function resolvePromptCounterRemaining(length: number): number | null {
   return remaining <= PROMPT_COUNTER_VISIBLE_REMAINING ? remaining : null;
 }
 
+/**
+ * Whether a keystroke has to re-ask whether the draft holds a visible
+ * character.
+ *
+ * The composer calls `hasVisibleComposerText` on every change. That walk returns
+ * at the first visible code point, so an ordinary draft pays one comparison;
+ * only a draft made entirely of spaces, zero-width marks or other fillers pays a
+ * full pass, which is still microseconds on a long draft. The saving here is the
+ * call and the walk it starts, not a large one: the answer cannot change on an
+ * append while it is already true, because the appended draft still holds the
+ * code point that made the previous one visible. Typing at the end, a paste at
+ * the end and a voice transcript append are all that shape. Every other edit — a
+ * deletion, a selection replaced in the middle, a clear — still asks the real
+ * question, and so does a draft that is currently invisible, because an append
+ * can be the first visible character.
+ */
+export function shouldRescanPromptVisibility(input: {
+  previous: string;
+  next: string;
+  publishedVisible: boolean;
+}): boolean {
+  const { previous, next, publishedVisible } = input;
+  if (!publishedVisible) {
+    return true;
+  }
+  return !next.startsWith(previous);
+}
+
 type NewSessionPromptControlInput = {
   attachmentsCount: number;
   attachmentMax: number;

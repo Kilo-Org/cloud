@@ -233,7 +233,7 @@ function CouncilScreen({
           <RowGroup leadingTile>
             <PreferenceRow
               icon={Users}
-              title={t('codeReviewer.council.title')}
+              title={t('codeReviewer.reviewDetail.council')}
               subtitle={t('codeReviewer.council.subtitle')}
               value={council.enabled}
               disabled={disabled || (belowMinimum && !council.enabled)}

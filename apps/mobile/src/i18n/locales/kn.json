@@ -1354,7 +1354,7 @@
       "severityNitpick": "ಸೂಕ್ಷ್ಮ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
       "tokensInOut": "{{input}} ಇನ್‌ಪುಟ್ / {{output}} ಔಟ್‌ಪುಟ್",
-      "council": "ಪರಿಶೀಲನಾ ಮಂಡಳಿ",
+      "council": "ಮಂಡಳಿ",
       "decision": "ನಿರ್ಧಾರ",
       "gate": "ಗುಣಮಟ್ಟದ ತಡೆ",
       "gateNone": "ಯಾವುದೂ ಇಲ್ಲ",

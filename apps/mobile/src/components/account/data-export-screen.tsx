@@ -153,9 +153,9 @@ export function DataExportScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <CenteredState>
-          {/* The answer paints a whole-surface state — the release notice or its
-              error — so the reserve is that same centered band, and neither
-              answer moves the content. */}
+          {/* The two whole-surface answers — the notice and the read error —
+              land in this same centered band; the released answer becomes the
+              content screen below the header instead. */}
           <ReleaseCheckSkeleton />
         </CenteredState>
       </View>

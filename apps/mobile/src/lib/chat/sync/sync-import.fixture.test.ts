@@ -68,7 +68,9 @@ async function importWith(options: {
   rememberChat(db, { sessionId: SESSION_ID, scope: 'user:personal', at: 1000 });
   stampServerSessionId({ db, sessionId: SESSION_ID, serverSessionId: SESSION_ID, sourceId: 'src' });
   const run = <A>(work: Effect.Effect<A, unknown, SessionStore>): Promise<A> =>
-    Effect.runPromise(Effect.provide(work, layerNodeStore(database)) as unknown as Effect.Effect<A>);
+    Effect.runPromise(
+      Effect.provide(work, layerNodeStore(database)) as unknown as Effect.Effect<A>
+    );
   const chosen = options.model;
   // The snapshot type carries an index signature on `origin`; the spread keeps
   // every field the reader validated, so one assertion states that contract.

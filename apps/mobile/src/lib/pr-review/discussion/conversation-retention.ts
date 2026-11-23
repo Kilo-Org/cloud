@@ -107,15 +107,7 @@ function liveEntry<C>(
   return entryOf(page, retained) ?? (retained.comments.length === 0 ? retained : EMPTY_RETAINED);
 }
 
-/**
- * Fallback used once the retention trim has evicted page one.
- *
- * The backend returns conversation comments on the first page only; later
- * pages carry `conversation: []`. Once `maxPages` trims the oldest page,
- * `pages[0]` is no longer the first page, so reading `pages[0].conversation`
- * would erase the comments. Prefer the current first page's conversation when
- * it is non-empty; otherwise fall back to the retained entry, marker included.
- */
+/** The live first-page entry, else the retained one. */
 export function retainConversation<C>(
   pages: readonly ConversationPage<C>[] | undefined,
   retained: RetainedConversation<C>

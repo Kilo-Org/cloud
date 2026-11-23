@@ -264,8 +264,6 @@ function Button({
   // its original children untouched. The fixed `icon` size has no label to
   // replace, so it draws the indicator inline instead.
   const usesBusyLayout = loading !== undefined && size !== 'icon';
-  // The children sit one level deeper in that layout, so their spacing moves
-  // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
   const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
   const busyMark = (

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useStackSafeReplace } from './stack-safe-replace';
+import { type StackSafeReplaceRouter, useStackSafeReplace } from './stack-safe-replace';
 
 type Route = { key: string; name: string };
 type State = { routes: Route[]; index: number };
@@ -15,9 +15,11 @@ type Nav = { state: State; transitionEnd: (() => void) | undefined };
 
 const nav = vi.hoisted<Nav>(() => ({ state: { routes: [], index: 0 }, transitionEnd: undefined }));
 
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: pushMock, replace: replaceMock }),
-  useNavigation: () => ({
+vi.mock('expo-router', () => {
+  // Real expo-router returns the same router and navigator objects on every
+  // render; a fresh object per call would defeat the memoisation under test.
+  const router = { push: pushMock, replace: replaceMock };
+  const navigation = {
     addListener: (event: string, listener: () => void) => {
       if (event === 'transitionEnd') {
         nav.transitionEnd = listener;
@@ -28,13 +30,19 @@ vi.mock('expo-router', () => ({
     },
     getState: () => nav.state,
     reset: resetMock,
-  }),
-}));
+  };
+  return {
+    useRouter: () => router,
+    useNavigation: () => navigation,
+  };
+});
 
+let latestRouter: StackSafeReplaceRouter | undefined = undefined;
 let latestReplace: ((href: string) => void) | undefined = undefined;
 
 function Harness() {
   const router = useStackSafeReplace();
+  latestRouter = router;
   latestReplace = router.replace as (href: string) => void;
   return null;
 }
@@ -75,6 +83,7 @@ describe('useStackSafeReplace', () => {
     replaceMock.mockReset();
     resetMock.mockReset();
     nav.transitionEnd = undefined;
+    latestRouter = undefined;
     latestReplace = undefined;
     setStack([TABS, r('new-1', 'agent-chat/new')], 1);
   });
@@ -304,6 +313,31 @@ describe('useStackSafeReplace', () => {
     endTransition();
 
     expect(resetMock).not.toHaveBeenCalled();
+
+    unmount(renderer);
+  });
+
+  it('returns the same object across renders, so callers can hold it in a dependency array', () => {
+    const renderer = mount();
+    const first = latestRouter;
+    if (!first) {
+      throw new Error('harness did not capture the router');
+    }
+
+    // An unrelated re-render must not hand callers a new `{ replace }`: the
+    // converted call sites keep this object in effect dependency arrays, and a
+    // fresh object on every render would rebuild their callbacks and
+    // re-subscribe their effects.
+    act(() => {
+      renderer.update(createElement(Harness));
+    });
+
+    expect(latestRouter).toBe(first);
+    expect(latestRouter?.replace).toBe(first.replace);
+
+    // The memoised object still replaces the way it did before.
+    latestRouter?.replace('/(app)/agent-chat/ses_1');
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith('/(app)/agent-chat/ses_1');
 
     unmount(renderer);
   });

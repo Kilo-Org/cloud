@@ -4,7 +4,7 @@ import test from 'node:test';
 import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import { InfraError } from './capture';
 import { normalize } from './rules';
-import { checkTouchOverlap, checkTouchTargets } from './rules/screen';
+import { checkOverlap, checkTouchOverlap, checkTouchTargets } from './rules/screen';
 import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
@@ -398,5 +398,80 @@ test('agent-device snapshot marks a scrolled box as one that clips what it draws
 
 test('a clipped text run leaves one tap owner on the message row', () => {
   const findings = checkTouchOverlap(normalize(agentDeviceToProbeDump(SCROLLED_TRANSCRIPT)));
+  assert.deepEqual(findings, []);
+});
+
+/**
+ * Frames measured on a 1080x2400 emulator (density 2.625) over the to-do detail
+ * header, where the fit check mounts a zero-opacity copy of the title to read
+ * the title's natural width. The platform reports that copy and the text inside
+ * it as not visible to the user; the visible pressable title is reported as
+ * visible. An accessibility snapshot carries no style, so only this flag keeps
+ * the copy out of the collision rules.
+ */
+const HIDDEN_TITLE_COPY = JSON.stringify({
+  data: {
+    androidSnapshot: { pixelDensity: 2.625 },
+    viewport: { width: 1080, height: 2400 },
+    nodes: [
+      node({
+        index: 0,
+        type: 'android.view.ViewGroup',
+        visibleToUser: true,
+        rect: { x: 0, y: 0, width: 1080, height: 2400 },
+      }),
+      node({
+        index: 1,
+        parentIndex: 0,
+        type: 'android.view.ViewGroup',
+        visibleToUser: false,
+        rect: { x: 37, y: 157, width: 1006, height: 130 },
+      }),
+      node({
+        index: 2,
+        parentIndex: 1,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        visibleToUser: false,
+        label: 'Rework the onboarding checklist so a new teammate can finish',
+        rect: { x: 37, y: 157, width: 1006, height: 130 },
+      }),
+      node({
+        index: 3,
+        parentIndex: 0,
+        type: 'android.widget.Button',
+        kind: 'button',
+        hittable: true,
+        visibleToUser: true,
+        label: 'Rework the onboarding checklist so a new teammate can finish, Rename task',
+        rect: { x: 135, y: 220, width: 908, height: 130 },
+      }),
+    ],
+  },
+});
+
+test('agent-device keeps a node the platform cannot show, marked as unseen', () => {
+  const dump = agentDeviceToProbeDump(HIDDEN_TITLE_COPY);
+  // The tree is not restructured: the copy stays, with its text under it, so the
+  // geometry rules still see the layout the app laid out.
+  assert.deepEqual(
+    dump.nodes.map(entry => [entry.tag, entry.invisible === true]),
+    [
+      ['View', false],
+      ['ViewGroup', false],
+      ['ViewGroup', true],
+      ['Paragraph', true],
+      ['Button', false],
+    ]
+  );
+  // A snapshot that never reports the flag reads as it did before.
+  assert.equal(
+    agentDeviceToProbeDump(SNAPSHOT).nodes.some(entry => entry.invisible === true),
+    false
+  );
+});
+
+test('a box the platform cannot show collides with nothing', () => {
+  const findings = checkOverlap(normalize(agentDeviceToProbeDump(HIDDEN_TITLE_COPY)));
   assert.deepEqual(findings, []);
 });

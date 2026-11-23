@@ -13,6 +13,13 @@ import { readAgentFrames } from './browser-agent-frames';
 import { preflightAgentCall } from './browser-agent-gate';
 import { SENSITIVE_REASON } from './browser-agent-checks';
 import type { BrowserGrant } from './browser-agent-checks';
+import type { WebMcpToolDescriptor } from './tab-debugger';
+
+/** These calls are not `browser_webmcp_call`: the gate reads no descriptor for them. */
+const NO_WEB_MCP_TOOLS: readonly WebMcpToolDescriptor[] | undefined = undefined;
+
+const noWebMcpTools = (): Promise<readonly WebMcpToolDescriptor[] | undefined> =>
+  Promise.resolve(NO_WEB_MCP_TOOLS);
 
 /** Runs the probe's own serialized source in a jsdom page, the way `scripting.executeScript` ships it. */
 const runInPage = (
@@ -338,7 +345,8 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { target: '#pay' },
         authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -376,7 +384,8 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { function: '(element) => element.ownerDocument.cookie', target: '#pay' },
         authorized,
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -421,7 +430,8 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { target: '#pay' },
         authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -517,7 +527,8 @@ describe('isolated refs inside a child frame', () => {
     preflightAgentCall({
       args: { target: 'e3' },
       authorized,
-      consumeStepToken: () => false,
+      consumeStepToken: () => ({ ok: false }),
+      readWebMcpTools: noWebMcpTools,
       session: framedSession(targets),
       sessionHandle: 'session-1',
       stepTokens: [],
@@ -567,7 +578,8 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'read', origin: PAY }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session,
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -601,7 +613,8 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'read', origin: SHOP }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session,
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -647,7 +660,8 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'act', origin: GITHUB }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
+        readWebMcpTools: noWebMcpTools,
         session,
         sessionHandle: 'session-1',
         stepTokens: [],

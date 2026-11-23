@@ -41,9 +41,8 @@ type PendingConsentOutcome = {
 // clears it so a queued enable can never fire after a revoke.
 let pendingConsentOutcome: PendingConsentOutcome | null = null;
 
-// Register once at module load: when PostHog becomes ready and an outcome is
-// pending, capture it and clear the pending slot. A not-ready transition
-// leaves the pending outcome in place for the next ready transition.
+// Register once at module load. A not-ready transition leaves the pending
+// outcome in place for the next ready transition.
 subscribeToPostHogReady(() => {
   if (isPostHogReady() && pendingConsentOutcome) {
     captureEvent(CONSENT_OUTCOME_EVENT, pendingConsentOutcome);
@@ -229,7 +228,6 @@ export async function revokeConsent(userId: string): Promise<void> {
     await SecureStore.deleteItemAsync(keyFor(userId));
     await SecureStore.deleteItemAsync(legacyKeyFor(userId));
   });
-  // A queued enable outcome must never fire after revoke.
   pendingConsentOutcome = null;
   captureEvent(CONSENT_OUTCOME_EVENT, { action: 'revoked', optional: false });
   await flushLastPostHogEvent();

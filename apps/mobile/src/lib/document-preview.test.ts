@@ -90,6 +90,10 @@ vi.mock('expo-sharing', () => ({
   shareAsync: vi.fn(),
 }));
 
+// The share module this suite imports for real now reaches `expo/fetch`, whose
+// runtime is not loadable in the node project; every transfer here is mocked.
+vi.mock('expo/fetch', () => ({ fetch: vi.fn() }));
+
 const downloadRemoteFile = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/share-remote-file', async importOriginal => {

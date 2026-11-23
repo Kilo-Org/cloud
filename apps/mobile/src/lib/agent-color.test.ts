@@ -54,8 +54,6 @@ describe('stateTint', () => {
     const idle = stateTint('idle');
     expect(idle).toBe(IDLE_TINT);
     expect(idle.hueTextClass).toBe('text-secondary-foreground');
-    // The strip token, not the settings-tile hairline: the hairline composites
-    // to about 1.1:1 on the page, so an idle row would carry no leading mark.
     expect(idle.hueClass).toBe('bg-session-strip');
     expect(idle).not.toBe(stateTint('live'));
     expect(idle).not.toBe(stateTint('unknown'));

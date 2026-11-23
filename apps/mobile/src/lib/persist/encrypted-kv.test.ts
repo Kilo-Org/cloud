@@ -46,8 +46,8 @@ let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
 // `PRAGMA journal_mode = WAL` returns the mode the connection switched to.
-// node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
-// this seam and the test can force a rejected switch.
+// The fake's `getFirstSync` answers this pragma itself, so a test can force a
+// rejected switch or a non-WAL answer.
 let journalMode = 'wal';
 // Simulates an engine that rejects the pragma outright instead of answering
 // with the mode it kept.
@@ -55,6 +55,13 @@ let failJournalMode = false;
 // Simulates a native handle that will not close. A leaked handle must not be
 // replaced by a second connection to the same file.
 let failClose = false;
+// Fails the next `deleteDatabaseAsync` the way a refused file delete does, so
+// the recovery's delete branch and its marker rollback can be proven.
+let failNextDelete = false;
+// Keys whose `setItemAsync` the fake keychain refuses, the way a closed
+// keychain refuses a write. A refusal must never reach the database key, so the
+// fake rejects only the keys listed here.
+const failSetKeys = new Set<string>();
 // Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
 // no row, exactly as plain SQLite does for an unrecognized pragma.
 let hasSQLCipher = true;
@@ -259,6 +266,9 @@ function createFakeDatabase(): FakeDatabase {
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => store.get(key) ?? null),
   setItemAsync: vi.fn(async (key: string, value: string) => {
+    if (failSetKeys.has(key)) {
+      throw new Error('keychain refused the write');
+    }
     store.set(key, value);
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -285,6 +295,10 @@ vi.mock('expo-sqlite', () => ({
   // The native delete drops the file under the handle, so the next open starts
   // from an empty database.
   deleteDatabaseAsync: vi.fn(async () => {
+    if (failNextDelete) {
+      failNextDelete = false;
+      throw new Error('delete failed');
+    }
     resetDatabaseFile();
   }),
 }));
@@ -297,9 +311,15 @@ vi.mock('@sentry/react-native', () => ({
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
-import { PERSIST_DB_KEY, PERSIST_MIGRATION_FAILURES_KEY } from '@/lib/storage-keys';
-import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
+  PERSIST_DB_KEY,
+  PERSIST_MIGRATION_FAILURES_KEY,
+  PERSIST_RESET_NOTICE_KEY,
+} from '@/lib/storage-keys';
+import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import {
+  clearPersistedResetNotice,
   clearScope,
   clearScopePrefix,
   getItem,
@@ -308,6 +328,7 @@ import {
   listEntryValues,
   listValues,
   MissingSQLCipherError,
+  readPersistedResetNotice,
   removeItem,
   removeItemIfValue,
   resetEncryptedKvOpenForTests,
@@ -335,6 +356,8 @@ beforeEach(() => {
   journalMode = 'wal';
   failJournalMode = false;
   failClose = false;
+  failNextDelete = false;
+  failSetKeys.clear();
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
@@ -760,6 +783,164 @@ describe('open failure recovery', () => {
   });
 });
 
+describe('reset notice marker', () => {
+  it.each([
+    {
+      path: 'a probe failure',
+      reset: () => {
+        failNextProbe = true;
+      },
+    },
+    {
+      path: 'a corruption inside the migration',
+      reset: () => {
+        failNextMigration = true;
+        nextMigrationMessage = 'database disk image is malformed';
+      },
+    },
+  ])('$path leaves the marker the notice reads', async ({ reset }) => {
+    reset();
+    await setItem('s', 'a', 'x');
+
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBe('1');
+  });
+
+  it('the three-strike migration reset leaves the marker', async () => {
+    // A healthy launch writes, then the count climbs across relaunches.
+    await setItem('draft:u1', 'k', 'v');
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    // A kept file is not a loss, so no notice may appear.
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+
+    // The third failure reaches the threshold and deletes the file.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBeNull();
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBe('1');
+  });
+
+  it('a counted migration failure that keeps the file leaves the marker unset', async () => {
+    await setItem('draft:u1', 'k', 'v');
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+  });
+
+  it('a busy failure that keeps the file leaves the marker unset', async () => {
+    await setItem('draft:u1', 'k', 'v');
+
+    failNextMigration = true;
+    nextMigrationMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+  });
+
+  it('reads the marker after a reset and reads it as cleared once it is deleted', async () => {
+    failNextProbe = true;
+    await setItem('s', 'a', 'x');
+
+    await expect(readPersistedResetNotice()).resolves.toBe(true);
+
+    await clearPersistedResetNotice();
+    await expect(readPersistedResetNotice()).resolves.toBe(false);
+  });
+
+  it('reads the flag on the very launch whose open performs the reset', async () => {
+    // No open has run yet, exactly as on the launch that finds the file
+    // unreadable: the read arrives before the open, and the reset writes the
+    // marker inside it. A reader that raced the open would answer false and the
+    // loss would show as an ordinary empty store until the next relaunch.
+    failNextProbe = true;
+
+    await expect(readPersistedResetNotice()).resolves.toBe(true);
+  });
+
+  it('reads only the flag value as a notice', async () => {
+    store.set(PERSIST_RESET_NOTICE_KEY, 'yes');
+
+    await expect(readPersistedResetNotice()).resolves.toBe(false);
+  });
+
+  it('a refused delete leaves no marker and still rejects the open', async () => {
+    failNextProbe = true;
+    failNextDelete = true;
+
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('delete failed');
+
+    // The file was never removed, so no notice may claim a loss.
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+  });
+
+  it('a refused marker write still recreates the store and reports the refusal', async () => {
+    // The keychain refuses the marker while protected data reads as available,
+    // so `writeStoredValueSafe` answers `false` on its own. The delete already
+    // removed the data, so a silent refusal would leave the person with neither
+    // the notice nor any record of the loss.
+    failSetKeys.add(PERSIST_RESET_NOTICE_KEY);
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    try {
+      failNextProbe = true;
+
+      // The recovery completes: a refused marker is reported, not fatal.
+      await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
+    } finally {
+      setTelemetrySink(null);
+    }
+
+    // The data was removed and the store was recreated under a fresh key.
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    // The marker did not land, which is exactly what the report has to say.
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(PERSIST_RESET_NOTICE_KEY, '1');
+
+    // The secure-store helper still reports its own failed write.
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        level: 'warning',
+        tags: { 'error.subsystem': 'secure_store', 'error.operation': 'write' },
+      })
+    );
+    // The reset is still reported under its own operation, and the marker
+    // refusal carries its own tag so the two never merge into one issue.
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset-notice-marker' },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('migration failure keeps the database', () => {
   it('a_migration_failure_does_not_delete_the_file_or_regenerate_the_key', async () => {
     // A healthy open stores a value and the key it opened with.
@@ -824,10 +1005,6 @@ describe('migration failure keeps the database', () => {
   });
 
   it('a_corrupt_page_that_fails_inside_the_migration_resets_like_a_probe_failure', async () => {
-    // Damage past the first page passes the `sqlite_master` count and fails
-    // inside `migrate()` instead. The engine message routes it into the same
-    // recovery: an unrecoverable file must not leave the store broken for
-    // every later launch.
     failNextMigration = true;
     nextMigrationMessage = 'database disk image is malformed';
     await setItem('s', 'a', 'x');

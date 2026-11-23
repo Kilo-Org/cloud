@@ -159,7 +159,7 @@ function command(runtime: PackagedRuntime, deadlineAt = Date.now() + 30_000) {
 function run(
   root: string,
   runtime: PackagedRuntime,
-  options: { deadlineAt?: number; poison?: boolean } = {}
+  options: { deadlineAt?: number; poison?: boolean; env?: Record<string, string> } = {}
 ) {
   const name = `ca-runtime-installer-${randomUUID()}`;
   names.add(name);
@@ -185,6 +185,7 @@ function run(
     'CLOUD_AGENT_SENTRY_DSN=https://test-public-key@sentry.invalid/1',
     '--env',
     'CLOUD_AGENT_SENTRY_ENVIRONMENT=runtime-installer-test',
+    ...Object.entries(options.env ?? {}).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
     ...(options.poison
       ? [
           '--env',
@@ -232,7 +233,7 @@ function run(
 async function succeeds(
   root: string,
   runtime: PackagedRuntime,
-  options: { poison?: boolean } = {}
+  options: { poison?: boolean; env?: Record<string, string> } = {}
 ) {
   select(runtime);
   const result = await run(root, runtime, options).completed;
@@ -253,6 +254,27 @@ async function fails(
   assert.deepEqual(reports, [{ allocationId, code: expected, authenticated: true }]);
   await assert.rejects(fs.access(path.join(root, 'workspace/starts-B')));
 }
+
+void test('optional proxy and CA settings preserve absence and configured values', async () => {
+  const runtime = await fixtureRuntime();
+  const settings = {
+    HTTPS_PROXY: 'http://proxy.test:3128',
+    HTTP_PROXY: 'http://proxy.test:3128',
+    NO_PROXY: 'host.docker.internal,localhost,127.0.0.1,::1',
+    NODE_USE_ENV_PROXY: '1',
+    NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt',
+    SSL_CERT_FILE: '/etc/ssl/certs/ca-certificates.crt',
+    SSL_CERT_DIR: '/etc/ssl/certs',
+    GIT_SSL_CAINFO: '/workspace/app/custom ca.pem',
+    CURL_CA_BUNDLE: '/etc/ssl/certs/ca-certificates.crt',
+    REQUESTS_CA_BUNDLE: '/etc/ssl/certs/ca-certificates.crt',
+  };
+  const absent = await succeeds(await setup(), runtime);
+  for (const name of Object.keys(settings)) assert.equal(absent.env[name], undefined, name);
+  const configured = await succeeds(await setup(), runtime, { env: settings });
+  for (const [name, value] of Object.entries(settings))
+    assert.equal(configured.env[name], value, name);
+});
 
 void test('fresh bootstrap selects the runtime and leaves user files, configuration and an executable dependency intact', async () => {
   const root = await setup();

@@ -199,9 +199,6 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
     }
     const declared = declaredTelemetryDescription(error);
     if (declared?.report === 'none') {
-      // The network layer owns this answer (an error-status response, or a
-      // transport failure it keeps as a breadcrumb): a second record here would
-      // duplicate it.
       return;
     }
     captureTelemetry({

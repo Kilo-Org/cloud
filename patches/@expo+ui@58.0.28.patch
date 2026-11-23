@@ -1,5 +1,5 @@
 diff --git a/android/build.gradle b/android/build.gradle
-index 231d507..21e27cf 100644
+index 231d50775f7c9ca7679f1a733b5fd26eecfb75fe..21e27cf9ddd1ce96e9b330606ec8eb65f4da22e0 100644
 --- a/android/build.gradle
 +++ b/android/build.gradle
 @@ -48,6 +48,10 @@ dependencies {
@@ -14,7 +14,7 @@ index 231d507..21e27cf 100644
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index 9ca0932..7ec42f0 100644
+index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b7d8706c7 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 @@ -5,9 +5,16 @@ package expo.modules.ui
@@ -86,15 +86,11 @@ index 9ca0932..7ec42f0 100644
    val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
    val modifiers: ModifierList = emptyList()
  ) : ComposeProps
-@@ -62,6 +94,16 @@ private fun Activity.isAcceptingText(): Boolean {
+@@ -62,6 +94,12 @@ private fun Activity.isAcceptingText(): Boolean {
    return inputMethodManager?.isAcceptingText == true
  }
  
-+/**
-+ * Repo-local, for `contentOwnsTopInset` callers: stop the sheet's own dialog window from also
-+ * fitting the system bars. See the prop's documentation — the two together keep the sheet's box
-+ * at the size its first painted frame already has.
-+ */
++/** Disables decor fitting on the sheet's own dialog window, for `contentOwnsTopInset` callers. */
 +private fun stopDecorFittingSystemBars(sheet: View) {
 +  val window = (sheet.parent as? DialogWindowProvider)?.window ?: return
 +  WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -103,7 +99,7 @@ index 9ca0932..7ec42f0 100644
  /**
   * Material3 shows [ModalBottomSheet] in its own dialog window. Android sends key events to the
   * focused window, so the activity does not get them while the sheet is open. Key triggers that
-@@ -74,7 +116,8 @@ private fun Activity.isAcceptingText(): Boolean {
+@@ -74,7 +112,8 @@ private fun Activity.isAcceptingText(): Boolean {
   * Without this check, typing "rr" in a sheet TextInput reloads the app.
   */
  @Composable
@@ -113,7 +109,7 @@ index 9ca0932..7ec42f0 100644
    val dialog = (LocalView.current.parent as? DialogWindowProvider)?.window?.callback as? Dialog
    if (dialog == null || activity == null) {
      return
-@@ -82,6 +125,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+@@ -82,6 +121,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
  
    DisposableEffect(dialog, activity) {
      dialog.setOnKeyListener { _, keyCode, event ->
@@ -124,18 +120,13 @@ index 9ca0932..7ec42f0 100644
        val isForwardable = event.action == KeyEvent.ACTION_UP &&
          keyCode != KeyEvent.KEYCODE_BACK &&
          keyCode != KeyEvent.KEYCODE_ESCAPE &&
-@@ -94,6 +141,38 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+@@ -94,6 +137,33 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
    }
  }
  
 +/**
-+ * The resources Compose resolves platform strings from, for [localeTag]. The
-+ * sheet's own platform strings (the scrim's dismiss label, the drag handle, the
-+ * pane title) come from Material3 and resolve against whatever locale its
-+ * resources carry — by default the device locale, which contradicts an app whose
-+ * UI language is a different one. Only the locale is replaced: the configuration
-+ * is a copy of the activity's, so layout direction, density and theme are
-+ * unchanged.
++ * The resources Compose resolves platform strings from for [localeTag], or null when no tag is
++ * set. The configuration is a copy of the context's, so only the locale changes.
 + */
 +private fun localizedResources(context: Context?, localeTag: String?): Resources? {
 +  if (context == null || localeTag.isNullOrEmpty()) {
@@ -163,7 +154,7 @@ index 9ca0932..7ec42f0 100644
  @Composable
  fun FunctionalComposableScope.ModalBottomSheetContent(
    props: ModalBottomSheetViewProps,
-@@ -153,31 +232,64 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+@@ -153,31 +223,64 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
      }
    val resolvedScrimColor = props.scrimColor.composeOrNull ?: BottomSheetDefaults.ScrimColor
    val dragHandleSlotView = findChildSlotView(view, "dragHandle")
@@ -251,7 +242,7 @@ index 9ca0932..7ec42f0 100644
  
    LaunchedEffect(Unit) {
 diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
-index cafa206..c665f4e 100644
+index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..c665f4e0bbcc1293a3d5e61d49d5c748a2cbb543 100644
 --- a/build/community/bottom-sheet/BottomSheet.android.js
 +++ b/build/community/bottom-sheet/BottomSheet.android.js
 @@ -37,7 +37,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
@@ -365,7 +356,7 @@ index cafa206..c665f4e 100644
                      properties: {
                          shouldDismissOnBackPress: enablePanDownToClose,
 diff --git a/build/community/bottom-sheet/BottomSheet.ios.js b/build/community/bottom-sheet/BottomSheet.ios.js
-index 7aff398..e721357 100644
+index 7aff3986d0287f80e8dd9d5e248dd61d0e2e56a8..e721357b3a7e5748deccb186701269624d5f4535 100644
 --- a/build/community/bottom-sheet/BottomSheet.ios.js
 +++ b/build/community/bottom-sheet/BottomSheet.ios.js
 @@ -71,7 +71,7 @@ function findNearestDetentIndex(detents, position) {
@@ -431,7 +422,7 @@ index 7aff398..e721357 100644
                      children: /*#__PURE__*/ _jsx(Group, {
                          modifiers: modifiers,
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
-index cf72b27..592a831 100644
+index cf72b27f4304b6772a844acd0eb144796c03b5c0..f7b8c3184f7f4ade0844190f8ae78388da1f6f31 100644
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts
 @@ -169,6 +169,40 @@ export interface BottomSheetProps {
@@ -445,8 +436,8 @@ index cf72b27..592a831 100644
 +     */
 +    dismissGestures?: boolean;
 +    /**
-+     * Called before a native dismissal the sheet received by itself (iOS backdrop
-+     * tap, Android back press or scrim tap). Return `false` to keep it presented.
++     * Called before the Android sheet's own dismissal (back press or scrim tap).
++     * Return `false` to keep it presented.
 +     * Repo-local.
 +     */
 +    onRequestDismiss?: () => boolean;
@@ -476,7 +467,7 @@ index cf72b27..592a831 100644
       * Whether the sheet should automatically size to fit its content.
       * @default true
 diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
-index 6d3806c..57038a4 100644
+index 6d3806c8213034310a304287da1e609453d30243..57038a48ffb2eaa2a3115a5ce67af0f57596eba1 100644
 --- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
 +++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
 @@ -78,6 +78,15 @@ export interface ModalBottomSheetProps {
@@ -496,7 +487,7 @@ index 6d3806c..57038a4 100644
       * Properties for the modal window behavior.
       */
 diff --git a/build/jetpack-compose/ModalBottomSheet/index.js b/build/jetpack-compose/ModalBottomSheet/index.js
-index ba36efa..4f3919c 100644
+index ba36efa65298eff84f5614318ee5b3e8c76ec0f7..4f3919c528a498641ea798b35c3e7c058512a10c 100644
 --- a/build/jetpack-compose/ModalBottomSheet/index.js
 +++ b/build/jetpack-compose/ModalBottomSheet/index.js
 @@ -12,6 +12,7 @@ function transformProps(props) {
@@ -508,7 +499,7 @@ index ba36efa..4f3919c 100644
              onDismissRequest?.();
          }
 diff --git a/build/swift-ui/BottomSheet/index.d.ts b/build/swift-ui/BottomSheet/index.d.ts
-index c39af1a..8788ce5 100644
+index c39af1a4010e20bcf702b52582f6de25c1eb73ba..8788ce51b76ab18f89e00b894cea684a1e4b8d02 100644
 --- a/build/swift-ui/BottomSheet/index.d.ts
 +++ b/build/swift-ui/BottomSheet/index.d.ts
 @@ -35,6 +35,17 @@ export interface BottomSheetProps extends CommonViewModifierProps {
@@ -530,7 +521,7 @@ index c39af1a..8788ce5 100644
  /**
   * `BottomSheet` presents content from the bottom of the screen.
 diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
-index 2a5e57b..121d743 100644
+index 2a5e57bc85660a666fc95f42b5a284ba16ebaf53..121d743b4fdb52213a08fbd2b1b75a3d2e103445 100644
 --- a/build/swift-ui/Text/index.d.ts
 +++ b/build/swift-ui/Text/index.d.ts
 @@ -1,9 +1,19 @@
@@ -556,7 +547,7 @@ index 2a5e57b..121d743 100644
      /**
       * Text content or nested Text components.
 diff --git a/ios/BottomSheetView.swift b/ios/BottomSheetView.swift
-index b331018..ef24300 100644
+index b331018ac492033c951ab5d51add0a98292e0989..ef243008cd221bffc03bfb89b4ffb39411e5b966 100644
 --- a/ios/BottomSheetView.swift
 +++ b/ios/BottomSheetView.swift
 @@ -6,8 +6,15 @@ import ExpoModulesCore
@@ -801,7 +792,7 @@ index b331018..ef24300 100644
    }
  
 diff --git a/ios/TextView.swift b/ios/TextView.swift
-index 7dfe0a9..a56405c 100644
+index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad0337b05607b 100644
 --- a/ios/TextView.swift
 +++ b/ios/TextView.swift
 @@ -5,11 +5,12 @@ import ExpoModulesCore
@@ -835,7 +826,7 @@ index 7dfe0a9..a56405c 100644
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index 2900e12..08afe39 100644
+index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac6bc85d53 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
 @@ -61,6 +61,18 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -962,7 +953,7 @@ index 2900e12..08afe39 100644
              properties={{
                shouldDismissOnBackPress: enablePanDownToClose,
 diff --git a/src/community/bottom-sheet/BottomSheet.ios.tsx b/src/community/bottom-sheet/BottomSheet.ios.tsx
-index ee198cf..9534e5c 100644
+index ee198cf8a3fe168cc319acb7460f11bcb4690c6e..9534e5c7e4c8842f9a4abe6c1a4c6c8553557d51 100644
 --- a/src/community/bottom-sheet/BottomSheet.ios.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.ios.tsx
 @@ -89,6 +89,10 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -1031,7 +1022,7 @@ index ee198cf..9534e5c 100644
              <Group modifiers={modifiers}>
                <RNHostView matchContents={fitToContents ? { vertical: true } : false}>
 diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
-index 51326fb..f504d1c 100644
+index 51326fbfdeb9642f52e6fe244093cc697fa585f7..e7d2260ffe0197475368e9a7e061b2d684f7354d 100644
 --- a/src/community/bottom-sheet/types.ts
 +++ b/src/community/bottom-sheet/types.ts
 @@ -191,6 +191,62 @@ export interface BottomSheetProps {
@@ -1053,9 +1044,9 @@ index 51326fb..f504d1c 100644
 +  dismissGestures?: boolean;
 +
 +  /**
-+   * Called before a native dismissal the sheet received by itself (iOS backdrop
-+   * tap, Android back press or scrim tap). Return `false` to keep it presented;
-+   * the caller usually answers with a confirmation. Repo-local.
++   * Called before the Android sheet's own dismissal (back press or scrim tap).
++   * Return `false` to keep it presented; the caller usually answers with a
++   * confirmation. Repo-local.
 +   *
 +   * @remarks A drag dismissal has already started when it is reported and cannot
 +   * be vetoed, so pair this with `dismissGestures={false}` on a surface that must
@@ -1098,7 +1089,7 @@ index 51326fb..f504d1c 100644
     * Whether the sheet should automatically size to fit its content.
     * @default true
 diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
-index c3225b1..0a133ca 100644
+index c3225b1d9c7c0636d366203e2b23f536fec9e54e..0a133ca1524a7dbfbe38f90ce21ee1ac08d71505 100644
 --- a/src/jetpack-compose/ModalBottomSheet/index.tsx
 +++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
 @@ -92,6 +92,20 @@ export interface ModalBottomSheetProps {
@@ -1123,7 +1114,7 @@ index c3225b1..0a133ca 100644
     * Properties for the modal window behavior.
     */
 diff --git a/src/swift-ui/BottomSheet/index.tsx b/src/swift-ui/BottomSheet/index.tsx
-index 3f111f5..ebee6cf 100644
+index 3f111f57a556deae32d7a45ff2901dcf013d1eac..ebee6cf58b455a231743dfd0582dab9486450f47 100644
 --- a/src/swift-ui/BottomSheet/index.tsx
 +++ b/src/swift-ui/BottomSheet/index.tsx
 @@ -42,6 +42,17 @@ export interface BottomSheetProps extends CommonViewModifierProps {
@@ -1145,7 +1136,7 @@ index 3f111f5..ebee6cf 100644
  
  type NativeBottomSheetProps = Omit<
 diff --git a/src/swift-ui/Text/index.tsx b/src/swift-ui/Text/index.tsx
-index 788da86..ca5d498 100644
+index 788da8626d019e9b861bc712e0c8d8db968a98ae..ca5d498a35267c62edb862738c8877ec91d72c72 100644
 --- a/src/swift-ui/Text/index.tsx
 +++ b/src/swift-ui/Text/index.tsx
 @@ -6,9 +6,19 @@ import { createViewModifierEventListener } from '../modifiers/utils';

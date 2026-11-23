@@ -64,8 +64,8 @@ export function modelReferenceLabel(reference: string): string {
  * so printing them verbatim put `~deepseek/deepseek-flash-latest` under the
  * summary text while the briefing settings picker showed the same model as
  * `DeepSeek Flash Latest`. Copy never prints a raw reference: a reference the
- * catalog does not carry (offline, cold cache, retired model) falls back to its
- * last path segment with hyphens as spaces, without the `~` latest-alias marker.
+ * catalog does not carry (offline, cold cache, retired model) falls back to
+ * the form `formatModelReferenceName` describes.
  */
 export function resolveCatalogModelName(model: string, catalog: readonly NamedModel[]): string {
   const option = catalog.find(item => item.id === model);

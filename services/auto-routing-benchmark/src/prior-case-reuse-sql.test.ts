@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { scheduleRunChunks } from './scheduler';
 import {
   getPendingDeciderOutput,
   markRunCompleted,
@@ -90,7 +91,7 @@ function sqliteBinding(sqlite: DatabaseSync): SqliteBinding {
 
 function insertRow(
   db: DatabaseSync,
-  table: 'benchmark_runs' | 'case_results' | 'pending_decider_outputs',
+  table: 'benchmark_runs' | 'benchmark_profiles' | 'case_results' | 'pending_decider_outputs',
   row: Record<string, unknown>
 ) {
   const columns = Object.keys(row);
@@ -250,6 +251,14 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
 
   afterEach(() => sqlite.close());
 
+  /** The destination row and the reuse bind always carry the same repetition count. */
+  function destinationRepetitions(repetitions: number) {
+    sqlite
+      .prepare('UPDATE benchmark_runs SET repetitions = ? WHERE id = ?')
+      .run(repetitions, 'destination');
+    return { ...reuseParams, repetitions };
+  }
+
   it('atomically removes only the exact pending payload after inserts and updates', async () => {
     insertPending(sqlite, 'destination', 'graded');
     insertPending(sqlite, 'destination', 'graded', undefined, { rep: 1 });
@@ -382,12 +391,11 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(0);
   });
 
-  it('requires compatible terminal decider identity, router, repetitions and exact concrete pair', async () => {
+  it('requires compatible terminal decider identity, router and exact concrete pair', async () => {
     const incompatibleRuns = [
       { id: 'dataset', engine_identity: 'other-dataset:engine' },
       { id: 'engine', engine_identity: 'dataset:other-engine' },
       { id: 'router', router: 'frontier' },
-      { id: 'reps', repetitions: 1 },
       { id: 'classifier', kind: 'classifier' },
       { id: 'running', status: 'running' },
       { id: 'queued', status: 'pending' },
@@ -406,6 +414,101 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(0);
     expect(results(sqlite, 'destination')).toEqual([]);
     expect(pending(sqlite, 'destination')).toEqual([]);
+  });
+
+  it('reuses a shorter prior for the repetitions it measured and leaves the rest unmeasured', async () => {
+    insertRun(sqlite, 'short', { repetitions: 1 });
+    insertCase(sqlite, 'short', 'a', { score: 0.4 });
+    insertCase(sqlite, 'short', 'b', { score: 0.5 });
+
+    expect(await reuseDeciderCaseResults(adapter.binding, destinationRepetitions(3))).toBe(2);
+    expect(results(sqlite, 'destination').map(row => [row.case_id, row.rep, row.score])).toEqual([
+      ['a', 0, 0.4],
+      ['b', 0, 0.5],
+    ]);
+  });
+
+  it('fills every repetition from a prior run of the same repetition count', async () => {
+    insertRun(sqlite, 'long', { repetitions: 3 });
+    for (const [rep, score] of [
+      [0, 0.4],
+      [1, 0.5],
+      [2, 0.6],
+    ]) {
+      insertCase(sqlite, 'long', 'a', { rep, score });
+    }
+
+    expect(await reuseDeciderCaseResults(adapter.binding, destinationRepetitions(3))).toBe(3);
+    expect(results(sqlite, 'destination').map(row => [row.rep, row.score])).toEqual([
+      [0, 0.4],
+      [1, 0.5],
+      [2, 0.6],
+    ]);
+  });
+
+  it('reuses only the first repetition of a longer prior run', async () => {
+    insertRun(sqlite, 'long', { repetitions: 3 });
+    for (const [rep, score] of [
+      [0, 0.4],
+      [1, 0.5],
+      [2, 0.6],
+    ]) {
+      insertCase(sqlite, 'long', 'a', { rep, score });
+      insertPending(sqlite, 'long', 'ungraded', undefined, { rep });
+    }
+
+    expect(await reuseDeciderCaseResults(adapter.binding, destinationRepetitions(1))).toBe(1);
+    expect(results(sqlite, 'destination').map(row => [row.rep, row.score])).toEqual([[0, 0.4]]);
+    expect(pending(sqlite, 'destination').map(row => [row.case_id, row.rep])).toEqual([
+      ['ungraded', 0],
+    ]);
+  });
+
+  it('never copies one stored repetition into another repetition', async () => {
+    insertRun(sqlite, 'older', { repetitions: 3, started_at: '2026-10-01T00:00:00.000Z' });
+    insertCase(sqlite, 'older', 'a', { score: 0.4 });
+    insertRun(sqlite, 'newer', { repetitions: 1, started_at: '2026-10-02T00:00:00.000Z' });
+    insertCase(sqlite, 'newer', 'a', { score: 0.9 });
+    insertPending(sqlite, 'older', 'ungraded');
+    insertPending(sqlite, 'newer', 'ungraded');
+
+    expect(await reuseDeciderCaseResults(adapter.binding, destinationRepetitions(3))).toBe(1);
+    expect(results(sqlite, 'destination').map(row => [row.case_id, row.rep, row.score])).toEqual([
+      ['a', 0, 0.9],
+    ]);
+    expect(pending(sqlite, 'destination').map(row => [row.case_id, row.rep])).toEqual([
+      ['ungraded', 0],
+    ]);
+  });
+
+  it('skips invalidated and failed priors while an older clean prior still fills its repetition', async () => {
+    insertRun(sqlite, 'invalidated', { repetitions: 1, started_at: '2026-10-01T00:00:00.000Z' });
+    insertRun(sqlite, 'failed', { repetitions: 1, started_at: '2026-10-02T00:00:00.000Z' });
+    insertRun(sqlite, 'valid', { repetitions: 1, started_at: '2026-10-03T00:00:00.000Z' });
+    insertCase(sqlite, 'invalidated', 'i', { score: 0.1 });
+    insertCase(sqlite, 'failed', 'f', { score: 0.2, error: 'CLI infrastructure failed' });
+    insertCase(sqlite, 'valid', 'v', { score: 0.3 });
+    insertPending(sqlite, 'invalidated', 'ungraded');
+    const exitFailure = pendingPayload('failed');
+    exitFailure.result.exitCode = 1;
+    insertPending(sqlite, 'failed', 'ungraded', JSON.stringify(exitFailure));
+    insertPending(sqlite, 'valid', 'ungraded');
+    insertRow(sqlite, 'benchmark_profiles', {
+      router: 'efficient',
+      model: 'concrete/model',
+      variant: 'high',
+      engine_identity: 'dataset:engine',
+      repetitions: 1,
+      invalidated_at: '2026-10-01T12:00:00.000Z',
+    });
+
+    expect(await reuseDeciderCaseResults(adapter.binding, destinationRepetitions(2))).toBe(1);
+    expect(results(sqlite, 'destination').map(row => [row.case_id, row.rep, row.score])).toEqual([
+      ['v', 0, 0.3],
+    ]);
+    expect(pending(sqlite, 'destination').map(row => [row.case_id, row.rep])).toEqual([
+      ['ungraded', 0],
+    ]);
   });
 
   it('never reuses historical alias-keyed rows even when explicitly requested', async () => {
@@ -660,16 +763,16 @@ describe('reuse statements on production migrations', () => {
     id: string,
     status: string,
     startedAt: string,
-    { router = 'efficient', purpose = 'platform' } = {}
+    { router = 'efficient', purpose = 'platform', repetitions = 2 } = {}
   ) {
     sqlite
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
         min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity
-      ) VALUES (?, ?, 'decider', ?, ?, ?, 0.7, 3, 0, 2, 'dataset:engine')
+      ) VALUES (?, ?, 'decider', ?, ?, ?, 0.7, 3, 0, ?, 'dataset:engine')
     `)
-      .run(id, router, purpose, status, startedAt);
+      .run(id, router, purpose, status, startedAt, repetitions);
   }
 
   function insertProductionCase(
@@ -735,6 +838,54 @@ describe('reuse statements on production migrations', () => {
     ).toEqual([
       { case_id: 'a', score: 0.9 },
       { case_id: 'b', score: 0.2 },
+    ]);
+  });
+
+  it('leaves the repetitions a shorter prior never measured for the scheduler', async () => {
+    insertProductionRun('prior', 'completed', '2026-10-01T00:00:00.000Z', { repetitions: 1 });
+    insertProductionRun('destination', 'running', '2026-10-05T00:00:00.000Z', {
+      repetitions: 3,
+    });
+    insertProductionCase('prior', 'm', 'a', 0.4);
+    insertProductionCase('prior', 'm', 'b', 0.5);
+    const db = sqliteD1(sqlite);
+
+    expect(
+      await reuseDeciderCaseResults(db, {
+        ...reuseParams,
+        repetitions: 3,
+        entries: [{ model: 'm', variant: null }],
+      })
+    ).toBe(2);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT case_id, rep FROM case_results WHERE run_id = 'destination' ORDER BY case_id"
+        )
+        .all()
+    ).toEqual([
+      { case_id: 'a', rep: 0 },
+      { case_id: 'b', rep: 0 },
+    ]);
+
+    await scheduleRunChunks(db, {
+      runId: 'destination',
+      entries: [{ model: 'm', variant: null }],
+      repetitions: 3,
+      caseIds: ['a', 'b'],
+      chunkSize: 2,
+    });
+
+    expect(
+      sqlite
+        .prepare(
+          "SELECT rep, status FROM scheduler_chunks WHERE run_id = 'destination' ORDER BY rep"
+        )
+        .all()
+    ).toEqual([
+      { rep: 0, status: 'completed' },
+      { rep: 1, status: 'pending' },
+      { rep: 2, status: 'pending' },
     ]);
   });
 });

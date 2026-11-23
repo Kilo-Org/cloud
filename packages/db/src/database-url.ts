@@ -44,7 +44,12 @@ export type PostgresConnectionTarget = {
 };
 
 /**
- * The database a connection string names, as `getDatabaseClientConfig` reports it.
+ * The database a connection names, as `getDatabaseClientConfig` reports it.
+ *
+ * Accepts either a connection string or an already-parsed `URL`, because both describe one
+ * connection and a caller holding the `URL` must pass it: parsing the string again would build a
+ * second decoded representation of the same connection, and the fields could then disagree with
+ * the password and sslmode the caller reads from its own `URL`.
  *
  * This is the one parse for the connection this package builds field by field: the pool
  * configuration below, and every caller that has to name the target without handling the URL.
@@ -54,8 +59,8 @@ export type PostgresConnectionTarget = {
  * never with a `connectionString`. A client that hands `pg` a `connectionString` directly, such as
  * `getWorkerDb`, is parsed by `pg` itself, which does read `?host=` and `?port=`.
  */
-export function postgresConnectionTarget(connectionString: string): PostgresConnectionTarget {
-  const url = new URL(connectionString);
+export function postgresConnectionTarget(connection: string | URL): PostgresConnectionTarget {
+  const url = typeof connection === 'string' ? new URL(connection) : connection;
   const user = decodeURIComponent(url.username);
   return {
     host: decodeURIComponent(url.hostname).toLowerCase(),
@@ -73,9 +78,9 @@ export function postgresConnectionTarget(connectionString: string): PostgresConn
  */
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
   const databaseUrl = new URL(postgresUrl);
-  // The shared parse decodes the user, host and database name, and fills in the port and database
-  // name that the pool would use anyway, so the config below cannot disagree with it.
-  const { host, port, database, user } = postgresConnectionTarget(postgresUrl);
+  // This single parse feeds the target fields, the password and the sslmode below, so the config
+  // cannot disagree with itself about which connection it describes.
+  const { host, port, database, user } = postgresConnectionTarget(databaseUrl);
   const clientConfig: ClientConfig = {
     user,
     password: decodeURIComponent(databaseUrl.password),

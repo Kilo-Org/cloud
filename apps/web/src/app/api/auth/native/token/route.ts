@@ -345,10 +345,6 @@ async function runNativeTokenExchange(
   // ── Step 2: Verify the proof ─────────────────────────────────────────────
   // A refused verdict is a 403. A provider fault is retryable, so it must not
   // be reported as a refusal of the device.
-  // A refusal that names a recovery (`recovery`) is the one case the client may
-  // repair itself: it is answered before any provider call, OTP reservation,
-  // ticket consumption, or settlement, so a single retry with a fresh proof
-  // cannot double-spend anything. Every other refusal keeps its old body.
   let admissionVerification: VerifyAdmissionOk;
   try {
     const verified = await verifyAdmissionAsync(admissionPayload);

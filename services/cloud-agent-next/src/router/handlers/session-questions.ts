@@ -3,44 +3,100 @@ import * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
 import { fetchSessionMetadata } from '../../session/metadata.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { answerWithAdmission } from '../../session/answer-admission.js';
+import type { ResolvedPayer } from '../../session/prompt-balance.js';
+import {
+  pendingQueueFullAdmissionFailure,
+  throwAdmissionError,
+} from '../../session/queue-message.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import type { ControlPlaneAnswerReply } from '../../shared/control-plane-protocol.js';
 import { withDORetry } from '../../utils/do-retry.js';
 
 /**
- * Forwards one question/permission reply to the control-plane Session DO and
- * projects its dispatch result onto the public `{success}` contract. The DO
- * reports `sent` only when the reply reached the live turn or was admitted as a
- * continuation, so `not_connected` is the public `success: false`.
+ * Forwards one question/permission reply through the shared answer admission.
+ * A live turn answers inside its own paid turn. An answer that would become a
+ * new turn passes the balance and model preflight first, so a refusal reaches
+ * the client as the same error the prompt mutation returns, and the pending
+ * interaction stays answerable.
  */
 async function answerControlPlane(
   env: Env,
   userId: string,
+  authToken: string | undefined,
   sessionId: SessionId,
-  reply: ControlPlaneAnswerReply
+  reply: ControlPlaneAnswerReply,
+  /** The payer the mutation's own access gate already resolved. */
+  resolvedPayer: ResolvedPayer
 ): Promise<{ success: boolean }> {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
-  const dispatch = await withDORetry(
-    () => getSandboxSessionStub(env, userId, sessionId),
-    current => current.answer({ sessionId, reply }),
-    'answer'
-  );
-  return { success: dispatch === 'sent' };
+  const outcome = await answerWithAdmission({
+    env,
+    userId,
+    ...(authToken === undefined ? {} : { authToken }),
+    cloudAgentSessionId: sessionId,
+    resolvedPayer,
+    reply,
+  });
+  switch (outcome.outcome) {
+    case 'sent':
+      return { success: true };
+    case 'not_pending':
+      return { success: false };
+    case 'queue-full':
+      // The same retryable capacity refusal a prompt reports.
+      return throwAdmissionError(pendingQueueFullAdmissionFailure());
+    case 'invalid':
+      // The reply carries nothing to send. The interaction still waits, so this
+      // is a malformed request, not a dead interaction.
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The answer carries no text; reply again',
+      });
+    case 'retryable':
+      // The interaction still waits; only the session moved on. `CONFLICT` is
+      // not a terminal client code, and the cause marks the retry explicitly.
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'The session moved on; send the answer again',
+        cause: { error: 'ANSWER_RETRY_REQUIRED', retryable: true },
+      });
+    case 'unavailable':
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Durable prompt admission is unavailable',
+      });
+    case 'balance':
+      // Mirror the facade projection: a payer scope the caller cannot reach is a
+      // hidden root, and a read failure is retryable.
+      throw new TRPCError({
+        code:
+          outcome.status === 402
+            ? 'PAYMENT_REQUIRED'
+            : outcome.status === 404
+              ? 'NOT_FOUND'
+              : outcome.status === 503
+                ? 'SERVICE_UNAVAILABLE'
+                : 'INTERNAL_SERVER_ERROR',
+        message: outcome.message,
+      });
+  }
 }
 
 export function createSessionQuestionHandlers() {
   return {
-    answerQuestion: protectedProcedure
+    answerQuestion: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema,
           questionId: z.string().min(1),
+          organizationId: z.string().optional(),
           answers: z.array(z.array(z.string())),
         })
       )
@@ -51,16 +107,23 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
-              action: 'answer',
-              questionId: input.questionId,
-              answers: input.answers,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'answer',
+                questionId: input.questionId,
+                answers: input.answers,
+              },
+              { organizationId: access.organizationId }
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question answer forwarded to session');
@@ -77,11 +140,12 @@ export function createSessionQuestionHandlers() {
         });
       }),
 
-    rejectQuestion: protectedProcedure
+    rejectQuestion: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema,
           questionId: z.string().min(1),
+          organizationId: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -91,15 +155,22 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
-              action: 'reject',
-              questionId: input.questionId,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'reject',
+                questionId: input.questionId,
+              },
+              { organizationId: access.organizationId }
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question rejection forwarded to session');
@@ -132,16 +203,23 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            await requireCurrentSessionAccess({
+            const access = await requireCurrentSessionAccess({
               env,
               kiloUserId: userId,
               cloudAgentSessionId: sessionId,
             });
-            const result = await answerControlPlane(env, userId, sessionId, {
-              action: 'permission',
-              permissionId: input.permissionId,
-              response: input.response,
-            });
+            const result = await answerControlPlane(
+              env,
+              userId,
+              ctx.authToken,
+              sessionId,
+              {
+                action: 'permission',
+                permissionId: input.permissionId,
+                response: input.response,
+              },
+              { organizationId: access.organizationId }
+            );
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })
               .info('Permission answer forwarded to session');
@@ -163,8 +241,10 @@ export function createSessionQuestionHandlers() {
      * session: an unauthorized read fails rather than reporting an empty pending
      * set.
      */
-    getPendingInteractions: protectedProcedure
-      .input(z.object({ cloudAgentSessionId: sessionIdSchema }))
+    getPendingInteractions: cloudAgentManagedProcedure
+      .input(
+        z.object({ cloudAgentSessionId: sessionIdSchema, organizationId: z.string().optional() })
+      )
       .output(
         z.object({
           questions: z.array(z.unknown()),
@@ -179,11 +259,13 @@ export function createSessionQuestionHandlers() {
           kiloUserId: userId,
           cloudAgentSessionId: sessionId,
         });
-        return await withDORetry(
+        const pending = await withDORetry(
           () => getSandboxSessionStub(env, userId, sessionId),
-          session => session.getPendingInteractions(),
+          (session): Promise<{ questions: unknown[]; permissions: unknown[] }> =>
+            session.getPendingInteractions(),
           'getPendingInteractions'
         );
+        return ctx.cloudAgentAuthority ? { ...pending, permissions: [] } : pending;
       }),
   };
 }

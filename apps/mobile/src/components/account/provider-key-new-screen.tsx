@@ -315,7 +315,7 @@ export function ProviderKeyNewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text variant="caption">
+          <Text variant="muted">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')
               : t('profile.providerKeys.editKeyDescription')}

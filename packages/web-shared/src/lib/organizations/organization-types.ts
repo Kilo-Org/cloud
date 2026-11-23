@@ -38,7 +38,6 @@ export function billingCycleToDb(cycle: BillingCycle): 'monthly' | 'yearly' {
   return cycle === 'annual' ? 'yearly' : 'monthly';
 }
 
-// Maps DB ('yearly') or Stripe ('year') interval values to the domain BillingCycle.
 export function toBillingCycle(source: 'monthly' | 'yearly' | 'month' | 'year'): BillingCycle {
   return source === 'yearly' || source === 'year' ? 'annual' : 'monthly';
 }

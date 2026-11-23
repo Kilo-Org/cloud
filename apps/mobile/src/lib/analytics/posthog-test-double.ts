@@ -14,9 +14,7 @@
 // body may reach the imported doubles because it runs lazily, while a
 // file-local `vi.hoisted` factory cannot (an imported binding resolves only
 // after the rewritten `await import(...)` of this helper executes — later than
-// the hoisted calls). Merging happens at file scope with `Object.assign` so
-// each suite's existing `hoisted.client`-style references keep working without
-// renames; its own `vi.mock` factories stay in the suites.
+// the hoisted calls).
 
 import { vi } from 'vitest';
 

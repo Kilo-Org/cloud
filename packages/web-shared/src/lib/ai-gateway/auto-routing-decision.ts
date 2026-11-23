@@ -8,6 +8,7 @@ import {
   type AutoRouter,
   type CustomRouterErrorCode,
   type CustomRouterErrorResponse,
+  type CustomRouterDefinition,
   type CustomRouterReference,
   normalizeClassifierInput,
 } from '@kilocode/auto-routing-contracts';
@@ -24,6 +25,17 @@ export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
 export type EfficientDecisionParams = {
   router?: AutoRouter;
   customRouter?: CustomRouterReference;
+  /**
+   * The pool definition the gateway already read for its own deny policy. Only the private
+   * authenticated custom-router path sets it, so the worker decides against the same pins the
+   * gateway enforces instead of its own cached or replicated copy.
+   */
+  customRouterDefinition?: CustomRouterDefinition;
+  /**
+   * Alias id -> the concrete target that same primary snapshot stored, so the worker ranks the
+   * model that would actually run. Only the private authenticated custom-router path sets it.
+   */
+  customRouterAliasTargets?: ReadonlyMap<string, string>;
   apiKind: ClassifierApiKind;
   body: unknown;
   requestedModel: string;
@@ -46,7 +58,11 @@ type FetchEfficientDecisionOptions = {
   onError?: (message: string, data: { error: string }) => void;
 };
 
-function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | null {
+// The outbound decide body: MirrorPayload plus the pool definition only the trusted custom-router
+// caller supplies. The worker validates the envelope it receives.
+type DecidePayload = MirrorPayload & { customRouterDefinition?: CustomRouterDefinition };
+
+function buildDecidePayload(params: EfficientDecisionParams): DecidePayload | null {
   const normalizedInput = normalizeClassifierInput(params.apiKind, params.body, {
     requestedModel: params.requestedModel,
     providerHints: params.providerHints,
@@ -73,6 +89,12 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
     input: normalizedInput,
     ...(params.router ? { router: params.router } : {}),
     ...(params.customRouter ? { customRouter: params.customRouter } : {}),
+    ...(params.customRouter && params.customRouterDefinition
+      ? { customRouterDefinition: params.customRouterDefinition }
+      : {}),
+    ...(params.customRouter && params.customRouterAliasTargets?.size
+      ? { customRouterAliasTargets: Object.fromEntries(params.customRouterAliasTargets) }
+      : {}),
     ...(params.deniedModelIds?.length
       ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }
       : {}),
@@ -94,7 +116,7 @@ type DecideOutcome =
   | { kind: 'failed' };
 
 async function postDecision(
-  payload: MirrorPayload,
+  payload: DecidePayload,
   workerUrl: URL,
   authToken: string,
   options: FetchEfficientDecisionOptions

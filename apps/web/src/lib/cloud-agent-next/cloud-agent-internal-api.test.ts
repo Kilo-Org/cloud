@@ -17,6 +17,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 // registry so the module under test reads the mocked values.
 jest.resetModules();
 
+import { ServiceFetchTimeoutError } from '../bounded-service-fetch';
 import {
   cleanupVercelSnapshotBuild,
   closeCloudAgentOrgStreams,
@@ -79,6 +80,7 @@ describe('readCloudAgentWidgetApprovalKey', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    jest.useRealTimers();
   });
 
   function respond(response: Response) {
@@ -129,6 +131,84 @@ describe('readCloudAgentWidgetApprovalKey', () => {
     await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow(
       /^Cloud Agent widget approval key failed: 403$/
     );
+  });
+
+  it('bounds a body the Worker stalls after its headers inside the widget budget', async () => {
+    jest.useFakeTimers();
+    const cancel = jest.fn(async () => undefined);
+    let bursts = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bursts += 1;
+        if (bursts === 1) {
+          controller.enqueue(encoder.encode('{"approvalKey":'));
+        }
+      },
+      cancel,
+    });
+    respond(new Response(stream, { status: 200 }));
+
+    const outcome = readCloudAgentWidgetApprovalKey(input).catch((error: unknown) => error);
+
+    let settledEarly = false;
+    void outcome.then(() => {
+      settledEarly = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(1_499);
+    expect(settledEarly).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(1_500);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('cancels the unread body of a refused answer', async () => {
+    const cancel = jest.fn(async () => undefined);
+    const stream = new ReadableStream<Uint8Array>({
+      pull() {
+        // A denied answer's body is never read, so nothing is enqueued.
+      },
+      cancel,
+    });
+    respond(new Response(stream, { status: 403 }));
+
+    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow(
+      /^Cloud Agent widget approval key failed: 403$/
+    );
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the caller signal win over a stalled body read', async () => {
+    jest.useFakeTimers();
+    const cancel = jest.fn(async () => undefined);
+    const stream = new ReadableStream<Uint8Array>({
+      pull() {
+        // Headers arrived, the body never completes.
+      },
+      cancel,
+    });
+    respond(new Response(stream, { status: 200 }));
+
+    const caller = new AbortController();
+    const callerReason = new Error('request went away');
+    const outcome = readCloudAgentWidgetApprovalKey(input, caller.signal).catch(
+      (error: unknown) => error
+    );
+
+    await jest.advanceTimersByTimeAsync(100);
+    caller.abort(callerReason);
+
+    const error = await outcome;
+    expect(error).toBe(callerReason);
+    expect(error).not.toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(jest.getTimerCount()).toBe(0);
   });
 });
 

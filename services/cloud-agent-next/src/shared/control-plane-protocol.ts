@@ -1,3 +1,4 @@
+import { AGENT_SANDBOX_PROVIDERS } from './sandbox-provider.js';
 import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
@@ -209,12 +210,18 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
+  'provider_lifetime_exhausted',
+  'provider_cleanup_required',
   'byoc_credential_missing',
+  'byoc_aws_not_ready',
+  'byoc_aws_forbidden',
+  'byoc_aws_stack_outdated',
   'byoc_vercel_not_ready',
   'byoc_vercel_forbidden',
   'byoc_vercel_capacity',
   'byoc_vercel_snapshot_missing',
   'provider_identity_mismatch',
+  'network_policy_failed',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 
@@ -305,11 +312,8 @@ export const controlPlaneWorkspaceFailureSubtypeSchema = z.enum(
 // Bounded run-container facts are duplicated locally (type-only import above)
 // so the standalone wrapper bundle never contains worker-utils. The drift
 // guards below and control-plane-run-container.test.ts contain the drift risk.
-export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS = [
-  'cloudflare',
-  'vercel',
-  'cloudflare-containers',
-] as const satisfies readonly CloudAgentRunContainer['provider'][];
+export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS =
+  AGENT_SANDBOX_PROVIDERS satisfies readonly CloudAgentRunContainer['provider'][];
 
 const controlPlaneRunContainerIdentifierSchema = z.string().min(1).max(128);
 
@@ -669,6 +673,7 @@ export const controlPlaneCredentialSourceSchema = z
     createdOnPlatform: z.string().max(100).optional(),
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
+    allowSubagentSessions: z.boolean().optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     additionalHostedGitHubRepositories: z
       .array(hostedGitHubRepositoryIdentitySchema)
@@ -1067,7 +1072,86 @@ export const controlPlaneAnswerPayloadSchema = z
   })
   .strict();
 
-export const controlPlaneDispatchResultSchema = z.enum(['sent', 'not_connected']);
+/**
+ * The continuation turn a settled answer becomes. It carries exactly what
+ * `answerMessageIntent` produces — the reply text, the last turn's agent and
+ * its finalization — and nothing else, so a caller cannot add a server-owned
+ * field such as `context`, an attachment, or a synthetic part that the
+ * preflight never saw.
+ */
+export const controlPlaneContinuationIntentSchema = controlPlanePromptPayloadBaseSchema
+  .pick({ messageId: true, finalization: true })
+  .extend({
+    turn: z
+      .object({
+        type: z.literal('prompt'),
+        prompt: z.string(),
+      })
+      .strict(),
+    agent: controlPlanePromptAgentSchema,
+  })
+  .strict();
+
+/**
+ * A settled answer is not admitted by the answer call. The answer returns the
+ * continuation intent, the Worker runs the same balance and model preflight a
+ * prompt runs, then this payload admits exactly that intent for exactly the
+ * interaction it resolves.
+ */
+export const controlPlaneAdmitAnswerPayloadSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    reply: controlPlaneAnswerReplySchema,
+    intent: controlPlaneContinuationIntentSchema,
+  })
+  .strict();
+
+/**
+ * The result of admitting a preflighted settled answer. `sent` admitted the
+ * continuation, `not_connected` is terminal for this reply, and `queue-full`
+ * keeps it pending until capacity returns. `retry` means the interaction the
+ * reply names is still pending, so the same reply can be admitted after the
+ * session settles again; only the preflighted turn no longer matches the
+ * session's current state.
+ */
+export const controlPlaneContinuationAdmissionResultSchema = z.enum([
+  'sent',
+  'not_connected',
+  'queue-full',
+  'retry',
+]);
+
+export const controlPlaneDispatchResultSchema = z.union([
+  z.literal('sent'),
+  z.literal('not_connected'),
+  z
+    .object({
+      result: z.literal('continuation'),
+      /** The new turn the settled answer would become, not yet admitted. */
+      intent: controlPlaneContinuationIntentSchema,
+    })
+    .strict(),
+  /**
+   * A settled answer the session cannot queue reports capacity instead of
+   * building a continuation.
+   */
+  z.object({ result: z.literal('queue-full') }).strict(),
+]);
+
+/**
+ * The result of an answer. It adds `retry` to the dispatch result: the
+ * interaction the reply names still waits, but the live sandbox route could not
+ * take the reply, so the same reply is admissible once the route is available
+ * again. Callers must keep the interaction and offer a retry. `invalid` means
+ * the reply itself carries nothing to send (an empty question selection), so
+ * the interaction still waits and the same reply can be replaced by a real
+ * answer; it is not the terminal result.
+ */
+export const controlPlaneAnswerResultSchema = z.union([
+  controlPlaneDispatchResultSchema,
+  z.literal('retry'),
+  z.literal('invalid'),
+]);
 
 export const controlPlaneStatusResultSchema = z
   .object({
@@ -1820,7 +1904,13 @@ export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRe
 export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
+export type ControlPlaneContinuationIntent = z.infer<typeof controlPlaneContinuationIntentSchema>;
+export type ControlPlaneAdmitAnswerPayload = z.infer<typeof controlPlaneAdmitAnswerPayloadSchema>;
+export type ControlPlaneContinuationAdmissionResult = z.infer<
+  typeof controlPlaneContinuationAdmissionResultSchema
+>;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;
+export type ControlPlaneAnswerResult = z.infer<typeof controlPlaneAnswerResultSchema>;
 export type ControlPlaneStatusResult = z.infer<typeof controlPlaneStatusResultSchema>;
 export type ControlPlaneSessionCredentialsPayload = z.infer<
   typeof controlPlaneSessionCredentialsPayloadSchema

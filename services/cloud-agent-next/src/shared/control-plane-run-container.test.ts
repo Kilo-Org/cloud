@@ -18,7 +18,7 @@ const invalidContainers = [
   ['empty sandboxId', { ...validContainer, sandboxId: '' }],
   ['oversized sandboxId', { ...validContainer, sandboxId: 'x'.repeat(129) }],
   ['oversized imageRef', { ...validContainer, imageRef: 'x'.repeat(1025) }],
-  ['unknown provider', { ...validContainer, provider: 'aws' }],
+  ['unknown provider', { ...validContainer, provider: 'unsupported-provider' }],
   ['unknown startSource', { ...validContainer, startSource: 'clone' }],
   ['extra property', { ...validContainer, unknownFact: true }],
 ] as const;

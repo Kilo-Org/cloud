@@ -9,6 +9,7 @@ import {
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
 import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
+import { AUDIT_REGION_TAGS } from '@kilocode/app-shared/organizations';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -1583,7 +1584,9 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
 // The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
-export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+// The region list lives in @kilocode/app-shared/organizations so the audit-log
+// detail reader and this stored schema cannot drift.
+export const OrganizationDataRegionSchema = z.enum(AUDIT_REGION_TAGS);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 // How Kilo clients may drive a browser for this organization's members: anything the
@@ -3271,6 +3274,8 @@ export const CustomLlmDefinitionSchema = z
      * an upstream that does not train on prompts. It never makes a custom LLM eligible
      * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
+    /** False keeps the row but serves it nowhere, as if it were deleted. Unset means enabled. */
+    is_enabled: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);

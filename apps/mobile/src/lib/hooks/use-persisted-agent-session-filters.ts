@@ -61,7 +61,7 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
           setSaved({ kind: 'unreadable', edited: false });
           // The defaults on screen are not what is stored: say the read failed
           // instead of blaming the write that follows it.
-          toast.error(i18n.t('common.couldnTLoad'));
+          toast.error(i18n.t('common.couldNotLoad'));
         }
       }
     };

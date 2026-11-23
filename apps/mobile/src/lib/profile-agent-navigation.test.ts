@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getCodeReviewerProfilePath,
   getNewProfilePath,
+  getNewProfileRouteName,
   getProfileAgentScope,
   getProfileAgentsPath,
   getProfileCommandsPath,
@@ -173,6 +174,8 @@ describe('Profile route names', () => {
   it('names the overview and each section the way the Stack registers them', () => {
     expect(getProfileOverviewRouteName()).toBe('profiles/[profileId]/index');
     expect(getProfileOverviewRouteName('app')).toBe('profile-management/[profileId]/index');
+    expect(getNewProfileRouteName()).toBe('profiles/new');
+    expect(getNewProfileRouteName('app')).toBe('profile-management/new');
     expect(getProfileSectionRouteName('agents')).toBe('profiles/[profileId]/agents');
     expect(getProfileSectionRouteName('slash-commands', 'app')).toBe(
       'profile-management/[profileId]/slash-commands'

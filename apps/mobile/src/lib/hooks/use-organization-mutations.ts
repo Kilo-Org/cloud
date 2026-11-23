@@ -4,11 +4,13 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import {
   type OrgListEntry,
   type OrgRole,
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { isTrialExpiredRefusal, organizationErrorMessage } from '@/lib/server-error-copy';
 import {
@@ -83,6 +85,11 @@ export function useOrganizationMutations(
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: withMembersKey }),
       queryClient.invalidateQueries({ queryKey: listKey }),
+      // The audit read is an infinite query, so an invalidation would refetch
+      // every retained page. A reconcile re-anchors page one and refetches only
+      // it for a mounted list, and removes an unmounted entry so its next mount
+      // fetches page one — which is the row this write just added.
+      reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId)),
     ]);
   };
 

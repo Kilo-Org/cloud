@@ -54,13 +54,15 @@ vi.mock('expo-router', () => ({
     canGoBack: () => routerCanGoBack.value,
   }),
 }));
-// The Android-safe replace is the screen's post-save exit
-// (`lib/navigation/stack-safe-replace.ts`). Its own mechanics have a suite; here
-// it stands in for the navigation call, so the asserted href is the
-// destination's.
+// The post-create hand-off goes through the push-then-retire hook that keeps
+// Android Fabric alive; its own mechanics have their own suite, so
+// here it stands in for the navigation call and the assertions stay about the
+// destination href.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: routerReplace }),
 }));
+// The screen arms its leave guard for the write window; the confirm branch is
+// unreachable here (no dirty path), so the dialog is a marker.
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
 }));

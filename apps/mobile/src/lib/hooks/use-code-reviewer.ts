@@ -26,6 +26,7 @@ import {
   useReviewerBillingRefusal,
 } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { settleReviewerWrite } from '@/lib/hooks/reviewer-settled-refresh';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
@@ -253,7 +254,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
       announceReviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => settleReviewerWrite(queryClient, scope, queryKey),
   });
 }
 
@@ -437,7 +438,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
       announceReviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => settleReviewerWrite(queryClient, scope, queryKey),
   });
 }
 

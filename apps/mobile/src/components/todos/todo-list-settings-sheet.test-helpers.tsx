@@ -46,8 +46,15 @@ vi.mock('@/lib/hooks/use-todos', async () => {
   };
 });
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: state.back, replace: state.replace, push: vi.fn() }),
+  useRouter: () => ({ back: state.back, push: vi.fn() }),
   useFocusEffect: () => undefined,
+}));
+// The post-create hand-off goes through the push-then-retire hook that keeps
+// Android Fabric alive; its own mechanics have their own suite, so
+// here it stands in for the navigation call and the assertions stay about the
+// destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: state.replace }),
 }));
 vi.mock('react-native', async () => {
   const React = await import('react');

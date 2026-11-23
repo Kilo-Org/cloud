@@ -305,6 +305,66 @@ describe('buildGlanceableSnapshot', () => {
     }
   });
 
+  // The newest-result pair answers one question: which agent changed state,
+  // and when. A body that sets one field without the other describes a line no
+  // card can draw, so the parse refuses it at `newestResultAt`.
+  it('refuses a newest-result kind with no instant', () => {
+    const paired = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(paired.newestResultKind).toBe('running');
+
+    const result = glanceableAgentsSnapshotSchema.safeParse({
+      ...paired,
+      newestResultAt: null,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(issue => issue.path)).toEqual([['newestResultAt']]);
+    }
+  });
+
+  it('refuses a newest-result instant with no kind', () => {
+    const paired = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(paired.newestResultAt).not.toBeNull();
+
+    const result = glanceableAgentsSnapshotSchema.safeParse({
+      ...paired,
+      newestResultKind: null,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(issue => issue.path)).toEqual([['newestResultAt']]);
+    }
+  });
+
+  it('parses a snapshot whose rows carried no status timestamp as a null pair', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }, { status: 'idle' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(snapshot);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.newestResultKind).toBeNull();
+      expect(result.data.newestResultAt).toBeNull();
+    }
+  });
+
   it('parses a version-1 record written before the scheduled fields existed', () => {
     const snapshot = buildGlanceableSnapshot({
       sessions: [{ status: 'busy' }],

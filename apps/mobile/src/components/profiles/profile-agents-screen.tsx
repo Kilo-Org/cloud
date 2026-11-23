@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
@@ -14,16 +14,16 @@ import { ProfileSectionHeader } from '@/components/profiles/profile-section-head
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
-import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
   useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -31,6 +31,7 @@ import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { isolateBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -58,6 +59,10 @@ export function ProfileAgentsScreen({
     error: profileQuery.error,
     connectivity: committedConnectivity,
   });
+  // A failed read with no retry the screen offers leaves nothing to act on, so
+  // the header's create control stays out of the way of the error state.
+  const readErrorTerminal = profileQuery.isError && !readError.showRetry;
+  const colors = useThemeColors();
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -69,7 +74,9 @@ export function ProfileAgentsScreen({
   const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
-  // what was typed instead of dropping it.
+  // what was typed instead of dropping it. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:agents:${profileId}`;
   // A save the server refused leaves one note the sheet renders: a slug the
   // profile already uses shows under the slug field, a create past the cap
@@ -85,6 +92,8 @@ export function ProfileAgentsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -144,31 +153,17 @@ export function ProfileAgentsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <AgentsSkeleton />;
   } else if (rows.length === 0) {
     content = (
       <EmptyState
         icon={Bot}
         title={t('profiles.agents.empty')}
-        description={null}
+        // A read-only member cannot add, so its state names the rule instead of
+        // an action the screen withholds.
+        description={permission === 'read-only' ? t('profiles.organizationRoleRequired') : null}
         placement="top"
-        action={
-          <ProfileManageSlot permission={permission}>
-            <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
-          </ProfileManageSlot>
-        }
       />
     );
   } else {
@@ -213,9 +208,6 @@ export function ProfileAgentsScreen({
               className="text-sm"
             />
           ) : null}
-          <Button disabled={atAgentCap} onPress={handleStartAdd}>
-            <Text>{t('profiles.agents.add')}</Text>
-          </Button>
         </ProfileManageSlot>
       </View>
     );
@@ -228,18 +220,42 @@ export function ProfileAgentsScreen({
         organizationId={organizationId}
         title={t('profiles.agents.title')}
         backFallback={backFallback}
+        headerRight={
+          canManage && !readErrorTerminal ? (
+            <IconButton
+              accessibilityLabel={t('profiles.agents.add')}
+              disabled={atAgentCap}
+              onPress={handleStartAdd}
+            >
+              <Plus size={22} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
-      {form.isOpen ? (
+      {form.isOpen && canManage && !readErrorTerminal ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

@@ -15,33 +15,40 @@ export type ChatUsage = Readonly<Record<string, ModelUsage>>;
 
 const count = z.number().nonnegative();
 
-/** A column this app owns, but one an older build or a crash can leave holding anything. */
-const storedSchema = z.record(
-  z.string(),
-  z.object({
-    inputTokens: count,
-    outputTokens: count,
-    cacheReadTokens: count,
-    cacheWriteTokens: count,
-    cost: count.optional(),
-  })
-);
+/** The column holds one entry per model, and nothing else is a column this reader knows. */
+const storedSchema = z.record(z.string(), z.unknown());
+
+/**
+ * One model's stored count. The column is this app's own, but an older build or
+ * a crash can leave it holding anything, so each entry is parsed on its own: one
+ * unreadable entry drops that model and leaves the chat's other models intact.
+ */
+const storedEntrySchema = z.object({
+  inputTokens: count,
+  outputTokens: count,
+  cacheReadTokens: count,
+  cacheWriteTokens: count,
+  cost: count.optional(),
+});
 
 export function parseChatUsage(stored: string | null): ChatUsage {
   if (stored === null) {
     return {};
   }
   try {
-    const parsed = storedSchema.safeParse(JSON.parse(stored));
-    if (!parsed.success) {
+    const column = storedSchema.safeParse(JSON.parse(stored));
+    if (!column.success) {
       return {};
     }
-    return Object.fromEntries(
-      Object.entries(parsed.data).map(([model, { cost, ...tokens }]) => [
-        model,
-        cost === undefined ? tokens : { ...tokens, cost },
-      ])
-    );
+    const entries: [string, ModelUsage][] = [];
+    for (const [model, value] of Object.entries(column.data)) {
+      const entry = storedEntrySchema.safeParse(value);
+      if (entry.success) {
+        const { cost, ...tokens } = entry.data;
+        entries.push([model, cost === undefined ? tokens : { ...tokens, cost }]);
+      }
+    }
+    return Object.fromEntries(entries);
   } catch {
     return {};
   }

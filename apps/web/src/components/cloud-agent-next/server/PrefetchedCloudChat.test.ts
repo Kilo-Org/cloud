@@ -155,4 +155,15 @@ describe('chat server prefetch', () => {
     expect(mockCloudPage).not.toHaveBeenCalled();
     expect(mockOrgCloudPage).not.toHaveBeenCalled();
   });
+
+  it('seeds nothing when the history read answers a typed failure', async () => {
+    mockGetSession.mockResolvedValue(session());
+    mockCloudPage.mockResolvedValue({
+      kind: 'invalid_data',
+      message: 'Session history is unavailable',
+    });
+
+    expect(await seededPage(null)).toBeUndefined();
+    expect(mockCloudPage).toHaveBeenCalledTimes(1);
+  });
 });

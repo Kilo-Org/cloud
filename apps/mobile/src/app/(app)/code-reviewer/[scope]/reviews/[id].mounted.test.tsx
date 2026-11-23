@@ -5,9 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CodeReviewerReviewDetailRoute from './[id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
+const useRetireCoveredSourceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
+}));
+
+// The retire itself is the hook's contract (`retire-covered-source.ts`); what
+// this route has to get right is the pair of route names it hands it.
+vi.mock('@/lib/navigation/retire-covered-source', () => ({
+  useRetireCoveredSource: useRetireCoveredSourceMock,
 }));
 
 vi.mock('@/components/invalid-route-state', () => ({
@@ -47,6 +54,7 @@ function mountRoute(): TestRenderer.ReactTestRenderer {
 
 beforeEach(() => {
   useLocalSearchParamsMock.mockReset();
+  useRetireCoveredSourceMock.mockReset();
 });
 
 describe('CodeReviewerReviewDetailRoute invalid scope', () => {
@@ -102,6 +110,34 @@ describe('CodeReviewerReviewDetailRoute invalid id', () => {
     expect(invalid).toHaveLength(1);
     expect(propOf(invalid[0], 'backTo')).toBe('/(app)/code-reviewer/personal/reviews');
     expect(findByType(renderer.root, 'ReviewDetailScreen')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerReviewDetailRoute retire of the create hand-off source', () => {
+  it('mounts one retire per form entry, each with its own guard beneath', () => {
+    // The form is opened from the reviews list and from the scope's platform
+    // list (`review-list-screen.tsx`, `platform-list-screen.tsx`), so the
+    // hand-off's source sits above one of those two screens. Both names are
+    // paths below `(app)/_layout.tsx`: no directory between this leaf and that
+    // Stack is a layout.
+    useLocalSearchParamsMock.mockReturnValue({ scope: 'personal', id: 'rev-1' });
+    const renderer = mountRoute();
+
+    expect(useRetireCoveredSourceMock).toHaveBeenCalledTimes(2);
+    expect(useRetireCoveredSourceMock).toHaveBeenNthCalledWith(
+      1,
+      'code-reviewer/[scope]/manual-review',
+      'code-reviewer/[scope]/reviews/index'
+    );
+    expect(useRetireCoveredSourceMock).toHaveBeenNthCalledWith(
+      2,
+      'code-reviewer/[scope]/manual-review',
+      'code-reviewer/[scope]/index'
+    );
 
     act(() => {
       renderer.unmount();

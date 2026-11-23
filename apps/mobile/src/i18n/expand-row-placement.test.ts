@@ -198,7 +198,7 @@ describe('counted expand rows', () => {
     expect(row('it', MORE_LINES, 1)).toBe('Mostra N riga in più (S–E)');
     await i18n.changeLanguage('fr');
     expect(
-      i18n.t('prReview.hunkRows.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
+      i18n.t('prReview.fileNavigator.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
     ).toBe('1 fichier chargé sur 5');
     expect(
       i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
@@ -252,12 +252,12 @@ describe('counted expand rows', () => {
     ['el', MORE_ABOVE, '… υπάρχει N επιπλέον γραμμή παραπάνω.'],
     ['am', MORE_ABOVE, '… ከላይ ተጨማሪ N መስመር አለ።'],
     ['eu', MORE_ABOVE, '… Beste N lerro dago goian.'],
-    ['hi', MORE_ABOVE, '… ऊपर N और पंक्ति है।'],
+    ['hi', MORE_ABOVE, '… ऊपर N और पंक्ति है'],
     ['mr', MORE_ABOVE, '… वर आणखी N ओळ आहे.'],
     ['ne', MORE_ABOVE, '… माथि थप N पङ्क्ति छ।'],
     ['pa', MORE_ABOVE, '… ਉੱਪਰ N ਹੋਰ ਲਾਈਨ ਹੈ।'],
     ['ta', MORE_ABOVE, '… மேலே மேலும் N வரி உள்ளது.'],
-    ['te', MORE_ABOVE, '… పైన మరో N పంక్తి ఉంది.'],
+    ['te', MORE_ABOVE, '… పైన మరో N పంక్తి ఉంది'],
     ['ur', MORE_ABOVE, 'اوپر مزید N سطر ہے…'],
     ['sq', MORE_ABOVE, '… N rresht tjetër më sipër'],
     ['am', 'agentChat.composer.charactersRemaining', '1 ቁምፊ ቀርቷል'],
@@ -319,7 +319,7 @@ describe('counted expand rows', () => {
   it('inflects the singular Zulu file rows the review requires', async () => {
     await i18n.changeLanguage('zu');
     expect(
-      i18n.t('prReview.hunkRows.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
+      i18n.t('prReview.fileNavigator.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
     ).toBe('kulayishwe ifayela elingu-1 kwangu-5');
     expect(
       i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {

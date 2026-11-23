@@ -4,11 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-import {
-  getShareRemoteFileReason,
-  shareLocalFile,
-  ShareRemoteFileError,
-} from '@/lib/share-remote-file';
+import { getShareFailureKind, shareLocalFile } from '@/lib/share-remote-file';
 
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import type * as AttachmentChipDescription from '@/components/agents/attachment-chip-description';
@@ -189,8 +185,7 @@ vi.mock('@/lib/share-remote-file', () => ({
   shareLocalFile: vi.fn(async () => {
     await Promise.resolve();
   }),
-  getShareRemoteFileReason: vi.fn(() => null),
-  ShareRemoteFileError: class ShareRemoteFileErrorMock extends Error {},
+  getShareFailureKind: vi.fn(() => 'general'),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@expo/react-native-action-sheet', () => ({
@@ -429,7 +424,7 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     ]);
 
     const body = chipBody(renderer.root);
-    expect(body.props.accessibilityLabel).toBe('photo.png, 1 kB');
+    expect(body.props.accessibilityLabel).toBe('photo.png, 1.02 kB');
     expect(body.props.accessibilityRole).toBe('button');
     expect(body.props.accessibilityState).toBeUndefined();
     expect(body.props.accessibilityValue).toBeUndefined();
@@ -942,7 +937,8 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('toasts the typed share failure', async () => {
     const renderer = await mount([makeAttachment({})]);
 
-    vi.mocked(shareLocalFile).mockRejectedValueOnce(new ShareRemoteFileError('download-failed'));
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('network down'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('retry');
 
     await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
@@ -955,14 +951,24 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     const renderer = await mount([makeAttachment({})]);
 
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
-    vi.mocked(getShareRemoteFileReason).mockReturnValueOnce('sharing-unavailable');
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('sharing-unavailable');
 
     await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
 
     expect(toast.error).toHaveBeenCalledWith('File sharing is not available on this device.');
 
-    // Reset the reason mock so later cases keep the default `null` reason.
-    vi.mocked(getShareRemoteFileReason).mockReturnValue(null);
+    renderer.unmount();
+  });
+
+  it('toasts that the file is gone when the server says the document is unavailable', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('file-unavailable');
+
+    await chooseSheetOptionByLabel(renderer.root, 'Open in external app');
+
+    expect(toast.error).toHaveBeenCalledWith('This file is no longer available to download');
 
     renderer.unmount();
   });

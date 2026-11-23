@@ -14,8 +14,12 @@ export function runtimeAuthorizationMaximumLifetimeMs(resourceKind: RuntimeResou
   }
 }
 
+/** Who were the two parties of the admitting credential: the user, or an automation. */
+export const RuntimeAdmissionSourceSchema = z.enum(['user', 'automation']);
+export type RuntimeAdmissionSource = z.infer<typeof RuntimeAdmissionSourceSchema>;
+
 export const RuntimeAdmissionSchema = z.object({
-  source: z.enum(['user', 'automation']),
+  source: RuntimeAdmissionSourceSchema,
   authorizationUserId: z.string().min(1),
   authorizationPepper: z.string().nullable(),
 });
@@ -35,8 +39,9 @@ export function resolveRuntimeEnvironment(value: string | undefined): RuntimeEnv
   return value === 'development' ? 'development' : 'production';
 }
 
-const pepperDigest = z.string().regex(/^[a-f0-9]{64}$/);
-const nullablePepperDigest = z.union([pepperDigest, z.literal('null')]);
+/** A lowercase SHA-256 hex digest, the shape every runtime credential digest field uses. */
+export const Sha256HexDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const nullablePepperDigest = z.union([Sha256HexDigestSchema, z.literal('null')]);
 
 export const RuntimeAuthorizationSchema = z
   .object({
@@ -69,7 +74,7 @@ export const RuntimeAuthorizationSchema = z
         tokenSource: z.string().optional(),
         botId: z.string().optional(),
         createdOnPlatform: z.string().optional(),
-        admissionSource: z.enum(['user', 'automation']),
+        admissionSource: RuntimeAdmissionSourceSchema,
       })
       .strict(),
     env: z.string().optional(),

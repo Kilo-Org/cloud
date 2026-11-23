@@ -18,9 +18,10 @@ describe('describeRestrictionSupport', () => {
     expect(describeRestrictionSupport('none', 'cloudflare-containers-standard-4')).toBeNull();
   });
 
-  it('warns that a sandbox without the egress proxy fails to start', () => {
-    expect(describeRestrictionSupport('limited', 'vercel-small')).toBe(
-      'This sandbox cannot restrict network access, so sessions will fail to start.'
-    );
+  it('states the limits of a proxy that sees only the listed hosts', () => {
+    const limits =
+      'On this sandbox, plain http:// requests fail; use https://. A domain that is not allowed does not resolve, and the egress audit does not record it. The egress audit records requests only in None or Limited mode.';
+    expect(describeRestrictionSupport('limited', 'vercel-small')).toBe(limits);
+    expect(describeRestrictionSupport('none', 'vercel-large')).toBe(limits);
   });
 });

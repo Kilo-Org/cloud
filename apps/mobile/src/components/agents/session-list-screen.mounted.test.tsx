@@ -262,7 +262,7 @@ vi.mock('expo-router', () => ({
     push: (path: string) => {
       state.destination = path;
     },
-    replace: (path: string) => {
+    navigate: (path: string) => {
       state.destination = path;
     },
     setParams: (params: Record<string, string | undefined>) => {

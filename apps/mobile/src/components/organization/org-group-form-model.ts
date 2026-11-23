@@ -5,6 +5,7 @@
  * rules.
  */
 
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import * as z from 'zod';
 
@@ -41,9 +42,14 @@ export function isOrgGroupFormDraft(value: unknown): value is OrgGroupFormDraft 
 
 export type OrgGroupNameError = 'required' | 'tooLong' | null;
 
+/**
+ * The name verdict the form shows, matching `OrganizationGroupNameSchema` on the
+ * server: a value made only of zero-width or control characters is as empty as
+ * spaces, so it is `required` and the form keeps the existing copy for it.
+ */
 export function orgGroupNameError(name: string): OrgGroupNameError {
   const trimmed = name.trim();
-  if (trimmed.length === 0) {
+  if (!hasVisibleText(trimmed)) {
     return 'required';
   }
   return trimmed.length > ORG_GROUP_NAME_MAX_LENGTH ? 'tooLong' : null;

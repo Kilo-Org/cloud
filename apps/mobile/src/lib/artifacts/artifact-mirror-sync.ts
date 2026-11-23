@@ -120,8 +120,6 @@ const sessionStateSchema = z.object({
   updatedAt: z.string(),
   /**
    * When this session last got one of {@link MAX_SESSIONS_PER_RUN}'s slots.
-   * The budget goes to the sessions that waited longest, so a session that
-   * keeps changing cannot hold a slot while the ones behind it starve.
    */
   lastAdvancedAt: z.number().nullable().default(null),
 });

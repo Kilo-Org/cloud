@@ -143,10 +143,6 @@ type UserWebConnection = {
 /**
  * Resolve a delivered command-error payload into an `Error` subclass.
  *
- * - A bare-string delivered error is wrapped in `CommandDeliveredError` so
- *   downstream consumers can distinguish it from transport-level failures
- *   (which stay plain `Error`). A blank string carries no copy to show, so it
- *   reports the generic message instead of an empty one.
  * - A structured relay envelope that matches `userWebCommandErrorDataSchema`
  *   becomes a `UserWebCommandError` (already has a `.code`).
  * - A malformed structured payload collapses to a plain

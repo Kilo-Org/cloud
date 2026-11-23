@@ -16,8 +16,12 @@
  * attributed to that hold.
  */
 
+import assert from 'node:assert/strict';
+import { ClientErrorSchema } from '@kilocode/worker-utils/client-error';
+import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   fakeDirective,
+  getMessageResult,
   interruptSession,
   isMessageCompleted,
   messageIdFromEvent,
@@ -32,7 +36,7 @@ import {
   type StreamEvent,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
-import type { SharedScenario } from './scenarios-shared.js';
+import { assistantChildMessageIds, type SharedScenario } from './scenarios-shared.js';
 import {
   createScenarioDeadline,
   sessionSandboxObservation,
@@ -368,16 +372,74 @@ async function runCallbackCompletion(
     const messageIdOk = payload.messageId === sent.messageId;
     const textOk = expectedText === undefined || payload.lastAssistantMessageText === expectedText;
     const ok = isMessageCompleted(terminal, sent.messageId) && statusOk && messageIdOk && textOk;
-    completed = ok;
+    if (!ok) {
+      return {
+        name: scenarioName,
+        conversation,
+        ok: false,
+        message: `callback mismatch: status=${payload.status} messageIdOk=${messageIdOk} textOk=${textOk} (expected=${JSON.stringify(expectedText)} got=${JSON.stringify(payload.lastAssistantMessageText)})`,
+        events,
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const [bootResult, followupResult] = await Promise.all([
+      deadline.within('boot result', signal =>
+        getMessageResult(config, session.cloudAgentSessionId, session.messageId, signal)
+      ),
+      deadline.within('follow-up result', signal =>
+        getMessageResult(config, session.cloudAgentSessionId, sent.messageId, signal)
+      ),
+    ]);
+    assert.equal(bootResult.status, 'completed', 'boot result status');
+    assert.equal(bootResult.failure, undefined, 'boot result must not include a failure');
+    const bootAssistant = bootResult.assistant;
+    assert.ok(bootAssistant, 'boot result must include an assistant message');
+    assert.equal(bootAssistant.text, 'warmup', 'boot result assistant text');
+    assert.ok(
+      assistantChildMessageIds(activeStream.events, session.messageId).has(bootAssistant.messageId),
+      'boot result assistant must answer the boot user message on the stream'
+    );
+    assert.ok(bootResult.branch, 'boot result must include a non-empty branch');
+    assert.equal(bootResult.branch, payload.lastSeenBranch, 'boot result branch and callback');
+    assert.equal(bootResult.preparation?.status, 'completed', 'boot result preparation status');
+    assert.equal(
+      bootResult.preparation?.failedStepLabel,
+      undefined,
+      'boot result preparation must not include a failed step'
+    );
+
+    assert.equal(followupResult.status, 'completed', 'follow-up result status');
+    const followupAssistant = followupResult.assistant;
+    assert.ok(followupAssistant, 'follow-up result must include an assistant message');
+    assert.equal(
+      followupAssistant.text,
+      payload.lastAssistantMessageText,
+      'follow-up result text and callback'
+    );
+    assert.notEqual(
+      followupAssistant.messageId,
+      bootAssistant.messageId,
+      'follow-up must have a different assistant message'
+    );
+    assert.equal(
+      followupResult.branch,
+      payload.lastSeenBranch,
+      'follow-up result branch and callback'
+    );
+    assert.equal(
+      followupResult.gateResult,
+      payload.gateResult,
+      'follow-up result gate and callback'
+    );
+    completed = true;
 
     return {
       name: scenarioName,
       conversation,
-      ok,
-      message: ok
-        ? `callback status=${payload.status} messageId=${payload.messageId}`
-        : `callback mismatch: status=${payload.status} messageIdOk=${messageIdOk} textOk=${textOk} (expected=${JSON.stringify(expectedText)} got=${JSON.stringify(payload.lastAssistantMessageText)})`,
-      events,
+      ok: true,
+      message: `callback status=${payload.status} messageId=${payload.messageId}; boot and follow-up results verified`,
+      events: [...activeStream.events],
       durationMs: Date.now() - start,
     };
   } catch (err) {
@@ -750,13 +812,39 @@ async function runCallbackInterrupt(
       return fail('no message-correlated callback received after interrupt');
     }
 
-    const interrupted = payload.status === 'interrupted';
-    completed = interrupted;
+    assert.equal(payload.status, 'interrupted', 'callback status');
+    const result = await deadline.within('interrupted result', signal =>
+      getMessageResult(config, hold.boot.cloudAgentSessionId, hold.held.messageId, signal)
+    );
+    const callbackFailure = CloudAgentSafeFailureSchema.parse(payload.failure);
+    const callbackClientError = ClientErrorSchema.parse(payload.clientError);
+    assert.equal(result.status, 'interrupted', 'interrupted result status');
+    assert.ok(result.failure, 'interrupted result must include a failure');
+    assert.equal(result.failure.stage, 'interruption', 'interrupted result failure stage');
+    assert.equal(result.failure.code, 'user_interrupt', 'interrupted result failure code');
+    assert.equal(
+      result.failure.stage,
+      callbackFailure.stage,
+      'interrupted result failure stage and callback'
+    );
+    assert.equal(
+      result.failure.code,
+      callbackFailure.code,
+      'interrupted result failure code and callback'
+    );
+    assert.equal(
+      result.failure.retryable,
+      callbackClientError.retryable,
+      'interrupted result retryable and callback'
+    );
+    assert.equal(typeof payload.lastSeenBranch, 'string', 'callback must include a branch');
+    assert.equal(result.branch, payload.lastSeenBranch, 'interrupted result branch and callback');
+    completed = true;
     return {
       name: scenarioName,
       conversation: directive,
-      ok: interrupted,
-      message: `callback status=${payload.status} messageId=${payload.messageId}`,
+      ok: true,
+      message: `callback status=${payload.status} messageId=${payload.messageId}; interrupted result verified`,
       events,
       durationMs: Date.now() - start,
     };

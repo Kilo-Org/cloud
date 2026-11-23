@@ -77,6 +77,22 @@ function pageWithoutOmittedItemCount(sessionId: string, summary: unknown) {
   return { messages, nextCursor };
 }
 
+/**
+ * The same page with one extra part on its user message. A persisted part
+ * carries `id` + `messageID` only; a native v2 display part adds its own id
+ * family on top of that.
+ */
+function pageWithUserPart(sessionId: string, part: Record<string, unknown>) {
+  const page = pageFor(sessionId);
+  return {
+    ...page,
+    messages: [
+      { ...page.messages[0], parts: [...page.messages[0].parts, part] },
+      ...page.messages.slice(1),
+    ],
+  };
+}
+
 describe('persisted message history for a stored session id', () => {
   it('parses a page whose messages and parts carry an id minted before the canonical shape', () => {
     // The store keeps sessions created before `ses_` + 26 was the only issued
@@ -145,6 +161,37 @@ describe('persisted message history for a stored session id', () => {
       pageWithUserSummary('ses_12345678901234567890123456', {
         title: 'Compacted history',
         diffs: [{ file: 'a.ts' }],
+      })
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('omits a native display part whose body this contract does not know', () => {
+    // The Durable Object serves a native v2 display part (`msg_…_000001`) as a
+    // persisted part; a client that does not understand its `type` must drop
+    // that part and count it, not lose the whole transcript.
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserPart('ses_12345678901234567890123456', {
+        id: 'msg_native_000001',
+        messageID: 'msg_native',
+        type: 'future-thing',
+      })
+    );
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({
+      omittedItemCount: 1,
+      messages: [{ parts: [{ id: 'prt_1' }] }, { parts: [{ id: 'prt_2' }] }],
+    });
+  });
+
+  it('rejects a native display part whose id does not belong to its message', () => {
+    // A native id that names another message is corrupt data, not an omission:
+    // accepting it would let one part masquerade under a different message.
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserPart('ses_12345678901234567890123456', {
+        id: 'msg_other_000001',
+        messageID: 'msg_native',
+        type: 'future-thing',
       })
     );
     expect(parsed.success).toBe(false);

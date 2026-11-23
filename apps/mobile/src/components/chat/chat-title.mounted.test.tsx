@@ -58,32 +58,50 @@ function layout(instance: Instance, width: number) {
 /** The transparent copy the notice's width comes from, and the name's node. */
 function nodes(tree: Instance) {
   const pressable = tree.find(node => (node.type as string) === 'Pressable');
+  // The copy fills the row and carries no handler; the box inside it is the
+  // pill's own and is what reports the notice's width. A `find` includes the
+  // node it starts from, so the measured box is selected by its handler.
+  const copy = pressable.find(node => (node.type as string) === 'View');
+  const noticeBox = copy.find(
+    node => (node.type as string) === 'View' && typeof node.props.onLayout === 'function'
+  );
   return {
     pressable,
     title: pressable.find(node => (node.type as string) === 'Text'),
-    notice: pressable.find(node => (node.type as string) === 'View'),
+    copy,
+    noticeBox,
     drawn: pressable.findAll(node => (node.type as string) === 'BetaPill'),
   };
 }
 
 function measure(instance: Instance, widths: { slot: number; title: number; notice: number }) {
-  const { pressable, title, notice } = nodes(instance);
+  const { pressable, title, noticeBox } = nodes(instance);
   layout(pressable, widths.slot);
   layout(title, widths.title);
-  layout(notice, widths.notice);
+  layout(noticeBox, widths.notice);
 }
 
 describe('the chat title', () => {
-  it('measures the notice without giving it a place in the row', async () => {
+  it('keeps the notice out of flow in a box the name sits inside', async () => {
     // The first frame must not squeeze the name to make room for a notice that
     // may not fit: the notice is drawn only after the measurement says both fit
     // together, and the measurement itself takes no room.
+    //
+    // The copy fills the row it measures in, so its box is the name's box and
+    // the pair is containment: a capture source that reports boxes without the
+    // style that keeps a node out of flow then sees the name inside the copy
+    // rather than the copy laid over the name (which it reported as a 45.3 x
+    // 24.8 dp overlap of the name and the notice). The measured box inside it
+    // stays the pill's own size, so the fit rule still reads the notice.
     view = await mount();
 
-    const { notice, drawn } = nodes(view.renderer.root);
-    expect(notice.props.className).toContain('absolute');
-    expect(notice.props.className).toContain('opacity-0');
-    expect(notice.props['aria-hidden']).toBe(true);
+    const { copy, noticeBox, drawn } = nodes(view.renderer.root);
+    expect(copy.props.className).toContain('absolute');
+    expect(copy.props.className).toContain('inset-0');
+    expect(copy.props.className).toContain('opacity-0');
+    expect(copy.props['aria-hidden']).toBe(true);
+    expect(copy.props.onLayout).toBeUndefined();
+    expect(typeof noticeBox.props.onLayout).toBe('function');
     expect(drawn).toHaveLength(1);
   });
 

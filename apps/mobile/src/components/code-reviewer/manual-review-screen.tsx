@@ -4,6 +4,7 @@ import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +29,6 @@ import { RemainingCharactersCounter } from '@/components/ui/remaining-characters
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import {
@@ -110,6 +110,7 @@ const FORM_EDGE_GAP = 16;
 const INSTRUCTIONS_COUNTER_VISIBLE_REMAINING = 1_000;
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
+  const stackSafeRouter = useStackSafeReplace();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const scopeTitle = useReviewerScopeTitle(scope);
@@ -163,10 +164,6 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   // than the watchdog's busy button: the deadline releases the action while the
   // request is still out, so the guard reads the mutation's own pending flag.
   const guard = useMetadataLeaveGuard({ enabled: true, saving: createReview.isPending });
-  // The review detail is a screen of this same Stack, so a literal `replace`
-  // would swap both screens in one native-stack commit, which the Android
-  // Fabric view host rejects; `stack-safe-replace.ts` exists for that swap.
-  const stackSafeReplace = useStackSafeReplace();
   // One operation key per draft intent: a retry of the draft this stall belongs
   // to replays the review the server already accepted, instead of creating a
   // second one for the same change.
@@ -234,7 +231,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // removal is dispatched, which keeps the retire that follows the push
             // from being intercepted.
             guard.leaveWithoutAsking(() => {
-              stackSafeReplace.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+              stackSafeRouter.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
             });
           },
           onError: error => {

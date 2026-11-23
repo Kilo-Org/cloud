@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, lt } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { z } from 'zod';
 
@@ -9,7 +9,8 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
   messageIdSchema,
-  partIdSchema,
+  sdkPartIdMatchesMessage,
+  sdkPartIdSchema,
   sessionDiffFileSchema,
   type KiloSdkMessagesCursor,
   type SessionDiffFile,
@@ -17,12 +18,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 
 import { ingestItems } from '../db/sqlite-schema';
-import {
-  getPartItemIdentityRanges,
-  parsePartItemIdentity,
-  streamMessagePartRows,
-  type PartItemIdentityRange,
-} from '../util/compaction';
+import { parsePartItemIdentity, streamMessagePartRows } from '../util/compaction';
 
 export const MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES = 8 * 1024 * 1024;
 export const MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES = 8 * 1024 * 1024;
@@ -518,30 +514,40 @@ type PersistedKiloSdkPartStorageIdentity = {
   partId: string;
 };
 
+/**
+ * Whether an item id is one direct, well-formed part id of `messageId`: the shared
+ * `sdkPartIdSchema` accepts the part segment, its native form names this message, and the
+ * id carries neither a nested segment past the part nor a U+0000.
+ */
+function isDirectPartItemId(itemId: string, messageId: string): boolean {
+  if (itemId.includes('\u0000')) return false;
+  const identity = parsePartItemIdentity(itemId);
+  if (identity === null || identity.messageId !== messageId) return false;
+  const parsed = sdkPartIdSchema.safeParse(identity.partId);
+  return parsed.success && sdkPartIdMatchesMessage({ id: parsed.data, messageID: messageId });
+}
+
 function parsePersistedKiloSdkPartStorageIdentity(
   itemId: string,
   expectedMessageId: string
 ): PersistedKiloSdkPartStorageIdentity | null {
   const identity = parsePartItemIdentity(itemId);
   if (identity === null) return null;
-  const parsed = z.object({ messageId: messageIdSchema, partId: partIdSchema }).safeParse(identity);
+  const parsed = z
+    .object({ messageId: messageIdSchema, partId: sdkPartIdSchema })
+    .safeParse(identity);
   return parsed.success && parsed.data.messageId === expectedMessageId ? parsed.data : null;
 }
 
-function countPartRows(db: DrizzleSqliteDODatabase, where: SQL | undefined): number {
-  return (
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(ingestItems)
-      .where(where)
-      .get()?.count ?? 0
-  );
-}
-
 /**
- * Counts one message's part rows under both layouts. The count is only usable when every row in
- * range carries a direct part id (nothing nested past the part segment) and none carries a
- * U+0000; otherwise the stored layout is corrupt and the caller fails the read.
+ * Counts one message's part rows. The count is only usable when every row in range carries a
+ * direct part id for that message and none carries a U+0000; otherwise the stored layout is
+ * corrupt and the caller fails the read.
+ *
+ * The id rule is applied in JavaScript through the contract's own schema, not re-spelled in SQL,
+ * so this count accepts exactly the id families the clients accept. The rows are streamed in
+ * bounded batches, one page per layout, and only the row position plus `item_id` is selected:
+ * this path never reads item bodies, and the range plus `afterRowId` bound the rows it walks.
  */
 function countKiloSdkMessagePartRowsByMessageId(
   db: DrizzleSqliteDODatabase,
@@ -549,33 +555,35 @@ function countKiloSdkMessagePartRowsByMessageId(
   afterRowId = 0
 ): KiloSdkMessagePartRowCount {
   if (!messageIdSchema.safeParse(messageId).success) return { kind: 'invalid_data' };
-  let broadCount = 0;
-  let directCount = 0;
-  let nulCount = 0;
-  for (const partRange of getPartItemIdentityRanges(messageId)) {
-    const inRange = and(
-      eq(ingestItems.item_type, 'part'),
-      gte(ingestItems.item_id, partRange.start),
-      lt(ingestItems.item_id, partRange.end),
-      gt(ingestItems.id, afterRowId)
-    );
-    broadCount += countPartRows(db, inRange);
-    directCount += countPartRows(db, and(inRange, directPartIdCondition(partRange)));
-    nulCount += countPartRows(
-      db,
-      and(inRange, sql`instr(CAST(${ingestItems.item_id} AS BLOB), X'00') > 0`)
-    );
+  let count = 0;
+  for (const row of streamMessagePartRows<PartStorageRow>({
+    messageId,
+    order: 'row-id',
+    batchSize: KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE,
+    fetchPage: (range, after, limit) =>
+      db
+        .select({
+          id: ingestItems.id,
+          item_id: ingestItems.item_id,
+          ingested_at: ingestItems.ingested_at,
+        })
+        .from(ingestItems)
+        .where(
+          and(
+            eq(ingestItems.item_type, 'part'),
+            gte(ingestItems.item_id, range.start),
+            lt(ingestItems.item_id, range.end),
+            gt(ingestItems.id, after?.id ?? afterRowId)
+          )
+        )
+        .orderBy(ingestItems.id)
+        .limit(limit)
+        .all(),
+  })) {
+    if (!isDirectPartItemId(row.item_id, messageId)) return { kind: 'invalid_data' };
+    count += 1;
   }
-  return broadCount === directCount && nulCount === 0
-    ? { kind: 'count', count: directCount }
-    : { kind: 'invalid_data' };
-}
-
-function directPartIdCondition(range: PartItemIdentityRange) {
-  return and(
-    sql`substr(${ingestItems.item_id}, length(${range.start}) + 1, 3) = 'prt'`,
-    sql`instr(substr(${ingestItems.item_id}, length(${range.start}) + 1), '/') = 0`
-  );
+  return { kind: 'count', count };
 }
 
 function countKiloSdkMessagePartRows(
@@ -932,10 +940,16 @@ function readPartIdentity(
   part: Record<string, unknown>
 ): PersistedKiloSdkPartStorageIdentity | null {
   const parsed = z
-    .object({ id: partIdSchema, messageID: messageIdSchema })
+    .object({ id: sdkPartIdSchema, messageID: messageIdSchema })
     .transform(value => ({ partId: value.id, messageId: value.messageID }))
     .safeParse(part);
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  // A native display part id names its own message. The client contract rejects one that
+  // names another (`persistedSdkPartIdentitySchema`), so the DO refuses it here instead of
+  // serving a transcript the client would drop.
+  return sdkPartIdMatchesMessage({ id: parsed.data.partId, messageID: parsed.data.messageId })
+    ? parsed.data
+    : null;
 }
 
 function compareKiloSdkMessageInfo(

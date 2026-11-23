@@ -115,7 +115,13 @@ export async function applyProbeActivations(
   db: D1Database,
   router: AutoRouter = PROBE_ACTIVATION_ROUTER,
   now: number = Date.now(),
-  revision: number = ACTIVE_MEASUREMENT_REVISION
+  revision: number = ACTIVE_MEASUREMENT_REVISION,
+  /**
+   * Only rows staged at or after this instant are applied. A deploy that retires the
+   * legacy measurement path must leave rows staged before its cutover inert: applying them
+   * would queue work the cutover exists to prevent.
+   */
+  requestedAfter: string | null = null
 ): Promise<ProbeActivationReport> {
   // The deploy that ships this code holds the dispatch lock from before it applies the
   // migration through the container rollout, and only after that is no instance of the
@@ -126,10 +132,10 @@ export async function applyProbeActivations(
     .prepare(
       `SELECT action, model, variant, engine_identity, repetitions, requested_at
       FROM probe_activations
-      WHERE router = ? AND required_revision <= ?
+      WHERE router = ? AND required_revision <= ? AND (? IS NULL OR requested_at >= ?)
       ORDER BY action, model, variant`
     )
-    .bind(router, revision)
+    .bind(router, revision, requestedAfter, requestedAfter)
     .all<StagedActivation>();
   if (results.length === 0) return { queued: 0, readmitted: 0 };
 

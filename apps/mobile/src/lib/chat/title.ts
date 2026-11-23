@@ -154,10 +154,6 @@ function markedTokenText(token: MarkedToken): string {
  * {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters is cut short at that cap with
  * a trailing ellipsis. A line that fits keeps its characters: the ellipsis
  * means a cut happened, never that the cap was counted in a different unit.
- *
- * The source is bounded before it is read, so the cost of a label is the label
- * rather than the length of the stored message; a message longer than the
- * window is labelled from the start of its body, and the rest is never read.
  */
 export function derivedChatText(text: string): string {
   return boundedOneLineExcerpt(

@@ -1,5 +1,6 @@
 import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted harness pins the mode badge, draft restore, save ownership, row layout, manage slot, and delete confirmation */
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,16 +56,23 @@ vi.mock('react-native', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The header slot is where this screen's add control now lives, so the stub
+  // renders it into the tree instead of dropping it.
+  ScreenHeader: (props: { headerRight?: ReactNode }) => props.headerRight ?? null,
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({
-  StateAction: 'StateAction',
-  // The real state renders its action inside its body, so the slot that stands in
-  // for the add action belongs to the tree; the stub keeps only that slot.
-  EmptyState: (props: { action?: ReactNode }) => props.action,
-}));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/empty-state', async () => {
+  // Hoisted above this module's imports, so React loads inside the factory.
+  const { createElement: create } = await import('react');
+  return {
+    // The state carries copy only, so the stub renders the description the
+    // reader sees and nothing else.
+    EmptyState: (props: { description?: ReactNode }) =>
+      props.description ? create('Text', null, props.description) : null,
+  };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
@@ -76,7 +84,41 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
   Plus: 'Plus',
 }));
-vi.mock('@/components/profiles/agent-form-sheet', () => ({ AgentFormSheet: 'AgentFormSheet' }));
+vi.mock('@/components/profiles/agent-form-sheet', async () => {
+  // vi.mock factories are hoisted above this module's imports, so the React,
+  // i18n and draft helpers load inside the factory. The stand-in keeps the
+  // screen's props on its host element and renders the two fields whose text the
+  // sheet's own draft holds (`agent-form-sheet.tsx` writes `slug` and `name`),
+  // so a case can type into them and read what a remount restores.
+  const { createElement: create } = await import('react');
+  const { i18n: translate } = await import('@/i18n');
+  const { useFormDraftRef } = await import('@/lib/form-draft');
+  function AgentFormSheet(props: { draftScope?: string }) {
+    const slugRef = useFormDraftRef(props.draftScope, 'slug', '');
+    const nameRef = useFormDraftRef(props.draftScope, 'name', '');
+    return create(
+      'AgentFormSheet',
+      props,
+      create('FormField', {
+        key: 'slug',
+        label: translate.t('profiles.agents.slug'),
+        defaultValue: slugRef.current,
+        onChangeText: (value: string) => {
+          slugRef.current = value;
+        },
+      }),
+      create('FormField', {
+        key: 'name',
+        label: translate.t('profiles.agents.name'),
+        defaultValue: nameRef.current,
+        onChangeText: (value: string) => {
+          nameRef.current = value;
+        },
+      })
+    );
+  }
+  return { AgentFormSheet };
+});
 
 function agent(id: string, mode: AgentSource['config']['mode']): AgentSource {
   return { id, slug: id, name: id, config: mode === undefined ? {} : { mode } };
@@ -177,18 +219,10 @@ describe('ProfileAgentsScreen mode badge', () => {
   });
 });
 
-type PressableProps = { onPress: () => void; onClose?: () => void };
-
-/** Fire one handler a host stub carries; the stubs keep props untyped. */
-function press(node: { props: unknown }): void {
-  const props = node.props as PressableProps;
-  act(() => {
-    props.onPress();
-  });
-}
+type CloseProps = { onClose?: () => void };
 
 function pressClose(sheet: { props: unknown }): void {
-  const props = sheet.props as PressableProps;
+  const props = sheet.props as CloseProps;
   const onClose = props.onClose;
   if (typeof onClose !== 'function') {
     throw new TypeError('the sheet rendered no onClose');
@@ -207,11 +241,7 @@ describe('ProfileAgentsScreen form draft', () => {
   it('reopens the add sheet after a remount', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const first = await mountScreen();
-    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
-    if (!addButton) {
-      throw new Error('the add button was not rendered');
-    }
-    press(addButton);
+    pressAdd(first.renderer);
     expect(
       first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
     ).toHaveLength(1);
@@ -227,11 +257,7 @@ describe('ProfileAgentsScreen form draft', () => {
   it('keeps the add sheet closed after the form was cancelled', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const first = await mountScreen();
-    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
-    if (!addButton) {
-      throw new Error('the add button was not rendered');
-    }
-    press(addButton);
+    pressAdd(first.renderer);
     const sheet = first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')[0];
     if (!sheet) {
       throw new Error('the sheet was not rendered');
@@ -270,14 +296,57 @@ function openSheet(renderer: MountedRenderer) {
   return sheet;
 }
 
+/** The header's create control, which the add label and its own icon identify. */
+function addControl(renderer: MountedRenderer) {
+  return nodesOfType(renderer, 'Pressable').find(node =>
+    String(node.props.accessibilityLabel).startsWith(i18n.t('profiles.agents.add'))
+  );
+}
+
 function pressAdd(renderer: MountedRenderer): void {
-  const button = nodesOfType(renderer, 'Button')[0];
-  if (!button) {
-    throw new Error('the add button was not rendered');
+  const control = addControl(renderer);
+  if (!control) {
+    throw new Error('the add control was not rendered');
   }
+  // The test renderer exposes host props untyped; the screen passes this handler.
+  const onPress = control.props.onPress as () => void;
   act(() => {
-    (button.props as { onPress: () => void }).onPress();
+    onPress();
   });
+}
+
+/** The props one sheet field stub carries; the renderer keeps them untyped. */
+type FieldProps = { defaultValue?: string; onChangeText?: (text: string) => void };
+
+/** The sheet field the stub renders under `label`. */
+function findField(renderer: MountedRenderer, label: string) {
+  const field = nodesOfType(renderer, 'FormField').find(node => node.props.label === label);
+  if (!field) {
+    throw new Error(`field ${label} was not rendered`);
+  }
+  return field;
+}
+
+/** Type into one sheet field, which writes the scope's draft as the sheet does. */
+function changeText(renderer: MountedRenderer, label: string, value: string): void {
+  const field = findField(renderer, label).props as FieldProps;
+  act(() => {
+    field.onChangeText?.(value);
+  });
+}
+
+/** Re-render the mounted screen against fresh mock state, keeping the providers. */
+function rerenderScreen(renderer: MountedRenderer, queryClient: QueryClient): void {
+  renderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ProfileAgentsScreen, {
+        profileId: 'profile-1',
+        backFallback: PROFILES_LIST_HREF,
+      })
+    )
+  );
 }
 
 describe('ProfileAgentsScreen save ownership', () => {
@@ -369,7 +438,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
 
     unmount();
   });
@@ -380,7 +449,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
     expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
 
     unmount();
@@ -392,7 +461,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).not.toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
 
     unmount();
   });
@@ -518,32 +587,24 @@ describe('ProfileAgentsScreen agent cap', () => {
     }
   });
 
-  it('states the cap above the Add action and disables it at the cap', async () => {
+  it('states the cap and disables the header create control at the cap', async () => {
     h.query.data = agentsAt(MAX_PROFILE_AGENTS);
     const { renderer, unmount } = await mountScreen();
 
-    // One pre-order walk, so the indexes compare the footer's own order.
-    const ordered = renderer.root.findAll(
-      node => String(node.type) === 'Text' || String(node.type) === 'Button'
-    );
-    const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
-    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
-
-    expect(noticeIndex).toBeGreaterThan(-1);
-    expect(addIndex).toBeGreaterThan(-1);
-    expect(noticeIndex).toBeLessThan(addIndex);
-    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
-    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(true);
+    const notice = nodesOfType(renderer, 'Text').find(node => node.props.children === capMessage());
+    expect(notice).toBeDefined();
+    expect(notice?.props.className).toContain('text-warn');
+    expect(addControl(renderer)?.props.disabled).toBe(true);
 
     unmount();
   });
 
-  it('offers the Add action without a notice one agent below the cap', async () => {
+  it('offers the create control without a notice one agent below the cap', async () => {
     h.query.data = agentsAt(MAX_PROFILE_AGENTS - 1);
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).not.toContain(capMessage());
-    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(false);
+    expect(addControl(renderer)?.props.disabled).toBe(false);
 
     unmount();
   });
@@ -597,8 +658,110 @@ describe('ProfileAgentsScreen agent cap', () => {
   });
 });
 
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressAdd(first.renderer);
+  changeText(first.renderer, i18n.t('profiles.agents.slug'), 'portal-agent');
+  changeText(first.renderer, i18n.t('profiles.agents.name'), 'Portal agent');
+  first.unmount();
+}
+
+describe('ProfileAgentsScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.query.data = [agent('alpha', 'primary')];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    h.permission = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+    expect(
+      screenTexts(renderer).filter(text => text === i18n.t('profiles.organizationRoleRequired'))
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    h.permission = 'read-only';
+
+    const denied = await mountScreen();
+    expect(nodesOfType(denied.renderer, 'AgentFormSheet')).toHaveLength(0);
+    denied.unmount();
+
+    h.permission = 'allowed';
+    const allowed = await mountScreen();
+    expect(nodesOfType(allowed.renderer, 'AgentFormSheet')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    h.permission = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(nodesOfType(resolving.renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(nodesOfType(resolving.renderer, 'AgentFormSheet')).toHaveLength(1);
+    const slug = findField(resolving.renderer, i18n.t('profiles.agents.slug')).props as FieldProps;
+    const name = findField(resolving.renderer, i18n.t('profiles.agents.name')).props as FieldProps;
+    expect(slug.defaultValue).toBe('portal-agent');
+    expect(name.defaultValue).toBe('Portal agent');
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAdd(renderer);
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
+    changeText(renderer, i18n.t('profiles.agents.slug'), 'portal-agent');
+
+    h.permission = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    unmount();
+  });
+});
+
 /** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
-type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  placement?: string;
+  onRetry?: () => void;
+};
 
 describe('ProfileAgentsScreen load errors', () => {
   beforeEach(() => {
@@ -633,6 +796,10 @@ describe('ProfileAgentsScreen load errors', () => {
     expect(queryError?.variant).toBe('permission');
     expect(queryError?.title).toBeUndefined();
     expect(queryError?.onRetry).toBeUndefined();
+    // A read with nothing under it owns the surface, so it centres and no
+    // tab scroller holds it.
+    expect(queryError?.placement).toBe('center');
+    expect(nodesOfType(renderer, 'ScrollView')).toHaveLength(0);
 
     unmount();
   });
@@ -655,6 +822,34 @@ describe('ProfileAgentsScreen load errors', () => {
       queryError?.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  // A terminal refusal hides the create control, so the form it opens must go
+  // with it: a sheet over a screen that offers nothing to act on has nowhere to
+  // save to.
+  it('terminal: hides the create control and any open add form', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await mountScreen();
+    pressAdd(renderer);
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
+
+    act(() => {
+      Object.assign(h.query, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    });
+    await act(async () => {
+      renderer.update(
+        createElement(ProfileAgentsScreen, {
+          profileId: 'profile-1',
+          backFallback: PROFILES_LIST_HREF,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(addControl(renderer)).toBeUndefined();
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
 
     unmount();
   });

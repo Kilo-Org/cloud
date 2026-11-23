@@ -87,8 +87,6 @@ describe('readStoredValueSafe', () => {
 
     await readStoredValueSafe('auth-token');
 
-    // The event carries the operation and the native cause only: no key name,
-    // no credential, no stored value.
     expect(JSON.stringify(events[0])).not.toContain('auth-token');
   });
 });
@@ -117,8 +115,6 @@ describe('readStoredValueForUpdate', () => {
   it('keeps "nothing stored" apart from a failed read', async () => {
     getItemAsync.mockResolvedValue(null);
 
-    // A real "nothing stored" is a value, not an unreadable record, so a
-    // read-modify-write can safely treat it as empty.
     await expect(readStoredValueForUpdate('viewed-key')).resolves.toEqual({
       status: 'value',
       value: null,
@@ -140,7 +136,6 @@ describe('readStoredValueForUpdate', () => {
       'error.subsystem': 'secure_store',
       'error.operation': 'read',
     });
-    // The key is never attached to the report.
     expect(JSON.stringify(events[0])).not.toContain('viewed-key');
   });
 });
@@ -191,7 +186,6 @@ describe('writeStoredValue and deleteStoredValue', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.level).toBe('warning');
     expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'write']);
-    // No credential material reaches the report.
     expect(JSON.stringify(events[0])).not.toContain('credential');
   });
 

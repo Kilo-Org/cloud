@@ -4,7 +4,12 @@ import type { SandboxProviderId } from '@kilocode/worker-utils/sandbox-provider-
  * The sandbox providers. Dependency-free, so the wrapper can share it;
  * `agentSandboxProviderSchema` in `src/types.ts` is built from this list.
  */
-export const AGENT_SANDBOX_PROVIDERS = ['cloudflare', 'vercel', 'cloudflare-containers'] as const;
+export const AGENT_SANDBOX_PROVIDERS = [
+  'cloudflare',
+  'vercel',
+  'cloudflare-containers',
+  'aws',
+] as const;
 
 export type AgentSandboxProvider = (typeof AGENT_SANDBOX_PROVIDERS)[number];
 
@@ -27,7 +32,7 @@ export function parseAgentSandboxProvider(
  * How contained SCM credentials reach the sandbox: the Worker's outbound
  * proxy injects them, or the provider's network policy forwards them.
  */
-export type CredentialTransport = 'outbound-proxy' | 'network-policy';
+export type CredentialTransport = 'outbound-proxy' | 'network-policy' | 'explicit-proxy';
 
 /**
  * Per-provider facts that are not product features. Feature support is in
@@ -56,6 +61,15 @@ export type ProviderDescriptor = {
 };
 
 export const PROVIDER_DESCRIPTORS = {
+  aws: {
+    label: 'AWS',
+    reservedPreviewPorts: [8080],
+    launchEnv: { PATH: '/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin' },
+    requiresCustomerCredential: true,
+    uniqueAllocationName: true,
+    credentialTransport: 'explicit-proxy',
+    retired: false,
+  },
   cloudflare: {
     label: 'Cloudflare',
     // The `@cloudflare/sandbox` control server runs on `SERVER_PORT` (3000)

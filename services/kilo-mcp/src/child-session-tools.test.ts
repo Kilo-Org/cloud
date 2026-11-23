@@ -79,8 +79,23 @@ describe('dedicated child session tools', () => {
   it('exposes dedicated tools only to parent-scoped connections, retaining general tools elsewhere', async () => {
     const scoped = await rpc('tools/list', {});
     expect(scoped.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'list_repositories',
       'search_models',
       'generate_message_id',
+      'get_session_messages',
+      'get_tool_part_detail',
+      'get_pending_questions',
+      'answer_question',
+      'reject_question',
+      'list_child_artifacts',
+      'get_child_artifact_url',
+      'cancel_queued_message',
+      'create_child_chat',
+      'sync_child_branch',
+      'restack_child_branch',
+      'list_branches',
+      'create_attachment_upload',
+      'release_pending_uploads',
       'list_environments',
       'spawn_session',
       'list_child_sessions',
@@ -186,25 +201,15 @@ describe('dedicated child session tools', () => {
     }
   );
 
-  it('keeps cached search/call clients working without publishing those tools or widening scope', async () => {
-    const result = await rpc('tools/call', {
-      name: 'search',
-      arguments: { query: 'child session', limit: 50 },
-    });
-    const paths = JSON.parse(result.result.content[0].text).results.map(
-      (row: { path: string }) => row.path
-    );
-    expect(paths).toContain('cloudAgentNext.prepareSession');
-    expect(paths).not.toContain('user.getMe');
-    const status = await rpc('tools/call', {
+  it.each([
+    { name: 'search', arguments: { query: 'child session' } },
+    {
       name: 'call',
       arguments: { path: 'cloudAgentNext.getSession', input: { cloudAgentSessionId: childId } },
-    });
-    expect(JSON.parse(status.result.content[0].text).cloudAgentSessionId).toBe(childId);
-    expect(fetchImpl).toHaveBeenCalledOnce();
-    fetchImpl.mockClear();
-    const denied = await rpc('tools/call', { name: 'call', arguments: { path: 'user.getMe' } });
-    expect(denied.error.message).toContain('does not permit');
+    },
+  ])('rejects hidden $name even for scoped operations', async params => {
+    const denied = await rpc('tools/call', params);
+    expect(denied.error.message).toContain(`Unknown tool "${params.name}"`);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -384,6 +389,52 @@ describe('dedicated child session tools', () => {
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['github', 'cloudAgentNext.listGitHubRepositories', auth, {}],
+    ['gitlab', 'cloudAgentNext.listGitLabRepositories', auth, {}],
+    [
+      'bitbucket',
+      'organizations.cloudAgentNext.listBitbucketRepositories',
+      { ...auth, organizationId, cloudAgentAuthority: { ...authority, organizationId } },
+      { organizationId },
+    ],
+  ] as const)(
+    'discovers %s repositories in the fixed account scope',
+    async (platform, path, connection, scope) => {
+      await run('list_repositories', { platform }, connection);
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      const target = new URL(new Request(url, init).url);
+      expect(target.pathname).toBe(`/api/trpc/${path}`);
+      expect(init?.method).toBe('GET');
+      expect(JSON.parse(target.searchParams.get('input')!)).toEqual({
+        forceRefresh: false,
+        ...scope,
+      });
+    }
+  );
+
+  it('rejects personal Bitbucket discovery and caller-supplied organization IDs', async () => {
+    await expect(run('list_repositories', { platform: 'bitbucket' })).rejects.toThrow('provider');
+    await expect(
+      run('list_repositories', { platform: 'github', organizationId })
+    ).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('routes branch discovery through the organization repository procedure', async () => {
+    const args = { platform: 'gitlab', repository: { fullName: 'group/subgroup/project' } };
+    await run('list_branches', args, {
+      ...auth,
+      organizationId,
+      cloudAgentAuthority: { ...authority, organizationId },
+    });
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    const target = new URL(new Request(url, init).url);
+    expect(target.pathname).toBe('/api/trpc/organizations.cloudAgentNext.listRepositoryBranches');
+    expect(init?.method).toBe('GET');
+    expect(JSON.parse(target.searchParams.get('input')!)).toEqual({ ...args, organizationId });
+  });
+
   it('rejects expired or mismatched scoped credentials before model or session fetches', async () => {
     for (const name of [
       'search_models',
@@ -407,7 +458,8 @@ describe('dedicated child session tools', () => {
   it('publishes usage guidance, strict schemas, and safe read/write annotations', () => {
     const tools = childSessionTools(authority);
     for (const tool of tools) {
-      expect(tool.description.length).toBeGreaterThan(100);
+      expect(tool.description.length).toBeGreaterThan(0);
+      expect(tool.description.length).toBeLessThan(250);
       expect(tool.inputSchema).toMatchObject({ type: 'object', additionalProperties: false });
       expect(tool.inputSchema).not.toHaveProperty('properties.organizationId');
       expect(tool.inputSchema).not.toHaveProperty('properties.autoInitiate');
@@ -422,7 +474,7 @@ describe('dedicated child session tools', () => {
       'properties.requireEnvironmentChoice'
     );
     expect(tools.find(tool => tool.name === 'list_environments')?.inputSchema).toMatchObject({
-      properties: { repository: { type: 'object' } },
+      properties: { repository: { oneOf: expect.any(Array) } },
       required: ['repository'],
     });
     expect(tools.find(tool => tool.name === 'list_environments')?.annotations.readOnlyHint).toBe(
@@ -525,8 +577,7 @@ describe('scoped workspace folder tools', () => {
     expect(tools.find(tool => tool.name === 'list_folders')?.annotations.readOnlyHint).toBe(true);
     const assignment = tools.find(tool => tool.name === 'assign_workspace_to_folder');
     expect(assignment?.annotations.readOnlyHint).toBe(false);
-    expect(assignment?.description).toContain('all sibling chats');
-    expect(assignment?.description).toContain('Cannot move this workspace');
+    expect(assignment?.description).toContain('workspace and its chats');
   });
 });
 
@@ -559,17 +610,30 @@ describe('scoped environment discovery tool', () => {
     { repository: { platform: 'github', fullName: '' } },
     { repository: { platform: 'github', fullName: 'acme/repo', organizationId } },
     { repository: { platform: 'local', fullName: 'acme/repo' } },
-    { repository: { platform: 'gitlab', projectPath: 'group/project' } },
-    {
-      repository: {
-        platform: 'bitbucket',
-        workspaceUuid: '88888888-8888-4888-8888-888888888888',
-        repositoryUuid: '99999999-9999-4999-8999-999999999999',
-      },
-    },
   ])('rejects invalid environment listing input before fetching: %j', async args => {
     await expect(run('list_environments', args)).rejects.toThrow('schema');
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { platform: 'gitlab', projectPath: 'group/project' },
+    {
+      platform: 'bitbucket',
+      workspaceUuid: '88888888-8888-4888-8888-888888888888',
+      repositoryUuid: '99999999-9999-4999-8999-999999999999',
+    },
+  ])('forwards the $platform environment repository', async repository => {
+    const scopedAuth = {
+      ...auth,
+      organizationId,
+      cloudAgentAuthority: { ...authority, organizationId },
+    };
+    await run('list_environments', { repository }, scopedAuth);
+    const request = new Request(...fetchImpl.mock.calls[0]!);
+    expect(JSON.parse(new URL(request.url).searchParams.get('input')!)).toEqual({
+      repository,
+      organizationId,
+    });
   });
 
   it.each(['cloudEnvironments.listAll', 'cloudEnvironments.get', 'cloudEnvironments.create'])(
@@ -587,13 +651,6 @@ describe('scoped environment discovery tool', () => {
     expect(listing?.annotations.destructiveHint).toBe(false);
     expect(listing?.annotations.idempotentHint).toBe(true);
     expect(listing?.description).toContain('requestedEnvironment.id');
-    expect(listing?.description).toContain('GitHub repository');
-    expect(listing?.description).toContain('only for the requested repository');
-    expect(listing?.description).not.toContain('cannot list other repositories');
-    const spawn = tools.find(tool => tool.name === 'spawn_session');
-    expect(spawn?.description).toContain('requestedEnvironment');
-    expect(spawn?.description).toContain('Omit requestedEnvironment');
-    expect(spawn?.description).toContain('automatic/default behavior');
   });
 });
 

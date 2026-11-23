@@ -76,7 +76,6 @@ export function timestampToIso(value: string | null | undefined): string | null 
   return at === null ? null : epochMsToIso(at);
 }
 
-/** Returns the first non-empty string, or '' when none is set. */
 export function firstNonEmpty(...values: (string | null | undefined)[]): string {
   for (const value of values) {
     if (value) {

@@ -8,7 +8,7 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for cr
 
 Every session is a `workspace_*` control-plane session. The Session DO (`SandboxSessionV2`, exported as `SandboxSession`) owns message, route and event state. The Sandbox DO (`SandboxControlV2`, exported as `SandboxControl`) owns allocations, provider lifecycle and wrapper connections. The wrapper in `wrapper/src/control-plane/` runs inside the sandbox and supervises Kilo. The retired `agent_*` plane has no code path and old session IDs are rejected.
 
-The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic.
+The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, fence wrapper connections, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic; a helper with no durable coordination belongs in a small helper module.
 
 Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper connects to the Sandbox DO, forwards Kilo events through it to the Session DO, and owns the job lifecycle inside the sandbox. In the sandbox, git authenticates through the platform's read-only credential helper (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`) and the per-session credential record in the runtime home. HTTP(S) worktree remotes use canonical URLs; SSH remotes retain their login.
 
@@ -48,8 +48,8 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 ### Code Quality
 
 - `pnpm run lint` - oxlint
-- `pnpm run format` - oxfmt write (src only)
-- `pnpm run format:check` - oxfmt check (src only)
+- `pnpm run format` - oxfmt write (src, scripts, test/postgres)
+- `pnpm run format:check` - oxfmt check (src, scripts, test/postgres)
 - `pnpm run typecheck:wrapper` - TypeScript (tsgo) + wrapper typecheck
 - `pnpm run test:checkers` - Duplication checker fixtures
 - `pnpm run check:duplication` - Production duplicate-code ratchet
@@ -137,7 +137,7 @@ This pattern blocks API endpoints from running for external contributors who don
 - Treat `messageId` as the durable user-message identity. Queued/accepted admission may replay idempotently, but completed/failed/interrupted IDs are final and must not be re-admitted. The split responses keep `executionId` only as a compatibility alias.
 - The split public endpoints accept flat input; handlers adapt it at the boundary into grouped `SessionCreateRequest` or queue input.
 - One workspace (the worktree directory and its shared runtime) owns the runtime and MCP configuration. Configure it once when the workspace is created; a rehydrated workspace restores its stored configuration. Sibling chats in that workspace do not get per-chat isolation or their own MCP configuration, while independent workspaces stay isolated. The built-in Cloud Agent MCP server uses the workspace's own authority (`src/control-plane/workspace/`), never a chat's authorization, and credential refresh is not a configuration change.
-- Scoped MCP management is limited to direct spawned children of the workspace. The workspace Durable Object owns the authority, revocation state and child registry; it is adopted once from the chat that created the workspace and survives that chat. Only a user send in the workspace renews an expired authority; nothing restores a revoked one. Check current workspace authority, live bindings and child lineage on every operation; an owner-wide list or matching organization is not sufficient. Child registry entries are discovery hints, not authority, and transient access failures must not appear as an empty list. Follow-ups reuse message IDs and existing child delegation rather than creating broader authority.
+- Scoped MCP management is limited to direct children of the workspace, including chats created through scoped tools. Each eligible child workspace can launch and manage its own direct children. Bot sessions do not receive child-session authority. The workspace Durable Object owns the authority, revocation state and child registry; it is adopted once from the chat that created the workspace and survives that chat. Only a user send in the workspace renews an expired authority; nothing restores a revoked one. Check current workspace authority, live bindings and child lineage on every operation; an owner-wide list or matching organization is not sufficient. Child registry entries are discovery hints, not authority, and transient access failures must not appear as an empty list. Follow-ups reuse message IDs and existing child delegation rather than creating broader authority.
 - New session metadata writes must use grouped `SessionMetadata` with `metadataSchemaVersion: 2`.
 - Legacy flat metadata reads are allowed only inside `src/persistence/session-metadata.ts` via `parseSessionMetadata`. Application code should consume current grouped metadata only.
 - Grouped `start` sends its already accepted canonical initial turn through `createSessionWithInitialAdmission`; retries must preserve the stored immutable intent and complete queue event/drain side effects without duplicate queue events. The retained prepared-session adapter reconstructs stored initial turns before admission.
@@ -147,9 +147,7 @@ This pattern blocks API endpoints from running for external contributors who don
 - Wrapper production code may import Worker code only through `src/shared`; Worker production code must not import `wrapper`.
 - Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
 - A control-plane session must remain recoverable after the physical sandbox dies: a new message in the same `workspace_*` session prepares a new sandbox (`docs/control-plane.md`).
-- The DOs should remain durable coordinators: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, and prepare/restore sandbox state.
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
-- Avoid growing the control-plane DOs with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
 
 ### Runtime Guidelines
 

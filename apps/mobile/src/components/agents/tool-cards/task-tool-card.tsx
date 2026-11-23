@@ -8,8 +8,9 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
+import { useToolDisplay } from '../use-tool-display';
 
 /**
  * Sheet body for a task tool part: the output block and the error. Renders only
@@ -31,7 +32,7 @@ export function TaskToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function TaskToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

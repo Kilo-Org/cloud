@@ -142,13 +142,10 @@ describe('useRecordLastRoute (mounted)', () => {
     await mountProbe('u1');
     await _hydrateLastRouteForTests();
 
-    // A fresh read from the mirror reproduces the same route for the account.
     expect(getLastRoute('u1')).toBe('/(app)/agent-chat/ses_gone');
   });
 });
 
-// Record-and-clear round trip proves the recorder never fights an explicit
-// sign-out clear that lands between commits.
 describe('useRecordLastRoute with an explicit clear (mounted)', () => {
   it('a clear between commits keeps the record dropped until the next commit', async () => {
     await mountProbe('u1');

@@ -42,6 +42,7 @@ const status = vi.hoisted(() => ({
   mutate: vi.fn(),
   refetch: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
 }));
 // The leave guard's own surface: the flag and removal handler it registers, the
 // confirmation it would raise, and the flag the review exit saw when the leave
@@ -57,11 +58,6 @@ const guard = vi.hoisted(() => ({
   replaceSawEnabled: [] as boolean[],
 }));
 /** The review detail route the settled start opens, dispatched by the guard's leave. */
-const routerReplace = vi.hoisted(() =>
-  vi.fn(() => {
-    guard.replaceSawEnabled.push(guard.enabled);
-  })
-);
 // The footer reads its keyboard lift from the root `KeyboardProvider` instead of
 // listening to React Native's keyboard events. The store below is driven per
 // test so the footer clearance can be asserted against a raised keyboard; the
@@ -167,16 +163,18 @@ vi.mock('expo-router', () => ({
     guard.enabled = enabled;
     guard.handler = handler;
   },
-  useRouter: () => ({ replace: routerReplace, push: status.push }),
+  useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
-// The review detail is a screen of the same Stack, so the start leaves through
-// the Android-safe replace (`lib/navigation/stack-safe-replace.ts`). Its own
-// mechanics have a suite; here it stands in for the navigation call so the
-// asserted href is the destination's.
+// The success hand-off goes through the push-then-retire hook (a literal
+// `router.replace` crashes Android Fabric); the suite pins the
+// destination it is handed.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => ({ replace: routerReplace }),
+  useStackSafeReplace: () => ({ replace: status.replace }),
 }));
+// The screen's leave guard renders its discard confirmation through this hook;
+// the confirm branch is unreachable here (no dirty path), so the dialog is a
+// marker the new cases can look for when they assert the guard is wired.
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
 }));
@@ -409,6 +407,7 @@ beforeEach(() => {
   status.mutate.mockReset();
   status.refetch.mockClear();
   status.push.mockClear();
+  status.replace.mockClear();
   operationKey.reset();
   operationKey.getKey.mockClear();
   operationKey.rotateKey.mockClear();
@@ -419,7 +418,9 @@ beforeEach(() => {
   guard.replaceSawEnabled = [];
   guard.enabled = false;
   guard.handler = undefined;
-  routerReplace.mockClear();
+  status.replace.mockImplementation(() => {
+    guard.replaceSawEnabled.push(guard.enabled);
+  });
 });
 
 describe.each(['android', 'ios'] as const)(
@@ -926,6 +927,12 @@ describe('ManualReviewScreen start operation key', () => {
     // The fulfilled intent ends, so a later Start of the same draft is a new
     // review rather than a replay of this one.
     expect(operationKey.rotateKey).toHaveBeenCalledTimes(1);
+    // The review replaces this form once it exists. The guard speaks for the
+    // leave, so the removal is dispatched one task behind its disarm render.
+    await waitFor(() => status.replace.mock.calls.length > 0);
+    expect(status.replace).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/code-reviewer/personal/reviews/review-1'
+    );
 
     unmount();
   });
@@ -983,6 +990,8 @@ describe('ManualReviewScreen start operation key', () => {
     act(() => starts[0]?.callbacks.onSuccess?.({ reviewId: 'review-old-draft' }));
 
     expect(operationKey.rotateKey).not.toHaveBeenCalled();
+    // A withdrawn draft's review is not the one on screen, so the form stays.
+    expect(status.replace).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -1437,8 +1446,8 @@ describe('ManualReviewScreen leave guard', () => {
 
     act(() => calls[0]?.onSuccess?.({ reviewId: 'review-1' }));
 
-    await waitFor(() => routerReplace.mock.calls.length === 1);
-    expect(routerReplace).toHaveBeenCalledWith('/(app)/code-reviewer/personal/reviews/review-1');
+    await waitFor(() => status.replace.mock.calls.length === 1);
+    expect(status.replace).toHaveBeenCalledWith('/(app)/code-reviewer/personal/reviews/review-1');
     expect(guard.replaceSawEnabled).toEqual([false]);
     expect(guard.confirm).not.toHaveBeenCalled();
     await waitFor(() => !guard.enabled);
@@ -1463,7 +1472,7 @@ describe('ManualReviewScreen leave guard', () => {
 
     act(() => calls[0]?.onSuccess?.({ reviewId: 'review-old-draft' }));
 
-    expect(routerReplace).not.toHaveBeenCalled();
+    expect(status.replace).not.toHaveBeenCalled();
 
     unmount();
   });

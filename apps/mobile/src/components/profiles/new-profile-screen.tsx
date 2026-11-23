@@ -88,6 +88,10 @@ export function NewProfileScreen({
   organizationId?: string;
 }>) {
   const router = useRouter();
+  // The post-create hand-off swaps this form for the new profile in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const {
     organizationId: boundaryOrganizationId,
@@ -103,11 +107,6 @@ export function NewProfileScreen({
   // of popping the form, because the removal the save dispatches when it lands
   // would then pop the scene a second time.
   const guard = useMetadataLeaveGuard({ enabled: true, saving: create.isPending });
-  // The overview is a screen of this same Stack, so `router.replace` would
-  // remove this route and insert that one in a single native commit, the swap
-  // the Android stack drops (`stack-safe-replace.ts`). The create route has one
-  // job and leaves once, so the push-then-retire end state is the readable one.
-  const stackSafeReplace = useStackSafeReplace();
   const nameField = useProfileNameField();
   const descriptionRef = useRef('');
   // `null` until the user picks: the route's request, or Personal, applies
@@ -157,8 +156,10 @@ export function NewProfileScreen({
         });
         return;
       }
+      // The guard disarms before the removal is dispatched, so the push-then-
+      // retire hand-off is not intercepted as a Back that the form must hold.
       guard.leaveWithoutAsking(() => {
-        stackSafeReplace.replace(
+        stackSafeRouter.replace(
           getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
         );
       });

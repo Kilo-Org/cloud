@@ -14,6 +14,17 @@ export function formatMicrodollars(microdollars: number, fractionDigits: number 
   }).format(dollars);
 }
 
+const benchmarkCurrency = new Intl.NumberFormat(undefined, {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+
+export function formatMicrodollarsAdaptive(microdollars: number): string {
+  return benchmarkCurrency.format(microdollars / 1_000_000);
+}
+
 /**
  * Formats a date to relative time (e.g., "2 days ago")
  */

@@ -77,7 +77,9 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 // The screen leaves a settled start through the Android-safe replace
-// (`lib/navigation/stack-safe-replace.ts`); no case here navigates.
+// (`lib/navigation/stack-safe-replace.ts`) and arms its leave guard for the
+// write window; this suite settles the start's failure copy, so the guard stays
+// off and no case here navigates.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: vi.fn() }),
 }));

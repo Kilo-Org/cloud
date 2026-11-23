@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
-
+import { mergeProjectOptions } from '@/components/agents/platform-filter-rows';
 import {
   expandPlatformFilter,
   normalisePlatformSelection,
@@ -44,6 +43,7 @@ export function useAgentSessionListData(options: {
     activeIsError,
     storedIsError,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     hasNextPage,
     storedAtRetentionBound,
@@ -76,6 +76,22 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
   });
+  // A paused read with no page of its own shouldered yet (`isPending`) is
+  // neither loading nor errored: it never settles until the network returns, so
+  // the body owes the person the offline state with a retry instead of
+  // skeletons that never land (or the unfiltered list painting under a paused
+  // search). A paused refetch over an answer already delivered keeps that
+  // answer, empty or not: an empty history keeps its New session action and a
+  // zero-match search keeps its Clear actions, and the app-wide offline banner
+  // speaks for the connection.
+  const pausedSearch = search.isPaused && search.isPending;
+  const pausedStored = storedIsPaused && storedIsPending;
+  const contentIsPaused = isSearching ? pausedSearch : pausedStored;
+  const handlePausedRetry = useCallback(() => {
+    // Fire-and-forget: a paused refetch settles only after reconnect, so the
+    // caller must not hold a busy state across it.
+    void (isSearching ? search.refetch() : refetch());
+  }, [isSearching, refetch, search]);
   const contentIsError = isSearching ? search.isError : storedIsError;
   const handleRetry = useCallback(async () => {
     if (!isSearching) {
@@ -149,42 +165,33 @@ export function useAgentSessionListData(options: {
       timeZone: groupedIn,
     }));
   }, [dateGroups, effectiveSearchQuery, search.dateGroups, search.timeZone, timeZone]);
-  const projectOptions = useMemo(() => {
-    const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
-    // The server already bounds `recentRepositories` (LIMIT 10); offer every row
-    // it returns so older repositories stay filterable. A client-side cap here
-    // silently drops the rows the user needs to narrow the list.
-    for (const project of recentRepositories?.repositories ?? []) {
-      byGitUrl.set(project.gitUrl, {
-        gitUrl: project.gitUrl,
-        displayName: formatGitUrlProject(project.gitUrl),
-      });
-    }
-    for (const selectedGitUrl of projectFilter) {
-      if (!byGitUrl.has(selectedGitUrl)) {
-        byGitUrl.set(selectedGitUrl, {
-          gitUrl: selectedGitUrl,
-          displayName: formatGitUrlProject(selectedGitUrl),
-        });
-      }
-    }
-    return [...byGitUrl.values()];
-  }, [projectFilter, recentRepositories?.repositories]);
+  const projectOptions = useMemo(
+    () =>
+      mergeProjectOptions({
+        recentProjects: recentRepositories?.repositories.map(project => project.gitUrl) ?? [],
+        sessionGitUrls: sections.flatMap(section => section.data.map(row => row.git_url)),
+        selectedProjects: projectFilter,
+      }),
+    [projectFilter, recentRepositories?.repositories, sections]
+  );
 
   return {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     paging,
     isRetentionLimited,
     refetch,
     handleRetry,
     handleRefetch,
+    handlePausedRetry,
     isSearching,
     search,
     projectOptions,
     contentIsError,
+    contentIsPaused,
     sections,
   };
 }

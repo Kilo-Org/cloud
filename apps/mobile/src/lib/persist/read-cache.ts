@@ -185,8 +185,8 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
   },
   {
     path: 'cliSessionsV2.recentRepositories',
-    // Only the default (personal-context) variant persists so at most one
-    // snapshot of this procedure is ever written.
+    // Only personal-context inputs persist: an `organizationId` of `null` or
+    // one that is omitted is admitted, and no other field is constrained.
     isAllowedInput: meta => {
       const input = metaInput(meta);
       if (input === undefined) {

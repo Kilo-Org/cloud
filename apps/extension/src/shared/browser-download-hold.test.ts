@@ -991,6 +991,32 @@ describe('the recorded state', () => {
     expect(secondHold.drain('session-1')).toEqual([]);
   });
 
+  it('keeps the origin a step approval is bound to across a worker restart', async () => {
+    const storage = makeStorage({});
+    const first = makeDownloads();
+    const firstHold = startChrome(first, storage);
+    /** The step's own call ran in the tab's document; the approval it needs belongs to the element's frame. */
+    const crossFrame = { ...step, boundOrigin: 'https://pay.example' };
+
+    firstHold.tab({ ...agentTab(), step: crossFrame });
+    firstHold.arm({
+      ...armedNeed({ url: 'https://app.example/reports/q4.pdf' }),
+      step: crossFrame,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const second = makeDownloads();
+    const secondHold = startChrome(second, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The restored tab and approval carry the origin the approval was bound to, which a file approval issued now
+    // Binds, so its retry matches the binding the gate recomputes rather than the origin of the call.
+    const restored = storage.store();
+    expect(JSON.stringify(restored)).toContain('https://pay.example');
+    expect(secondHold.needOf('session-1')?.step?.boundOrigin).toBe('https://pay.example');
+  });
+
   /**
    * The defect this covers: a call registers its tab (and its approval) before the tool runs, and the host marked the
    * session as decided there. A record read still in flight was therefore skipped for that session, and the write the

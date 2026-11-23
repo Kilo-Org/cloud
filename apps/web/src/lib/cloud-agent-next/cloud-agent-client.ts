@@ -180,6 +180,8 @@ type PrepareSessionSharedFields = {
     id: string;
     repositories?: { repoFullName: string; branch?: string }[];
   };
+  environmentSetupRunId?: string;
+  verificationOf?: { runId: string };
   /** Set by a client that shows an environment picker; see the worker's `requireEnvironmentChoice`. */
   requireEnvironmentChoice?: true;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
@@ -682,13 +684,15 @@ type CloudAgentNextTRPCClient = {
     mutate: (input: { sessionId: string; organizationId?: string }) => Promise<InterruptResult>;
   };
   cancelQueuedMessage: {
-    mutate: (input: CancelQueuedMessageInput) => Promise<{ dropped: boolean }>;
+    mutate: (
+      input: CancelQueuedMessageInput & { organizationId?: string }
+    ) => Promise<{ dropped: boolean }>;
   };
   getSession: {
-    query: (input: GetSessionInput) => Promise<GetSessionOutput>;
+    query: (input: GetSessionInput & { stackOnWorktreeId?: string }) => Promise<GetSessionOutput>;
   };
   getSessionMessagesPage: {
-    query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
+    query: (input: GetSessionMessagesPageInput & { organizationId?: string }) => Promise<unknown>;
   };
   getBackgroundActivity: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -697,7 +701,7 @@ type CloudAgentNextTRPCClient = {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
   getSessionToolPartDetail: {
-    query: (input: CloudToolPartDetailInput) => Promise<unknown>;
+    query: (input: CloudToolPartDetailInput & { organizationId?: string }) => Promise<unknown>;
   };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -730,10 +734,10 @@ type CloudAgentNextTRPCClient = {
     mutate: (input: AdoptWorktreeBaseInput) => Promise<AdoptWorktreeBaseOutput>;
   };
   listWorkspaceArtifacts: {
-    query: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
+    query: (input: GetSessionInput) => Promise<unknown>;
   };
   getWorkspaceArtifactDownloadUrl: {
-    query: (input: { cloudAgentSessionId: string; relativePath: string }) => Promise<unknown>;
+    query: (input: GetSessionInput & { relativePath: string }) => Promise<unknown>;
   };
   deleteWorkspaceArtifact: {
     mutate: (input: {
@@ -1007,9 +1011,13 @@ export class CloudAgentNextClient {
    * Cancel one queued (not yet accepted) message by id without interrupting the
    * active run. Returns whether a pending message was dropped.
    */
-  async cancelQueuedMessage(sessionId: string, messageId: string): Promise<{ dropped: boolean }> {
+  async cancelQueuedMessage(
+    sessionId: string,
+    messageId: string,
+    organizationId?: string
+  ): Promise<{ dropped: boolean }> {
     try {
-      return await this.client.cancelQueuedMessage.mutate({ sessionId, messageId });
+      return await this.client.cancelQueuedMessage.mutate({ sessionId, messageId, organizationId });
     } catch (error) {
       console.error(`Error canceling queued message ${messageId} in session ${sessionId}:`, error);
       captureException(error, {
@@ -1028,7 +1036,8 @@ export class CloudAgentNextClient {
    */
   async getSession(
     cloudAgentSessionId: string,
-    organizationId?: string
+    organizationId?: string,
+    stackOnWorktreeId?: string
   ): Promise<GetSessionOutput> {
     return this.request(
       'getSession',
@@ -1036,6 +1045,7 @@ export class CloudAgentNextClient {
         this.client.getSession.query({
           cloudAgentSessionId,
           ...(organizationId === undefined ? {} : { organizationId }),
+          ...(stackOnWorktreeId === undefined ? {} : { stackOnWorktreeId }),
         }),
       { cloudAgentSessionId }
     );
@@ -1050,11 +1060,12 @@ export class CloudAgentNextClient {
   }
 
   async getSessionMessagesPage(
-    input: GetSessionMessagesPageInput
+    input: GetSessionMessagesPageInput,
+    organizationId?: string
   ): Promise<CloudSessionMessagesWirePage> {
     const request = cloudSessionMessagesPageInputSchema.parse(input);
     return cloudSessionMessagesPageWireSchema.parse(
-      await this.client.getSessionMessagesPage.query(request)
+      await this.client.getSessionMessagesPage.query({ ...request, organizationId })
     );
   }
 
@@ -1071,11 +1082,12 @@ export class CloudAgentNextClient {
   }
 
   async getSessionToolPartDetail(
-    input: CloudToolPartDetailInput
+    input: CloudToolPartDetailInput,
+    organizationId?: string
   ): Promise<CloudToolPartDetailWire> {
     const request = cloudToolPartDetailInputSchema.parse(input);
     return cloudToolPartDetailWireSchema.parse(
-      await this.client.getSessionToolPartDetail.query(request)
+      await this.client.getSessionToolPartDetail.query({ ...request, organizationId })
     );
   }
 
@@ -1134,7 +1146,14 @@ export class CloudAgentNextClient {
 
   async getEgressAudit(input: GetEgressAuditInput): Promise<GetEgressAuditResponse> {
     try {
-      return GetEgressAuditResponseSchema.parse(await this.client.getEgressAudit.query(input));
+      return GetEgressAuditResponseSchema.parse(
+        await this.client.getEgressAudit.query({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+        })
+      );
     } catch (error) {
       rethrowCloudAgentError(error);
     }
@@ -1181,20 +1200,25 @@ export class CloudAgentNextClient {
     return await this.client.adoptWorktreeBase.mutate(input);
   }
 
-  async listWorkspaceArtifacts(cloudAgentSessionId: string): Promise<ListWorkspaceArtifactsOutput> {
+  async listWorkspaceArtifacts(
+    cloudAgentSessionId: string,
+    organizationId?: string
+  ): Promise<ListWorkspaceArtifactsOutput> {
     return listWorkspaceArtifactsOutputSchema.parse(
-      await this.client.listWorkspaceArtifacts.query({ cloudAgentSessionId })
+      await this.client.listWorkspaceArtifacts.query({ cloudAgentSessionId, organizationId })
     );
   }
 
   async getWorkspaceArtifactDownloadUrl(
     cloudAgentSessionId: string,
-    relativePath: string
+    relativePath: string,
+    organizationId?: string
   ): Promise<GetWorkspaceArtifactDownloadUrlOutput> {
     return getWorkspaceArtifactDownloadUrlOutputSchema.parse(
       await this.client.getWorkspaceArtifactDownloadUrl.query({
         cloudAgentSessionId,
         relativePath,
+        organizationId,
       })
     );
   }
@@ -1410,14 +1434,18 @@ export class CloudAgentNextClient {
     });
   }
 
-  async answerQuestion(input: AnswerQuestionInput): Promise<{ success: boolean }> {
+  async answerQuestion(
+    input: AnswerQuestionInput & { organizationId?: string }
+  ): Promise<{ success: boolean }> {
     return this.request('answerQuestion', () => this.client.answerQuestion.mutate(input), {
       sessionId: input.sessionId,
       questionId: input.questionId,
     });
   }
 
-  async rejectQuestion(input: RejectQuestionInput): Promise<{ success: boolean }> {
+  async rejectQuestion(
+    input: RejectQuestionInput & { organizationId?: string }
+  ): Promise<{ success: boolean }> {
     return this.request('rejectQuestion', () => this.client.rejectQuestion.mutate(input), {
       sessionId: input.sessionId,
       questionId: input.questionId,
@@ -1431,10 +1459,13 @@ export class CloudAgentNextClient {
     });
   }
 
-  async getPendingInteractions(cloudAgentSessionId: string): Promise<GetPendingInteractionsOutput> {
+  async getPendingInteractions(
+    cloudAgentSessionId: string,
+    organizationId?: string
+  ): Promise<GetPendingInteractionsOutput> {
     return this.request(
       'getPendingInteractions',
-      () => this.client.getPendingInteractions.query({ cloudAgentSessionId }),
+      () => this.client.getPendingInteractions.query({ cloudAgentSessionId, organizationId }),
       { cloudAgentSessionId }
     );
   }

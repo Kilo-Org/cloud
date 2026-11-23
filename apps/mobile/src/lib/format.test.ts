@@ -331,7 +331,6 @@ describe('parseLocalizedNumber with the device keypad separator', () => {
   });
 
   it('rejects input the two readings disagree on', () => {
-    // A thousand in German, or 1.234 from a dot keypad: the text does not say.
     expect(parseLocalizedNumber('1.234', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('12.345', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('1,234', 'en-US', ',')).toBeNull();

@@ -938,21 +938,26 @@ function reportSlackRetirementOutcome(teamId: string, outcome: SlackWorkspaceRet
  * identity cache inside one settlement budget,
  * {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}.
  *
- * Every step is bounded by what is left of that budget, and every step is awaited:
+ * Every step is awaited before the next one starts, and each step is cut off at
+ * the deadline where its call supports it:
  *
  * - the revoke hands the remaining budget to the Slack client as its request
  *   timeout, and the client makes no second attempt, so the request aborts there;
  * - the identity-cache removal gets a signal that fires at the deadline: it starts
  *   no further SCAN round and no further delete batch after that, and the batch in
  *   flight is awaited before the removal resolves;
- * - the installation removal is one Redis command, and it runs only while the
- *   budget is unspent.
+ * - the installation removal is one Redis command started only while the budget is
+ *   unspent. The command carries no deadline of its own, because the Redis client
+ *   has no command timeout; a transport that stalls holds the section past the
+ *   budget until its own socket timeout ends it, and the deadline then ends the
+ *   settlement with the remaining steps skipped.
  *
  * A step whose turn comes after the budget is spent is skipped. The revoke is
  * skipped too when the previous workspace stored no token; a revoke Slack does
  * not confirm is reported and the removals still run. A settlement whose steps
  * did not all finish inside the budget reports `timed_out`; the steps that did
- * finish stay done, and nothing is still running when it returns.
+ * finish stay done, and nothing the settlement started is still running when it
+ * returns.
  */
 async function settleSlackWorkspace(
   previous: PreviousSlackWorkspace,
@@ -1010,13 +1015,15 @@ async function settleSlackWorkspace(
  * owner key, so a retirement in flight never delays another connection of this
  * owner.
  *
- * Every step of the settlement is bounded by
- * {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}, because the section's
- * `statement_timeout` bounds its SQL only: the revoke by the Slack client's
- * request timeout, the identity scan by an abort signal, the installation removal
- * is a single Redis command. Nothing continues after the section returns. A step
- * that did not finish inside the budget is skipped or cut short at its deadline,
- * and the retirement reports `settlement_timed_out` with the team id.
+ * Every settlement step is awaited inside this section, and the steps that can be
+ * cut short are cut short at {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}: the
+ * revoke by the Slack client's request timeout, the identity scan by an abort
+ * signal. The installation removal is a single Redis command gated on the budget;
+ * the Redis client has no command timeout, so a stalled transport is the one case
+ * that holds the section past the budget, until its socket timeout ends the
+ * command and the deadline skips the remaining steps. A step that did not run
+ * inside the budget is skipped, and the retirement reports
+ * `settlement_timed_out` with the team id.
  *
  * A token Slack does not confirm as revoked, a workspace a row records, and a
  * settlement past its budget are reported with the team id rather than thrown:

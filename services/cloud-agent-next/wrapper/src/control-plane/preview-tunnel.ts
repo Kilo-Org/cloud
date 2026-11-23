@@ -50,23 +50,27 @@ export const PREVIEW_TUNNEL_CLIENT_LIMITS: PreviewTunnelLimits = {
 export type TunnelSocket = WebSocket & { ping(): void };
 type TunnelSocketCtor = new (
   url: string,
-  options: { headers: Record<string, string> }
+  options: { headers: Record<string, string>; proxy?: string }
 ) => WebSocket;
 
-function openTunnelSocket(url: string, credential: string): TunnelSocket {
+function openTunnelSocket(url: string, credential: string, proxyUrl?: string): TunnelSocket {
   const Ctor = WebSocket as unknown as TunnelSocketCtor;
-  return new Ctor(url, { headers: { Authorization: `Bearer ${credential}` } }) as TunnelSocket;
+  return new Ctor(url, {
+    proxy: proxyUrl,
+    headers: { Authorization: `Bearer ${credential}` },
+  }) as TunnelSocket;
 }
 
 export type PreviewTunnelClientDeps = {
   /** The tunnel URL from `previewTunnelUrl`; null leaves preview off. */
   url: string | null;
   credential: string;
+  proxyUrl?: string;
   forwarder: PreviewForwarder;
   log: (message: string) => void;
   limits?: Partial<PreviewTunnelLimits>;
   /** Tests replace the socket. */
-  connect?: (url: string, credential: string) => TunnelSocket;
+  connect?: (url: string, credential: string, proxyUrl?: string) => TunnelSocket;
 };
 
 export type PreviewTunnelClient = {
@@ -254,7 +258,7 @@ export function createPreviewTunnelClient(deps: PreviewTunnelClientDeps): Previe
       current?.close(1000, 'Preview tunnel replaced');
       let socket: TunnelSocket;
       try {
-        socket = connect(deps.url, deps.credential);
+        socket = connect(deps.url, deps.credential, deps.proxyUrl);
       } catch {
         deps.log('preview tunnel connect failed');
         return;

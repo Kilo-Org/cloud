@@ -9,7 +9,11 @@ import {
   unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { resolveSecret } from '../../auth.js';
 import {
   CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
@@ -20,11 +24,12 @@ import {
   signWorkspaceMcpGrant,
   workspaceAuthorityFromAnchor,
   workspaceAuthorityUnavailableReason,
+  workspaceSessionIdForScope,
   workspaceSessionIdSchema,
   type WorkspaceAuthorityRecord,
   type WorkspaceAuthoritySeed,
+  type WorkspaceSpawnContext,
   type WorkspaceChildEntry,
-  type WorkspaceEgress,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import { logger } from '../../logger.js';
@@ -156,17 +161,13 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   }
 
   /** Authority check for a launch, plus the workspace policy the child inherits. */
-  async getSpawnContext(authority: unknown): Promise<{
-    token: string;
-    createdOnPlatform: string | undefined;
-    egress: WorkspaceEgress | undefined;
-    environmentSetup: CloudAgentAuthority['environmentSetup'];
-  }> {
+  async getSpawnContext(authority: unknown): Promise<WorkspaceSpawnContext> {
     const live = await this.liveAuthority(authority);
     return {
       token: live.token,
       createdOnPlatform: live.record.createdOnPlatform,
       egress: live.record.egress,
+      configuration: live.record.spawnConfiguration,
       environmentSetup: live.record.environmentSetup,
     };
   }
@@ -175,13 +176,74 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   async authorizeChild(input: {
     authority: CloudAgentAuthority;
     childSessionId: string;
+    stackOnWorktreeId?: string;
   }): Promise<{ token: string; seal: string }> {
-    // The Worker allocates the child session id, so this boundary refuses any other
-    // value and delegates authority only to a session id this service created.
     const childSessionId = serverAllocatedSessionId(input.childSessionId);
-    const record = await this.record();
-    assertWorkspaceAuthority(record, input.authority);
+    const record = (await this.liveAuthority(input.authority)).record;
+    if (input.stackOnWorktreeId !== undefined) {
+      await this.checkStackTarget(input.authority, input.stackOnWorktreeId, record);
+    }
     return this.delegate(record, childSessionId, input.authority);
+  }
+
+  async assertStackTarget(authority: CloudAgentAuthority, worktreeId: string): Promise<void> {
+    const { record } = await this.liveAuthority(authority);
+    await this.checkStackTarget(authority, worktreeId, record);
+  }
+
+  private async checkStackTarget(
+    authority: CloudAgentAuthority,
+    worktreeId: string,
+    record: WorkspaceAuthorityRecord
+  ): Promise<void> {
+    if (record.worktreeId === worktreeId) return;
+    const registry = await this.ctx.storage.list<WorkspaceChildEntry>({ prefix: CHILD_PREFIX });
+    const anchorId = workspaceSessionIdForScope(worktreeId, '');
+    const childIds = new Set([
+      ...[...registry]
+        .filter(([, entry]) => entry.worktreeId === worktreeId)
+        .map(([key]) => key.slice(CHILD_PREFIX.length)),
+      ...(anchorId ? [anchorId] : []),
+    ]);
+    let readFailure: { error: unknown } | undefined;
+    for (const childId of childIds) {
+      try {
+        const metadata = await this.readChildMetadata(authority, childId);
+        if (metadata?.workspace?.worktreeId === worktreeId) return;
+      } catch (error) {
+        readFailure ??= { error };
+      }
+    }
+    if (readFailure) throw readFailure.error;
+    throw new Error(CLOUD_AGENT_STACK_TARGET_DENIED);
+  }
+
+  private async readChildMetadata(authority: CloudAgentAuthority, childSessionId: string) {
+    const metadata = await withDORetry(
+      () => getSandboxSessionStub(this.env, authority.ownerId, childSessionId),
+      (stub): Promise<SessionMetadata | null> => stub.getMetadata(),
+      'getMetadata'
+    );
+    return metadata?.identity.sessionId === childSessionId &&
+      metadata.identity.userId === authority.ownerId &&
+      (metadata.identity.orgId ?? null) === authority.organizationId &&
+      metadata.parentCloudAgentSessionId === authority.parentSessionId
+      ? metadata
+      : null;
+  }
+
+  async authorizeChildChat(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+    chatSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
+    const { record } = await this.liveAuthority(input.authority);
+    if (
+      !(await this.readChildMetadata(input.authority, input.childSessionId))?.workspace?.worktreeId
+    )
+      throw denied();
+    return this.delegate(record, chatSessionId, input.authority);
   }
 
   /** Delegates the workspace authority to a new chat in this workspace (a callback chat). */

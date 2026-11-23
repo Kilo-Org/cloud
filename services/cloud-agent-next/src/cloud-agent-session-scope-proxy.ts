@@ -1,4 +1,5 @@
 import {
+  cloudAgentOrganizationIdSchema,
   cloudAgentSessionScopeHeaders,
   cloudAgentSessionScopeProtocolVersion,
   cloudAgentSessionScopeProtocolVersionV2,
@@ -64,9 +65,14 @@ export function encodeCloudAgentSessionScopeV2ViewHeaders(
 ): Record<string, string> | null {
   const worktreeId = cloudAgentWorktreeIdSchema.safeParse(view.scopeId);
   if (!worktreeId.success) return null;
+  const organizationId =
+    view.expectedOrganizationId === null
+      ? null
+      : cloudAgentOrganizationIdSchema.safeParse(view.expectedOrganizationId);
+  if (organizationId !== null && !organizationId.success) return null;
   const encoded = tryEncodeCloudAgentSessionScopeV2Headers({
     worktreeId: worktreeId.data,
-    organizationId: view.expectedOrganizationId,
+    organizationId: organizationId === null ? null : organizationId.data,
     memberRootKiloSessionIds: view.memberRootKiloSessionIds,
   });
   if (encoded === null) return null;

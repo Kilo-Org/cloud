@@ -20,13 +20,10 @@ describe('providerKeyName', () => {
   });
 
   it('keeps a brand name as the server sent it', () => {
-    // No catalog entry, because a mark reads the same in every language.
     expect(providerKeyName('deepseek', 'DeepSeek')).toBe('DeepSeek');
   });
 
   it('drops the credential noun from a server name the table does not hold', () => {
-    // The switch label and the remove confirm already say "… the {{provider}}
-    // key", so a name carrying its own noun would say it twice.
     expect(providerKeyName('some-retired-provider', 'Acme API key')).toBe('Acme API');
   });
 

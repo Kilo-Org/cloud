@@ -218,29 +218,46 @@ describe('workspace session callback delivery', () => {
     );
   });
 
-  it.each(['child target', 'other workspace', 'other owner'])(
-    'rejects a callback to %s',
-    async condition => {
-      getMetadata.mockImplementation(async (_env, owner, sessionId) => {
-        if (owner !== userId) return null;
-        if (sessionId === childId) return child;
-        if (sessionId === rootId) return parent;
-        if (sessionId !== targetId) return null;
-        if (condition === 'other owner')
-          return { ...parent, identity: { userId: 'other', sessionId: targetId } };
-        return {
-          ...parent,
-          identity: { userId, sessionId: targetId },
-          parentCloudAgentSessionId: condition === 'child target' ? rootId : undefined,
-          workspace: {
-            worktreeId: condition === 'other workspace' ? 'worktree_other' : worktreeId,
-          },
-        };
-      });
-      expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-      expect(queuePrompt).not.toHaveBeenCalled();
-    }
-  );
+  it.each(['other workspace', 'other owner'])('rejects a callback to %s', async condition => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) => {
+      if (owner !== userId) return null;
+      if (sessionId === childId) return child;
+      if (sessionId === rootId) return parent;
+      if (sessionId !== targetId) return null;
+      if (condition === 'other owner')
+        return { ...parent, identity: { userId: 'other', sessionId: targetId } };
+      return {
+        ...parent,
+        identity: { userId, sessionId: targetId },
+        workspace: {
+          worktreeId: condition === 'other workspace' ? 'worktree_other' : worktreeId,
+        },
+      };
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+    expect(queuePrompt).not.toHaveBeenCalled();
+  });
+
+  it('delivers a grandchild callback to the child chat that launched it', async () => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) => {
+      if (owner !== userId) return null;
+      if (sessionId === childId) return child;
+      if (sessionId === rootId) return parent;
+      return sessionId === targetId
+        ? {
+            ...parent,
+            identity: { userId, sessionId: targetId },
+            parentCloudAgentSessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+          }
+        : null;
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'success' });
+    expect(queuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId }),
+      expect.anything(),
+      'workspace_session_callback'
+    );
+  });
 });
 
 describe('callback fallbacks', () => {

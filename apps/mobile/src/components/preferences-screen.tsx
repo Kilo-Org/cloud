@@ -37,6 +37,9 @@ import { ChatSyncSettingRow } from '@/components/chat/chat-sync-setting-row';
  *
  * Every row is also wrapped in the search target the index names, so a search
  * result lands on the row instead of only opening this screen.
+ *
+ * The rows below the Appearance control carry their own section heading: they
+ * lead to account and notification destinations, not to appearance settings.
  */
 export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?: string }>) {
   const router = useRouter();
@@ -116,48 +119,50 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
           <ChatSyncSettingRow />
         </SettingsTarget>
 
-        <RowGroup leadingTile>
-          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.account}>
-            <ConfigureRow
-              icon={Globe}
-              title={t(PREFERENCES_HUB_SETTINGS.account.label)}
-              subtitle={t('preferences.accountSubtitle')}
-              subtitleNumberOfLines={2}
-              onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/account' as Href);
-              }}
-            />
-          </SettingsTarget>
-          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notifications}>
-            <ConfigureRow
-              icon={Bell}
-              title={t(PREFERENCES_HUB_SETTINGS.notifications.label)}
-              subtitle={t('preferences.notificationsSubtitle')}
-              onPress={() => {
-                router.push('/(app)/notifications' as Href);
-              }}
-            />
-          </SettingsTarget>
-          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notificationHistory}>
-            <ConfigureRow
-              icon={History}
-              title={t(PREFERENCES_HUB_SETTINGS.notificationHistory.label)}
-              subtitle={t('notifications.history.subtitle')}
-              onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
-              }}
-            />
-          </SettingsTarget>
-          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.spendAlerts}>
-            <ConfigureRow
-              icon={Wallet}
-              title={t(PREFERENCES_HUB_SETTINGS.spendAlerts.label)}
-              onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
-              }}
-            />
-          </SettingsTarget>
-        </RowGroup>
+        <Section label={t('preferences.accountNotifications')}>
+          <RowGroup leadingTile>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.account}>
+              <ConfigureRow
+                icon={Globe}
+                title={t(PREFERENCES_HUB_SETTINGS.account.label)}
+                subtitle={t('preferences.accountSubtitle')}
+                subtitleNumberOfLines={2}
+                onPress={() => {
+                  router.push('/(app)/(tabs)/(3_profile)/account' as Href);
+                }}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notifications}>
+              <ConfigureRow
+                icon={Bell}
+                title={t(PREFERENCES_HUB_SETTINGS.notifications.label)}
+                subtitle={t('preferences.notificationsSubtitle')}
+                onPress={() => {
+                  router.push('/(app)/notifications' as Href);
+                }}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notificationHistory}>
+              <ConfigureRow
+                icon={History}
+                title={t(PREFERENCES_HUB_SETTINGS.notificationHistory.label)}
+                subtitle={t('notifications.history.subtitle')}
+                onPress={() => {
+                  router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
+                }}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.spendAlerts}>
+              <ConfigureRow
+                icon={Wallet}
+                title={t(PREFERENCES_HUB_SETTINGS.spendAlerts.label)}
+                onPress={() => {
+                  router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
+                }}
+              />
+            </SettingsTarget>
+          </RowGroup>
+        </Section>
       </SettingsSearchScrollView>
     </View>
   );

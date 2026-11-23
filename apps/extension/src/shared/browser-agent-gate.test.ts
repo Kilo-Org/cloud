@@ -13,6 +13,7 @@ import { postAgentNavigate, preflightAgentCall } from './browser-agent-gate';
 import type { AgentPreflight } from './browser-agent-gate';
 import type { AgentFrameInventory } from './browser-agent-frames';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
+import type { WebMcpToolDescriptor } from './tab-debugger';
 
 type CdpHandler = (
   params: Record<string, unknown> | undefined
@@ -64,6 +65,9 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
     frame: { id: 'main', securityOrigin: 'https://app.example.com', url: mainUrl },
   },
 });
+
+/** No descriptor at all: the page cannot report its WebMCP tools. */
+const NO_WEB_MCP_TOOLS: readonly WebMcpToolDescriptor[] | undefined = undefined;
 
 const createSession = (
   options: {
@@ -311,6 +315,7 @@ const run = (
     readonly authorized?: readonly BrowserGrant[];
     readonly probe?: Record<string, unknown>;
     readonly readFrames?: () => Promise<AgentFrameInventory>;
+    readonly readWebMcpTools?: () => Promise<readonly WebMcpToolDescriptor[] | undefined>;
     readonly session?: FakeGateSession;
     readonly stepTokens?: readonly string[];
     readonly toolName: string;
@@ -325,6 +330,8 @@ const run = (
     authorized: input.authorized ?? grants,
     consumeStepToken: (token, binding) => tokens.take(token, [binding]),
     ...(input.readFrames === undefined ? {} : { readFrames: input.readFrames }),
+    // No WebMCP descriptor unless a spec supplies one, so only those specs read the page's tool list.
+    readWebMcpTools: input.readWebMcpTools ?? (() => Promise.resolve(NO_WEB_MCP_TOOLS)),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),
     sessionHandle: 'session-1',
@@ -718,6 +725,80 @@ describe('origin grants', () => {
     });
 
     expect(allowed).toMatchObject({ ok: true, origin: 'https://other.example.com' });
+  });
+});
+
+describe('webmcp call origin', () => {
+  const tool = (origin: string): WebMcpToolDescriptor => ({
+    description: 'Does a thing',
+    inputSchema: { properties: {}, type: 'object' },
+    name: 'do_thing',
+    origin,
+    title: 'Do thing',
+  });
+  const discover = (origin: string) => () => Promise.resolve([tool(origin)]);
+
+  it('refuses a tool that names another origin, without asking for a permission it cannot grant', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      authorized: [],
+      readWebMcpTools: discover('https://elsewhere.example.net'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    const failure = failureOf(result);
+
+    // A page-controlled origin is never a permission target: the refusal is blocked, and it names both origins.
+    expect(failure).toMatchObject({
+      error: expect.stringContaining('https://elsewhere.example.net') as unknown,
+      kind: 'blocked',
+    });
+  });
+
+  it('refuses a tool that names no origin', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: discover(''),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      error:
+        'WebMCP tool "do_thing" does not name the origin it belongs to, so the call was refused.',
+      kind: 'blocked',
+    });
+  });
+
+  it('leaves the top-origin act decision untouched for a tool that names the tab’s own origin', async () => {
+    const missing = await run({
+      args: { name: 'do_thing' },
+      authorized: [],
+      readWebMcpTools: discover('https://app.example.com'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(missing)).toStrictEqual({
+      items: [{ class: 'act', origin: 'https://app.example.com' }],
+      kind: 'needs_permission',
+    });
+
+    const allowed = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: discover('https://app.example.com'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(allowed).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+  });
+
+  it('passes a call the page cannot describe to the handler’s own error', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: () => Promise.resolve(NO_WEB_MCP_TOOLS),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
   });
 });
 
@@ -1527,6 +1608,66 @@ describe('script calls', () => {
     });
 
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('refuses a page-registered tool call when a readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        { class: 'sensitive', origin: 'https://app.example.com', reason: SENSITIVE_REASON.script },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('runs a page-registered tool call when no readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({}),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(allowedOf(result)).toMatchObject({
+      class: 'act',
+      ok: true,
+      origin: 'https://app.example.com',
+    });
+    expect(sensitiveOf(result)).toBeUndefined();
+  });
+
+  it('fails closed on a page-registered tool call when a readable frame cannot be inspected', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://pay.example.com' },
+      ],
+      session: createSession({ fieldProbeFailureFrames: ['f1'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('probes the tab origin for a page-registered tool call granted only on the tab origin', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+      ],
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
   });
 
   it('allows the retry that carries the token bound to the script call', async () => {

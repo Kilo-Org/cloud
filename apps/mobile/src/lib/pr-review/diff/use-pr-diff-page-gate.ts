@@ -14,7 +14,7 @@ function freshPageGate(): PageGate {
  * The pagination gate for the diff file list. FlashList reports the end as
  * reached as soon as its content fits the viewport, so a first page shorter
  * than the screen used to be replaced by the next pages before the
- * partial-load row (`prReview.hunkRows.loadedOfTotalFiles`, "1 of 5 files
+ * partial-load row (`prReview.fileNavigator.loadedOfTotalFiles`, "1 of 5 files
  * loaded") and its Load all action could be read. The user's own drag is the
  * gate: the row is the resting state until then, and a programmatic scroll
  * (scroll-to-file) pulls nothing.

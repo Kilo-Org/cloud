@@ -547,6 +547,23 @@ test('safe-area: text under the top and bottom insets, tolerance', () => {
   assert.deepEqual(run('safe-area', [{ parent: 0, tag: 'View', rect: [0, 0, 400, 100] }], env), []);
 });
 
+test('safe-area: a box the platform reports unseen reaches into no inset', () => {
+  const env = { safeArea: { top: 24, right: 0, bottom: 30, left: 0 } };
+  // An accessibility snapshot carries no style, so an app's hidden measurement
+  // copy — a 2 x 3 px box laid out at the window's own origin — arrives as
+  // ordinary text inside the status bar.
+  const hidden: ProbeNode = {
+    parent: 0,
+    tag: 'Paragraph',
+    rect: [0, 0, 0.76, 1.14],
+    invisible: true,
+  };
+  assert.deepEqual(run('safe-area', [hidden], env), []);
+  // The same box without the platform's answer still reports the inset: the
+  // rule reads the frame it is given, and only the flag excuses it.
+  assert.equal(run('safe-area', [{ ...hidden, invisible: undefined }], env)[0]?.measured, 1.14);
+});
+
 test('safe-area: a presented surface is measured from its own origin', () => {
   const env = {
     safeArea: { top: 24, right: 0, bottom: 30, left: 0 },

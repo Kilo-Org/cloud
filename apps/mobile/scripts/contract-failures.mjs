@@ -15,7 +15,6 @@
 export function createContractFailures() {
   const failures = [];
 
-  /** Records `message` when `condition` is falsy. Condition first, message second. */
   function check(condition, message) {
     if (!condition) failures.push(message);
   }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the connect tap and the disconnect refresh share one provider-mock surface: both read the same hub reads and role mocks */
 // The hub's Connect control hands the browser the app-shell page that owns a
 // provider's connect flow, reached through a one-time hand-off token. The mint
 // is the only step that can fail, and its failure is the tap's failure: the row
@@ -8,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type IntegrationProvider } from '@/lib/integrations/provider-catalog';
+import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 
 import {
   type IntegrationConnect,
@@ -19,6 +21,7 @@ const HANDOFF_URL = 'https://app.example.com/app-shell/handoff?token=handoff-tok
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
   handoffUrl: vi.fn((_target: unknown): Promise<string> => Promise.resolve(HANDOFF_URL)),
   launch: vi.fn<(url: string) => Promise<unknown>>(),
   role: 'member' as string | undefined,
@@ -28,6 +31,10 @@ const mocks = vi.hoisted(() => ({
       error: unknown,
       variables: { provider: IntegrationProvider; integrationId: string | null }
     ) => void;
+    onSuccess?: (
+      result: unknown,
+      variables: { provider: IntegrationProvider; integrationId: string | null }
+    ) => Promise<void> | void;
   } | null,
 }));
 
@@ -50,23 +57,68 @@ vi.mock('@/lib/hooks/use-organizations-list', () => ({
   }),
 }));
 
+const invalidateQueriesMock = vi.hoisted(() => vi.fn((_options: unknown) => Promise.resolve()));
+const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
+// One object for every `useQueryClient` call, so an assertion can name the
+// client the hook handed the reconcile.
+const queryClientMock = vi.hoisted(() => ({
+  invalidateQueries: (options: unknown) => invalidateQueriesMock(options),
+}));
+
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (options: unknown) => {
     mocks.mutation = options as typeof mocks.mutation;
     return { mutate: vi.fn() };
   },
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => queryClientMock,
 }));
+
+// The disconnect's success path refreshes the organization audit log's page
+// one for the Bitbucket branch only. Only that export is replaced, so the rest
+// of the module stays real.
+vi.mock('@/lib/query/infinite-retention', async importOriginal => {
+  const actual = await importOriginal<typeof InfiniteRetentionModule>();
+  return { ...actual, reconcileFirstPage: reconcileFirstPageMock };
+});
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: mocks.toastError, success: vi.fn(), warning: vi.fn() },
+  announcingToast: {
+    error: mocks.toastError,
+    success: mocks.toastSuccess,
+    warning: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: mocks.handoffUrl }));
 
 // `use-integrations` also owns the provider reads and disconnects, which build
 // their queries and call the uninstall procedures; this suite drives only the
-// connect tap, so the client is never reached.
-vi.mock('@/lib/trpc', () => ({ trpcClient: {}, useTRPC: () => ({}) }));
+// connect tap, so the client is never reached. The query keys the disconnect's
+// success path invalidates are named here so its refresh runs against them.
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({
+    platformIntegrations: {
+      listSetupStatus: { queryKey: (input: unknown) => [['platformIntegrations'], input] },
+    },
+    githubApps: { listIntegrations: { queryKey: (input: unknown) => [['githubApps'], input] } },
+    organizations: {
+      bitbucket: {
+        getStatus: { queryKey: (input: unknown) => [['organizations', 'bitbucket'], input] },
+      },
+      reviewAgent: {
+        getBitbucketReadiness: {
+          queryKey: (input: unknown) => [['organizations', 'readiness'], input],
+        },
+      },
+      cloudAgentNext: {
+        listBitbucketRepositories: {
+          queryKey: (input: unknown) => [['organizations', 'repositories'], input],
+        },
+      },
+    },
+  }),
+}));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
@@ -291,5 +343,68 @@ describe('useDisconnectIntegration', () => {
 
     expect(mocks.toastError).toHaveBeenCalledWith('integrations.disconnectFailed');
     expect(mocks.toastError.mock.calls.at(-1)).toHaveLength(1);
+  });
+});
+
+// Only the Bitbucket disconnect writes an organization audit row: the other
+// providers' uninstalls record nothing the log pages, so their branches must
+// not reconcile it.
+describe('useDisconnectIntegration audit log refresh', () => {
+  beforeEach(() => {
+    invalidateQueriesMock.mockClear();
+    reconcileFirstPageMock.mockClear();
+  });
+
+  async function settleMutation(
+    mutation: NonNullable<typeof mocks.mutation>,
+    provider: IntegrationProvider
+  ) {
+    await mutation.onSuccess?.(undefined, { provider, integrationId: 'integration-1' });
+  }
+
+  it('reconciles the audit log page one for a Bitbucket disconnect', async () => {
+    const mutation = mountDisconnect('org_1');
+
+    await settleMutation(mutation, 'bitbucket');
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      'org_1',
+    ]);
+    // The status and readiness invalidations this branch already made stay.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: [['organizations', 'bitbucket'], { organizationId: 'org_1' }],
+    });
+  });
+
+  it('reconciles nothing on the audit log for a GitHub disconnect', async () => {
+    const mutation = mountDisconnect('org_1');
+
+    await settleMutation(mutation, 'github');
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    // The invalidation that branch does make still runs.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: [['platformIntegrations'], { organizationId: 'org_1' }],
+    });
+  });
+
+  it('reconciles nothing on the audit log for a Slack disconnect', async () => {
+    const mutation = mountDisconnect('org_1');
+
+    await settleMutation(mutation, 'slack');
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    // The success toast proves the branch's `onSuccess` ran at all.
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('integrations.disconnected');
+  });
+
+  it('reconciles nothing on the audit log for a personal Bitbucket disconnect', async () => {
+    const mutation = mountDisconnect(undefined);
+
+    await settleMutation(mutation, 'bitbucket');
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('integrations.disconnected');
   });
 });

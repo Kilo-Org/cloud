@@ -370,6 +370,10 @@ export function checkGutter(tree: LayoutTree): Finding[] {
 
   for (const node of tree.nodes) {
     if (!node.paints || node.absolute) continue;
+    // A box the platform says the user cannot see is painted nowhere, so it
+    // stands on no page column. An accessibility snapshot carries no style, so a
+    // hidden measurement copy arrives here as ordinary content at the page edge.
+    if (node.probe.invisible === true) continue;
     const root = surfaceRoot(node);
     const page = pageFor(tree, root);
     const nodes = chain(node, root);

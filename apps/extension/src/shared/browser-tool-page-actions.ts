@@ -7,7 +7,10 @@ import {
   ambiguousSelectorError,
   originPatternMatches,
   toBrowserOrigin,
+  webMcpCallArgumentError,
+  webMcpCallArgumentsSchema,
 } from './browser-agent-checks';
+import type { AgentReadScope } from './browser-agent-frames';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import type {
   BrowserToolDialog,
@@ -24,7 +27,7 @@ import type {
   WebMcpDiscoveryResult,
 } from './tab-debugger';
 import type { WebMcpToolCallEvent } from './agent-conversation';
-import { buildWebMcpToolDefinitions } from './web-mcp-tools';
+import { buildWebMcpToolDefinitions, readableWebMcpTools } from './web-mcp-tools';
 
 /**
  * The ten upstream Playwright MCP page and lifecycle tools the debugger
@@ -126,11 +129,13 @@ export interface BrowserAgentAccess {
 }
 
 export interface BrowserToolPageActionOptions {
+  /** Present only for a CLI agent caller: the tab actions enforce the D9 boundary, and the WebMCP list shows only what it may read. */
+  readonly agentScope?: AgentReadScope | undefined;
   /** Present only for a CLI agent caller: the tab actions enforce the D9 boundary and per-origin grants. */
   readonly agentAccess?: BrowserAgentAccess | undefined;
   /** Records a tab the call opened, with the tab that opened it, so the session may use it later. */
   readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
-  /** WebMCP discovery across frames; wired to the existing WebMCP runtime. */
+  /** WebMCP discovery in the tab's top-level document; wired to the existing WebMCP runtime. */
   readonly webMcpDiscover?: (tabId: number) => Promise<WebMcpDiscoveryResult | undefined>;
   /** WebMCP execution by tool name; wired to the existing WebMCP runtime. */
   readonly webMcpExecute?: (event: WebMcpToolCallEvent) => Promise<EvalTabResult>;
@@ -144,7 +149,6 @@ const stringSchema = z.string();
 const numberSchema = z.coerce.number();
 const booleanSchema = z.boolean();
 const stringArraySchema = z.array(z.string());
-const jsonRecordSchema = z.record(z.string(), z.unknown());
 const integerSchema = z.coerce.number().int();
 
 const cdpRemoteObjectSchema = z.object({
@@ -217,15 +221,6 @@ const getStringArrayArgument = (
   name: string
 ): string[] | undefined => {
   const parsed = stringArraySchema.safeParse(args[name]);
-
-  return parsed.success ? parsed.data : undefined;
-};
-
-const getRecordArgument = (
-  args: Record<string, unknown>,
-  name: string
-): Record<string, unknown> | undefined => {
-  const parsed = jsonRecordSchema.safeParse(args[name]);
 
   return parsed.success ? parsed.data : undefined;
 };
@@ -822,7 +817,7 @@ const runWebMcpList = async (options: BrowserToolPageActionOptions): Promise<Eva
   }
 
   return done({
-    tools: discovery.tools.map(tool => ({
+    tools: readableWebMcpTools(discovery.tools, options.agentScope?.readableOrigins).map(tool => ({
       description: tool.description,
       inputSchema: tool.inputSchema,
       name: tool.name,
@@ -840,11 +835,13 @@ const runWebMcpCall = async (
     return fail('WebMCP API is unavailable.');
   }
 
-  const name = getStringArgument(args, 'name');
+  const parsed = webMcpCallArgumentsSchema.safeParse(args);
 
-  if (name === undefined || name === '') {
-    return fail('browser_webmcp_call needs a tool name.');
+  if (!parsed.success) {
+    return fail(webMcpCallArgumentError(parsed.error));
   }
+
+  const { name } = parsed.data;
 
   if (options.tabId === undefined) {
     return fail(BROWSER_TOOL_NO_SELECTED_TAB_ERROR);
@@ -867,9 +864,42 @@ const runWebMcpCall = async (
     return fail(`WebMCP tool "${name}" is not available. List the page's WebMCP tools first.`);
   }
 
+  // Discovery and execution run in the tab's top-level document, so a tool that names no origin is not one this call can safely bind to a page.
+  if (route.origin === '') {
+    return fail(
+      `WebMCP tool "${name}" does not name the origin it belongs to, so the call was refused.`
+    );
+  }
+
+  // The route came from a listing this call made, so a descriptor registered since is judged here too: the page controls the descriptor, and execution happens in the tab's own document.
+  const getTab = options.tabsApi?.get?.bind(options.tabsApi);
+  let tab: BrowserTabInfo | undefined = undefined;
+
+  if (getTab !== undefined) {
+    try {
+      tab = await getTab(options.tabId);
+    } catch {
+      tab = undefined;
+    }
+  }
+
+  const tabOrigin = toBrowserOrigin(tab?.url);
+
+  if (tabOrigin === undefined) {
+    return fail(
+      `WebMCP tool "${name}" reports origin ${route.origin}, but the tab's own origin cannot be read, so the call was refused.`
+    );
+  }
+
+  if (tabOrigin !== route.origin) {
+    return fail(
+      `WebMCP tool "${name}" reports origin ${route.origin} but runs in the tab's own document (${tabOrigin}), so the call was refused.`
+    );
+  }
+
   const result = await options.webMcpExecute(
     createWebMcpToolCall({
-      arguments: getRecordArgument(args, 'params') ?? {},
+      arguments: parsed.data.params ?? {},
       definitionSignature: route.definitionSignature,
       documentId: route.documentId,
       name,

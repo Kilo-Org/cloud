@@ -265,7 +265,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
           ? undefined
           : await resolveStackedWorkspaceSource({
               db,
-              client,
+              client: ctx.cloudAgentAuthority
+                ? { getSession: id => client.getSession(id, undefined, stackOnWorktreeId) }
+                : client,
               userId: ctx.user.id,
               worktreeId: stackOnWorktreeId,
             });
@@ -413,6 +415,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         user: ctx.user,
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
         operationKey: input.operationKey,
         kiloSessionId: input.kiloSessionId,
       })
@@ -616,6 +619,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'sync',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -631,6 +635,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 

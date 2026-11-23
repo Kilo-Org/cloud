@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 import { createR2Client } from '@kilocode/worker-utils/r2-client';
 import {
   deleteWorkspaceArtifactOutputSchema,
@@ -20,7 +21,7 @@ import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 
 type SandboxControlStub = ReturnType<typeof getSandboxControlStub>;
@@ -34,10 +35,12 @@ type SandboxTransferEnv = Pick<
 
 const ListWorkspaceArtifactsInput = workspaceArtifactSessionInputSchema.extend({
   cloudAgentSessionId: sessionIdSchema,
+  organizationId: z.string().optional(),
 });
 
 const GetWorkspaceArtifactDownloadUrlInput = workspaceArtifactDownloadInputSchema.extend({
   cloudAgentSessionId: sessionIdSchema,
+  organizationId: z.string().optional(),
 });
 
 const DeleteWorkspaceArtifactInput = workspaceArtifactDeleteInputSchema.extend({
@@ -47,12 +50,14 @@ const DeleteWorkspaceArtifactInput = workspaceArtifactDeleteInputSchema.extend({
 async function resolveWorkspaceArtifactSandboxId(
   env: Env,
   userId: string,
-  cloudAgentSessionId: string
+  cloudAgentSessionId: string,
+  expectedOrganizationId?: string | null
 ): Promise<string> {
   const access = await requireCurrentSessionAccess({
     env,
     kiloUserId: userId,
     cloudAgentSessionId,
+    expectedOrganizationId,
   });
 
   const metadata = await withDORetry(
@@ -148,7 +153,7 @@ function attachmentDisposition(relativePath: string): string {
 
 export function createSessionWorkspaceArtifactsHandlers() {
   return {
-    listWorkspaceArtifacts: protectedProcedure
+    listWorkspaceArtifacts: cloudAgentManagedProcedure
       .input(ListWorkspaceArtifactsInput)
       .output(listWorkspaceArtifactsOutputSchema)
       .query(({ input, ctx }) =>
@@ -156,7 +161,8 @@ export function createSessionWorkspaceArtifactsHandlers() {
           const sandboxId = await resolveWorkspaceArtifactSandboxId(
             ctx.env,
             ctx.userId,
-            input.cloudAgentSessionId
+            input.cloudAgentSessionId,
+            ctx.cloudAgentAuthority?.organizationId
           );
           logger.setTags({
             userId: ctx.userId,
@@ -167,7 +173,7 @@ export function createSessionWorkspaceArtifactsHandlers() {
         })
       ),
 
-    getWorkspaceArtifactDownloadUrl: protectedProcedure
+    getWorkspaceArtifactDownloadUrl: cloudAgentManagedProcedure
       .input(GetWorkspaceArtifactDownloadUrlInput)
       .output(getWorkspaceArtifactDownloadUrlOutputSchema)
       .query(({ input, ctx }) =>
@@ -175,7 +181,8 @@ export function createSessionWorkspaceArtifactsHandlers() {
           const sandboxId = await resolveWorkspaceArtifactSandboxId(
             ctx.env,
             ctx.userId,
-            input.cloudAgentSessionId
+            input.cloudAgentSessionId,
+            ctx.cloudAgentAuthority?.organizationId
           );
           logger.setTags({
             userId: ctx.userId,

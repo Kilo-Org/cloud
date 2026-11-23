@@ -16,6 +16,39 @@ export const dropPathsSchema = z.array(z.string().min(1));
 export const dropTargetSchema = z.string().min(1);
 
 /**
+ * The arguments `browser_webmcp_call` takes: a tool name and its params. Strict,
+ * because a key this tool has no room for — the vendored contract's `frame` — is
+ * refused here rather than dropped by a handler that reads the keys it knows.
+ */
+export const webMcpCallArgumentsSchema = z.strictObject({
+  name: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * The tool error for arguments `browser_webmcp_call` does not take. A caller
+ * that sends a key the tool has no room for is told which key: an argument
+ * dropped in silence is a call that does something other than what was asked.
+ */
+export const webMcpCallArgumentError = (error: z.ZodError): string => {
+  const unrecognizedKeys = error.issues.flatMap(issue =>
+    issue.code === 'unrecognized_keys' ? issue.keys : []
+  );
+
+  if (unrecognizedKeys.length > 0) {
+    const keys = unrecognizedKeys.map(key => `"${key}"`).join(', ');
+
+    return `browser_webmcp_call does not take ${keys}; it takes a tool name and its params.`;
+  }
+
+  if (error.issues.some(issue => issue.path[0] === 'name')) {
+    return 'browser_webmcp_call needs a tool name.';
+  }
+
+  return 'browser_webmcp_call arguments were invalid.';
+};
+
+/**
  * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
  * does `browser_drop` when its `paths` lists at least one local file. A drop that carries
  * only `data`, or an empty or malformed `paths`, names no file and is not an upload.
@@ -371,9 +404,17 @@ export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
   'browser_run_code_unsafe',
 ]);
 
-/** The two tools that run model-authored page code (D11: they need the `act` grant). */
-export const isScriptTool = (toolName: string): boolean =>
-  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
+/**
+ * The tools that run code in the page: model-authored code (`browser_evaluate`
+ * and `browser_run_code_unsafe`) and page-registered code (`browser_webmcp_call`
+ * runs a tool the page registered). The D11 `act` grant class is expressed by
+ * `ACT_TOOL_NAMES`; this predicate decides which calls probe the page for a
+ * sensitive field, not which grant class they need.
+ */
+export const runsPageCode = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' ||
+  toolName === 'browser_run_code_unsafe' ||
+  toolName === 'browser_webmcp_call';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
@@ -408,20 +449,6 @@ export const SENSITIVE_REASON = {
   scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
-
-/** The tool families whose act calls can be sensitive; read-only tools never are. */
-export const SENSITIVE_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
-  'browser_click',
-  'browser_drag',
-  'browser_drop',
-  'browser_evaluate',
-  'browser_fill_form',
-  'browser_file_upload',
-  'browser_handle_dialog',
-  'browser_press_key',
-  'browser_run_code_unsafe',
-  'browser_type',
-]);
 
 const OAUTH_CONSENT_ROUTES: readonly {
   readonly host: string;

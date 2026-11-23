@@ -218,7 +218,9 @@ describe('PreferencesScreen hub', () => {
     }
 
     // Nothing the index publishes is invisible: the navigation rows, the three
-    // segment labels, and the labelled section account for every source label.
+    // segment labels, and the Appearance section heading all render. The
+    // account group's heading is a grouping label, not a setting, so it
+    // renders in addition to every published label.
     const sectionLabels = renderer.root
       .findAll(node => typeof node.type === 'function' && node.type.name === 'Section')
       .map(node => node.props.label)
@@ -228,9 +230,13 @@ describe('PreferencesScreen hub', () => {
       ...options.map(option => option.label),
       ...sectionLabels,
     ];
-    expect(new Set(visibleLabels)).toEqual(
-      new Set(hubSettings.map(setting => i18n.t(setting.label)))
-    );
+    for (const label of new Set(hubSettings.map(setting => i18n.t(setting.label)))) {
+      expect(visibleLabels).toContain(label);
+    }
+    expect(sectionLabels).toEqual([
+      i18n.t('preferences.appearance'),
+      i18n.t('preferences.accountNotifications'),
+    ]);
 
     const renderedIds: string[] = [];
     for (const target of renderer.root.findAll(

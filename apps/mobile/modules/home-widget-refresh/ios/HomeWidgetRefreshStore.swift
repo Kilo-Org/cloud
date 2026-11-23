@@ -73,11 +73,23 @@ enum HomeWidgetRefreshStore {
     return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
   }
 
-  static func configure(_ config: [String: Any]) throws {
+  /// Stores the incoming scope and returns the scope it replaced — that scope's
+  /// credential and widget push token — so the caller can unregister the
+  /// registration the replaced scope owns.
+  static func configure(_ config: [String: Any]) throws -> HomeWidgetRetiredScope? {
+    var retired: HomeWidgetRetiredScope?
     let stored: Void? = try locked { defaults in
-      let previous = context()
-      if previous?["scopeKey"] as? String != config["scopeKey"] as? String ||
-         previous?["accountEpoch"] as? Int != config["accountEpoch"] as? Int { clearLocked(defaults) }
+      switch homeWidgetConfigureScope(
+        previous: context(),
+        token: defaults.string(forKey: "homeWidgetPushToken"),
+        config: config
+      ) {
+      case .keep:
+        break
+      case .replace(let retire):
+        retired = retire
+        clearLocked(defaults)
+      }
       let data = try JSONSerialization.data(withJSONObject: config)
       var query = keyQuery
       query[kSecValueData as String] = data
@@ -99,6 +111,7 @@ enum HomeWidgetRefreshStore {
       throw NSError(domain: service, code: 3, userInfo: [NSLocalizedDescriptionKey: "Widget storage unavailable"])
     }
     WidgetCenter.shared.reloadTimelines(ofKind: widgetName)
+    return retired
   }
 
   static func clearLocked(_ defaults: UserDefaults) {

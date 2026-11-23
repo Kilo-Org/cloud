@@ -60,7 +60,16 @@ public class HomeWidgetRefreshModule: Module {
       guard let epoch = config["operationEpoch"] as? Int else {
         throw NSError(domain: HomeWidgetRefreshStore.service, code: 2, userInfo: [NSLocalizedDescriptionKey: "Missing widget operation epoch"])
       }
-      let applied = try self.performOperation(epoch) { try HomeWidgetRefreshStore.configure(config) }
+      var retired: HomeWidgetRetiredScope?
+      let applied = try self.performOperation(epoch) {
+        retired = try HomeWidgetRefreshStore.configure(config)
+      }
+      // A registration belongs to the scope that created it. When this
+      // configure replaces a scope, unregister that scope's token with its own
+      // credential before the stored token is registered for the new scope.
+      if let retired {
+        await HomeWidgetRefreshStore.unregisterPushToken(retired.token, config: retired.config)
+      }
       if applied { await HomeWidgetRefreshStore.registerStoredPushToken() }
     }
     AsyncFunction("clear") { (epoch: Int) in

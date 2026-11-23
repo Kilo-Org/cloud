@@ -191,7 +191,6 @@ async function mountProbe(Probe: ProbeComponent) {
   return { view, holder };
 }
 
-
 /** Consume a write's rejection without awaiting it; the hook announces it. */
 function ignoreRejection(attempt: Promise<unknown> | null): void {
   const consume = async (): Promise<void> => {
@@ -226,7 +225,6 @@ async function flushQueryUpdates(): Promise<void> {
   // this suite reads, then throws, so the throw is swallowed here.
   await waitFor(() => false, 8).catch(() => undefined);
 }
-
 
 /**
  * Runs one write while the device reports itself offline. The caller has

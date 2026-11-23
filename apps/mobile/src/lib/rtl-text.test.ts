@@ -467,12 +467,20 @@ describe('withoutLeadingDirectionMarks', () => {
 
   // A heading can also sit inside a list item, and there the item's content
   // indent decides whether the text after the marker is the item's prose or an
-  // indented code block. Five or more spaces after the marker pad to one and
-  // leave code, whose text keeps every character it holds.
+  // indented code block. Five or more columns of padding after the marker leave
+  // code, whose text keeps every character it holds. A tab reaches the next
+  // four-column stop, so the columns are counted rather than the characters.
   it('keeps a mark in a list item whose padding makes an indented code block', () => {
     const code = '-     # \u200FLatin';
     expect(withoutLeadingDirectionMarks(code)).toBe(code);
     expect(withoutLeadingDirectionMarks('-     Latin')).toBe('-     Latin');
+  });
+
+  it('counts tab padding in columns for that rule', () => {
+    const code = '-\t\t# \u200FLatin';
+    expect(withoutLeadingDirectionMarks(code)).toBe(code);
+    // One tab reaches column 4, which is still the item's own indent.
+    expect(withoutLeadingDirectionMarks('-\t# \u200FLatin')).toBe('-\t# Latin');
   });
 
   it('returns the same string when there is no mark to strip', () => {

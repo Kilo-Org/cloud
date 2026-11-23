@@ -672,12 +672,23 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     let contentStart = 0;
     if (list !== null) {
       // `LIST_START` is greedy over the padding, so the marker's own width is
-      // read apart from it: the item's content starts after one to four spaces.
+      // read apart from it. CommonMark expands a tab to the next four-column tab
+      // stop before it decides this, so the padding is measured in columns, not
+      // in characters: `-\t\t# x` pads seven columns and holds code, where two
+      // characters would look like an item's own indent.
       const markerEnd = /^ {0,3}(?:[-*+]|\d{1,9}[.)])/.exec(body)?.[0].length ?? 0;
-      const padding = /^[ \t]*/.exec(body.slice(markerEnd))?.[0].length ?? 0;
-      // Five or more spaces pad to one, leaving an indented code block: its text
+      const afterMarker = body.slice(markerEnd);
+      const run = /^[ \t]*/.exec(afterMarker)?.[0] ?? '';
+      let column = markerEnd;
+      let padding = 0;
+      for (const character of run) {
+        const next = character === '\t' ? column + 4 - (column % 4) : column + 1;
+        padding = next - markerEnd;
+        column = next;
+      }
+      // Five or more columns pad to one, leaving an indented code block: its text
       // is code and the heading rule must not reach into it.
-      contentStart = padding >= 5 ? body.length : markerEnd + padding;
+      contentStart = padding >= 5 ? body.length : markerEnd + run.length;
     }
     const heading = HEADING_START.exec(body.slice(contentStart));
     const marker = contentStart + (heading?.[0].length ?? 0);

@@ -18,13 +18,7 @@ import {
   world,
 } from './remote-mcp.world.test-helpers';
 
-/**
- * The stored remote MCP servers, discovered for the tools they offer.
- *
- * The store is faked, in `remote-mcp.world.test-helpers`, so the module's own
- * subscription — the thing that drops a disabled server's tools — can be driven
- * without a device.
- */
+/** The stored remote MCP servers, discovered for the tools they offer. */
 
 beforeEach(() => {
   resetWorld();

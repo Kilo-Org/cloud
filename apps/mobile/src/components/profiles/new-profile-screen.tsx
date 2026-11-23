@@ -15,6 +15,7 @@ import {
   ownerChoices,
   type ProfileOwnerChoice,
 } from '@/components/profiles/profile-owner-model';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -97,6 +98,9 @@ export function NewProfileScreen({
     role,
     org,
     isResolving,
+    isError,
+    isFetching,
+    refetch,
   } = useOrgBoundary(organizationId);
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
@@ -111,8 +115,11 @@ export function NewProfileScreen({
     organizationId: string | null;
     owner: ProfileOwnerChoice;
   } | null>(null);
+  // The owner stays a placeholder until the boundary answers. A submit before
+  // then would carry the wrong owner, so Create waits for the answer.
+  const roleUnknown = isResolving || isError;
   const canOwnOrganization =
-    !isResolving && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
+    !roleUnknown && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
   const pickedOwner =
     ownerSelection?.organizationId === boundaryOrganizationId ? ownerSelection.owner : null;
   const owner: ProfileOwnerChoice = canOwnOrganization
@@ -124,6 +131,9 @@ export function NewProfileScreen({
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
+    if (roleUnknown) {
+      return;
+    }
     const name = nameField.commit();
     if (name === null) {
       return;
@@ -180,6 +190,16 @@ export function NewProfileScreen({
           }}
         />
 
+        {isError ? (
+          <QueryError
+            placement="top"
+            inset="none"
+            compact
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
+        ) : null}
+
         {canOwnOrganization ? (
           <View className="gap-1.5">
             <FormFieldLabel
@@ -206,7 +226,7 @@ export function NewProfileScreen({
 
         <Button
           loading={create.isPending}
-          disabled={create.isPending}
+          disabled={roleUnknown || create.isPending}
           onPress={() => void submit()}
         >
           <Text>{t('profiles.createAction')}</Text>

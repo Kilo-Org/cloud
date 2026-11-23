@@ -2994,7 +2994,7 @@
       "windowUnavailable": "قەبارەی پەنجەرەی کۆنتێکست بەردەست نییە",
       "tapToViewDetails": " بۆ بینینی وردەکارییەکانی کۆنتێکست، لێی بدە.",
       "costClause": "، تێچوون {{cost}}",
-      "loadingCostSpoken": "تێچوون: {{cost}}.",
+      "loadingCostSpoken": "تێچووی تا ئێستا: {{cost}}.",
       "tokensWindowUnavailable": "کۆنتێکست: {{used}} تۆکن، قەبارەی پەنجەرە بەردەست نییە{{costClause}}.",
       "tokensUsage": "کۆنتێکست: {{used}} لە {{window}} تۆکن، {{percentage}} بەکارهاتووە{{costClause}}.",
       "title": "بەکارهێنانی کۆنتێکست",

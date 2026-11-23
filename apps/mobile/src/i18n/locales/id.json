@@ -2432,7 +2432,7 @@
       "windowUnavailable": "Ukuran jendela konteks tidak tersedia",
       "tapToViewDetails": " Ketuk untuk melihat detail konteks.",
       "costClause": ", biaya {{cost}}",
-      "loadingCostSpoken": "biaya {{cost}}.",
+      "loadingCostSpoken": "biaya sejauh ini {{cost}}.",
       "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, ukuran jendela konteks tidak tersedia{{costClause}}.",
       "tokensUsage": "Konteks menggunakan {{used}} dari {{window}} token, {{percentage}} terpakai{{costClause}}.",
       "title": "Penggunaan konteks",

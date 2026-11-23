@@ -2994,7 +2994,7 @@
       "windowUnavailable": "Testuinguru-leihoaren tamaina ez dago erabilgarri",
       "tapToViewDetails": " Sakatu testuinguruaren xehetasunak ikusteko.",
       "costClause": ", kostua {{cost}}",
-      "loadingCostSpoken": "kostua: {{cost}}.",
+      "loadingCostSpoken": "oraingoz kostua: {{cost}}.",
       "tokensWindowUnavailable": "Testuinguruan {{used}} token, leihoaren tamaina ez dago erabilgarri{{costClause}}.",
       "tokensUsage": "Testuinguruan {{window}} tokenetik {{used}} erabilita ({{percentage}}){{costClause}}.",
       "title": "Testuinguruaren erabilera",

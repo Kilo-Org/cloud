@@ -2994,7 +2994,7 @@
       "windowUnavailable": "Oke ozi ntụaka adịghị",
       "tapToViewDetails": " Pịa ka ị lee nkọwa ozi ntụaka.",
       "costClause": ", ọnụ ahịa {{cost}}",
-      "loadingCostSpoken": "ọnụ ahịa {{cost}}.",
+      "loadingCostSpoken": "ọnụ ahịa ruo ugbu a {{cost}}.",
       "tokensWindowUnavailable": "Tokin {{used}} nke ozi ntụaka, oke adịghị{{costClause}}.",
       "tokensUsage": "Tokin {{used}} n'ime {{window}} nke ozi ntụaka, ejirila {{percentage}}{{costClause}}.",
       "title": "Ojiji ozi ntụaka",

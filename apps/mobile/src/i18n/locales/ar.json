@@ -2556,7 +2556,7 @@
       "windowUnavailable": "حجم نافذة السياق غير متاح",
       "tapToViewDetails": " اضغط لعرض تفاصيل السياق.",
       "costClause": "، التكلفة {{cost}}",
-      "loadingCostSpoken": "التكلفة {{cost}}.",
+      "loadingCostSpoken": "التكلفة حتى الآن {{cost}}.",
       "tokensWindowUnavailable": "السياق: {{used}} من الرموز، حجم نافذة السياق غير متاح{{costClause}}.",
       "tokensUsage": "السياق: {{used}} من أصل {{window}} من الرموز، نسبة الاستخدام {{percentage}}{{costClause}}.",
       "title": "استخدام السياق",

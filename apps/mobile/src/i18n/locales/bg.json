@@ -2994,7 +2994,7 @@
       "windowUnavailable": "Неизвестен размер на контекстния прозорец",
       "tapToViewDetails": " Докосни, за да видиш подробностите за контекста.",
       "costClause": ", разход {{cost}}",
-      "loadingCostSpoken": "разход {{cost}}.",
+      "loadingCostSpoken": "разход досега {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токена, размерът на прозореца е неизвестен{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}{{costClause}}.",
       "title": "Използване на контекста",

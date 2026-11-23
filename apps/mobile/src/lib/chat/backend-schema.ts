@@ -53,30 +53,56 @@ const SENDABLE_TEXT = /^[\u0020-\u007E\u00A1-\u00AC\u00AE-\u00FF]*$/;
  */
 const STORED_TEXT = /^[\u0020-\u007E\u0080-\u00FF]*$/;
 
-/** Names the transport sets itself, or that would rewrite the header object. */
+/**
+ * Names the transport sets itself, or that would rewrite the header object. The record
+ * parse below drops an own `__proto__` key before any refinement runs, so the pre-parse
+ * guard is what reports that key; the name stays here because it states the rule.
+ */
 const RESERVED_HEADER_NAMES = new Set(
   'host content-length content-type connection transfer-encoding proxy-authorization __proto__ constructor prototype'.split(
     ' '
   )
 );
 
-/** Header rules a stored read applies: every name rule plus the widest stored value. */
-const storedBackendHeadersSchema = z.record(z.string(), z.string()).superRefine((headers, ctx) => {
-  const names = new Set<string>();
-  for (const [name, value] of Object.entries(headers)) {
-    const lower = name.toLowerCase();
-    if (
-      !/^[!#$%&'*+.^_`|~\da-z-]+$/i.test(name) ||
-      !STORED_TEXT.test(value) ||
-      lower.startsWith('x-kilo') ||
-      RESERVED_HEADER_NAMES.has(lower) ||
-      names.has(lower)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'Invalid headers' });
-    }
-    names.add(lower);
+/** True when a pasted header value is an object that can carry header names. */
+function isPastedObject(value: unknown): value is Record<string, unknown> {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the header object is pasted JSON, so typeof is the entry-boundary decode
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * A pasted header object can carry an own `__proto__` key, and `z.record` drops it
+ * while parsing: the assignment becomes a plain object's prototype instead of an
+ * entry, so no rule inside the record ever sees the key and the save quietly loses
+ * it. Refuse it on the raw input, before the record rewrites the object.
+ */
+function refuseOwnPrototypeKey(input: unknown, ctx: z.RefinementCtx) {
+  if (isPastedObject(input) && Object.hasOwn(input, '__proto__')) {
+    ctx.addIssue({ code: 'custom', message: 'Invalid headers' });
   }
-});
+}
+
+/** Header rules a stored read applies: every name rule plus the widest stored value. */
+const storedBackendHeadersSchema = z
+  .unknown()
+  .superRefine(refuseOwnPrototypeKey)
+  .pipe(z.record(z.string(), z.string()))
+  .superRefine((headers, ctx) => {
+    const names = new Set<string>();
+    for (const [name, value] of Object.entries(headers)) {
+      const lower = name.toLowerCase();
+      if (
+        !/^[!#$%&'*+.^_`|~\da-z-]+$/i.test(name) ||
+        !STORED_TEXT.test(value) ||
+        lower.startsWith('x-kilo') ||
+        RESERVED_HEADER_NAMES.has(lower) ||
+        names.has(lower)
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'Invalid headers' });
+      }
+      names.add(lower);
+    }
+  });
 
 /** A save also refuses a header value outside the printable set, as it does the key. */
 export const backendHeadersSchema = storedBackendHeadersSchema.refine(headers =>

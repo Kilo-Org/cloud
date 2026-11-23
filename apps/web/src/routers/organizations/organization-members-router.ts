@@ -24,7 +24,11 @@ import {
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  findOrganizationMembers,
+  OrganizationMemberSearchQuerySchema,
+} from '@/lib/organizations/organization-member-search';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
@@ -224,6 +228,26 @@ export const organizationsMembersRouter = createTRPCRouter({
     .output(PublicOrganizationMembersSchema)
     .query(async ({ input }) => {
       return await getOrganizationMembers(input.organizationId);
+    }),
+
+  /**
+   * Members whose name has a word starting with `query`, with name and avatar
+   * only. Unlike the other member procedures, it requires the caller's own
+   * membership: Kilo admins and parent-organization admins get no elevation.
+   */
+  search: baseProcedure
+    .input(OrganizationIdInputSchema.extend({ query: OrganizationMemberSearchQuerySchema }))
+    .query(async ({ ctx, input }) => {
+      const members = await findOrganizationMembers(ctx.user.id, input.organizationId, {
+        query: input.query,
+      });
+      if (!members) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not a member of this organization',
+        });
+      }
+      return { members };
     }),
 
   update: organizationAdminMutationProcedure

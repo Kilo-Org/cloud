@@ -27808,6 +27808,39 @@
     ],
     "searchBlob": "organizations.members.resendInvite Resend a pending organization invitation email. Use when an invited person did not receive the original invite. organizations members resendinvite organizationid inviteid organizationId inviteId"
   },
+  "organizations.members.search": {
+    "path": "organizations.members.search",
+    "kind": "query",
+    "summary": "Search members of an organization the caller belongs to by name only, matching the start of any word of a member's name, and return id, name and avatar for at most 10 active members. Email addresses are never matched or returned, and members whose name is empty or contains an @ are left out. Fails if the caller is not a direct member of the organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "organizationId",
+        "query"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "members",
+      "search",
+      "organizationid",
+      "query"
+    ],
+    "searchBlob": "organizations.members.search Search members of an organization the caller belongs to by name only, matching the start of any word of a member's name, and return id, name and avatar for at most 10 active members. Email addresses are never matched or returned, and members whose name is empty or contains an @ are left out. Fails if the caller is not a direct member of the organization. organizations members search organizationid query organizationId query"
+  },
   "organizations.members.setChildMemberships": {
     "path": "organizations.members.setChildMemberships",
     "kind": "mutation",

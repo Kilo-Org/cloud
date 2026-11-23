@@ -10,6 +10,8 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
 import { PAGES_AUTH_STATE_PATTERN, verifyPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { pagesDirectoryCapabilities } from '@/lib/pages-auth/pages-directory';
+import { createPagesMemberSearchProof } from '@/lib/pages-auth/pages-member-search-proof';
 import { getUserAuthProviders } from '@/lib/user';
 import { hasVerifiedPrimaryAddress } from '@/lib/user/verified-address';
 
@@ -96,7 +98,15 @@ async function userIdFromPagesToken(token: string, audience: string): Promise<st
  *
  * The answer is identity only, and no Kilo token is issued:
  *
- *     { "user": { "id", "name", "verified_email"? }, "organizations": [...] }
+ *     { "user": { "id", "name", "verified_email"? }, "organizations": [...],
+ *       "directory": { "capabilities": [...] }, "member_search_proof"? }
+ *
+ * `directory.capabilities` names what Pages may ask Kilo about people
+ * (`pagesDirectoryCapabilities`). `member_search_proof` is present only when
+ * `member_search` is listed. Pages sends it to
+ * `POST /api/pages-auth/organization-members` to search on this person's
+ * behalf. It is bound to this deployment and person, and good for one Pages
+ * session.
  *
  * `verified_email` is the account's primary address, present only when a
  * sign-in method that verifies addresses carries it
@@ -149,6 +159,7 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
     getUserAuthProviders(user.id),
   ]);
   const verified = hasVerifiedPrimaryAddress(user.google_user_email, providers);
+  const capabilities = pagesDirectoryCapabilities();
 
   return NextResponse.json(
     {
@@ -158,6 +169,10 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
         ...(verified ? { verified_email: user.google_user_email } : {}),
       },
       organizations,
+      directory: { capabilities },
+      ...(capabilities.includes('member_search')
+        ? { member_search_proof: createPagesMemberSearchProof({ userId: user.id, audience }) }
+        : {}),
     },
     { headers: { 'Cache-Control': 'no-store' } }
   );

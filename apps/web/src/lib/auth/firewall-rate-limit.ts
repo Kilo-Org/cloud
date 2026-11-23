@@ -95,10 +95,24 @@ export async function checkFirewallRateLimit(
 /**
  * Routes that guard a branch call this so the status codes and `{ error }` bodies
  * are written once.
+ *
+ * `retryAfterSeconds` adds `Retry-After` to a 429. The limiter reports no
+ * reset time, so a caller that sends it passes its rule's window.
  */
-export function firewallRateLimitRefusal(limit: FirewallRateLimitResult): NextResponse | null {
+export function firewallRateLimitRefusal(
+  limit: FirewallRateLimitResult,
+  { retryAfterSeconds }: { retryAfterSeconds?: number } = {}
+): NextResponse | null {
   if (limit === 'limited') {
-    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'RATE_LIMITED' },
+      {
+        status: 429,
+        ...(retryAfterSeconds === undefined
+          ? {}
+          : { headers: { 'Retry-After': String(retryAfterSeconds) } }),
+      }
+    );
   }
   if (limit === 'unavailable') {
     return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });

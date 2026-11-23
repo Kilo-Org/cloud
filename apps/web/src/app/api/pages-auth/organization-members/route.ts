@@ -1,0 +1,130 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
+import {
+  findOrganizationMembers,
+  OrganizationMemberSearchQuerySchema,
+} from '@/lib/organizations/organization-member-search';
+import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
+import { isPagesMemberSearchEnabled } from '@/lib/pages-auth/pages-directory';
+import { isPagesMemberSearchProofFor } from '@/lib/pages-auth/pages-member-search-proof';
+
+/**
+ * Vercel Firewall rules this route counts against. Both must exist in the
+ * project's firewall configuration before this route deploys: the exchange
+ * hands out proofs from then on, and a missing rule answers 503.
+ *
+ * The searcher's rule is checked first, so a request it refuses never spends
+ * the deployment's shared budget. One person looping searches is cut off alone
+ * instead of locking every owner on the deployment out of search and grants.
+ */
+const SEARCHER_RATE_LIMIT_ID = 'pages-member-search-searcher';
+const DEPLOYMENT_RATE_LIMIT_ID = 'pages-member-search-deployment';
+
+/**
+ * The window both firewall rules count over; keep it equal to theirs. The
+ * firewall answers only "limited", with no reset time, so a 429's
+ * `Retry-After` is this whole window: never too early, at most one window
+ * late.
+ */
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+
+const UserIdSchema = z.string().min(1).max(500);
+
+const common = {
+  audience: z.string().min(1).max(200),
+  searcher_id: UserIdSchema,
+  organization_id: z.uuid(),
+  proof: z.string().min(1).max(4096),
+};
+
+const RequestSchema = z.union([
+  z.object({ ...common, query: OrganizationMemberSearchQuerySchema }).strict(),
+  z.object({ ...common, member_id: UserIdSchema }).strict(),
+]);
+
+function refuse(status: number, error: string) {
+  return NextResponse.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
+}
+
+/**
+ * Searches one organization's members, or confirms one member, for a person
+ * signed in to a Pages deployment.
+ *
+ * A Pages deployment calls this from its server with its secret as a bearer
+ * credential and one of:
+ *
+ *     { audience, searcher_id, organization_id, proof, query }
+ *     { audience, searcher_id, organization_id, proof, member_id }
+ *
+ * `proof` is the `member_search_proof` from the searcher's exchange. `query`
+ * is 2 to 100 characters after trimming and matches the start of any word of
+ * a name. `member_id` resolves one pick at grant time, so Pages never grants an
+ * id or name its browser sent.
+ *
+ * The answer is `{ "members": [{ "id", "name", "image_url" }] }`, at most 10,
+ * and empty when nobody matches. `image_url` is null when the account has
+ * none. Ids are raw Kilo user ids.
+ *
+ * While `PAGES_MEMBER_SEARCH_ENABLED` is off, every call answers 404
+ * `not_found`, and the exchange advertises no `member_search`.
+ *
+ * Otherwise, refusals in the order they are checked: 400 `invalid_request` for a body
+ * that is not exactly one of the shapes above; 401 `invalid_client` for a
+ * caller that is not a configured deployment; 401 `invalid_proof` for a proof
+ * that is forged, expired, or minted for another person or deployment; 403
+ * `not_a_member` when the searcher's account is missing or blocked, or holds no
+ * membership of its own in a live organization. 429, with `Retry-After`, and
+ * 503 come from the rate limits, checked after the proof: per searcher first,
+ * then per deployment.
+ */
+export const POST = withRestTiming(
+  '/api/pages-auth/organization-members',
+  async (request: Request) => {
+    if (!isPagesMemberSearchEnabled()) return refuse(404, 'not_found');
+
+    const body: unknown = await request.json().catch(() => null);
+    const parsed = RequestSchema.safeParse(body);
+    if (!parsed.success) return refuse(400, 'invalid_request');
+    const input = parsed.data;
+    const { audience, searcher_id: searcherId } = input;
+
+    const secret = extractBearerToken(request.headers.get('authorization'));
+    if (!isPagesAuthClient(audience, secret)) return refuse(401, 'invalid_client');
+
+    if (!isPagesMemberSearchProofFor(input.proof, { userId: searcherId, audience })) {
+      return refuse(401, 'invalid_proof');
+    }
+
+    const searcherRefusal = firewallRateLimitRefusal(
+      await checkFirewallRateLimit(SEARCHER_RATE_LIMIT_ID, {
+        source: 'pages_member_search_searcher',
+        request,
+        rateLimitKey: `${audience}:${searcherId}`,
+      }),
+      { retryAfterSeconds: RATE_LIMIT_WINDOW_SECONDS }
+    );
+    if (searcherRefusal) return searcherRefusal;
+
+    const deploymentRefusal = firewallRateLimitRefusal(
+      await checkFirewallRateLimit(DEPLOYMENT_RATE_LIMIT_ID, {
+        source: 'pages_member_search_deployment',
+        request,
+        rateLimitKey: audience,
+      }),
+      { retryAfterSeconds: RATE_LIMIT_WINDOW_SECONDS }
+    );
+    if (deploymentRefusal) return deploymentRefusal;
+
+    const members = await findOrganizationMembers(
+      searcherId,
+      input.organization_id,
+      'query' in input ? { query: input.query } : { memberId: input.member_id }
+    );
+    if (!members) return refuse(403, 'not_a_member');
+
+    return NextResponse.json({ members }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+);

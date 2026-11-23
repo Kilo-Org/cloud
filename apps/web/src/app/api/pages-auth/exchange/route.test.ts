@@ -6,6 +6,7 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { isPagesMemberSearchProofFor } from '@/lib/pages-auth/pages-member-search-proof';
 import { getUserAuthProviders } from '@/lib/user';
 import { POST } from './route';
 
@@ -128,12 +129,52 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(await response.json()).toEqual({
       user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
       organizations,
+      directory: { capabilities: [] },
     });
     expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
     expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {
       excludeAccessBlocked: true,
     });
     expect(mockedGetUserAuthProviders).toHaveBeenCalledWith('user-1');
+  });
+
+  describe('member search', () => {
+    afterEach(() => {
+      delete process.env.PAGES_MEMBER_SEARCH_ENABLED;
+    });
+
+    test.each([undefined, '', 'false', 'TRUE', '1'])(
+      'advertises nothing and mints no proof while the setting is %j',
+      async value => {
+        if (value === undefined) delete process.env.PAGES_MEMBER_SEARCH_ENABLED;
+        else process.env.PAGES_MEMBER_SEARCH_ENABLED = value;
+
+        const response = await exchange({ code: codeFor(), audience: PAGES, state: STATE });
+        const body = await response.json();
+
+        expect(body.directory).toEqual({ capabilities: [] });
+        expect(body).not.toHaveProperty('member_search_proof');
+      }
+    );
+
+    test('advertises member_search with a proof bound to the person and deployment', async () => {
+      process.env.PAGES_MEMBER_SEARCH_ENABLED = 'true';
+
+      const response = await exchange(
+        { code: codeFor(PAGES_DEV), audience: PAGES_DEV, state: STATE },
+        DEV_SECRET
+      );
+      const { directory, member_search_proof: proof } = await response.json();
+
+      expect(directory).toEqual({ capabilities: ['member_search'] });
+      expect(isPagesMemberSearchProofFor(proof, { userId: 'user-1', audience: PAGES_DEV })).toBe(
+        true
+      );
+      expect(isPagesMemberSearchProofFor(proof, { userId: 'user-1', audience: PAGES })).toBe(false);
+      expect(isPagesMemberSearchProofFor(proof, { userId: 'user-2', audience: PAGES_DEV })).toBe(
+        false
+      );
+    });
   });
 
   describe('verified_email', () => {
@@ -367,6 +408,7 @@ describe('POST /api/pages-auth/exchange', () => {
       expect(await response.json()).toEqual({
         user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
         organizations,
+        directory: { capabilities: [] },
       });
       expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
       expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {

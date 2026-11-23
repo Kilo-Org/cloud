@@ -70,10 +70,10 @@ function translatedPart(
  * the message leads that row alone; a title naming the event (a session, a
  * conversation, an alert) keeps the headline it had. The security lifecycle
  * notice reads the product name entry (`GENERIC_PUSH_TITLE_KEY`), so the test
- * is a comparison with the same catalog's spelling in `locale` — `I-Kilo` in
- * Zulu, `Kilo` elsewhere — taken from the title template with its params left
- * out: a session the user named "Kilo" keeps its title, because its template is
- * the session name.
+ * is a comparison with the row locale's own catalog spelling of the product
+ * name, taken from the title template with its params left out: a session whose
+ * title repeats the product name keeps its title, because its template is the
+ * session name.
  */
 export function notificationHistoryCopy(
   row: NotificationHistoryCopyFields,

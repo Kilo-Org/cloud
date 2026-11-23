@@ -391,11 +391,9 @@ describe('MarkdownImage inert-until-load', () => {
   });
 
   it('re-derives confirmation from the current uri when the instance is recycled', async () => {
-    // Start with an unconfirmed HTTPS URI: Load chip, no Image.
     const renderer = await mount('https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
-    // Confirm a.png through the Load chip.
     await pressLoad(renderer.root, 'https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
 
@@ -431,10 +429,8 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (image.props.onError as () => void)();
     });
-    // Old URI shows the retry chip.
     expect(texts(renderer.root)).toContain('Image unavailable\nshot');
 
-    // Recycle to a new, unconfirmed URI: it must show Load, never the old chip.
     await act(async () => {
       await Promise.resolve();
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));

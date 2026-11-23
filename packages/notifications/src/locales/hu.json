@@ -7,6 +7,7 @@
       "spendAlert": "A költésed figyelmet igényel",
       "securityFinding": "Egy biztonsági találat figyelmet igényel",
       "securityUpdate": "Egy biztonsági ellenőrzés frissítést kapott",
+      "agentBriefing": "A jelentésed az ügynök tevékenységéről elkészült",
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },

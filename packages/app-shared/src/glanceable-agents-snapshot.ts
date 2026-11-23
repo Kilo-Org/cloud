@@ -385,7 +385,6 @@ function extremeTimestampRow(
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;
-  const compare = compareSessionInstant(readTimestamp, extreme);
   for (const session of sessions) {
     if (!qualifies(session)) {
       continue;
@@ -394,7 +393,7 @@ function extremeTimestampRow(
     if (at === null) {
       continue;
     }
-    if (winner !== null && compare(session, winner.session) >= 0) {
+    if (winner !== null && (extreme === 'earliest' ? at >= winner.at : at <= winner.at)) {
       continue;
     }
     winner = { at, session };

@@ -967,6 +967,61 @@ describe('organizations members trpc router', () => {
       }
     });
 
+    it('records the parent organization name on child membership audit rows', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      const child = await createChildOrganization('Parent Name Child Members', childOwner.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
+      const input = { organizationId: testOrganization.id, memberId: target.id };
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [child.id],
+          })
+        ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+
+        const addedAudits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, child.id),
+              sql`${organization_audit_logs.details}->>'id' = 'member.parentAdded'`
+            )
+          );
+        expect(addedAudits).toHaveLength(1);
+        expect(addedAudits[0].details).toMatchObject({
+          id: 'member.parentAdded',
+          parent: testOrganization.name,
+        });
+        expect(addedAudits[0].details).not.toMatchObject({ parent: testOrganization.id });
+
+        await expect(
+          caller.organizations.members.setChildMemberships({ ...input, childOrganizationIds: [] })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
+
+        const removedAudits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, child.id),
+              sql`${organization_audit_logs.details}->>'id' = 'member.parentRemoved'`
+            )
+          );
+        expect(removedAudits).toHaveLength(1);
+        expect(removedAudits[0].details).toMatchObject({
+          id: 'member.parentRemoved',
+          parent: testOrganization.name,
+        });
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
     it('records only bypassed Kilo admin child-membership writes', async () => {
       const childOwner = await insertTestUser({ is_admin: false });
       const target = await insertTestUser({ is_admin: false });

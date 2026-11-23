@@ -81,8 +81,6 @@ describe('SessionHistoryFailureError', () => {
   });
 
   it('maps one copy key for every declared failure kind', () => {
-    // `SessionHistoryFailureKind` derives from the object, so a new kind
-    // cannot fail to type-check the mapping above; this case fails instead.
     const expected: Record<string, string> = {
       retryable_failure: 'agentChat.session.historyUnavailable',
       too_large: 'agentChat.session.historyTooLarge',

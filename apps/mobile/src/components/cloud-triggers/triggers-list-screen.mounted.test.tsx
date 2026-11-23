@@ -216,11 +216,16 @@ describe('TriggersListScreen rows', () => {
     const switches = root.findAll(node => Object.is(node.type, SWITCH));
     const labels = switches.map(node => node.props.accessibilityLabel as string);
 
-    expect(labels[0]).toBe('Trigger active and trigger-a');
+    expect(labels[0]).toBe('Trigger active: trigger-a');
     for (const [index, label] of labels.entries()) {
-      expect(label).toContain('Trigger active');
+      expect(label).toContain('Trigger active: ');
       expect(label).toContain(index === 0 ? 'trigger-a' : 'trigger-b');
     }
+
+    // Only the webhook row has a copy control; it names its own trigger too.
+    const copyButtons = root.findAll(node => Object.is(node.type, ICON_BUTTON));
+    expect(copyButtons).toHaveLength(1);
+    expect(copyButtons[0]?.props.accessibilityLabel).toBe('Copy link for trigger-a');
 
     const [first] = switches;
     if (!first) {

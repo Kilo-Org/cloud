@@ -443,6 +443,56 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
   });
 
+  it('re-runs the OS launcher-surface clear for the signed-out launch', () => {
+    // The shortcuts, the quick-settings tile and the Quick Actions are
+    // device-wide and label themselves from the signed-in account's sessions, so
+    // a sign-out whose clear never landed must not keep offering the previous
+    // account's session for the whole signed-out window.
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes a mounted launcher publisher write its derivation again after the launch', () => {
+    // The clear runs outside the publisher, so the surface revision it records is
+    // what stops a publisher from treating its own last payload as current.
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, () => {
+      mocks.clearLauncherSurfaces();
+    });
+    const launcherTargets = {
+      newAgentUrl: 'kiloapp:///cloud/sessions/new',
+      needsInputUrl: null,
+      openLastSessionUrl: null,
+    };
+    const translate = (key: string): string => key;
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-runs the stored PR recents delete for the signed-out launch', () => {
+    // The recents key is device-global and the index collector folds it into the
+    // search documents, so a sign-out whose delete never landed would let the
+    // next account's first sync publish the previous account's pull requests.
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(2);
+  });
+
   it('deletes the mirror root once, then signals the provider', () => {
     let mirrorWasGone: boolean | null = null;
     mocks.notifyArtifactsChanged.mockImplementationOnce(() => {

@@ -7,6 +7,7 @@
       "spendAlert": "Seu gasto precisa de atenção",
       "securityFinding": "Um achado de segurança precisa de atenção",
       "securityUpdate": "Uma verificação de segurança tem uma atualização",
+      "agentBriefing": "Seu relatório do agente está pronto",
       "activeAgentsGlanceable": "Os agentes ativos têm uma atualização"
     }
   },

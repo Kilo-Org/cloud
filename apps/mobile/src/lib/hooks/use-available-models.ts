@@ -298,7 +298,8 @@ export async function fetchOrgDefaults(organizationId: string): Promise<{ defaul
 // ── Hooks ────────────────────────────────────────────────────────────
 
 export function useOrgDefaultModel(organizationId: string | undefined) {
-  const { data, isLoading } = useQuery({
+  const enabled = Boolean(organizationId);
+  const { data, isPending, isError, isFetching, isFetched, refetch } = useQuery({
     queryKey: ['org-default-model', organizationId] as const,
     queryFn: async () => {
       if (!organizationId) {
@@ -307,12 +308,25 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
       const defaults = await fetchOrgDefaults(organizationId);
       return defaults;
     },
-    enabled: Boolean(organizationId),
+    enabled,
     staleTime: 60_000,
     // The model picker's auto-selection waits on this value.
     ...SETTLE_WHILE_OFFLINE,
   });
-  return { defaultModel: data?.defaultModel, isLoading };
+  // v5 runs a no-data refetch as `pending` and clears `error`, so the failure
+  // has to survive the retry the model row offers — the same rule as
+  // `resolveGatewayModelsReadFailed`. `isFetched` is also true after a read
+  // that answered, so only a missing payload may claim the failure.
+  const failed = isError || (isPending && isFetched);
+  return {
+    defaultModel: data?.defaultModel,
+    // A disabled query stays `pending` for good in v5, so the wait is gated on
+    // `enabled`: a personal account has no organization default to read.
+    isPending: enabled && isPending,
+    isError: enabled && data === undefined && failed,
+    isFetching,
+    refetch,
+  };
 }
 
 /**

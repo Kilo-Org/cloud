@@ -9,6 +9,8 @@ import { MonoScrollBlock, MonoScrollSheetProvider } from './mono-scroll-block';
 // ScrollView becomes a string element; `LayoutChangeEvent` is type-only.
 vi.mock('react-native', () => ({
   View: 'View',
+  // `ltrValueTextStyle` reads the interface direction to pin a copied value.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',

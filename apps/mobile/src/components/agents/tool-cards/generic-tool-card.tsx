@@ -16,6 +16,7 @@ import { toolPartHasDetails } from '../tool-card-display';
 import { toolFieldLabel } from '../tool-field-label';
 import { toolStatusLabel } from '../tool-status-label';
 import { useToolDisplay } from '../use-tool-display';
+import { TOOL_VALUE_SURFACE_CLASS } from './value-surface';
 
 /**
  * Sheet body for a generic tool part (including unknown tools): one labelled
@@ -68,9 +69,14 @@ export function GenericToolCardBody({
       {detail.fields.map((field, index) => (
         <View key={`${field.key}-${index}`} className="gap-1">
           <Text className="text-xs text-muted-foreground">{toolFieldLabel(t, field.key)}</Text>
-          <SelectableText className="font-mono text-xs text-foreground" style={ltrValueTextStyle()}>
-            {field.value}
-          </SelectableText>
+          <View className={TOOL_VALUE_SURFACE_CLASS}>
+            <SelectableText
+              className="font-mono text-xs text-foreground"
+              style={ltrValueTextStyle()}
+            >
+              {field.value}
+            </SelectableText>
+          </View>
         </View>
       ))}
       {detail.output ? (

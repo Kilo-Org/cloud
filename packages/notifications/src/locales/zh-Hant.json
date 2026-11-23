@@ -7,6 +7,7 @@
       "spendAlert": "您的支出需要留意",
       "securityFinding": "安全發現需要留意",
       "securityUpdate": "安全檢查有更新",
+      "agentBriefing": "您的代理簡報已準備好",
       "activeAgentsGlanceable": "使用中的代理程式有更新"
     }
   },

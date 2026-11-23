@@ -360,6 +360,7 @@ async function createGuardrail(params: {
     await createAuditLog({
       action: 'organization.guardrail.add',
       ...auditEntry(params.ctx, params.organizationId),
+      details: { id: 'guardrail.identity', type: created.type, name: created.name },
       message: `${params.auditVerb} ${describeGuardrail(created)}`,
       tx,
     });
@@ -443,6 +444,19 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         await createAuditLog({
           action: 'organization.settings.change',
           ...auditEntry(ctx, input.organizationId),
+          details:
+            input.type === 'mcp'
+              ? {
+                  id: 'guardrail.enforcement',
+                  target: 'mcp',
+                  enforcement: input.enforcement,
+                }
+              : {
+                  id: 'guardrail.enforcement',
+                  target: 'skill',
+                  enabled: input.enabled,
+                  scanBeforeUse: input.scanBeforeUse,
+                },
           message:
             input.type === 'mcp'
               ? `Set MCP server enforcement to ${input.enforcement}`
@@ -615,6 +629,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
           await createAuditLog({
             action: 'organization.guardrail.update',
             ...auditEntry(ctx, input.organizationId),
+            details: { id: 'guardrail.identity', type: row.type, name: row.name },
             message: `Updated ${describeGuardrail(row)}`,
             tx,
           });
@@ -646,6 +661,12 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
       await createAuditLog({
         action: 'organization.guardrail.update',
         ...auditEntry(ctx, input.organizationId),
+        details: {
+          id: 'guardrail.status',
+          type: updated.type,
+          name: updated.name,
+          enabled: input.status === 'enabled',
+        },
         message: `${input.status === 'enabled' ? 'Enabled' : 'Disabled'} ${describeGuardrail(updated)}`,
       });
       return serializeGuardrail(updated);
@@ -799,6 +820,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         await createAuditLog({
           action: 'organization.guardrail.remove',
           ...auditEntry(ctx, input.organizationId),
+          details: { id: 'guardrail.identity', type: guardrail.type, name: guardrail.name },
           message: `Removed ${describeGuardrail(guardrail)}`,
           tx,
         });

@@ -356,6 +356,19 @@ export function readPreparationSteps(
   });
 }
 
+export function readLatestPreparationAttemptForMessage(
+  eventQueries: EventQueries,
+  triggerMessageId: string
+): PreparationAttempt | null {
+  const row = eventQueries.findLatestAttemptSnapshotForMessage(
+    'preparation/attempt/',
+    triggerMessageId
+  );
+  const snapshot = row ? parseSnapshot(row.payload) : null;
+  if (snapshot?.action !== 'attempt_snapshot') return null;
+  return { ...snapshot.attempt, steps: readPreparationSteps(eventQueries, snapshot.attempt.id) };
+}
+
 /**
  * Every materialized attempt with its steps, in the order a client that
  * replays the snapshots builds them, so a page can show them before the stream.

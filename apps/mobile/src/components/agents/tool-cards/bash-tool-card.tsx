@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
+import { codeFieldTextStyle } from '@/lib/rtl-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
@@ -12,6 +13,7 @@ import { useOpenPartDetail } from '../open-part-detail-context';
 import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
 import { useToolDisplay } from '../use-tool-display';
+import { TOOL_VALUE_SURFACE_CLASS } from './value-surface';
 
 const bashToolInputSchema = z.object({ command: z.string() });
 
@@ -31,8 +33,15 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   return (
     <View className="gap-2">
       {command.length > 0 ? (
-        <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-          <SelectableText className="font-mono text-xs leading-[1rem] text-foreground">
+        <View className={TOOL_VALUE_SURFACE_CLASS}>
+          {/* A command is code that must copy verbatim: the code field's own
+              style keeps it on the left in every interface (not on the label's
+              start edge) and pins its direction, which also keeps the RTL base
+              mark out of the copied text (see `rtlBaseMarkedChildren`). */}
+          <SelectableText
+            className="font-mono text-xs leading-[1rem] text-foreground"
+            style={codeFieldTextStyle()}
+          >
             {commandText}
           </SelectableText>
         </View>

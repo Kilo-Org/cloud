@@ -44,10 +44,12 @@ export type SandboxTerminalRecord = {
   state: 'running' | 'ended';
 };
 
+export type SandboxTerminalLookup = SandboxTerminalRecord | 'wrapper-unavailable' | undefined;
+
 type SandboxTerminalBridgeOptions = {
   state: DurableObjectState;
   getMetadata: () => Promise<SessionMetadata | null>;
-  getTerminal: (ptyId: string) => Promise<SandboxTerminalRecord | undefined>;
+  getTerminal: (ptyId: string) => Promise<SandboxTerminalLookup>;
   requestConnect: (
     record: SandboxTerminalRecord,
     payload: SessionTerminalConnectPayload
@@ -204,12 +206,13 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
   }
 
   function recordMatchesMetadata(
-    record: SandboxTerminalRecord | undefined,
+    record: SandboxTerminalLookup,
     metadata: SessionMetadata | null,
     ptyId: string
   ): record is SandboxTerminalRecord {
     if (
       !record ||
+      record === 'wrapper-unavailable' ||
       !metadata ||
       record.ptyId !== ptyId ||
       record.ownerId !== metadata.identity.userId ||
@@ -327,21 +330,18 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     if (!ptyId) return new Response('Invalid PTY ID', { status: 400 });
 
     const [metadata, record] = await Promise.all([getMetadata(), getTerminal(ptyId)]);
-    if (!record || !metadata) return new Response('PTY not found', { status: 404 });
-    if (!recordMatchesMetadata(record, metadata, ptyId)) {
+    if (!metadata) return new Response('PTY not found', { status: 404 });
+    if (record === 'wrapper-unavailable') {
+      return new Response('Terminal unavailable', { status: 503 });
+    }
+    if (record && !recordMatchesMetadata(record, metadata, ptyId)) {
       return new Response('Invalid terminal session', { status: 403 });
     }
 
-    if (record.state === 'ended') {
+    if (!record || record.state === 'ended') {
+      // Browsers cannot read the HTTP status of a failed WebSocket upgrade.
       const pair = new WebSocketPair();
-      const attachment: TerminalSocketAttachment = {
-        role: 'browser',
-        ptyId,
-        bridgeGeneration: crypto.randomUUID(),
-        wrapperInstanceId: record.wrapperId,
-      };
-      state.acceptWebSocket(pair[1], [TERMINAL_TAG, socketTag('browser', ptyId)]);
-      pair[1].serializeAttachment(attachment);
+      state.acceptWebSocket(pair[1]);
       closeSocket(pair[1], 1000, TERMINAL_ENDED_REASON);
       return new Response(null, { status: 101, webSocket: pair[0] });
     }

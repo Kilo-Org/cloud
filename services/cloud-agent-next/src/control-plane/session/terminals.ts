@@ -8,6 +8,7 @@ import {
 import {
   createSandboxTerminalBridge,
   terminalWrapperIdSchema,
+  type SandboxTerminalLookup,
   type SandboxTerminalRecord,
 } from '../../sandbox-session/terminal-bridge.js';
 import {
@@ -168,11 +169,12 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     await clearCompleted(current.ptyId);
   }
 
-  async function getTerminal(ptyId: string): Promise<SandboxTerminalRecord | undefined> {
+  async function getTerminal(ptyId: string): Promise<SandboxTerminalLookup> {
     const record = await readRecord(ptyId);
     if (!record) return undefined;
     const wrapperId = await deps.getWrapperId();
-    if (wrapperId === undefined || record.wrapperId !== wrapperId) return undefined;
+    if (wrapperId === undefined) return 'wrapper-unavailable';
+    if (record.wrapperId !== wrapperId) return undefined;
     return record;
   }
 

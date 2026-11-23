@@ -255,6 +255,10 @@ export function useCloudAgentTerminal({
       return ptyId !== null && ptyId === restoredPty && ptyId !== reachedPty;
     }
 
+    function canRetryConnection(): boolean {
+      return !isUnreachedRestoredPty() || reconnectAttemptsRef.current < MAX_RESTORED_PTY_RETRIES;
+    }
+
     function replaceUnreachedRestoredPty(term: Terminal, fitAddon: FitAddon) {
       restoredPty = null;
       pendingRawInput = [];
@@ -467,22 +471,22 @@ export function useCloudAgentTerminal({
           return;
         }
 
-        if (
-          isUnreachedRestoredPty() &&
-          (decision.kind === 'exited' ||
-            (decision.kind === 'retry' && reconnectAttemptsRef.current >= MAX_RESTORED_PTY_RETRIES))
-        ) {
-          // A failed WebSocket upgrade hides the HTTP status. Do not delete a potentially live PTY.
+        if (isUnreachedRestoredPty() && decision.kind === 'exited') {
           replaceUnreachedRestoredPty(term, fitAddon);
           return;
         }
 
         if (decision.kind === 'retry') {
-          scheduleReconnect(term, fitAddon, decision.statusText);
+          if (canRetryConnection()) {
+            scheduleReconnect(term, fitAddon, decision.statusText);
+          } else {
+            stopInput(term);
+            updateStatus('error', 'Terminal connection failed');
+          }
           return;
         }
 
-        if (!connectionReplaced) retirePty();
+        if (!connectionReplaced && !isUnreachedRestoredPty()) retirePty();
         stopInput(term);
         updateStatus(decision.kind === 'exited' ? 'exited' : 'error', decision.statusText);
       };
@@ -521,10 +525,7 @@ export function useCloudAgentTerminal({
           enterSleeping(term);
           return;
         }
-        if (
-          decision.kind === 'retry' &&
-          (!isUnreachedRestoredPty() || reconnectAttemptsRef.current < MAX_RESTORED_PTY_RETRIES)
-        ) {
+        if (decision.kind === 'retry' && canRetryConnection()) {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
         }
@@ -665,7 +666,7 @@ export function useCloudAgentTerminal({
       resizeObserverRef.current?.disconnect();
       wsRef.current?.close(1000, 'Terminal closed');
       const ptyId = ptyIdRef.current;
-      if (ptyId && !connectionReplaced) {
+      if (ptyId && !connectionReplaced && !isUnreachedRestoredPty()) {
         closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId });
       }
       wsRef.current = null;

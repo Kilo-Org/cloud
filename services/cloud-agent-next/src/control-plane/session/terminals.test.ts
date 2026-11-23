@@ -150,6 +150,7 @@ function fakeState(
 function fixture(
   overrides: {
     isRouteReady?: boolean;
+    getWrapperId?: () => Promise<string | undefined>;
     getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
     sockets?: FakeSocket[];
     metadata?: ReturnType<typeof metadata>;
@@ -166,7 +167,7 @@ function fixture(
     sessionId: SESSION_ID,
     getMetadata: () => overrides.metadata ?? metadata(),
     getDirectory: () => DIRECTORY,
-    getWrapperId: async () => CURRENT_WRAPPER,
+    getWrapperId: overrides.getWrapperId ?? (async () => CURRENT_WRAPPER),
     isRouteReady: () => overrides.isRouteReady ?? true,
     getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
     request,
@@ -175,6 +176,18 @@ function fixture(
 }
 
 describe('V2 control-plane terminals projection', () => {
+  it('does not report an existing PTY as ended when the wrapper is unavailable', async () => {
+    const { terminals, values } = fixture({ getWrapperId: async () => undefined });
+    values.set('control_terminal:pty_existing', record(CURRENT_WRAPPER, 'pty_existing'));
+
+    const response = await terminals.handleBrowserUpgrade(
+      new Request('https://control.test/terminal/browser?ptyId=pty_existing', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    expect(response.status).toBe(503);
+  });
+
   it('reports a sleeping sandbox without forwarding a terminal request', async () => {
     const { terminals, request } = fixture({
       isRouteReady: false,

@@ -198,7 +198,7 @@ describe('counted expand rows', () => {
     expect(row('it', MORE_LINES, 1)).toBe('Mostra N riga in più (S–E)');
     await i18n.changeLanguage('fr');
     expect(
-      i18n.t('prReview.hunkRows.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
+      i18n.t('prReview.fileNavigator.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
     ).toBe('1 fichier chargé sur 5');
     expect(
       i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
@@ -319,7 +319,7 @@ describe('counted expand rows', () => {
   it('inflects the singular Zulu file rows the review requires', async () => {
     await i18n.changeLanguage('zu');
     expect(
-      i18n.t('prReview.hunkRows.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
+      i18n.t('prReview.fileNavigator.loadedOfTotalFiles', { count: 1, loaded: '1', total: '5' })
     ).toBe('kulayishwe ifayela elingu-1 kwangu-5');
     expect(
       i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {

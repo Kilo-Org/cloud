@@ -210,8 +210,8 @@ const WORDED_COUNTS = new Set([
   'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
   'prReview.tabs.discussionAccessibility:two:ar',
-  'prReview.hunkRows.fileLoadedCount:two:ar',
-  'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
+  'prReview.fileNavigator.fileLoadedCount:two:ar',
+  'prReview.fileNavigator.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
   'organization.kiloPass.paidSeat:two:ar',
 ]);

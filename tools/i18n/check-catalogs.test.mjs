@@ -2328,6 +2328,41 @@ test('accepts a push key a composer function builds from its leaf', () => {
   assert.deepEqual(found, []);
 });
 
+test('accepts a push key an expression-bodied arrow builds from its leaf', () => {
+  // The same builder as a block-bodied declaration, written as an arrow with an
+  // expression body, must contribute its head too.
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      'const genericBodyCatalogKey = leaf => `generic.body.${leaf}`;',
+      "const SECURITY_LEAF = 'scheduledAction';",
+      'const SECURITY_KEY = genericBodyCatalogKey(SECURITY_LEAF);',
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, genericBodyCatalogKey(leaf), undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects a push key under a built head that no leaf names', () => {
   const found = run({
     pushEnglish: {

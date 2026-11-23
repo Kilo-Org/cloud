@@ -1195,7 +1195,7 @@ function checkBorrowedDanda(values, label) {
 /** The mark an Urdu catalog declares as its sentence terminator. */
 const URDU_SENTENCE_TERMINATOR = '\u06D4';
 /** What continues a token after a dot rather than starting a sentence. */
-const LATIN_OR_NUMBER_AFTER_DOT = /[A-Za-z0-9/%\-]/;
+const LATIN_OR_NUMBER_AFTER_DOT = /[A-Za-z0-9/%-]/;
 
 /** Whether the character is a letter of the Arabic script, as Urdu words are. */
 function isArabicLetter(char) {

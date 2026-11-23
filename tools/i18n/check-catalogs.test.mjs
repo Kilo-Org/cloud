@@ -294,6 +294,45 @@ test('admits a zero form the plural rule cannot select', () => {
   assert.deepEqual(found, []);
 });
 
+test('admits a form the shipped plural data selects', () => {
+  // Vietnamese is the case that makes the truth source matter: the app bundles
+  // FormatJS plural data that selects `one` at a count of one, while a host on
+  // a newer CLDR reports `other` only. Judging by the host's ICU would call the
+  // Vietnamese singular dead and delete live copy, so the catalog keeps it.
+  //
+  // The tree links the repository's own loader map and polyfill data, because
+  // those are exactly what the rule reads: a fixture without them falls back to
+  // the host's rules and cannot test this case.
+  const root = fixture({
+    'apps/mobile/src/i18n/languages.ts': "export const SUPPORTED_LANGUAGES = ['en', 'vi'];",
+    'apps/mobile/src/example.ts': SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(ENGLISH),
+    'apps/mobile/src/i18n/locales/vi.json': JSON.stringify({
+      agents: {
+        title: 'Tác nhân bản địa hoá',
+        liveCount_one: '{{count}} phiên bản địa hoá',
+        liveCount_other: '{{count}} phiên bản địa hoá',
+      },
+    }),
+    'packages/notifications/src/locales/en.json': '{}',
+    'packages/notifications/src/locales/vi.json': '{}',
+    'packages/notifications/src/i18n.ts': [
+      `import en from './locales/en.json';`,
+      `import vi from './locales/vi.json';`,
+      `const pushCatalogs = { 'en': en, 'vi': vi };`,
+    ].join('\n'),
+    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+  });
+  symlinkSync(join(REPO, 'apps/mobile/src/lib'), join(root, 'apps/mobile/src/lib'), 'dir');
+  symlinkSync(
+    join(REPO, 'apps/mobile/node_modules'),
+    join(root, 'apps/mobile/node_modules'),
+    'dir'
+  );
+  const found = checkCatalogs(root).problems;
+  assert.deepEqual(found, []);
+});
+
 test('rejects an unused English exact key', () => {
   const found = run({ source: "t('agents.liveCount', { count: 2 });" });
   assert.ok(found.length > 0, 'expected a problem');

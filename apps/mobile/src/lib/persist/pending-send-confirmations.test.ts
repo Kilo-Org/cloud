@@ -57,6 +57,7 @@ import {
   clearPendingSendConfirmation,
   PENDING_SEND_MAX_IDS,
   PENDING_SEND_MAX_SESSIONS,
+  pendingSendMessageIdForText,
   persistPendingSendConfirmation,
   readPendingSendConfirmations,
 } from './pending-send-confirmations';
@@ -272,12 +273,32 @@ describe('pending send confirmations', () => {
 
   it('answers an empty owner id or session id with a complete, empty record', async () => {
     // No account can hold a record for an empty id, so this is not a read
-    // failure: the caller must still trust the answer.
+    // failure: the caller must still trust the answer. A real record for the
+    // owner makes the empty answer mean something and no store read waived.
+    kvMock.scopes.set(
+      deliveryScope(USER_ID),
+      new Map([
+        [
+          KEY,
+          {
+            v: '{"items":[{"messageId":"msg-1","text":"hello"}],"complete":true}',
+            updatedAt: 1,
+          },
+        ],
+      ])
+    );
     const empty = { items: [], complete: true };
 
     await expect(readPendingSendConfirmations('', SESSION_ID)).resolves.toEqual(empty);
+    expect(kvMock.getItem).not.toHaveBeenCalled();
     await expect(readPendingSendConfirmations(USER_ID, '')).resolves.toEqual(empty);
     await expect(readPendingSendConfirmations('', '')).resolves.toEqual(empty);
+    // A guard that kept only one half would consult the store on these reads.
+    expect(kvMock.getItem).not.toHaveBeenCalled();
+    await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual({
+      items: [{ messageId: 'msg-1', text: 'hello' }],
+      complete: true,
+    });
   });
 
   it('keeps a warm-start record across sign-out and the same user signing in again', async () => {
@@ -450,5 +471,55 @@ describe('pending send confirmations', () => {
       complete: true,
     });
     expect(pendingRecord(SESSION_ID)).toBeUndefined();
+  });
+});
+
+describe('pendingSendMessageIdForText', () => {
+  const record = (
+    items: readonly { messageId: string; text: string }[],
+    complete = true
+  ): { items: readonly { messageId: string; text: string }[]; complete: boolean } => ({
+    items,
+    complete,
+  });
+
+  it('names the newest recorded send with that prompt', () => {
+    expect(
+      pendingSendMessageIdForText(
+        record([
+          { messageId: 'msg-old', text: 'Delivered late' },
+          { messageId: 'msg-new', text: 'Delivered late' },
+        ]),
+        'Delivered late'
+      )
+    ).toBe('msg-new');
+  });
+
+  it('compares the prompt a send carries, so surrounding whitespace matches', () => {
+    expect(
+      pendingSendMessageIdForText(record([{ messageId: 'msg-1', text: 'hello' }]), '  hello\n')
+    ).toBe('msg-1');
+  });
+
+  it('answers null for text no recorded send matches', () => {
+    expect(
+      pendingSendMessageIdForText(record([{ messageId: 'msg-1', text: 'hello' }]), 'another')
+    ).toBeNull();
+    expect(pendingSendMessageIdForText(record([]), 'hello')).toBeNull();
+  });
+
+  it('never attributes from an incomplete record', () => {
+    // A cut record may have lost the entry, so its silence is not evidence.
+    expect(
+      pendingSendMessageIdForText(record([{ messageId: 'msg-1', text: 'hello' }], false), 'hello')
+    ).toBeNull();
+  });
+
+  it('answers null for an empty or invisible draft', () => {
+    // An attachment-only entry carries no text, so it can never name a draft.
+    expect(pendingSendMessageIdForText(record([{ messageId: 'msg-1', text: '' }]), '')).toBeNull();
+    expect(
+      pendingSendMessageIdForText(record([{ messageId: 'msg-1', text: '' }]), ' \u200B ')
+    ).toBeNull();
   });
 });

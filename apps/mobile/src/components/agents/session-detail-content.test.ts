@@ -77,6 +77,7 @@ import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh'
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
+import type * as PendingSendConfirmationsModule from '@/lib/persist/pending-send-confirmations';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import type * as UseEffectiveAgentProfileModule from '@/components/agents/use-effective-agent-profile';
 import type * as UseEffectiveProfileCustomModesModule from '@/components/agents/use-effective-profile-custom-modes';
@@ -732,6 +733,30 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
+// The pending-send record lives in the encrypted SQLCipher store, which cannot
+// open in this node suite. Only its read is stubbed; the attribution helper the
+// screen applies to the answer stays the real one. The store module is stubbed
+// too, so loading the helper never pulls the native SQLCipher chain.
+const pendingSendRead = vi.hoisted(() => ({
+  calls: [] as { userId: string; sessionId: string }[],
+  record: { items: [] as { messageId: string; text: string }[], complete: true as boolean },
+}));
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: vi.fn(() => Promise.resolve(null)),
+  setItem: vi.fn(() => Promise.resolve(undefined)),
+  removeItem: vi.fn(() => Promise.resolve(undefined)),
+  listEntryValues: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock('@/lib/persist/pending-send-confirmations', async importOriginal => {
+  const actual = await importOriginal<typeof PendingSendConfirmationsModule>();
+  return {
+    ...actual,
+    readPendingSendConfirmations: (userId: string, sessionId: string) => {
+      pendingSendRead.calls.push({ userId, sessionId });
+      return Promise.resolve(pendingSendRead.record);
+    },
+  };
+});
 vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({
     settled: draftLoadState.settled,
@@ -1047,6 +1072,9 @@ beforeEach(() => {
   pendingSend = null;
   draftLoadState.settled = true;
   draftLoadState.value = null;
+  pendingSendRead.calls.length = 0;
+  pendingSendRead.record.items = [];
+  pendingSendRead.record.complete = true;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   sessionConfigSync.currentModel = '';
@@ -5104,6 +5132,60 @@ describe('session detail composer after a failed turn', () => {
       Object.is(candidate.type, 'ChatComposer')
     );
     expect(settledComposer.props.initialDraft).toBe(text);
+    // The record of unknown-outcome sends names no send for this draft, and the
+    // composer is told the answer is final so it can release a held withdrawal.
+    expect(settledComposer.props.restoredSend).toBeNull();
+    expect(settledComposer.props.restoredSendSettled).toBe(true);
+  });
+
+  it('attributes the loaded draft to the recorded send', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // The durable record of unknown-outcome sends names the id the send
+    // carried; that is the only identity a restored draft can take.
+    pendingSendRead.record.items = [
+      { messageId: 'msg-older', text: 'Another prompt' },
+      { messageId: 'msg-delivered', text: 'Delivered late' },
+    ];
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(composer.props.initialDraft).toBe('Delivered late');
+
+    await waitFor(() => {
+      const settled = view.renderer.root.find(candidate =>
+        Object.is(candidate.type, 'ChatComposer')
+      );
+      return settled.props.restoredSend !== null;
+    });
+    const attributed = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(attributed.props.restoredSend).toEqual({
+      text: 'Delivered late',
+      messageId: 'msg-delivered',
+    });
+    expect(attributed.props.restoredSendSettled).toBe(true);
+    expect(pendingSendRead.calls).toEqual([{ userId: 'test-user', sessionId: ROOT_ID }]);
+  });
+
+  it('does not attribute a draft from an incomplete record', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // A cut record may have lost the entry, so its silence is not evidence.
+    pendingSendRead.record.items = [{ messageId: 'msg-delivered', text: 'Delivered late' }];
+    pendingSendRead.record.complete = false;
+    const view = await mountDetails([]);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(composer.props.restoredSend).toBeNull();
+    expect(composer.props.restoredSendSettled).toBe(true);
   });
 
   it('keeps the composer sendable after a non-retryable turn failure', async () => {

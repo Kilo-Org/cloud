@@ -218,6 +218,10 @@ import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { composerPromptText } from '@/lib/composer-text';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import {
+  pendingSendMessageIdForText,
+  readPendingSendConfirmations,
+} from '@/lib/persist/pending-send-confirmations';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useKeepAwake } from '@/lib/keep-awake';
@@ -608,6 +612,61 @@ export function SessionDetailContent({
     isIdentityLoading,
     entityKey: sessionComposerDraftKey,
   });
+
+  // The send the loaded draft came from. A restored draft is the text of a send
+  // whose outcome was unknown, and the durable pending-send record is the only
+  // trace of that send's message id. Naming it lets the composer withdraw the
+  // draft once the server confirms that send, instead of leaving the delivered
+  // text beside its own row. `settled` tells the composer "not read yet" apart
+  // from "read, nothing found", so a withdrawal that arrives first is held.
+  const [restoredDraftSend, setRestoredDraftSend] = useState<{
+    text: string;
+    messageId: string;
+  } | null>(null);
+  const [restoredDraftSendSettled, setRestoredDraftSendSettled] = useState(false);
+  // The session the screen shows right now. The route keeps one mounted screen
+  // across a session switch, so a read that resolves late compares against this
+  // before it attributes anything.
+  const liveSessionIdRef = useRef(sessionId);
+  liveSessionIdRef.current = sessionId;
+  // Bumped by every attribution run, so only the newest read may publish.
+  const restoredDraftReadGenerationRef = useRef(0);
+  const composerDraftSettled = composerDraft.settled;
+  const composerDraftValue = composerDraft.value;
+  useEffect(() => {
+    if (!composerDraftSettled) {
+      return;
+    }
+    restoredDraftReadGenerationRef.current += 1;
+    const generation = restoredDraftReadGenerationRef.current;
+    const draft = composerDraftValue ?? '';
+    setRestoredDraftSendSettled(false);
+    setRestoredDraftSend(null);
+    // Nothing to attribute: no draft, no account, or no session. Reporting the
+    // answer as settled releases a held withdrawal instead of keeping it.
+    const attributable =
+      composerPromptText(draft) !== '' && userId !== undefined && sessionId !== '';
+    if (!attributable) {
+      setRestoredDraftSendSettled(true);
+      return;
+    }
+    // Fence the read on the session it was started for: a late answer for
+    // another session must never attribute a draft in this one.
+    const readFor = { userId, sessionId };
+    const attributeDraft = async (): Promise<void> => {
+      const record = await readPendingSendConfirmations(readFor.userId, readFor.sessionId);
+      if (
+        restoredDraftReadGenerationRef.current !== generation ||
+        liveSessionIdRef.current !== readFor.sessionId
+      ) {
+        return;
+      }
+      const messageId = pendingSendMessageIdForText(record, draft);
+      setRestoredDraftSend(messageId === null ? null : { text: draft, messageId });
+      setRestoredDraftSendSettled(true);
+    };
+    void attributeDraft();
+  }, [composerDraftSettled, composerDraftValue, userId, sessionId]);
 
   // Composer remount identity. An account CHANGE must remount the composer, so
   // one account's typed text never surfaces under another. Identity RESOLVING
@@ -3457,6 +3516,8 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 deliveredDraft={consumableDeliveredDraft}
+                restoredSend={restoredDraftSend}
+                restoredSendSettled={restoredDraftSendSettled}
                 isPromptDelivered={isPromptDelivered}
                 onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}

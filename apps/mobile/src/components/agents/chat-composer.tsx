@@ -297,6 +297,20 @@ type ChatComposerProps = {
    */
   deliveredDraft?: string | null;
   /**
+   * The send the host attributed to the draft it loaded: the durable record of
+   * unknown-outcome sends names the message id whose prompt text is that draft.
+   * The composer arms the restore with it, so the host can withdraw exactly
+   * this draft once the server confirms that send. `null` means no record
+   * names the draft.
+   */
+  restoredSend?: { text: string; messageId: string } | null;
+  /**
+   * Whether the host finished attributing the loaded draft. `false` means the
+   * answer is still being read, so a withdrawal for an unarmed draft must be
+   * held instead of spending the load's suppression on a guess.
+   */
+  restoredSendSettled?: boolean;
+  /**
    * Asks the host whether THIS send — identified by its own message id — is
    * already confirmed in the transcript, asked before a failed send is
    * restored. A send the server confirmed resolves success and never reaches
@@ -382,6 +396,8 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   deliveredDraft = null,
+  restoredSend = null,
+  restoredSendSettled = false,
   isPromptDelivered,
   onDeliveredDraftConsumed,
   sessionId = null,
@@ -458,18 +474,27 @@ export function ChatComposer({
   // mounts with editable=true from the start. Draft text is restored after
   // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
-  // The restore this composer made after a send failed, with the message id
-  // that send carried. A draft loaded from storage is never armed: the app
-  // cannot tell such a draft from text the reader typed. The server can accept
-  // a send whose response was lost, and the confirmed row then makes this
-  // restore a duplicate, so the host withdraws exactly it. It is dropped as
-  // soon as the reader edits the draft. That text is then their next message,
-  // not the failed one.
+  // The restore this composer made, with the message id that send carried. A
+  // send this composer saw fail arms it directly; a draft loaded from storage
+  // arms it only when the host attributes the draft to a recorded send. The
+  // server can accept a send whose response was lost, and the confirmed row
+  // then makes this restore a duplicate, so the host withdraws exactly it. It
+  // is dropped as soon as the reader edits the draft. That text is then their
+  // next message, not the failed one.
   const restoredFailedSendRef = useRef<{
     text: string;
     messageId: string;
     attachmentIds: readonly string[];
   } | null>(null);
+  // A withdrawal that arrived before the host attributed the loaded draft. The
+  // answer decides whether it withdraws that draft, so it is held instead of
+  // spending the load's suppression on a guess. It is resolved once, when the
+  // attribution settles.
+  const pendingWithdrawalRef = useRef<{ text: string; messageId: string } | null>(null);
+  // Whether the host's attribution is final, as the latest render published it.
+  // The imperative handle is created once, so it reads this ref.
+  const restoredSendSettledRef = useRef(false);
+  restoredSendSettledRef.current = restoredSendSettled;
   // Armed by handleStop; the remount effect restores the live text once.
   const pendingDraftRestoreRef = useRef(false);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
@@ -730,6 +755,9 @@ export function ChatComposer({
   // typed while the draft was loading wins, and the stale stored draft is
   // dropped rather than pasted over the typing.
   const initialDraftAppliedRef = useRef(false);
+  // Whether this composer actually put the stored draft into the input. Only
+  // that text can be the recorded send: text the reader typed is theirs.
+  const initialDraftRestoredRef = useRef(false);
   useEffect(() => {
     if (initialDraftAppliedRef.current || initialDraft === undefined) {
       return;
@@ -751,8 +779,10 @@ export function ChatComposer({
       return;
     }
     restoreTextIntoInput(initialDraft);
+    initialDraftRestoredRef.current = true;
     // Withdrawal needs the send's message id, so a draft loaded from storage is
-    // not armed here.
+    // not armed here: the attribution effect below arms it once the host names
+    // the send the draft came from.
   }, [
     initialDraft,
     deliveredDraft,
@@ -830,6 +860,65 @@ export function ChatComposer({
   const clearDraftRef = useRef<() => void>(() => undefined);
   const onDeliveredDraftConsumedRef = useRef<() => void>(() => undefined);
 
+  // Withdraws one armed restore: its attachments leave, the draft is cleared,
+  // and the host's record is consumed so it cannot hold the same words against
+  // a later draft. Shared by the withdrawal path and the held request.
+  const spendRestoredSend = useCallback(
+    (restored: { text: string; messageId: string; attachmentIds: readonly string[] }) => {
+      restoredFailedSendRef.current = null;
+      for (const id of restored.attachmentIds) {
+        removeAttachmentRef.current(id);
+      }
+      clearDraftRef.current();
+      onDeliveredDraftConsumedRef.current();
+    },
+    []
+  );
+
+  // Arm a draft loaded from storage once the host names the send it came from,
+  // and resolve a withdrawal that arrived before that answer. A draft the reader
+  // edited no longer matches the attributed text, so it is never armed: it is
+  // their next message.
+  useEffect(() => {
+    if (!initialDraftAppliedRef.current) {
+      return;
+    }
+    const held = pendingWithdrawalRef.current;
+    // Only a draft this composer put back can be the recorded send. Text the
+    // reader typed while the draft loaded is theirs, even with the same words.
+    const holdsAttributedDraft =
+      initialDraftRestoredRef.current &&
+      restoredSend !== null &&
+      composerPromptText(textRef.current) === composerPromptText(restoredSend.text);
+    // An arm this composer already made keeps its own id: it names a send whose
+    // response was lost, which is not the stored draft the host attributed.
+    if (holdsAttributedDraft && restoredFailedSendRef.current === null) {
+      restoredFailedSendRef.current = {
+        text: restoredSend.text,
+        messageId: restoredSend.messageId,
+        attachmentIds: [],
+      };
+    }
+    if (held === null) {
+      return;
+    }
+    // With no answer yet, the read may still name the send. Keep holding.
+    if (!restoredSendSettled && restoredSend === null) {
+      return;
+    }
+    pendingWithdrawalRef.current = null;
+    const armed = restoredFailedSendRef.current;
+    if (armed !== null && armed.messageId === held.messageId) {
+      // The held request named the very send this draft came from: the draft
+      // is a duplicate of the delivered message, so it leaves the input.
+      spendRestoredSend(armed);
+      return;
+    }
+    // Any other answer leaves the text and spends the load's suppression, so it
+    // cannot outlive the load it was published for.
+    onDeliveredDraftConsumedRef.current();
+  }, [initialDraft, restoredSend, restoredSendSettled, spendRestoredSend]);
+
   useImperativeHandle(
     controlRef,
     () => ({
@@ -851,7 +940,18 @@ export function ChatComposer({
           return false;
         };
         const restored = restoredFailedSendRef.current;
-        if (restored === null || restored.messageId !== messageId) {
+        if (restored === null) {
+          // The host has not answered yet which send the loaded draft came
+          // from. Spending the suppression now would guess, and dropping the
+          // request would leave the delivered text in the input. Hold it for
+          // the one answer the load is waiting on.
+          if (!restoredSendSettledRef.current) {
+            pendingWithdrawalRef.current = { text, messageId };
+            return false;
+          }
+          return releaseSettledDraftLoad();
+        }
+        if (restored.messageId !== messageId) {
           return releaseSettledDraftLoad();
         }
         // Both sides compare as the prompt a send carries: the record names the
@@ -864,18 +964,13 @@ export function ChatComposer({
         if (composerPromptText(textRef.current) !== composerPromptText(restored.text)) {
           return releaseSettledDraftLoad();
         }
-        restoredFailedSendRef.current = null;
-        for (const id of restored.attachmentIds) {
-          removeAttachmentRef.current(id);
-        }
-        clearDraftRef.current();
         // The restore this record was published for is spent: the host must not
         // keep holding the same words against a later draft.
-        onDeliveredDraftConsumedRef.current();
+        spendRestoredSend(restored);
         return true;
       },
     }),
-    []
+    [spendRestoredSend]
   );
   onDeliveredDraftConsumedRef.current = onDeliveredDraftConsumed ?? (() => undefined);
 

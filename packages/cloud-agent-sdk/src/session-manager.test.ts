@@ -9117,6 +9117,45 @@ describe('createSessionManager', () => {
       expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith(sentId);
     });
 
+    it('keeps a resolved send id suppressed after its session record is evicted', async () => {
+      // The record cannot be vouched for, so the predicate falls back to
+      // hiding replayed failures. An id this process sent is not a replay, so
+      // it is exempt — until the person resolves it: a resolved id must never
+      // be exempt again, even once the bounded per-session record forgets it.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete: false })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(false);
+
+      // The re-send was accepted, so the id is resolved and suppressed.
+      mgr.clearFailedMessage(sentId);
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(true);
+
+      // The bounded per-session record holds 20 sessions; enough switches evict
+      // `ses-1`'s entry while this process still remembers minting the id.
+      for (let index = 0; index < 20; index += 1) {
+        await mgr.switchSession(kiloId(`ses-other-${index}`));
+      }
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      // The record is gone and the read still cannot vouch for the session, so
+      // only the resolution itself can suppress the replayed failure.
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(true);
+    });
+
     it('drops a failure the replay applied before the unverifiable read landed', async () => {
       // The DO's stored-event replay normally applies the footer before the
       // durable read resolves, so hiding later failures is not enough: an

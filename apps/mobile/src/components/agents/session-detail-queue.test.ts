@@ -109,6 +109,7 @@ vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/persist/pending-send-confirmations', () => ({
+  pendingSendMessageIdForText: () => null,
   readPendingSendConfirmations: vi.fn(async () => ({ items: [], complete: true })),
   persistPendingSendConfirmation: vi.fn(async () => undefined),
   clearPendingSendConfirmation: vi.fn(async () => undefined),

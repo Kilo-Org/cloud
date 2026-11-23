@@ -4640,6 +4640,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // durable write below lands; that write is what keeps the clear across a
     // relaunch.
     resolvedFailuresForSession(owner).add(messageId);
+    // A resolved id must never be exempt again: the exemption exists for a
+    // failure this process has not seen resolved, and the bounded per-session
+    // set can lose the resolution while this process keeps the id.
+    locallySentMessageIds.delete(messageId);
     // The accepted resolution replaces the in-flight mark: one record per id,
     // and the resolved record is the one that survives a relaunch.
     unmarkMessageSuperseded(messageId, owner);

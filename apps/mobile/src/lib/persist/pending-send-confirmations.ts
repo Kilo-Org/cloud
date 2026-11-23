@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { composerPromptText } from '@/lib/composer-text';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { deliveryScope, readCacheScope } from '@/lib/persist/cache-scope';
 import {
@@ -209,6 +210,36 @@ export async function readPendingSendConfirmations(
     return stored;
   }
   return migrateLegacyPendingSend(userId, sessionId);
+}
+
+/**
+ * The message id of the newest recorded send whose prompt text equals `text`,
+ * or `null`. Only a complete record can attribute: a cut or unreadable one may
+ * have lost the entry, so its silence is not evidence.
+ *
+ * The draft a session restores is the text of a send whose outcome was
+ * unknown, and this record is the only durable trace of that send's id. It
+ * lets the composer withdraw a restored draft once the server confirms the same
+ * send, instead of leaving the delivered text beside its own row.
+ */
+export function pendingSendMessageIdForText(
+  record: DeliveryRecordRead<PendingSendConfirmation>,
+  text: string
+): string | null {
+  const prompt = composerPromptText(text);
+  // An attachment-only entry carries no text, so it can never name a draft.
+  if (!record.complete || prompt === '') {
+    return null;
+  }
+  // Newest first: the most recent send with these words is the one that
+  // restored them.
+  for (let index = record.items.length - 1; index >= 0; index -= 1) {
+    const entry = record.items[index];
+    if (entry !== undefined && composerPromptText(entry.text) === prompt) {
+      return entry.messageId;
+    }
+  }
+  return null;
 }
 
 /**

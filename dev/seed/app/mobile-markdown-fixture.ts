@@ -30,8 +30,20 @@ const PART_MERMAID = 'prtMdLibsMermaid001';
 const PART_HTML = 'prtMdLibsHtml000001';
 const PART_PROMPT = 'prtMdLibsPrompt00001';
 const PART_READ = 'prtMdLibsRead000001';
+const PART_READ_TILDE = 'prtMdLibsTilde00001';
+const PART_READ_BACKTICKS = 'prtMdLibsTicks00001';
 const PART_FILE = 'prtMdLibsFile000001';
-const EXPECTED = [PART_PROMPT, PART_RICH, PART_BIG, PART_MERMAID, PART_HTML, PART_READ, PART_FILE];
+const EXPECTED = [
+  PART_PROMPT,
+  PART_RICH,
+  PART_BIG,
+  PART_MERMAID,
+  PART_HTML,
+  PART_READ,
+  PART_READ_TILDE,
+  PART_READ_BACKTICKS,
+  PART_FILE,
+];
 const MD_DOC = [
   '# Notes file',
   '',
@@ -46,9 +58,54 @@ const MD_DOC = [
   'const ok = true;',
   '```',
 ].join('\n');
+// A truncated read whose visible text ends inside an unterminated `~~~` fence.
+// The sheet's markdown body has to close that fence with the opening run's own
+// marker and length, so the footer underneath renders as markdown instead of
+// being swallowed by a code block.
+const TILDE_DOC = [
+  '# Tilde fence file',
+  '',
+  '~~~ts',
+  'export const depth = 40;',
+  'export const total = 400;',
+].join('\n');
+
+// The same case for a four-backtick opening run, which the closing run must
+// match in length rather than defaulting to three.
+const BACKTICKS_DOC = [
+  '# Backtick fence file',
+  '',
+  '````text',
+  'first sample line',
+  'second sample line',
+].join('\n');
 const T0 = 1_700_700_000_000;
 
 const FENCE = '```';
+
+/**
+ * The read tool's output for one truncated window: the numbered lines the
+ * display shows, then the trailer the reader falls back to when the display
+ * metadata is absent. The window is passed in so the trailer names the same
+ * lines the display does; the display metadata stays authoritative.
+ */
+function readOutput(path: string, text: string, lineEnd: number, totalLines: number): string {
+  const numbered = text
+    .split('\n')
+    .map((line, index) => `${index + 1}: ${line}`)
+    .join('\n');
+  const shown = `Showing lines 1-${lineEnd} of ${totalLines}.`;
+  const resume = `Use offset=${lineEnd + 1} to continue.`;
+  return [
+    `<path>${path}</path>`,
+    '<type>file</type>',
+    '<content>',
+    numbered,
+    '',
+    `(Output capped at 50.0KB. ${shown} ${resume})`,
+    '</content>',
+  ].join('\n');
+}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-markdown-fixture ${usage}`);
@@ -56,6 +113,9 @@ function printUsage(): void {
   console.log('Seeds one agent session whose assistant message covers the markdown,');
   console.log('Mermaid, and HTML-in-markdown renderers, through the local');
   console.log('cloudflare-session-ingest worker. Resets only its own session.');
+  console.log('Two truncated reads end inside an unterminated fence (a ~~~ run and a');
+  console.log('four-backtick run) so each read sheet must close the fence and render');
+  console.log('its footer as markdown.');
   console.log('Use --causal-order for a compact prompt and replies with mismatched device clocks.');
   console.log('');
   console.log('Example:');
@@ -350,6 +410,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       title: 'Read NOTES.md',
       metadata: {
         display: {
+          type: 'file',
           path: '/workspace/NOTES.md',
           text: MD_DOC,
           lineStart: 1,
@@ -360,6 +421,52 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       },
       start: T0 + 1_100,
       end: T0 + 1_200,
+    }),
+    buildToolPartItem({
+      partId: PART_READ_TILDE,
+      sessionId: SESSION_ID,
+      messageId: ASSISTANT_ID,
+      callId: 'callMdLibsTilde0001',
+      tool: 'read',
+      input: { filePath: '/workspace/TILDE.md' },
+      output: readOutput('/workspace/TILDE.md', TILDE_DOC, 40, 400),
+      title: 'Read TILDE.md',
+      metadata: {
+        display: {
+          type: 'file',
+          path: '/workspace/TILDE.md',
+          text: TILDE_DOC,
+          lineStart: 1,
+          lineEnd: 40,
+          totalLines: 400,
+          truncated: true,
+        },
+      },
+      start: T0 + 1_300,
+      end: T0 + 1_400,
+    }),
+    buildToolPartItem({
+      partId: PART_READ_BACKTICKS,
+      sessionId: SESSION_ID,
+      messageId: ASSISTANT_ID,
+      callId: 'callMdLibsTicks0001',
+      tool: 'read',
+      input: { filePath: '/workspace/BACKTICKS.md' },
+      output: readOutput('/workspace/BACKTICKS.md', BACKTICKS_DOC, 40, 400),
+      title: 'Read BACKTICKS.md',
+      metadata: {
+        display: {
+          type: 'file',
+          path: '/workspace/BACKTICKS.md',
+          text: BACKTICKS_DOC,
+          lineStart: 1,
+          lineEnd: 40,
+          totalLines: 400,
+          truncated: true,
+        },
+      },
+      start: T0 + 1_500,
+      end: T0 + 1_600,
     }),
     buildFilePartItem({
       partId: PART_FILE,
@@ -406,7 +513,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     causalOrder
       ? 'This fixture represents: a phone-clock prompt and CLI-clock replies whose IDs and creation times put the replies first.'
-      : 'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool and file part.'
+      : 'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool, two truncated reads that end inside an unterminated ~~~ or four-backtick fence, and a file part.'
   );
   console.log('Suggested next step: open the deep link on a signed-in dev build.');
   return {

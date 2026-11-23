@@ -257,6 +257,20 @@ describe('balanceCodeFences', () => {
     const text = '````\ncode\n```\nmore';
     expect(balanceCodeFences(text)).toBe('````\ncode\n```\nmore\n````');
   });
+
+  it('does not close a backtick fence with a tilde run of the same length', () => {
+    const text = '```\ncode\n~~~\nmore';
+    expect(balanceCodeFences(text)).toBe('```\ncode\n~~~\nmore\n```');
+  });
+
+  it('treats an open marker run with trailing text as content, not a closer', () => {
+    const text = '```\ncode\n```ts\nmore';
+    expect(balanceCodeFences(text)).toBe('```\ncode\n```ts\nmore\n```');
+  });
+
+  it('closes a fence whose body holds no content line', () => {
+    expect(balanceCodeFences('```')).toBe('```\n```');
+  });
 });
 
 describe('resolveMarkdownBody', () => {

@@ -259,6 +259,31 @@ test('rejects a missing required locale plural category', () => {
   );
 });
 
+test('still requires a zero form in a language that selects zero', () => {
+  // Arabic selects the zero category itself, so its families owe a `_zero`
+  // form. The required list must not drop that category on the way to matching
+  // the runtime's own categories: i18next's count-zero lookup is an override
+  // for the languages that do not select zero, not a reason to stop asking.
+  const found = run({
+    language: 'ar',
+    translated: {
+      agents: {
+        title: 'وكلاء محليون',
+        liveCount_one: '{{count}} جلسة محلية',
+        liveCount_two: 'جلستان محليتان',
+        liveCount_few: '{{count}} جلسات محلية',
+        liveCount_many: '{{count}} جلسة محلية',
+        liveCount_other: '{{count}} جلسة محلية',
+      },
+    },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ar: plural family "agents\.liveCount" lacks the zero category of ar/
+  );
+});
+
 test('rejects a plural category the locale can never select', () => {
   // Japanese selects only `other`, so i18next never asks it for `_one`: the
   // form is copy that ships to nobody.

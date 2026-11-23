@@ -2244,9 +2244,10 @@ function checkKeyParity({
  * must read one truth source or they can contradict each other: a category the
  * host requires but the runtime cannot select would be demanded by one rule and
  * rejected by the other, leaving the audit unsatisfiable. The required list is
- * the intersection of the host's categories and the catalog's own selectable
- * set, minus `zero`, which i18next consults as a count-zero override rather
- * than a plural category of the language.
+ * therefore the intersection of the host's categories and the catalog's own
+ * selectable set, and it keeps `zero` wherever the host list carries it: a
+ * language that selects that category itself (Arabic, Welsh, Latvian) still owes
+ * its `_zero` form.
  *
  * The demand therefore never includes a form the runtime cannot render. It also
  * cannot demand a category only the shipped data selects, so a family a locale

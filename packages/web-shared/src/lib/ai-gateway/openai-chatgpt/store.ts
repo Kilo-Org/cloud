@@ -82,7 +82,6 @@ function ownerRowWhere(...conditions: [SQL, SQL, ...SQL[]]): SQL {
  * through the wrong partial index while reads still match the old row.
  */
 type OpenAiChatGptOwnerShape = {
-  /** Matches the owner's row for reads, updates and deletes. */
   row: SQL;
   /** The identity columns a save writes for this shape. */
   identity: (createdBy: string) => {

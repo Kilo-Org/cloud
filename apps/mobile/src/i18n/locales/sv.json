@@ -91,6 +91,7 @@
     "draft": "Utkast",
     "enabled": "Aktiverad",
     "github": "GitHub",
+    "image": "Bild",
     "imageUnavailable": "Bilden är inte tillgänglig",
     "loading": "Läser in…",
     "loadMore": "Visa fler",
@@ -1591,7 +1592,7 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och faktureringsansvariga) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken",
       "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
       "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Läser in bild",
       "imageUnavailableRetry": "Bilden är inte tillgänglig. Försök läsa in den igen",
+      "imageUnavailableRetryWithAlt": "Bilden är inte tillgänglig. {{alt}}. Försök läsa in den igen",
       "imagePreviewUnavailableInSession": "Bilden kan inte förhandsvisas i den här sessionen.",
       "viewImage": "Visa bild",
       "viewImageWithAlt": "Visa bild {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
     "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",
     "signupStepUpBack": "Gå tillbaka och välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
-    "invalidCode": "Koden är felaktig eller har gått ut. Försök igen eller välj ”$t(login.resendCode)”.",
+    "invalidCode": "Koden är felaktig eller har gått ut. Använd ”$t(login.resendCode)” eller ”$t(login.moreSignInOptions)”.",
     "codeInProgress": "Din kod behandlas. Vänta en stund och försök igen.",
     "tooManyAttempts": "För många försök. Begär en ny kod.",
     "invalidToken": "Inloggningen misslyckades. Försök igen.",
@@ -4338,7 +4340,15 @@
       "download": "Ladda ned modell till enheten",
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
-      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen.",
+      "cannotUse": "Kan inte köra: {{items}}.",
+      "cannotUseOptions": "Kan inte fylla i: vissa verktygsalternativ.",
+      "limitations": "Begränsningar",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Visa inställningar",
+        "settingsSet": "Ändra inställningar"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Det gick inte att spara instruktionen",
     "instructionDeleteFailed": "Det gick inte att ta bort instruktionen",
     "instructionToggleFailed": "Det gick inte att uppdatera instruktionen",
+    "instructionViewTitle": "Instruktionsfil",
     "instructionLimitReached": "En profil kan ha högst {{max}} instruktioner. Ta bort en för att lägga till en annan.",
     "mcp": {
       "title": "MCP-servrar",

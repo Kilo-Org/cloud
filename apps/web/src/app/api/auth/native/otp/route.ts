@@ -39,6 +39,15 @@ async function enforceResponseFloor(startTime: number): Promise<void> {
  * identical to an eligible-but-wrong-code attempt, so the response never
  * reveals whether an account exists.
  *
+ * That branch therefore answers INVALID_CODE at the token route, not the
+ * SIGNUP-STEP-UP body: the code is reserved before the account is settled, so a
+ * challenge with no row never reaches settlement. Only the
+ * EMAIL-SIGNUP-DISABLED refusal issues a real code, and only that path reaches
+ * settlement's step-up. The refused address's way out is the client's: the code
+ * step offers the other sign-in methods beside the resend action, so a person
+ * whose address was silently rejected can still finish a sign-in. Keep that
+ * recovery in the code step if you change this branch.
+ *
  * The response diverges only where the client must act on the outcome: 400
  * INVALID_REQUEST when the body carries no valid email, 429 when the address
  * or the caller is rate limited, 403 with ssoOrganizationId (or 503 when the

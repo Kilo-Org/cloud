@@ -148,9 +148,7 @@ export async function fetchWithinBudget(
  * the transfer.
  *
  * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
- * this read was configured with, and it is the value the timeout error reports
- * so logs and Sentry show the configured budget instead of the few milliseconds
- * that were left when the body started.
+ * this read was configured with.
  *
  * The reader, the timer and the cancellation are shared with
  * {@link readTextWithinBudget} through {@link readBodyWithinBudget}, which
@@ -203,9 +201,7 @@ export async function readJsonWithinBudget<T = unknown>(
  * the transfer.
  *
  * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
- * this read was configured with, and it is the value the timeout error reports
- * so logs and Sentry show the configured budget instead of the few milliseconds
- * that were left when the body started.
+ * this read was configured with.
  *
  * `maxChars` caps the result: with it set, a body the reader owns is collected
  * only up to that many characters and the reader is then cancelled, so a long
@@ -254,9 +250,7 @@ export async function readTextWithinBudget(
  * a timeout.
  *
  * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
- * this read was configured with, and it is the value the timeout error reports
- * so logs and Sentry show the configured budget instead of the few milliseconds
- * that were left when the body started.
+ * this read was configured with.
  *
  * `maxChars` is forwarded to {@link readAllText} so an owned reader stops
  * collecting at the cap instead of buffering a body the caller will slice away.

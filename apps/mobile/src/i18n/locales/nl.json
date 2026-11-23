@@ -91,6 +91,7 @@
     "draft": "Concept",
     "enabled": "Ingeschakeld",
     "github": "GitHub",
+    "image": "Afbeelding",
     "imageUnavailable": "De afbeelding is niet beschikbaar.",
     "loading": "Laden…",
     "loadMore": "Meer laden",
@@ -1029,7 +1030,7 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en factuurbeheerders) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden",
       "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
       "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Afbeelding laden",
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
+      "imageUnavailableRetryWithAlt": "Afbeelding niet beschikbaar, {{alt}}, opnieuw laden",
       "imagePreviewUnavailableInSession": "Er is geen voorbeeld van de afbeelding beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Gebruik '$t(login.signInWithApple)' om het aanmaken van je account te voltooien.",
     "signupStepUpGoogle": "Gebruik '$t(login.signInWithGoogle)' om het aanmaken van je account te voltooien.",
     "signupStepUpBack": "Ga terug en gebruik '$t(login.moreSignInOptions)' om het aanmaken van je account te voltooien.",
-    "invalidCode": "Die code is onjuist of verlopen. Probeer het opnieuw of gebruik '$t(login.resendCode)'.",
+    "invalidCode": "Die code is onjuist of verlopen. Gebruik '$t(login.resendCode)' of '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Je code wordt verwerkt. Wacht even en probeer het opnieuw.",
     "tooManyAttempts": "Te veel pogingen. Vraag een nieuwe code aan.",
     "invalidToken": "Aanmelden is mislukt. Probeer het opnieuw.",
@@ -4338,7 +4340,15 @@
       "download": "Model op het apparaat downloaden",
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",
-      "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
+      "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw.",
+      "cannotUse": "Kan niet worden uitgevoerd: {{items}}.",
+      "cannotUseOptions": "Kan niet worden ingevuld: sommige toolopties.",
+      "limitations": "Beperkingen",
+      "tools": {
+        "time": "Tijd",
+        "settingsList": "Toon instellingen",
+        "settingsSet": "Wijzig instellingen"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Kon de instructie niet opslaan",
     "instructionDeleteFailed": "Kon de instructie niet verwijderen",
     "instructionToggleFailed": "Kon de instructie niet bijwerken",
+    "instructionViewTitle": "Instructiebestand",
     "instructionLimitReached": "Een profiel kan maximaal {{max}} instructies bevatten. Verwijder er een om er nog een toe te voegen.",
     "mcp": {
       "title": "MCP-servers",

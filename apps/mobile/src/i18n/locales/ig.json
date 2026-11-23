@@ -91,6 +91,7 @@
     "draft": "Ihe odide mbido",
     "enabled": "Agbanyere",
     "github": "GitHub",
+    "image": "Onyonyo",
     "imageUnavailable": "Onyonyo adịghị",
     "loading": "Na-ebudata…",
     "loadMore": "Budata ọzọ",
@@ -1591,7 +1592,7 @@
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
       "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
-      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
+      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ịgba ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
       "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
       "trackedReviewsCaption": "Nyocha ndị gụchara n'oge a mgbe agbanyere ọnụọgụgụ nyocha. Ọ dịghị mgbe a na-agụta nyocha ndị na-agba ma ọ bụ ndị dara.",
       "trackedReviewsUncounted": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Na-ebudata onyonyo",
       "imageUnavailableRetry": "Onyonyo adịghị, nwaa ibudata ọzọ",
+      "imageUnavailableRetryWithAlt": "Onyonyo adịghị, {{alt}}, nwaa ibudata ọzọ",
       "imagePreviewUnavailableInSession": "Nlele onyonyo adịghị na nnọkọ a.",
       "viewImage": "Lee onyonyo",
       "viewImageWithAlt": "Lee onyonyo {{alt}}",
@@ -3686,7 +3688,7 @@
       "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
       "alreadyMember": "Onye a abụrụla onye otu nke òtù a.",
       "seatsFull": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù.",
-      "seatsFullCanInviteBilling": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Ị ka nwere ike ịkpọ ndị njikwa ịkwụ ụgwọ òkù, ndị anaghị eji oche ọ bụla.",
+      "seatsFullCanInviteBilling": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Ị ka nwere ike ịkpọ ndị njikwa ịgba ụgwọ òkù, ndị anaghị eji oche ọ bụla.",
       "noSeatsAvailable": "A na-eji oche niile ugbu a. Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù."
     },
     "invoices": {
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Iji mechaa imepụta akaụntụ gị, laghachi azụ ma jiri '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Biko nwaa ọzọ ma ọ bụ jiri '$t(login.resendCode)'.",
+    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Jiri '$t(login.resendCode)' ma ọ bụ jiri '$t(login.moreSignInOptions)'.",
     "codeInProgress": "A na-ahazi koodu gị. Chere nwa oge wee nwaa ọzọ.",
     "tooManyAttempts": "Mgbalị karịrị akarị. Biko rịọ koodu ọhụrụ.",
     "invalidToken": "Nbanye emezughị. Biko nwaa ọzọ.",
@@ -4338,7 +4340,15 @@
       "download": "Budata ihe nlereanya na ngwaọrụ",
       "downloading": "Na-ebudata…",
       "downloadProgress": "Na-ebudata… {{percent}}%",
-      "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ."
+      "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ.",
+      "cannotUse": "Enweghị ike ịrụ ọrụ: {{items}}.",
+      "cannotUseOptions": "Enweghị ike ịdejupụta: ụfọdụ nhọrọ ngwá ọrụ.",
+      "limitations": "Oke",
+      "tools": {
+        "time": "Oge",
+        "settingsList": "Gosi ntọala",
+        "settingsSet": "Gbanwee ntọala"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Enweghị ike ichekwa ntụziaka",
     "instructionDeleteFailed": "Enweghị ike ihichapụ ntụziaka",
     "instructionToggleFailed": "Enweghị ike imelite ntụziaka",
+    "instructionViewTitle": "Faịlụ ntụziaka",
     "instructionLimitReached": "Profaịlụ nwere ike ịnwe ihe ruru ntụziaka {{max}}. Hichapụ otu ka ịtinye ọzọ.",
     "mcp": {
       "title": "Ihe nkesa MCP",

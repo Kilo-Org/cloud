@@ -157,8 +157,6 @@ describe('createGatewayVoiceInputEngine', () => {
     expect(events.map(entry => entry.event)).toEqual(['start']);
 
     engine.stop();
-    // The transcribing signal fires before any await so the UI flips to
-    // "Transcribing…" without a gap.
     expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing']);
 
     await vi.waitFor(() => {

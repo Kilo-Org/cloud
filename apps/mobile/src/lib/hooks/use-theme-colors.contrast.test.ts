@@ -498,3 +498,42 @@ describe('filled neutral action contrast (non-text)', () => {
     }
   });
 });
+
+// The session status glyph's idle ring and scheduled clock, and the Home
+// widget's idle dot, are the mark's whole meaning: WCAG 1.4.11 asks 3:1, and a
+// row can sit on the page, on a card, or on the pill/row fill. They paint the
+// muted text ink; the focus-only `mutedSoft` measured about 2.2–2.5:1 on those
+// surfaces in both palettes and left the mark unreadable.
+describe('status mark ink contrast (WCAG 1.4.11 non-text)', () => {
+  it('every theme: the status mark clears 3:1 on background, card and secondary', () => {
+    for (const [themeName, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      for (const surfaceName of ['background', 'card', 'secondary'] as const) {
+        expect(
+          contrastRatio(colors.mutedForeground, colors[surfaceName]),
+          `status mark vs ${surfaceName} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      }
+    }
+  });
+
+  // The Android widget palette and the iOS glanceable renderers paint their own
+  // surfaces: the page in light, the card in dark, a secondary step of their own,
+  // and the always-black Dynamic Island. The idle dot takes the muted ink on each.
+  it('every theme: the widget idle dot clears 3:1 on the widget surfaces', () => {
+    const widgetSurfaces = [
+      ['light', lightColors, [lightColors.background, lightColors.secondary]],
+      ['dark', darkColors, [darkColors.card, '#26262B', '#000000']],
+    ] as const;
+    for (const [themeName, colors, surfaces] of widgetSurfaces) {
+      for (const surface of surfaces) {
+        expect(
+          contrastRatio(colors.mutedForeground, surface),
+          `widget idle dot vs ${surface} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      }
+    }
+  });
+});

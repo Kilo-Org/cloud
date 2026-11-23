@@ -170,7 +170,6 @@ describe('useTrackingPermissionPrompt', () => {
     expect(continueButton.text).toBe('Continue');
     expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
 
-    // Tap Continue.
     await act(async () => {
       continueButton.onPress?.();
       await Promise.resolve();
@@ -194,7 +193,6 @@ describe('useTrackingPermissionPrompt', () => {
     const notNowButton = buttons[0];
     expect(notNowButton.text).toBe('Not now');
 
-    // Tap Not now.
     await act(async () => {
       notNowButton.onPress?.();
       await Promise.resolve();
@@ -273,8 +271,6 @@ describe('useTrackingPermissionPrompt', () => {
     (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
   });
 
-  // Request failure: Sentry receives error; no rethrow, and the person gets a
-  // retry alert.
   it('reports errors to Sentry and does not rethrow when requestTrackingPermissionsAsync fails', async () => {
     getTrackingPermissionsAsync.mockResolvedValue({
       status: 'undetermined',
@@ -414,7 +410,6 @@ describe('useTrackingPermissionPrompt', () => {
     expect(alertMock).toHaveBeenCalledOnce();
   });
 
-  // getTrackingPermissionsAsync failure: error reported to Sentry, no alert shown.
   it('reports errors to Sentry when getTrackingPermissionsAsync fails and shows no alert', async () => {
     const checkError = new Error('ATT check failed');
     getTrackingPermissionsAsync.mockRejectedValue(checkError);
@@ -432,7 +427,6 @@ describe('useTrackingPermissionPrompt', () => {
     renderer.unmount();
   });
 
-  // Cancellation: a late status result cannot show Alert after disable.
   it('does not show Alert when enabled becomes false before status resolves', async () => {
     const { promise: statusPromise, resolve: resolveStatus } = deferred<{ status: string }>();
     getTrackingPermissionsAsync.mockReturnValue(statusPromise);
@@ -460,7 +454,6 @@ describe('useTrackingPermissionPrompt', () => {
     renderer.unmount();
   });
 
-  // Unmount: a late status result cannot show Alert after unmount.
   it('does not show Alert when the component unmounts before status resolves', async () => {
     const { promise: statusPromise, resolve: resolveStatus } = deferred<{ status: string }>();
     getTrackingPermissionsAsync.mockReturnValue(statusPromise);

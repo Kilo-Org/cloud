@@ -18,6 +18,7 @@ import {
 } from '@kilocode/db/schema-types';
 import {
   describeModelAccessPolicyWriteRefusal,
+  OrganizationGroupNameSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPolicySchema,
@@ -490,6 +491,28 @@ function counted(count: number, singular: string, plural: string) {
 }
 
 /**
+ * The group name a create or rename stores: trimmed, and refused with a typed
+ * `BAD_REQUEST` when it carries nothing a reader can see.
+ *
+ * `assertGroupNameAvailable` compares trimmed names, and the table's
+ * `char_length(btrim(name))` check counts zero-width characters, so neither
+ * stops a name of `\u200B` from saving as a nameless row. The rule lives here
+ * as well as in the router input, because tests and other procedures call this
+ * module directly: a `ZodError` thrown inside a procedure body would answer
+ * `INTERNAL_SERVER_ERROR`, not the `BAD_REQUEST` the client can explain.
+ */
+function parseGroupName(name: string): string {
+  const parsed = OrganizationGroupNameSchema.safeParse(name);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: parsed.error.issues[0]?.message ?? 'Group name is required',
+    });
+  }
+  return parsed.data;
+}
+
+/**
  * Reject a group name that collides (case- and whitespace-insensitively) with
  * an existing group in the same organization, so both create and rename return
  * a typed `CONFLICT` instead of surfacing the
@@ -617,7 +640,7 @@ export async function createOrganizationGroup(params: {
         });
       }
 
-      const canonicalName = params.name.trim();
+      const canonicalName = parseGroupName(params.name);
       await assertGroupNameAvailable(tx, params.organizationId, canonicalName);
 
       const [group] = await tx
@@ -658,18 +681,14 @@ export async function updateOrganizationGroupMetadata(params: {
     params.actor.id,
     async ({ tx }) => {
       const existing = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      if (params.name !== undefined) {
-        await assertGroupNameAvailable(
-          tx,
-          params.organizationId,
-          params.name.trim(),
-          params.groupId
-        );
+      const canonicalName = params.name === undefined ? undefined : parseGroupName(params.name);
+      if (canonicalName !== undefined) {
+        await assertGroupNameAvailable(tx, params.organizationId, canonicalName, params.groupId);
       }
       const [updated] = await tx
         .update(organization_groups)
         .set({
-          ...(params.name !== undefined ? { name: params.name.trim() } : {}),
+          ...(canonicalName !== undefined ? { name: canonicalName } : {}),
           ...(params.description !== undefined ? { description: params.description } : {}),
           updated_at: sql`now()`,
         })
@@ -707,7 +726,8 @@ export async function updateOrganizationGroupDetails(params: {
     params.actor.id,
     async ({ tx, pendingPolicyRevision }) => {
       const existing = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      await assertGroupNameAvailable(tx, params.organizationId, params.name.trim(), params.groupId);
+      const canonicalName = parseGroupName(params.name);
+      await assertGroupNameAvailable(tx, params.organizationId, canonicalName, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
       const currentMemberIds = await listOrganizationGroupMemberIds(
@@ -726,7 +746,7 @@ export async function updateOrganizationGroupDetails(params: {
       const [group] = await tx
         .update(organization_groups)
         .set({
-          name: params.name.trim(),
+          name: canonicalName,
           description: params.description ?? null,
           updated_at: sql`now()`,
         })

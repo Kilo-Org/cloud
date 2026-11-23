@@ -198,10 +198,6 @@ export async function applyDeviceLanguage(
   language: SupportedLanguage
 ): Promise<ApplyLanguageOutcome> {
   if (I18nManager.isRTL !== isRtlLanguage(language)) {
-    // A device switch to an RTL language while the login screen holds typed
-    // state must persist it the way the picker's reload does: a reload
-    // discards the JS context without running React cleanup, so the login
-    // screen's unmount-time persist cannot be relied on.
     await flushBeforeReload();
     return restartForDirection(language, true);
   }

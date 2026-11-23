@@ -125,7 +125,6 @@ export function getLocalFakeTranscriptionProvider(): Provider | null {
   };
 }
 
-/** Full transcription-models catalog URL on the local fake LLM, or null. */
 export function getLocalFakeTranscriptionModelsUrl(): string | null {
   const baseUrl = getLocalFakeBaseUrl();
   if (!baseUrl) return null;

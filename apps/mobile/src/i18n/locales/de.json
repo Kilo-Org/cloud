@@ -91,6 +91,7 @@
     "draft": "Entwurf",
     "enabled": "Aktiviert",
     "github": "GitHub",
+    "image": "Bild",
     "imageUnavailable": "Das Bild ist nicht verfügbar.",
     "loading": "Wird geladen…",
     "loadMore": "Mehr laden",
@@ -1029,7 +1030,7 @@
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
       "offTitle": "Analysen sind für {{platform}} deaktiviert",
-      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Owner, Admins und Billing-Manager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
+      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Inhaber, Admins und Abrechnungsmanager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
       "couldNotLoad": "Analysen konnten nicht geladen werden",
       "trackedReviewsCaption": "Reviews, die in diesem Zeitraum bei aktivierten Analysen abgeschlossen wurden. Laufende und fehlgeschlagene Reviews werden nie gezählt.",
       "trackedReviewsUncounted": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
@@ -1649,12 +1650,12 @@
       "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden",
       "installedTitle": "GitHub-App installiert",
       "installedMessage": "Deine Repositories sind jetzt verbunden.",
-      "pendingTitle": "Genehmigung durch Administrator ausstehend",
-      "pendingMessage": "Ein Organisationsadministrator muss die Installationsanfrage genehmigen.",
+      "pendingTitle": "Genehmigung durch Admin ausstehend",
+      "pendingMessage": "Ein Admin der Organisation muss die Installationsanfrage genehmigen.",
       "accountMismatchTitle": "Konten stimmen nicht überein",
       "accountMismatchMessage": "Du hast diese Verbindung in der Kilo App mit einem anderen Konto gestartet. Melde dich im Browser mit demselben Konto an oder starte den Vorgang in der App erneut.",
       "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
-      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Administrator deiner Organisation, Kilo zu installieren.",
+      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Admin deiner Organisation, Kilo zu installieren.",
       "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
       "installationUnavailableMessage": "Diese GitHub App-Installation ist ausgesetzt oder nicht mehr verfügbar. Stelle sie in GitHub wieder her oder installiere sie dort erneut, und starte dann erneut.",
       "multipleInstallationsMessage": "Diese Kilo-Organisation kann derzeit nur eine einzige GitHub-Organisation verbinden.",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Bild wird geladen",
       "imageUnavailableRetry": "Bild nicht verfügbar, erneut laden",
+      "imageUnavailableRetryWithAlt": "Bild nicht verfügbar, {{alt}}, erneut laden",
       "imagePreviewUnavailableInSession": "In dieser Sitzung ist keine Bildvorschau verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild „{{alt}}“ ansehen",
@@ -3851,7 +3853,7 @@
       "nameRequired": "Gruppennamen eingeben.",
       "nameTooLong": "Name auf höchstens 80 Zeichen beschränken.",
       "notFound": "Diese Gruppe existiert nicht mehr.",
-      "permissionDenied": "Nur ein Inhaber oder Administrator einer Organisation kann deren Gruppen ändern.",
+      "permissionDenied": "Nur ein Inhaber oder Admin einer Organisation kann deren Gruppen ändern.",
       "searchMembers": "Mitglieder suchen",
       "selectAllVisible": "Alle angezeigten auswählen"
     },
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Verwende „$t(login.resendCode)“ oder wähle „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -4338,7 +4340,15 @@
       "download": "Modell auf dem Gerät herunterladen",
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
-      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
+      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut.",
+      "cannotUse": "Kann nicht ausgeführt werden: {{items}}.",
+      "cannotUseOptions": "Kann nicht ausgefüllt werden: einige Tool-Optionen.",
+      "limitations": "Einschränkungen",
+      "tools": {
+        "time": "Zeit",
+        "settingsList": "Einstellungen anzeigen",
+        "settingsSet": "Einstellungen ändern"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Anweisung konnte nicht gespeichert werden",
     "instructionDeleteFailed": "Anweisung konnte nicht gelöscht werden",
     "instructionToggleFailed": "Anweisung konnte nicht aktualisiert werden",
+    "instructionViewTitle": "Anweisungsdatei",
     "instructionLimitReached": "Ein Profil kann bis zu {{max}} Anweisungen enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "mcp": {
       "title": "MCP-Server",
@@ -4903,7 +4914,7 @@
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
     "emptyHistory": "Keine gespeicherten Briefings",
-    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte eine Organisationsbesitzerin oder einen Organisationsbesitzer, dies zu aktivieren.",
+    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte einen Inhaber der Organisation, dies zu aktivieren.",
     "saved": "Briefing-Einstellungen gespeichert",
     "selectedSessions": "Ausgewählte Sitzungen",
     "snapshotPullRequests": "PRs in ausgewählten Sitzungen",

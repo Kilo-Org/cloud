@@ -91,6 +91,7 @@
     "draft": "ਖਰੜਾ",
     "enabled": "ਚਾਲੂ",
     "github": "GitHub",
+    "image": "ਚਿੱਤਰ",
     "imageUnavailable": "ਤਸਵੀਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
     "loadMore": "ਹੋਰ ਲੋਡ ਕਰੋ",
@@ -2211,12 +2212,12 @@
       "couldNotOpenMessage": "ਅਸੀਂ GitHub ਐਪ ਦਾ ਸੈੱਟਅੱਪ ਸ਼ੁਰੂ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "installedTitle": "GitHub ਐਪ ਸਥਾਪਿਤ ਹੋ ਗਈ",
       "installedMessage": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਹੁਣ ਕਨੈਕਟ ਹੋ ਗਈਆਂ ਹਨ।",
-      "pendingTitle": "ਪ੍ਰਸ਼ਾਸਕ ਦੀ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ",
-      "pendingMessage": "ਸਥਾਪਨਾ ਦੀ ਬੇਨਤੀ ਲਈ ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਦੀ ਮਨਜ਼ੂਰੀ ਲਾਜ਼ਮੀ ਹੈ।",
+      "pendingTitle": "ਐਡਮਿਨ ਦੀ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ",
+      "pendingMessage": "ਸਥਾਪਨਾ ਦੀ ਬੇਨਤੀ ਲਈ ਸੰਸਥਾ ਦੇ ਐਡਮਿਨ ਦੀ ਮਨਜ਼ੂਰੀ ਲਾਜ਼ਮੀ ਹੈ।",
       "accountMismatchTitle": "ਖਾਤਾ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "accountMismatchMessage": "ਇਹ ਕਨੈਕਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਵੇਲੇ ਤੁਸੀਂ Kilo App ਵਿੱਚ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਨਾਲ ਸਾਈਨ-ਇਨ ਕੀਤਾ ਹੋਇਆ ਸੀ। ਉਸੇ ਖਾਤੇ ਨਾਲ ਵੈੱਬ 'ਤੇ ਸਾਈਨ-ਇਨ ਕਰੋ ਜਾਂ ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
       "cannotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ",
-      "notAdminMessage": "ਉਸ ਖਾਤੇ ਦਾ GitHub ਪ੍ਰਸ਼ਾਸਕ ਹੀ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦਾ ਹੈ। ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ Kilo ਸਥਾਪਿਤ ਕਰਨ ਲਈ ਕਹੋ।",
+      "notAdminMessage": "ਉਸ ਖਾਤੇ ਦਾ GitHub ਪ੍ਰਸ਼ਾਸਕ ਹੀ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦਾ ਹੈ। ਸੰਸਥਾ ਦੇ ਐਡਮਿਨ ਨੂੰ Kilo ਸਥਾਪਿਤ ਕਰਨ ਲਈ ਕਹੋ।",
       "alreadyClaimedMessage": "ਉਹ GitHub ਸਥਾਪਨਾ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਕਨੈਕਟ ਹੈ। ਪਹਿਲਾਂ ਉੱਥੇ ਇਸਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰੋ।",
       "installationUnavailableMessage": "ਇਹ GitHub App ਸਥਾਪਨਾ ਮੁਅੱਤਲ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ GitHub ਵਿੱਚ ਬਹਾਲ ਕਰੋ ਜਾਂ ਦੁਬਾਰਾ ਸਥਾਪਿਤ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
       "multipleInstallationsMessage": "ਇਹ Kilo ਸੰਗਠਨ ਇਸ ਸਮੇਂ ਸਿਰਫ਼ ਇੱਕ GitHub ਸੰਗਠਨ ਨਾਲ ਕਨੈਕਟ ਹੋ ਸਕਦਾ ਹੈ।",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
       "imageUnavailableRetry": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ, ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+      "imageUnavailableRetryWithAlt": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ, {{alt}}, ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "imagePreviewUnavailableInSession": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਚਿੱਤਰ ਦੀ ਝਲਕ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "viewImage": "ਚਿੱਤਰ ਵੇਖੋ",
       "viewImageWithAlt": "{{alt}} ਚਿੱਤਰ ਵੇਖੋ",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithApple)' ਵਰਤੋ।",
     "signupStepUpGoogle": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithGoogle)' ਵਰਤੋ।",
     "signupStepUpBack": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ ਪਿੱਛੇ ਜਾਓ ਅਤੇ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
-    "invalidCode": "ਇਹ ਕੋਡ ਗਲਤ ਹੈ ਜਾਂ ਇਸਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਜਾਂ '$t(login.resendCode)' ਵਰਤੋ।",
+    "invalidCode": "ਇਹ ਕੋਡ ਗਲਤ ਹੈ ਜਾਂ ਇਸਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ। '$t(login.resendCode)' ਜਾਂ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "codeInProgress": "ਤੁਹਾਡੇ ਕੋਡ 'ਤੇ ਕਾਰਵਾਈ ਹੋ ਰਹੀ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਉਡੀਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "tooManyAttempts": "ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਨਵਾਂ ਕੋਡ ਮੰਗੋ।",
     "invalidToken": "ਸਾਈਨ ਇਨ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -4338,7 +4340,15 @@
       "download": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲਾ ਮਾਡਲ ਡਾਊਨਲੋਡ ਕਰੋ",
       "downloading": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
       "downloadProgress": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ… {{percent}}%",
-      "downloadFailed": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਅਤੇ ਖਾਲੀ ਸਟੋਰੇਜ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "downloadFailed": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਅਤੇ ਖਾਲੀ ਸਟੋਰੇਜ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "cannotUse": "ਚਲਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ: {{items}}।",
+      "cannotUseOptions": "ਭਰਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ: ਕੁਝ ਟੂਲ ਵਿਕਲਪ।",
+      "limitations": "ਸੀਮਾਵਾਂ",
+      "tools": {
+        "time": "ਸਮਾਂ",
+        "settingsList": "ਸੈਟਿੰਗਾਂ ਦਿਖਾਓ",
+        "settingsSet": "ਸੈਟਿੰਗਾਂ ਬਦਲੋ"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ਇਹ ਮਾਡਲ ਸੋਚਣ ਦੇ ਪੱਧਰ ਦਾ ਸਮਰਥਨ ਕਰਦਾ ਹੈ"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "ਹਦਾਇਤ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ",
     "instructionDeleteFailed": "ਹਦਾਇਤ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ",
     "instructionToggleFailed": "ਹਦਾਇਤ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕੀ",
+    "instructionViewTitle": "ਹਦਾਇਤ ਫ਼ਾਈਲ",
     "instructionLimitReached": "ਇੱਕ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਵੱਧ ਤੋਂ ਵੱਧ {{max}} ਹਦਾਇਤਾਂ ਹੋ ਸਕਦੀਆਂ ਹਨ। ਹੋਰ ਸ਼ਾਮਲ ਕਰਨ ਲਈ ਇੱਕ ਮਿਟਾਓ।",
     "mcp": {
       "title": "MCP ਸਰਵਰ",
@@ -5134,7 +5145,7 @@
   },
   "organizationGuardrails": {
     "title": "ਏਆਈ ਗਾਰਡਰੇਲ",
-    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ। $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਨਹੀਂ ਹੈ",
     "unavailable": "ਕੀਲੋ ਬੇਨਤੀ 'ਤੇ ਕਿਸੇ ਸੰਗਠਨ ਲਈ ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਕਰਦਾ ਹੈ। {{supportEmail}} ਨਾਲ ਸੰਪਰਕ ਕਰੋ, ਅਤੇ Kilo ਟੀਮ ਤੁਹਾਡੀ ਸੰਸਥਾ ਲਈ ਇਸਨੂੰ ਚਾਲੂ ਕਰੇਗੀ।",
     "contactSupport": "ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ",
@@ -5276,7 +5287,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ਐਂਟਰਪ੍ਰਾਈਜ਼ ਵਿਸ਼ੇਸ਼ਤਾ",
     "enterpriseOnly": "ਪ੍ਰਦਾਤੇ ਅਤੇ ਮਾਡਲ ਐਂਟਰਪ੍ਰਾਈਜ਼ ਪਲਾਨ 'ਤੇ ਉਪਲਬਧ ਹਨ।",
-    "readOnly": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਇਹ ਸੈਟਿੰਗਾਂ ਬਦਲ ਸਕਦੇ ਹਨ।",
+    "readOnly": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਹੀ ਇਹ ਸੈਟਿੰਗਾਂ ਬਦਲ ਸਕਦੇ ਹਨ।",
     "loadError": "ਪ੍ਰਦਾਤੇ ਅਤੇ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "tabModels": "ਮਾਡਲ",
     "tabProviders": "ਪ੍ਰਦਾਤੇ",

@@ -91,6 +91,7 @@
     "draft": "Qabyo",
     "enabled": "La shiday",
     "github": "GitHub",
+    "image": "Sawir",
     "imageUnavailable": "Sawirka lama heli karo.",
     "loading": "Soo raraya…",
     "loadMore": "Soo rar kuwo kale",
@@ -1591,7 +1592,7 @@
       "empty": "Weli ma jiro dib-u-eegis leh tirakoob",
       "emptyDescription": "Tirakoobku wuxuu diiwaangeliyaa dib-u-eegisyo dhammaaday inta uu ururka u shidan yahay.",
       "offTitle": "Tirakoobku wuu dansan yahay {{platform}}",
-      "offDescription": "Mulkiilayaasha, maamulayaasha iyo maareerayaasha lacag-bixinta ee ururku waxay tirakoobka shidi karaan habaynta ururka ee bogga web-ka si loo diiwaangeliyo dib-u-eegisyo dhammaaday.",
+      "offDescription": "Mulkiilayaasha, maamulayaasha iyo maareeyayaasha biilasha ee ururku waxay tirakoobka shidi karaan habaynta ururka ee bogga web-ka si loo diiwaangeliyo dib-u-eegisyo dhammaaday.",
       "couldNotLoad": "Tirakoobka lama soo dejin karin",
       "trackedReviewsCaption": "Dib-u-eegisyo dhammaaday oo mudadaan ku dhammaystay iyadoo tirakoobku shidan yahay. Dib-u-eegisyaasha socda iyo kuwa guuldaraysan waligood lama tirin.",
       "trackedReviewsUncounted": "Lama tirin: {{displayCount}} ka mid ah {{displayTotal}} dib-u-eegis oo dhammaaday ee ay ururku helayo, natiijadeeda lama qin.",
@@ -2211,7 +2212,7 @@
       "couldNotOpenMessage": "Diyaarinta barnaamijka GitHub lama bilaabi karin. Fadlan mar kale isku day.",
       "installedTitle": "Barnaamijka GitHub waa la rakibay",
       "installedMessage": "Kaydadkaaga hadda waa la xiray.",
-      "pendingTitle": "Sugaya oggolaanshaha maamulka",
+      "pendingTitle": "Sugaya oggolaanshaha maamulaha",
       "pendingMessage": "Maamulaha ururka waa inuu ansixiyaa codsiga rakibidda.",
       "accountMismatchTitle": "Akoonno aan iswaafaqin",
       "accountMismatchMessage": "Xiriirkan waxaa laga bilaabay Kilo App iyadoo lagu soo galay akoon kale. Ku gal bogga internetka akoonkaas ama mar kale ka bilow abka.",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
+      "imageUnavailableRetryWithAlt": "Sawirka lama heli karo, {{alt}}, mar kale isku day inaad soo shubto",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Si aad u dhammaystirto abuurista akoonkaaga, dib u noqo oo isticmaal '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Mar kale isku day ama isticmaal '$t(login.resendCode)'.",
+    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Isticmaal '$t(login.resendCode)' ama '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Koodhkaaga waa la habaynayaa. Wax yar sug oo mar kale isku day.",
     "tooManyAttempts": "Isku dayo aad u badan. Fadlan codso koodh cusub.",
     "invalidToken": "Soo geliddu way fashilantay. Fadlan mar kale isku day.",
@@ -4338,7 +4340,15 @@
       "download": "Soo deji moodeelka aaladda gudaheeda",
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
-      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale.",
+      "cannotUse": "Lama socodsan karo: {{items}}.",
+      "cannotUseOptions": "Lama buuxin karo: xulashooyin qalab oo qaar ah.",
+      "limitations": "Xaddidaadyo",
+      "tools": {
+        "time": "Waqti",
+        "settingsList": "Muuji dejinta",
+        "settingsSet": "Beddel dejinta"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Lama kaydin karin tilmaanta",
     "instructionDeleteFailed": "Lama tirtiri karin tilmaanta",
     "instructionToggleFailed": "Lama cusboonaysiin karin tilmaanta",
+    "instructionViewTitle": "Faylka tilmaanta",
     "instructionLimitReached": "Borofilku wuxuu qaadi karaa ilaa {{max}} tilmaamood. Tirtir mid si aad u darto mid kale.",
     "mcp": {
       "title": "Adeegayaasha MCP",

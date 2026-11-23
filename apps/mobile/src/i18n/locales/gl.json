@@ -91,6 +91,7 @@
     "draft": "Borrador",
     "enabled": "Activado",
     "github": "GitHub",
+    "image": "Imaxe",
     "imageUnavailable": "A imaxe non está dispoñible.",
     "loading": "Cargando…",
     "loadMore": "Cargar máis",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Cargando a imaxe",
       "imageUnavailableRetry": "Imaxe non dispoñible, volver tentar cargala",
+      "imageUnavailableRetryWithAlt": "Imaxe non dispoñible, {{alt}}, volver tentar cargala",
       "imagePreviewUnavailableInSession": "A vista previa da imaxe non está dispoñible nesta sesión.",
       "viewImage": "Ver imaxe",
       "viewImageWithAlt": "Ver imaxe {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Para rematar de crear a túa conta, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Para rematar de crear a túa conta, usa \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "Para rematar de crear a túa conta, volve atrás e usa \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "Ese código é incorrecto ou caducou. Téntao de novo ou usa \"$t(login.resendCode)\".",
+    "invalidCode": "Ese código é incorrecto ou caducou. Usa \"$t(login.resendCode)\" ou \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "O teu código está a procesarse. Agarda un momento e téntao de novo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código novo.",
     "invalidToken": "Fallou o inicio de sesión. Téntao de novo.",
@@ -4338,7 +4340,15 @@
       "download": "Descargar o modelo no dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
-      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo."
+      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo.",
+      "cannotUse": "Non se pode executar: {{items}}.",
+      "cannotUseOptions": "Non se poden encher: algunhas opcións de ferramenta.",
+      "limitations": "Limitacións",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Amosar configuración",
+        "settingsSet": "Cambiar configuración"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Non se puido gardar a instrución",
     "instructionDeleteFailed": "Non se puido eliminar a instrución",
     "instructionToggleFailed": "Non se puido actualizar a instrución",
+    "instructionViewTitle": "Ficheiro de instrución",
     "instructionLimitReached": "Un perfil pode ter ata {{max}} instrucións. Elimina unha para engadir outra.",
     "mcp": {
       "title": "Servidores MCP",

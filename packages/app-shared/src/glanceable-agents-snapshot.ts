@@ -230,12 +230,6 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
     : null;
 }
 
-/**
- * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. The one terminal vocabulary: a consumer that maps a terminal status to
- * its own value reads the narrowed status this predicate returns instead of
- * restating the set.
- */
 export const GLANCEABLE_TERMINAL_STATUSES = [
   'signed_out',
   'privacy',
@@ -287,20 +281,12 @@ export function isScheduledSessionRow(session: GlanceableSessionRow): boolean {
 }
 
 /**
- * Map session rows to the glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
- * `scheduled` → scheduled, and any other status (starting, empty, unknown,
- * completed) counts as running: a session is idle only when the agent says
- * so, and no row is dropped from the count its list row shows.
+ * Map session rows to the glanceable counts.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
  * disconnects while that session was waiting on an answer, and the CLI writes
  * it while backing off after a provider error.
- *
- * The scheduled count and `isScheduledSessionRow` are the same membership
- * rule, so a row counted as scheduled is one the wake selector and the
- * widget's scheduled list also admit.
  */
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
@@ -324,15 +310,11 @@ export function isApprovableGlanceableStatus(status: string): boolean {
 }
 
 /**
- * The number of session rows whose status is exactly `permission`. A
- * permission wait is the one needs-input kind the user can clear without
- * choosing an option, so the wrist control offers Approve only against this
- * count.
+ * The number of session rows whose status is exactly `permission`, so the
+ * wrist control offers Approve only against this count.
  *
  * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
- * `retry` needs the provider to come back, so neither is approvable. It reads
- * `isApprovableGlanceableStatus`, the same rule the Home widget's approving row
- * reads, so the count and that row cannot drift.
+ * `retry` needs the provider to come back, so neither is approvable.
  */
 export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
   let approvals = 0;
@@ -511,8 +493,6 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  // One normalization: a missing or empty organization id is the personal
-  // scope, so the key and the bound flag cannot read the input differently.
   const organizationId = input.organizationId || null;
   // Idle and scheduled counts: a connected agent doing nothing, or one that
   // will wake later, is still something the user wants on the Lock Screen.

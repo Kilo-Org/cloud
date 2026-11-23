@@ -84,14 +84,33 @@ describe('UnreadableRequestNotices mounted', () => {
     expect(announceForA11y).toHaveBeenCalledWith(i18n.t('agentChat.questionCard.unreadableBody'));
   });
 
+  it('announces nothing again when one of two notices resolves on iOS', async () => {
+    platform.os = 'ios';
+    const renderer = await renderNotices({ hasQuestions: true, hasPermissions: true });
+
+    expect(announceForA11y).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderer.update(
+        createElement(UnreadableRequestNotices, { hasQuestions: true, hasPermissions: false })
+      );
+    });
+    expect(announceForA11y).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderer.update(
+        createElement(UnreadableRequestNotices, { hasQuestions: false, hasPermissions: false })
+      );
+    });
+    expect(announceForA11y).toHaveBeenCalledTimes(1);
+  });
+
   it('draws nothing and announces nothing when no request is unreadable', async () => {
     platform.os = 'ios';
     const renderer = await renderNotices({ hasQuestions: false, hasPermissions: false });
 
     expect(renderer.toJSON()).toBeNull();
-    expect(renderer.root.findAll(node => node.props.accessibilityRole === 'alert')).toHaveLength(
-      0
-    );
+    expect(renderer.root.findAll(node => node.props.accessibilityRole === 'alert')).toHaveLength(0);
     expect(announceForA11y).not.toHaveBeenCalled();
   });
 });

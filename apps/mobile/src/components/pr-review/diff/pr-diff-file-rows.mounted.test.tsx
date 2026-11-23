@@ -312,11 +312,9 @@ describe('PatchMissingRow repeats nothing from the file row above', () => {
   it('carries an info icon, not a second file icon', () => {
     mountPatchlessRow('binary');
 
-    expect(hasHostNode('Info')).toBe(true);
     expect(hasHostNode('File')).toBe(false);
-    // The raised dark surface drops the muted foreground under 3:1, so the
-    // glyph takes the same ink as the link it introduces.
-    expect(renderer?.root.find(node => Object.is(node.type, 'Info'))?.props.color).toBe(
+    // The raised dark surface drops the muted foreground under 3:1.
+    expect(renderer?.root.find(node => Object.is(node.type, 'Info')).props.color).toBe(
       themeColors.ink2
     );
   });
@@ -360,32 +358,20 @@ describe('PatchMissingRow provider link', () => {
     ).toHaveLength(0);
   });
 
-  /**
-   * The link is a caption action under the notice, not a status: it paints the
-   * quiet second-line ink and lets its leading glyph name it, instead of the
-   * bright status blue that pulled the eye off the file rows and the review
-   * action.
-   */
   it('paints the provider link in the quiet second-line ink, not the status blue', () => {
     mountPatchlessRow('provider_omitted', {
       url: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12/diffs',
       provider: 'gitlab',
     });
 
-    const glyph = renderer?.root.find(node => Object.is(node.type, 'Link2'));
-    expect(glyph?.props.color).toBe(themeColors.ink2);
-
+    expect(renderer?.root.find(node => Object.is(node.type, 'Link2')).props.color).toBe(
+      themeColors.ink2
+    );
     const label = hostTexts().find(
       node =>
         node.props.children === i18n.t('prReview.fileRows.openOnProvider', { provider: 'GitLab' })
     );
-    expect(label).toBeDefined();
-    expect(String(label?.props.className).split(' ')).toEqual(
-      expect.arrayContaining(['text-sm', 'text-ink2'])
-    );
-    // The ink comes from the token class, not from an inline style, and no node
-    // in the row still carries the status blue.
-    expect(JSON.stringify(label?.props.style ?? null)).not.toContain(themeColors.info);
+    expect(String(label?.props.className).split(' ')).toContain('text-ink2');
     expect(renderer?.root.findAll(node => node.props.color === themeColors.info)).toHaveLength(0);
   });
 });

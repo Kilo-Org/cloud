@@ -70,7 +70,9 @@ function signInCodeWhere({
 
 /**
  * The row identity of a sign-in code without its hash, for paths that resolve
- * a row before hashing the code. They append what they need through `clauses`.
+ * a row before hashing the code: the challenge when the caller has one,
+ * otherwise the delivered address. They append what they need through
+ * `clauses`.
  */
 function signInCodeRowWhere({
   codeEmail,

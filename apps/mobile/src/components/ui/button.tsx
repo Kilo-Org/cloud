@@ -173,17 +173,30 @@ const buttonLabelClasses = Object.fromEntries(
 ) as Record<ButtonVariant, string>;
 
 /**
- * The pair a disabled (not busy) primary action paints: the palette's muted
- * surface and the muted ink that reads on it (4.6:1 light, 4.5:1 dark). A
- * brand or taupe fill reads as a second colour rather than as an inactive
- * control; the muted step is the one every disabled row in the app already
- * uses. The label takes the complete class set rather than overriding the
- * variant's ink, so no two colour utilities compete. A caller that paints its
- * own mark on this fill takes `useMutedDisabledInk` from
- * `@/lib/hooks/use-theme-colors`.
+ * The face a disabled (not busy) primary action paints: `--primary-disabled-fill`,
+ * the palette's own step for a disabled filled control. A brand or taupe fill
+ * reads as a second colour rather than as an inactive control, so the face takes
+ * a faint tint instead. In dark that tint is 1.27:1 off `--secondary`, the
+ * surface a `Card` paints, and 1.49:1 off the page: it clears the two floors the
+ * palette already holds a faint surface to, so the plate has a shape, and it
+ * stays under both `--secondary-fill` and the floor an enabled control's own
+ * surface must clear, so it recedes. In light it keeps the value the disabled
+ * action has always painted.
+ *
+ * The plate draws no border, so an enabled-to-disabled transition changes no
+ * geometry. The label takes `--muted-foreground` in light (4.62:1) and `--ink2`
+ * in dark (7.19:1), because `--muted-foreground` measures 3.57:1 on the dark
+ * fill. `--secondary-fill` is the palette's step for an enabled filled neutral
+ * action, so the dark face must not take it: an unavailable primary would
+ * otherwise look like an available `secondary` action. The label takes the
+ * complete class set rather than overriding the variant's ink, so no two colour
+ * utilities compete. A caller that paints its own mark on this fill takes
+ * `useMutedDisabledInk` from `@/lib/hooks/use-theme-colors`. The enabled brand
+ * fill and the busy face do not change.
  */
-const MUTED_DISABLED_FILL_CLASS = 'bg-muted';
-const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
+const DISABLED_PRIMARY_FILL_CLASS = 'bg-primary-disabled-fill';
+const DISABLED_PRIMARY_LABEL_CLASS =
+  'text-center text-sm font-semibold text-muted-foreground dark:text-ink2';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
@@ -234,15 +247,15 @@ function Button({
   // label. Halving the whole control's opacity for the disabled state
   // composites that pair into olive-on-olive (about 2.4:1 in light, 4.4:1 in
   // dark), and it also washes out any child that hard-codes primaryForeground.
-  // A disabled (not busy) primary instead takes a muted fill that still
-  // contrasts with the ink label, so the label stays legible. A busy primary
-  // keeps the brand fill and its spinner so it still reads as working.
+  // A disabled (not busy) primary instead takes the disabled primary fill, which
+  // still contrasts with the ink label, so the label stays legible. A busy
+  // primary keeps the brand fill and its spinner so it still reads as working.
   //
   // A control that announces busy keeps that enabled face even when it also
   // refuses presses: the spinner (or the caller's own busy glyph) is its state
   // signal, and dimming it would read as unavailable instead of working.
   const isFaceDisabled = isDisabled && busy !== true;
-  const isMutedDisabled = isFaceDisabled && !loading && isPrimary;
+  const isDisabledPrimaryFace = isFaceDisabled && !loading && isPrimary;
   // Dimming is a disabled signal, and a busy control has nothing visible to
   // signal with: the label is already transparent and the spinner sits alone in
   // the slot. Halving the control's opacity then halves the indicator too, which
@@ -316,14 +329,16 @@ function Button({
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider
-      value={isMutedDisabled ? MUTED_DISABLED_LABEL_CLASS : buttonTextVariants({ variant, size })}
+      value={
+        isDisabledPrimaryFace ? DISABLED_PRIMARY_LABEL_CLASS : buttonTextVariants({ variant, size })
+      }
     >
       <Pressable
         className={cn(
           isDimmed && 'opacity-50',
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
-          isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
+          isDisabledPrimaryFace && DISABLED_PRIMARY_FILL_CLASS,
           className
         )}
         role="button"

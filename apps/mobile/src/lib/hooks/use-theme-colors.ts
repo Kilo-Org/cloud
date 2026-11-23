@@ -14,11 +14,13 @@ export function useThemeColors(): ThemeColors {
 
 /**
  * The ink a caller-painted mark (an ActivityIndicator, a glyph) takes on the
- * fill a disabled (not busy) primary action paints: the palette's
- * `--muted-foreground` on `--muted`, the pair the Button's muted fill uses in
- * `components/ui/button.tsx`. A mark painted on that fill must use this ink.
+ * fill a disabled (not busy) primary action paints. That fill is the palette's
+ * `--primary-disabled-fill`, the pair the Button's disabled plate uses in
+ * `components/ui/button.tsx`. In light the mark takes `--muted-foreground`
+ * (4.62:1 on the light fill). In dark it takes `--ink2` (7.19:1), because
+ * `--muted-foreground` measures 3.57:1 on the dark fill and would leave the
+ * mark unreadable. A mark painted on that fill must use this ink.
  */
 export function useMutedDisabledInk(): string {
-  const colors = useThemeColors();
-  return colors.mutedForeground;
+  return useColorScheme() === 'dark' ? darkColors.ink2 : lightColors.mutedForeground;
 }

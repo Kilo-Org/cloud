@@ -76,6 +76,7 @@ type CardProps = {
   questions: Question[];
   onAnswer: (answers: string[][]) => void;
   initialAnswer?: string | null;
+  isSubmitting?: boolean;
 };
 
 async function renderCard(
@@ -95,13 +96,14 @@ async function renderCard(
   return renderer;
 }
 
-function cardElement({ questions, onAnswer, initialAnswer }: CardProps) {
+function cardElement({ questions, onAnswer, initialAnswer, isSubmitting }: CardProps) {
   return createElement(QuestionCard, {
     questions,
     onAnswer,
     onReject: () => undefined,
     requestId: 'question-req-1',
     initialAnswer,
+    isSubmitting: isSubmitting ?? false,
   });
 }
 
@@ -441,5 +443,29 @@ describe('QuestionCard remembered reply answer', () => {
     // Nothing is answered by the seed, so the card's submit stays disabled.
     expect(submitAction(renderer.root).props.disabled).toBe(true);
     expect(submitted).toEqual([]);
+  });
+});
+
+describe('QuestionCard locked option ink', () => {
+  it('keeps a selected option on its brand ink while the card is locked', async () => {
+    // A selected option re-applies `bg-primary` on the shared default Button, so
+    // it keeps the brand fill while the card is submitting. The disabled face
+    // puts `dark:text-ink2` on a label, and Tailwind emits that after the base
+    // ink, so without this option's own dark ink the label would paint on the
+    // brand fill at about 1.3:1.
+    const questions = makeQuestion();
+    const onAnswer = () => undefined;
+    const renderer = await renderCard(questions, onAnswer);
+    press(optionButton(renderer.root, 'Continue'));
+
+    updateCard(renderer, { questions, onAnswer, isSubmitting: true });
+
+    const label = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.type === 'Text' && node.children.includes('Continue')
+    )[0];
+    const classes = String(label?.props.className).split(' ');
+    expect(classes).toContain('text-primary-foreground');
+    expect(classes).toContain('dark:text-primary-foreground');
   });
 });

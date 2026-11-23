@@ -61,7 +61,7 @@ export function BlockedImageChip({
   // flashes nor grows to a touch target nobody can use.
   if (!onPress && !onShowLinkActions) {
     return (
-      <View className={chrome} accessibilityRole="text" accessibilityLabel={label}>
+      <View className={chrome} accessible accessibilityRole="text" accessibilityLabel={label}>
         {body}
       </View>
     );

@@ -246,6 +246,11 @@ type StateActionProps = {
    *  brand-filled controls on one screen make the eye choose between them
    *  (`DESIGN.md` 'one primary action per surface'). */
   emphasis?: 'primary' | 'quiet';
+  /** The surface the state sits on. `on-dark` is for a state that sits on a
+   *  surface painted dark in every scheme, so its one action keeps the brand
+   *  pair that surface was designed for instead of the scheme's `--primary`,
+   *  whose light value is olive and reads muted on black. */
+  surface?: 'default' | 'on-dark';
 };
 
 /**
@@ -279,11 +284,13 @@ export function StateAction({
   accessibilityLabel,
   accessibilityHint,
   emphasis = 'primary',
+  surface = 'default',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
   const quiet = emphasis === 'quiet';
+  const onDark = surface === 'on-dark';
   // A busy action keeps its enabled face — the fill and the label ink the
   // button paints on it (`Button` never dims or mutes a control that announces
   // busy) — so its mark must take that same ink. The muted ink is only for the
@@ -292,16 +299,24 @@ export function StateAction({
   const showMutedInk = disabled === true && !busy;
   // The quiet face is an outlined control, whose label ink `Button` paints as
   // `foreground`; only the leading mark's colour is computed here, so it takes
-  // that same ink, and the primary face keeps the brand fill's contrasting ink.
-  let enabledInk = colors.primaryForeground;
+  // that same ink. The on-dark face fills with the palette's scheme-invariant
+  // `--accent-soft`, whose ink is `accent-soft-foreground`; the plain primary
+  // face keeps the brand fill's contrasting ink.
+  let enabledInk = onDark ? colors.accentSoftForeground : colors.primaryForeground;
   if (quiet) {
     enabledInk = colors.foreground;
   }
   const markColor = showMutedInk ? mutedDisabledInk : enabledInk;
+  // The quiet face is an outlined control and wins whichever surface the state
+  // sits on; otherwise the surface picks the brand pair it was designed for.
+  let variant: 'outline' | 'primary-on-dark' | 'default' = onDark ? 'primary-on-dark' : 'default';
+  if (quiet) {
+    variant = 'outline';
+  }
   return (
     <Button
       size="sm"
-      variant={quiet ? 'outline' : 'default'}
+      variant={variant}
       // The `outline` variant paints `bg-card dark:bg-secondary`, and `--card`
       // is the same step as the `Card` a quiet action sits on, so the control
       // would lose its fill in dark. The filled neutral takes a visible step

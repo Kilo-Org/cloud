@@ -388,6 +388,15 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
               }}
               sharing={sharing}
               shareError={shareError}
+              // A file part's URL is presigned and expires, so its viewer retry
+              // renews the URL rather than re-reading a dead one.
+              onRetry={
+                resolved.attachmentRef
+                  ? async () => {
+                      await refreshFilePartUrl(part.id);
+                    }
+                  : undefined
+              }
               onClose={closeViewer}
             />
           )}

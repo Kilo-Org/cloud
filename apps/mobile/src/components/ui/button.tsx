@@ -46,6 +46,11 @@ const buttonVariants = cva(
         // primary already fills with #ffdd00, and a solid accent-soft button
         // could not be told apart from it.
         'accent-soft': 'bg-accent-soft-tint active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // The brand action for a surface that is dark in every scheme, so it
+        // paints the palette's scheme-invariant brand pair (#ffdd00 / #1a1a10)
+        // instead of the scheme's `--primary`, whose light value is olive and
+        // would read muted on black.
+        'primary-on-dark': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
         // min-h (not fixed h) so a button with a label grows to fit text scaled
@@ -160,6 +165,7 @@ const BUTTON_INK = {
     label: 'text-accent-soft-tint-foreground',
     mark: 'accentSoftTintForeground',
   },
+  'primary-on-dark': { label: 'text-accent-soft-foreground', mark: 'accentSoftForeground' },
 } as const satisfies Record<ButtonVariant, { label: string; mark: keyof ThemeColors }>;
 
 /**

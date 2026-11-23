@@ -33,6 +33,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     destructive: '#654321',
     destructiveSolidForeground: '#fedcba',
     accentSoftTintForeground: '#1a1a10',
+    accentSoftForeground: '#1a1a10',
   }),
 }));
 
@@ -124,6 +125,7 @@ describe('Button native target contract', () => {
     'ghost',
     'link',
     'accent-soft',
+    'primary-on-dark',
   ] as const)(
     'keeps the %s label and control identity while loading disables interaction',
     variant => {

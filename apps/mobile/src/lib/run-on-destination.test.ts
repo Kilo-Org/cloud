@@ -92,6 +92,13 @@ describe('followLiveRunOn', () => {
     expect(followLiveRunOn(selected, [other])).toBe(selected);
     expect(followLiveRunOn(selected, [])).toBe(selected);
   });
+
+  it('keeps the selection when two live peers share its name and project', () => {
+    // Neither peer carries the selected id, so the pair names no single host:
+    // the form must not rebind to one of them.
+    const peer: InstancePickerInstance = { ...live, connectionId: 'cli-3' };
+    expect(followLiveRunOn(selected, [peer, live])).toBe(selected);
+  });
 });
 
 describe('shouldRestorePersistedRunOn', () => {

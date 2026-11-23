@@ -23,6 +23,7 @@ import {
 } from './use-code-reviews';
 
 type MutationOptions = {
+  networkMode?: 'online' | 'always' | 'offlineFirst';
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onSuccess?: (data: unknown, vars: unknown) => void;
   onError?: (error: unknown, vars?: { reviewId: string }) => void;
@@ -850,5 +851,25 @@ describe('selectReviewFirstPageAction', () => {
         asReviewPage({ success: false, reviews: [], error: 'boom' })
       )
     ).toBe('merge');
+  });
+});
+
+/*
+ * The review-write hooks settle while the device reports itself offline. On the
+ * default `networkMode: 'online'` a tap is paused: no request, `isPending` never
+ * leaves, the row's action never returns to an enabled retry state, and no
+ * failure toast runs. The option is what makes the attempt instead.
+ */
+describe('review writes settle while offline', () => {
+  it('attempts the cancellation while the online manager reports offline', () => {
+    expect(getOptions('cancel').networkMode).toBe('always');
+  });
+
+  it('attempts the retrigger while the online manager reports offline', () => {
+    expect(getOptions('retrigger').networkMode).toBe('always');
+  });
+
+  it('attempts the manual review create while the online manager reports offline', () => {
+    expect(getOptions('create').networkMode).toBe('always');
   });
 });

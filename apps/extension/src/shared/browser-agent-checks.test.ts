@@ -120,6 +120,8 @@ describe('file handoff to the page', () => {
 
   it('treats an empty or malformed paths value as no file list', () => {
     expect(isUploadCall('browser_drop', { paths: [], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: [''], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: ['', '/tmp/a.txt'], target: 'e1' })).toBe(false);
     expect(isUploadCall('browser_drop', { paths: [42], target: 'e1' })).toBe(false);
     expect(isUploadCall('browser_drop', { target: 'e1' })).toBe(false);
   });

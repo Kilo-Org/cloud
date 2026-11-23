@@ -9,13 +9,13 @@ import { z } from 'zod';
  */
 export type BrowserGrantClass = 'read' | 'act' | 'navigate';
 
-/** A `browser_drop`'s `paths`, as the contract carries them: a list of local files the page may read. */
-const dropPathsSchema = z.array(z.string()).min(1);
+/** One entry of a `browser_drop`'s `paths`: a local file the page may read, so never an empty string. */
+export const dropPathsSchema = z.array(z.string().min(1));
 
 /**
  * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
- * does `browser_drop` when its `paths` names at least one local file. A drop that carries
- * only `data` is not an upload.
+ * does `browser_drop` when its `paths` lists at least one local file. A drop that carries
+ * only `data`, or an empty or malformed `paths`, names no file and is not an upload.
  */
 export const isUploadCall = (toolName: string, args: Record<string, unknown> = {}): boolean => {
   if (toolName === 'browser_file_upload') {
@@ -24,7 +24,7 @@ export const isUploadCall = (toolName: string, args: Record<string, unknown> = {
 
   const paths = dropPathsSchema.safeParse(args['paths']);
 
-  return toolName === 'browser_drop' && paths.success && paths.data.some(path => path !== '');
+  return toolName === 'browser_drop' && paths.success && paths.data.length > 0;
 };
 
 export interface BrowserGrant {

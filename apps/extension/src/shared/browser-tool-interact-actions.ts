@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import {
   ambiguousSelectorError,
+  dropPathsSchema,
   FRESH_SNAPSHOT_HINT,
   looksLikeBrowserRef,
   STALE_REF_ERROR,
@@ -1074,7 +1075,8 @@ const handleDrag = async (
 const dropArgsSchema = z.object({
   data: z.record(z.string(), z.string()).optional(),
   element: z.string().optional(),
-  paths: z.array(z.string()).optional(),
+  /** An empty entry is refused here because it names no file. */
+  paths: dropPathsSchema.optional(),
   target: z.string().min(1),
 });
 

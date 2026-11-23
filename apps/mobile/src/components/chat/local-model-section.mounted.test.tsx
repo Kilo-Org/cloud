@@ -90,26 +90,41 @@ function limitationHeading(root: TestRenderer.ReactTestInstance) {
 }
 
 /**
- * The heading and its note lines as the card's own children, in render order.
+ * The `View` that wraps the heading in the row's card, found by its rounded
+ * border, rather than whatever element happens to hold the heading.
+ */
+function rowCard(heading: TestRenderer.ReactTestInstance) {
+  let node = heading.parent;
+  while (node !== null) {
+    if (Object.is(node.type, 'View') && String(node.props.className ?? '').includes('rounded-xl')) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('Missing the row card around the limitations heading');
+}
+
+/**
+ * The heading and its note lines as the row card's own children, in render
+ * order.
  *
  * Nothing wraps them any more: the heading owns the hairline divider and each
- * note line is the next child of the same parent, so the run is read from the
- * heading forward and stops at the first child that is not part of it. A
- * wrapper element between two notes would end the run early and the
- * expectation below would miss the line it hides.
+ * note line is the next child of the same card, so the run is read from the
+ * heading forward and stops at the first child that is not part of it. Reading
+ * the card, not the heading's immediate parent, means a wrapper element around
+ * the heading and its lines cannot hide behind the anchoring: the heading would
+ * no longer be a direct child of the card, and a wrapper between two notes
+ * would end the run early, so the expectations below miss the line it hides.
  */
 function noteChildren(root: TestRenderer.ReactTestInstance) {
   const heading = limitationHeading(root);
-  const parent = heading.parent;
-  if (!parent) {
-    throw new Error('Missing note parent');
-  }
-  const start = parent.children.indexOf(heading);
+  const card = rowCard(heading);
+  const start = card.children.indexOf(heading);
   if (start === -1) {
-    throw new Error('The heading is not a child of its own parent');
+    throw new Error('The heading is not a child of the row card');
   }
   const run: TestRenderer.ReactTestInstance[] = [];
-  for (const node of parent.children.slice(start)) {
+  for (const node of card.children.slice(start)) {
     if (typeof node === 'string') {
       break;
     }
@@ -165,10 +180,10 @@ describe('the on-device model row', () => {
     // the notes used to sit inside.
     expect(heading.props.children).toEqual('modelChat.localModels.limitations');
     expect(heading.props.variant).toEqual('caption');
+    // The divider the notes used to sit inside: the colour token and the half
+    // point width that draws the visible hairline.
     expect(String(heading.props.className)).toContain('border-hair-soft');
-    // The heading is a `Text`, not a group: the card holds three `Text`
-    // children, so nothing wraps the lines.
-    expect(Object.is(heading.type, 'Text')).toBe(true);
+    expect(String(heading.props.className)).toContain('border-t-[0.5px]');
     expect(
       root.findAll(
         node =>

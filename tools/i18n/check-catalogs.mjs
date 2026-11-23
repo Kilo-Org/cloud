@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogEntryNames,
   catalogTags,
@@ -1458,13 +1458,13 @@ function quotedLabelRuns({ value, englishValues, ownValues }) {
 /**
  * The catalog key a node names as a plain string: unwrapped from its
  * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
- * including a template literal and an empty string, names no key here.
+ * including a template literal and an empty string, names no key here. The read
+ * itself is the shared one, so a key rule cannot see a literal shape the others
+ * do not; the non-empty requirement is this layer's own.
  */
 function staticStringKey(node) {
-  const value = unwrap(node);
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  const value = stringLiteralValue(node);
+  return value !== null && value !== '' ? value : null;
 }
 
 /** The catalog key a property's value translates, when it is `t('literal')`. */

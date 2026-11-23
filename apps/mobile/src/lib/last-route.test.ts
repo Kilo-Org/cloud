@@ -323,11 +323,12 @@ describe('subscribeLastRoute (the restart read)', () => {
   });
 
   it('stops notifying an unsubscribed listener', () => {
+    consumeLastRouteForRepair('u1');
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribeLastRoute(listener);
     unsubscribe();
 
-    recordLastRoute('/(app)/a', 'u1');
+    expect(recordLastRoute('/(app)/a', 'u1')).toBe(true);
     expect(listener).not.toHaveBeenCalled();
   });
 

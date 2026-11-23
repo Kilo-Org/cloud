@@ -198,14 +198,18 @@ const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted
  * The muted face above cannot carry a full-width plate. Measured against the
  * page, `--muted` is 1.1:1 in light and 1.18:1 in dark, so a disabled Save in a
  * pinned footer read as no control at all beside the outlined Cancel sharing its
- * row — the reviewer of this screen reported exactly that. The plate stands
- * 5.1:1 off the light page and 3.2:1 off the dark one, and stays 4.5:1 below the
- * enabled brand fill in dark so it never reads as tappable, carrying
- * `--primary-foreground` in light (5.4:1) and `--foreground` in dark (5.3:1).
+ * row — the reviewer of this screen reported exactly that. The light plate
+ * (#918c82) stands 3.2:1 off the page and 3.4:1 off the card, so a footer reads
+ * it as a filled control; the dark plate stands 3.2:1 off its page and 4.5:1
+ * below the enabled brand fill, so it never reads as tappable. Both carry
+ * `--foreground` ink (5.6:1 in light, 5.3:1 in dark). Light therefore signals
+ * disabled by fill luminance and an inverted label ink — the plate is 2.2:1
+ * from the brand fill by luminance, a full step lighter than it, while the
+ * brand face carries `--primary-foreground` — where dark signals it by that
+ * 4.5:1 step below the brand fill.
  */
 const PLATED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
-const PLATED_DISABLED_LABEL_CLASS =
-  'text-center text-sm font-semibold text-primary-foreground dark:text-foreground';
+const PLATED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-foreground';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {

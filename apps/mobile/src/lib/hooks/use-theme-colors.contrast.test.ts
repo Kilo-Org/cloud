@@ -263,7 +263,7 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
     } as const;
     // The palette's own non-text floor for a control surface: the value
     // `--control-idle` and the ring track are held to. Dark measures 3.18:1 and
-    // light 5.14:1.
+    // light 3.20:1.
     expect(ratios.light, 'primary-disabled-action vs background (light)').toBeGreaterThanOrEqual(
       MIN_NON_TEXT_RATIO
     );
@@ -273,7 +273,8 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
   });
 
   it('light theme: the plate label clears WCAG AA text', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
+    // The plated face takes `--foreground` in both themes.
+    const ratio = contrastRatio(lightColors.foreground, lightColors.primaryDisabledAction);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
@@ -282,14 +283,22 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
+  it('light theme: the plate separates from the enabled brand fill by luminance', () => {
+    // Measured 2.24:1 (#4f5a10 against #918c82): the plate is a full step
+    // lighter than the dark brand fill. This is a luminance cue rather than a
+    // text ratio because the light brand is dark enough that no plate carrying
+    // legible ink can sit a text ratio away from it — the plate signals
+    // disabled with its lighter fill and inverted `--foreground` ink instead.
+    const light = contrastRatio(lightColors.primary, lightColors.primaryDisabledAction);
+    expect(light, 'primary vs primary-disabled-action (light)').toBeGreaterThanOrEqual(2);
+  });
+
   it('dark theme: the plate keeps its distance from the enabled brand fill', () => {
     // A disabled action must never read as tappable. The dark accent is the
     // brightest thing on the page, so the dark plate holds a full text ratio of
-    // headroom below it (4.50:1). Light has no such margin to defend: the light
-    // brand (#4f5a10) is dark enough that a plate carrying the white label this
-    // palette gives a disabled primary cannot sit a text ratio away from it at
-    // all, and the pair reads as dimmed-neutral against olive by hue rather than
-    // by weight. The light plate is the palette's own disabled primary.
+    // headroom below it (4.50:1). Light carries no such margin: its plate pairs
+    // a lighter fill with inverted `--foreground` ink instead, pinned by the
+    // light luminance test above.
     const dark = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
     expect(dark, 'primary vs primary-disabled-action (dark)').toBeGreaterThanOrEqual(4.4);
   });

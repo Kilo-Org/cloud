@@ -312,8 +312,8 @@ describe('Button native target contract', () => {
     expect(classes).not.toContain('bg-muted');
     expect(classes).not.toContain('opacity-50');
     const labelClasses = (plated.findByType(NativeText).props.className as string).split(' ');
-    expect(labelClasses).toContain('text-primary-foreground');
-    expect(labelClasses).toContain('dark:text-foreground');
+    expect(labelClasses).toContain('text-foreground');
+    expect(labelClasses).not.toContain('text-primary-foreground');
     expect(labelClasses).not.toContain('text-muted-foreground');
 
     // The face is ignored where it would lie about the control's state.

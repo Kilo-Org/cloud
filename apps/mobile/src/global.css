@@ -36,11 +36,18 @@
   --primary-disabled: #6f6a61;
   /* Fill of a disabled primary action the caller declares its screen's one
    * primary action (a default-variant Button with `disabledFace="primary"`).
-   * Light keeps the palette's disabled primary, whose white label clears 5.4:1.
-   * It is its own token because the dark plate that face needs differs from the
-   * dark `--primary-disabled`, which is too bright a neutral to sit on the
-   * near-black page (see the dark block). */
-  --primary-disabled-action: #6f6a61;
+   * A step lighter than `--primary-disabled`, because the enabled brand fill it
+   * replaces (#4f5a10) is itself dark: the palette's disabled neutral sat 1.4:1
+   * from the brand by luminance and carried the same white label, so enabled
+   * and disabled differed by hue alone and a greyscale reader saw no change.
+   * This step is the lightest plate that still clears 3:1 off the page and the
+   * card (3.2:1 and 3.4:1), so the disabled Save keeps the plate that makes it
+   * read as a control, while it sits 2.2:1 from the brand by luminance and
+   * takes `--foreground` ink (5.6:1) where the enabled label is white: two
+   * cues that survive greyscale. It is its own token because the dark plate
+   * that face needs differs from the dark `--primary-disabled`, which is too
+   * bright a neutral to sit on the near-black page (see the dark block). */
+  --primary-disabled-action: #918c82;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   /* Solid destructive control fill. Separate from `--destructive` because the

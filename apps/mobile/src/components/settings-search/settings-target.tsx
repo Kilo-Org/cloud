@@ -226,18 +226,31 @@ export function SettingsSearchTargetScope({
 type SettingsSearchScrollViewProps = ComponentProps<typeof TabScreenScrollView> & {
   settingsTarget?: string;
   revealKey?: number;
+  /**
+   * A body swap counter. The scroller is one native view for whichever body the
+   * caller renders, so its scroll offset survives a body the person scrolled
+   * while a different body was in place. A caller that replaces the whole body
+   * (Profile swaps its settings list for the search results and back) bumps this
+   * when the replacing body is not the destination of a reveal; the scroller
+   * then returns to its start, so the new body never opens scrolled past its own
+   * first row. A reveal owns its transition instead: it bumps `revealKey`, so a
+   * selection neither moves the scroller nor is moved by it.
+   */
+  resetKey?: number;
   ref?: Ref<ScrollViewInstance>;
 };
 
 /**
  * A settings screen's scrolling body that can reveal one routed target row.
  * Every `TabScreenScrollView` prop — including its IME reveal callback — and the
- * forwarded scroll ref pass through; the additions are `settingsTarget` and the
- * `revealKey` that repeats a reveal for the same target.
+ * forwarded scroll ref pass through; the additions are `settingsTarget`, the
+ * `revealKey` that repeats a reveal for the same target, and the `resetKey` that
+ * returns a replaced body to its first row.
  */
 export function SettingsSearchScrollView({
   settingsTarget,
   revealKey,
+  resetKey,
   ref,
   children,
   onContentSizeChange,
@@ -252,6 +265,21 @@ export function SettingsSearchScrollView({
     () => scrollRef.current,
     []
   );
+  // Return a replaced body to its first row. The offset belongs to the native
+  // scroller, not to either body, so nothing else resets it: measured on the
+  // Profile tab, a search-results list scrolled deep left the settings body
+  // parked with its credits card and every section above APP above the viewport
+  // once the query cleared. No animation, because the body the offset belonged
+  // to is already gone in the same commit.
+  const seenReset = useRef(resetKey);
+  useEffect(() => {
+    if (seenReset.current === resetKey) {
+      return;
+    }
+    seenReset.current = resetKey;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [resetKey]);
+
   // The committed geometry the reveal re-measures against. Both are reports
   // the native scroller emits after the body and frame have laid out, so the
   // scope keeps one reveal owner instead of a second scroll path.

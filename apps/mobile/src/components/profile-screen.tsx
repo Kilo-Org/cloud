@@ -375,6 +375,10 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   const [settingsTarget, setSettingsTarget] = useState(
     routeTarget === undefined ? undefined : { id: routeTarget, attempt: 0 }
   );
+  // Whether the body swap in flight belongs to a root result selection, whose
+  // reveal is the destination the person asked for. Cleared by the swap that
+  // ends the search, so a later plain clear resets as it should.
+  const selectedTargetRef = useRef(false);
 
   const selectSetting = useCallback(
     (entry: SettingsSearchResult['entry']) => {
@@ -382,6 +386,13 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       // before the row is revealed or the destination opens, so neither lands
       // behind the IME. The results list keeps the first tap (`handled` taps).
       Keyboard.dismiss();
+      // A root result highlights its row and the reveal scrolls to it, so the
+      // body swap it causes must not also return the scroller to the start: the
+      // new offset is the destination. Nested results leave the tab, so their
+      // swap resets like any other end of the search.
+      if (!entry.path) {
+        selectedTargetRef.current = true;
+      }
       settingsSearch.clear();
       if (entry.path) {
         // Expo Router's per-route Href union cannot associate this union of
@@ -398,6 +409,34 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
     },
     [router, settingsSearch]
   );
+
+  // The scroller is one native view for both bodies, so the offset the person
+  // scrolled the search results to would otherwise stay on the settings body
+  // that replaces them: measured on the device, a results list scrolled deep
+  // left the credits card and every section above APP out of the viewport, with
+  // Add credits unreachable. Each body swap away from the results returns the
+  // replaced body to its first row, except the swap a root result owns (its
+  // reveal is the destination) — that is the `selectedTargetRef` arm above.
+  const searchActive = settingsSearch.active;
+  const [bodySwap, setBodySwap] = useState(0);
+  const bodyWasSearch = useRef(searchActive);
+  useEffect(() => {
+    if (bodyWasSearch.current === searchActive) {
+      return;
+    }
+    bodyWasSearch.current = searchActive;
+    if (searchActive) {
+      // Entering the search: the results body is new, so it starts at its own
+      // first row whatever the settings body was scrolled to.
+      setBodySwap(current => current + 1);
+      return;
+    }
+    if (selectedTargetRef.current) {
+      selectedTargetRef.current = false;
+      return;
+    }
+    setBodySwap(current => current + 1);
+  }, [searchActive]);
 
   // Personal context has no selected organization to label, so its row opens
   // the account picker; otherwise the row names the destination for the active
@@ -519,6 +558,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
         ref={deleteScrollRef}
         settingsTarget={settingsTarget?.id}
         revealKey={settingsTarget?.attempt}
+        resetKey={bodySwap}
         className="flex-1"
         contentContainerClassName={settingsSearch.active ? undefined : SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}

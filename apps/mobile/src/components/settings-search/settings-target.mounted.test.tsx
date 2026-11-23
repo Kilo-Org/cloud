@@ -186,4 +186,28 @@ describe('SettingsSearchScrollView', () => {
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();
     expect(overlays(root)).toEqual([]);
   });
+
+  it('returns a replaced body to its first row when the reset key moves', () => {
+    // The scroller is one native view for whichever body the caller renders, so
+    // an offset scrolled on the body that is replaced outlives it: measured on
+    // the Profile tab, a search-results list scrolled deep left the settings
+    // body parked with its credits card above the viewport once the query
+    // cleared. A `resetKey` bump is the caller saying the body was replaced.
+    const body = (resetKey: number) => (
+      <SettingsSearchScrollView resetKey={resetKey}>{row('body')}</SettingsSearchScrollView>
+    );
+    harness.mount(body(0));
+    fake.state.contentHeight = 2000;
+    fake.state.frameHeight = 800;
+    fake.state.offset = 700;
+
+    // A re-render that does not move the key leaves the person's scroll alone.
+    harness.update(body(0));
+    expect(fake.scroll.scrollTo).not.toHaveBeenCalled();
+    expect(fake.state.offset).toBe(700);
+
+    harness.update(body(1));
+    expect(fake.scroll.scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+    expect(fake.state.offset).toBe(0);
+  });
 });

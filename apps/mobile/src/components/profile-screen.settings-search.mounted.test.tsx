@@ -8,6 +8,7 @@ import {
   mountProfile,
   providersQueryFn,
   routerPush,
+  scrollToFn,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
 import { SettingsTarget } from '@/components/settings-search/settings-target';
@@ -80,6 +81,7 @@ describe('ProfileScreen settings search', () => {
     confirmFn.mockClear();
     keyboardDismissFn.mockClear();
     routerPush.mockClear();
+    scrollToFn.mockClear();
     signOutFn.mockClear();
     // Linked providers are account data, not settings: the section stays hidden
     // so the coverage assertion can speak about permanent rows alone.
@@ -221,6 +223,45 @@ describe('ProfileScreen settings search', () => {
       pathname: '/(app)/(tabs)/(3_profile)/preferences',
       params: { settingsTarget: 'appearance.dark' },
     });
+  });
+
+  it('returns the settings body to its first row when the search ends', async () => {
+    // The settings body and the results body share one scroller. A results list
+    // scrolled deep used to leave its offset on the settings body that replaced
+    // it, which parked the credits card and every section above APP above the
+    // viewport with Add credits unreachable.
+    const { renderer } = await mountProfile();
+    const root = renderer.root;
+    const resets = () =>
+      scrollToFn.mock.calls.filter(([options]) => (options as { y?: number } | undefined)?.y === 0);
+
+    expect(resets()).toHaveLength(0);
+
+    query(root, 'logout');
+    // Entering the search swaps the body, so the results start at their own
+    // first row.
+    expect(resets()).toHaveLength(1);
+    expect(scrollToFn).toHaveBeenLastCalledWith({ y: 0, animated: false });
+
+    // A root result selects the row it highlights, so that swap belongs to the
+    // reveal and must not also reset the scroller.
+    const entry = results(root).find(result => result.entry.path === undefined);
+    if (!entry) {
+      throw new Error('the search renders no root result');
+    }
+    const beforeSelection = resets().length;
+    selectResult(root, entry);
+    expect(resets()).toHaveLength(beforeSelection);
+
+    // Any other end of the search — the clear control, a nested result — resets.
+    query(root, 'theme');
+    const beforeNested = resets().length;
+    const nested = results(root).find(result => result.entry.path !== undefined);
+    if (!nested) {
+      throw new Error('the search renders no nested result');
+    }
+    selectResult(root, nested);
+    expect(resets().length).toBeGreaterThan(beforeNested);
   });
 
   it('opens the privacy analytics setting on the consent review screen', async () => {

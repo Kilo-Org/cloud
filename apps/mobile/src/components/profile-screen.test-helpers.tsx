@@ -1,5 +1,5 @@
 /* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -39,6 +39,8 @@ const connectivityState = vi.hoisted(() => ({
 }));
 const confirmFn = vi.hoisted(() => vi.fn());
 const keyboardDismissFn = vi.hoisted(() => vi.fn());
+/** The settings scroller's own `scrollTo`, so a spec can read the body reset. */
+const scrollToFn = vi.hoisted(() => vi.fn());
 
 export {
   authState,
@@ -52,6 +54,7 @@ export {
   organizationsQueryFn,
   providersQueryFn,
   routerPush,
+  scrollToFn,
   setOrganizationIdFn,
   signOutFn,
 };
@@ -230,7 +233,27 @@ vi.mock('@/components/language-picker-sheet', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The settings scroller's own reset path reads the native scroller's offset, so
+// the suite hands it an instance whose `scrollTo` the screen's assertions can
+// read, instead of an inert host node. A `vi.mock` factory is hoisted above the
+// module's static imports, so React is imported inside it; the static form
+// cannot be used here.
+vi.mock('@/components/tab-screen', async () => {
+  const react = await import('react');
+  return {
+    TabScreenScrollView: ({
+      ref,
+      children,
+      ...props
+    }: {
+      ref?: { current: unknown } | null;
+      children?: ReactNode;
+    } & Record<string, unknown>) => {
+      react.useImperativeHandle(ref, () => ({ scrollTo: scrollToFn }), []);
+      return react.createElement('ScrollView', props, children);
+    },
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));

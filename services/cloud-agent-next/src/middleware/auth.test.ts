@@ -163,31 +163,25 @@ describe('authMiddleware', () => {
       'getMessageResult',
       'interruptSession',
       'sendMessageV2',
+      'createWorktreeChat',
     ]) {
       const allowed = await app.fetch(
         new Request(`https://worker.test/trpc/${path}`, { method: 'POST' }),
         env
       );
-      expect(allowed.status).toBe(200);
+      expect(allowed.status, path).toBe(200);
       expect(await allowed.json()).toEqual({ authority: cloudAgentAuthority });
     }
     expect(validateKiloToken).toHaveBeenCalledWith(
       null,
       expect.objectContaining({ allowCloudAgentAuthority: true })
     );
-    for (const path of [
-      'start',
-      'send',
-      'updateSession',
-      'deleteSession',
-      'createWorktreeChat',
-      'prepareSession,send',
-    ]) {
+    for (const path of ['start', 'send', 'updateSession', 'deleteSession', 'prepareSession,send']) {
       const denied = await app.fetch(
         new Request(`https://worker.test/trpc/${path}`, { method: 'POST' }),
         env
       );
-      expect(denied.status).toBe(403);
+      expect(denied.status, path).toBe(403);
     }
   });
 });

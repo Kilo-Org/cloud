@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn- og GitHub-links",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
+      "emptyRemovesLink": "Hvis du gemmer et tomt felt, slettes det pågældende link.",
       "invalidUrl": "Angiv en URL, der starter med http:// eller https://",
       "saved": "Profilen er opdateret"
     },

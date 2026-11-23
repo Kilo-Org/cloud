@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn र GitHub लिङ्कहरू",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "खाली फाँट सेभ गर्दा त्यो लिङ्क मेटिन्छ",
       "invalidUrl": "http:// वा https:// बाट सुरु हुने URL प्रविष्ट गर्नुहोस्",
       "saved": "प्रोफाइल अद्यावधिक गरियो"
     },

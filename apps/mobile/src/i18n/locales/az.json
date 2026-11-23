@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn və GitHub keçidləri",
       "linkedinLabel": "LinkedIn URL-i",
       "githubLabel": "GitHub URL-i",
+      "emptyRemovesLink": "Boş sahəni yadda saxladıqda həmin keçid silinir.",
       "invalidUrl": "http:// və ya https:// ilə başlayan URL daxil et",
       "saved": "Profil yeniləndi"
     },

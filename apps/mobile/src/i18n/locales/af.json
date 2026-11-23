@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn- en GitHub-skakels",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
+      "emptyRemovesLink": "As 'n leë veld gestoor word, word daardie skakel verwyder",
       "invalidUrl": "Voer 'n URL in wat met http:// of https:// begin",
       "saved": "Profiel bygewerk"
     },

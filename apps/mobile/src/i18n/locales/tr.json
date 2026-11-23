@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn ve GitHub bağlantıları",
       "linkedinLabel": "LinkedIn URL'si",
       "githubLabel": "GitHub URL'si",
+      "emptyRemovesLink": "Boş bir alanı kaydetmek o bağlantıyı siler",
       "invalidUrl": "http:// veya https:// ile başlayan bir URL gir",
       "saved": "Profil güncellendi"
     },

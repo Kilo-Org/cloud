@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn- ja GitHub-lingid",
       "linkedinLabel": "LinkedIni URL",
       "githubLabel": "GitHubi URL",
+      "emptyRemovesLink": "Tühja välja salvestamine kustutab selle lingi.",
       "invalidUrl": "Sisesta URL, mis algab http:// või https://",
       "saved": "Profiil on uuendatud"
     },

@@ -379,6 +379,7 @@
       "rowSubtitle": "Xiriirada LinkedIn iyo GitHub",
       "linkedinLabel": "URL-ka LinkedIn",
       "githubLabel": "URL-ka GitHub",
+      "emptyRemovesLink": "Kaydinta goob madhan waxay tirtiraysaa xiriiriyahaas.",
       "invalidUrl": "Geli URL ku bilaabma http:// ama https://",
       "saved": "Bogga shakhsiga waa la cusboonaysiiyay"
     },

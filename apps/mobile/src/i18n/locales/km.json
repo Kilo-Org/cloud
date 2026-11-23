@@ -378,6 +378,7 @@
       "rowSubtitle": "តំណ LinkedIn និង GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "ការរក្សាទុកវាលទទេនឹងលុបតំណនោះ។",
       "invalidUrl": "បញ្ចូល URL ដែលចាប់ផ្តើមដោយ http:// ឬ https://",
       "saved": "បានធ្វើបច្ចុប្បន្នភាពប្រូហ្វាល់"
     },

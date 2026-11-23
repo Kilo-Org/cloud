@@ -379,6 +379,7 @@
       "rowSubtitle": "Lyen LinkedIn ak GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Anrejistre yon chan vid efase lyen sa a.",
       "invalidUrl": "Antre yon URL ki kòmanse ak http:// oswa https://",
       "saved": "Pwofil la mete ajou"
     },

@@ -379,6 +379,7 @@
       "rowSubtitle": "Tenglar á LinkedIn og GitHub",
       "linkedinLabel": "LinkedIn-slóð",
       "githubLabel": "GitHub-slóð",
+      "emptyRemovesLink": "Ef þú vistar tóman reit eyðist sá tengill.",
       "invalidUrl": "Sláðu inn slóð sem byrjar á http:// eða https://",
       "saved": "Prófíll uppfærður"
     },

@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn ଓ GitHub ଲିଙ୍କ୍",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "ଖାଲି ଫିଲ୍ଡ ସେଭ୍ କଲେ ସେହି ଲିଙ୍କ୍ ଡିଲିଟ୍ ହୋଇଯିବ",
       "invalidUrl": "http:// କିମ୍ବା https:// ରେ ଆରମ୍ଭ ହେଉଥିବା ଏକ URL ଲେଖନ୍ତୁ",
       "saved": "ପ୍ରୋଫାଇଲ୍ ଅପଡେଟ୍ ହେଲା"
     },

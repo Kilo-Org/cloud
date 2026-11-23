@@ -383,6 +383,7 @@
       "rowSubtitle": "روابط LinkedIn وGitHub",
       "linkedinLabel": "رابط LinkedIn",
       "githubLabel": "رابط GitHub",
+      "emptyRemovesLink": "حفظ حقل فارغ يحذف هذا الرابط",
       "invalidUrl": "أدخل رابطًا يبدأ بـ http:// أو https://",
       "saved": "تم تحديث الملف الشخصي"
     },

@@ -379,6 +379,7 @@
       "rowSubtitle": "Viungo vya LinkedIn na GitHub",
       "linkedinLabel": "URL ya LinkedIn",
       "githubLabel": "URL ya GitHub",
+      "emptyRemovesLink": "Kuhifadhi uga tupu hufuta kiungo hicho",
       "invalidUrl": "Weka URL inayoanza na http:// au https://",
       "saved": "Wasifu umesasishwa"
     },

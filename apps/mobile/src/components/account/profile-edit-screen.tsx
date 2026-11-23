@@ -82,7 +82,8 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const submitLockedRef = useRef(false);
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
-  const validateUrl = createProfileUrlError(t('profile.editProfile.invalidUrl'));
+  const invalidUrlMessage = t('profile.editProfile.invalidUrl');
+  const validateUrl = createProfileUrlError(invalidUrlMessage);
 
   const update = useMutation(
     trpc.user.updateProfile.mutationOptions({
@@ -149,6 +150,11 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={linkedinError ?? undefined}
+        // The rule can arrive from a Save press, with no focus on this field,
+        // so the slot is held from the first render: the Save button beneath
+        // never moves between the untouched form and a shown error.
+        alwaysReserve
+        reserveErrorMessages={[invalidUrlMessage]}
         onChangeText={value => {
           linkedinRef.current = value;
           setLinkedinError(null);
@@ -163,6 +169,8 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
         autoCorrect={false}
         validate={validateUrl}
         error={githubError ?? undefined}
+        alwaysReserve
+        reserveErrorMessages={[invalidUrlMessage]}
         onChangeText={value => {
           githubRef.current = value;
           setGithubError(null);
@@ -253,6 +261,7 @@ export function ProfileEditScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <Text variant="muted">{t('profile.editProfile.emptyRemovesLink')}</Text>
         {body}
       </TabScreenScrollView>
     </View>

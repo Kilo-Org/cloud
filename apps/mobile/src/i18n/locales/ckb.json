@@ -379,6 +379,7 @@
       "rowSubtitle": "بەستەرەکانی LinkedIn و GitHub",
       "linkedinLabel": "URLی LinkedIn",
       "githubLabel": "URLی GitHub",
+      "emptyRemovesLink": "پاشەکەوتکردنی خانەیەکی بەتاڵ ئەو بەستەرە دەسڕێتەوە",
       "invalidUrl": "URLێک بنووسە کە بە http:// یان https:// دەست پێ بکات",
       "saved": "پرۆفایل نوێکرایەوە"
     },

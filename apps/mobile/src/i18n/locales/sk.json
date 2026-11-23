@@ -381,6 +381,7 @@
       "rowSubtitle": "Odkazy na LinkedIn a GitHub",
       "linkedinLabel": "URL na LinkedIn",
       "githubLabel": "URL na GitHub",
+      "emptyRemovesLink": "Uložením prázdneho poľa sa tento odkaz vymaže",
       "invalidUrl": "Zadaj URL, ktorá začína http:// alebo https://",
       "saved": "Profil bol aktualizovaný"
     },

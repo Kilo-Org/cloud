@@ -379,6 +379,7 @@
       "rowSubtitle": "Врски до LinkedIn и GitHub",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Ако зачуваш празно поле, таа врска се брише",
       "invalidUrl": "Внеси URL што започнува со http:// или https://",
       "saved": "Профилот е ажуриран"
     },

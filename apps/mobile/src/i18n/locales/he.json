@@ -380,6 +380,7 @@
       "rowSubtitle": "קישורים ל-LinkedIn ול-GitHub",
       "linkedinLabel": "כתובת URL של LinkedIn",
       "githubLabel": "כתובת URL של GitHub",
+      "emptyRemovesLink": "שמירה של שדה ריק מוחקת את הקישור הזה",
       "invalidUrl": "יש להזין כתובת URL שמתחילה ב-http:// או ב-https://",
       "saved": "הפרופיל עודכן"
     },

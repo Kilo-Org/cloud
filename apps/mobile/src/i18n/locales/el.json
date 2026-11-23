@@ -379,6 +379,7 @@
       "rowSubtitle": "Σύνδεσμοι LinkedIn και GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Η αποθήκευση ενός κενού πεδίου διαγράφει αυτόν τον σύνδεσμο.",
       "invalidUrl": "Εισήγαγε ένα URL που ξεκινά με http:// ή https://",
       "saved": "Το προφίλ ενημερώθηκε"
     },

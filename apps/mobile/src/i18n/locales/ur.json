@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn اور GitHub لنکس",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "خالی فیلڈ محفوظ کرنے سے وہ لنک حذف ہو جاتا ہے",
       "invalidUrl": "ایسا URL درج کریں جو http:// یا https:// سے شروع ہو",
       "saved": "پروفائل اپ ڈیٹ ہو گئی"
     },

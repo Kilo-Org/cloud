@@ -379,6 +379,7 @@
       "rowSubtitle": "د LinkedIn او GitHub لینکونه",
       "linkedinLabel": "د LinkedIn URL",
       "githubLabel": "د GitHub URL",
+      "emptyRemovesLink": "که یوه خونه تشه خوندي کړئ، هغه لینک حذف کیږي",
       "invalidUrl": "داسې URL ولیکئ چې په http:// یا https:// پیل شي",
       "saved": "پروفایل تازه شو"
     },

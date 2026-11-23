@@ -379,6 +379,7 @@
       "rowSubtitle": "Ngā hononga LinkedIn me GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Ki te tiakina he āpure kau, ka mukua tēnā hononga",
       "invalidUrl": "Tāurutia he URL ka tīmata ki te http:// ki te https:// rānei",
       "saved": "Kua whakahoutia te kōtaha"
     },

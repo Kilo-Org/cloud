@@ -378,6 +378,7 @@
       "rowSubtitle": "LinkedIn 和 GitHub 链接",
       "linkedinLabel": "LinkedIn 链接",
       "githubLabel": "GitHub 链接",
+      "emptyRemovesLink": "保存空字段会删除该链接",
       "invalidUrl": "请输入以 http:// 或 https:// 开头的链接",
       "saved": "个人资料已更新"
     },

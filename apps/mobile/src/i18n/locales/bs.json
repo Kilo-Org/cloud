@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn i GitHub linkovi",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Ako sačuvaš prazno polje, ta poveznica se briše",
       "invalidUrl": "Unesi URL koji počinje s http:// ili https://",
       "saved": "Profil je ažuriran"
     },

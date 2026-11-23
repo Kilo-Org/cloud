@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn ও GitHub লিংক",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "খালি ফিল্ড সংরক্ষণ করলে সেই লিংকটি মুছে যাবে।",
       "invalidUrl": "http:// বা https:// দিয়ে শুরু হওয়া একটি URL দিন",
       "saved": "প্রোফাইল আপডেট হয়েছে"
     },

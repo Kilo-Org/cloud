@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn- und GitHub-Links",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
+      "emptyRemovesLink": "Wenn du ein leeres Feld speicherst, wird der entsprechende Link gelöscht",
       "invalidUrl": "Gib eine URL ein, die mit http:// oder https:// beginnt",
       "saved": "Profil aktualisiert"
     },

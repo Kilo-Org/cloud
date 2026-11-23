@@ -123,6 +123,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 
 const FIELD = 'FormField' as ElementType;
 const BUTTON = 'Button' as ElementType;
+const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -333,6 +334,33 @@ describe('ProfileEditScreen', () => {
     expect(field(root, 'GitHub URL').props.error).toBe(
       'Enter a URL that starts with http:// or https://'
     );
+  });
+
+  it('states that an empty field deletes the link, and holds the error slot from the first render', async () => {
+    const root = await mount();
+
+    // An emptied field submits `null`, which deletes the saved link; the screen
+    // says so before the reader clears anything.
+    const hints = root.findAll(
+      node =>
+        Object.is(node.type, TEXT) &&
+        node.props.children === 'Saving an empty field deletes that link.'
+    );
+    expect(hints).toHaveLength(1);
+
+    // The rule can arrive from a Save press with no focus on the field, so both
+    // fields hold their error line from the first render: the Save button below
+    // them never moves between the untouched form and a shown error.
+    for (const label of ['LinkedIn URL', 'GitHub URL']) {
+      const props = field(root, label).props as {
+        alwaysReserve?: boolean;
+        reserveErrorMessages?: string[];
+      };
+      expect(props.alwaysReserve).toBe(true);
+      expect(props.reserveErrorMessages).toEqual([
+        'Enter a URL that starts with http:// or https://',
+      ]);
+    }
   });
 
   it('clears a link by submitting null', async () => {

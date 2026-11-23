@@ -379,6 +379,7 @@
       "rowSubtitle": "Mga link ng LinkedIn at GitHub",
       "linkedinLabel": "URL ng LinkedIn",
       "githubLabel": "URL ng GitHub",
+      "emptyRemovesLink": "Kapag nag-save ng blangkong field, matatanggal ang link na iyon",
       "invalidUrl": "Maglagay ng URL na nagsisimula sa http:// o https://",
       "saved": "Na-update ang profile"
     },

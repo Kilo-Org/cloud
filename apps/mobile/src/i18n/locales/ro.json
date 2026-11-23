@@ -380,6 +380,7 @@
       "rowSubtitle": "Linkuri LinkedIn și GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Salvarea unui câmp gol șterge linkul respectiv",
       "invalidUrl": "Introdu un URL care începe cu http:// sau https://",
       "saved": "Profil actualizat"
     },

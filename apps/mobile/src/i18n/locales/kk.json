@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn және GitHub сілтемелері",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Бос өрісті сақтау сол сілтемені жояды",
       "invalidUrl": "http:// немесе https:// деп басталатын URL енгізіңіз",
       "saved": "Профиль жаңартылды"
     },

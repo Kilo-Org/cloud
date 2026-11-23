@@ -25,7 +25,6 @@ import {
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
-/** The catalog id a request's model resolves to: the exact id, else its normalized base id. */
 function resolveCatalogModelId(models: GatewayModelMap, model: string): string {
   return Object.hasOwn(models, model) ? model : normalizeModelId(model);
 }

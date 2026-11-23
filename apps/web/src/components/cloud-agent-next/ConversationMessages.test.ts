@@ -10,6 +10,7 @@ import type {
   SessionManager,
   StandaloneQuestion,
   StandaloneSuggestion,
+  UnreadableQuestionState,
 } from '@kilocode/cloud-agent-sdk';
 import type { AssistantMessage } from '@/types/opencode';
 import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
@@ -937,7 +938,7 @@ describe('ConversationMessages', () => {
   it.each([false, true])('keeps live actions visible with collapse tools=%s', collapseTools => {
     const atoms: Pick<
       SessionManager['atoms'],
-      'activeQuestion' | 'isStreaming' | 'activeSuggestion'
+      'activeQuestion' | 'isStreaming' | 'activeSuggestion' | 'unreadableQuestions'
     > = {
       activeQuestion: atom<StandaloneQuestion | null, [StandaloneQuestion | null], void>(
         null,
@@ -959,6 +960,7 @@ describe('ConversationMessages', () => {
           set(atoms.activeSuggestion, value);
         }
       ),
+      unreadableQuestions: atom<readonly UnreadableQuestionState[]>([]),
     };
     jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
     const childSessionId = `ses_${'a'.repeat(26)}`;

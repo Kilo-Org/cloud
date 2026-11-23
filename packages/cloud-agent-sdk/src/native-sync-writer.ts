@@ -450,7 +450,8 @@ export function classifyConflict(
 
 function errorCode(error: unknown): string | undefined {
   if (error instanceof NativeSyncError) return error.code;
-  if (error instanceof Error && 'code' in error && typeof error.code === 'string') return error.code;
+  if (error instanceof Error && 'code' in error && typeof error.code === 'string')
+    return error.code;
   return undefined;
 }
 

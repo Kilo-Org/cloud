@@ -207,9 +207,9 @@ export class NativeSyncError extends Error {
 }
 
 /** The retryable/failed split shared by every one-shot session-sync call. */
-export function classifyNativeSyncError(error: unknown):
-  | { type: 'retryable'; retryAfterMs?: number }
-  | { type: 'failed'; code: string } {
+export function classifyNativeSyncError(
+  error: unknown
+): { type: 'retryable'; retryAfterMs?: number } | { type: 'failed'; code: string } {
   if (error instanceof NativeSyncError) {
     const retryable =
       error.status === 0 ||
@@ -775,7 +775,8 @@ export class NativeSyncClient {
   async listSessions(
     params?: ListSessionsParams | string
   ): Promise<{ items: ListedSession[]; cursor: string | null }> {
-    const input: ListSessionsParams = typeof params === 'string' ? { cursor: params } : (params ?? {});
+    const input: ListSessionsParams =
+      typeof params === 'string' ? { cursor: params } : (params ?? {});
     const query = new URLSearchParams();
     query.set('limit', String(input.limit ?? 50));
     if (input.cursor) query.set('cursor', input.cursor);
@@ -799,7 +800,11 @@ export class NativeSyncClient {
     } catch (error) {
       if (error instanceof NativeSyncError) {
         if (error.code === 'session_deleted') return { type: 'deleted' };
-        if (error.code === 'session_not_found' || error.code === 'not_found' || error.status === 404) {
+        if (
+          error.code === 'session_not_found' ||
+          error.code === 'not_found' ||
+          error.status === 404
+        ) {
           return { type: 'not_found' };
         }
       }

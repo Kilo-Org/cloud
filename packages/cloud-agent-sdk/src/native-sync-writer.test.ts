@@ -486,7 +486,9 @@ describe('NativeSyncWriter.register', () => {
 
   it('maps a tombstone to deleted', async () => {
     const { client } = makeClient(() => errorResponse(410, 'session_deleted'));
-    await expect(new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')
+    ).resolves.toStrictEqual({
       type: 'deleted',
     });
   });
@@ -495,7 +497,9 @@ describe('NativeSyncWriter.register', () => {
     const { client } = makeClient(() =>
       errorResponse(503, 'service_overloaded', {}, { 'Retry-After': '3' })
     );
-    await expect(new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')
+    ).resolves.toStrictEqual({
       type: 'retryable',
       retryAfterMs: 3000,
     });
@@ -503,7 +507,9 @@ describe('NativeSyncWriter.register', () => {
 
   it('maps a creator mismatch to failed', async () => {
     const { client } = makeClient(() => errorResponse(403, 'creator_mismatch'));
-    await expect(new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).register(sessionID, sourceID, 'mobile')
+    ).resolves.toStrictEqual({
       type: 'failed',
       code: 'creator_mismatch',
     });
@@ -516,7 +522,10 @@ describe('NativeSyncWriter.putBlob', () => {
     const hash = createHash('sha256').update(bytes).digest('hex');
     const { client, calls } = makeClient(call =>
       call.path === `${sessionPath}/blobs/${hash}`
-        ? Response.json({ version: 1, hash, bytes: bytes.byteLength, created: true }, { status: 201 })
+        ? Response.json(
+            { version: 1, hash, bytes: bytes.byteLength, created: true },
+            { status: 201 }
+          )
         : undefined
     );
     const writer = new NativeSyncWriter(client);
@@ -537,7 +546,9 @@ describe('NativeSyncWriter.putBlob', () => {
     const { client } = makeClient(() =>
       Response.json({ version: 1, hash, bytes: 5, created: false })
     );
-    await expect(new NativeSyncWriter(client).putBlob(sessionID, bytes, 'text/plain')).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).putBlob(sessionID, bytes, 'text/plain')
+    ).resolves.toStrictEqual({
       hash,
       bytes: 5,
     });
@@ -548,9 +559,9 @@ describe('NativeSyncWriter.putBlob', () => {
     const { client } = makeClient(() =>
       Response.json({ version: 1, hash: 'f'.repeat(64), bytes: 5, created: true })
     );
-    await expect(new NativeSyncWriter(client).putBlob(sessionID, bytes, 'text/plain')).rejects.toBeInstanceOf(
-      NativeSyncError
-    );
+    await expect(
+      new NativeSyncWriter(client).putBlob(sessionID, bytes, 'text/plain')
+    ).rejects.toBeInstanceOf(NativeSyncError);
   });
 });
 
@@ -561,7 +572,9 @@ describe('NativeSyncWriter.commit', () => {
     const { client, calls } = makeClient(call =>
       call.path === `${sessionPath}/batches` ? Response.json(receipt, { status: 201 }) : undefined
     );
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'committed',
       receipt,
     });
@@ -580,7 +593,9 @@ describe('NativeSyncWriter.commit', () => {
     const { client } = makeClient(() =>
       errorResponse(409, 'batch_superseded', { position: 9, details: { position: 9 } })
     );
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'superseded',
       position: 9,
     });
@@ -590,7 +605,9 @@ describe('NativeSyncWriter.commit', () => {
     const { client } = makeClient(() =>
       errorResponse(409, 'position_conflict', { details: { position: 4 } })
     );
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'conflict',
       position: 4,
     });
@@ -598,14 +615,20 @@ describe('NativeSyncWriter.commit', () => {
 
   it('maps a tombstone to deleted', async () => {
     const { client } = makeClient(() => errorResponse(410, 'session_deleted'));
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'deleted',
     });
   });
 
   it('maps rate limiting to retryable', async () => {
-    const { client } = makeClient(() => errorResponse(429, 'rate_limited', {}, { 'Retry-After': '2' }));
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    const { client } = makeClient(() =>
+      errorResponse(429, 'rate_limited', {}, { 'Retry-After': '2' })
+    );
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'retryable',
       retryAfterMs: 2000,
     });
@@ -613,7 +636,9 @@ describe('NativeSyncWriter.commit', () => {
 
   it('maps an unregistered source to failed', async () => {
     const { client } = makeClient(() => errorResponse(409, 'source_conflict'));
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(changes))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(changes))
+    ).resolves.toStrictEqual({
       type: 'failed',
       code: 'source_conflict',
     });
@@ -627,7 +652,9 @@ describe('NativeSyncWriter.commit', () => {
       id: `msg_${index}`,
       value: { seq: index },
     }));
-    await expect(new NativeSyncWriter(client).commit(sessionID, packet(oversized))).resolves.toStrictEqual({
+    await expect(
+      new NativeSyncWriter(client).commit(sessionID, packet(oversized))
+    ).resolves.toStrictEqual({
       type: 'failed',
       code: 'too_many_changes',
     });
@@ -824,7 +851,9 @@ describe('NativeSyncClient.deleteSession', () => {
   });
 
   it('maps rate limiting to retryable', async () => {
-    const { client } = makeClient(() => errorResponse(429, 'rate_limited', {}, { 'Retry-After': '1' }));
+    const { client } = makeClient(() =>
+      errorResponse(429, 'rate_limited', {}, { 'Retry-After': '1' })
+    );
     await expect(client.deleteSession(sessionID)).resolves.toStrictEqual({
       type: 'retryable',
       retryAfterMs: 1000,

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import { Hono } from 'hono';
 import type { HonoContext } from '../hono-context.js';
-import { handleVercelScmForward, registerVercelScmBrokerRoute } from './vercel-route.js';
+import { handleVercelScmForward } from './vercel-route.js';
+import { registerVercelEgressRoute } from '../egress/vercel-egress-route.js';
 import type { admitVercelScmForwardAtLocator } from './vercel-admission.js';
 
 const env = {
@@ -42,6 +43,8 @@ const admitManaged = vi.fn<typeof admitVercelScmForwardAtLocator>(async () => ({
     outboundContainerId: 'binding-test',
   },
 }));
+
+const unrestrictedEgress = async () => ({ ok: true, policy: null });
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -132,10 +135,10 @@ describe('prepared Vercel forwarding route', () => {
     'admits the configured locator through registered route %s',
     async (route, host, port, path) => {
       const admitScmForward = vi.fn(async () => ({ ok: true, authority: { type: 'unmanaged' } }));
-      const getByName = vi.fn(() => ({ admitScmForward }));
+      const getByName = vi.fn(() => ({ admitScmForward, admitEgressForward: unrestrictedEgress }));
       const bindings = { ...env, SANDBOX_CONTROL: { getByName } } as unknown as Env;
       const app = new Hono<HonoContext>();
-      registerVercelScmBrokerRoute(app);
+      registerVercelEgressRoute(app);
       const target = `https://${host}${port === '443' ? '' : `:${port}`}${path}`;
       const fetch = vi.fn(async (request: Request) => {
         expect(request.url).toBe(target);
@@ -250,11 +253,12 @@ describe('prepared Vercel forwarding route', () => {
     vi.stubGlobal('fetch', fetch);
     const init = { method: 'POST', body, duplex: 'half' } as RequestInit;
     const app = new Hono<HonoContext>();
-    registerVercelScmBrokerRoute(app);
+    registerVercelEgressRoute(app);
     const bindings = {
       ...env,
       SANDBOX_CONTROL: {
         getByName: () => ({
+          admitEgressForward: unrestrictedEgress,
           admitScmForward: async () => ({
             ok: true,
             authority: {

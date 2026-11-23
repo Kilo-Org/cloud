@@ -4,7 +4,11 @@ import { type ReactNode } from 'react';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type CouncilGate, useCouncilGate } from '@/lib/hooks/use-reviewer-council';
+import {
+  type CouncilGate,
+  useCouncilEntryAvailable,
+  useCouncilGate,
+} from '@/lib/hooks/use-reviewer-council';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -178,6 +182,63 @@ describe('council gate', () => {
     await waitFor(() => holder.gate?.entitlementFetching === false);
 
     expect(holder.gate?.refusalReason).toBe('refused');
+    view.unmount();
+  });
+});
+
+// The overview row is offered on the build gate alone, so the entitlement read
+// stays with the route's own gate. A second read here would put a plan-check
+// request on every overview open, and would hide the row from the one reader
+// the refusal screen exists to tell.
+describe('council entry availability', () => {
+  type EntryHolder = { available: boolean | null };
+
+  function EntryProbe({ holder, scope }: { holder: EntryHolder; scope: string }) {
+    holder.available = useCouncilEntryAvailable(scope);
+    return null;
+  }
+
+  async function mountEntry(scope: string) {
+    const queryClient = createTestQueryClient();
+    queryClientRef.current = queryClient;
+    const holder: EntryHolder = { available: null };
+    const view = await renderWithProviders(<EntryProbe holder={holder} scope={scope} />, {
+      queryClient,
+      wrapper,
+    });
+    return { view, holder };
+  }
+
+  beforeEach(() => {
+    queryClientRef.current = null;
+    transport.mockReset();
+    flagState.enabled = true;
+  });
+
+  it('answers true for an organization behind the rollout flag, without reading the plan', async () => {
+    const { view, holder } = await mountEntry(SCOPE);
+    await flush();
+
+    expect(holder.available).toBe(true);
+    expect(callsTo(ENTITLEMENT)).toBe(0);
+    view.unmount();
+  });
+
+  it('answers false for the personal scope, where council never exists', async () => {
+    const { view, holder } = await mountEntry('personal');
+    await flush();
+
+    expect(holder.available).toBe(false);
+    view.unmount();
+  });
+
+  it('answers false for an organization when the build predates the flag', async () => {
+    flagState.enabled = false;
+
+    const { view, holder } = await mountEntry(SCOPE);
+    await flush();
+
+    expect(holder.available).toBe(false);
     view.unmount();
   });
 });

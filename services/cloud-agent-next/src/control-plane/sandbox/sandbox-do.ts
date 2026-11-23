@@ -24,6 +24,14 @@ import {
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
 import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
+import type {
+  SandboxEgressAdmission,
+  SandboxEgressAdmissionResult,
+} from '../../egress/egress-admission.js';
+import {
+  admitVercelEgressForward,
+  createEgressIdentityCache,
+} from '../../egress/vercel-egress-admission.js';
 import { admitScmRequest } from '../../scm-broker/admission.js';
 import {
   verifiedVercelSandboxIdentityContract,
@@ -88,7 +96,6 @@ import {
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import { getWorkspaceStub } from '../workspace/workspace-stub.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -104,6 +111,7 @@ import { RetiredSandboxProviderError } from '../../sandbox-control/retired-cloud
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
+  SandboxNetworkPolicyError,
   ProviderSnapshotCreationError,
   type ProviderAdapter,
   type ProviderAllocationIntent,
@@ -973,6 +981,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
+  private readonly egressIdentities = createEgressIdentityCache();
   private createInFlight = false;
   /**
    * The allocation whose provider launch has not returned yet. A wrapper may
@@ -1510,7 +1519,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.applyEvent({
         type: 'stop-requested',
         at: Date.now(),
-        reason: policyApplied ? 'preparation_cancelled' : 'sandbox_lost',
+        reason: policyApplied ? 'preparation_cancelled' : this.refusedPolicyStopReason(),
       });
       return { stopEpoch: stop.epoch, stopAt: stop.at };
     });
@@ -1667,7 +1676,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sharedHandleSurvives) {
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
-      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      await this.applyVercelNetworkPolicyOrStop();
     }
     const state = await this.readAllocation();
     await this.armAlarm(state);
@@ -2566,6 +2575,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  /** Admits one request to the sandbox egress proxy route, without the lifecycle queue. */
+  async admitEgressForward(input: SandboxEgressAdmission): Promise<SandboxEgressAdmissionResult> {
+    await this.initialized;
+    return admitVercelEgressForward(input, {
+      env: this.env,
+      contract: verifiedVercelSandboxIdentityContract,
+      pin: this.providerPin,
+      identities: this.egressIdentities,
+      readContext: () => this.readScmAdmissionContext(),
+    });
+  }
+
   private scmAdmissionDependencies() {
     return {
       serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
@@ -3269,7 +3290,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     input: EnsureAllocationInput,
     repositoryUrl?: string,
     kiloToken?: string,
-    networkSecrets: readonly NetworkSecretGrant[] = []
+    networkSecrets: readonly NetworkSecretGrant[] = [],
+    cloudAgentMcp?: boolean
   ): StoredProviderPin {
     const policy = egressPolicySchema.safeParse(input);
     if (!policy.success) throw new ProviderCreationError('invalid_configuration');
@@ -3307,6 +3329,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               env: this.env,
               repositoryUrl,
               kiloToken,
+              cloudAgentMcp,
             }),
           }),
       ...(input.byoc ? { byoc: input.byoc } : {}),
@@ -3622,7 +3645,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sandboxId: this.sandboxId,
             sessionId: spec.sessionId,
             environment,
-          })
+          }),
+          source.allowSubagentSessions
         );
       }
       if (
@@ -4586,13 +4610,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Fail-closed revocation path: if the released session's alias cannot be
-   * removed from the provider policy, stop the sandbox as a platform failure.
+   * The stop reason after a refused policy update: a platform failure. The
+   * policy of a sandbox with an egress allowlist also holds the list, so that
+   * stop names the network policy.
    */
-  private async applyVercelNetworkPolicyOrStop(reason: ControlPlaneFailureReason): Promise<void> {
+  private refusedPolicyStopReason(): 'sandbox_lost' | 'network_policy_failed' {
+    return this.providerPin?.egressAllowlist === undefined
+      ? 'sandbox_lost'
+      : 'network_policy_failed';
+  }
+
+  /**
+   * Fail-closed revocation path: if the released session's alias cannot be
+   * removed from the provider policy, stop the sandbox.
+   */
+  private async applyVercelNetworkPolicyOrStop(): Promise<void> {
     if (await this.refreshVercelNetworkPolicy()) return;
     const state = await this.readAllocation();
     if (state.kind === 'stopped' || state.kind === 'stopping') return;
+    const reason = this.refusedPolicyStopReason();
     await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
   }
 
@@ -5497,12 +5533,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async refreshCloudAgentMcp(route: RouteRecord, state: AllocationState): Promise<void> {
     const binding = this.workspaceMcpBinding(route);
-    // Only interactive workspaces can launch children; automation never asks.
-    if (
-      binding === null ||
-      route.grant === null ||
-      !isInteractiveSessionOrigin(route.credentialSource?.createdOnPlatform)
-    ) {
+    if (binding === null || route.grant === null) {
       return;
     }
     const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
@@ -6058,7 +6089,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         if (
           error instanceof ByocVercelProviderError ||
-          error instanceof VercelScmContainmentError
+          error instanceof VercelScmContainmentError ||
+          error instanceof SandboxNetworkPolicyError
         ) {
           await this.failCreationRoutes(allocationId, false, error.reason);
           return;

@@ -564,9 +564,11 @@ export function IdleAuth({
             catalog with a short conjunction. The 12.25dp `text-sm` copy is
             DESIGN.md's label step: the smaller `text-xs` sat below every other
             line on the screen and its 8dp wrapped-line gap left the two lines
-            of the sentence reading as separate items. The row's 5dp margin
+            of the sentence reading as separate items. The row's 13dp margin
             still holds the links' vertical reach clear of the buttons above and
-            below. A long locale wraps the sentence, so the row also keeps the
+            below: the far side reaches `(28 - 17.5) / 2 + 18 = 23.25dp` past the
+            sentence line, inside the screen's 10.5dp gutter plus that margin. A
+            long locale wraps the sentence, so the row also keeps the
             shared wrapped-line gap (`INLINE_LINK_LINE_GAP_CLASS`); a sentence
             that fits one line never sees it. */}
 

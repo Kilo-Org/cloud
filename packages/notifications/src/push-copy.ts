@@ -53,9 +53,8 @@ export function genericPushTitle(locale: string | null | undefined): string {
  * session title, message body, org name, amount, or id — the OS lock-screen
  * text must not leak private content.
  *
- * It is the only push module that reads the locale catalogs, so it stays out of
- * the `./schemas` entry: a consumer that only routes or validates a payload
- * must not load them.
+ * It reads the locale catalogs, so it stays out of the `./schemas` entry: a
+ * consumer that only routes or validates a payload must not load them.
  */
 export function genericPushContentForPushData(
   data: PushData,

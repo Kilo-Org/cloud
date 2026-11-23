@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -53,6 +54,25 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
+// Hindi selects only `one` and `other`, so a fixture catalog for it declares
+// those two forms and nothing else: a form Hindi cannot select is now a
+// reported problem of its own.
+const HINDI_TRANSLATED = {
+  agents: {
+    title: 'स्थानीयकृत एजेंट',
+    liveCount_one: '{{count}} स्थानीयकृत सत्र',
+    liveCount_other: '{{count}} स्थानीयकृत सत्र',
+  },
+};
+
+// Thai selects only `other`, so its fixture catalog carries that one form.
+const THAI_TRANSLATED = {
+  agents: {
+    title: 'เอเจนต์ที่แปลแล้ว',
+    liveCount_other: '{{count}} เซสชันที่แปลแล้ว',
+  },
+};
+
 // One parent directory for the whole file: each case writes its files into a
 // directory of its own, so a case never sees another case's catalogs.
 const FIXTURES = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
@@ -84,6 +104,7 @@ function run({
   pushSource = '',
   wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
+  afterWrite = null,
 } = {}) {
   const root = fixture({
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', '${language}'];`,
@@ -105,7 +126,16 @@ function run({
       : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
-  return checkCatalogs(root).problems;
+  // A case that needs a mode the tree cannot hold — a file the filesystem
+  // refuses to read — changes it here, after the write and before the audit.
+  // A hook that returns a function gets it called after the audit, so the case
+  // can put the mode back before the fixture cleanup deletes the tree.
+  const restore = afterWrite === null ? null : afterWrite(root);
+  try {
+    return checkCatalogs(root).problems;
+  } finally {
+    restore?.();
+  }
 }
 
 /**
@@ -133,6 +163,10 @@ function standardFiles({ english = ENGLISH, translated = TRANSLATED, source = SO
   return {
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'];`,
     'apps/mobile/src/example.ts': source,
+    // The push catalog's second source root. A command tree's root IS the
+    // repository root inside the copied checker, so a root absent here is the
+    // strict case: the audit has to have every declared source tree.
+    'services/example.ts': "export const pushExample = 'Example';",
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
@@ -240,6 +274,124 @@ test('rejects a missing required locale plural category', () => {
   );
 });
 
+test('still requires a zero form in a language that selects zero', () => {
+  // Arabic selects the zero category itself, so its families owe a `_zero`
+  // form. The required list must not drop that category on the way to matching
+  // the runtime's own categories: i18next's count-zero lookup is an override
+  // for the languages that do not select zero, not a reason to stop asking.
+  const found = run({
+    language: 'ar',
+    translated: {
+      agents: {
+        title: 'وكلاء محليون',
+        liveCount_one: '{{count}} جلسة محلية',
+        liveCount_two: 'جلستان محليتان',
+        liveCount_few: '{{count}} جلسات محلية',
+        liveCount_many: '{{count}} جلسة محلية',
+        liveCount_other: '{{count}} جلسة محلية',
+      },
+    },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ar: plural family "agents\.liveCount" lacks the zero category of ar/
+  );
+});
+
+test('rejects a plural category the locale can never select', () => {
+  // Japanese selects only `other`, so i18next never asks it for `_one`. This
+  // form repeats its family's `other` text, so removing it cannot change what
+  // a reader sees, and the rule reports it.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.match(
+    found.join('\n'),
+    /mobile\/ja: plural family "agents\.liveCount" declares a one form that ja never selects/
+  );
+});
+
+test('keeps a form the locale cannot select when its copy is its own', () => {
+  // The form has text its `other` sibling does not share. A runtime that
+  // selects it would render different copy, so the rule must leave it alone:
+  // only a form that repeats its family's `other` text is provably safe to
+  // remove from the catalogs alone.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件だけです',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('admits a zero form the plural rule cannot select', () => {
+  // i18next looks `_zero` up by itself at count 0, so Japanese may carry one
+  // even though its plural rule never selects that category.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_zero: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('admits a form the shipped plural data selects', () => {
+  // Vietnamese is the case that makes the truth source matter: the app bundles
+  // FormatJS plural data that selects `one` at a count of one, while a host on
+  // a newer CLDR reports `other` only. Judging by the host's ICU would call the
+  // Vietnamese singular dead and delete live copy, so the catalog keeps it.
+  //
+  // The tree links the repository's own loader map and polyfill data, because
+  // those are exactly what the rule reads: a fixture without them falls back to
+  // the host's rules and cannot test this case.
+  const root = fixture({
+    'apps/mobile/src/i18n/languages.ts': "export const SUPPORTED_LANGUAGES = ['en', 'vi'];",
+    'apps/mobile/src/example.ts': SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(ENGLISH),
+    'apps/mobile/src/i18n/locales/vi.json': JSON.stringify({
+      agents: {
+        title: 'Tác nhân bản địa hoá',
+        liveCount_one: '{{count}} phiên bản địa hoá',
+        liveCount_other: '{{count}} phiên bản địa hoá',
+      },
+    }),
+    'packages/notifications/src/locales/en.json': '{}',
+    'packages/notifications/src/locales/vi.json': '{}',
+    'packages/notifications/src/i18n.ts': [
+      `import en from './locales/en.json';`,
+      `import vi from './locales/vi.json';`,
+      `const pushCatalogs = { 'en': en, 'vi': vi };`,
+    ].join('\n'),
+    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+  });
+  symlinkSync(join(REPO, 'apps/mobile/src/lib'), join(root, 'apps/mobile/src/lib'), 'dir');
+  symlinkSync(
+    join(REPO, 'apps/mobile/node_modules'),
+    join(root, 'apps/mobile/node_modules'),
+    'dir'
+  );
+  const found = checkCatalogs(root).problems;
+  assert.deepEqual(found, []);
+});
+
 test('rejects an unused English exact key', () => {
   const found = run({ source: "t('agents.liveCount', { count: 2 });" });
   assert.ok(found.length > 0, 'expected a problem');
@@ -299,6 +451,56 @@ test('still rejects a template-literal key', () => {
     found.join('\n'),
     /t\(\) called with a template literal; the key check cannot see it/
   );
+});
+
+test('does not call a key unused when a source file could not be read', context => {
+  // A refused read leaves that file's keys out of the scan, so the dead-key rule
+  // would name every key it never saw. The unreadable file here is the one that
+  // used `agents.retired`: calling it dead would ask someone to delete copy a
+  // screen still renders. The read failure is reported instead, and the key the
+  // readable source calls but English does not define is still named.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const file = 'apps/mobile/src/unreadable.ts';
+  const found = run({
+    english: { agents: { title: 'Agents', retired: 'Retired agents' } },
+    translated: { agents: { title: 'Localized agents', retired: 'Localized retirees' } },
+    source: "t('agents.title');\nt('agents.missing');",
+    extraFiles: { [file]: "t('agents.retired');" },
+    afterWrite: root => {
+      const path = join(root, file);
+      chmodSync(path, 0o000);
+      return () => chmodSync(path, 0o644);
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /apps\/mobile\/src\/unreadable\.ts: cannot read: /);
+  assert.doesNotMatch(text, /which no source file uses/);
+  assert.match(text, /mobile: source uses "agents\.missing", which en\.json does not define/);
+});
+
+test('reports a missing source tree instead of naming every key unused', () => {
+  // Inside the copied checker the fixture tree IS the repository root, so every
+  // declared source tree must be there. The push key below is called only from
+  // `services`, so removing that tree leaves the key invisible to the scan:
+  // without the completeness rule the run would name it dead, and the
+  // `doesNotMatch` below would fail. The assertion therefore reads the
+  // suppression and not just the missing-tree line.
+  const pushEnglish = { internal: { lowBalance: 'Low balance' } };
+  const pushTranslated = { internal: { lowBalance: 'Низкий баланс' } };
+  const root = cliFixture({
+    ...standardFiles(),
+    'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
+    'packages/notifications/src/locales/ru.json': JSON.stringify(pushTranslated),
+    'services/alert.ts': "translatePush('en', 'internal.lowBalance');",
+  });
+  rmSync(join(root, 'services'), { recursive: true, force: true });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: no source tree at services$/m);
+  assert.doesNotMatch(result.stderr, /which no source file uses/);
 });
 
 test('reports an unparsed file by its path below the tree it was read from', () => {
@@ -547,6 +749,7 @@ test('rejects a borrowed Devanagari danda in a catalog that writes no sentence m
   // sentence mark at all and a danda there belongs to no script of its own.
   const found = run({
     language: 'hi',
+    translated: { agents: HINDI_TRANSLATED.agents },
     pushEnglish: {
       generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
     },
@@ -627,7 +830,7 @@ test('accepts a bare-space sentence joiner in the markless Thai catalog', () => 
   const found = run({
     language: 'th',
     english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
-    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: THAI_TRANSLATED.agents },
     source: `${SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);
@@ -3305,6 +3508,39 @@ test('rejects an added plural form that quotes the English label', () => {
     found.join('\n'),
     /^mobile\/ru: "agents\.window_few" quotes the English label "Agents"; name its key with \$t\(\)$/m
   );
+});
+
+// English exempts nothing: a label it spells is a label it can name, so its own
+// catalog cannot quote another of its labels either.
+test('rejects an English label that quotes another English label', () => {
+  const found = run({
+    english: {
+      agents: { title: 'Agents', mention: 'Ask the "Agents" list' },
+    },
+    translated: {
+      agents: { title: 'Агенты', mention: 'Спросите у списка' },
+    },
+    source: "t('agents.title');\nt('agents.mention');",
+  });
+  assert.deepEqual(found, [
+    'mobile/en: "agents.mention" quotes the label "Agents"; name its key with $t()',
+  ]);
+});
+
+// A product name the locale keeps in its own catalog sits in a value barely
+// longer than the name, so a translated sentence that quotes it names no
+// control the user misses.
+test('accepts a locale that quotes a product name its own catalog keeps', () => {
+  const found = run({
+    english: {
+      agents: { brand: 'Kilo', hint: 'Open the Kilo console' },
+    },
+    translated: {
+      agents: { brand: 'Kilo Pass', hint: 'Откройте "Kilo" здесь' },
+    },
+    source: "t('agents.brand');\nt('agents.hint');",
+  });
+  assert.deepEqual(found, []);
 });
 
 // A zero category words its own answer — "none" beside a noun reads badly — so

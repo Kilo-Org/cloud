@@ -353,6 +353,58 @@ describe('browser_drop', () => {
       items: [{ data: 'hello', mimeType: 'text/plain' }],
     });
   });
+
+  it('refuses a path list whose entries name no file', async () => {
+    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_drop',
+      { paths: [''], target: 'e70' },
+      session
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('browser_drop: invalid arguments.');
+      expect(result.error).toContain('paths');
+      expect(result.error).not.toContain('At least one of');
+    }
+    expect(commands.filter(command => command.method === 'Input.dispatchDragEvent')).toEqual([]);
+  });
+
+  it('still drops data alongside an empty paths list', async () => {
+    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_drop',
+      { data: { 'text/plain': 'hello' }, paths: [], target: 'e70' },
+      session
+    );
+
+    expect(result.ok).toBe(true);
+    const drags = commands.filter(command => command.method === 'Input.dispatchDragEvent');
+    expect(drags.map(command => command.params?.['type'])).toEqual([
+      'dragEnter',
+      'dragOver',
+      'drop',
+    ]);
+  });
+
+  it('keeps the upstream wording for an empty paths list with no data', async () => {
+    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_drop',
+      { paths: [], target: 'e70' },
+      session
+    );
+
+    expect(result).toEqual({
+      error: 'At least one of "paths" or "data" must be provided.',
+      ok: false,
+    });
+    expect(commands.filter(command => command.method === 'Input.dispatchDragEvent')).toEqual([]);
+  });
 });
 
 interface DomTypingFixture {

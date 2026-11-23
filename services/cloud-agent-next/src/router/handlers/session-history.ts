@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -13,11 +13,12 @@ import {
   type ToolPartDetail,
 } from '../../control-plane/session/tool-detail.js';
 
-export const getSessionMessagesPage = protectedProcedure
+export const getSessionMessagesPage = cloudAgentManagedProcedure
   .input(
-    sessionHistoryPageInputSchema
-      .omit({ expectedRootKiloSessionId: true })
-      .extend({ sessionId: z.templateLiteral(['workspace_', z.uuid()]) })
+    sessionHistoryPageInputSchema.omit({ expectedRootKiloSessionId: true }).extend({
+      sessionId: z.templateLiteral(['workspace_', z.uuid()]),
+      organizationId: z.string().optional(),
+    })
   )
   .query(async ({ input, ctx }) => {
     const access = await requireCurrentSessionAccess({
@@ -70,11 +71,12 @@ export const getSessionMessagesPage = protectedProcedure
  * Complete stored details for one tool call shown as a preview. Authorized on
  * every read like a history page; a client's cached marker is only a lookup hint.
  */
-export const getSessionToolPartDetail = protectedProcedure
+export const getSessionToolPartDetail = cloudAgentManagedProcedure
   .input(
-    toolPartDetailInputSchema
-      .omit({ expectedRootKiloSessionId: true })
-      .extend({ sessionId: z.templateLiteral(['workspace_', z.uuid()]) })
+    toolPartDetailInputSchema.omit({ expectedRootKiloSessionId: true }).extend({
+      sessionId: z.templateLiteral(['workspace_', z.uuid()]),
+      organizationId: z.string().optional(),
+    })
   )
   .query(async ({ input, ctx }) => {
     const access = await requireCurrentSessionAccess({

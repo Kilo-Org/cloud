@@ -5,7 +5,6 @@ import {
   type SetStateAction,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 
@@ -55,14 +54,28 @@ export function NewSessionModelProvider({
   const [variant, setVariant] = useState('');
   const { models } = useAvailableModels(organizationId);
   const autoSelected = useAutoSelectModel(models, organizationId);
-  const hasAppliedAutoSelection = useRef(false);
+  // The selection is resolved from the account the form shows: the catalog, the
+  // route prefill and the auto-selection all read this one scope, so the model
+  // and variant the form holds belong to the account the session is created in.
+  // The latch lives in state beside the pair, so a render React discards drops
+  // the latch and the clears together and the next render runs the reset.
+  // `null` is the personal account, so it never shares a key with an
+  // organization; `undefined` is the unset latch.
+  const scope = organizationId ?? null;
+  const [resolvedScope, setResolvedScope] = useState<string | null | undefined>(undefined);
+  if (resolvedScope !== scope) {
+    setResolvedScope(scope);
+    if (model !== '' || variant !== '') {
+      setModel('');
+      setVariant('');
+    }
+  }
   const initialSelection =
     resolvePrefillModel(models, prefill) ??
     (autoSelected.kind === 'selected'
       ? { model: autoSelected.model, variant: autoSelected.variant }
       : null);
-  if (!hasAppliedAutoSelection.current && initialSelection?.model && !model) {
-    hasAppliedAutoSelection.current = true;
+  if (initialSelection?.model && !model) {
     setModel(initialSelection.model);
     setVariant(initialSelection.variant);
   }

@@ -1,6 +1,7 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { verifyKiloTokenSignature } from './kilo-token-verification';
+import { Sha256HexDigestSchema } from './runtime-authorization-contract';
 import { sha256Hex } from './sha256';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
@@ -38,7 +39,7 @@ const runtimeProxyAttestationClaims = z
     userId: z.string().min(1),
     authorizationId: z.string().uuid(),
     resourceId: z.string().min(1),
-    bearerDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    bearerDigest: Sha256HexDigestSchema,
     iat: z.number().int().nonnegative(),
     exp: z.number().int().positive(),
   })
@@ -79,7 +80,7 @@ export async function issueRuntimeProxyAttestation(
     iss: RUNTIME_PROXY_ATTESTATION_ISSUER,
     type: RUNTIME_PROXY_ATTESTATION_TYPE,
     version: RUNTIME_PROXY_ATTESTATION_VERSION,
-    aud: RuntimeProxyAttestationAudienceSchema.parse(input.audience),
+    aud: input.audience,
     userId: input.userId,
     authorizationId: input.authorizationId,
     resourceId: input.resourceId,

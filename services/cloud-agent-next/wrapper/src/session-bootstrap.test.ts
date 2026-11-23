@@ -2566,6 +2566,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(rules).toContain('**New stacked workspace**');
     expect(rules).toContain('The parent does not need an open PR.');
     expect(rules).toContain('does not register a Cloud workspace');
+    expect(rules).not.toContain('spawn_session');
   });
 
   it('atomically rotates warm credentials without rerunning runtime bootstrap', async () => {

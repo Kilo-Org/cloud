@@ -138,6 +138,8 @@ export type VercelSandboxNetworkPolicy = {
           match: VercelSandboxInjectionRule['match'];
           transform: Array<{ headers: Record<string, string> }>;
         }
+      /** An unconditional transform, such as the `host` pin of a restricted policy. */
+      | { transform: Array<{ headers: Record<string, string> }> }
       | { forwardURL: string }
     >
   >;

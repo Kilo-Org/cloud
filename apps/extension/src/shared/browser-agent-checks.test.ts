@@ -9,9 +9,11 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
+  isUploadCall,
   maskSensitiveValues,
   MASKED_VALUE,
   originPatternMatches,
+  runsPageCode,
   SENSITIVE_REASON,
   sensitiveReasonForField,
   toBrowserOrigin,
@@ -103,15 +105,57 @@ describe('download-capable tools', () => {
   });
 });
 
+describe('file handoff to the page', () => {
+  it('counts an upload, whatever arguments it carries', () => {
+    expect(isUploadCall('browser_file_upload')).toBe(true);
+    expect(isUploadCall('browser_file_upload', { paths: [] })).toBe(true);
+  });
+
+  it('counts a drop that hands the page local file paths', () => {
+    expect(isUploadCall('browser_drop', { paths: ['/tmp/a.txt'], target: 'e1' })).toBe(true);
+  });
+
+  it('leaves a drop of page-made data alone', () => {
+    expect(isUploadCall('browser_drop', { data: { 'text/plain': 'x' }, target: 'e1' })).toBe(false);
+  });
+
+  it('treats an empty or malformed paths value as no file list', () => {
+    expect(isUploadCall('browser_drop', { paths: [], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: [''], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: ['', '/tmp/a.txt'], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: [42], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { target: 'e1' })).toBe(false);
+  });
+
+  it('leaves every other tool alone', () => {
+    expect(isUploadCall('browser_click', { target: 'e1' })).toBe(false);
+  });
+});
+
+describe('page-code predicates', () => {
+  it('counts the tools that run model-authored code', () => {
+    expect(runsPageCode('browser_evaluate')).toBe(true);
+    expect(runsPageCode('browser_run_code_unsafe')).toBe(true);
+  });
+
+  it('counts the tool that runs code the page registered', () => {
+    expect(runsPageCode('browser_webmcp_call')).toBe(true);
+  });
+
+  it('leaves a page action or a read alone', () => {
+    expect(runsPageCode('browser_click')).toBe(false);
+    expect(runsPageCode('browser_webmcp_list')).toBe(false);
+    expect(runsPageCode('browser_snapshot')).toBe(false);
+  });
+});
+
 describe('download tier choice', () => {
   const base = {
-    approved: false,
     canDownload: true,
     canIntercept: true,
     hasHold: true,
     hasPermission: true,
-    needsTheFile: false,
-    sensitiveToken: false,
+    legacyGuardCanExempt: true,
   } as const;
 
   it('holds on a browser with the event and the permission', () => {
@@ -126,6 +170,27 @@ describe('download tier choice', () => {
 
   it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
     expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
+  });
+
+  it('leaves the legacy guard unarmed for an approval whose refusal named no file', () => {
+    expect(
+      downloadTierOf({
+        canDownload: true,
+        canIntercept: true,
+        hasHold: false,
+        hasPermission: true,
+        legacyGuardCanExempt: false,
+      })
+    ).toBe('none');
+    expect(
+      downloadTierOf({
+        canDownload: true,
+        canIntercept: true,
+        hasHold: false,
+        hasPermission: true,
+        legacyGuardCanExempt: true,
+      })
+    ).toBe('legacy');
   });
 
   it('names one tier per permission and browser combination, never two', () => {
@@ -150,16 +215,8 @@ describe('download tier choice', () => {
     ]);
   });
 
-  it('chooses no guard for a call that cannot start a download or already spent its token', () => {
+  it('chooses no guard for a call that cannot start a download', () => {
     expect(downloadTierOf({ ...base, canDownload: false })).toBe('none');
-    expect(downloadTierOf({ ...base, sensitiveToken: true })).toBe('none');
-  });
-
-  it('guards nothing on a browser whose only guard is the legacy one, when the approval names no file', () => {
-    expect(downloadTierOf({ ...base, approved: true, hasHold: false })).toBe('none');
-    expect(downloadTierOf({ ...base, approved: true, hasHold: false, needsTheFile: true })).toBe(
-      'legacy'
-    );
   });
 });
 
@@ -245,15 +302,45 @@ describe('step tokens', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-1' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.consume(token, binding)).toBe(true);
-    expect(store.consume(token, binding)).toBe(false);
+    expect(store.take(token, [binding]).ok).toBe(true);
+    expect(store.take(token, [binding]).ok).toBe(false);
   });
 
   it('rejects a token bound to another tab, tool, element or argument set', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-2' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.consume(token, { ...binding, tabId: 8 })).toBe(false);
+    expect(store.take(token, [{ ...binding, tabId: 8 }]).ok).toBe(false);
+  });
+
+  it('matches a token against the second of the bindings a call names', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-any' });
+    const other = { ...binding, element: 'e99', origin: 'https://pay.example.com', tabId: 8 };
+    const token = store.issue({ ...other, reason: SENSITIVE_REASON.download });
+
+    expect(store.take(token, [binding, other]).ok).toBe(true);
+  });
+
+  it('burns the token when none of the named bindings match', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-miss' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.download });
+
+    expect(
+      store.take(token, [
+        { ...binding, tabId: 8 },
+        { ...binding, element: 'e99' },
+      ])
+    ).toStrictEqual({ ok: false });
+    // Still burnt: a replay of the same token against the real binding answers nothing either.
+    expect(store.take(token, [binding]).ok).toBe(false);
+  });
+
+  it('burns the token when a call names no binding at all', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-empty' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.download });
+
+    expect(store.take(token, [])).toStrictEqual({ ok: false });
+    expect(store.size()).toBe(0);
   });
 
   it('keeps the file an approval is for, for the whole life of the token', () => {
@@ -265,9 +352,13 @@ describe('step tokens', () => {
     // A human takes half a minute: no download record survives that long, and the token still names the file.
     clock += 30_000;
 
-    expect(store.take(token, binding)).toStrictEqual({ need, ok: true });
+    expect(store.take(token, [binding])).toStrictEqual({
+      need,
+      ok: true,
+      reason: SENSITIVE_REASON.download,
+    });
     // The token is spent whether or not the next call matches: a replay cannot probe for a valid binding.
-    expect(store.take(token, binding)).toStrictEqual({ ok: false });
+    expect(store.take(token, [binding])).toStrictEqual({ ok: false });
   });
 
   it('expires after 60 s', () => {
@@ -276,11 +367,11 @@ describe('step tokens', () => {
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
     clock += 59_999;
-    expect(store.consume(token, binding)).toBe(true);
+    expect(store.take(token, [binding]).ok).toBe(true);
 
     const second = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
     clock += 60_000;
-    expect(store.consume(second, binding)).toBe(false);
+    expect(store.take(second, [binding]).ok).toBe(false);
     expect(store.size()).toBe(0);
   });
 });

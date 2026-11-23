@@ -62,6 +62,7 @@ class TestSocket {
   static OPEN = 1;
   static CONNECTING = 0;
   static instances: TestSocket[] = [];
+  static constructorError: Error | undefined;
   readyState = 1;
   onopen?: () => void;
   onmessage?: (event: { data: string }) => void;
@@ -73,8 +74,9 @@ class TestSocket {
   closes = 0;
   constructor(
     _url: string,
-    readonly options?: { headers?: Record<string, string> }
+    readonly options?: { headers?: Record<string, string>; proxy?: string }
   ) {
+    if (TestSocket.constructorError) throw TestSocket.constructorError;
     TestSocket.instances.push(this);
   }
   send(text: string): void {
@@ -182,6 +184,40 @@ async function withTestSocket(
     Object.assign(globalThis, { WebSocket: original });
   }
 }
+
+it('opens the control socket through the configured proxy', () => {
+  withControlledConnection(() => {
+    expect(TestSocket.instances.at(-1)?.options?.proxy).toBeUndefined();
+  });
+  withControlledConnection(
+    () => {
+      expect(TestSocket.instances.at(-1)?.options?.proxy).toBe('http://proxy.test:3128');
+    },
+    { proxyUrl: 'http://proxy.test:3128' }
+  );
+});
+
+it('logs the socket construction failure without proxy credentials', () => {
+  const proxy = new URL('http://proxy.test:3128');
+  proxy.username = 'kilo';
+  proxy.password = 'not-a-real-proxy-token';
+  const proxyUrl = proxy.href;
+  withControlledConnection(
+    ({ connection, logs }) => {
+      TestSocket.constructorError = new Error(`Cannot connect through ${proxyUrl}`);
+      try {
+        connection.recycle();
+        const failure = logs.find(line => line.startsWith('control-plane connection failed: '));
+        expect(failure).toContain('Cannot connect through http://');
+        expect(failure).toContain('proxy.test:3128');
+        expect(logs.join('\n')).not.toContain('not-a-real-proxy-token');
+      } finally {
+        TestSocket.constructorError = undefined;
+      }
+    },
+    { proxyUrl }
+  );
+});
 
 it('advertises worktree support without changing the strict legacy hello', () => {
   withControlledConnection(({ connection }) => {

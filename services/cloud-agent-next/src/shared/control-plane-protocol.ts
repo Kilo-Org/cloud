@@ -215,6 +215,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'byoc_vercel_capacity',
   'byoc_vercel_snapshot_missing',
   'provider_identity_mismatch',
+  'network_policy_failed',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 
@@ -669,6 +670,7 @@ export const controlPlaneCredentialSourceSchema = z
     createdOnPlatform: z.string().max(100).optional(),
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
+    allowSubagentSessions: z.boolean().optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     additionalHostedGitHubRepositories: z
       .array(hostedGitHubRepositoryIdentitySchema)

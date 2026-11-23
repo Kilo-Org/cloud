@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { db as WebDb } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2, cloud_agent_worktrees } from '@kilocode/db/schema';
+import { CLOUD_AGENT_STACK_TARGET_DENIED } from '@kilocode/worker-utils/cloud-agent-authority';
 import { normalizeGitUrl } from '@kilocode/worker-utils/normalize-git-url';
 
 import {
@@ -342,6 +343,12 @@ export async function resolveStackedWorkspaceSource(params: {
   try {
     metadata = await params.client.getSession(root.rootCloudAgentSessionId);
   } catch (error) {
+    if (error instanceof Error && error.message === CLOUD_AGENT_STACK_TARGET_DENIED) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: CLOUD_AGENT_STACK_TARGET_DENIED,
+      });
+    }
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'Could not read the branch of that workspace. Try again.',

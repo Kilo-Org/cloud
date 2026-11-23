@@ -188,6 +188,45 @@ describe('BitbucketConnectSheet', () => {
     expect(denied?.props.action).toBeUndefined();
   });
 
+  it('names the connection state rather than a connect action the member cannot finish', async () => {
+    state.role = 'member';
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    // The header may not name an action the body refuses: a member reads that
+    // Bitbucket is not connected, and the denial under it still holds.
+    const header = root.find(node => Object.is(node.type, HEADER));
+    expect(header.props.title).toBe(i18n.t('prReview.connect.bitbucketNotConnectedTitle'));
+    expect(root.findAll(node => Object.is(node.type, PERMISSION_DENIED))).toHaveLength(1);
+  });
+
+  it('names the platform rather than a reconnect action the member cannot finish', async () => {
+    state.role = 'member';
+    state.readiness.integrationId = 'bitbucket-2';
+    state.status.data = { method: 'workspace_access_token', integrationId: 'bitbucket-2' };
+    const root = await mount();
+
+    // A reconnect title would promise a form the sheet replaces with the ask
+    // for an owner, so the header states only the platform.
+    const header = root.find(node => Object.is(node.type, HEADER));
+    expect(header.props.title).toBe(i18n.t('agentChat.repoPicker.platformBitbucket'));
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.deniedReconnectRole', { organization: 'Acme' })
+    );
+  });
+
+  it('still names the connect action for a role that can finish it', async () => {
+    state.role = 'owner';
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    // The role rule narrows the title for a refused member only; an owner keeps
+    // the action the form under it performs.
+    const header = root.find(node => Object.is(node.type, HEADER));
+    expect(header.props.title).toBe(i18n.t('common.connectBitbucket'));
+  });
+
   it('names the lapsed plan under the role in its own line when a member cannot connect', async () => {
     state.role = 'member';
     state.isTrialExpiredForEnforcement = true;

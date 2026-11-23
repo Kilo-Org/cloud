@@ -9,8 +9,26 @@ import { z } from 'zod';
  */
 export type BrowserGrantClass = 'read' | 'act' | 'navigate';
 
-/** A file upload always needs a human-approved step token. */
-export const isUploadTool = (toolName: string): boolean => toolName === 'browser_file_upload';
+/** One entry of a `browser_drop`'s `paths`: a local file the page may read, so never an empty string. */
+export const dropPathsSchema = z.array(z.string().min(1));
+
+/** A `browser_drop`'s `target`: the ref or selector the files are dropped onto, never an empty string. */
+export const dropTargetSchema = z.string().min(1);
+
+/**
+ * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
+ * does `browser_drop` when its `paths` lists at least one local file. A drop that carries
+ * only `data`, or an empty or malformed `paths`, names no file and is not an upload.
+ */
+export const isUploadCall = (toolName: string, args: Record<string, unknown> = {}): boolean => {
+  if (toolName === 'browser_file_upload') {
+    return true;
+  }
+
+  const paths = dropPathsSchema.safeParse(args['paths']);
+
+  return toolName === 'browser_drop' && paths.success && paths.data.length > 0;
+};
 
 export interface BrowserGrant {
   readonly class: BrowserGrantClass;
@@ -115,14 +133,16 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 };
 
 /**
- * The one guard a call runs, chosen once from the browser and the optional
+ * The one guard a call runs, chosen once from the browser and the live optional
  * `downloads` permission — never two at a time, because each one decides the
- * same item and the later one would only overrule the earlier.
+ * same item and the later one would only overrule the earlier. The one file an
+ * approval buys is exempted by the guard's own exempt predicate, so a guard that
+ * has none decides every file of the call alike.
  * - `hold`: `chrome.downloads.onDeterminingFilename` exists, so the item is held before its file exists.
  * - `intercept`: Chrome without the permission, so the response that would become a file is failed.
  * - `legacy`: neither the event nor a permission to hold with (`downloadsApi` is `undefined` only on a browser
  *   whose `chrome.downloads` cannot be read), so the item is cancelled after it starts.
- * - `none`: this call cannot start a download, or its approval already names the one file it buys.
+ * - `none`: this call cannot start a download, or this browser offers no guard it can arm for it.
  *
  * `holdsDownloads` is whether this browser has the event at all, which is what the hold object exists for; a hold
  * without the permission cannot answer it, so the permission picks `intercept` there and never `hold`.
@@ -134,20 +154,16 @@ export type DownloadTier =
   | 'intercept'
   /** The item is cancelled after it starts: a browser with neither the event nor the permission. */
   | 'legacy'
-  /** This call cannot start a download, or its approval already names the one file it buys. */
+  /** This call cannot start a download, or this browser offers no guard it can arm for it. */
   | 'none';
 
 export const downloadTierOf = ({
-  approved,
   canDownload,
   canIntercept,
   hasHold,
   hasPermission,
-  needsTheFile,
-  sensitiveToken,
+  legacyGuardCanExempt,
 }: {
-  /** Whether this call redeemed a download approval. */
-  readonly approved: boolean;
   /** Whether this call is an agent call that can start a download at all. */
   readonly canDownload: boolean;
   /** Whether this tab can pause a response at all: a debugger backend, so Chrome and not Firefox. */
@@ -156,12 +172,13 @@ export const downloadTierOf = ({
   readonly hasHold: boolean;
   /** Whether the optional `downloads` permission is granted right now. */
   readonly hasPermission: boolean;
-  /** Whether the approval still names the one file it buys: without it nothing could be exempt from the guard. */
-  readonly needsTheFile: boolean;
-  /** Set when the gate already refused this step for a sensitive target: the guard would only repeat that. */
-  readonly sensitiveToken: boolean;
+  /**
+   * Whether the legacy guard has something to decide: an unapproved call to refuse, a step approval whose retry it still
+   * guards, or an approval that names a file to exempt. It is false only for an approval whose refusal named no file.
+   */
+  readonly legacyGuardCanExempt: boolean;
 }): DownloadTier => {
-  if (!canDownload || sensitiveToken) {
+  if (!canDownload) {
     return 'none';
   }
 
@@ -171,7 +188,7 @@ export const downloadTierOf = ({
   }
 
   if (!hasHold) {
-    return approved && !needsTheFile ? 'none' : 'legacy';
+    return legacyGuardCanExempt ? 'legacy' : 'none';
   }
 
   return 'hold';
@@ -354,9 +371,17 @@ export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
   'browser_run_code_unsafe',
 ]);
 
-/** The two tools that run model-authored page code (D11: they need the `act` grant). */
-export const isScriptTool = (toolName: string): boolean =>
-  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
+/**
+ * The tools that run code in the page: model-authored code (`browser_evaluate`
+ * and `browser_run_code_unsafe`) and page-registered code (`browser_webmcp_call`
+ * runs a tool the page registered). The D11 `act` grant class is expressed by
+ * `ACT_TOOL_NAMES`; this predicate decides which calls probe the page for a
+ * sensitive field, not which grant class they need.
+ */
+export const runsPageCode = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' ||
+  toolName === 'browser_run_code_unsafe' ||
+  toolName === 'browser_webmcp_call';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
@@ -391,20 +416,6 @@ export const SENSITIVE_REASON = {
   scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
-
-/** The tool families whose act calls can be sensitive; read-only tools never are. */
-export const SENSITIVE_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
-  'browser_click',
-  'browser_drag',
-  'browser_drop',
-  'browser_evaluate',
-  'browser_fill_form',
-  'browser_file_upload',
-  'browser_handle_dialog',
-  'browser_press_key',
-  'browser_run_code_unsafe',
-  'browser_type',
-]);
 
 const OAUTH_CONSENT_ROUTES: readonly {
   readonly host: string;
@@ -561,22 +572,24 @@ export interface StepTokenIssue extends StepTokenBinding {
   readonly reason: string;
 }
 
-/** What consuming a token answered: whether it named the call, and the file its approval buys. */
+/** What consuming a token answered: whether it named the call, the file its approval buys, and what it approved. */
 export interface StepTokenTake {
   readonly need?: StepTokenNeed | undefined;
   readonly ok: boolean;
+  /** The reason the token was issued for, so a caller can tell the step an approval buys from a download's file. */
+  readonly reason?: string | undefined;
 }
 
 export interface StepTokenStore {
   /** Issues a single-use token bound to one call; the clock is the store's, not the caller's. */
   readonly issue: (input: StepTokenIssue) => string;
-  /** Consumes a token: true only when it names the same call and has not expired. */
-  readonly consume: (token: string, binding: StepTokenBinding) => boolean;
   /**
    * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
-   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
+   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes. The bindings are
+   * the finite set of calls this token may legitimately name, so a caller can offer the one it recomputed beside the
+   * one the token was issued under.
    */
-  readonly take: (token: string, binding: StepTokenBinding) => StepTokenTake;
+  readonly take: (token: string, bindings: readonly StepTokenBinding[]) => StepTokenTake;
   readonly size: () => number;
 }
 
@@ -689,7 +702,7 @@ export const createStepTokenStore = ({
     }
   };
 
-  const take: StepTokenStore['take'] = (token, binding) => {
+  const take: StepTokenStore['take'] = (token, bindings) => {
     prune();
 
     const stored = tokens.get(token);
@@ -698,18 +711,22 @@ export const createStepTokenStore = ({
       return { ok: false };
     }
 
-    // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
+    // A token is single use: unless one of the named bindings matches, it is burnt and gone. A replay presenting it
+    // Again can therefore never probe for a valid binding.
     tokens.delete(token);
 
-    if (!stepTokenBindingMatches(stored, binding)) {
+    if (!bindings.some(binding => stepTokenBindingMatches(stored, binding))) {
       return { ok: false };
     }
 
-    return stored.need === undefined ? { ok: true } : { need: stored.need, ok: true };
+    return {
+      ok: true,
+      reason: stored.reason,
+      ...(stored.need === undefined ? {} : { need: stored.need }),
+    };
   };
 
   return {
-    consume: (token, binding) => take(token, binding).ok,
     issue: input => {
       prune();
 

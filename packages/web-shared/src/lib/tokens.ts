@@ -184,20 +184,10 @@ export function generateOrganizationApiToken(
 ) {
   const expiresAt = new Date(Date.now() + FIFTEEN_MINUTES_IN_SECONDS * 1000);
 
-  const token = jwt.sign(
-    {
-      env: process.env.NODE_ENV,
-      kiloUserId: user.id,
-      apiTokenPepper: user.api_token_pepper,
-      version: KILO_TOKEN_VERSION,
-      organizationId,
-      organizationRole,
-    },
-    NEXTAUTH_SECRET,
-    {
-      algorithm: jwtSigningAlgorithm,
-      expiresIn: FIFTEEN_MINUTES_IN_SECONDS,
-    }
+  const token = generateApiToken(
+    user,
+    { organizationId, organizationRole },
+    { expiresIn: FIFTEEN_MINUTES_IN_SECONDS }
   );
 
   return {
@@ -295,7 +285,6 @@ export function validateAuthorizationHeader(
     requestPathname?: string;
   }
 ) {
-  const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
     warnExceptInTest('Authorization header missing or invalid');
@@ -317,6 +306,7 @@ export function validateAuthorizationHeader(
   const payload = tryJwtVerify(token);
 
   if (!payload) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return {
       error: `Invalid token (${traceability_logging_id})`,
@@ -330,6 +320,7 @@ export function validateAuthorizationHeader(
       mode: 'allow-legacy',
     })
   ) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return {
       error: `Invalid token (${traceability_logging_id})`,
@@ -338,6 +329,7 @@ export function validateAuthorizationHeader(
   }
 
   if (payload.version !== KILO_TOKEN_VERSION) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,
@@ -378,6 +370,7 @@ export function validateAuthorizationHeader(
       payload.runtimeAuthorization
     );
     if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
+      const traceability_logging_id = crypto.randomUUID();
       warnExceptInTest(`Invalid token (${traceability_logging_id})`);
       return {
         error: `Invalid token (${traceability_logging_id})`,
@@ -458,7 +451,13 @@ export function generateCloudAgentWorkflowToken(
     authorizationUser?: User;
   }
 ): string {
+  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow control token expiry must be positive');
+  }
   if (!isResourceTokenIssuanceEnabled('cloud-agent-next')) {
+    // The audience-less payload keeps its compatibility shape. The one-hour
+    // bound and the positive-lifetime refusal apply to both payloads.
     return generateApiToken(
       user,
       {
@@ -467,17 +466,13 @@ export function generateCloudAgentWorkflowToken(
         botId: options.botId,
         createdOnPlatform: options.createdOnPlatform,
       },
-      { expiresIn: options.expiresIn }
+      { expiresIn }
     );
   }
   assertMintablePepper(
     user.api_token_pepper,
     'Workflow control tokens require a current user pepper'
   );
-  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
-  if (expiresIn <= 0) {
-    throw new Error('Workflow control token expiry must be positive');
-  }
   const authorizationUser = options.authorizationUser ?? user;
   return signWorkflowKiloToken({
     user,

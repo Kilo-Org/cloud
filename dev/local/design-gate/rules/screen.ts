@@ -187,9 +187,15 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
 
 export function checkOverlap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
+  // A box the platform says the user cannot see collides with nothing: an
+  // accessibility snapshot carries no style, so a copy the app hides from sight
+  // arrives here as an ordinary sibling and reads as a collision over the
+  // visible box beside it. The probe marks the same node `opacity: 0` or
+  // `position: absolute` and never pairs it.
+  const unseen = (node: LayoutNode) => node.probe.invisible === true;
   for (const node of tree.nodes) {
     const siblings = node.children.filter(
-      child => !child.absolute && (child.hasText || child.pressable)
+      child => !child.absolute && !unseen(child) && (child.hasText || child.pressable)
     );
     for (let i = 0; i < siblings.length; i++) {
       for (let j = i + 1; j < siblings.length; j++) {
@@ -388,6 +394,11 @@ export function checkSafeArea(tree: LayoutTree): Finding[] {
   const { safeArea, window } = tree.env;
   for (const node of tree.nodes) {
     if (!node.isText && !node.isTextInput && !node.pressable) continue;
+    // A box the platform says the user cannot see is painted nowhere, so it can
+    // reach into no inset. An accessibility snapshot carries no style, so a
+    // measurement copy an app mounts — hidden, or laid out against another
+    // window's origin — arrives here as ordinary text at the window's top edge.
+    if (node.probe.invisible === true) continue;
     // A node inside a native dialog or sheet is measured against that surface's
     // origin, which the platform placed inside the window: its frame says nothing
     // about the window's insets, and the surface's presenter owns them.

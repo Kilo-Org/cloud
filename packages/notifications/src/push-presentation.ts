@@ -41,10 +41,8 @@ export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
  * The channel every Android build before the agent-channel split addressed the
- * glanceable active-agents pushes with. It is not in
- * `ANDROID_NOTIFICATION_CHANNELS`: current builds only create the split
- * channels, and this id exists solely so a server push can still reach a token
- * registered by an older build (see `androidChannelIdForPushDataToAppVersion`).
+ * glanceable active-agents pushes with. Not in `ANDROID_NOTIFICATION_CHANNELS`
+ * for the reason given on `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
  */
 export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
 

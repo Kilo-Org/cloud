@@ -91,6 +91,7 @@
     "draft": "Daftari",
     "enabled": "An kunna",
     "github": "GitHub",
+    "image": "Hoto",
     "imageUnavailable": "Ba a samun hoton.",
     "loading": "Ana loda…",
     "loadMore": "Loda ƙari",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ana loda hoto",
       "imageUnavailableRetry": "Ba a samun hoton, sake gwada loda shi",
+      "imageUnavailableRetryWithAlt": "Ba a samun hoton, {{alt}}, sake gwada loda shi",
       "imagePreviewUnavailableInSession": "Ba a iya ganin hoton a wannan zaman.",
       "viewImage": "Duba hoto",
       "viewImageWithAlt": "Duba hoton {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Don kammala ƙirƙirar asusunka, yi amfani da '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Don kammala ƙirƙirar asusunka, yi amfani da '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Don kammala ƙirƙirar asusunka, koma baya ka yi amfani da '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Wannan lambar ba daidai ba ce ko kuma ta ƙare. Sake gwadawa ko yi amfani da '$t(login.resendCode)'.",
+    "invalidCode": "Wannan lambar ba daidai ba ce ko kuma ta ƙare. Yi amfani da '$t(login.resendCode)' ko '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Ana sarrafa lambarka. Jira ɗan lokaci ka sake gwadawa.",
     "tooManyAttempts": "An yi ƙoƙari da yawa. Nemi sabuwar lamba.",
     "invalidToken": "An kasa shiga. Da fatan za ka sake gwadawa.",
@@ -4338,7 +4340,15 @@
       "download": "Sauke samfurin da ke kan na'ura",
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",
-      "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa."
+      "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa.",
+      "cannotUse": "Ba za a iya gudanar da {{items}} ba.",
+      "cannotUseOptions": "Ba za a iya cika wasu zaɓuɓɓukan kayan aiki ba.",
+      "limitations": "Iyaka",
+      "tools": {
+        "time": "Lokaci",
+        "settingsList": "Nuna saituna",
+        "settingsSet": "Canza saituna"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "An kasa adana umarnin",
     "instructionDeleteFailed": "An kasa share umarnin",
     "instructionToggleFailed": "An kasa sabunta umarnin",
+    "instructionViewTitle": "Fayil ɗin umarni",
     "instructionLimitReached": "Bayanin na iya ɗaukar umarni har {{max}}. Share ɗaya don ƙara wani.",
     "mcp": {
       "title": "Sabar MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",
       "expiredGrant": "Lokaci ya ƙare: {{description}}",
+      "expiredStatus": "Lokaci ya ƙare",
       "googlePlayReceipt": "Rasiti daga Google Play",
       "kind": {
         "adjustment": "Gyara",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya.",
       "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan.",
-      "voidedGrant": "An soke: {{description}}"
+      "voidedGrant": "An soke: {{description}}",
+      "voidedStatus": "An soke"
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",

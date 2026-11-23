@@ -91,6 +91,7 @@
     "draft": "Taslak",
     "enabled": "Etkin",
     "github": "GitHub",
+    "image": "Görsel",
     "imageUnavailable": "Görsel kullanılamıyor.",
     "loading": "Yükleniyor…",
     "loadMore": "Daha fazla yükle",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Görsel yükleniyor",
       "imageUnavailableRetry": "Görsel kullanılamıyor, yüklemeyi tekrar dene",
+      "imageUnavailableRetryWithAlt": "Görsel kullanılamıyor, {{alt}}, yüklemeyi tekrar dene",
       "imagePreviewUnavailableInSession": "Bu oturumda görsel önizlemesi kullanılamıyor.",
       "viewImage": "Görseli görüntüle",
       "viewImageWithAlt": "Görseli görüntüle: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithApple)' seçeneğini kullan.",
     "signupStepUpGoogle": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithGoogle)' seçeneğini kullan.",
     "signupStepUpBack": "Hesabını oluşturmayı tamamlamak için geri dön ve '$t(login.moreSignInOptions)' seçeneğini kullan.",
-    "invalidCode": "Bu kod yanlış veya süresi dolmuş. Tekrar dene ya da '$t(login.resendCode)' seçeneğini kullan.",
+    "invalidCode": "Bu kod yanlış veya süresi dolmuş. '$t(login.resendCode)' ya da '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "codeInProgress": "Kodun işleniyor. Biraz bekle ve tekrar dene.",
     "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen yeni bir kod iste.",
     "invalidToken": "Oturum açılamadı. Lütfen tekrar dene.",
@@ -4338,7 +4340,15 @@
       "download": "Cihazdaki modeli indir",
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
-      "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+      "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin.",
+      "cannotUse": "Çalıştırılamaz: {{items}}.",
+      "cannotUseOptions": "Doldurulamaz: bazı araç seçenekleri.",
+      "limitations": "Sınırlamalar",
+      "tools": {
+        "time": "Saat",
+        "settingsList": "Ayarları göster",
+        "settingsSet": "Ayarları değiştir"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Talimat kaydedilemedi",
     "instructionDeleteFailed": "Talimat silinemedi",
     "instructionToggleFailed": "Talimat güncellenemedi",
+    "instructionViewTitle": "Talimat dosyası",
     "instructionLimitReached": "Bir profilde en fazla {{max}} talimat olabilir. Eklemek için birini silin.",
     "mcp": {
       "title": "MCP sunucuları",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
       "expiredGrant": "Süresi doldu: {{description}}",
+      "expiredStatus": "Süresi doldu",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
       "retentionLimit": "En son kredi geçmişi gösteriliyor.",
-      "voidedGrant": "İptal edildi: {{description}}"
+      "voidedGrant": "İptal edildi: {{description}}",
+      "voidedStatus": "İptal edildi"
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",

@@ -91,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Gambar",
     "imageUnavailable": "Gambar tidak tersedia.",
     "loading": "Memuat…",
     "loadMore": "Muat lebih banyak",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Memuat gambar",
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
+      "imageUnavailableRetryWithAlt": "Gambar tidak tersedia, {{alt}}, coba muat ulang",
       "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Gunakan '$t(login.resendCode)' atau '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -4338,7 +4340,15 @@
       "download": "Unduh model di perangkat",
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
-      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi.",
+      "cannotUse": "Tidak dapat dijalankan: {{items}}.",
+      "cannotUseOptions": "Tidak dapat diisi: beberapa opsi alat.",
+      "limitations": "Batasan",
+      "tools": {
+        "time": "Waktu",
+        "settingsList": "Tampilkan pengaturan",
+        "settingsSet": "Ubah pengaturan"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Gagal menyimpan instruksi",
     "instructionDeleteFailed": "Gagal menghapus instruksi",
     "instructionToggleFailed": "Gagal memperbarui instruksi",
+    "instructionViewTitle": "File instruksi",
     "instructionLimitReached": "Satu profil dapat memuat hingga {{max}} instruksi. Hapus satu untuk menambah lagi.",
     "mcp": {
       "title": "server MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
       "expiredGrant": "Kedaluwarsa: {{description}}",
+      "expiredStatus": "Kedaluwarsa",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Menampilkan riwayat kredit terbaru.",
-      "voidedGrant": "Dibatalkan: {{description}}"
+      "voidedGrant": "Dibatalkan: {{description}}",
+      "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",

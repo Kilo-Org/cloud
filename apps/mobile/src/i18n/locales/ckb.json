@@ -91,6 +91,7 @@
     "draft": "ڕەشنووس",
     "enabled": "چالاک",
     "github": "GitHub",
+    "image": "وێنە",
     "imageUnavailable": "وێنەکە بەردەست نییە.",
     "loading": "بار دەکرێت…",
     "loadMore": "بارکردنی زیاتر",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنەکە بەردەست نییە، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
+      "imageUnavailableRetryWithAlt": "وێنەکە بەردەست نییە، {{alt}}، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
       "imagePreviewUnavailableInSession": "پێشاندانی پێشەکیی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنەی {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، «$t(login.signInWithApple)» بەکار بهێنە.",
     "signupStepUpGoogle": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، «$t(login.signInWithGoogle)» بەکار بهێنە.",
     "signupStepUpBack": "بۆ تەواوکردنی دروستکردنی هەژمارەکەت، بگەڕێوە دواوە و «$t(login.moreSignInOptions)» بەکار بهێنە.",
-    "invalidCode": "ئەو کۆدە هەڵەیە یان بەسەرچووە. دووبارە هەوڵ بدەوە یان «$t(login.resendCode)» بەکار بهێنە.",
+    "invalidCode": "ئەو کۆدە هەڵەیە یان بەسەرچووە. «$t(login.resendCode)» یان «$t(login.moreSignInOptions)» بەکار بهێنە.",
     "codeInProgress": "کۆدەکەت پرۆسێس دەکرێت. کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەوە.",
     "tooManyAttempts": "زۆر جار هەوڵت داوە. تکایە داوای کۆدێکی نوێ بکە.",
     "invalidToken": "چوونەژوورەوە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدەوە.",
@@ -4338,7 +4340,15 @@
       "download": "داگرتنی مۆدێلی سەر ئامێر",
       "downloading": "دادەبەزێت…",
       "downloadProgress": "دادەبەزێت… {{percent}}%",
-      "downloadFailed": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت و شوێنی بەتاڵی بیرگە بپشکنە، پاشان دووبارە هەوڵ بدەرەوە."
+      "downloadFailed": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت و شوێنی بەتاڵی بیرگە بپشکنە، پاشان دووبارە هەوڵ بدەرەوە.",
+      "cannotUse": "ناتوانرێت جێبەجێ بکرێت: {{items}}.",
+      "cannotUseOptions": "ناتوانرێت پڕ بکرێتەوە: هەندێک هەڵبژاردەی ئامراز.",
+      "limitations": "سنوورەکان",
+      "tools": {
+        "time": "کات",
+        "settingsList": "پیشاندانی ڕێکخستنەکان",
+        "settingsSet": "گۆڕینی ڕێکخستنەکان"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ئەم مۆدێلە پشتگیری هەوڵی بیرکردنەوە دەکات"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "نەتوانرا ڕێنماییەکە پاشەکەوت بکرێت",
     "instructionDeleteFailed": "نەتوانرا ڕێنماییەکە بسڕدرێتەوە",
     "instructionToggleFailed": "نەتوانرا ڕێنماییەکە نوێ بکرێتەوە",
+    "instructionViewTitle": "فایلی ڕێنمایی",
     "instructionLimitReached": "پرۆفایلێک دەتوانێت تا {{max}} ڕێنمایی هەڵبگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.",
     "mcp": {
       "title": "سێرڤەرەکانی MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
       "expiredGrant": "بەسەرچوو: {{description}}",
+      "expiredStatus": "بەسەرچوو",
       "googlePlayReceipt": "پسوولە لە Google Play",
       "kind": {
         "adjustment": "ڕێکخستنەوە",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
       "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە.",
       "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت.",
-      "voidedGrant": "پووچەڵ کراوە: {{description}}"
+      "voidedGrant": "پووچەڵ کراوە: {{description}}",
+      "voidedStatus": "پووچەڵ کراوە"
     },
     "title": "کرێدیت بکڕە",
     "description": "کرێدیت کڕینێکی یەکجارە کە بۆ تەوازنی Kiloت زیاد دەکرێت بۆ بەڕێوەبردنی دانیشتنەکانی کۆدکردنی AI لە ئەپی Kilo. فرۆشگا پارە لە هەژمارەکەت وەردەگرێت و کرێدیت دوای پشتڕاستکردنەوەی پارەدان لەلایەن فرۆشگاوە زیاد دەکرێت.",

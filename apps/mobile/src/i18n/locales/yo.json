@@ -91,6 +91,7 @@
     "draft": "Àkọsílẹ̀ àkọ́kọ́",
     "enabled": "A ti mú ṣiṣẹ́",
     "github": "GitHub",
+    "image": "Àwòrán",
     "imageUnavailable": "Àwòrán kò sí.",
     "loading": "Ń gbé dátà wọlé…",
     "loadMore": "Gbé síi wọlé",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",
       "imageUnavailableRetry": "Àwòrán kò sí, gbìyànjú láti tún un gbé wọlé",
+      "imageUnavailableRetryWithAlt": "Àwòrán kò sí, {{alt}}, gbìyànjú láti tún un gbé wọlé",
       "imagePreviewUnavailableInSession": "A kò lè fi àwòrán hàn ṣáájú nínú ìgbà iṣẹ́ yìí.",
       "viewImage": "Wo àwòrán",
       "viewImageWithAlt": "Wo àwòrán {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, padà sẹ́yìn kí o sì lo '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Tún gbìyànjú tàbí lo '$t(login.resendCode)'.",
+    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Lo '$t(login.resendCode)' tàbí lo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "À ń ṣe àyẹ̀wò kóòdù rẹ. Dúró díẹ̀ kí o tún gbìyànjú.",
     "tooManyAttempts": "Àwọn ìgbìyànjú pọ̀ jù. Jọ̀wọ́ béèrè fún kóòdù tuntun.",
     "invalidToken": "Ìwọlé kùnà. Jọ̀wọ́ tún gbìyànjú.",
@@ -4338,7 +4340,15 @@
       "download": "Gba awoṣe lórí ẹ̀rọ sílẹ̀",
       "downloading": "Ó ń gbà sílẹ̀…",
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
-      "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
+      "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "cannotUse": "Kò lè ṣiṣẹ́: {{items}}.",
+      "cannotUseOptions": "Kò lè kún: àwọn àṣàyàn irinṣẹ́ kan.",
+      "limitations": "Ààlà",
+      "tools": {
+        "time": "Àkókò",
+        "settingsList": "Fi ètò hàn",
+        "settingsSet": "Yí ètò padà"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Kò lè fi ìlànà náà pamọ́",
     "instructionDeleteFailed": "Kò lè pa ìlànà náà rẹ́",
     "instructionToggleFailed": "Kò lè ṣàtúnṣe ìlànà náà",
+    "instructionViewTitle": "Fáìlì ìlànà",
     "instructionLimitReached": "Profáìlì kan lè gba ìlànà tó pọ̀ jù {{max}}. Pa ọ̀kan rẹ́ kí o lè fi òmíràn kún.",
     "mcp": {
       "title": "Awọn olupin MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
       "expiredGrant": "Àkókò ti kọjá: {{description}}",
+      "expiredStatus": "Àkókò ti kọjá",
       "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
       "kind": {
         "adjustment": "Àtúnṣe",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí.",
       "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ.",
-      "voidedGrant": "A ti fagilé: {{description}}"
+      "voidedGrant": "A ti fagilé: {{description}}",
+      "voidedStatus": "A ti fagilé"
     },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",

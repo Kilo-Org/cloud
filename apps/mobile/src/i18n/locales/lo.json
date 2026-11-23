@@ -91,6 +91,7 @@
     "draft": "ສະບັບຮ່າງ",
     "enabled": "ເປີດໃຊ້ແລ້ວ",
     "github": "GitHub",
+    "image": "ຮູບພາບ",
     "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
     "loading": "ກຳລັງໂຫຼດ…",
     "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ສະແດງຮູບພາບບໍ່ໄດ້, ລອງໂຫຼດໃໝ່",
+      "imageUnavailableRetryWithAlt": "ສະແດງຮູບພາບບໍ່ໄດ້, {{alt}}, ລອງໂຫຼດໃໝ່",
       "imagePreviewUnavailableInSession": "ບໍ່ສາມາດເບິ່ງຕົວຢ່າງຮູບພາບໃນເຊດຊັນນີ້ໄດ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
       "viewImageWithAlt": "ເບິ່ງຮູບພາບ {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ໃຊ້ '$t(login.signInWithApple)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpGoogle": "ໃຊ້ '$t(login.signInWithGoogle)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpBack": "ກັບຄືນໄປ ແລ້ວໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
-    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ ຫຼື ໃຊ້ '$t(login.resendCode)'.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ໃຊ້ '$t(login.resendCode)' ຫຼື ໃຊ້ '$t(login.moreSignInOptions)'.",
     "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ.",
     "tooManyAttempts": "ທ່ານລອງຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາຂໍລະຫັດໃໝ່.",
     "invalidToken": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
@@ -4338,7 +4340,15 @@
       "download": "ດາວໂຫຼດໂມເດວຢູ່ໃນອຸປະກອນ",
       "downloading": "ກຳລັງດາວໂຫຼດ…",
       "downloadProgress": "ກຳລັງດາວໂຫຼດ… {{percent}}%",
-      "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່."
+      "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່.",
+      "cannotUse": "ບໍ່ສາມາດເຮັດວຽກ: {{items}}.",
+      "cannotUseOptions": "ບໍ່ສາມາດຕື່ມໄດ້: ບາງຕົວເລືອກຂອງເຄື່ອງມື.",
+      "limitations": "ຂໍ້ຈຳກັດ",
+      "tools": {
+        "time": "ເວລາ",
+        "settingsList": "ສະແດງການຕັ້ງຄ່າ",
+        "settingsSet": "ປ່ຽນການຕັ້ງຄ່າ"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳແນະນຳໄດ້",
     "instructionDeleteFailed": "ບໍ່ສາມາດລຶບຄຳແນະນຳໄດ້",
     "instructionToggleFailed": "ບໍ່ສາມາດອັບເດດຄຳແນະນຳໄດ້",
+    "instructionViewTitle": "ໄຟລ໌ຄຳແນະນຳ",
     "instructionLimitReached": "ໜຶ່ງໂປຣໄຟລ໌ເກັບໄດ້ສູງສຸດ {{max}} ຄຳແນະນຳ. ລຶບອັນໜຶ່ງເພື່ອເພີ່ມອັນໃໝ່.",
     "mcp": {
       "title": "ເຊີບເວີ MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
       "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
+      "expiredStatus": "ໝົດອາຍຸແລ້ວ",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
       "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
-      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}",
+      "voidedStatus": "ຍົກເລີກແລ້ວ"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",

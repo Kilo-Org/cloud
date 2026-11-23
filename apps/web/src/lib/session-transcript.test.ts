@@ -89,7 +89,7 @@ it('reconstructs ordered sync-only messages and reports incomplete messages', as
   });
   expect(v2SnapshotToLogEntries(transcript ?? { messages: [] }).at(-1)).toMatchObject({
     eventType: 'status',
-    message: 'Transcript incomplete: 1 message could not be loaded.',
+    message: 'Transcript incomplete: 1 message has missing content.',
   });
   expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
     `https://sync.test${path}`,
@@ -169,6 +169,34 @@ it('reads an attachment and gives later requests a fresh one-minute credential',
   );
   const iat = Math.floor((originalTime + 61_000) / 1000);
   expect(readCredential(2)).toMatchObject({ iat, exp: iat + 60 });
+});
+
+it('reports an unbound attachment as an incomplete message instead of rejecting', async () => {
+  const unboundURI = `media:${'b'.repeat(64)}`;
+  // The message is stored without its asset mapping, so this reference can never resolve.
+  mockSnapshot([
+    entity('message', 'msg_unbound', {
+      seq: 1,
+      message: {
+        id: 'msg_unbound',
+        type: 'user',
+        time: { created: 2 },
+        text: 'Summarize this screenshot',
+        files: [{ mime: 'image/png', uri: unboundURI, source: { type: 'inline' } }],
+      },
+    }),
+  ]);
+
+  await expect(fetchSessionTranscript(session)).resolves.toMatchObject({
+    source: 'sync',
+    incompleteMessageCount: 1,
+    messages: [{ parts: [{ type: 'text', text: 'Summarize this screenshot' }] }],
+  });
+  // No bytes were requested, because no authorization could bind this reference.
+  expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+    `https://sync.test${path}`,
+    `https://sync.test${path}/entities?revision=1&limit=100`,
+  ]);
 });
 
 it.each([

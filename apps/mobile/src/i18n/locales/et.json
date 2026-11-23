@@ -91,6 +91,7 @@
     "draft": "Mustand",
     "enabled": "Sisse lülitatud",
     "github": "GitHub",
+    "image": "Pilt",
     "imageUnavailable": "Pilt pole saadaval.",
     "loading": "Laadimine…",
     "loadMore": "Laadi veel",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
+      "imageUnavailableRetryWithAlt": "Pilt pole saadaval, {{alt}}, proovi laadimist uuesti",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Konto loomise lõpetamiseks mine tagasi ja kasuta valikut „$t(login.moreSignInOptions)“.",
-    "invalidCode": "See kood on vale või aegunud. Proovi uuesti või kasuta valikut „$t(login.resendCode)“.",
+    "invalidCode": "See kood on vale või aegunud. Kasuta valikut „$t(login.resendCode)“ või „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
     "invalidToken": "Sisselogimine ebaõnnestus. Proovi uuesti.",
@@ -4338,7 +4340,15 @@
       "download": "Laadi seadmesisene mudel alla",
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
-      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
+      "cannotUse": "Ei saa käivitada: {{items}}.",
+      "cannotUseOptions": "Ei saa täita: mõned tööriista valikud.",
+      "limitations": "Piirangud",
+      "tools": {
+        "time": "Aeg",
+        "settingsList": "Näita seadeid",
+        "settingsSet": "Muuda seadeid"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",
     "instructionToggleFailed": "Juhise uuendamine ebaõnnestus",
+    "instructionViewTitle": "Juhise fail",
     "instructionLimitReached": "Profiil mahutab kuni {{max}} juhist. Kustuta üks, et lisada veel.",
     "mcp": {
       "title": "MCP-serverid",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
       "expiredGrant": "Aegunud: {{description}}",
+      "expiredStatus": "Aegunud",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
       "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu.",
-      "voidedGrant": "Tühistatud: {{description}}"
+      "voidedGrant": "Tühistatud: {{description}}",
+      "voidedStatus": "Tühistatud"
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",

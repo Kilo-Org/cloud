@@ -91,6 +91,7 @@
     "draft": "Нацрт",
     "enabled": "Овозможено",
     "github": "GitHub",
+    "image": "Слика",
     "imageUnavailable": "Сликата е недостапна.",
     "loading": "Се вчитува…",
     "loadMore": "Вчитај повеќе",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Вчитување слика",
       "imageUnavailableRetry": "Сликата не е достапна. Вчитај ја повторно",
+      "imageUnavailableRetryWithAlt": "Сликата не е достапна. {{alt}}. Вчитај ја повторно",
       "imagePreviewUnavailableInSession": "Прегледот на сликата е недостапен во оваа сесија.",
       "viewImage": "Погледни ја сликата",
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да го завршиш создавањето на сметката, врати се назад и избери „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодот е неточен или истечен. Обиди се повторно или избери „$t(login.resendCode)“.",
+    "invalidCode": "Кодот е неточен или истечен. Користи „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Твојот код се обработува. Почекај малку и обиди се повторно.",
     "tooManyAttempts": "Премногу обиди. Побарај нов код.",
     "invalidToken": "Најавата не успеа. Обиди се повторно.",
@@ -4338,7 +4340,15 @@
       "download": "Преземи модел на уредот",
       "downloading": "Се презема…",
       "downloadProgress": "Се презема… {{percent}}%",
-      "downloadFailed": "Преземањето не заврши. Проверете ја врската и слободниот простор, па обидете се повторно."
+      "downloadFailed": "Преземањето не заврши. Проверете ја врската и слободниот простор, па обидете се повторно.",
+      "cannotUse": "Не може да се изврши: {{items}}.",
+      "cannotUseOptions": "Не може да се пополнат: некои опции на алатката.",
+      "limitations": "Ограничувања",
+      "tools": {
+        "time": "Време",
+        "settingsList": "Прикажи поставки",
+        "settingsSet": "Промени поставки"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Овој модел поддржува ниво на размислување"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Не можеше да се зачува инструкцијата",
     "instructionDeleteFailed": "Не можеше да се избрише инструкцијата",
     "instructionToggleFailed": "Не можеше да се ажурира инструкцијата",
+    "instructionViewTitle": "Датотека со инструкции",
     "instructionLimitReached": "Профилот може да содржи до {{max}} инструкции. Избришете една за да додадете друга.",
     "mcp": {
       "title": "MCP сервери",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
       "emptyTitle": "Нема историја на кредити",
       "expiredGrant": "Истечен рок: {{description}}",
+      "expiredStatus": "Истечен рок",
       "googlePlayReceipt": "Сметка од Google Play",
       "kind": {
         "adjustment": "Корекција",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
       "receiptUnavailable": "Не е достапна сметка за ова купување.",
       "retentionLimit": "Се прикажува најновата историја на кредити.",
-      "voidedGrant": "Поништено: {{description}}"
+      "voidedGrant": "Поништено: {{description}}",
+      "voidedStatus": "Поништено"
     },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",

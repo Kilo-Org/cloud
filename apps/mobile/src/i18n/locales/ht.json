@@ -91,6 +91,7 @@
     "draft": "Bwouyon",
     "enabled": "Aktive",
     "github": "GitHub",
+    "image": "Imaj",
     "imageUnavailable": "Imaj la pa disponib.",
     "loading": "Ap chaje…",
     "loadMore": "Chaje plis",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ap chaje imaj la",
       "imageUnavailableRetry": "Imaj la pa disponib, eseye chaje li ankò",
+      "imageUnavailableRetryWithAlt": "Imaj la pa disponib, {{alt}}, eseye chaje li ankò",
       "imagePreviewUnavailableInSession": "Apèsi imaj la pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj la",
       "viewImageWithAlt": "Gade imaj {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Pou fini kreye kont ou a, itilize '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Pou fini kreye kont ou a, itilize '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Pou fini kreye kont ou a, retounen dèyè epi itilize '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Eseye ankò oswa itilize '$t(login.resendCode)'.",
+    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Itilize '$t(login.resendCode)' oswa '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kòd ou a ap trete. Tann yon ti moman epi eseye ankò.",
     "tooManyAttempts": "Twòp tantativ. Tanpri mande yon nouvo kòd.",
     "invalidToken": "Koneksyon an echwe. Tanpri eseye ankò.",
@@ -4338,7 +4340,15 @@
       "download": "Telechaje modèl sou aparèy la",
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",
-      "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
+      "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò.",
+      "cannotUse": "Pa ka egzekite: {{items}}.",
+      "cannotUseOptions": "Pa ka ranpli: kèk opsyon zouti.",
+      "limitations": "Limitasyon",
+      "tools": {
+        "time": "Lè",
+        "settingsList": "Montre paramèt",
+        "settingsSet": "Chanje paramèt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modèl sa a sipòte efò refleksyon"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Pa t kapab sovgade enstriksyon an",
     "instructionDeleteFailed": "Pa t kapab efase enstriksyon an",
     "instructionToggleFailed": "Pa t kapab mete enstriksyon an ajou",
+    "instructionViewTitle": "Fichye enstriksyon",
     "instructionLimitReached": "Yon pwofil ka kenbe jiska {{max}} enstriksyon. Efase youn pou ajoute yon lòt.",
     "mcp": {
       "title": "MCP serveurs",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
       "expiredGrant": "Ekspire: {{description}}",
+      "expiredStatus": "Ekspire",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
       "retentionLimit": "Sa yo se istorik kredi ki pi resan an.",
-      "voidedGrant": "Anile: {{description}}"
+      "voidedGrant": "Anile: {{description}}",
+      "voidedStatus": "Anile"
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",

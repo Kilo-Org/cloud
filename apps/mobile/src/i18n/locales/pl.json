@@ -93,6 +93,7 @@
     "draft": "Wersja robocza",
     "enabled": "Włączone",
     "github": "GitHub",
+    "image": "Obraz",
     "imageUnavailable": "Obraz jest niedostępny.",
     "loading": "Ładowanie…",
     "loadMore": "Pokaż więcej",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Wczytywanie obrazu",
       "imageUnavailableRetry": "Obraz jest niedostępny. Wczytaj go ponownie",
+      "imageUnavailableRetryWithAlt": "Obraz jest niedostępny. {{alt}}. Wczytaj go ponownie",
       "imagePreviewUnavailableInSession": "Podgląd obrazu jest niedostępny w tej sesji.",
       "viewImage": "Wyświetl obraz",
       "viewImageWithAlt": "Wyświetl obraz: {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Aby dokończyć tworzenie konta, wróć i użyj opcji „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Spróbuj ponownie albo użyj opcji „$t(login.resendCode)”.",
+    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Użyj opcji „$t(login.resendCode)” lub „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Trwa sprawdzanie twojego kodu. Poczekaj chwilę i spróbuj ponownie.",
     "tooManyAttempts": "Zbyt wiele prób. Poproś o nowy kod.",
     "invalidToken": "Logowanie nie powiodło się. Spróbuj ponownie.",
@@ -4496,7 +4498,15 @@
       "download": "Pobierz model na urządzenie",
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
-      "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
+      "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie.",
+      "cannotUse": "Nie można uruchomić: {{items}}.",
+      "cannotUseOptions": "Nie można wypełnić: niektóre opcje narzędzia.",
+      "limitations": "Ograniczenia",
+      "tools": {
+        "time": "Czas",
+        "settingsList": "Pokaż ustawienia",
+        "settingsSet": "Zmień ustawienia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Nie udało się zapisać instrukcji",
     "instructionDeleteFailed": "Nie udało się usunąć instrukcji",
     "instructionToggleFailed": "Nie udało się zaktualizować instrukcji",
+    "instructionViewTitle": "Plik instrukcji",
     "instructionLimitReached": "Profil może mieć maksymalnie {{max}} instrukcji. Usuń jedną, aby dodać kolejną.",
     "mcp": {
       "title": "Serwery MCP",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
       "expiredGrant": "Wygasło: {{description}}",
+      "expiredStatus": "Wygasło",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
       "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
-      "voidedGrant": "Unieważniono: {{description}}"
+      "voidedGrant": "Unieważniono: {{description}}",
+      "voidedStatus": "Unieważniono"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

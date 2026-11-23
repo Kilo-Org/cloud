@@ -91,6 +91,7 @@
     "draft": "សេចក្តីព្រាង",
     "enabled": "បានបើក",
     "github": "GitHub",
+    "image": "រូបភាព",
     "imageUnavailable": "មិនអាចបង្ហាញរូបភាពបានទេ។",
     "loading": "កំពុងផ្ទុក…",
     "loadMore": "ផ្ទុកបន្ថែម",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត",
+      "imageUnavailableRetryWithAlt": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត {{alt}}",
       "imagePreviewUnavailableInSession": "មិនអាចមើលរូបភាពជាមុនក្នុងវគ្គនេះបានទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithApple)'។",
     "signupStepUpGoogle": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithGoogle)'។",
     "signupStepUpBack": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក សូមត្រឡប់ក្រោយ ហើយប្រើ '$t(login.moreSignInOptions)'។",
-    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមព្យាយាមម្តងទៀត ឬប្រើ '$t(login.resendCode)'។",
+    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមប្រើ '$t(login.resendCode)' ឬប្រើ '$t(login.moreSignInOptions)'។",
     "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្តងទៀត។",
     "tooManyAttempts": "ការព្យាយាមច្រើនពេកហើយ។ សូមស្នើសុំលេខកូដថ្មី។",
     "invalidToken": "មិនអាចចូលគណនីបានទេ។ សូមព្យាយាមម្តងទៀត។",
@@ -4338,7 +4340,15 @@
       "download": "ទាញយកគំរូនៅលើឧបករណ៍",
       "downloading": "កំពុងទាញយក…",
       "downloadProgress": "កំពុងទាញយក… {{percent}}%",
-      "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។"
+      "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។",
+      "cannotUse": "មិនអាចដំណើរការបានទេ៖ {{items}}។",
+      "cannotUseOptions": "មិនអាចបំពេញបានទេ៖ ជម្រើសឧបករណ៍មួយចំនួន។",
+      "limitations": "ដែនកំណត់",
+      "tools": {
+        "time": "ពេលវេលា",
+        "settingsList": "បង្ហាញការកំណត់",
+        "settingsSet": "ផ្លាស់ប្តូរការកំណត់"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "គំរូនេះគាំទ្រកម្រិតនៃការគិត"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "មិនអាចរក្សាទុកការណែនាំបានទេ",
     "instructionDeleteFailed": "មិនអាចលុបការណែនាំបានទេ",
     "instructionToggleFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពការណែនាំបានទេ",
+    "instructionViewTitle": "ឯកសារការណែនាំ",
     "instructionLimitReached": "profile មួយអាចផ្ទុកការណែនាំបានរហូតដល់ {{max}}។ លុបមួយ ដើម្បីបន្ថែមមួយទៀត។",
     "mcp": {
       "title": "ម៉ាស៊ីនមេ MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
       "expiredGrant": "បានផុតកំណត់៖ {{description}}",
+      "expiredStatus": "បានផុតកំណត់",
       "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
       "kind": {
         "adjustment": "ការកែតម្រូវ",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។",
       "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។",
-      "voidedGrant": "បានលុបចោល៖ {{description}}"
+      "voidedGrant": "បានលុបចោល៖ {{description}}",
+      "voidedStatus": "បានលុបចោល"
     },
     "title": "ទិញឥណទាន",
     "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",

@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuté",
     "github": "GitHub",
+    "image": "Obrázok",
     "imageUnavailable": "Obrázok nie je dostupný.",
     "loading": "Načítava sa…",
     "loadMore": "Načítať viac",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nie je dostupný, skúsiť ho znova načítať",
+      "imageUnavailableRetryWithAlt": "Obrázok nie je dostupný, {{alt}}, skúsiť ho znova načítať",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tejto relácii dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Použi „$t(login.resendCode)“ alebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -4496,7 +4498,15 @@
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
-      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
+      "cannotUse": "Nedá sa spustiť: {{items}}.",
+      "cannotUseOptions": "Nedá sa vyplniť: niektoré možnosti nástroja.",
+      "limitations": "Obmedzenia",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobraziť nastavenia",
+        "settingsSet": "Zmeniť nastavenia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",
     "instructionToggleFailed": "Pokyn sa nepodarilo aktualizovať",
+    "instructionViewTitle": "Súbor pokynu",
     "instructionLimitReached": "Profil môže obsahovať najviac {{max}} pokynov. Ak chcete pridať ďalší, jeden odstráňte.",
     "mcp": {
       "title": "servery MCP",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
       "expiredGrant": "Platnosť vypršala: {{description}}",
+      "expiredStatus": "Platnosť vypršala",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
       "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
-      "voidedGrant": "Stornované: {{description}}"
+      "voidedGrant": "Stornované: {{description}}",
+      "voidedStatus": "Stornované"
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",

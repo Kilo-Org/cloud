@@ -20,9 +20,12 @@ export type ConnectionConnector =
   | { kind: 'gone' };
 
 /**
- * Resolves the connector recorded on a connection. Account erasure keeps the
+ * Resolves the connector recorded on a connection. It is gone when the lookup
+ * yields no account row, when the account is soft-deleted or being deleted, and
+ * when it holds no usable trimmed email. Account erasure keeps the
  * `kilocode_users` row and replaces it with a placeholder address and a
- * soft-deleted reason, so a missing row alone never reports a gone connector.
+ * soft-deleted reason, so an erased account is still caught by that reason
+ * rather than by the row's absence.
  */
 export async function resolveConnectionConnector(
   createdBy: string | null | undefined,

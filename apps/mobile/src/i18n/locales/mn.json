@@ -91,6 +91,7 @@
     "draft": "Ноорог",
     "enabled": "Идэвхтэй",
     "github": "GitHub",
+    "image": "Зураг",
     "imageUnavailable": "Зургийг харуулах боломжгүй.",
     "loading": "Ачаалж байна…",
     "loadMore": "Цааш ачаалах",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Зургийг ачаалж байна",
       "imageUnavailableRetry": "Зургийг харах боломжгүй, дахин ачаалах",
+      "imageUnavailableRetryWithAlt": "Зургийг харах боломжгүй, {{alt}}, дахин ачаалах",
       "imagePreviewUnavailableInSession": "Энэ сессэд зургийг урьдчилан харах боломжгүй.",
       "viewImage": "Зургийг үзэх",
       "viewImageWithAlt": "{{alt}} зургийг үзэх",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithApple)' сонголтыг ашиглана уу.",
     "signupStepUpGoogle": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithGoogle)' сонголтыг ашиглана уу.",
     "signupStepUpBack": "Бүртгэл үүсгэж дуусгахын тулд буцаад '$t(login.moreSignInOptions)' сонголтыг ашиглана уу.",
-    "invalidCode": "Энэ код буруу эсвэл хугацаа нь дууссан байна. Дахин оролдох эсвэл '$t(login.resendCode)' товчийг ашиглана уу.",
+    "invalidCode": "Энэ код буруу эсвэл хугацаа нь дууссан байна. '$t(login.resendCode)' товчийг эсвэл '$t(login.moreSignInOptions)' товчийг ашиглана уу.",
     "codeInProgress": "Таны кодыг боловсруулж байна. Хэсэг хүлээгээд дахин оролдоно уу.",
     "tooManyAttempts": "Хэт олон удаа оролдсон байна. Шинэ код хүснэ үү.",
     "invalidToken": "Нэвтрэлт амжилтгүй боллоо. Дахин оролдоно уу.",
@@ -4338,7 +4340,15 @@
       "download": "Төхөөрөмж дээрх загварыг татах",
       "downloading": "Татаж байна…",
       "downloadProgress": "Татаж байна… {{percent}}%",
-      "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу."
+      "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу.",
+      "cannotUse": "Ажиллуулах боломжгүй: {{items}}.",
+      "cannotUseOptions": "Бөглөх боломжгүй: зарим багажны сонголт.",
+      "limitations": "Хязгаарлалт",
+      "tools": {
+        "time": "Цаг",
+        "settingsList": "Тохиргоог харуулах",
+        "settingsSet": "Тохиргоог өөрчлөх"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Зааврыг хадгалж чадсангүй",
     "instructionDeleteFailed": "Зааврыг устгаж чадсангүй",
     "instructionToggleFailed": "Зааврыг шинэчилж чадсангүй",
+    "instructionViewTitle": "Зааврын файл",
     "instructionLimitReached": "Профайлд хамгийн ихдээ {{max}} заавар байж болно. Өөр нэмэхийн тулд нэгийг устгана уу.",
     "mcp": {
       "title": "MCP серверүүд",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
       "expiredGrant": "Хугацаа нь дууссан: {{description}}",
+      "expiredStatus": "Хугацаа нь дууссан",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
         "adjustment": "Залруулга",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
       "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна.",
-      "voidedGrant": "Хүчингүй болгосон: {{description}}"
+      "voidedGrant": "Хүчингүй болгосон: {{description}}",
+      "voidedStatus": "Хүчингүй болгосон"
     },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",

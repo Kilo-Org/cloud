@@ -65,8 +65,6 @@ const CoreUsageSchema = z.object({
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
   abuse_classification: z.enum(ABUSE_CLASSIFICATION),
-  // The `organizations.id` column contract: any stored id passes, so a stricter
-  // check here would reject a legitimate payer. See `KiloOrganizationIdSchema`.
   organization_id: KiloOrganizationIdSchema.nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),

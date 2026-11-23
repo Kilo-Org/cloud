@@ -91,6 +91,7 @@
     "draft": "मसुदा",
     "enabled": "सुरू",
     "github": "GitHub",
+    "image": "प्रतिमा",
     "imageUnavailable": "प्रतिमा उपलब्ध नाही",
     "loading": "लोड होत आहे…",
     "loadMore": "आणखी दाखवा",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "प्रतिमा लोड होत आहे",
       "imageUnavailableRetry": "प्रतिमा उपलब्ध नाही, ती लोड करण्याचा पुन्हा प्रयत्न करा",
+      "imageUnavailableRetryWithAlt": "प्रतिमा उपलब्ध नाही, {{alt}}, ती लोड करण्याचा पुन्हा प्रयत्न करा",
       "imagePreviewUnavailableInSession": "या सत्रात प्रतिमेचे पूर्वावलोकन उपलब्ध नाही.",
       "viewImage": "प्रतिमा पहा",
       "viewImageWithAlt": "{{alt}} ही प्रतिमा पहा",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithApple)' वापरा.",
     "signupStepUpGoogle": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithGoogle)' वापरा.",
     "signupStepUpBack": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी मागे जा आणि '$t(login.moreSignInOptions)' वापरा.",
-    "invalidCode": "तो कोड चुकीचा आहे किंवा त्याची मुदत संपली आहे. कृपया पुन्हा प्रयत्न करा किंवा '$t(login.resendCode)' वापरा.",
+    "invalidCode": "तो कोड चुकीचा आहे किंवा त्याची मुदत संपली आहे. कृपया '$t(login.resendCode)' वापरा किंवा '$t(login.moreSignInOptions)' वापरा.",
     "codeInProgress": "तुमच्या कोडवर प्रक्रिया सुरू आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
     "tooManyAttempts": "खूप वेळा प्रयत्न झाले आहेत. कृपया नवीन कोड मागवा.",
     "invalidToken": "साइन इन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
@@ -4338,7 +4340,15 @@
       "download": "डिव्हाइसवरील मॉडेल डाउनलोड करा",
       "downloading": "डाउनलोड होत आहे…",
       "downloadProgress": "डाउनलोड होत आहे… {{percent}}%",
-      "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा."
+      "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा.",
+      "cannotUse": "चालवता येत नाही: {{items}}.",
+      "cannotUseOptions": "भरता येत नाही: काही टूल पर्याय.",
+      "limitations": "मर्यादा",
+      "tools": {
+        "time": "वेळ",
+        "settingsList": "सेटिंग्ज दाखवा",
+        "settingsSet": "सेटिंग्ज बदला"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "सूचना सेव्ह करता आली नाही",
     "instructionDeleteFailed": "सूचना हटवता आली नाही",
     "instructionToggleFailed": "सूचना अद्ययावत करता आली नाही",
+    "instructionViewTitle": "सूचना फाइल",
     "instructionLimitReached": "एका प्रोफाइलमध्ये जास्तीत जास्त {{max}} सूचना ठेवता येतात. अजून एक जोडण्यासाठी एक हटवा.",
     "mcp": {
       "title": "MCP सर्व्हर",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
       "expiredGrant": "कालबाह्य: {{description}}",
+      "expiredStatus": "कालबाह्य",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
       "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
-      "voidedGrant": "रद्द केले: {{description}}"
+      "voidedGrant": "रद्द केले: {{description}}",
+      "voidedStatus": "रद्द केले"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",

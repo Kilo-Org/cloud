@@ -7,7 +7,7 @@
 // keep the reserved line blank.
 
 import { createElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -104,6 +104,28 @@ function sharedSession(metadata: Record<string, unknown>): Record<string, unknow
   return { metadata, messages: [], transcriptUnavailable: false };
 }
 
+/** A payload that names a repository, which most of these cases watch. */
+function repoSession(gitBranch: string | null, createdAt: string | null = CREATED_AT) {
+  return sharedSession({
+    title: 'Fix login',
+    ownerName: 'alice',
+    gitUrl: 'Kilo-Org/cloud',
+    gitBranch,
+    createdAt,
+  });
+}
+
+/** A payload with no repository, so the eyebrow falls back to the start time. */
+function repoLessSession(createdAt: string | null = CREATED_AT) {
+  return sharedSession({
+    title: 'Fix login',
+    ownerName: 'alice',
+    gitUrl: null,
+    gitBranch: null,
+    createdAt,
+  });
+}
+
 function renderScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -130,12 +152,27 @@ function queryErrors(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 // The date the subtitle prints for the same payload timestamp, in the language
-// the screen formats with.
+// the screen formats with. The screen adds the year to a session from an
+// earlier year and leaves it off one from the current year, comparing the
+// years the locale itself prints, so the expectation reads the same clock and
+// calendar.
 function subtitleDateLabel(createdAt: string): string {
-  return formatDate(new Date(createdAt), i18n.language, { month: 'short', day: 'numeric' });
+  const date = new Date(createdAt);
+  const currentYear = formatDate(new Date(), i18n.language, { year: 'numeric' });
+  const sessionYear = formatDate(date, i18n.language, { year: 'numeric' });
+  return formatDate(date, i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    ...(sessionYear === currentYear ? {} : { year: 'numeric' }),
+  });
 }
 
+// A fixed clock keeps both the current-year and the prior-year expectation
+// deterministic: the payload year is compared with the reader's own year.
+const NOW = new Date('2026-11-22T12:00:00.000Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ now: NOW });
   query.data = undefined;
   query.isPending = false;
   query.isError = false;
@@ -148,15 +185,13 @@ beforeEach(() => {
   headers.rendered = [];
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('shared session header eyebrow', () => {
   it('paints the repository when the payload has one', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: 'Kilo-Org/cloud',
-      gitBranch: 'main',
-      createdAt: CREATED_AT,
-    });
+    query.data = repoSession('main');
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
@@ -166,13 +201,7 @@ describe('shared session header eyebrow', () => {
   });
 
   it('names the session time when the payload has no repository', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: null,
-      gitBranch: null,
-      createdAt: CREATED_AT,
-    });
+    query.data = repoLessSession();
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
@@ -207,13 +236,7 @@ describe('shared session header eyebrow', () => {
   });
 
   it('keeps the reserved line when the payload has no usable timestamp', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: null,
-      gitBranch: null,
-      createdAt: null,
-    });
+    query.data = repoLessSession(null);
     const renderer = renderScreen();
 
     // A settled payload that names neither a repository nor a time is not a
@@ -278,13 +301,7 @@ describe('shared session read failure', () => {
 
 describe('shared session subtitle', () => {
   it('shows the decoded branch, not the stored percent-encoded one', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: 'Kilo-Org/cloud',
-      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
-      createdAt: CREATED_AT,
-    });
+    query.data = repoSession('fix/%E8%AB%8B%E6%B1%82%E6%9B%B8');
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
@@ -294,13 +311,7 @@ describe('shared session subtitle', () => {
   });
 
   it('isolates the sharer, the branch and the date so a right-to-left date cannot split', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: 'Kilo-Org/cloud',
-      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
-      createdAt: CREATED_AT,
-    });
+    query.data = repoSession('fix/%E8%AB%8B%E6%B1%82%E6%9B%B8');
     const renderer = renderScreen();
 
     // Every segment carries its own isolate pair, so the paragraph direction
@@ -316,13 +327,7 @@ describe('shared session subtitle', () => {
   });
 
   it('leaves no empty isolate pair when the payload has no branch', () => {
-    query.data = sharedSession({
-      title: 'Fix login',
-      ownerName: 'alice',
-      gitUrl: 'Kilo-Org/cloud',
-      gitBranch: null,
-      createdAt: CREATED_AT,
-    });
+    query.data = repoSession(null);
     const renderer = renderScreen();
 
     const subtitle = headers.rendered[0]?.subtitle ?? '';
@@ -338,6 +343,35 @@ describe('shared session subtitle', () => {
       expect(segment.startsWith(ISOLATE_OPEN)).toBe(true);
       expect(segment.endsWith(ISOLATE_CLOSE)).toBe(true);
     }
+    renderer.unmount();
+  });
+
+  it('shows the year when the session started before the current calendar year', () => {
+    const priorYear = '2025-10-08T19:40:00.000Z';
+    query.data = repoSession('main', priorYear);
+    const renderer = renderScreen();
+
+    // A permanent share outlives its year, so a month and a day alone would
+    // read it as this year's date. The last segment carries the year.
+    const dateLabel = subtitleDateLabel(priorYear);
+    expect(dateLabel).toContain('2025');
+    expect(headers.rendered[0]?.subtitle).toBe(
+      [isolated(sharedByLabel('alice')), isolated('main'), isolated(dateLabel)].join(' · ')
+    );
+    renderer.unmount();
+  });
+
+  it('keeps the short date for a session from the current calendar year', () => {
+    query.data = repoSession('main');
+    const renderer = renderScreen();
+
+    // The clock is pinned inside the current calendar year, so this date does
+    // not need the year it would repeat.
+    const dateLabel = subtitleDateLabel(CREATED_AT);
+    expect(dateLabel).not.toContain('2026');
+    expect(headers.rendered[0]?.subtitle).toBe(
+      [isolated(sharedByLabel('alice')), isolated('main'), isolated(dateLabel)].join(' · ')
+    );
     renderer.unmount();
   });
 });

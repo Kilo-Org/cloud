@@ -204,7 +204,6 @@ function logControlPlaneBudgetExceeded({
           procedureType,
           durationMs: Math.round(durationMs),
           ok: false,
-          // Omitted from the line: this surface names the procedure path only.
           userId: null,
           dimensions: readClientDimensions(headersList),
         })

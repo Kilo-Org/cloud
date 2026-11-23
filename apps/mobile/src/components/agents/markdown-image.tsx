@@ -3,19 +3,19 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
-import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
+import { AlertCircle, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
 
 import {
   isMarkdownImageLoadAllowed,
   requestMarkdownImageTrust,
   subscribeMarkdownImageLoadAllowed,
 } from './markdown-image-confirm';
+import { BlockedImageChip, UnconfirmedImageChip } from './markdown-image-chips';
 import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
@@ -49,77 +49,6 @@ function FixedImageSlot({
       style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
     >
       {children}
-    </View>
-  );
-}
-
-/** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
-function BlockedImageChip({
-  kind,
-  uri,
-  onShowLinkActions,
-}: Readonly<{ kind: 'http' | 'data'; uri: string; onShowLinkActions?: () => void }>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
-  const label = host
-    ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
-    : t('agentChat.markdownImage.httpsOnly');
-  return (
-    <View
-      className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
-      accessibilityRole="text"
-      accessibilityLabel={label}
-      accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-      onAccessibilityAction={event => {
-        if (event.nativeEvent.actionName === 'showLinkActions') {
-          onShowLinkActions?.();
-        }
-      }}
-    >
-      <AlertCircle size={14} color={colors.mutedForeground} />
-      <Text className="shrink text-xs text-muted-foreground" numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-/** HTTPS, not yet confirmed: source host plus a Load affordance. No Image mounts. */
-function UnconfirmedImageChip({
-  uri,
-  onLoad,
-  onShowLinkActions,
-}: Readonly<{ uri: string; onLoad: () => void; onShowLinkActions?: () => void }>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  const host = formatTrustedImageHost(uri);
-  return (
-    <View className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
-      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-        {host ?? t('agentChat.markdownImage.httpsOnly')}
-      </Text>
-      <Pressable
-        onPress={onLoad}
-        accessibilityRole="button"
-        accessibilityLabel={
-          host
-            ? t('agentChat.markdownImage.loadWithHost', { host })
-            : t('agentChat.markdownImage.load')
-        }
-        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-        onAccessibilityAction={event => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            onShowLinkActions?.();
-          }
-        }}
-        className="min-h-11 min-w-11 shrink-0 flex-row items-center justify-center gap-1 px-2 active:opacity-70"
-      >
-        <Download size={16} color={colors.mutedForeground} />
-        <Text className="text-xs font-medium text-foreground">
-          {t('agentChat.markdownImage.load')}
-        </Text>
-      </Pressable>
     </View>
   );
 }
@@ -160,7 +89,7 @@ export function MarkdownImage({
     setMeasuredAspectRatio(undefined);
   }
 
-  const filename = markdownImageFilename(uri, alt);
+  const filename = markdownImageFilename(uri, alt, t('common.image'));
   const imageAccessibilityLabel = alt
     ? t('agentChat.filePart.viewImageWithAlt', { alt })
     : t('agentChat.filePart.viewImage');
@@ -174,7 +103,16 @@ export function MarkdownImage({
   );
 
   if (kind === 'http' || kind === 'data') {
-    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
+    return (
+      <BlockedImageChip
+        kind={kind}
+        uri={uri}
+        alt={alt}
+        linkLabel={accessibilityLabel}
+        onPress={onPress}
+        onShowLinkActions={onShowLinkActions}
+      />
+    );
   }
 
   if (kind === 'https' && !loadAllowed) {
@@ -182,6 +120,7 @@ export function MarkdownImage({
       <FixedImageSlot aspectRatio={aspectRatio}>
         <UnconfirmedImageChip
           uri={uri}
+          alt={alt}
           onShowLinkActions={onShowLinkActions}
           onLoad={() => {
             requestMarkdownImageTrust(uri);
@@ -194,10 +133,17 @@ export function MarkdownImage({
   // Other schemes never reach MarkdownImage from the renderer; keep the alt
   // text visible so a direct or fallback use never drops the description.
   if (kind === null) {
-    return <Text className="text-xs text-muted-foreground">{alt || 'image'}</Text>;
+    return <Text className="text-xs text-muted-foreground">{alt || t('common.image')}</Text>;
   }
 
   if (failed) {
+    const retryAlt = alt.trim();
+    // One catalog sentence carries the description, so the translators own the
+    // punctuation and the word order. `common.imageUnavailable` cannot be joined
+    // into a list: several catalogs end it with a period.
+    const retryLabel = retryAlt
+      ? t('agentChat.filePart.imageUnavailableRetryWithAlt', { alt: retryAlt })
+      : t('agentChat.filePart.imageUnavailableRetry');
     return (
       <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
         <Pressable
@@ -209,7 +155,7 @@ export function MarkdownImage({
           onLongPress={onShowLinkActions}
           className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
-          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+          accessibilityLabel={retryLabel}
           accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
           onAccessibilityAction={event => {
             if (event.nativeEvent.actionName === 'showLinkActions') {

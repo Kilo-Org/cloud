@@ -91,6 +91,7 @@
     "draft": "කෙටුම්පත",
     "enabled": "සක්‍රීයයි",
     "github": "GitHub",
+    "image": "රූපය",
     "imageUnavailable": "රූපය ලබාගත නොහැක.",
     "loading": "පූරණය වෙමින්…",
     "loadMore": "තවත් පූරණය කරන්න",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබා ගත නොහැක. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
+      "imageUnavailableRetryWithAlt": "රූපය ලබා ගත නොහැක. {{alt}}. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
       "viewImageWithAlt": "{{alt}} රූපය බලන්න",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",
     "signupStepUpBack": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට ආපසු ගොස් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
-    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න, නැතහොත් '$t(login.resendCode)' භාවිත කරන්න.",
+    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර '$t(login.resendCode)' භාවිත කරන්න හෝ නැතහොත් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "codeInProgress": "ඔබේ කේතය සකසනු ලැබේ. මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න.",
     "tooManyAttempts": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර නව කේතයක් ඉල්ලන්න.",
     "invalidToken": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -4338,7 +4340,15 @@
       "download": "උපාංගයේ ආකෘතිය බාගන්න",
       "downloading": "බාගත වෙමින්…",
       "downloadProgress": "බාගත වෙමින්… {{percent}}%",
-      "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+      "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "cannotUse": "ධාවනය කළ නොහැක: {{items}}.",
+      "cannotUseOptions": "පිරවිය නොහැක: මෙවලම් විකල්ප කිහිපයක්.",
+      "limitations": "සීමාවන්",
+      "tools": {
+        "time": "වේලාව",
+        "settingsList": "සැකසීම් පෙන්වන්න",
+        "settingsSet": "සැකසීම් වෙනස් කරන්න"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "උපදෙස සුරැකීමට නොහැකි විය",
     "instructionDeleteFailed": "උපදෙස මැකීමට නොහැකි විය",
     "instructionToggleFailed": "උපදෙස යාවත්කාලීන කිරීමට නොහැකි විය",
+    "instructionViewTitle": "උපදෙස් ගොනුව",
     "instructionLimitReached": "පැතිකඩකට උපදෙස් {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
     "mcp": {
       "title": "MCP සේවාදායකයන්",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
       "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
+      "expiredStatus": "කල් ඉකුත් වී ඇත",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
       "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
-      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}",
+      "voidedStatus": "අවලංගු කර ඇත"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",

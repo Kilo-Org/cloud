@@ -92,6 +92,7 @@
     "draft": "טיוטה",
     "enabled": "מופעל",
     "github": "GitHub",
+    "image": "תמונה",
     "imageUnavailable": "התמונה לא זמינה.",
     "loading": "בטעינה…",
     "loadMore": "טעינת פריטים נוספים",
@@ -2125,6 +2126,7 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
+      "imageUnavailableRetryWithAlt": "התמונה אינה זמינה, {{alt}}, ניסיון טעינה נוסף",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
       "viewImageWithAlt": "הצגת התמונה: {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
-    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. השתמש ב-'$t(login.resendCode)' או ב-'$t(login.moreSignInOptions)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -4417,7 +4419,15 @@
       "download": "הורדת המודל למכשיר",
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
-      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב.",
+      "cannotUse": "לא ניתן להריץ: {{items}}.",
+      "cannotUseOptions": "לא ניתן למלא: כמה אפשרויות של כלי.",
+      "limitations": "מגבלות",
+      "tools": {
+        "time": "שעה",
+        "settingsList": "הצג הגדרות",
+        "settingsSet": "שנה הגדרות"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "לא ניתן היה לשמור את ההוראה",
     "instructionDeleteFailed": "לא ניתן היה למחוק את ההוראה",
     "instructionToggleFailed": "לא ניתן היה לעדכן את ההוראה",
+    "instructionViewTitle": "קובץ הוראה",
     "instructionLimitReached": "פרופיל יכול להכיל עד {{max}} הוראות. מחקו אחת כדי להוסיף אחרת.",
     "mcp": {
       "title": "שרתי MCP",
@@ -4776,6 +4787,7 @@
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",
       "expiredGrant": "פג התוקף: {{description}}",
+      "expiredStatus": "פג התוקף",
       "googlePlayReceipt": "קבלה מ-Google Play",
       "kind": {
         "adjustment": "התאמה",
@@ -4802,7 +4814,8 @@
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
       "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר.",
-      "voidedGrant": "בוטל: {{description}}"
+      "voidedGrant": "בוטל: {{description}}",
+      "voidedStatus": "בוטל"
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",

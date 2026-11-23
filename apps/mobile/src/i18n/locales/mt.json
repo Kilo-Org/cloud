@@ -94,6 +94,7 @@
     "draft": "Abbozz",
     "enabled": "Attivat",
     "github": "GitHub",
+    "image": "Immaġni",
     "imageUnavailable": "L-immaġni mhix disponibbli.",
     "loading": "Qed jgħabbi…",
     "loadMore": "Għabbi aktar",
@@ -2819,6 +2820,7 @@
     "filePart": {
       "loadingImage": "Qed titgħabba l-immaġni",
       "imageUnavailableRetry": "L-immaġni mhix disponibbli, erġa' pprova tgħabbiha",
+      "imageUnavailableRetryWithAlt": "L-immaġni mhix disponibbli, {{alt}}, erġa' pprova tgħabbiha",
       "imagePreviewUnavailableInSession": "Il-previżjoni tal-immaġni mhix disponibbli f'din is-sessjoni.",
       "viewImage": "Ara l-immaġni",
       "viewImageWithAlt": "Ara l-immaġni {{alt}}",
@@ -4100,7 +4102,7 @@
     "signupStepUpApple": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Biex tlesti l-ħolqien tal-kont tiegħek, mur lura u uża '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Erġa' pprova jew uża '$t(login.resendCode)'.",
+    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Uża '$t(login.resendCode)' jew '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Il-kodiċi tiegħek qed jiġi pproċessat. Stenna mument u erġa' pprova.",
     "tooManyAttempts": "Wisq tentattivi. Jekk jogħġbok itlob kodiċi ġdid.",
     "invalidToken": "Ma stajtx tidħol. Erġa' pprova.",
@@ -4575,7 +4577,15 @@
       "download": "Niżżel il-mudell fuq l-apparat",
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
-      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova.",
+      "cannotUse": "Ma jistax jiġi eżegwit: {{items}}.",
+      "cannotUseOptions": "Ma jistgħux jimtlew: xi għażliet tal-għodda.",
+      "limitations": "Limitazzjonijiet",
+      "tools": {
+        "time": "Ħin",
+        "settingsList": "Uri l-impostazzjonijiet",
+        "settingsSet": "Biddel l-impostazzjonijiet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
@@ -4769,6 +4779,7 @@
     "instructionSaveFailed": "Ma setgħetx tiġi salvata l-istruzzjoni",
     "instructionDeleteFailed": "Ma setgħetx tiġi mħassra l-istruzzjoni",
     "instructionToggleFailed": "Ma setgħetx tiġi aġġornata l-istruzzjoni",
+    "instructionViewTitle": "Fajl tal-istruzzjoni",
     "instructionLimitReached": "Profil jista' jżomm sa {{max}} struzzjonijiet. Ħassar waħda biex iżżid oħra.",
     "mcp": {
       "title": "servers MCP",
@@ -4946,6 +4957,7 @@
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",
       "expiredGrant": "Skada: {{description}}",
+      "expiredStatus": "Skada",
       "googlePlayReceipt": "Irċevuta minn Google Play",
       "kind": {
         "adjustment": "Aġġustament",
@@ -4972,7 +4984,8 @@
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
       "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti.",
-      "voidedGrant": "Annullat: {{description}}"
+      "voidedGrant": "Annullat: {{description}}",
+      "voidedStatus": "Annullat"
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",

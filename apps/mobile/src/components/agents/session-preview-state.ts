@@ -16,6 +16,18 @@ export type SessionPreviewTarget = {
   live: boolean;
   statusKind: GlanceableStatusKind | null;
   needsInput: boolean;
+  /**
+   * The row's own status at open time, so a preview that outlives the row can
+   * settle its state label once the ack store hydrates. Absent on a target that
+   * has no server status, which keeps `needsInput` as the answer.
+   */
+  status?: string | null;
+  /**
+   * The row's own raise time, so a preview that outlives the row reads the same
+   * raise identity its row used (`statusUpdatedAt ?? status`). Absent on a
+   * target that carries no status time, and on one that carries no status.
+   */
+  statusUpdatedAt?: string | null;
   totalCostMicrodollars: number | null;
   /** Absent → no Copy session ID item. */
   onCopySessionId?: () => void;

@@ -91,6 +91,7 @@
     "draft": "Volavola",
     "enabled": "Mandeha",
     "github": "GitHub",
+    "image": "Sary",
     "imageUnavailable": "Tsy azo aseho ny sary.",
     "loading": "Mampiditra…",
     "loadMore": "Ampidiro ny manaraka",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Maka sary",
       "imageUnavailableRetry": "Tsy azo aseho ny sary, andramo alaina indray",
+      "imageUnavailableRetryWithAlt": "Tsy azo aseho ny sary, {{alt}}, andramo alaina indray",
       "imagePreviewUnavailableInSession": "Tsy azo jerena mialoha ny sary amin'ity fotoam-piasana ity.",
       "viewImage": "Jereo ny sary",
       "viewImageWithAlt": "Jereo ny sary {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Ampiasao ny '$t(login.resendCode)' na ny '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -4338,7 +4340,15 @@
       "download": "Sintony ny modely ao amin'ny fitaovana",
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
-      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray.",
+      "cannotUse": "Tsy afaka mampandeha: {{items}}.",
+      "cannotUseOptions": "Tsy afaka mameno: safidy fitaovana sasany.",
+      "limitations": "Fetra",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Asehoy ny fikirana",
+        "settingsSet": "Ovao ny fikirana"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Tsy afaka nitahiry ny torolalana",
     "instructionDeleteFailed": "Tsy afaka namafa ny torolalana",
     "instructionToggleFailed": "Tsy afaka nanavao ny torolalana",
+    "instructionViewTitle": "Rakitra torolalana",
     "instructionLimitReached": "Ny profil iray dia mahazaka torolalana hatramin'ny {{max}}. Fafao ny iray hanampiana ny hafa.",
     "mcp": {
       "title": "Mpizara MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
       "expiredGrant": "Lany fe-potoana: {{description}}",
+      "expiredStatus": "Lany fe-potoana",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
       "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra.",
-      "voidedGrant": "Nofoanana: {{description}}"
+      "voidedGrant": "Nofoanana: {{description}}",
+      "voidedStatus": "Nofoanana"
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",

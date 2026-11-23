@@ -165,8 +165,6 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
   await writeAccountMetadata(PR_REVIEW_VIEWED_KEY, async () => {
     const map = await readMap();
     if (map === null) {
-      // The read failed and was reported at warning level. Abort: persisting a
-      // map derived from an unreadable record would wipe the stored viewed set.
       return;
     }
     const key = viewedFilesKey(input);

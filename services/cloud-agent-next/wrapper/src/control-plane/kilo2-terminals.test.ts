@@ -31,7 +31,11 @@ function info(id: string, status: 'running' | 'exited' = 'running') {
   };
 }
 
-function startKilo(state: { ptys: Map<string, 'running' | 'exited'> }) {
+function startKilo(state: {
+  ptys: Map<string, 'running' | 'exited'>;
+  listedPtys?: string[];
+  beforePtyRead?: () => Promise<void>;
+}) {
   const requests: Recorded[] = [];
   const upgrades: { search: URLSearchParams; authorization: string | null }[] = [];
   const server = Bun.serve({
@@ -64,7 +68,9 @@ function startKilo(state: { ptys: Map<string, 'running' | 'exited'> }) {
           state.ptys.set(id, 'running');
           return Response.json({ data: info(id) });
         }
-        return Response.json({ data: [...state.ptys.keys()].map(id => info(id)) });
+        return Response.json({
+          data: (state.listedPtys ?? [...state.ptys.keys()]).map(id => info(id)),
+        });
       }
       if (persistent) {
         const id = decodeURIComponent(persistent[1] ?? '');
@@ -83,6 +89,7 @@ function startKilo(state: { ptys: Map<string, 'running' | 'exited'> }) {
           state.ptys.delete(id);
           return new Response(null, { status: 204 });
         }
+        if (request.method === 'GET') await state.beforePtyRead?.();
         return Response.json({ data: info(id, status) });
       }
       return new Response('unexpected route', { status: 500 });
@@ -198,8 +205,39 @@ describe('Kilo v2 persistent terminals', () => {
     expect(await terminals.isIdle('/workspace/other', signal)).toBe(true);
     state.ptys.set(pty.id, 'exited');
     expect(await terminals.isIdle(directory, signal)).toBe(true);
-    state.ptys.delete(pty.id);
+
+    const gone = await terminals.createPty({ sessionId, cwd: directory, title: 'gone', env: {} });
+    state.ptys.delete(gone.id);
+    const beforeProbe = kilo.requests.length;
     expect(await terminals.isIdle(directory, signal)).toBe(true);
+    expect(await terminals.isIdle(directory, signal)).toBe(true);
+    expect(kilo.requests.slice(beforeProbe).map(({ path }) => path)).toEqual([
+      `/api/experimental/persistent-pty/${gone.id}`,
+    ]);
+  });
+
+  it('checks live terminal statuses concurrently', async () => {
+    const bothReadsStarted = Promise.withResolvers<void>();
+    let reads = 0;
+    const ptys = new Map<string, 'running' | 'exited'>();
+    const kilo = startKilo({
+      ptys,
+      beforePtyRead: async () => {
+        if (++reads === 2) bothReadsStarted.resolve();
+        await bothReadsStarted.promise;
+      },
+    });
+    const { terminals } = terminalsFor(kilo.url);
+    const first = await terminals.createPty({ sessionId, cwd: directory, title: 'a', env: {} });
+    await terminals.createPty({ sessionId, cwd: directory, title: 'b', env: {} });
+    ptys.set(first.id, 'exited');
+
+    try {
+      expect(await terminals.isIdle(directory, AbortSignal.timeout(1000))).toBe(false);
+      expect(reads).toBe(2);
+    } finally {
+      bothReadsStarted.resolve();
+    }
   });
 
   it('closes every session terminal in a directory', async () => {
@@ -213,5 +251,18 @@ describe('Kilo v2 persistent terminals', () => {
 
     expect(state.ptys.size).toBe(0);
     expect(await kilo2.terminals.isIdle(directory, AbortSignal.timeout(5000))).toBe(true);
+  });
+
+  it('continues session cleanup and removes unlisted exited PTYs after a session list fails', async () => {
+    const ptys = new Map<string, 'running' | 'exited'>([['pty_untracked', 'running']]);
+    const kilo = startKilo({ ptys, listedPtys: ['pty_untracked'] });
+    const kilo2 = terminalsFor(kilo.url, ['ses_unavailable', sessionId]);
+    const pty = await kilo2.terminals.createPty({ sessionId, cwd: directory, title: 't', env: {} });
+    ptys.set(pty.id, 'exited');
+    expect(await kilo2.terminals.isIdle(directory, AbortSignal.timeout(5000))).toBe(true);
+
+    await kilo2.closeDirectory(directory);
+
+    expect(ptys.size).toBe(0);
   });
 });

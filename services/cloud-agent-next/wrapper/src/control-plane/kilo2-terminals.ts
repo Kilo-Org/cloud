@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
+import { logToFile } from '../utils.js';
 import type { HarnessTerminal, HarnessTerminals } from './harness.js';
 import { Kilo2HttpError, type Kilo2Api } from './kilo2-api.js';
 
 const MAX_SESSION_TERMINALS = 64;
+type TrackedTerminal = Pick<HarnessTerminal, 'cwd' | 'status'>;
 
 /** The size-prefixed input frames of OpenCode's persistent PTY protocol. */
 const PERSISTENT_PTY_INPUT_PROTOCOL = '1';
@@ -72,7 +74,7 @@ export function createKilo2Terminals(options: {
   const { api } = options;
   // A persistent PTY belongs to a session, not a directory, so the idle probe
   // reads the terminals this runtime created.
-  const created = new Map<string, string>();
+  const created = new Map<string, TrackedTerminal>();
 
   async function remove(path: string, signal?: AbortSignal) {
     try {
@@ -104,7 +106,7 @@ export function createKilo2Terminals(options: {
           body: { args: [], cwd: input.cwd, title: input.title, env: input.env },
         })
       );
-      created.set(pty.id, pty.cwd);
+      created.set(pty.id, { cwd: pty.cwd, status: pty.status });
       return toHarnessTerminal(pty);
     },
     async resizePty(id, size) {
@@ -141,17 +143,23 @@ export function createKilo2Terminals(options: {
       };
     },
     async isIdle(directory, signal) {
-      for (const [id, cwd] of created) {
-        if (cwd !== directory) continue;
-        try {
-          const pty = persistentPtySchema.parse(await api.data(persistentPtyPath(id), { signal }));
-          if (pty.status === 'running') return false;
-        } catch (error) {
-          if (!(error instanceof Kilo2HttpError && error.status === 404)) throw error;
-          created.delete(id);
-        }
-      }
-      return true;
+      const isLive = (pty: TrackedTerminal) => pty.cwd === directory && pty.status === 'running';
+      await Promise.all(
+        [...created]
+          .filter(([, pty]) => isLive(pty))
+          .map(async ([id, tracked]) => {
+            try {
+              const pty = persistentPtySchema.parse(
+                await api.data(persistentPtyPath(id), { signal })
+              );
+              if (pty.status === 'exited') tracked.status = 'exited';
+            } catch (error) {
+              if (!(error instanceof Kilo2HttpError && error.status === 404)) throw error;
+              created.delete(id);
+            }
+          })
+      );
+      return ![...created.values()].some(isLive);
     },
   };
 
@@ -159,9 +167,18 @@ export function createKilo2Terminals(options: {
     terminals,
     removeSessionTerminals,
     async closeDirectory(directory: string) {
-      for (const sessionId of await options.listSessionIds(directory))
-        await removeSessionTerminals(sessionId);
-      for (const [id, cwd] of created) if (cwd === directory) await terminals.deletePty(id);
+      for (const sessionId of await options.listSessionIds(directory)) {
+        try {
+          await removeSessionTerminals(sessionId);
+        } catch (error) {
+          const reason =
+            error instanceof Kilo2HttpError
+              ? `HTTP ${error.status}`
+              : 'invalid or unavailable data';
+          logToFile(`kilo2 terminal cleanup failed sessionId=${sessionId}: ${reason}`);
+        }
+      }
+      for (const [id, pty] of created) if (pty.cwd === directory) await terminals.deletePty(id);
     },
   };
 }

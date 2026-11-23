@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { type LucideIcon } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -47,11 +48,21 @@ export function MetricCard({
   );
 }
 
-/** The dashboard's first paint: the segment row, four figure cards and two rows. */
+/**
+ * The lines each caption below the cards wraps to at the width the dashboard
+ * opens in, so their band is reserved at the height the loaded copy takes.
+ */
+const CAPTION_LINES = [2, 1] as const;
+
+/**
+ * The dashboard's first paint: the body alone. The platform and period controls
+ * render outside the body in every state, so nothing stands in for them, and
+ * every block the loaded body paints below the cards — the two caption lines and
+ * the labelled repository group — is reserved here at its own geometry.
+ */
 export function AnalyticsSkeleton(): ReactNode {
   return (
     <View className="gap-6">
-      <Skeleton className="h-10 w-full rounded-md bg-muted-soft" />
       <View className="gap-3">
         <View className="flex-row gap-3">
           <Card className="flex-1">
@@ -73,12 +84,22 @@ export function AnalyticsSkeleton(): ReactNode {
             <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
         </View>
-      </View>
-      <RowGroup leadingTile>
-        {Array.from({ length: 2 }, (_, index) => (
-          <RowSkeleton key={index} tile subtitle />
+        {CAPTION_LINES.map((lines, index) => (
+          <View key={index}>
+            {Array.from({ length: lines }, (_, line) => (
+              <Skeleton key={line} className="h-4 w-full rounded bg-muted-soft" />
+            ))}
+          </View>
         ))}
-      </RowGroup>
+      </View>
+      <View className="gap-3">
+        <SectionHeaderSkeleton />
+        <RowGroup leadingTile>
+          {Array.from({ length: 2 }, (_, index) => (
+            <RowSkeleton key={index} tile subtitle />
+          ))}
+        </RowGroup>
+      </View>
     </View>
   );
 }

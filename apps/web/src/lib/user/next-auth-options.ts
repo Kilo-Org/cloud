@@ -545,6 +545,15 @@ function createSSOAccountInfo(
 }
 
 /**
+ * The WorkOS organization a WorkOS SSO profile was issued for, or null when the
+ * profile does not name one.
+ */
+export function workOSProfileOrganizationId(profile: unknown): string | null {
+  const organizationId = (profile as { organization_id?: unknown } | undefined)?.organization_id;
+  return typeof organizationId === 'string' && organizationId.length > 0 ? organizationId : null;
+}
+
+/**
  * Parses a name from LinkedIn profile fields, ensuring it always returns a string.
  * This function guards against operator precedence bugs that could cause boolean values
  * to be returned instead of strings.
@@ -1362,6 +1371,7 @@ export const authOptions: NextAuthOptions = {
 
           const result = await processSSOUserLogin(
             accountInfo,
+            workOSProfileOrganizationId(profile),
             requestHeaders,
             affiliateTrackingId,
             trackingContext,

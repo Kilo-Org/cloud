@@ -754,6 +754,32 @@ export const INLINE_LINK_ROW_MARGIN_DP = 13;
 export const INLINE_LINK_ROW_CLASS = 'my-[13px] gap-y-[11px]';
 
 /**
+ * The space a sentence row carrying a {@link INLINE_LINK_BOX_CLASS} reserves
+ * below itself before a neighbouring control, and its class.
+ *
+ * {@link INLINE_LINK_ROW_CLASS} covers a sentence whose neighbours are the
+ * screen's own gutter away. The consent review card's sentence sits in the
+ * pinned footer's `<View className="gap-3">` block, so its only neighbour below
+ * is the action button, one 10.5dp `gap-3` away. The row's rect overflows its
+ * `text-sm` line by `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 = 5.25dp`
+ * below, so the button's top edge lands 10.5 - 5.25 = 5.25dp under the box —
+ * measured 5.7dp on an Android device. A control owns every pixel from its top
+ * edge up, so a raw tap 5.7dp under the link box opened the button's confirm
+ * sheet instead of the link: the downward
+ * {@link INLINE_LINK_VERTICAL_HIT_SLOP_DP} band never reached the button, and
+ * the link's 44dp target was cut to 27.8 + 5.7 = 33.5dp on that side.
+ *
+ * The reserve is 5.25dp — `mb-1.5`, 0.375rem at NativeWind's 14dp rem — so the
+ * free space under the box becomes 10.5dp. That delivers the whole 9dp downward
+ * slop, and with it the 27.8 + 9 + 9 = 45.8dp measured band `DESIGN.md:364`
+ * asks for. It is not the smaller 3.5dp: Android rounds 9dp to 24 physical
+ * pixels at density 2.625, and 3.5dp under the 5.7dp measured gap left only
+ * 0.19px of clearance, so the button could still take the band's last row.
+ */
+export const INLINE_LINK_NEIGHBOUR_RESERVE_DP = 5.25;
+export const INLINE_LINK_NEIGHBOUR_RESERVE_CLASS = 'mb-1.5';
+
+/**
  * The box a text action renders at the end of a line of copy — the code
  * reviewer's sync line is its snapshot's age with Refresh at the line's end.
  *

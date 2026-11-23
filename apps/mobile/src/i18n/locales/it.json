@@ -3379,6 +3379,7 @@
       "pendingComment_other": "commenti da inviare",
       "pendingComment_one": "commento in attesa di invio",
       "summaryOptional": "Riepilogo (facoltativo)",
+      "footerHint": "La dicitura «Revisione effettuata tramite Kilo» viene aggiunta al momento dell'invio.",
       "partialPostedFresh": "Commenti pubblicati: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Commenti pubblicati: {{displayFreshCount}}. ",
       "partialPostedFresh_many": "Commenti pubblicati: {{displayFreshCount}}. ",

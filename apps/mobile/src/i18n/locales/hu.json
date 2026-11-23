@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Törlöd az elküldésre váró hozzászólást?",
       "deletePendingMessage": "Ez a hozzászólás eltűnik a kódellenőrzés küldésre váró hozzászólásai közül.",
       "summaryOptional": "Összefoglaló (nem kötelező)",
+      "footerHint": "Az „Ellenőrizve a Kilo alkalmazással” lábléc az elküldéskor bekerül az ellenőrzés végére.",
       "pendingComment_one": "elküldésre váró hozzászólás",
       "pendingComment": "elküldésre váró hozzászólás",
       "pendingComment_other": "elküldésre váró hozzászólás",

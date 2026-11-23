@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Slet ventende kommentar?",
       "deletePendingMessage": "Denne kommentar fjernes fra køen til gennemgangen.",
       "summaryOptional": "Resumé (valgfrit)",
+      "footerHint": "»Gennemgangen er lavet via Kilo« tilføjes, når du indsender.",
       "pendingComment_one": "ventende kommentar",
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",

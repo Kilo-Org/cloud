@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Διαγραφή εκκρεμούς σχολίου;",
       "deletePendingMessage": "Αυτό το σχόλιο θα αφαιρεθεί από την ουρά αξιολόγησης.",
       "summaryOptional": "Σύνοψη (προαιρετική)",
+      "footerHint": "Η υποσημείωση «Έλεγχος μέσω Kilo» προστίθεται όταν υποβάλλεις.",
       "pendingComment_one": "εκκρεμές σχόλιο",
       "pendingComment": "εκκρεμή σχόλια",
       "pendingComment_other": "εκκρεμή σχόλια",

@@ -3379,6 +3379,7 @@
       "pendingComment_other": "comentarios pendientes",
       "pendingComment_one": "comentario pendiente",
       "summaryOptional": "Resumen (opcional)",
+      "footerHint": "Se añade «Revisado con Kilo» al enviar.",
       "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_many": "Comentarios publicados: {{displayFreshCount}}. ",

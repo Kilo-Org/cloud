@@ -3436,6 +3436,7 @@
       "pendingComment_other": "oczekującego komentarza",
       "pendingComment_one": "komentarz do wysłania",
       "summaryOptional": "Podsumowanie (opcjonalne)",
+      "footerHint": "Stopka „Przegląd wykonano w Kilo” jest dodawana podczas przesyłania.",
       "partialPostedFresh": "Liczba opublikowanych komentarzy: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Liczba opublikowanych komentarzy: {{displayFreshCount}}. ",
       "partialPostedFresh_few": "Liczba opublikowanych komentarzy: {{displayFreshCount}}. ",

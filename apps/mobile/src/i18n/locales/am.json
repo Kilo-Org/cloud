@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "ያልተላከው አስተያየት ይሰረዝ?",
       "deletePendingMessage": "ይህ አስተያየት ከግምገማ ወረፋው ይወገዳል።",
       "summaryOptional": "ማጠቃለያ (አማራጭ)",
+      "footerHint": "«በKilo ተገምግሟል» ሲያስገቡ ይታከላል።",
       "pendingComment_one": "ያልተላከ አስተያየት",
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",

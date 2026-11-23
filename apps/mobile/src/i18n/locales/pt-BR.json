@@ -3437,6 +3437,7 @@
       "pendingComment_zero": "comentários pendentes",
       "pendingComment_one": "comentário pendente",
       "summaryOptional": "Resumo (opcional)",
+      "footerHint": "O rodapé \"Revisado pelo Kilo\" é adicionado quando você envia.",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_many": "Comentários publicados: {{displayFreshCount}}. ",

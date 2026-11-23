@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Slette usendt kommentar?",
       "deletePendingMessage": "Denne kommentaren fjernes fra køen for kodegjennomgangen.",
       "summaryOptional": "Sammendrag (valgfritt)",
+      "footerHint": "«Gjennomgått via Kilo» legges til når du sender inn.",
       "pendingComment_one": "usendt kommentar",
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",

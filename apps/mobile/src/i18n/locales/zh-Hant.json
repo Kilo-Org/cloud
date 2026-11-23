@@ -3322,6 +3322,7 @@
       "pendingComment_other": "則待送出的留言",
       "pendingComment_one": "則待送出留言",
       "summaryOptional": "摘要（非必填）",
+      "footerHint": "送出時會自動加上透過 Kilo 審查。",
       "partialPostedFresh": "已發佈 {{displayFreshCount}} 則留言。",
       "partialPostedFresh_one": "已發佈 {{displayFreshCount}} 則留言。",
       "partialPostedFresh_other": "已發佈 {{displayFreshCount}} 則留言。",

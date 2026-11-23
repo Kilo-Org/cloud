@@ -1066,6 +1066,7 @@
       "deletePendingTitle": "Eliminar comentário pendente?",
       "deletePendingMessage": "Este comentário será removido da fila de revisão.",
       "summaryOptional": "Resumo (opcional)",
+      "footerHint": "O rodapé que indica que a revisão foi feita através do Kilo é adicionado quando a enviar.",
       "pendingComment_one": "comentário pendente",
       "pendingComment": "comentários pendentes",
       "pendingComment_other": "comentários pendentes",

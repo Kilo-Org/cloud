@@ -3322,6 +3322,7 @@
       "pendingComment_other": "未送信のコメント",
       "pendingComment_one": "未送信のコメント",
       "summaryOptional": "総評（任意）",
+      "footerHint": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言が自動的に追加されます。",
       "partialPostedFresh": "{{displayFreshCount}}件のコメントを投稿しました。",
       "partialPostedFresh_one": "{{displayFreshCount}}件のコメントを投稿しました。",
       "partialPostedFresh_other": "{{displayFreshCount}}件のコメントを投稿しました。",

@@ -1047,6 +1047,7 @@
       "deletePendingTitle": "Ștergi comentariul în așteptare?",
       "deletePendingMessage": "Acest comentariu va fi eliminat din lista de comentarii în așteptare pentru revizuire.",
       "summaryOptional": "Rezumat (opțional)",
+      "footerHint": "Mențiunea „Revizuit prin Kilo” este adăugată când trimiți.",
       "pendingComment_one": "comentariu în așteptare",
       "pendingComment": "comentarii în așteptare",
       "pendingComment_other": "comentarii în așteptare",

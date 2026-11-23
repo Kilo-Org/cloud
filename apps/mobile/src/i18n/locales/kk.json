@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Жіберілмеген пікірді жою керек пе?",
       "deletePendingMessage": "Бұл пікір кодты тексеру кезегінен жойылады.",
       "summaryOptional": "Қорытынды (міндетті емес)",
+      "footerHint": "Тексеру нәтижесін жібергенде, «Kilo арқылы тексерілді» деген жазу қосылады.",
       "pendingComment_one": "жіберілмеген пікір",
       "pendingComment": "жіберілмеген пікір",
       "pendingComment_other": "жіберілмеген пікір",

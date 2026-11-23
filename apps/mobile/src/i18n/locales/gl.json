@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Eliminar comentario pendente?",
       "deletePendingMessage": "Este comentario eliminarase da cola de revisión.",
       "summaryOptional": "Resumo (opcional)",
+      "footerHint": "Revisado con Kilo engádese ao enviar.",
       "pendingComment_one": "comentario pendente",
       "pendingComment": "comentarios pendentes",
       "pendingComment_other": "comentarios pendentes",

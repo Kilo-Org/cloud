@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "पठाउन बाँकी टिप्पणी मेट्ने?",
       "deletePendingMessage": "यो टिप्पणी समीक्षा कतारबाट हटाइनेछ।",
       "summaryOptional": "सारांश (वैकल्पिक)",
+      "footerHint": "तपाईंले पेश गर्दा ‘Kilo मार्फत समीक्षा गरिएको’ स्वतः थपिन्छ।",
       "pendingComment_one": "पठाउन बाँकी टिप्पणी",
       "pendingComment": "नपठाइएका टिप्पणीहरू",
       "pendingComment_other": "नपठाइएका टिप्पणीहरू",

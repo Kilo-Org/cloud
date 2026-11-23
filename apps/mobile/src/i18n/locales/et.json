@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Kas kustutada ootel kommentaar?",
       "deletePendingMessage": "See kommentaar eemaldatakse ülevaatuse järjekorrast.",
       "summaryOptional": "Kokkuvõte (valikuline)",
+      "footerHint": "Ülevaatuse esitamisel lisatakse jalusesse märge „Üle vaadatud Kilo kaudu“.",
       "pendingComment_one": "ootel kommentaar",
       "pendingComment": "ootel kommentaari",
       "pendingComment_other": "ootel kommentaari",

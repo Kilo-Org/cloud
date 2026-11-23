@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Ta bort oskickad kommentar?",
       "deletePendingMessage": "Den här kommentaren tas bort från granskningskön.",
       "summaryOptional": "Sammanfattning (valfri)",
+      "footerHint": "Granskad via Kilo läggs till när du skickar.",
       "pendingComment_one": "oskickad kommentar",
       "pendingComment": "oskickade kommentarer",
       "pendingComment_other": "oskickade kommentarer",

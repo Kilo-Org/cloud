@@ -3379,6 +3379,7 @@
       "pendingComment_other": "commentaires en attente",
       "pendingComment_one": "commentaire en attente",
       "summaryOptional": "Résumé (facultatif)",
+      "footerHint": "La mention « Revue via Kilo » est ajoutée lors de l'envoi.",
       "partialPostedFresh": "Commentaires publiés : {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Publié : {{displayFreshCount}} commentaire. ",
       "partialPostedFresh_many": "Commentaires publiés : {{displayFreshCount}}. ",

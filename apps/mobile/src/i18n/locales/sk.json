@@ -1066,6 +1066,7 @@
       "deletePendingTitle": "Odstrániť neodoslaný komentár?",
       "deletePendingMessage": "Tento komentár sa odstráni zo zoznamu komentárov čakajúcich na odoslanie v rámci kontroly kódu.",
       "summaryOptional": "Zhrnutie (voliteľné)",
+      "footerHint": "Pri odoslaní kontroly sa pridá pätička „Skontrolované cez Kilo“.",
       "pendingComment_one": "neodoslaný komentár",
       "pendingComment": "neodoslaných komentárov",
       "pendingComment_other": "neodoslaných komentárov",

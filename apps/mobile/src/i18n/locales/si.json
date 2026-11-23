@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "යැවීමට ඇති අදහස මකන්නද?",
       "deletePendingMessage": "මෙම අදහස සමාලෝචන පෝලිමෙන් ඉවත් කරනු ඇත.",
       "summaryOptional": "සාරාංශය (අනිවාර්ය නැත)",
+      "footerHint": "ඔබ ඉදිරිපත් කරන විට \"Kilo හරහා සමාලෝචනය කරන ලදි\" යන පාද සටහන එක් කරනු ලැබේ.",
       "pendingComment_one": "යැවීමට ඇති අදහස",
       "pendingComment": "යැවීමට ඇති අදහස්",
       "pendingComment_other": "යැවීමට ඇති අදහස්",

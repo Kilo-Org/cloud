@@ -3322,6 +3322,7 @@
       "pendingComment_other": "komentar belum dikirim",
       "pendingComment_one": "komentar dalam antrean",
       "summaryOptional": "Ringkasan (opsional)",
+      "footerHint": "Ditinjau melalui Kilo ditambahkan saat kamu mengirim.",
       "partialPostedFresh": "{{displayFreshCount}} komentar terkirim. ",
       "partialPostedFresh_one": "{{displayFreshCount}} komentar terkirim. ",
       "partialPostedFresh_other": "{{displayFreshCount}} komentar terkirim. ",

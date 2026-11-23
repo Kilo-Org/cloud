@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "په تمه تبصره ړنګه شي؟",
       "deletePendingMessage": "دا تبصره به د بیاکتنې له کتار څخه لرې شي.",
       "summaryOptional": "لنډیز (اختیاري)",
+      "footerHint": "کله چې بیاکتنه وسپارئ، «د Kilo له لارې بیاکتل شوی» ورزیات شي.",
       "pendingComment_one": "په تمه تبصره",
       "pendingComment": "په تمه تبصرې",
       "pendingComment_other": "په تمه تبصرې",

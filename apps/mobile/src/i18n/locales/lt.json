@@ -1066,6 +1066,7 @@
       "deletePendingTitle": "Ištrinti nepateiktą komentarą?",
       "deletePendingMessage": "Šis komentaras bus pašalintas iš peržiūros eilės.",
       "summaryOptional": "Santrauka (neprivaloma)",
+      "footerHint": "Pateikus peržiūrą pridedama poraštė, nurodanti, kad peržiūrėta naudojant Kilo.",
       "pendingComment_one": "nepateiktas komentaras",
       "pendingComment": "nepateiktų komentarų",
       "pendingComment_other": "nepateiktų komentarų",

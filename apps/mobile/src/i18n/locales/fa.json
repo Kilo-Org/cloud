@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "نظر در انتظار ارسال حذف شود؟",
       "deletePendingMessage": "این نظر از صف بازبینی حذف می‌شود.",
       "summaryOptional": "خلاصه (اختیاری)",
+      "footerHint": "هنگام ارسال، «بازبینی‌شده با Kilo» اضافه می‌شود.",
       "pendingComment_one": "نظر در انتظار ارسال",
       "pendingComment": "نظر در انتظار ارسال",
       "pendingComment_other": "نظر در انتظار ارسال",

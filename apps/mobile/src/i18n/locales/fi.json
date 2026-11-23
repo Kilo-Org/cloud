@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Poistetaanko lähettämätön kommentti?",
       "deletePendingMessage": "Tämä kommentti poistetaan katselmoinnin lähetysjonosta.",
       "summaryOptional": "Yhteenveto (valinnainen)",
+      "footerHint": "Maininta, että katselmointi tehtiin Kilolla, lisätään, kun lähetät.",
       "pendingComment_one": "lähettämätön kommentti",
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",

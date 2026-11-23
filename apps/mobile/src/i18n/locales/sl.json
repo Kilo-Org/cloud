@@ -1066,6 +1066,7 @@
       "deletePendingTitle": "Izbrišem čakajoči komentar?",
       "deletePendingMessage": "Ta komentar bo odstranjen iz čakalne vrste za pregled.",
       "summaryOptional": "Povzetek (neobvezno)",
+      "footerHint": "Vrstica »Pregledano prek aplikacije Kilo« se doda ob oddaji.",
       "pendingComment_one": "čakajoči komentar",
       "pendingComment": "neoddanih komentarjev",
       "pendingComment_other": "neoddanih komentarjev",

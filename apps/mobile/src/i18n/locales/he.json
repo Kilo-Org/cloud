@@ -3379,6 +3379,7 @@
       "pendingComment_other": "תגובות ממתינות",
       "pendingComment_one": "תגובה ממתינה",
       "summaryOptional": "סיכום (לא חובה)",
+      "footerHint": "הכיתוב 'נסקר דרך Kilo' מתווסף בעת השליחה.",
       "partialPostedFresh": "פורסמו {{displayFreshCount}} תגובות. ",
       "partialPostedFresh_one": "פורסמו {{displayFreshCount}} תגובות. ",
       "partialPostedFresh_two": "פורסמו {{displayFreshCount}} תגובות. ",

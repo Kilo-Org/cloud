@@ -3322,6 +3322,7 @@
       "pendingComment_other": "条待提交评论",
       "pendingComment_one": "条待提交的评论",
       "summaryOptional": "总结（可选）",
+      "footerHint": "提交时会在末尾添加“通过 Kilo 审查”。",
       "partialPostedFresh": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedFresh_one": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedFresh_other": "已发布 {{displayFreshCount}} 条评论。",

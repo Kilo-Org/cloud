@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "অপেক্ষমাণ মন্তব্য মুছবেন?",
       "deletePendingMessage": "এই মন্তব্যটি রিভিউয়ের অপেক্ষমাণ তালিকা থেকে সরানো হবে।",
       "summaryOptional": "সারাংশ (ঐচ্ছিক)",
+      "footerHint": "জমা দেওয়ার সময় ‘Kilo দিয়ে রিভিউ করা হয়েছে’ যোগ করা হয়।",
       "pendingComment_one": "অপেক্ষমাণ মন্তব্য",
       "pendingComment": "অপেক্ষমাণ মন্তব্য",
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",

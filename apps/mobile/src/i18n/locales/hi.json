@@ -3322,6 +3322,7 @@
       "pendingComment_other": "लंबित टिप्पणियाँ",
       "pendingComment_one": "लंबित टिप्पणी",
       "summaryOptional": "सारांश (वैकल्पिक)",
+      "footerHint": "‘Kilo के ज़रिए समीक्षा की गई’ समीक्षा भेजते समय जोड़ा जाता है।",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट की गई। ",
       "partialPostedFresh_other": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",

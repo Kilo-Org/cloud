@@ -3322,6 +3322,7 @@
       "pendingComment_other": "bình luận chưa gửi",
       "pendingComment_one": "bình luận chờ gửi",
       "summaryOptional": "Tóm tắt (tùy chọn)",
+      "footerHint": "Dòng Đã rà soát qua Kilo sẽ được thêm vào khi bạn gửi.",
       "partialPostedFresh": "Đã đăng {{displayFreshCount}} bình luận. ",
       "partialPostedFresh_one": "Đã đăng {{displayFreshCount}} bình luận. ",
       "partialPostedFresh_other": "Đã đăng {{displayFreshCount}} bình luận. ",

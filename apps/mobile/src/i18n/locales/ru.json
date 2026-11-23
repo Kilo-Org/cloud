@@ -3436,6 +3436,7 @@
       "pendingComment_other": "неотправленного комментария",
       "pendingComment_one": "неотправленный комментарий",
       "summaryOptional": "Итоговый комментарий (необязательно)",
+      "footerHint": "Подпись «Проверено с помощью Kilo» добавляется при отправке.",
       "partialPostedFresh": "Опубликовано комментариев: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Опубликовано комментариев: {{displayFreshCount}}. ",
       "partialPostedFresh_few": "Опубликовано комментариев: {{displayFreshCount}}. ",

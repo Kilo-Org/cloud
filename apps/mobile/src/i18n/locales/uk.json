@@ -3436,6 +3436,7 @@
       "pendingComment_other": "ненадісланого коментаря",
       "pendingComment_one": "ненадісланий коментар",
       "summaryOptional": "Підсумок (необов'язково)",
+      "footerHint": "Підпис «Перевірено через Kilo» додається під час надсилання.",
       "partialPostedFresh": "Опубліковано коментарів: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Опубліковано коментарів: {{displayFreshCount}}. ",
       "partialPostedFresh_few": "Опубліковано коментарів: {{displayFreshCount}}. ",

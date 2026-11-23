@@ -1028,6 +1028,7 @@
       "deletePendingTitle": "Eyða athugasemd í bið?",
       "deletePendingMessage": "Þessi athugasemd verður fjarlægð úr biðröð yfirferðarinnar.",
       "summaryOptional": "Samantekt (valfrjáls)",
+      "footerHint": "Yfirfarið með Kilo bætist við þegar þú sendir inn.",
       "pendingComment_one": "athugasemd í bið",
       "pendingComment": "ósendar athugasemdir",
       "pendingComment_other": "ósendar athugasemdir",

@@ -219,6 +219,7 @@ describe('mapRunRow', () => {
       purpose: 'platform' as const,
       // A completed run needs no admission marker: nothing claims it.
       admission_marker: null,
+      plan_fingerprint: null,
     };
     const result = mapRunRow(runRow);
     expect(result).toEqual({

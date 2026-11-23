@@ -35,6 +35,7 @@ vi.mock('./scheduler', async importOriginal => {
     cooldownModel: vi.fn(),
     deferCatalogChunk: vi.fn(),
     deferChunk: vi.fn(),
+    deferNoModelCallChunk: vi.fn(),
     deferThrottledChunk: vi.fn(),
     failChunk: vi.fn(),
     failScheduledEntry: vi.fn(),
@@ -219,6 +220,7 @@ import {
   cooldownModel,
   deferCatalogChunk,
   deferChunk,
+  deferNoModelCallChunk,
   deferThrottledChunk,
   failChunk,
   finishChunk,
@@ -230,9 +232,10 @@ import {
   restartPaidCase,
   scheduleRunChunks,
   startChunk,
-  SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_MAX_CATALOG_DEFERRALS,
+  SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_THROTTLE_DEFERRALS,
+  SCHEDULER_MAX_USER_ATTEMPTS,
   type SchedulerClaim,
 } from './scheduler';
 
@@ -259,7 +262,9 @@ const schedulerPrepare = vi.fn((sql: string): FakeStatement => {
     // The SQL is the only way a caller's `first` can be told apart, so the shared mock sees it.
     first: ((...args: unknown[]) => schedulerFirst(sql, ...args)) as typeof schedulerFirst,
     all: schedulerAll,
-    run: schedulerRun,
+    // A single-statement `run` sees its SQL too: the retry's attempt spend is one of them,
+    // and it must be granted like the ledger's own statements are.
+    run: ((...args: unknown[]) => schedulerRun(sql, ...args)) as typeof schedulerRun,
     bind: (...values: unknown[]) => {
       statement.params = values;
       return statement;
@@ -380,6 +385,7 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     attempts: 1,
     throttle_deferrals: 0,
     catalog_deferrals: 0,
+    lease_reclaims: 0,
     ...overrides,
   };
   vi.mocked(getChunk).mockResolvedValue(claim);
@@ -466,7 +472,15 @@ beforeEach(async () => {
       : null
   );
   schedulerAll.mockResolvedValue({ results: [] });
-  schedulerRun.mockResolvedValue({ meta: { changes: 0 } });
+  // An ordinary deferral succeeds unless a test says the block's budget is spent. Reset
+  // first: `clearAllMocks` keeps queued once-values, and one would leak into a later test.
+  vi.mocked(deferChunk).mockReset().mockResolvedValue('deferred');
+  // A block's retry attempts are its own counter; the grant stands unless a test refuses it.
+  schedulerRun.mockImplementation(async (sql?: string) => ({
+    meta: {
+      changes: typeof sql === 'string' && sql.includes('attempts = attempts + 1') ? 1 : 0,
+    },
+  }));
   queueSend.mockResolvedValue(undefined);
   vi.mocked(startChunk).mockResolvedValue(true);
   vi.mocked(restartPaidCase).mockResolvedValue(true);
@@ -1347,7 +1361,9 @@ describe('processJob — scheduler-owned execution', () => {
       // with no catalog cooldown and no catalog deferral kind.
       expect(deferCatalogChunk).not.toHaveBeenCalled();
       expect(cooldownCatalog).not.toHaveBeenCalled();
-      expect(deferChunk).toHaveBeenCalledWith(
+      // Nothing reached the model, so the wait spends no automatic attempt.
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(deferNoModelCallChunk).toHaveBeenCalledWith(
         env.BENCH_DB,
         'chunk-1',
         'token-1',
@@ -1796,9 +1812,21 @@ describe('processJob — scheduler-owned execution', () => {
       processJob(env, { runId, kind: 'decider', model, schedulerWake: true })
     ).rejects.toThrow('queue unavailable');
     expect(queueSend).toHaveBeenCalledTimes(2);
-    expect(deferChunk).toHaveBeenCalledTimes(2);
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-b', 'token-b', expect.any(Number));
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-c', 'token-c', expect.any(Number));
+    // Unsent claims never reached a worker: they are released without spending an attempt.
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalledTimes(2);
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-b',
+      'token-b',
+      expect.any(Number)
+    );
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-c',
+      'token-c',
+      expect.any(Number)
+    );
   });
 });
 
@@ -1980,19 +2008,21 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(runDeciderCaseViaCli)
       .mockResolvedValueOnce(catalogFailure)
       .mockResolvedValueOnce(catalogFailure);
-    mockClaim({ attempts: SCHEDULER_MAX_ATTEMPTS });
+    mockClaim({ attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS });
     await processJob(env, deciderMessage());
     expect(deferCatalogChunk).toHaveBeenCalled();
     expect(failChunk).not.toHaveBeenCalled();
 
     vi.mocked(deferCatalogChunk).mockClear();
     mockClaim({
-      attempts: SCHEDULER_MAX_ATTEMPTS,
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
       catalog_deferrals: SCHEDULER_MAX_CATALOG_DEFERRALS,
     });
+    // The catalog budget is spent, so the failure takes an ordinary deferral; the row's own
+    // counter is already at the platform cap, so that deferral fails the block.
+    vi.mocked(deferChunk).mockReset().mockResolvedValue('failed');
     await processJob(env, deciderMessage());
     expect(deferCatalogChunk).not.toHaveBeenCalled();
-    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
     expect(recordLaneFailure).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ model, failureClass: 'catalog_load' })
@@ -2246,7 +2276,15 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(runDeciderCaseViaCli).mockRejectedValueOnce(new Error(message));
     await processJob(env, deciderMessage());
     expect(releasedUnbilledGeneration()).toBe(true);
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // A container that could not be reached made no model call, so the block waits under the
+    // no-model-call bound instead of spending a billed attempt.
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
+    expect(deferChunk).not.toHaveBeenCalled();
     expect(queueSend).toHaveBeenCalledWith(
       { runId, kind: 'decider', model, schedulerWake: true },
       { delaySeconds: 15 }
@@ -2266,7 +2304,8 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
   });
 
   function schedulerWaitEvent(calls: unknown[][]): unknown {
@@ -2287,7 +2326,12 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(releasedUnbilledGeneration()).toBe(true);
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
     expect(failChunk).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
@@ -2313,15 +2357,20 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    const firstStartedAt =
+      vi.mocked(runDeciderCaseViaCli).mock.calls[0]?.[1].resultCallback?.execution.attemptStartedAt;
     const retryStartedAt =
       vi.mocked(runDeciderCaseViaCli).mock.calls[1]?.[1].resultCallback?.execution.attemptStartedAt;
+    expect(retryStartedAt).toBeGreaterThan(firstStartedAt ?? 0);
+    // The refund put both starts back to the first attempt's, so the graded row records that
+    // start — not the retry start that never reached the model.
     expect(savePendingDeciderOutput).toHaveBeenCalledWith(
       env.BENCH_DB,
       { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
       {
         result: first,
         retried: false,
-        attemptStartedAt: retryStartedAt,
+        attemptStartedAt: firstStartedAt,
         promptRevision: MEASUREMENT_REVISION,
       }
     );
@@ -2418,6 +2467,48 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     });
   });
 
+  it('defers a user-pool block whose container cannot be reached, failing only at the bound', async () => {
+    // A container that was never reached made no model call, so a user block must not lose its
+    // single billed attempt to one transient observation. It waits under the no-model-call
+    // bound and fails only when that bound is reached.
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, purpose: 'user', admission_marker: '2026-06-16T00:00:00.000Z' },
+    });
+    const claim = mockClaim();
+    const unreachable = new Error(
+      'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container just exited'
+    );
+    vi.mocked(runDeciderCaseViaCli).mockRejectedValue(unreachable);
+    vi.mocked(deferNoModelCallChunk).mockResolvedValueOnce('deferred');
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    // A wait, not a measurement: no deferral that spends the attempt, no lane death, no grade.
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+
+    // The same observation at the bound ends the block, so the run can finish.
+    vi.mocked(deferNoModelCallChunk).mockResolvedValueOnce('failed');
+    await processJob(env, deciderMessage());
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ failureClass: 'container_capacity' })
+    );
+  });
+
   it('defers a killed-before-events case whose retry never reaches the container', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(runDeciderCaseViaCli)
@@ -2443,7 +2534,13 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(failChunk).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // The refused retry is a no-model-call wait, so the block is released without spending.
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
     expect(schedulerWaitEvent(warn.mock.calls)).toMatchObject({
       reason: 'container_capacity',
@@ -2460,7 +2557,14 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // Nothing reached the model, so the release spends no automatic attempt.
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
     expect(failChunk).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
@@ -2572,19 +2676,21 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(runDeciderCaseViaCli)
       .mockResolvedValueOnce(throttled)
       .mockResolvedValueOnce(throttled);
-    mockClaim({ attempts: SCHEDULER_MAX_ATTEMPTS });
+    mockClaim({ attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS });
     await processJob(env, deciderMessage());
     expect(deferThrottledChunk).toHaveBeenCalled();
     expect(failChunk).not.toHaveBeenCalled();
 
     vi.mocked(deferThrottledChunk).mockClear();
     mockClaim({
-      attempts: SCHEDULER_MAX_ATTEMPTS,
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
       throttle_deferrals: SCHEDULER_MAX_THROTTLE_DEFERRALS,
     });
+    // The throttle budget is spent, so the failure takes an ordinary deferral; the block's
+    // own counter is already at the platform cap, so that deferral fails it.
+    vi.mocked(deferChunk).mockReset().mockResolvedValue('failed');
     await processJob(env, deciderMessage());
     expect(deferThrottledChunk).not.toHaveBeenCalled();
-    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
     expect(recordLaneFailure).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ model, failureClass: 'provider_unavailable' })
@@ -2666,6 +2772,63 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(deferChunk).not.toHaveBeenCalled();
     expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
+  /** Makes the run a user pool whose case run is owned by another executor. */
+  async function mockAttachedGeneration(startedAt: number): Promise<void> {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, purpose: 'user', admission_marker: '2026-06-16T00:00:00.000Z' },
+    });
+    // This invocation opened no ledger row of its own; the generation is another executor's.
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(null);
+    vi.mocked(readPaidCaseRun).mockResolvedValue({
+      ...paidCaseRunRow(),
+      executor_run_id: 'other-run',
+      executor_token: 'other-executor',
+      started_at: new Date(startedAt).toISOString(),
+    });
+  }
+
+  it('waits out a healthy attached generation instead of failing it at the old 45s bound', async () => {
+    // The previous counter-bounded wait gave up after ~45 s. An attached generation stays live
+    // up to PAID_OUTPUT_WAIT_MS, so its block waits for that output instead of dying.
+    const attachedSince = Date.now();
+    await mockAttachedGeneration(attachedSince);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, claimId: 'chunk-1', claimToken: 'token-1' },
+      { delaySeconds: expect.any(Number) }
+    );
+
+    // 60 s later, still no output: past the old 45 s bound, and still a wait, not a death.
+    vi.spyOn(Date, 'now').mockReturnValue(attachedSince + 60_000);
+    await processJob(env, deciderMessage());
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).not.toHaveBeenCalled();
+  });
+
+  it('fails an attached generation only once its output deadline has passed', async () => {
+    await mockAttachedGeneration(Date.now() - PAID_OUTPUT_WAIT_MS - 1);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ failureClass: 'ambiguous_execution' })
+    );
   });
 
   it('rechecks a lost paid connection without killing the lane', async () => {
@@ -2786,6 +2949,133 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  /** Switches the mocked run snapshot to a user-purpose run, as the paid flow creates one. */
+  async function mockUserRunSnapshot(): Promise<void> {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: {
+        ...snapshot.run,
+        purpose: 'user',
+        admission_marker: '2026-06-16T00:00:00.000Z',
+      },
+    });
+  }
+
+  it.each([
+    {
+      name: 'a throttled provider failure',
+      result: { stderrTail: 'HTTP 429 rate limited' },
+      defer: 'deferThrottledChunk' as const,
+    },
+    {
+      name: 'a catalog-load failure',
+      result: { stderrTail: 'Failed to load Kilo model catalog: fetch failed' },
+      defer: 'deferCatalogChunk' as const,
+    },
+  ])(
+    're-attempts a user-pool block after an unbilled $name, within its budget',
+    async ({ result, defer }) => {
+      // These failures are only ever raised after CaseStore's native proof released the
+      // generation, so no model call completed and nothing was billed. D129's ban covers an
+      // errored BILLED attempt only, so the block is re-admitted on the deferral budget that
+      // bounds it — not on the user's single billed attempt, which the deferral refunds.
+      await mockUserRunSnapshot();
+      const claim = mockClaim();
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        exitCode: 1,
+        costUsd: 0,
+        ...result,
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+      expect(SCHEDULER_MAX_USER_ATTEMPTS).toBe(1);
+      if (defer === 'deferThrottledChunk') {
+        expect(deferThrottledChunk).toHaveBeenCalledWith(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          expect.any(Number)
+        );
+        expect(deferCatalogChunk).not.toHaveBeenCalled();
+        expect(cooldownModel).toHaveBeenCalledWith(env.BENCH_DB, claim.model, expect.any(Number));
+      } else {
+        expect(deferCatalogChunk).toHaveBeenCalledWith(
+          env.BENCH_DB,
+          claim.id,
+          claim.token,
+          expect.any(Number)
+        );
+        expect(deferThrottledChunk).not.toHaveBeenCalled();
+        expect(cooldownCatalog).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+      }
+      // The block is re-admitted through its own budget; it does not fail and does not spend
+      // the billed attempt.
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(failChunk).not.toHaveBeenCalled();
+      expect(recordLaneFailure).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(queueSend).toHaveBeenCalledWith(
+        { runId, kind: 'decider', model, schedulerWake: true },
+        { delaySeconds: expect.any(Number) }
+      );
+    }
+  );
+
+  it('fails a user-pool block on a billed error and never re-attempts it', async () => {
+    // The attempt was made and billed; the generation then settled without a usable result.
+    // D129 ends the block: no deferral, no second call, and only the manual requeue admits it.
+    await mockUserRunSnapshot();
+    const claim = mockClaim();
+    vi.mocked(readPaidCaseRun).mockResolvedValue({
+      ...paidCaseRunRow(),
+      status: 'settled',
+      result_usable: 0,
+      failure_reason: 'provider returned an unusable answer',
+    });
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(deferCatalogChunk).not.toHaveBeenCalled();
+    expect(restartPaidCase).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, claim.id, claim.token);
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'unknown' })
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
+  it('runs a user-pool block once across a lease loss, because the ledger fence refuses a second billed call', async () => {
+    // A lease loss refunds the block's attempt, so it is re-admitted. The fence is what stops
+    // the second call: the ledger already records this generation's start, so the next
+    // invocation raises the ambiguity instead of inferring again.
+    await mockUserRunSnapshot();
+    const claim = mockClaim();
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - 1_000);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    // Waiting out the delivery window: the ledger row is the durable proof of the one call.
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, claimId: claim.id, claimToken: claim.token },
+      expect.anything()
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
   it.each([
     { name: 'a signal kill before any event', timedOut: false, eventCount: 0, calls: 2 },
     { name: 'a timeout', timedOut: true, eventCount: 0, calls: 1 },
@@ -2831,6 +3121,119 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       expect.anything()
     );
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
+  it('never grades a killed-before-events attempt whose retry the block refused', async () => {
+    // The block is on its last claim, so the retry is refused. A first attempt killed before
+    // any event is not a measurement: grading it would write a zero for a case that never ran,
+    // so it is deferred through normal admission instead (the retry===null rule).
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: -1,
+      costUsd: 0,
+      eventCount: 0,
+      lastEventTypes: [],
+    });
+    schedulerRun.mockImplementation(async (sql?: string) => ({
+      meta: { changes: typeof sql === 'string' && sql.includes('attempts = attempts + 1') ? 0 : 1 },
+    }));
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    // Nothing is measured or written for the case.
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(savePendingDeciderOutput).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    // It is released as unbilled and the chunk defers through normal admission.
+    expect(restartPaidCase).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
+  });
+
+  it('spends the block’s retry attempt before the in-process empty-output retry', async () => {
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '', costUsd: 0.01 })
+      .mockResolvedValueOnce({ ...successfulCliResult, costUsd: 0.02 });
+    await processJob(env, deciderMessage());
+    // Exactly one additional invocation happens, and the attempt counter is what authorised
+    // it: the same column the scheduler spends on claims and deferrals.
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    const spend = vi
+      .mocked(schedulerRun)
+      .mock.calls.filter(([sql]) => String(sql).includes('attempts = attempts + 1'));
+    expect(spend).toHaveLength(1);
+    // The spend names this claim and its token, so it can only authorise this block's retry.
+    const spendStatement = vi
+      .mocked(schedulerPrepare)
+      .mock.results.map(result => result.value)
+      .find(statement => statement.sql.includes('attempts = attempts + 1'));
+    expect(spendStatement?.params).toEqual(['chunk-1', 'token-1', expect.any(Number)]);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ cost_usd: 0.03, retried: true }),
+      expect.anything()
+    );
+  });
+
+  it('refuses the in-process retry once the block’s automatic attempts are spent', async () => {
+    // The block already used both automatic attempts (this claim plus one retry), so the
+    // spend is refused and the measured first answer stands: no third model call.
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      costUsd: 0.01,
+    });
+    // Every spend is refused: the block has no automatic attempt left.
+    schedulerRun.mockImplementation(async () => ({ meta: { changes: 0 } }));
+    await processJob(env, deciderMessage());
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ score: 0, cost_usd: 0.01, retried: false }),
+      expect.anything()
+    );
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
+  it('fails a platform block on its last automatic attempt instead of deferring it again', async () => {
+    // A paid attempt that reached the model still spends its attempt even when only grading
+    // failed. The row is at the platform cap, so the ordinary deferral fails the block into
+    // the existing failure path — the manual CTA is what admits it after that.
+    mockClaim({ attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS });
+    vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1 unavailable'));
+    vi.mocked(deferChunk).mockReset().mockResolvedValue('failed');
+    await processJob(env, deciderMessage());
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // The lane records the failure the block actually hit: a grading retry it could not spend
+    // an attempt on.
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'grader' })
+    );
+    // No scheduler wake is queued for a block that is already terminal.
+    expect(queueSend).not.toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      expect.anything()
+    );
+  });
+
+  it('defers a platform block below the cap and queues its wake', async () => {
+    mockClaim({ attempts: 1 });
+    vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1 unavailable'));
+    vi.mocked(deferChunk).mockReset().mockResolvedValue('deferred');
+    await processJob(env, deciderMessage());
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      { delaySeconds: 15 }
+    );
   });
 
   it('records a container-posted outcome as pending output or a released ledger row', async () => {

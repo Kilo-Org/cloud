@@ -422,6 +422,7 @@ beforeEach(() => {
           measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           // The insert SQL stamps the provenance marker itself; `startRun` is not given it.
           admission_marker: 'admitted:test',
+          plan_fingerprint: null,
           status: 'running',
           completed_at: null,
           error: null,
@@ -497,6 +498,7 @@ const RUN_ROW_BASE = {
   measurement_revision: 2,
   // Provenance marker: `retireLegacyRuns` treats a running run without one as legacy work.
   admission_marker: 'admitted:test',
+  plan_fingerprint: null,
 };
 
 /**
@@ -865,6 +867,7 @@ describe('decider run completion', () => {
       attempts: 1,
       throttle_deferrals: 0,
       catalog_deferrals: 0,
+      lease_reclaims: 0,
     });
     await processJob(env, {
       runId,
@@ -2672,6 +2675,7 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     attempts: 1,
     throttle_deferrals: 0,
     catalog_deferrals: 0,
+    lease_reclaims: 0,
   };
   vi.mocked(claimScheduledChunks)
     .mockResolvedValueOnce([claim, { ...claim, id: 'claim-2', token: 'claim-token-2' }])

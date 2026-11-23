@@ -1276,6 +1276,20 @@ export async function readOwnedCaseGeneration(
  * Move a running generation's canonical start to a further paid call its own run and
  * claim token make. The launch fence compares `started_at` to ISO(attemptStartedAt), so a
  * retry that moved only the run's ledger row would be refused as `not_live`.
+ *
+ * It shares the ledger restart's guard so the retry's batch applies both starts or neither:
+ * the ledger row exists under this token, the chunk still holds an active unexpired lease,
+ * the run is still `running`, and the lane has no recorded failure. Those four predicates are
+ * what keep `benchmark_case_runs.started_at` and `scheduler_executions.started_at` from
+ * disagreeing where RunnerCancel's live check compares them.
+ *
+ * Not shared: the ledger statement's `? IS NULL OR started_at = ?` predicate. On this path
+ * `attemptStartedAt` is always the start the retry is leaving, so the retry can never
+ * accidentally match an unrelated ledger start, and requiring the old value here would only
+ * duplicate a check that statement already makes in the same transaction.
+ *
+ * Bind order: this statement's own two timestamps (`startedAt` twice), the case key's five
+ * columns, the executor run id and token, then `startedAt` again for the lease clock.
  */
 export function restartPaidCaseRunStatement(
   db: D1Database,
@@ -1289,7 +1303,29 @@ export function restartPaidCaseRunStatement(
     .prepare(
       `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
       WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
-        AND executor_run_id = ? AND executor_token = ? AND status = 'running'`
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'
+        AND EXISTS (
+          SELECT 1 FROM scheduler_executions AS ledger
+          WHERE ledger.run_id = benchmark_case_runs.executor_run_id
+            AND ledger.model = benchmark_case_runs.model
+            AND ledger.variant = benchmark_case_runs.variant
+            AND ledger.rep = benchmark_case_runs.rep
+            AND ledger.case_id = benchmark_case_runs.case_id
+            AND ledger.token = benchmark_case_runs.executor_token
+            AND EXISTS (
+              SELECT 1 FROM scheduler_chunks AS chunk
+              WHERE chunk.run_id = ledger.run_id AND chunk.model = ledger.model
+                AND chunk.variant = ledger.variant AND chunk.rep = ledger.rep
+                AND chunk.token = ledger.token
+                AND chunk.status = 'active' AND chunk.lease_until > ?
+            )
+            AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ledger.run_id AND status = 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM run_lane_failures AS failure
+              WHERE failure.run_id = ledger.run_id AND failure.model = ledger.model
+                AND failure.variant = ledger.variant AND failure.rep = ledger.rep
+            )
+        )`
     )
     .bind(
       new Date(input.startedAt).toISOString(),
@@ -1300,7 +1336,8 @@ export function restartPaidCaseRunStatement(
       input.key.rep,
       input.key.caseId,
       input.executor.runId,
-      input.executor.token
+      input.executor.token,
+      input.startedAt
     );
 }
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { markStaleRunsFailed } from './db';
+import { markStaleRunsFailed, restartPaidCaseRunStatement } from './db';
 import {
   acquireInitializationLease,
   beginPaidCase,
@@ -12,6 +12,7 @@ import {
   clearUnbilledCase,
   cooldownModel,
   deferChunk,
+  deferNoModelCallChunk,
   deferThrottledChunk,
   finishChunk,
   failScheduledEntry,
@@ -29,7 +30,13 @@ import {
   SCHEDULER_LANE_HEADS_SQL,
   SCHEDULER_LIVE_SQL,
   SCHEDULER_MATERIALIZED_LANES_SQL,
-  SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+  SCHEDULER_MAX_USER_ATTEMPTS,
+  SCHEDULER_MATERIALIZED_PAGE_SIZE,
+  consumeRetryAttemptStatement,
+  refundUnspentRetryAttempt,
+  restartPaidCaseStatement,
+  SCHEDULER_MAX_NO_MODEL_REATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
   SCHEDULER_PRUNE_EXECUTIONS_SQL,
@@ -866,7 +873,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       chunkSize: 1,
     });
     const config = schedulerConfig('{"slots":1}');
-    const throttles = SCHEDULER_MAX_ATTEMPTS + 2;
+    const throttles = SCHEDULER_MAX_PLATFORM_ATTEMPTS + 2;
     for (let throttle = 1; throttle <= throttles; throttle++) {
       const [claim] = await claimMany(db, config, 1, `throttle-${throttle}`, NOW + throttle);
       if (!claim) throw new Error(`Expected throttled claim ${throttle}`);
@@ -886,7 +893,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunks(sqlite)[0]).toEqual(stored);
   });
 
-  it('fails exhausted leases without allowing another claim or retaining a slot', async () => {
+  it('fails a platform lease reclaim at the second attempt, never a third claim', async () => {
     insertRun(sqlite, 'exhausted');
     await scheduleRunChunks(db, {
       runId: 'exhausted',
@@ -897,23 +904,578 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     let now = NOW;
     const config = schedulerConfig('{"slots":1}');
-    for (let attempt = 1; attempt <= SCHEDULER_MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
       const [claim] = await claimMany(db, config, 1, `attempt-${attempt}`, now);
       if (!claim) throw new Error(`Expected claim attempt ${attempt}`);
       expect(claim.attempts).toBe(attempt);
       now += SCHEDULER_QUEUE_LEASE_MS;
       const failed = await recoverChunks(db, now);
-      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_ATTEMPTS ? 1 : 0);
+      expect(failed).toHaveLength(attempt === SCHEDULER_MAX_PLATFORM_ATTEMPTS ? 1 : 0);
     }
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
       slot: null,
       token: null,
       lease_until: 0,
-      attempts: SCHEDULER_MAX_ATTEMPTS,
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
     });
     expect(await claimMany(db, config, 4, 'after-exhaustion', now)).toEqual([]);
     expect(liveChunks(sqlite)).toEqual([]);
+  });
+
+  it('re-attempts a user block after a lease loss without spending its billed attempt', async () => {
+    insertRun(sqlite, 'user-exhausted', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-exhausted',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    let now = NOW;
+    const config = schedulerConfig('{"slots":1}');
+    // A lease loss leaves no invocation to report what it spent, so the block returns to the
+    // queue and its single BILLED attempt is refunded; the paid ledger fence on the next claim
+    // is what prevents a second billed call.
+    for (let reclaim = 1; reclaim <= SCHEDULER_MAX_NO_MODEL_REATTEMPTS; reclaim++) {
+      const [claim] = await claimMany(db, config, 1, `user-reclaim-${reclaim}`, now);
+      if (!claim) throw new Error(`Expected user claim ${reclaim}`);
+      expect(claim.attempts).toBe(1);
+      now += SCHEDULER_QUEUE_LEASE_MS;
+      expect(await recoverChunks(db, now)).toHaveLength(0);
+      expect(storedChunks(sqlite)[0]).toMatchObject({
+        status: 'pending',
+        attempts: 0,
+        lease_reclaims: reclaim,
+      });
+    }
+    // The reclaim bound is what keeps a losing block from looping: one more lease loss fails it.
+    const [last] = await claimMany(db, config, 1, 'user-reclaim-last', now);
+    if (!last) throw new Error('Expected the bounded user claim');
+    now += SCHEDULER_QUEUE_LEASE_MS;
+    const failed = await recoverChunks(db, now);
+    expect(failed).toHaveLength(1);
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: 0,
+      lease_reclaims: SCHEDULER_MAX_NO_MODEL_REATTEMPTS + 1,
+    });
+    expect(await claimMany(db, config, 2, 'after-user-lease', now)).toEqual([]);
+  });
+
+  it('fails a platform block on its second ordinary deferral', async () => {
+    insertRun(sqlite, 'platform-defer');
+    await scheduleRunChunks(db, {
+      runId: 'platform-defer',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const outcomes: string[] = [];
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `platform-defer-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected platform claim ${attempt}`);
+      outcomes.push(await deferChunk(db, claim.id, claim.token, NOW + attempt));
+    }
+    // The first deferral returns the block to the queue; the second spends its last attempt
+    // and fails it, so no third claim exists to make a third model call.
+    expect(outcomes).toEqual(['deferred', 'failed']);
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(await claimMany(db, config, 2, 'after-platform-failure', NOW + 10)).toEqual([]);
+  });
+
+  it('fails a user block on its first ordinary deferral, never re-running the model', async () => {
+    insertRun(sqlite, 'user-defer', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-defer',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const outcomes: string[] = [];
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `user-defer-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected user claim ${attempt}`);
+      outcomes.push(await deferChunk(db, claim.id, claim.token, NOW + attempt));
+    }
+    // A deferral is the errored block's whole automatic life: its single model call is spent,
+    // so the block fails instead of being re-admitted, and only the manual CTA brings it back.
+    expect(outcomes).toEqual(['failed']);
+    expect(storedChunks(sqlite)[0]).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_USER_ATTEMPTS,
+    });
+    expect(await claimMany(db, config, 2, 'after-user-defer', NOW + 10)).toEqual([]);
+  });
+
+  it("refunds a refused retry's attempt and ledger start against a real database", async () => {
+    // The refund addresses the chunk by the CLAIM's id: a chunk id is the JSON of the block's
+    // position, so binding the run id there matched nothing and silently left the block at its
+    // cap. This runs the production helper against real migrations, not mocks.
+    insertRun(sqlite, 'refund');
+    await scheduleRunChunks(db, {
+      runId: 'refund',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refund-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    // The retry spent its attempt and moved the ledger start, then was refused.
+    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
+    const ledgerKey = {
+      runId: 'refund',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    const retriedAt = NOW + 1;
+    await restartPaidCaseStatement(
+      db,
+      {
+        runId: 'refund',
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        caseId: 'case',
+        token: claim.token,
+        attemptStartedAt: NOW,
+      },
+      retriedAt
+    ).run();
+
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      // `execution` carries the attempt's ORIGINAL start; `startedAt` is what the retry
+      // wrote. Reverting restores the original, which is what the WHERE clause matches.
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+    expect(
+      sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
+    ).toEqual({ started_at: NOW });
+  });
+
+  /** Seeds the canonical case run the retry's fence moves, as the production claim does. */
+  function seedCanonicalCaseRun(runId: string, claim: SchedulerClaim, startedAt: number): void {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_case_runs (
+          engine_identity, model, variant, rep, case_id, status, generation,
+          executor_run_id, executor_token, platform_covered, result_usable,
+          created_at, updated_at, started_at
+        ) VALUES (?, ?, ?, ?, 'case', 'running', 1, ?, ?, 1, 0, ?, ?, ?)`
+      )
+      .run(
+        'scheduler-storage-test',
+        claim.model,
+        claim.variant,
+        claim.rep,
+        runId,
+        claim.token,
+        new Date(startedAt).toISOString(),
+        new Date(startedAt).toISOString(),
+        new Date(startedAt).toISOString()
+      );
+  }
+
+  const retryStarts = () => ({
+    ledger: sqlite
+      .prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?')
+      .get('case'),
+    canonical: sqlite
+      .prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?')
+      .get('case'),
+  });
+
+  it('leaves both starts untouched when the consume statement refuses the retry', async () => {
+    // The retry spends its attempt before it moves either start, so a refused spend means the
+    // ledger start and the canonical case-run start were never touched and still agree — which
+    // is what RunnerCancel's live check compares.
+    insertRun(sqlite, 'refused');
+    await scheduleRunChunks(db, {
+      runId: 'refused',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refused-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    expect(
+      await beginPaidCase(
+        db,
+        {
+          runId: 'refused',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+          token: claim.token,
+        },
+        NOW
+      )
+    ).toBe(true);
+    seedCanonicalCaseRun('refused', claim, NOW);
+    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
+
+    const before = retryStarts();
+    // The canonical row really is seeded, so the assertion below is not undefined === undefined.
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(0);
+
+    expect(retryStarts()).toEqual(before);
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
+  });
+
+  it('moves both starts to the retry start when the fence accepts it', async () => {
+    // The accepting path of the shared guard: a wrong bind order or a predicate that never
+    // matches would silently refuse every retry in production, which assertions about
+    // refusals alone cannot see. Everything the guard names is valid here.
+    insertRun(sqlite, 'accepted');
+    await scheduleRunChunks(db, {
+      runId: 'accepted',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'accepted-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'accepted',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('accepted', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(1);
+    const retriedAt = NOW + 1;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'accepted', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    const retried = retryStarts();
+    const ledgerStart = retried.ledger as { started_at: number };
+    const canonicalStart = retried.canonical as { started_at: string };
+    expect(ledgerStart).toEqual({ started_at: retriedAt });
+    expect(canonicalStart).toEqual({ started_at: new Date(retriedAt).toISOString() });
+    // Both starts name the same instant, which is what RunnerCancel's live check compares.
+    expect(new Date(ledgerStart.started_at).toISOString()).toBe(canonicalStart.started_at);
+    // The claim spent one attempt, and the retry spent exactly one more.
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
+  });
+
+  it('puts both starts back to the first attempt when the retry never reached the model', async () => {
+    // The retry's restart batch succeeded, then the retry was refused (container not reached or
+    // the launch fence). The refund must restore the ledger start AND the canonical start to
+    // the first attempt's, or RunnerCancel's live check compares two different instants.
+    insertRun(sqlite, 'refunded');
+    await scheduleRunChunks(db, {
+      runId: 'refunded',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refunded-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'refunded',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('refunded', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    // The retry spends its attempt and its restart batch succeeds, moving both starts.
+    expect(
+      (await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run()).meta.changes
+    ).toBe(1);
+    const retriedAt = NOW + 1;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'refunded', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    expect(retryStarts().canonical).toEqual({ started_at: new Date(retriedAt).toISOString() });
+
+    // The retry is then refused before reaching the model.
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    expect(retryStarts()).toEqual(before);
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+  });
+
+  it('applies both reverts or neither when the lease expires before the refund', async () => {
+    // The canonical revert carries the ledger revert's guard term for term, so a lease that
+    // expired between the restart and the refund refuses BOTH: the two starts stay equal (both
+    // still at the retry start) instead of the canonical one drifting on its own.
+    insertRun(sqlite, 'expired');
+    await scheduleRunChunks(db, {
+      runId: 'expired',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'expired-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'expired',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('expired', claim, NOW);
+    expect(
+      (await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run()).meta.changes
+    ).toBe(1);
+    const retriedAt = NOW + 1;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'expired', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    const atRetry = retryStarts();
+    expect(atRetry.canonical).toEqual({ started_at: new Date(retriedAt).toISOString() });
+
+    // The claim's lease expires before the refund runs.
+    sqlite.prepare('UPDATE scheduler_chunks SET lease_until = 0 WHERE id = ?').run(claim.id);
+
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    // Both statements refused, so both starts are untouched and still agree.
+    expect(retryStarts()).toEqual(atRetry);
+    // The attempt refund is guarded by status/token only, so it still returns the spend.
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+  });
+
+  it('checks both reverts against one lease clock, so a lease inside the retry window cannot split them', async () => {
+    // The ledger and canonical reverts must use the SAME lease clock. With the ledger clocked
+    // at the first start and the canonical at the retry start, a lease expiring between them
+    // satisfies one statement and refuses the other, and the two starts end up disagreeing.
+    insertRun(sqlite, 'windows');
+    await scheduleRunChunks(db, {
+      runId: 'windows',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'windows-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'windows',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('windows', claim, NOW);
+    expect(
+      (await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run()).meta.changes
+    ).toBe(1);
+
+    // The retry starts well after the first attempt, and the lease expires strictly between the
+    // two — the window the two different clocks used to straddle.
+    const retriedAt = NOW + 5_000;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'windows', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    sqlite
+      .prepare('UPDATE scheduler_chunks SET lease_until = ? WHERE id = ?')
+      .run(NOW + 2_500, claim.id);
+
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    // Both fits the shared clock (the suite pins the system time to NOW), so both applied: the
+    // two starts are equal again, at the first attempt's start.
+    const after = retryStarts();
+    expect(after.ledger).toEqual({ started_at: NOW });
+    expect(after.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+  });
+
+  it('moves neither start when the run ends between the consume and the restart', async () => {
+    // The two restart statements carry the SAME guard, so a fence refusal cannot move only the
+    // canonical row: here the consume succeeds, then the run is paused, and the batch's guard
+    // refuses both. The retry's refund then restores the attempt and both starts still match.
+    insertRun(sqlite, 'paused');
+    await scheduleRunChunks(db, {
+      runId: 'paused',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'paused-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'paused',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('paused', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toBeDefined();
+
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(1);
+    // The run stops being live between the spend and the fence restart.
+    sqlite.prepare("UPDATE benchmark_runs SET status = 'failed' WHERE id = 'paused'").run();
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, NOW + 1),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'paused', token: claim.token },
+        startedAt: NOW + 1,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([0, 0]);
+    expect(retryStarts()).toEqual(before);
+
+    // The refusal refunds the attempt it spent; both starts were never touched.
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: NOW + 1,
+    });
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+    expect(retryStarts()).toEqual(before);
+  });
+
+  it('does not spend a platform attempt on a wait that never reached the model', async () => {
+    insertRun(sqlite, 'platform-wait');
+    await scheduleRunChunks(db, {
+      runId: 'platform-wait',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'wait-claim');
+    if (!claim) throw new Error('Expected a claim');
+    await deferNoModelCallChunk(db, claim.id, claim.token, NOW);
+    expect(storedChunk(sqlite, claim.id)).toMatchObject({ status: 'pending', attempts: 0 });
   });
 
   it('persists the paid-case guard across connection restart, lease recovery and token replacement', async () => {
@@ -1274,12 +1836,75 @@ describe('scheduler (production migrations and real SQLite)', () => {
       'SEARCH case_results USING COVERING INDEX sqlite_autoindex_case_results_1 (run_id=? AND model=? AND variant=? AND case_id=? AND rep=?)'
     );
     expect(insertPlan).not.toContain('SCAN case_results');
+    // Materialization stays one insert per row: the block guard is a run-scoped read done
+    // once per pass, not a per-row scan over the chunk table.
     expect(insertPlan).not.toContain('scheduler_chunks');
     const lanesPlan = explainPlan(sqlite, SCHEDULER_MATERIALIZED_LANES_SQL);
     expect(lanesPlan).toContain(
-      'SEARCH scheduler_chunks USING INDEX IX_scheduler_chunks_run (run_id=?)'
+      'SEARCH scheduler_chunks USING INDEX IX_scheduler_chunks_run_id (run_id=?)'
     );
     expect(lanesPlan).not.toContain('SCAN scheduler_chunks');
+  });
+
+  it('terminalizes a pending block already over its cap, for a platform and a user run', async () => {
+    // Rows an earlier build wrote can be `pending` at or above the cap this build enforces:
+    // `claimScheduledChunks` refuses them, so nothing would retire them and their run would hold
+    // a queue slot (and a paid request) forever. The recovery pass moves them to `failed`, which
+    // is where the lane-failure record and run finalization pick them up — the same terminal
+    // state the cap path produces, with no deploy script involved.
+    for (const purpose of ['platform', 'user'] as const) {
+      const runId = `over-cap-${purpose}`;
+      insertRun(sqlite, runId, { purpose });
+      await scheduleRunChunks(db, {
+        runId,
+        entries: [
+          { model: 'over/model', variant: '' },
+          { model: 'normal/model', variant: '' },
+        ],
+        repetitions: 1,
+        caseIds: ['case-a'],
+        chunkSize: 1,
+      });
+      // The old six-attempt rule left this block at 3 attempts.
+      sqlite
+        .prepare(
+          "UPDATE scheduler_chunks SET attempts = 3 WHERE run_id = ? AND model = 'over/model'"
+        )
+        .run(runId);
+
+      // It is not selectable, so a dispatch pass takes only the healthy block — and the run is
+      // still unsettled, which is exactly the wedge the recovery pass has to clear.
+      const claims = await claimMany(db, schedulerConfig('{"slots":4}'), 4, `pre-${purpose}`, NOW);
+      expect(claims.map(claim => claim.model)).toEqual(['normal/model']);
+      expect(await hasUnsettledChunks(db, runId)).toBe(true);
+
+      const failed = await recoverChunks(db, NOW + 1);
+
+      expect(
+        sqlite
+          .prepare("SELECT status FROM scheduler_chunks WHERE run_id = ? AND model = 'over/model'")
+          .get(runId)
+      ).toEqual({ status: 'failed' });
+      // Reported once for the lane-failure record, which is what lets the run finish.
+      expect(failed.filter(row => row.run_id === runId).map(row => row.model)).toEqual([
+        'over/model',
+      ]);
+      // Dispatch records the lane failure from that report; the next pass then has nothing to
+      // re-report, so a terminal block is never revisited.
+      sqlite
+        .prepare(
+          `INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, failed_at, failure_class)
+          VALUES (?, 'over/model', '', 0, 0, ?, 'unknown')`
+        )
+        .run(runId, new Date(NOW).toISOString());
+      expect(await recoverChunks(db, NOW + 2)).toEqual([]);
+      // The healthy block completes normally and the run has nothing unsettled left.
+      const healthyClaim = claims[0];
+      if (!healthyClaim) throw new Error('Expected the healthy claim');
+      expect(await startChunk(db, healthyClaim.id, healthyClaim.token, NOW + 1)).toBe(true);
+      await finishChunk(db, healthyClaim.id, healthyClaim.token);
+      expect(await hasUnsettledChunks(db, runId)).toBe(false);
+    }
   });
 
   it('does not repeatedly report failed chunks from lanes already recorded in run_lane_failures', async () => {
@@ -1296,7 +1921,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     sqlite
       .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = ?")
-      .run(SCHEDULER_MAX_ATTEMPTS);
+      .run(SCHEDULER_MAX_PLATFORM_ATTEMPTS);
     const recordFailure = sqlite.prepare(`
       INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, failed_at)
       VALUES ('failed-lanes', 'shared/model', ?, ?, 0, ?)
@@ -1592,7 +2217,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     }
     const chunksPlan = explainPlan(sqlite, SCHEDULER_PRUNE_CHUNKS_SQL);
     expect(chunksPlan).toContain(
-      'SEARCH c USING COVERING INDEX IX_scheduler_chunks_run (run_id>?)'
+      'SEARCH c USING COVERING INDEX IX_scheduler_chunks_run_id (run_id>?)'
     );
     expect(chunksPlan).toContain('SEARCH run USING INDEX sqlite_autoindex_benchmark_runs_1 (id=?)');
     expect(chunksPlan).not.toMatch(/^SCAN run$/m);
@@ -1721,5 +2346,489 @@ describe('scheduler (production migrations and real SQLite)', () => {
       .prepare("UPDATE scheduler_chunks SET status = 'failed', slot = NULL WHERE status = 'active'")
       .run();
     expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(false);
+  });
+});
+
+/**
+ * The automatic-attempt cap is keyed on the chunk row, so the proof that a platform block
+ * cannot exceed two calls reduces to: a block (run, model, variant, rep, case) always lands
+ * in the same chunk id, in a run that is never re-opened, and the row is never pruned and
+ * re-created. These tests replay every path that could break that.
+ */
+describe('platform attempt cap — a block can never be re-chunked with a fresh counter', () => {
+  let directory: string;
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    directory = mkdtempSync(join(tmpdir(), 'benchmark-retry-cap-'));
+    sqlite = new DatabaseSync(join(directory, 'scheduler.sqlite'));
+    applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
+    db = sqliteD1(sqlite);
+  });
+
+  afterEach(() => {
+    sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+    vi.useRealTimers();
+  });
+
+  /** Drives one platform block to its failed terminal state and returns its chunk id. */
+  async function exhaustOneBlock(runId: string, caseId: string): Promise<string> {
+    await scheduleRunChunks(db, {
+      runId,
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: [caseId],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(
+        db,
+        config,
+        1,
+        `${runId}-${caseId}-${attempt}`,
+        NOW + attempt
+      );
+      if (!claim) throw new Error(`Expected claim ${attempt} for ${caseId}`);
+      expect(claim.case_ids).toBe(JSON.stringify([caseId]));
+      await deferChunk(db, claim.id, claim.token, NOW + attempt);
+    }
+    const row = storedChunks(sqlite).find(chunk => chunk.run_id === runId);
+    if (!row) throw new Error('Expected the exhausted chunk');
+    expect(row).toMatchObject({ status: 'failed', attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS });
+    return row.id;
+  }
+
+  it('keeps the same chunk id and counter when initialization is replayed after a failure', async () => {
+    insertRun(sqlite, 'replay');
+    const id = await exhaustOneBlock('replay', 'case-a');
+
+    // Dead-letter's legacy branch and every dispatch retry call initializeScheduledRun again.
+    // The chunk id is derived from the run and the block's position, and the insert is
+    // ON CONFLICT (id) DO NOTHING, so the replay neither recreates the row nor resets it.
+    await scheduleRunChunks(db, {
+      runId: 'replay',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 1,
+    });
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(storedChunks(sqlite)).toHaveLength(1);
+    expect(
+      await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'replay-after', NOW + 10)
+    ).toEqual([]);
+  });
+
+  it('keeps the cap when a changed plan moves a block to a different chunk id', async () => {
+    // A user lane's cases come from its paid request plan, which can reorder between
+    // initialization passes. The chunk id is the block's position in that lane, so a moved
+    // case would otherwise land in a brand-new row with `attempts` back at 0 — a fresh budget
+    // for the same block. The initializer refuses a second row for a block that already has
+    // one, so the cap stays a property of the block (run, model, variant, rep, case set).
+    insertRun(sqlite, 'moved', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    await scheduleRunChunks(db, {
+      runId: 'moved',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+    });
+    const before = storedChunks(sqlite).map(row => [row.id, row.case_ids]);
+    expect(before).toEqual([
+      [JSON.stringify(['moved', 'cap/model', '', 0, 0]), JSON.stringify(['case-a'])],
+      [JSON.stringify(['moved', 'cap/model', '', 0, 1]), JSON.stringify(['case-b'])],
+    ]);
+    const caseBChunk = storedChunks(sqlite).find(
+      row => row.case_ids === JSON.stringify(['case-b'])
+    );
+    if (!caseBChunk) throw new Error('Expected the case-b chunk');
+    // Spend the block's only attempt and fail it, exactly as an errored billed block ends.
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = 1 WHERE id = ?")
+      .run(caseBChunk.id);
+
+    // The plan now names case-b first: its block would be chunk 0, an id that already belongs
+    // to case-a, and case-a would take chunk 1. Neither may be re-created.
+    await scheduleRunChunks(db, {
+      runId: 'moved',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-b', 'case-a'],
+      chunkSize: 1,
+      laneCaseIds: new Map([
+        [JSON.stringify([block.model, block.variant, 0]), ['case-b', 'case-a']],
+      ]),
+    });
+
+    expect(
+      storedChunks(sqlite).map(row => [row.id, row.case_ids, row.status, row.attempts])
+    ).toEqual([
+      [JSON.stringify(['moved', 'cap/model', '', 0, 0]), JSON.stringify(['case-a']), 'pending', 0],
+      [JSON.stringify(['moved', 'cap/model', '', 0, 1]), JSON.stringify(['case-b']), 'failed', 1],
+    ]);
+    // The failed block is still not claimable: the carried counter is what the claim reads.
+    expect(
+      (await claimMany(db, schedulerConfig('{"slots":2}'), 2, 'after-move', NOW + 10)).map(
+        claim => claim.case_ids
+      )
+    ).toEqual([JSON.stringify(['case-a'])]);
+  });
+
+  it("reads the run's rows once per plan version, not once per pass", async () => {
+    // The case-level guard needs the run's rows, but reading them on every pass would make a
+    // rescan cost O(rows written so far) per pass — quadratic over a large plan. The plan
+    // fingerprint on the run gates it: an unchanged plan resumes from its prefix and reads
+    // no rows at all, and only a re-plan pays one full read.
+    insertRun(sqlite, 'cost', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    const caseIds = Array.from({ length: 40 }, (_, index) => `case-${index}`);
+    const plan = new Map([[laneKey, caseIds]]);
+
+    const reads = { chunkRows: 0, queries: 0 };
+    const counting = sqliteD1(sqlite, () => {
+      reads.queries += 1;
+    });
+    const counted = {
+      ...counting,
+      prepare(sqlText: string) {
+        // The guard's pages, told apart from the lanes aggregate the resume cursor uses.
+        if (sqlText.includes('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks')) {
+          reads.chunkRows += 1;
+          // Every page carries the keyset bound (except the first) and the page size, so the
+          // read can never become one unbounded result.
+          expect(sqlText).toContain(`LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`);
+          expect(sqlText).toContain('ORDER BY id');
+        }
+        return counting.prepare(sqlText);
+      },
+    } as unknown as D1Database;
+
+    // First pass: no fingerprint recorded yet, so the plan is "changed" and it reads once.
+    await scheduleRunChunks(counted, {
+      runId: 'cost',
+      entries: [block],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+      laneCaseIds: plan,
+    });
+    expect(reads.chunkRows).toBe(1);
+    // The plan's 40 single-case chunks are materialized and the plan version is recorded.
+    expect(storedChunks(sqlite)).toHaveLength(40);
+    expect(
+      sqlite.prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'cost'").get()
+    ).toMatchObject({ plan_fingerprint: expect.any(String) });
+
+    // Resume passes with the same plan: the prefix cursor carries them and no rows are read,
+    // whatever the run already holds. This is the property that keeps the total linear.
+    const before = reads.chunkRows;
+    for (let pass = 0; pass < 5; pass++) {
+      sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'cost'").run();
+      await scheduleRunChunks(counted, {
+        runId: 'cost',
+        entries: [block],
+        repetitions: 1,
+        caseIds,
+        chunkSize: 1,
+        laneCaseIds: plan,
+      });
+    }
+    expect(reads.chunkRows).toBe(before);
+
+    // A re-plan reads the run's rows exactly once, however many rows it already holds.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'cost'").run();
+    await scheduleRunChunks(counted, {
+      runId: 'cost',
+      entries: [block],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, [...caseIds, 'case-new']]]),
+    });
+    // A re-plan reads the run's rows in keyset pages of SCHEDULER_MATERIALIZED_PAGE_SIZE:
+    // 41 rows fit one page, so the statement count is the ceiling of rows/page, never one
+    // unbounded result.
+    expect(reads.chunkRows).toBe(before + Math.ceil(41 / SCHEDULER_MATERIALIZED_PAGE_SIZE));
+    // Only the case the new plan adds is written; the 40 it already had keep their rows.
+    expect(storedChunks(sqlite)).toHaveLength(41);
+  });
+
+  it('keeps each case’s cap when a re-plan regroups cases into different chunks', async () => {
+    // Production chunks hold one case (`DECIDER_CHUNK_SIZE = 1`, src/run.ts:298), but the
+    // initializer takes a chunk size, so the guard must be case-level rather than
+    // case-set-level: a re-plan that regroups a multi-case chunk would otherwise hand every
+    // case in it a fresh counter. Blocks are `(run, model, variant, rep, case)`.
+    insertRun(sqlite, 'regrouped', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: 'low' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c']]]),
+    });
+    // Two chunks: [a,b] and [c]. Fail the [c] chunk after spending its attempt.
+    const chunkC = storedChunks(sqlite).find(row => row.case_ids === JSON.stringify(['case-c']));
+    if (!chunkC) throw new Error('Expected the case-c chunk');
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = 1 WHERE id = ?")
+      .run(chunkC.id);
+    expect(storedChunks(sqlite)).toHaveLength(2);
+    // A re-plan can only reach the initializer while its pass is unfinished: the marker
+    // commits with the last batch, and every later call returns immediately. Clearing it
+    // models the interrupted pass a re-plan resumes from.
+    const interruptInitialization = () =>
+      sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'regrouped'").run();
+    interruptInitialization();
+
+    // The plan now regroups: [b,c] and [a]. case-b was in [a,b] and case-c was failed on its
+    // own, so both new groupings contain a scheduled case and neither may be written. Only a
+    // case with no row at all would be.
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-b', 'case-c', 'case-a'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-b', 'case-c', 'case-a']]]),
+    });
+
+    // Nothing was re-created and no case inherited a second row: the [a,b] chunk still holds
+    // only case-a and case-b, and case-c keeps its failed row and its spent attempt.
+    expect(storedChunks(sqlite).map(row => [row.case_ids, row.status, row.attempts])).toEqual([
+      [JSON.stringify(['case-a', 'case-b']), 'pending', 0],
+      [JSON.stringify(['case-c']), 'failed', 1],
+    ]);
+    // A regrouped case never becomes claimable again: case-c has no second row to claim.
+    // (Claims are checked once at the end, so no chunk is already live when they run.)
+
+    // The plan now puts a NEW case beside an existing one: [a,b] stays, and [c,case-d] adds
+    // case-d. Filtering the whole chunk on its existing case would silently drop case-d and
+    // it would never be benchmarked, so only case-d may be written — at an id no row holds,
+    // because the plan's own index 1 already belongs to the failed [case-c] chunk.
+    interruptInitialization();
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c', 'case-d'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c', 'case-d']]]),
+    });
+
+    const after = storedChunks(sqlite).map(row => [row.case_ids, row.status, row.attempts]);
+    // case-d gets exactly one row, holding only itself; case-c keeps its failed row and the
+    // attempt it spent, and case-a/case-b keep their untouched pending row.
+    expect(after).toEqual([
+      [JSON.stringify(['case-a', 'case-b']), 'pending', 0],
+      [JSON.stringify(['case-c']), 'failed', 1],
+      [JSON.stringify(['case-d']), 'pending', 0],
+    ]);
+    const claimable = (
+      await claimMany(db, schedulerConfig('{"slots":4}'), 4, 'after-new-case', NOW + 20)
+    ).map(claim => claim.case_ids);
+    // Both live cases are claimable exactly once, and the spent case is not: the cap still
+    // follows the case, not the position.
+    expect(claimable.sort()).toEqual([
+      JSON.stringify(['case-a', 'case-b']),
+      JSON.stringify(['case-d']),
+    ]);
+  });
+
+  it('keeps the cap when an interrupted re-plan pass resumes, and never double-schedules a case', async () => {
+    // kilobot's shape: an interrupted pass leaves the plan fingerprint unrecorded, so the
+    // resumed pass must read the run's rows again. Without that it would resume as "unchanged"
+    // and could place a residual chunk on a free id holding a case that already has a row.
+    insertRun(sqlite, 'interrupted', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    await scheduleRunChunks(db, {
+      runId: 'interrupted',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c']]]),
+    });
+    // The pass that would have recorded the fingerprint was interrupted: no marker, and no
+    // fingerprint on the run either.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'interrupted'").run();
+    sqlite
+      .prepare("UPDATE benchmark_runs SET plan_fingerprint = NULL WHERE id = 'interrupted'")
+      .run();
+    // The re-plan prepends a new case, so every existing one moves one position: [d,a,b,c].
+    await scheduleRunChunks(db, {
+      runId: 'interrupted',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-d', 'case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, ['case-d', 'case-a', 'case-b', 'case-c']]]),
+    });
+
+    // Every case has exactly one row: the new case-d is scheduled, and no existing case was
+    // written twice while its position moved.
+    const rows = storedChunks(sqlite).map(row => JSON.parse(row.case_ids) as string[]);
+    const scheduled = rows.flat();
+    expect(scheduled.sort()).toEqual(['case-a', 'case-b', 'case-c', 'case-d']);
+    // Exactly one row per case: the check above would still pass if one case held two rows
+    // and another none, so count them.
+    expect(new Set(scheduled).size).toBe(scheduled.length);
+    expect(rows.every(cases => cases.length === 1)).toBe(true);
+  });
+
+  it('hashes every repetition, so a plan that fills a reused lane still reads as changed', async () => {
+    // Repetition 0 is fully reused (no planned rows) while repetition 1 is planned. If the
+    // fingerprint skipped the empty lane and returned early, a changed plan for repetition 1
+    // would hash equal: the pass would take the prefix path with no materialized set, and a
+    // case that moved above the prefix would be dropped by ON CONFLICT DO NOTHING.
+    insertRun(sqlite, 'reused-rep', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = (rep: number) => JSON.stringify([block.model, block.variant, rep]);
+    const firstPlan = new Map([
+      [laneKey(0), []],
+      [laneKey(1), ['case-a', 'case-b']],
+    ]);
+    await scheduleRunChunks(db, {
+      runId: 'reused-rep',
+      entries: [block],
+      repetitions: 2,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+      laneCaseIds: firstPlan,
+    });
+    expect(storedChunks(sqlite).map(row => row.case_ids)).toEqual([
+      JSON.stringify(['case-a']),
+      JSON.stringify(['case-b']),
+    ]);
+    const recorded = sqlite
+      .prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'reused-rep'")
+      .get() as { plan_fingerprint: string };
+    expect(recorded.plan_fingerprint).toEqual(expect.any(String));
+
+    // Re-plan repetition 1 by moving case-b ahead of case-a. Repetition 0 stays empty.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'reused-rep'").run();
+    await scheduleRunChunks(db, {
+      runId: 'reused-rep',
+      entries: [block],
+      repetitions: 2,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+      laneCaseIds: new Map([
+        [laneKey(0), []],
+        [laneKey(1), ['case-b', 'case-a']],
+      ]),
+    });
+
+    // The fingerprint changed, so the guard ran: each case still has exactly one row.
+    expect(
+      (
+        sqlite
+          .prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'reused-rep'")
+          .get() as { plan_fingerprint: string }
+      ).plan_fingerprint
+    ).not.toBe(recorded.plan_fingerprint);
+    const scheduled = storedChunks(sqlite).flatMap(row => JSON.parse(row.case_ids) as string[]);
+    expect(scheduled.sort()).toEqual(['case-a', 'case-b']);
+    expect(new Set(scheduled).size).toBe(scheduled.length);
+  });
+
+  it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {
+    insertRun(sqlite, 'resize');
+    const id = await exhaustOneBlock('resize', 'case-a');
+    // chunkSize is a constant 1 for every decider run, but even a different size lands the
+    // only case at chunk 0; the id must not move and the counter must not restart.
+    await scheduleRunChunks(db, {
+      runId: 'resize',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 3,
+    });
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(
+      await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'resize-after', NOW + 10)
+    ).toEqual([]);
+  });
+
+  it('assigns every block the same chunk id and counter on every replay', async () => {
+    insertRun(sqlite, 'narrowed');
+    // `laneCaseIds` can shift case offsets, but the initializer builds it only for a user run
+    // (`if (run.purpose === 'user')`, src/run.ts:1658); a platform run always measures the
+    // whole ordered catalog list, so each block keeps its own chunk index across replays.
+    const caseIds = ['case-a', 'case-b', 'case-c'];
+    await scheduleRunChunks(db, {
+      runId: 'narrowed',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    const before = storedChunks(sqlite).map(row => [row.id, row.case_ids]);
+    expect(before).toEqual(
+      caseIds.map((caseId, index) => [
+        JSON.stringify(['narrowed', 'cap/model', 'high', 0, index]),
+        JSON.stringify([caseId]),
+      ])
+    );
+    // Replaying the same initialization, which is what every retry path does, is a no-op.
+    await scheduleRunChunks(db, {
+      runId: 'narrowed',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    expect(storedChunks(sqlite).map(row => [row.id, row.case_ids])).toEqual(before);
+  });
+
+  it('prunes a failed chunk only with its stale run, and a terminal run is never re-opened', async () => {
+    insertRun(sqlite, 'pruned');
+    const id = await exhaustOneBlock('pruned', 'case-a');
+
+    // A running run's failed chunk is retained through the whole 24-hour window.
+    await recoverChunks(db, NOW + 23 * 3600_000);
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+
+    // Only a run that already left `running` is pruned, and nothing in production writes a
+    // run back to `running` (no UPDATE benchmark_runs ... 'running' exists; a requeue starts
+    // a brand-new run id). So there is no later initialization that could recreate the row.
+    // The initialization marker the schedule pass already wrote names it for the prune,
+    // exactly as a real completed run's does.
+    sqlite
+      .prepare("UPDATE benchmark_runs SET status = 'failed', completed_at = ? WHERE id = 'pruned'")
+      .run(new Date(NOW).toISOString());
+    await recoverChunks(db, NOW + 25 * 3600_000);
+    expect(storedChunks(sqlite).find(row => row.id === id)).toBeUndefined();
+    await scheduleRunChunks(db, {
+      runId: 'pruned',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 1,
+    });
+    // A terminal run's initialization is refused, so the pruned block is never recreated.
+    expect(storedChunks(sqlite)).toEqual([]);
   });
 });

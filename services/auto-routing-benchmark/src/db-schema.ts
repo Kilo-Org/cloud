@@ -128,6 +128,11 @@ export const benchmarkRuns = sqliteTable(
     // during the deploy overlap is recognized and fenced — wall clock proves nothing.
     // NULL means never claimable, initializable or dispatchable again.
     admission_marker: text('admission_marker'),
+    // Hash of the paid-request plan the run's scheduler chunks were materialized from. The
+    // initializer reads the run's chunk rows only when this differs from the plan it is
+    // handed, so a resumed pass over an unchanged plan stays a bounded prefix scan instead
+    // of re-reading every row it has written.
+    plan_fingerprint: text('plan_fingerprint'),
   },
   table => [
     // Decider queues run several runs at once; a classifier run derives one winner.
@@ -284,10 +289,16 @@ export const schedulerChunks = sqliteTable(
     attempts: integer('attempts').notNull().default(0),
     throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
     catalog_deferrals: integer('catalog_deferrals').notNull().default(0),
+    // Automatic re-attempts that made no billed call: a lease loss, a crash, or a wait on
+    // another executor's generation. Bounds those re-attempts for both purposes, so a block
+    // cannot re-queue forever; a block reaching the bound fails into the manual retry path.
+    lease_reclaims: integer('lease_reclaims').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
-    index('IX_scheduler_chunks_run').on(table.run_id),
+    // Serves both the run-scoped reads and the initializer's keyset page: `(run_id, id)` has
+    // `run_id` as its leftmost prefix, so it replaces the old single-column index.
+    index('IX_scheduler_chunks_run_id').on(table.run_id, table.id),
     // Lane-head dispatch: a lane is one (run, model, variant, rep) chunk chain, and
     // `(available_at, chunk)` orders its runnable head. This prefix lets a claim
     // find each lane's next runnable chunk by index seek instead of scanning the

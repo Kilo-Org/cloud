@@ -8,6 +8,7 @@ import {
   type BenchmarkSchedulerSettingKey,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
+import { sha256Hex } from '@kilocode/worker-utils';
 
 export type PaidExecutionKey = {
   runId: string;
@@ -135,7 +136,68 @@ export async function saveSchedulerOverrides(
 
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;
 export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
-export const SCHEDULER_MAX_ATTEMPTS = 6;
+/**
+ * Automatic attempts one block of a USER pool may use: exactly one model call. A user pool
+ * never re-runs an errored block on its own — not through a deferral, not through a lease
+ * reclaim, and not through a redelivered queue message — so an errored user block waits for
+ * the manual "Requeue retryable" CTA. Waits that made no model call return this attempt
+ * ({@link deferNoModelCallChunk}), so a lost claim or a launch-fence refusal does not burn it.
+ */
+export const SCHEDULER_MAX_USER_ATTEMPTS = 1;
+/**
+ * Automatic re-attempts one block may use when nothing reached the model — a lease loss, a
+ * crash, an attached generation, an unreachable gateway, a refused launch, or a container that
+ * could not be reached. Both purposes share it, and it is deliberately separate from the
+ * attempt cap: none of these spends a billed attempt.
+ *
+ * A lease loss leaves no invocation to say what it spent, so this counter is the bound that
+ * keeps a block from looping; the paid ledger fence (`getPaidCaseStartedAt` raising
+ * `AmbiguousBenchmarkExecutionError`) is what stops a second billed call. Three rides out a
+ * deploy or a container restart; a fourth fails the block into the manual requeue.
+ */
+export const SCHEDULER_MAX_NO_MODEL_REATTEMPTS = 3;
+/**
+ * Automatic attempts one block of a PLATFORM pool may use: the first run plus one
+ * automatic retry, counted on the chunk's own `attempts` across every automatic path
+ * (chunk deferral, lease reclaim and the in-process empty-output retry). Once both are
+ * spent the block fails into the ordinary failure path, and only the manual
+ * "Requeue retryable" CTA admits it again.
+ */
+export const SCHEDULER_MAX_PLATFORM_ATTEMPTS = 2;
+/**
+ * Rows per page when a changed paid-request plan makes the initializer read the run's
+ * materialized chunks.
+ *
+ * The widest real plan is 68 pairs x 597 cases x 3 reps = 121,788 blocks, one case per chunk.
+ * Measured against the repo's own identifiers — the 75-character longest decider case id, a
+ * 41-character catalog model, variant `high`, a UUID-shaped paid run id, chunk index 121787 —
+ * one serialized `(id, model, variant, rep, case_ids)` row is 292 bytes, so one statement
+ * would return ~35.6 MB (average-width cases: ~31 MB). D1 caps a query result at 50 MB, the
+ * Worker at 128 MB, and the whole request at 30 s, so a single read would sit at 71% of the
+ * result cap with ~121k parsed strings live in the isolate. Keyset paging bounds each
+ * statement to 1,000 rows (~292 KB) and ~122 queries; the case set it builds still holds every
+ * materialized case id and chunk id for the pass, which is the smaller of the two costs and
+ * the one the guard needs.
+ */
+export const SCHEDULER_MATERIALIZED_PAGE_SIZE = 1_000;
+
+/** True for a chunk of a user pool's run; every other chunk belongs to a platform pool. */
+function chunkIsUserSql(alias: string): string {
+  return `EXISTS (
+  SELECT 1 FROM benchmark_runs AS run
+  WHERE run.id = ${alias}.run_id AND run.purpose = 'user')`;
+}
+
+/**
+ * The automatic attempt cap of a block, in SQL, for the statements that decide a chunk's
+ * fate from its own row. Reading the cap from the owning run's purpose keeps every automatic
+ * path in one policy without a second column: `attempts` is the block's single persistent
+ * counter.
+ */
+function chunkAttemptCapSql(alias: string): string {
+  return `(CASE WHEN ${chunkIsUserSql(alias)} THEN ${SCHEDULER_MAX_USER_ATTEMPTS} ELSE ${SCHEDULER_MAX_PLATFORM_ATTEMPTS} END)`;
+}
+
 /**
  * A provider throttle is not a chunk failure, so it refunds the claim's attempt and
  * counts here instead. With 15–300 second backoff, the budget gives a throttled chunk
@@ -172,6 +234,7 @@ export type SchedulerClaim = {
   attempts: number;
   throttle_deferrals: number;
   catalog_deferrals: number;
+  lease_reclaims: number;
 };
 
 type SchedulerLaneHead = {
@@ -284,6 +347,93 @@ export async function scheduleRunChunks(
     ])
   );
   const statements: D1PreparedStatement[] = [];
+  // The manager's block is `(model, effort, rep, case)`. A chunk's id is its position in the
+  // lane and a user lane's cases come from a paid-request plan that can reorder between
+  // passes, so position is not a block identity: a case must never land in a second row with
+  // its attempt counters back at 0. The guard that enforces it costs one read of the run's
+  // chunk rows, so it is gated on a plan fingerprint stored on the run:
+  //
+  // - unchanged plan: the rows written so far are the plan's prefix, so the prefix cursor
+  //   alone is correct and nothing is read;
+  // - changed plan (or none recorded yet): the plan can have moved cases, so every row is
+  //   read once, and its cases are skipped where they already sit.
+  //
+  // A pass therefore reads rows at most once per plan version. A lane of `n` cases takes
+  // `ceil(n / chunkSize)` rows per pass, so a run of `S` slots takes `O(S)` passes at
+  // `O(S)` rows each in the worst case — but only the passes after a re-plan pay the full
+  // read; every other pass pays only its own prefix scan.
+  const planFingerprint = run.laneCaseIds
+    ? await sha256Hex(
+        JSON.stringify(
+          // Every (entry, rep, case list) in order, with an empty lane as its own marker: a
+          // lane the plan left out must hash differently from one it later fills. Returning
+          // early for an empty lane would drop the later repetitions of the same entry from
+          // the hash, so a changed plan for those repetitions would look unchanged.
+          run.entries.flatMap(entry => {
+            const variant = entry.variant ?? '';
+            return Array.from({ length: run.repetitions }, (_, rep) => [
+              entry.model,
+              variant,
+              rep,
+              run.laneCaseIds?.get(JSON.stringify([entry.model, variant, rep])) ?? [],
+            ]);
+          })
+        )
+      )
+    : null;
+  // Only a plan-driven run has a fingerprint to compare (the column is written only for one),
+  // so a platform pass skips this round-trip entirely.
+  const recordedFingerprint = planFingerprint
+    ? await db
+        .prepare('SELECT plan_fingerprint FROM benchmark_runs WHERE id = ?')
+        .bind(run.runId)
+        .first<{ plan_fingerprint: string | null }>()
+    : undefined;
+  const planChanged =
+    planFingerprint !== null && recordedFingerprint?.plan_fingerprint !== planFingerprint;
+  const materialized = new Map<string, Set<string>>();
+  const takenIds = new Set<string>();
+  if (planChanged) {
+    // Keyset pages, so the peak stays one page of rows in memory instead of every row the
+    // run has written. Each row is read exactly once: the total stays S for the widest plan
+    // (~121.8k rows), at ~122 queries for 1,000-row pages rather than one 15 MB result.
+    type MaterializedRow = {
+      id: string;
+      model: string;
+      variant: string;
+      rep: number;
+      case_ids: string;
+    };
+    let cursor: string | null = null;
+    for (;;) {
+      const page: D1Result<MaterializedRow> =
+        cursor === null
+          ? await db
+              .prepare(
+                `SELECT id, model, variant, rep, case_ids FROM scheduler_chunks
+                WHERE run_id = ? ORDER BY id LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`
+              )
+              .bind(run.runId)
+              .all<MaterializedRow>()
+          : await db
+              .prepare(
+                `SELECT id, model, variant, rep, case_ids FROM scheduler_chunks
+                WHERE run_id = ? AND id > ? ORDER BY id LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`
+              )
+              .bind(run.runId, cursor)
+              .all<MaterializedRow>();
+      for (const row of page.results) {
+        takenIds.add(row.id);
+        const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
+        const cases = materialized.get(laneKey) ?? new Set<string>();
+        for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
+        materialized.set(laneKey, cases);
+      }
+      const last: MaterializedRow | undefined = page.results.at(-1);
+      if (page.results.length < SCHEDULER_MATERIALIZED_PAGE_SIZE || last === undefined) break;
+      cursor = last.id;
+    }
+  }
   const writeBatch = async (final: boolean): Promise<boolean> => {
     const status = await db
       .prepare('SELECT status FROM benchmark_runs WHERE id = ?')
@@ -292,11 +442,22 @@ export async function scheduleRunChunks(
     if (status?.status !== 'running') return false;
     await db.batch([
       ...statements,
+      // The fingerprint commits only with the initialization marker. A pass that flushes a
+      // batch and then stops at its deadline is not a pass that finished the plan, so the
+      // next one must still read the run's rows: recording the fingerprint early would make
+      // it resume as "unchanged" and could write a second chunk for a scheduled case.
       ...(final
         ? [
             db
               .prepare('INSERT INTO scheduler_runs (run_id) VALUES (?) ON CONFLICT DO NOTHING')
               .bind(run.runId),
+            ...(planChanged
+              ? [
+                  db
+                    .prepare('UPDATE benchmark_runs SET plan_fingerprint = ? WHERE id = ?')
+                    .bind(planFingerprint, run.runId),
+                ]
+              : []),
           ]
         : []),
     ]);
@@ -310,22 +471,40 @@ export async function scheduleRunChunks(
       const laneCaseIds = run.laneCaseIds ? run.laneCaseIds.get(laneKey) : run.caseIds;
       if (!laneCaseIds || laneCaseIds.length === 0) continue;
       const chunks = Math.ceil(laneCaseIds.length / run.chunkSize);
-      const start = resumeAt.get(laneKey) ?? 0;
+      // The resume prefix is exact while the lane's cases have not moved: for a catalog lane
+      // `caseIds` is the immutable ordered list, and for a plan-driven lane the fingerprint
+      // above says whether the plan is the one the rows were written from. Only a changed
+      // plan rescans, and the case guard then skips what is already scheduled.
+      const start = planChanged ? 0 : (resumeAt.get(laneKey) ?? 0);
+      // Chunk ids are positions. A residual chunk (some of its cases already scheduled) is
+      // written with only its new cases, and only onto an id no row holds: the plan's own
+      // last index and up are free for a non-empty plan, and a collision moves it on.
+      let nextFree = chunks;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;
+        const laneCases = laneCaseIds.slice(offset, offset + run.chunkSize);
+        const scheduled = materialized.get(laneKey);
+        // A case that already has a row keeps it: its attempts, its deferral budgets and its
+        // terminal status are the block's budget. Only the cases without a row are written,
+        // so an existing case never lands in a second row and a new case beside one is never
+        // dropped. Nothing is left to write when every case is already scheduled.
+        const newCases = scheduled ? laneCases.filter(caseId => !scheduled.has(caseId)) : laneCases;
+        if (newCases.length === 0) continue;
+        let position = chunk;
+        if (takenIds.has(JSON.stringify([run.runId, entry.model, variant, rep, position]))) {
+          while (takenIds.has(JSON.stringify([run.runId, entry.model, variant, rep, nextFree])))
+            nextFree += 1;
+          position = nextFree;
+        }
+        const chunkId = JSON.stringify([run.runId, entry.model, variant, rep, position]);
+        takenIds.add(chunkId);
+        const caseIds = JSON.stringify(newCases);
         statements.push(
           db
             .prepare(SCHEDULER_INSERT_CHUNK_SQL)
-            .bind(
-              JSON.stringify([run.runId, entry.model, variant, rep, chunk]),
-              run.runId,
-              entry.model,
-              variant,
-              rep,
-              chunk,
-              JSON.stringify(laneCaseIds.slice(offset, offset + run.chunkSize))
-            )
+            .bind(chunkId, run.runId, entry.model, variant, rep, position, caseIds)
         );
+        for (const caseId of newCases) scheduled?.add(caseId);
         if (statements.length < SCHEDULER_MATERIALIZE_BATCH) continue;
         if (!(await writeBatch(false)) || Date.now() >= deadline) return false;
       }
@@ -594,6 +773,7 @@ export async function claimScheduledChunks(
               UPDATE scheduler_chunks SET status = 'queued', token = ?1, slot = ?2,
                 lease_until = ?3, attempts = attempts + 1
               WHERE id = ?4 AND status = 'pending'
+                AND attempts < ${chunkAttemptCapSql('scheduler_chunks')}
                 AND EXISTS (SELECT 1 FROM scheduler_dispatch_lock WHERE id = 1 AND token = ?1)
               RETURNING *
             `)
@@ -601,6 +781,8 @@ export async function claimScheduledChunks(
           )
         );
         for (const result of results) {
+          // Only rows this statement actually transitioned count: a chunk at its attempt cap
+          // matches nothing, so it never blocks the rest of the pass from being claimed.
           claimed += result.results.length;
           claims.push(...result.results);
         }
@@ -664,19 +846,66 @@ export async function finishChunk(db: D1Database, id: string, token: string): Pr
     .run();
 }
 
+/**
+ * Returns a chunk to the queue, failing it instead once its block has spent every automatic
+ * attempt. The budget comes from the owning run's purpose: a platform block stops after its
+ * one retry, and a user block after its single billed attempt.
+ *
+ * It reports which of the two happened, because that decision is made against the row's
+ * current `attempts` — never a claim object read before this invocation spent an attempt of
+ * its own (the in-process retry).
+ */
 export async function deferChunk(
   db: D1Database,
   id: string,
   token: string,
   availableAt: number,
   onlyQueued = false
-): Promise<void> {
-  await db
-    .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+): Promise<'deferred' | 'failed'> {
+  const row = await db
+    .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
     available_at = ?, slot = NULL, token = NULL, lease_until = 0
-    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')`)
-    .bind(SCHEDULER_MAX_ATTEMPTS, availableAt, id, token, onlyQueued ? 1 : 0)
-    .run();
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')
+    RETURNING status`)
+    .bind(availableAt, id, token, onlyQueued ? 1 : 0)
+    .first<{ status: string }>();
+  return row?.status === 'failed' ? 'failed' : 'deferred';
+}
+
+/**
+ * Returns a chunk to the queue for a wait in which this invocation made no model call: a
+ * lost claim, another executor's generation, unreachable infrastructure, or a launch-fence
+ * refusal.
+ *
+ * The claim's attempt is given back in the same statement, because every block's budget counts
+ * executions of the model only: charging a wait would fail a block that never ran, and a user
+ * block has exactly one attempt to lose.
+ */
+export async function deferNoModelCallChunk(
+  db: D1Database,
+  id: string,
+  token: string,
+  availableAt: number,
+  onlyQueued = false
+): Promise<'deferred' | 'failed'> {
+  // The wait is counted on `lease_reclaims`, the counter that already bounds automatic
+  // re-attempts for a block's lease losses. A wait that made no model call is exactly as
+  // retryable as a lease loss, so it uses the same boundary: `SCHEDULER_MAX_NO_MODEL_REATTEMPTS`
+  // re-attempts are allowed and the next one fails the block. Without the bound, a generation
+  // attached to a lost executor or a permanently unreachable gateway would re-queue the block
+  // forever at the constant backoff.
+  const row = await db
+    .prepare(`UPDATE scheduler_chunks SET
+    status = CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_NO_MODEL_REATTEMPTS}
+      THEN 'failed' ELSE 'pending' END,
+    attempts = MAX(attempts - 1, 0),
+    lease_reclaims = lease_reclaims + 1,
+    available_at = ?, slot = NULL, token = NULL, lease_until = 0
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND (? = 0 OR status = 'queued')
+    RETURNING status`)
+    .bind(availableAt, id, token, onlyQueued ? 1 : 0)
+    .first<{ status: string }>();
+  return row?.status === 'failed' ? 'failed' : 'deferred';
 }
 
 export async function deferThrottledChunk(
@@ -765,6 +994,28 @@ export async function failScheduledEntry(
 ): Promise<void> {
   await db.batch(failScheduledEntryStatements(db, claim, failureClass, nowIso));
 }
+
+/**
+ * A block whose attempts already reached its cap but is still `pending` can never be claimed
+ * again (`claimScheduledChunks` refuses it), so nothing would retire it: its run stays
+ * `running`, holds a queue slot and leaves a paid request pending. Lowering the cap makes
+ * exactly that state reachable from rows an earlier build wrote, so the recovery pass
+ * terminalizes them. They land in `failed`, where the unrecorded-failed select below records
+ * the lane failure and dispatch finalizes the run — the same terminal state the cap path
+ * produces.
+ *
+ * Bounded per pass: the remaining rows are swept on the next one, so a large backlog cannot
+ * hold the recovery pass open. The rows are not read back here — the select below finds them
+ * by status.
+ */
+export const SCHEDULER_EXHAUSTED_PENDING_CHUNKS_SQL = `
+  UPDATE scheduler_chunks SET status = 'failed', slot = NULL, token = NULL, lease_until = 0
+  WHERE rowid IN (
+    SELECT rowid FROM scheduler_chunks
+    WHERE status = 'pending' AND attempts >= ${chunkAttemptCapSql('scheduler_chunks')}
+    LIMIT 250
+  )
+`;
 
 /**
  * Failed chunks of running runs whose lane death is not recorded yet. Starts from the
@@ -869,17 +1120,21 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
           AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep
       ) THEN 'failed' WHEN EXISTS (
         SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status != 'running'
-      ) THEN 'completed' WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+      ) THEN 'completed' WHEN ${chunkIsUserSql('scheduler_chunks')} THEN CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_NO_MODEL_REATTEMPTS} THEN 'failed' ELSE 'pending' END
+      WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
+      attempts = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN MAX(attempts - 1, 0) ELSE attempts END,
+      lease_reclaims = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN lease_reclaims + 1 ELSE lease_reclaims END,
       slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('queued', 'active') AND lease_until <= ?`)
-      .bind(SCHEDULER_MAX_ATTEMPTS, now),
+      .bind(now),
+    db.prepare(SCHEDULER_EXHAUSTED_PENDING_CHUNKS_SQL),
     db.prepare(SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL),
     db.prepare(SCHEDULER_PRUNE_EXECUTIONS_SQL).bind(pruneBefore),
     db.prepare(SCHEDULER_PRUNE_CHUNKS_SQL).bind(pruneBefore),
     db.prepare(SCHEDULER_PRUNE_MARKERS_SQL).bind(pruneBefore),
     db.prepare('DELETE FROM scheduler_cooldowns WHERE until <= ?').bind(now),
   ]);
-  return results[2]?.results ?? [];
+  return results[3]?.results ?? [];
 }
 
 const UNSETTLED_CHUNK_PREDICATE = `
@@ -1058,11 +1313,19 @@ export async function getPaidCaseStartedAt(
   return row?.started_at ?? null;
 }
 
-/** Moves a ledgered case's start to a further paid call its own token makes. */
+/**
+ * Moves a ledgered case's start to a further paid call its own token makes.
+ *
+ * `now` is the start the row moves to. `leaseClock` is the instant the chunk's lease is checked
+ * against, defaulting to `now`; a caller that also moves a second row in the same batch passes
+ * the SAME instant to both, because two different clocks would let a lease expire between them
+ * and apply one statement while the other refuses.
+ */
 export function restartPaidCaseStatement(
   db: D1Database,
   key: PaidExecutionKey,
-  now: number
+  now: number,
+  leaseClock: number = now
 ): D1PreparedStatement {
   return db
     .prepare(`UPDATE scheduler_executions SET started_at = ?
@@ -1093,9 +1356,173 @@ export function restartPaidCaseStatement(
       key.token,
       key.attemptStartedAt ?? null,
       key.attemptStartedAt ?? null,
-      now
+      leaseClock
     );
 }
+
+/** The owned-claim guard a retry's ledger restart and its attempt spend share. */
+function retryGuardSql(): string {
+  return `EXISTS (
+        SELECT 1 FROM scheduler_executions AS execution
+        WHERE execution.run_id = scheduler_chunks.run_id
+          AND execution.model = scheduler_chunks.model
+          AND execution.variant = scheduler_chunks.variant
+          AND execution.rep = scheduler_chunks.rep
+          AND execution.token = scheduler_chunks.token
+      )
+      AND EXISTS (
+        SELECT 1 FROM benchmark_runs
+        WHERE id = scheduler_chunks.run_id AND status = 'running'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM run_lane_failures AS failure
+        WHERE failure.run_id = scheduler_chunks.run_id AND failure.model = scheduler_chunks.model
+          AND failure.variant = scheduler_chunks.variant AND failure.rep = scheduler_chunks.rep
+      )`;
+}
+
+/**
+ * Spends one further automatic attempt of a block for a retry the same invocation is about
+ * to make (the platform empty-output retry). It is the same counter the scheduler spends on
+ * every claim and deferral, so a claim plus this retry can never exceed the run's cap: the
+ * statement reports zero changes once the block has spent its automatic attempts, and the
+ * caller then keeps the attempt it already measured instead of paying again.
+ *
+ * Its guard is the one the retry's ledger restart uses (our own active claim, a live run, a
+ * lane that has not dead-lettered, and this claim's ledger row), so an attempt is never
+ * spent on a retry the ledger would refuse.
+ */
+export function consumeRetryAttemptStatement(
+  db: D1Database,
+  id: string,
+  token: string,
+  now: number
+): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE scheduler_chunks SET attempts = attempts + 1
+    WHERE id = ? AND token = ? AND status = 'active' AND lease_until > ?
+      AND attempts + 1 <= ${chunkAttemptCapSql('scheduler_chunks')}
+      AND ${retryGuardSql()}`)
+    .bind(id, token, now);
+}
+
+/** Returns the attempt a retry spent when that retry never reached the model. */
+export function refundRetryAttemptStatement(
+  db: D1Database,
+  id: string,
+  token: string
+): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE scheduler_chunks SET attempts = MAX(attempts - 1, 0)
+    WHERE id = ? AND token = ? AND status = 'active' AND attempts > 0`)
+    .bind(id, token);
+}
+
+/**
+ * Undo a retry that provably never reached the model, after the retry's ledger start was moved
+ * and its attempt was spent: both are given back.
+ *
+ * Every write names this claim's own token, and the chunk is addressed by the claim's id: a
+ * chunk id is the JSON of the block's position, never the run id. Best effort by design — the
+ * block is already deferring, and a failed refund must not turn a wait into a lane death.
+ */
+export async function refundUnspentRetryAttempt(
+  db: D1Database,
+  input: RetryRefundInput
+): Promise<void> {
+  // Both reverts check the lease against ONE instant. The ledger statement's `now` is the
+  // start it writes, so its lease clock is passed separately: with the revert target as the
+  // clock, a lease expiring between the first start and the retry start would satisfy the
+  // ledger revert and refuse the canonical one, leaving the two starts disagreeing.
+  const leaseClock = Date.now();
+  await db
+    .batch([
+      refundRetryAttemptStatement(db, input.claim.id, input.claim.token),
+      restartPaidCaseStatement(
+        db,
+        { ...input.execution, attemptStartedAt: input.startedAt },
+        input.execution.attemptStartedAt,
+        leaseClock
+      ),
+      revertRetryCanonicalStartStatement(db, input, leaseClock),
+    ])
+    .catch((error: unknown) => input.onError?.(error));
+}
+
+/**
+ * Puts the canonical case-run start back to the first attempt's, for a retry that never
+ * reached the model.
+ *
+ * Its guard is the ledger revert's, term for term, because both run in the same batch and
+ * must apply together or not at all: this claim's ledger row (`scheduler_executions`, same
+ * run, model, variant, rep, case and token), an active unexpired lease on the claimed chunk,
+ * a run still `running`, and no recorded lane failure for that lane. A canonical revert that
+ * could apply while the ledger one refuses would put the two starts back out of step, which
+ * is exactly what RunnerCancel's live check compares.
+ *
+ * Bind order: the revert's timestamp twice, the case key's five columns, the executor run id
+ * and token, then the lease clock — the same instant the ledger revert in this batch checks,
+ * so the two statements apply together or refuse together.
+ */
+export function revertRetryCanonicalStartStatement(
+  db: D1Database,
+  input: RetryRefundInput,
+  leaseClock: number
+): D1PreparedStatement {
+  const startedAt = new Date(input.execution.attemptStartedAt).toISOString();
+  return db
+    .prepare(
+      `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
+      WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'
+        AND EXISTS (
+          SELECT 1 FROM scheduler_executions AS ledger
+          WHERE ledger.run_id = benchmark_case_runs.executor_run_id
+            AND ledger.model = benchmark_case_runs.model
+            AND ledger.variant = benchmark_case_runs.variant
+            AND ledger.rep = benchmark_case_runs.rep
+            AND ledger.case_id = benchmark_case_runs.case_id
+            AND ledger.token = benchmark_case_runs.executor_token
+            AND EXISTS (
+              SELECT 1 FROM scheduler_chunks AS chunk
+              WHERE chunk.run_id = ledger.run_id AND chunk.model = ledger.model
+                AND chunk.variant = ledger.variant AND chunk.rep = ledger.rep
+                AND chunk.token = ledger.token
+                AND chunk.status = 'active' AND chunk.lease_until > ?
+            )
+            AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ledger.run_id AND status = 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM run_lane_failures AS failure
+              WHERE failure.run_id = ledger.run_id AND failure.model = ledger.model
+                AND failure.variant = ledger.variant AND failure.rep = ledger.rep
+            )
+        )`
+    )
+    .bind(
+      startedAt,
+      startedAt,
+      input.engineIdentity,
+      input.execution.model,
+      input.execution.variant,
+      input.execution.rep,
+      input.execution.caseId,
+      input.execution.runId,
+      input.claim.token,
+      leaseClock
+    );
+}
+
+type RetryRefundInput = {
+  /** The claim the retry ran under. */
+  claim: { id: string; token: string };
+  /** The canonical case row's engine identity. */
+  engineIdentity: string;
+  /** The case whose ledger start the retry moved. */
+  execution: PaidExecutionKey & { attemptStartedAt: number };
+  /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
+  startedAt: number;
+  onError?: (error: unknown) => void;
+};
 
 export async function restartPaidCase(
   db: D1Database,

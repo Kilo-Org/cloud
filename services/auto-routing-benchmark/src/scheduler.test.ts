@@ -1974,6 +1974,78 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     ).toEqual([JSON.stringify(['case-a'])]);
   });
 
+  it("reads the run's rows once per plan version, not once per pass", async () => {
+    // The case-level guard needs the run's rows, but reading them on every pass would make a
+    // rescan cost O(rows written so far) per pass — quadratic over a large plan. The plan
+    // fingerprint on the run gates it: an unchanged plan resumes from its prefix and reads
+    // no rows at all, and only a re-plan pays one full read.
+    insertRun(sqlite, 'cost', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    const caseIds = Array.from({ length: 40 }, (_, index) => `case-${index}`);
+    const plan = new Map([[laneKey, caseIds]]);
+
+    const reads = { chunkRows: 0, queries: 0 };
+    const counting = sqliteD1(sqlite, () => {
+      reads.queries += 1;
+    });
+    const counted = {
+      ...counting,
+      prepare(sqlText: string) {
+        // The guard's read, told apart from the lanes aggregate the resume cursor uses.
+        if (sqlText.includes('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks'))
+          reads.chunkRows += 1;
+        return counting.prepare(sqlText);
+      },
+    } as unknown as D1Database;
+
+    // First pass: no fingerprint recorded yet, so the plan is "changed" and it reads once.
+    await scheduleRunChunks(counted, {
+      runId: 'cost',
+      entries: [block],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+      laneCaseIds: plan,
+    });
+    expect(reads.chunkRows).toBe(1);
+    // The plan's 40 single-case chunks are materialized and the plan version is recorded.
+    expect(storedChunks(sqlite)).toHaveLength(40);
+    expect(
+      sqlite.prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'cost'").get()
+    ).toMatchObject({ plan_fingerprint: expect.any(String) });
+
+    // Resume passes with the same plan: the prefix cursor carries them and no rows are read,
+    // whatever the run already holds. This is the property that keeps the total linear.
+    const before = reads.chunkRows;
+    for (let pass = 0; pass < 5; pass++) {
+      sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'cost'").run();
+      await scheduleRunChunks(counted, {
+        runId: 'cost',
+        entries: [block],
+        repetitions: 1,
+        caseIds,
+        chunkSize: 1,
+        laneCaseIds: plan,
+      });
+    }
+    expect(reads.chunkRows).toBe(before);
+
+    // A re-plan reads the run's rows exactly once, however many rows it already holds.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'cost'").run();
+    await scheduleRunChunks(counted, {
+      runId: 'cost',
+      entries: [block],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+      laneCaseIds: new Map([[laneKey, [...caseIds, 'case-new']]]),
+    });
+    expect(reads.chunkRows).toBe(before + 1);
+    // Only the case the new plan adds is written; the 40 it already had keep their rows.
+    expect(storedChunks(sqlite)).toHaveLength(41);
+  });
+
   it('keeps each case’s cap when a re-plan regroups cases into different chunks', async () => {
     // Production chunks hold one case (`DECIDER_CHUNK_SIZE = 1`, src/run.ts:298), but the
     // initializer takes a chunk size, so the guard must be case-level rather than

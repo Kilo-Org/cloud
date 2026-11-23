@@ -372,6 +372,7 @@ beforeEach(() => {
           // a null marker means the run is never claimable again. The insert input carries
           // no marker, so the mock states it directly.
           admission_marker: 'paid-cutover',
+          plan_fingerprint: null,
           status: 'running',
           completed_at: null,
           error: null,
@@ -1565,6 +1566,7 @@ describe('POST /admin/runs', () => {
       measurement_revision: 2,
       purpose: 'platform',
       admission_marker: 'paid-cutover',
+      plan_fingerprint: null,
     });
 
     const res = await authedPost('/admin/runs', { kind: 'classifier' });

@@ -422,6 +422,7 @@ beforeEach(() => {
           measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           // The insert SQL stamps the provenance marker itself; `startRun` is not given it.
           admission_marker: 'admitted:test',
+          plan_fingerprint: null,
           status: 'running',
           completed_at: null,
           error: null,
@@ -497,6 +498,7 @@ const RUN_ROW_BASE = {
   measurement_revision: 2,
   // Provenance marker: `retireLegacyRuns` treats a running run without one as legacy work.
   admission_marker: 'admitted:test',
+  plan_fingerprint: null,
 };
 
 /**

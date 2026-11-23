@@ -128,6 +128,11 @@ export const benchmarkRuns = sqliteTable(
     // during the deploy overlap is recognized and fenced — wall clock proves nothing.
     // NULL means never claimable, initializable or dispatchable again.
     admission_marker: text('admission_marker'),
+    // Hash of the paid-request plan the run's scheduler chunks were materialized from. The
+    // initializer reads the run's chunk rows only when this differs from the plan it is
+    // handed, so a resumed pass over an unchanged plan stays a bounded prefix scan instead
+    // of re-reading every row it has written.
+    plan_fingerprint: text('plan_fingerprint'),
   },
   table => [
     // Decider queues run several runs at once; a classifier run derives one winner.

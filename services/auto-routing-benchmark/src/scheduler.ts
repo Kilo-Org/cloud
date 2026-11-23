@@ -8,6 +8,7 @@ import {
   type BenchmarkSchedulerSettingKey,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
+import { sha256Hex } from '@kilocode/worker-utils';
 
 export type PaidExecutionKey = {
   runId: string;
@@ -331,24 +332,57 @@ export async function scheduleRunChunks(
   const statements: D1PreparedStatement[] = [];
   // The manager's block is `(model, effort, rep, case)`. A chunk's id is its position in the
   // lane and a user lane's cases come from a paid-request plan that can reorder between
-  // passes, so position is not a block identity: the same case would otherwise land in a
-  // brand-new row with its attempt counters back at 0, and a chunk holding several cases
-  // would lose its budget when a re-plan regroups them. One run-scoped read of the
-  // materialized cases keeps the budget a property of the case: a case that any existing
-  // chunk of this lane already schedules is never written again, so its counters and its
-  // terminal status survive wherever the plan puts it.
-  const materializedRows = await db
-    .prepare('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
+  // passes, so position is not a block identity: a case must never land in a second row with
+  // its attempt counters back at 0. The guard that enforces it costs one read of the run's
+  // chunk rows, so it is gated on a plan fingerprint stored on the run:
+  //
+  // - unchanged plan: the rows written so far are the plan's prefix, so the prefix cursor
+  //   alone is correct and nothing is read;
+  // - changed plan (or none recorded yet): the plan can have moved cases, so every row is
+  //   read once, and its cases are skipped where they already sit.
+  //
+  // A pass therefore reads rows at most once per plan version. A lane of `n` cases takes
+  // `ceil(n / chunkSize)` rows per pass, so a run of `S` slots takes `O(S)` passes at
+  // `O(S)` rows each in the worst case — but only the passes after a re-plan pay the full
+  // read; every other pass pays only its own prefix scan.
+  const planFingerprint = run.laneCaseIds
+    ? await sha256Hex(
+        JSON.stringify(
+          run.entries.flatMap(entry => {
+            const variant = entry.variant ?? '';
+            const lanes: Array<[string, string, number, readonly string[]]> = [];
+            for (let rep = 0; rep < run.repetitions; rep++) {
+              const laneCaseIds = run.laneCaseIds?.get(JSON.stringify([entry.model, variant, rep]));
+              // Missing lanes are skipped by the loop below, so they hash as empty rather
+              // than borrowing the catalog list the loop would never use.
+              if (!laneCaseIds || laneCaseIds.length === 0) return lanes;
+              lanes.push([entry.model, variant, rep, laneCaseIds]);
+            }
+            return lanes;
+          })
+        )
+      )
+    : null;
+  const recordedFingerprint = await db
+    .prepare('SELECT plan_fingerprint FROM benchmark_runs WHERE id = ?')
     .bind(run.runId)
-    .all<{ id: string; model: string; variant: string; rep: number; case_ids: string }>();
+    .first<{ plan_fingerprint: string | null }>();
+  const planChanged =
+    planFingerprint !== null && recordedFingerprint?.plan_fingerprint !== planFingerprint;
   const materialized = new Map<string, Set<string>>();
   const takenIds = new Set<string>();
-  for (const row of materializedRows.results) {
-    takenIds.add(row.id);
-    const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
-    const cases = materialized.get(laneKey) ?? new Set<string>();
-    for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
-    materialized.set(laneKey, cases);
+  if (planChanged) {
+    const materializedRows = await db
+      .prepare('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
+      .bind(run.runId)
+      .all<{ id: string; model: string; variant: string; rep: number; case_ids: string }>();
+    for (const row of materializedRows.results) {
+      takenIds.add(row.id);
+      const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
+      const cases = materialized.get(laneKey) ?? new Set<string>();
+      for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
+      materialized.set(laneKey, cases);
+    }
   }
   const writeBatch = async (final: boolean): Promise<boolean> => {
     const status = await db
@@ -358,6 +392,13 @@ export async function scheduleRunChunks(
     if (status?.status !== 'running') return false;
     await db.batch([
       ...statements,
+      ...(planChanged
+        ? [
+            db
+              .prepare('UPDATE benchmark_runs SET plan_fingerprint = ? WHERE id = ?')
+              .bind(planFingerprint, run.runId),
+          ]
+        : []),
       ...(final
         ? [
             db
@@ -376,11 +417,11 @@ export async function scheduleRunChunks(
       const laneCaseIds = run.laneCaseIds ? run.laneCaseIds.get(laneKey) : run.caseIds;
       if (!laneCaseIds || laneCaseIds.length === 0) continue;
       const chunks = Math.ceil(laneCaseIds.length / run.chunkSize);
-      // The resume prefix assumes the lane's cases did not move, which holds for a catalog
-      // lane: `caseIds` is the immutable ordered catalog list. A plan-driven lane reorders
-      // and regroups between passes instead, so it rescans and lets the case guard skip what
-      // is already scheduled — a paid request's lane is small, and correctness comes first.
-      const start = run.laneCaseIds ? 0 : (resumeAt.get(laneKey) ?? 0);
+      // The resume prefix is exact while the lane's cases have not moved: for a catalog lane
+      // `caseIds` is the immutable ordered list, and for a plan-driven lane the fingerprint
+      // above says whether the plan is the one the rows were written from. Only a changed
+      // plan rescans, and the case guard then skips what is already scheduled.
+      const start = planChanged ? 0 : (resumeAt.get(laneKey) ?? 0);
       // Chunk ids are positions. A residual chunk (some of its cases already scheduled) is
       // written with only its new cases, and only onto an id no row holds: the plan's own
       // last index and up are free for a non-empty plan, and a collision moves it on.

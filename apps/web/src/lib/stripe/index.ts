@@ -896,6 +896,7 @@ async function handleAutoTopUpSetup(
         stripe_payment_method_id: paymentMethodId,
         amount_cents: amountCents,
         disabled_reason: null,
+        charge_refused_at: null,
       },
       // `owned_by_user_id` uniqueness is enforced by a partial unique index.
       // Include the predicate so Postgres can match the conflict target.
@@ -978,6 +979,7 @@ async function handleOrgAutoTopUpSetup(
         threshold_cents: thresholdCents,
         disabled_reason: null,
         created_by_user_id: kiloUserId,
+        charge_refused_at: null,
       },
       targetWhere: sql`${auto_top_up_configs.owned_by_organization_id} IS NOT NULL`,
     });

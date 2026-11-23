@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isPersonal } from '@/lib/code-reviewer-config';
 import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Bitbucket is org-only, so unlike the GitHub/GitLab status hooks there is no
@@ -49,6 +50,7 @@ export function useBitbucketReadiness(scope: string) {
       organizationId: scope,
     }),
     enabled: !isPersonal(scope),
+    ...SETTLE_WHILE_OFFLINE,
   });
 }
 
@@ -62,6 +64,8 @@ export function useBitbucketIntegrationStatus(scope: string | undefined, enabled
   return useQuery({
     ...trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId: scope ?? '' }),
     enabled: enabled && scope !== undefined && !isPersonal(scope),
+    // The hub's row stays pending on the id this read names.
+    ...SETTLE_WHILE_OFFLINE,
   });
 }
 

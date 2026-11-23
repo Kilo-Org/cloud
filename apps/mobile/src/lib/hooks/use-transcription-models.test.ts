@@ -1,16 +1,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
+import type * as ReactI18nextModule from 'react-i18next';
+import type * as ReactModule from 'react';
+
 import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 import { sortModelOptions } from './use-available-models';
-import { fetchTranscriptionModels } from './use-transcription-models';
+import { fetchTranscriptionModels, useTranscriptionModels } from './use-transcription-models';
+
+const lastReadOptions = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 
 // Stub native/expo modules so pure-node Vitest can resolve the
 // module graph when importing from use-transcription-models.ts
 // (same stub set as use-available-models.test.ts).
 vi.mock('expo-secure-store', () => ({}));
-vi.mock('@tanstack/react-query', () => ({}));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (opts: Record<string, unknown>) => {
+    lastReadOptions.current = opts;
+    return {
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+}));
+vi.mock('react', async importOriginal => {
+  const actual = await importOriginal<typeof ReactModule>();
+  // The settle case calls the hook outside a tree, so the memo has no store to
+  // read; running the factory inline keeps the options capture honest.
+  return { ...actual, useMemo: (factory: () => unknown) => factory() };
+});
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18nextModule>();
+  // The app's i18n instance still needs the real `initReactI18next`; only the
+  // hook is replaced so the read can be called outside a React tree.
+  return { ...actual, useTranslation: () => ({ i18n: { language: 'en' } }) };
+});
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 
 const getAuthTokenForRequest = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
@@ -266,6 +295,20 @@ describe('fetchTranscriptionModels', () => {
       fingerprint: ['transcription-models-fetch', 'http.500'],
       report: 'none',
       tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 500 },
+    });
+  });
+});
+
+describe('useTranscriptionModels offline read', () => {
+  it('carries the offline settle in its options', () => {
+    lastReadOptions.current = null;
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useTranscriptionModels();
+    // The picker has no other exit: a paused read leaves its loading row up.
+    expect(lastReadOptions.current).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
     });
   });
 });

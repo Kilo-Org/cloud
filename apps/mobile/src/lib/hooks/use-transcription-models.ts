@@ -11,6 +11,7 @@ import {
   sortModelOptions,
   toModelOptions,
 } from '@/lib/hooks/use-available-models';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
 
 const TRANSCRIPTION_MODELS_TIMEOUT_MS = 15_000;
@@ -166,6 +167,9 @@ export function useTranscriptionModels(organizationId?: string) {
     queryFn: fetchTranscriptionModels.bind(null, organizationId),
     staleTime: 60_000,
     enabled: true,
+    // The settings picker has no other exit: a paused read shows its loading
+    // row forever, with no failure and nothing to retry.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   // The cached `data` was collated for the language that fetched it, and a

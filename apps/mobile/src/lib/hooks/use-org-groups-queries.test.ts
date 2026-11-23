@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 
-import { useOrgGroupMutations } from './use-org-groups-queries';
+import { useOrgGroup, useOrgGroupMutations } from './use-org-groups-queries';
 
 type MutationOptions = {
   onSuccess?: (result: unknown, vars: unknown) => void;
@@ -11,6 +11,7 @@ type MutationOptions = {
 // `useOrgGroupMutations` registers its mutations in this order:
 // create, updateDetails, remove.
 const capturedMutations: MutationOptions[] = [];
+let lastReadOptions: Record<string, unknown> | null = null;
 const invalidateQueriesMock = vi.fn(() => Promise.resolve());
 const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
@@ -22,6 +23,10 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     capturedMutations.push(opts);
     return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false };
+  },
+  useQuery: (opts: Record<string, unknown>) => {
+    lastReadOptions = opts;
+    return { data: undefined };
   },
   useQueryClient: () => queryClientMock,
 }));
@@ -43,6 +48,12 @@ vi.mock('@/lib/trpc', () => ({
     organizations: {
       groups: {
         pathFilter: () => ({ queryKey: ['organizations', 'groups'] }),
+        get: {
+          queryOptions: (input: unknown, options: Record<string, unknown>) => ({
+            queryKey: ['organizations', 'groups', 'get', input],
+            ...options,
+          }),
+        },
       },
     },
   }),
@@ -58,6 +69,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const GROUP_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 function groupMutation(index: number): MutationOptions {
   const mutation = capturedMutations[index];
@@ -65,6 +77,17 @@ function groupMutation(index: number): MutationOptions {
     throw new Error(`useOrgGroupMutations registered no mutation at index ${index}`);
   }
   return mutation;
+}
+
+function groupReadOptions(): Record<string, unknown> {
+  lastReadOptions = null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useOrgGroup(ORG_ID, GROUP_ID, true);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!lastReadOptions) {
+    throw new Error('options for useOrgGroup were not captured');
+  }
+  return lastReadOptions;
 }
 
 describe('useOrgGroupMutations audit log refresh', () => {
@@ -111,6 +134,17 @@ describe('useOrgGroupMutations audit log refresh', () => {
     ]);
     expect(invalidateQueriesMock).toHaveBeenCalledExactlyOnceWith({
       queryKey: ['organizations', 'groups'],
+    });
+  });
+});
+
+describe('useOrgGroup offline read', () => {
+  it('carries the offline settle in its options', () => {
+    // A paused first read leaves the edit screen with no data and no failure.
+    expect(groupReadOptions()).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
     });
   });
 });

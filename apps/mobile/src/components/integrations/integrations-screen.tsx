@@ -28,6 +28,7 @@ import {
 } from '@/lib/hooks/use-integrations';
 import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -41,9 +42,14 @@ import {
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
 import { integrationProviderSetting } from '@/lib/settings-search/integration-provider-settings';
-import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
+import { isPermissionDeniedError } from '@/lib/trpc-error';
 
 /**
  * The catalog key naming who can change the connections the viewer cannot. The
@@ -111,6 +117,8 @@ export function IntegrationsScreen({ organizationId, settingsTarget }: Integrati
 
   const statuses = useIntegrationStatuses(organizationId, scopeResolved);
   const githubConnections = useGitHubConnections(organizationId, scopeResolved);
+  // Reactive: a connectivity commit re-picks the failure's variant.
+  const committedConnectivity = useCommittedConnectivityStatus();
   // The setup-status read reports whether a Bitbucket workspace is installed but
   // never the integration row, which is the only id a native disconnect names.
   const bitbucket = useBitbucketIntegrationStatus(organizationId, scopeResolved);
@@ -152,6 +160,14 @@ export function IntegrationsScreen({ organizationId, settingsTarget }: Integrati
         </View>
       );
     }
+    // The read settles while offline (`SETTLE_WHILE_OFFLINE`), so a failure the
+    // server never answered names the connection, and only a failure that can
+    // pass on a second attempt offers the retry.
+    const kind = classifyReadFailureKind({
+      errors: [statuses.error],
+      isPaused: statuses.fetchStatus === 'paused',
+      connectivity: committedConnectivity,
+    });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -161,9 +177,9 @@ export function IntegrationsScreen({ organizationId, settingsTarget }: Integrati
         />
         <QueryError
           className="bg-background"
-          variant={trpcErrorVariant(statuses.error)}
+          variant={readFailureKindVariant(kind)}
           title={t('integrations.couldNotLoad')}
-          onRetry={() => void statuses.refetch()}
+          onRetry={readFailureKindIsRetryable(kind) ? () => void statuses.refetch() : undefined}
           isRetrying={statuses.isFetching}
         />
       </View>

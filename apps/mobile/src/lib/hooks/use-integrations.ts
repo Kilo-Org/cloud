@@ -11,6 +11,7 @@ import {
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
@@ -25,6 +26,9 @@ export function useIntegrationStatuses(organizationId: string | undefined, enabl
   const input = organizationId ? { organizationId } : {};
   return useQuery({
     ...trpc.platformIntegrations.listSetupStatus.queryOptions(input, { enabled }),
+    // The screen's whole-face failure waits on this read; a paused one keeps
+    // the skeleton up with no retry and no cause.
+    ...SETTLE_WHILE_OFFLINE,
   });
 }
 
@@ -37,6 +41,7 @@ export function useGitHubConnections(organizationId: string | undefined, enabled
   const input = organizationId ? { organizationId } : {};
   return useQuery({
     ...trpc.githubApps.listIntegrations.queryOptions(input, { enabled }),
+    ...SETTLE_WHILE_OFFLINE,
   });
 }
 

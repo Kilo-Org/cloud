@@ -7,6 +7,7 @@ import { mergeRepositoryOptions, type RepoOption } from '@/components/profiles/r
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import { type AgentRepoBinding } from '@/lib/hooks/agent-profile-types';
 import { keepPreviousDataForQueryKey } from '@/lib/hooks/use-agent-profiles';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /** Stable empty fallbacks so an unsettled result is not a new array each render. */
@@ -103,6 +104,7 @@ export function useRepoOptions(organizationId: string | undefined, enabled: bool
           forceRefresh: false,
         })),
     enabled,
+    ...SETTLE_WHILE_OFFLINE,
   });
   const gitlab = useQuery({
     ...(organizationId === undefined
@@ -112,6 +114,9 @@ export function useRepoOptions(organizationId: string | undefined, enabled: bool
           forceRefresh: false,
         })),
     enabled,
+    // Two reads feed one picker; a paused one keeps its half missing with no
+    // failure the picker could show.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const repositories = useMemo(

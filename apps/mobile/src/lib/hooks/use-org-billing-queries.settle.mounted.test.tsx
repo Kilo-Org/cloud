@@ -14,7 +14,7 @@ import {
   waitFor,
 } from '@/test/render-with-providers';
 
-import { useOrgRequestLogs } from './use-org-billing-queries';
+import { useOrgRequestLogs, useOrgSeatSubscription } from './use-org-billing-queries';
 
 /** The options object the hook hands `queryOptions`, as this module sees it. */
 type ReadOptions = { enabled?: boolean; networkMode?: string; refetchOnReconnect?: boolean };
@@ -37,6 +37,18 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({
     organizations: {
+      subscription: {
+        get: {
+          queryOptions: (input: unknown, options: ReadOptions) => {
+            state.options.push(options);
+            return {
+              queryKey: ['organizations.subscription.get', input],
+              queryFn: state.request,
+              ...options,
+            };
+          },
+        },
+      },
       requestLogs: {
         list: {
           queryOptions: (input: unknown, options: ReadOptions) => {
@@ -74,6 +86,16 @@ async function render(): Promise<void> {
   tree = await renderWithProviders(createElement(Probe));
 }
 
+/** Mounts only the seat-subscription read; its case asserts on the options. */
+function SubscriptionProbe(): null {
+  useOrgSeatSubscription('org-1', true);
+  return null;
+}
+
+async function renderSubscription(): Promise<void> {
+  tree = await renderWithProviders(createElement(SubscriptionProbe));
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   onlineManager.setOnline(true);
@@ -107,6 +129,23 @@ describe('useOrgRequestLogs offline read', () => {
 
     // The reconnect refetch the settle policy also re-enables is part of the
     // read's options, so the window recovers when the connection returns.
+    expect(state.options.at(-1)).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
+  });
+});
+
+describe('useOrgSeatSubscription offline read', () => {
+  it('settles the plan row offline instead of pausing it', async () => {
+    onlineManager.setOnline(false);
+    state.request.mockRejectedValue(new TypeError('Network request failed'));
+
+    await renderSubscription();
+    // The attempt went out while the manager reported offline; a paused read
+    // would have called nothing and left the plan row loading forever.
+    expect(state.request).toHaveBeenCalledTimes(1);
     expect(state.options.at(-1)).toMatchObject({
       enabled: true,
       networkMode: 'always',

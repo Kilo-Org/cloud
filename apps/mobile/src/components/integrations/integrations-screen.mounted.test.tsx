@@ -9,6 +9,8 @@ import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as TrpcErrorModule from '@/lib/trpc-error';
+
 import { i18n } from '@/i18n';
 import IntegrationsRoute from '@/app/(app)/(tabs)/(3_profile)/integrations';
 import { blockedNoteKey, IntegrationsScreen } from './integrations-screen';
@@ -129,10 +131,12 @@ vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
   useRouteForegroundRefresh: () => undefined,
 }));
 
-vi.mock('@/lib/trpc-error', () => ({
-  isPermissionDeniedError: () => state.permissionDenied,
-  trpcErrorVariant: () => 'server',
-}));
+vi.mock('@/lib/trpc-error', async importOriginal => {
+  const actual = await importOriginal<typeof TrpcErrorModule>();
+  // The failure classifier reads the real helpers; only the permission verdict
+  // is driven by this suite, so one case can turn it on.
+  return { ...actual, isPermissionDeniedError: () => state.permissionDenied };
+});
 
 vi.mock('@/lib/app-shell-handoff', () => ({
   openAppShellHandoff: (target: unknown) => {
@@ -618,6 +622,20 @@ describe('IntegrationsScreen', () => {
       retry?.();
     });
     expect(calls.refetch).toHaveBeenCalled();
+  });
+
+  it('names the connection when the read never reached the server', () => {
+    // A transport failure has no server answer: the settled read says the
+    // connection failed, and keeps its retry because a second attempt can pass.
+    state.statuses = statusState({
+      data: undefined,
+      isError: true,
+      error: new TypeError('Network request failed'),
+    });
+    const [error] = findOne(mount().root, 'QueryErrorMock');
+
+    expect(error?.props.variant).toBe('offline');
+    expect(error?.props.onRetry).toEqual(expect.any(Function));
   });
 
   it('reserves the screen for a viewer who lost access', () => {

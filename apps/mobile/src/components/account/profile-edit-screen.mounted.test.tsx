@@ -90,19 +90,22 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     ...actual,
     useQuery: (options: Record<string, unknown>) => {
       state.lastQueryOptions = options;
+      // A coded failure is a tRPC envelope the server answered; without a code
+      // the error is the transport's, carrying no server answer.
+      let error: Error | null = null;
+      if (state.error) {
+        error =
+          state.errorCode === undefined
+            ? new TypeError('Network request failed')
+            : Object.assign(new Error('read failed'), { data: { code: state.errorCode } });
+      }
       return {
         data: state.error ? null : state.links,
         isPending: false,
         isError: state.error,
         isFetching: false,
         fetchStatus: 'idle',
-        // A coded failure is a tRPC envelope the server answered; without a
-        // code the error is the transport's, carrying no server answer.
-        error: state.error
-          ? state.errorCode === undefined
-            ? new TypeError('Network request failed')
-            : Object.assign(new Error('read failed'), { data: { code: state.errorCode } })
-          : null,
+        error,
         refetch: state.refetch,
       };
     },

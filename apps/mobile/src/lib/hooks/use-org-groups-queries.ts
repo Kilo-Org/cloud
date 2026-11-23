@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -28,7 +29,10 @@ export function useOrgGroup(
   return useQuery(
     trpc.organizations.groups.get.queryOptions(
       { organizationId: organizationId ?? '', groupId: groupId ?? '' },
-      { enabled: enabled && organizationId != null && groupId != null }
+      {
+        enabled: enabled && organizationId != null && groupId != null,
+        ...SETTLE_WHILE_OFFLINE,
+      }
     )
   );
 }
@@ -46,7 +50,7 @@ export function useOrgGroups(organizationId: string | null, enabled: boolean) {
   return useQuery(
     trpc.organizations.groups.list.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: enabled && organizationId != null }
+      { enabled: enabled && organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

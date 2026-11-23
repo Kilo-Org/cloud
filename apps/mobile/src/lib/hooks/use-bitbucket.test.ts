@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 
-import { useConnectBitbucket, useReplaceBitbucketToken } from './use-bitbucket';
+import {
+  useBitbucketReadiness,
+  useConnectBitbucket,
+  useReplaceBitbucketToken,
+} from './use-bitbucket';
 
 type MutationOptions = {
   onSuccess?: () => Promise<void>;
@@ -18,13 +22,17 @@ const replaceTokenMutateMock = vi.hoisted(() => vi.fn(() => Promise.resolve({ su
 const queryClientMock = { invalidateQueries: invalidateQueriesMock };
 
 let lastCapturedOptions: MutationOptions | null = null;
+let lastReadOptions: Record<string, unknown> | null = null;
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     lastCapturedOptions = opts;
     return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false };
   },
-  useQuery: () => ({ data: undefined }),
+  useQuery: (opts: Record<string, unknown>) => {
+    lastReadOptions = opts;
+    return { data: undefined };
+  },
   useQueryClient: () => queryClientMock,
 }));
 
@@ -40,7 +48,10 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     organizations: {
       reviewAgent: {
-        getBitbucketReadiness: { queryKey: (input: unknown) => ['readiness', input] },
+        getBitbucketReadiness: {
+          queryKey: (input: unknown) => ['readiness', input],
+          queryOptions: (input: unknown) => ({ queryKey: ['readiness', input] }),
+        },
       },
       cloudAgentNext: {
         listBitbucketRepositories: { queryKey: (input: unknown) => ['repositories', input] },
@@ -84,8 +95,20 @@ function replaceTokenOptions(scope: string): MutationOptions {
   return lastCapturedOptions;
 }
 
+function readinessReadOptions(scope: string): Record<string, unknown> {
+  lastReadOptions = null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useBitbucketReadiness(scope);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!lastReadOptions) {
+    throw new Error('options for useBitbucketReadiness were not captured');
+  }
+  return lastReadOptions;
+}
+
 beforeEach(() => {
   lastCapturedOptions = null;
+  lastReadOptions = null;
   invalidateQueriesMock.mockClear();
   reconcileFirstPageMock.mockClear();
   connectMutateMock.mockClear();
@@ -129,5 +152,16 @@ describe('useReplaceBitbucketToken audit log refresh', () => {
 
     expect(reconcileFirstPageMock).not.toHaveBeenCalled();
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe('useBitbucketReadiness offline read', () => {
+  it('carries the offline settle in its options', () => {
+    // A paused first read leaves the reviewer readiness with no exit.
+    expect(readinessReadOptions(ORG_ID)).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

@@ -4,6 +4,7 @@ import { type OrgModeConfigInput } from '@/components/organization/org-mode-form
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -17,7 +18,8 @@ export function useOrgModes(organizationId: string | null) {
   return useQuery(
     trpc.organizations.modes.list.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      // A paused first read leaves the mode picker with no exit.
+      { enabled: organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

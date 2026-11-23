@@ -18,7 +18,7 @@ export function useOrgSeatSubscription(organizationId: string | null, enabled: b
   return useQuery(
     trpc.organizations.subscription.get.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: enabled && organizationId != null }
+      { enabled: enabled && organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }
@@ -33,7 +33,7 @@ export function useOrgSeats(organizationId: string | null) {
   return useQuery(
     trpc.organizations.seats.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      { enabled: organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }
@@ -44,7 +44,7 @@ export function useOrgAutoTopUpConfig(organizationId: string | null, enabled: bo
   return useQuery(
     trpc.organizations.autoTopUp.getConfig.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: enabled && organizationId != null }
+      { enabled: enabled && organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

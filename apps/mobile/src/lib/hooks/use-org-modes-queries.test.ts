@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 
-import { useOrgModeMutations } from './use-org-modes-queries';
+import { useOrgModeMutations, useOrgModes } from './use-org-modes-queries';
 
 type MutationOptions = {
   onSuccess?: (result: unknown, vars: unknown) => void;
@@ -11,6 +11,7 @@ type MutationOptions = {
 // `useOrgModeMutations` registers its mutations in this order:
 // create, update, remove.
 const capturedMutations: MutationOptions[] = [];
+let lastReadOptions: Record<string, unknown> | null = null;
 const invalidateQueriesMock = vi.fn(() => Promise.resolve());
 const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
@@ -22,6 +23,10 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     capturedMutations.push(opts);
     return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false };
+  },
+  useQuery: (opts: Record<string, unknown>) => {
+    lastReadOptions = opts;
+    return { data: undefined };
   },
   useQueryClient: () => queryClientMock,
 }));
@@ -43,6 +48,12 @@ vi.mock('@/lib/trpc', () => ({
     organizations: {
       modes: {
         pathFilter: () => ({ queryKey: ['organizations', 'modes'] }),
+        list: {
+          queryOptions: (input: unknown, options: Record<string, unknown>) => ({
+            queryKey: ['organizations', 'modes', 'list', input],
+            ...options,
+          }),
+        },
       },
     },
   }),
@@ -65,6 +76,17 @@ function modeMutation(index: number): MutationOptions {
     throw new Error(`useOrgModeMutations registered no mutation at index ${index}`);
   }
   return mutation;
+}
+
+function modesReadOptions(): Record<string, unknown> {
+  lastReadOptions = null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useOrgModes(ORG_ID);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!lastReadOptions) {
+    throw new Error('options for useOrgModes were not captured');
+  }
+  return lastReadOptions;
 }
 
 describe('useOrgModeMutations audit log refresh', () => {
@@ -111,6 +133,17 @@ describe('useOrgModeMutations audit log refresh', () => {
     ]);
     expect(invalidateQueriesMock).toHaveBeenCalledExactlyOnceWith({
       queryKey: ['organizations', 'modes'],
+    });
+  });
+});
+
+describe('useOrgModes offline read', () => {
+  it('carries the offline settle in its options', () => {
+    // A paused first read leaves the mode picker with no exit.
+    expect(modesReadOptions()).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
     });
   });
 });

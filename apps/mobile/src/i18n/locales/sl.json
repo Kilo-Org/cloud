@@ -3925,7 +3925,8 @@
       "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
       "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali skrbnik obračunavanja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vhod · {{output}} izhod",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ti časi sledijo časovnemu pasu vaše naprave ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

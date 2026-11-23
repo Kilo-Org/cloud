@@ -3789,7 +3789,8 @@
       "loadError": "അഭ്യർത്ഥന ലോഗുകൾ ലോഡ് ചെയ്യാനായില്ല.",
       "permissionDenied": "ഓർഗനൈസേഷന്റെ ഉടമയ്ക്കോ അഡ്മിനോ ബില്ലിംഗ് മാനേജർക്കോ മാത്രമേ അതിന്റെ അഭ്യർത്ഥന ലോഗുകൾ കാണാനാകൂ. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ഇൻപുട്ട് {{input}} · ഔട്ട്പുട്ട് {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ഈ സമയങ്ങൾ നിങ്ങളുടെ ഉപകരണത്തിന്റെ സമയ മേഖല ({{zone}}) പിന്തുടരുന്നു."
     },
     "usageStats": {
       "inputTokens": "ഇൻപുട്ട് ടോക്കണുകൾ",

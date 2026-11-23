@@ -3789,7 +3789,8 @@
       "loadError": "Kunne ikke laste inn forespørselslogger.",
       "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} inn · {{output}} ut",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Disse klokkeslettene følger enhetens tidssone ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",

@@ -3793,7 +3793,8 @@
       "loadError": "Kan verzoeklogboeken niet laden.",
       "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de verzoeklogboeken bekijken. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Deze tijden volgen de tijdzone van je apparaat ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Invoertokens",

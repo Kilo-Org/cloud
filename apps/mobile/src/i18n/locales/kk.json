@@ -3789,7 +3789,8 @@
       "loadError": "Сұраныс журналдарын жүктеу мүмкін болмады.",
       "permissionDenied": "Сұраныс журналдарын тек ұйымның иесі, әкімшісі немесе төлем менеджері оқи алады. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} кіріс · {{output}} шығыс",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Бұл уақыттар құрылғыңыздың уақыт белдеуіне сәйкес келеді ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Кіріс токендері",

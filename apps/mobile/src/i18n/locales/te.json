@@ -3791,7 +3791,8 @@
       "loadError": "రిక్వెస్ట్ లాగ్‌లను లోడ్ చేయడం సాధ్యపడలేదు.",
       "permissionDenied": "సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్ మాత్రమే దాని రిక్వెస్ట్ లాగ్‌లను చూడగలరు. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ఇన్‌పుట్ · {{output}} అవుట్‌పుట్",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ఈ సమయాలు మీ పరికర సమయ మండలాన్ని ({{zone}}) అనుసరిస్తాయి."
     },
     "usageStats": {
       "inputTokens": "ఇన్‌పుట్ టోకెన్లు",

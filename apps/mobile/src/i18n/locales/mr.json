@@ -3789,7 +3789,8 @@
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
       "permissionDenied": "संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "या वेळा तुमच्या डिव्हाइसच्या वेळ क्षेत्रानुसार आहेत ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

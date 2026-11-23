@@ -3789,7 +3789,8 @@
       "loadError": "अनुरोध लगहरू लोड गर्न सकिएन।",
       "permissionDenied": "संस्थाको मालिक, प्रशासक वा बिलिङ व्यवस्थापकले मात्र यसको अनुरोध लगहरू पढ्न सक्नुहुन्छ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "यी समयहरू तपाईंको यन्त्रको समय क्षेत्र ({{zone}}) अनुसार हुन्छन्।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",

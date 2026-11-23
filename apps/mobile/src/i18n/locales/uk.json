@@ -3929,7 +3929,8 @@
       "loadError": "Не вдалося завантажити журнали запитів.",
       "permissionDenied": "Журнали запитів організації можуть переглядати лише її власник, адміністратор або менеджер з оплати. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} вх. · {{output}} вих.",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ці позначки часу відповідають часовому поясу вашого пристрою ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Вхідні токени",

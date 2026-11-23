@@ -3793,7 +3793,8 @@
       "loadError": "İstek günlükleri yüklenemedi.",
       "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıkış",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Bu saatler cihazınızın saat dilimine göre gösterilir ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

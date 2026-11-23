@@ -3732,7 +3732,8 @@
       "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
       "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye njikwa ịgba ụgwọ nwere ike ịgụ ndekọ arịrịọ ya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} batara · {{output}} pụtara",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Oge ndị a na-eso mpaghara oge ngwaọrụ gị ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",

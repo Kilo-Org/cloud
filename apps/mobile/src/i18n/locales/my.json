@@ -3732,7 +3732,8 @@
       "loadError": "တောင်းဆိုမှုမှတ်တမ်းများကို ရယူ၍ မရပါ။",
       "permissionDenied": "အဖွဲ့အစည်း၏ ပိုင်ရှင်၊ စီမံခန့်ခွဲသူ သို့မဟုတ် ငွေတောင်းခံမှု မန်နေဂျာသာ ၎င်း၏ တောင်းဆိုမှုမှတ်တမ်းများကို ဖတ်နိုင်သည်။ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ဝင် {{input}} · ထွက် {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ဤအချိန်များသည် သင့်စက်ပစ္စည်း၏ အချိန်ဇုန် ({{zone}}) ကို လိုက်နာပါသည်။"
     },
     "usageStats": {
       "inputTokens": "အဝင်တိုကင်များ",

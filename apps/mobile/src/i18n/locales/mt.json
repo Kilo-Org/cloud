@@ -3993,7 +3993,8 @@
       "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
       "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} dħul · {{output}} ħruġ",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Dawn il-ħinijiet isegwu ż-żona tal-ħin tal-apparat tiegħek ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",

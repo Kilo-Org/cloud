@@ -3789,7 +3789,8 @@
       "loadError": "Хүсэлтийн бүртгэлийг ачаалж чадсангүй.",
       "permissionDenied": "Хүсэлтийн бүртгэлийг зөвхөн байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер харах боломжтой. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} оролт · {{output}} гаралт",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Эдгээр цаг нь таны төхөөрөмжийн цагийн бүсийг дагана ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Оролтын токенууд",

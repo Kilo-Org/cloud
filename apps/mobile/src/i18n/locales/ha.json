@@ -3789,7 +3789,8 @@
       "loadError": "An kasa loda rajistun buƙatu.",
       "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} shigarwa · {{output}} fitarwa",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Waɗannan lokutan suna bin yankin lokaci na na'urarka ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",

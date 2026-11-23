@@ -3789,7 +3789,8 @@
       "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
       "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofa. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} seene · {{output}} ba'e",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Sa'aatiin kunneen zoonii yeroo meeshaa keessanii hordofu ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",

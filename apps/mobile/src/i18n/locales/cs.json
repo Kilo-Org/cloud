@@ -3925,7 +3925,8 @@
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
       "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Tyto časy se řídí časovým pásmem vašeho zařízení ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",

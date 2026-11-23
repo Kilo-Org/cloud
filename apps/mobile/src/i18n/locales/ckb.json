@@ -3789,7 +3789,8 @@
       "loadError": "نەتوانرا تۆمارەکانی داواکاری بار بکرێن.",
       "permissionDenied": "تەنها خاوەن، بەڕێوەبەر یان بەڕێوەبەری پارەدانی ڕێکخراوەیەک دەتوانێت تۆمارەکانی داواکارییەکەی بخوێنێتەوە. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} داخڵ · {{output}} دەرچوو",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ئەم کاتژمێرانە پەیڕەوی ناوچەی کاتیی ئامێرەکەت دەکەن ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "تۆکنەکانی تێدراو",

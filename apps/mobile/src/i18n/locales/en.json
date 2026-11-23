@@ -3903,7 +3903,8 @@
       "loadError": "Couldn't load request logs.",
       "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} out",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "These times follow your device's time zone ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Input tokens",

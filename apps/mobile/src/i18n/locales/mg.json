@@ -3789,7 +3789,8 @@
       "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
       "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} miditra · {{output}} mivoaka",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ireto ora ireto dia manaraka ny faritra ora amin'ny fitaovanao ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

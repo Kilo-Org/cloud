@@ -3857,7 +3857,8 @@
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
       "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ulaz: {{input}} · izlaz: {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ova vremena slijede vremensku zonu vašeg uređaja ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

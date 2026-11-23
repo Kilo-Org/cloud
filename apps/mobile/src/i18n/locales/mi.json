@@ -3789,7 +3789,8 @@
       "loadError": "Kāore i taea te uta i ngā pūkete tono.",
       "permissionDenied": "Mā te rangatira, te kaiwhakahaere, te kaiwhakahaere utu rānei o tētahi rōpū anake e pānui ōna pūkete tono. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ki roto · {{output}} ki waho",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ka whai ēnei wā i te rohe wā o tō pūrere ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",

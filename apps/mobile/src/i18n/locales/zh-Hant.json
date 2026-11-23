@@ -3732,7 +3732,8 @@
       "loadError": "無法載入請求記錄。",
       "permissionDenied": "只有組織的擁有者、管理員或帳單管理員可以查看其請求記錄。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "這些時間會依循您裝置的時區（{{zone}}）。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",

@@ -3789,7 +3789,8 @@
       "loadError": "Nou pa t ka chaje jounal demann yo.",
       "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon nan òganizasyon an ki ka li jounal demann li. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} antre · {{output}} soti",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Èdtan sa yo swiv zòn lè aparèy ou a ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Jeton antre",

@@ -3732,7 +3732,8 @@
       "loadError": "リクエストログを読み込めませんでした。",
       "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "入力 {{input}} · 出力 {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "これらの時刻はデバイスのタイムゾーン（{{zone}}）に従います。"
     },
     "usageStats": {
       "inputTokens": "入力トークン",

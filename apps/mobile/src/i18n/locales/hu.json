@@ -3789,7 +3789,8 @@
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
       "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} be · {{output}} ki",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ezek az időpontok az eszköze időzónáját követik ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

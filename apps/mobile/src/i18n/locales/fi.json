@@ -3789,7 +3789,8 @@
       "loadError": "Pyyntölokien lataaminen epäonnistui.",
       "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisään · {{output}} ulos",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Nämä kellonajat noudattavat laitteesi aikavyöhykettä ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

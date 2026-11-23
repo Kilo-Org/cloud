@@ -19,6 +19,8 @@ import { i18n } from '@/i18n';
 // above; the screen reaches this adapter through `use-manual-refresh`, and
 // importing the mocked module here is how the test reads its spy.
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { isolateBidiText } from '@/lib/bidi';
+import type * as IntlCache from '@/lib/intl-cache';
 import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
 import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
@@ -38,6 +40,62 @@ const boundary = {
   role: 'owner' as string | null,
   isResolving: false,
 };
+
+// The screen reads the device zone against the shared tick, so the suite pins
+// the tick and moves it: the caption must re-read the probe on each tick rather
+// than freeze the zone it saw at mount. React Compiler memoizes a call with no
+// traced argument, which is the defect this pins. The mock keeps a listener set
+// so advancing the tick re-renders its subscribers the way the shared store's
+// `useSyncExternalStore` does on a device.
+const tick = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const store = {
+    now: Date.parse('2026-01-01T10:00:00.000Z'),
+    advance(ms: number) {
+      store.now += ms;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    // Handed straight to `useSyncExternalStore`, which calls it with one
+    // argument and keeps the returned unsubscribe.
+    listen(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    snapshot() {
+      return store.now;
+    },
+  };
+  return store;
+});
+const zone = vi.hoisted(() => ({ current: 'Etc/UTC', probes: 0 }));
+
+// `vi.mock` factories are hoisted above this file's imports, so the hook is
+// reached through a dynamic import: a static `react` binding is not initialised
+// when the factory runs.
+vi.mock('@/lib/hooks/use-now-ticker', async () => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    useRelativeTimeNow: () =>
+      useSyncExternalStore(
+        listener => tick.listen(listener),
+        () => tick.snapshot()
+      ),
+  };
+});
+
+// The probe itself, so the test can move the device zone under a mounted screen.
+// The rest of the module stays real: the formatters a list reads live there.
+vi.mock('@/lib/intl-cache', async importOriginal => ({
+  ...(await importOriginal<typeof IntlCache>()),
+  deviceTimeZone: () => {
+    zone.probes += 1;
+    return zone.current;
+  },
+}));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
@@ -123,6 +181,11 @@ vi.mock('@/components/ui/directional-icons', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The band is a shared component that reads the motion policy and the scheme
+// from native modules this suite stubs, so it stands in as a host node here:
+// the suite asserts where it sits and which control it carries, not its paint.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 
 // The failed pull announces through this adapter, and the real module pulls
 // native deps; the spy records the screen's announcement instead.
@@ -250,6 +313,10 @@ beforeEach(() => {
   boundary.organizationId = 'org-1';
   boundary.role = 'owner';
   boundary.isResolving = false;
+  // One test moves both the tick and the zone; every other test starts from the
+  // same instant and zone a device reports.
+  tick.now = Date.parse('2026-01-01T10:00:00.000Z');
+  zone.current = 'Etc/UTC';
 });
 
 describe('OrganizationRequestLogsScreen', () => {
@@ -357,6 +424,9 @@ describe('OrganizationRequestLogsScreen', () => {
     unmount();
   });
 
+  // The loop presses Older hour once per hour back to the bound (8760 React
+  // batches), so its wall time tracks the machine rather than the code; the
+  // default budget is not enough on a loaded runner.
   it('drops the Older-hour pointer once the history bound stops the step', async () => {
     logsQuery.data = [];
     const { renderer, unmount } = await mount();
@@ -393,7 +463,7 @@ describe('OrganizationRequestLogsScreen', () => {
     // state names the bound instead, so the reader knows why Older hour is off.
     expect(empty?.props.description).toBe('This is as far back as request logs go.');
     unmount();
-  });
+  }, 120_000);
 
   it('prints every field the web table shows, and the BYOK marker', async () => {
     logsQuery.data = entries(1);
@@ -473,6 +543,62 @@ describe('OrganizationRequestLogsScreen', () => {
       }
     });
     expect(Date.parse(logsQuery.startTimes.at(-1) ?? '')).toBe(anchor);
+    unmount();
+  });
+
+  it('names the clock the header times are read on, once per tick', async () => {
+    zone.current = 'Etc/UTC';
+    zone.probes = 0;
+    const { renderer, unmount } = await mount();
+
+    const caption = () => texts(renderer).find(text => text.includes('time zone'));
+    const first = caption();
+    if (!first) {
+      throw new Error('the header rendered no time-zone caption');
+    }
+    // The caption is the catalog's sentence around the probed zone.
+    expect(first).toBe(
+      i18n.t('organization.requestLogs.timeZoneNote', { zone: isolateBidiText('Etc/UTC') })
+    );
+    // The zone run is a first-strong isolate: an IANA id is Latin by design, so
+    // a right-to-left reader must not have its segments reordered.
+    const open = first.indexOf('\u2068');
+    const close = first.indexOf('\u2069');
+    expect(open).toBeGreaterThan(-1);
+    expect(close).toBeGreaterThan(open);
+    expect(first.slice(open, close + 1)).toBe('\u2068Etc/UTC\u2069');
+
+    // The probe takes no argument, so React Compiler memoizes it against its
+    // traced input: the caption must hold one read per tick, not one per
+    // render, and a tick must re-read it. Both halves matter — a probe read on
+    // every render would thrash a formatter construction per row, and a probe
+    // read once per mount would keep the zone the device has left.
+    // A re-render that is not a tick keeps the memoized zone: stepping the
+    // window back re-renders the header, and the probe must not run again.
+    const afterMount = zone.probes;
+    expect(afterMount).toBeGreaterThan(0);
+    const stepBack = renderer.root
+      .findAllByType('Button')
+      .find(node => node.props.accessibilityLabel === 'Older hour');
+    await act(() => {
+      if (stepBack) {
+        handlerOf(stepBack, 'onPress')?.();
+      }
+    });
+    expect(zone.probes).toBe(afterMount);
+
+    // A tick re-reads it, so the move reaches the header.
+    zone.current = 'Pacific/Auckland';
+    await act(async () => {
+      tick.advance(60_000);
+      await Promise.resolve();
+    });
+    expect(zone.probes).toBeGreaterThan(afterMount);
+    expect(caption()).toBe(
+      i18n.t('organization.requestLogs.timeZoneNote', {
+        zone: isolateBidiText('Pacific/Auckland'),
+      })
+    );
     unmount();
   });
 
@@ -587,6 +713,57 @@ describe('OrganizationRequestLogsScreen pull to refresh', () => {
       await Promise.resolve();
     });
     expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('draws one static band above each pull surface, carrying its control', async () => {
+    // The band is the pull's visible half under reduced motion, where the
+    // platform control is forced back to rest. It paints over the body rather
+    // than sitting in flow, so it moves no row at rest and never scrolls away
+    // with the rows. The list and the state scroller are handed the same control
+    // element, so one band paints whichever pull is in flight.
+    logsQuery.data = entries(2);
+    const list = await mount();
+    expect(list.renderer.root.findAllByType('RefreshProgress')).toHaveLength(1);
+    const [listBand] = list.renderer.root.findAllByType('RefreshProgress');
+    const [listNode] = list.renderer.root.findAllByType('FlashList');
+    if (!listNode) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(listBand?.props.refreshControl).toBe(listNode.props.refreshControl);
+    list.unmount();
+
+    logsQuery.data = [];
+    const empty = await mount();
+    expect(empty.renderer.root.findAllByType('RefreshProgress')).toHaveLength(1);
+    const [emptyBand] = empty.renderer.root.findAllByType('RefreshProgress');
+    const [emptyScroller] = empty.renderer.root.findAllByType('TabScreenScrollView');
+    if (!emptyScroller) {
+      throw new Error('the empty hour rendered no scroller');
+    }
+    expect(emptyBand?.props.refreshControl).toBe(pullControl(emptyScroller));
+    empty.unmount();
+
+    logsQuery.data = undefined;
+    logsQuery.error = new TypeError('Network request failed');
+    const failed = await mount();
+    expect(failed.renderer.root.findAllByType('RefreshProgress')).toHaveLength(1);
+    const [failedBand] = failed.renderer.root.findAllByType('RefreshProgress');
+    const [failedScroller] = failed.renderer.root.findAllByType('TabScreenScrollView');
+    if (!failedScroller) {
+      throw new Error('the failure body rendered no scroller');
+    }
+    expect(failedBand?.props.refreshControl).toBe(pullControl(failedScroller));
+    failed.unmount();
+  });
+
+  it('draws no band while the window loads', async () => {
+    // No read has settled, so `useManualRefresh` hands the skeleton no gesture;
+    // a band there would reserve height for a pull nothing owns.
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('Skeleton').length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByType('RefreshProgress')).toHaveLength(0);
     unmount();
   });
 });

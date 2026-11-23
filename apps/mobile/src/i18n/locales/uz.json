@@ -3789,7 +3789,8 @@
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
       "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} kirish · {{output}} chiqish",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Bu vaqtlar qurilmangizning vaqt mintaqasiga ({{zone}}) mos keladi."
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",

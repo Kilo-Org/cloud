@@ -3789,7 +3789,8 @@
       "loadError": "Akukwazekanga ukulayisha amarekhodi ezicelo.",
       "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} okungenayo · {{output}} okuphumayo",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Lezi zikhathi zilandela izoni yesikhathi yedivayisi yakho ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",

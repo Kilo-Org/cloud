@@ -3789,7 +3789,8 @@
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
       "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, inzibatçısı və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıxış",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Bu saatlar cihazınızın saat qurşağına uyğundur ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",

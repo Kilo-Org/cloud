@@ -3728,7 +3728,8 @@
       "loadError": "មិនអាចផ្ទុកកំណត់ហេតុសំណើបានទេ។",
       "permissionDenied": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះ ដែលអាចអានកំណត់ហេតុសំណើរបស់អង្គការបាន។ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ចូល {{input}} · ចេញ {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ម៉ោងទាំងនេះគោរពតាមល្វែងម៉ោងរបស់ឧបករណ៍អ្នក ({{zone}})។"
     },
     "usageStats": {
       "inputTokens": "តូខេនទិន្នន័យបញ្ចូល",

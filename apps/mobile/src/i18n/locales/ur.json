@@ -3789,7 +3789,8 @@
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
       "permissionDenied": "صرف تنظیم کا مالک، منتظم یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "یہ اوقات آپ کے ڈیوائس کے ٹائم زون ({{zone}}) کے مطابق ہیں۔"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

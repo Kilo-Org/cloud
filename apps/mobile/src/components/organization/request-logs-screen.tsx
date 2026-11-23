@@ -1,6 +1,6 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
@@ -20,14 +20,17 @@ import {
   DirectionalLogs,
 } from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
 import { formatClockTime, formatDate } from '@/lib/format';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { deviceTimeZone } from '@/lib/intl-cache';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import {
   classifyReadFailureKind,
@@ -121,6 +124,13 @@ export function OrganizationRequestLogsScreen() {
   // The screen's own read can be pulled in place, and a failed pull is
   // announced: the inert reduced-motion indicator cannot say it.
   const [refreshing, onRefresh] = useManualRefresh(logs.refetch, t('common.couldNotRefresh'));
+  // The tick is the traced input: React Compiler memoizes a call against its own
+  // arguments, and `deviceTimeZone()` takes none, so an untracked probe would
+  // freeze the caption's zone for the life of the screen while the header's
+  // clock range re-formats in the zone the device moved to.
+  const zoneNow = useRelativeTimeNow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the tick is the dependency, not an input the body reads
+  const timeZone = useMemo(() => deviceTimeZone(), [zoneNow]);
 
   // `RequestLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering.
@@ -245,6 +255,15 @@ export function OrganizationRequestLogsScreen() {
   // applies the side insets itself, so those two bodies are not wrapped in the
   // padded view the list and the skeleton need.
   const bodyPulls = body.kind === 'empty' || body.kind === 'failure';
+  // The pull's visible half under reduced motion, where the platform control is
+  // forced back to rest. It belongs to the three bodies that own a pull — the
+  // list, the empty hour and the failure — and never to the skeleton: no read
+  // has settled, so `useManualRefresh` hands it no gesture to paint. It paints
+  // over the body rather than in flow: in flow its `h-9` reserve opened a gap
+  // between the window header's buttons and the first row three times the row
+  // separator, so the header block read as detached from the list; out of flow
+  // it never moves content and still paints the pull's only visible feedback.
+  const showsRefreshBand = body.kind === 'list' || bodyPulls;
   const bodyContent = renderBody(body);
 
   return (
@@ -272,6 +291,16 @@ export function OrganizationRequestLogsScreen() {
               {t('common.timeRange', {
                 start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
                 end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+              })}
+            </Text>
+            {/* The clocks above are the server's instants, so the header says
+                which clock they were read on. The zone id is pinned
+                left-to-right: an IANA id is Latin by design and a right-to-left
+                reader must not have its segments reordered. The caption wraps
+                instead of clipping, so a long id stays whole. */}
+            <Text variant="caption">
+              {t('organization.requestLogs.timeZoneNote', {
+                zone: isolateBidiText(timeZone),
               })}
             </Text>
           </View>
@@ -318,24 +347,31 @@ export function OrganizationRequestLogsScreen() {
           </View>
         </View>
       </View>
-      {bodyPulls ? (
-        // `flex-grow` lets short content still pull: a content box only as tall
-        // as the state cannot be dragged far enough to trigger the gesture. The
-        // state draws its own gutter through `inset="gutter"`, so this body
-        // adds none.
-        <TabScreenScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow"
-          showsVerticalScrollIndicator={false}
-          refreshControl={refreshControl}
-        >
-          {bodyContent}
-        </TabScreenScrollView>
-      ) : (
-        <View className="flex-1" style={sideInsetStyle}>
-          {bodyContent}
-        </View>
-      )}
+      <View className="flex-1">
+        {bodyPulls ? (
+          // `flex-grow` lets short content still pull: a content box only as tall
+          // as the state cannot be dragged far enough to trigger the gesture. The
+          // state draws its own gutter through `inset="gutter"`, so this body
+          // adds none.
+          <TabScreenScrollView
+            className="flex-1"
+            contentContainerClassName="flex-grow"
+            showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
+          >
+            {bodyContent}
+          </TabScreenScrollView>
+        ) : (
+          <View className="flex-1" style={sideInsetStyle}>
+            {bodyContent}
+          </View>
+        )}
+        {showsRefreshBand ? (
+          <View className="absolute inset-x-0 top-0" pointerEvents="none">
+            <RefreshProgress refreshControl={refreshControl} />
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

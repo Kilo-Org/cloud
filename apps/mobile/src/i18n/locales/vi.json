@@ -3793,7 +3793,8 @@
       "loadError": "Không thể tải nhật ký yêu cầu.",
       "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vào · {{output}} ra",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Các mốc thời gian này tuân theo múi giờ của thiết bị bạn ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",

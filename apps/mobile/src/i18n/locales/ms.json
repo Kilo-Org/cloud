@@ -3728,7 +3728,8 @@
       "loadError": "Tidak dapat memuatkan log permintaan.",
       "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Masa ini mengikut zon waktu peranti anda ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Token masukan",

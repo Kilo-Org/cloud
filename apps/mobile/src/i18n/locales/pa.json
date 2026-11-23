@@ -3789,7 +3789,8 @@
       "loadError": "ਬੇਨਤੀ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ਇਨਪੁੱਟ · {{output}} ਆਉਟਪੁੱਟ",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ਇਹ ਸਮੇਂ ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਦੇ ਸਮਾਂ ਖੇਤਰ ({{zone}}) ਦੀ ਪਾਲਣਾ ਕਰਦੇ ਹਨ।"
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",

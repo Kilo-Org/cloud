@@ -3789,7 +3789,8 @@
       "loadError": "Lama soo rari karin diiwaannada codsiyada.",
       "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} gal · {{output}} bax",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Waqtiyadan waxay raacaan aagga waqtiga qalabkaaga ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

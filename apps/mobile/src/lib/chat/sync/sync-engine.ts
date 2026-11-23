@@ -120,9 +120,13 @@ export type TurnAdmission =
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-/** Decodes the base64 an image part stores, without a platform global. */
+/**
+ * Decodes the base64 an image part stores, without a platform global and
+ * without bit operations: each 4-character group is three bytes expressed in
+ * base 64, so plain arithmetic answers them.
+ */
 export function base64ToBytes(base64: string): Uint8Array {
-  const clean = base64.replaceAll(/[^A-Za-z0-9+/=]/g, '');
+  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, '');
   const bytes: number[] = [];
   for (let index = 0; index + 3 < clean.length; index += 4) {
     const a = BASE64.indexOf(clean[index] ?? '');
@@ -132,12 +136,12 @@ export function base64ToBytes(base64: string): Uint8Array {
     if (a === -1 || b === -1) {
       break;
     }
-    bytes.push((a << 2) | (b >> 4));
+    bytes.push(a * 4 + Math.floor(b / 16));
     if (c !== -1) {
-      bytes.push(((b & 0x0F) << 4) | (c >> 2));
+      bytes.push((b % 16) * 16 + Math.floor(c / 4));
     }
     if (d !== -1) {
-      bytes.push(((c & 0x03) << 6) | d);
+      bytes.push((c % 4) * 64 + d);
     }
   }
   return Uint8Array.from(bytes);
@@ -340,12 +344,12 @@ export async function uploadChat(
   }
   const { serverId } = ready;
   let record = ready.record;
-  // A frozen outbox that commits is the outcome, even when it carried the
-  // chat's only pending messages: there is nothing left to send afterwards.
-  let resentPosition: number | null = null;
   if (record.phase === 'diverged') {
     return { kind: 'diverged' };
   }
+  // A frozen outbox that commits is the outcome, even when it carried the
+  // chat's only pending messages: there is nothing left to send afterwards.
+  let resentPosition: number | null = null;
 
   // A frozen outbox goes first, byte-identical: the server may already hold
   // it, and resending is how the acknowledgement is recovered.

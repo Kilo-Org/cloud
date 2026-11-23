@@ -4353,6 +4353,7 @@
     "mcpLoadFailed": "ไม่สามารถโหลดเซิร์ฟเวอร์ MCP ได้",
     "slashCommandsLoadFailed": "ไม่สามารถโหลดคำสั่งสแลชได้",
     "repoBindingsLoadFailed": "ไม่สามารถโหลดโปรไฟล์เริ่มต้นได้",
+    "pinnedReposLoadFailed": "ไม่สามารถโหลดคลังโค้ดที่ปักหมุดไว้ได้",
     "counts": {
       "vars_other": "{{count}} ตัวแปร",
       "mcp": "{{count}} MCP",

@@ -192,7 +192,7 @@ describe('ProfileRepoPinsSection', () => {
       throw new Error('QueryError was not rendered');
     }
     expect(queryError.variant).toBe('server');
-    expect(queryError.title).toBe("Couldn't load default profiles");
+    expect(queryError.title).toBe("Couldn't load pinned repositories");
     act(() => {
       queryError.onRetry?.();
     });
@@ -252,7 +252,7 @@ describe('ProfileRepoPinsSection', () => {
       | RenderedQueryError
       | undefined;
     expect(queryError?.variant).toBe('offline');
-    expect(queryError?.title).toBe("Couldn't load default profiles");
+    expect(queryError?.title).toBe("Couldn't load pinned repositories");
     expect(typeof queryError?.onRetry).toBe('function');
     act(() => {
       queryError?.onRetry?.();

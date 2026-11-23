@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Չհաջողվեց բեռնել MCP սերվերները",
     "slashCommandsLoadFailed": "Չհաջողվեց բեռնել Slash հրամանները",
     "repoBindingsLoadFailed": "Չհաջողվեց բեռնել լռելյայն պրոֆիլները",
+    "pinnedReposLoadFailed": "Չհաջողվեց բեռնել ամրացված պահոցները",
     "counts": {
       "vars_one": "{{count}} փոփոխական",
       "vars_other": "{{count}} փոփոխական",

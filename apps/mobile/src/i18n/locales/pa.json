@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP ਸਰਵਰ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "slashCommandsLoadFailed": "ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "repoBindingsLoadFailed": "ਮੂਲ ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "pinnedReposLoadFailed": "ਪਿੰਨ ਕੀਤੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "counts": {
       "vars_one": "{{count}} ਵੇਰੀਏਬਲ",
       "vars_other": "{{count}} ਵੇਰੀਏਬਲ",

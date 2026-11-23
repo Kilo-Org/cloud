@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP серверлерін жүктеу мүмкін болмады",
     "slashCommandsLoadFailed": "Slash пәрмендерін жүктеу мүмкін болмады",
     "repoBindingsLoadFailed": "Әдепкі профильдерді жүктеу мүмкін болмады",
+    "pinnedReposLoadFailed": "Бекітілген репозиторийлерді жүктеу мүмкін болмады",
     "counts": {
       "vars_one": "{{count}} айнымалы",
       "vars_other": "{{count}} айнымалы",

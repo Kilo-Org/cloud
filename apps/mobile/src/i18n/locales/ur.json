@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP سرورز لوڈ نہیں ہو سکے۔",
     "slashCommandsLoadFailed": "سلیش کمانڈز لوڈ نہیں ہو سکے۔",
     "repoBindingsLoadFailed": "ڈیفالٹ پروفائلز لوڈ نہیں ہو سکے۔",
+    "pinnedReposLoadFailed": "پن کی گئی ریپوزٹریز لوڈ نہیں ہو سکیں۔",
     "counts": {
       "vars_one": "{{count}} متغیر",
       "vars_other": "{{count}} متغیرات",

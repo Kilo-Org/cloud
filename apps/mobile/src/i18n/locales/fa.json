@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "سرورهای MCP بارگیری نشد",
     "slashCommandsLoadFailed": "فرمانهای اسلش بارگیری نشد",
     "repoBindingsLoadFailed": "نمایه‌های پیش‌فرض بارگیری نشد",
+    "pinnedReposLoadFailed": "مخازن پین شده بارگیری نشد",
     "counts": {
       "vars_one": "{{count}} متغیر",
       "vars_other": "{{count}} متغیر",

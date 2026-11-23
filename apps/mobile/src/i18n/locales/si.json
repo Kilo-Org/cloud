@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP සේවාදායකයන් පූරණය කළ නොහැකි විය",
     "slashCommandsLoadFailed": "Slash විධාන පූරණය කළ නොහැකි විය",
     "repoBindingsLoadFailed": "පෙරනිමි පැතිකඩ පූරණය කළ නොහැකි විය",
+    "pinnedReposLoadFailed": "පින් කළ ගබඩා පූරණය කළ නොහැකි විය",
     "counts": {
       "vars_one": "{{count}} විචල්ය",
       "vars_other": "{{count}} විචල්ය",

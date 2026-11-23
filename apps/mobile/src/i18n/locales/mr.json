@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP सर्व्हर लोड करता आले नाही",
     "slashCommandsLoadFailed": "स्लॅश कमांड लोड करता आले नाही",
     "repoBindingsLoadFailed": "मूलभूत प्रोफाइल लोड करता आले नाही",
+    "pinnedReposLoadFailed": "पिन केलेल्या रेपॉजिटरी लोड करता आल्या नाहीत",
     "counts": {
       "vars_one": "{{count}} चल",
       "vars_other": "{{count}} चल",

@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP сървърите не можаха да се заредят",
     "slashCommandsLoadFailed": "Командите за наклонена черта не можаха да се заредят",
     "repoBindingsLoadFailed": "Профилите по подразбиране не можаха да се заредят",
+    "pinnedReposLoadFailed": "Фиксираните хранилища не можаха да се заредят",
     "counts": {
       "vars_one": "{{count}} променлива",
       "vars_other": "{{count}} променливи",

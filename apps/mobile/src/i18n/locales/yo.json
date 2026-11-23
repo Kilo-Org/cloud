@@ -4358,6 +4358,7 @@
     "mcpLoadFailed": "Ko le kojọpọ awọn olupin MCP",
     "slashCommandsLoadFailed": "Ko le kojọpọ awọn aṣẹ idinku",
     "repoBindingsLoadFailed": "Ko le kojọpọ awọn profaili aiyipada",
+    "pinnedReposLoadFailed": "Ko le kojọpọ awọn ibi ipamọ tí a pin",
     "counts": {
       "vars_other": "{{count}} oniyipada",
       "mcp": "{{count}} MCP",

@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP சேவையகங்களை ஏற்ற முடியவில்லை",
     "slashCommandsLoadFailed": "ஸ்லாஷ் கட்டளைகளை ஏற்ற முடியவில்லை",
     "repoBindingsLoadFailed": "இயல்புநிலை சுயவிவரங்களை ஏற்ற முடியவில்லை",
+    "pinnedReposLoadFailed": "பின் செய்யப்பட்ட களஞ்சியங்களை ஏற்ற முடியவில்லை",
     "counts": {
       "vars_one": "{{count}} மாறி",
       "vars_other": "{{count}} மாறிகள்",

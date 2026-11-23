@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Kunne ikke laste inn MCP-servere",
     "slashCommandsLoadFailed": "Kunne ikke laste inn slash-kommandoer",
     "repoBindingsLoadFailed": "Kunne ikke laste inn standardprofiler",
+    "pinnedReposLoadFailed": "Kunne ikke laste inn festede repositorier",
     "counts": {
       "vars_one": "{{count}} variabel",
       "vars_other": "{{count}} variabler",

@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Ezin izan dira kargatu MCP zerbitzariak",
     "slashCommandsLoadFailed": "Ezin izan dira kargatu barra komandoak",
     "repoBindingsLoadFailed": "Ezin izan dira kargatu profil lehenetsiak",
+    "pinnedReposLoadFailed": "Ezin izan dira kargatu ainguratutako biltegiak",
     "counts": {
       "vars_one": "{{count}} aldagai",
       "vars_other": "{{count}} aldagai",

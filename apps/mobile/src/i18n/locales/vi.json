@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Không thể tải máy chủ MCP",
     "slashCommandsLoadFailed": "Không thể tải lệnh gạch chéo",
     "repoBindingsLoadFailed": "Không thể tải hồ sơ mặc định",
+    "pinnedReposLoadFailed": "Không thể tải kho lưu trữ đã ghim",
     "counts": {
       "vars_one": "{{count}} biến",
       "vars_other": "{{count}} biến",

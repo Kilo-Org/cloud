@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Nevarēja ielādēt MCP serverus",
     "slashCommandsLoadFailed": "Nevarēja ielādēt svītru komandas",
     "repoBindingsLoadFailed": "Nevarēja ielādēt noklusējuma profilus",
+    "pinnedReposLoadFailed": "Nevarēja ielādēt piespraustās krātuves",
     "counts": {
       "vars_zero": "{{count}} mainīgo",
       "vars_one": "{{count}} mainīgais",

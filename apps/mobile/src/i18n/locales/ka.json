@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP სერვერების ჩატვირთვა ვერ მოხერხდა",
     "slashCommandsLoadFailed": "Slash ბრძანებების ჩატვირთვა ვერ მოხერხდა",
     "repoBindingsLoadFailed": "ნაგულისხმევი პროფილების ჩატვირთვა ვერ მოხერხდა",
+    "pinnedReposLoadFailed": "ჩამაგრებული საცავების ჩატვირთვა ვერ მოხერხდა",
     "counts": {
       "vars_one": "{{count}} ცვლადი",
       "vars_other": "{{count}} ცვლადი",

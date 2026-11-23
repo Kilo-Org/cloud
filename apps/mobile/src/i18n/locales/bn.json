@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP সার্ভার লোড করা যায়নি",
     "slashCommandsLoadFailed": "স্ল্যাশ কমান্ড লোড করা যায়নি",
     "repoBindingsLoadFailed": "ডিফল্ট প্রোফাইল লোড করা যায়নি",
+    "pinnedReposLoadFailed": "পিন করা সংগ্রহস্থল লোড করা যায়নি",
     "counts": {
       "vars_one": "{{count}} ভেরিয়েবল",
       "vars_other": "{{count}} ভেরিয়েবল",

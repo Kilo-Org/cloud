@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Δεν ήταν δυνατή η φόρτωση των διακομιστών MCP",
     "slashCommandsLoadFailed": "Δεν ήταν δυνατή η φόρτωση των εντολών με κάθετο",
     "repoBindingsLoadFailed": "Δεν ήταν δυνατή η φόρτωση των προεπιλεγμένων προφίλ",
+    "pinnedReposLoadFailed": "Δεν ήταν δυνατή η φόρτωση των καρφιτσωμένων αποθετηρίων",
     "counts": {
       "vars_one": "{{count}} μεταβλητή",
       "vars_other": "{{count}} μεταβλητές",

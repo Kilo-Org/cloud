@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Kāore i taea te uta i tūmau MCP",
     "slashCommandsLoadFailed": "Kāore i taea te uta i ngā whakahau rītaha",
     "repoBindingsLoadFailed": "Kāore i taea te uta i kōtaha taunoa",
+    "pinnedReposLoadFailed": "Kāore i taea te uta i ngā putunga kua titi",
     "counts": {
       "vars_one": "{{count}} taurangi",
       "vars_other": "{{count}} taurangi",

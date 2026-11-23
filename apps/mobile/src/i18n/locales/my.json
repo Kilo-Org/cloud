@@ -4357,6 +4357,7 @@
     "mcpLoadFailed": "MCP ဆာဗာများကို တင်၍မရပါ။",
     "slashCommandsLoadFailed": "မျဉ်းစောင်းအမိန့်များကို တင်၍မရပါ။",
     "repoBindingsLoadFailed": "မူရင်းပရိုဖိုင်များကို တင်၍မရပါ။",
+    "pinnedReposLoadFailed": "ပင်ထိုးထားသော သိုလှောင်ရုံများကို တင်၍မရပါ။",
     "counts": {
       "vars_other": "{{count}} ကိန်းရှင်",
       "mcp": "{{count}} MCP",

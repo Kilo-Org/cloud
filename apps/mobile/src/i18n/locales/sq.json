@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Serverët MCP nuk mund të ngarkoheshin",
     "slashCommandsLoadFailed": "Komandat me prerje nuk mund të ngarkoheshin",
     "repoBindingsLoadFailed": "Profilet e paravendosura nuk mund të ngarkoheshin",
+    "pinnedReposLoadFailed": "Depot e ngjitura nuk mund të ngarkoheshin",
     "counts": {
       "vars_one": "{{count}} variabël",
       "vars_other": "{{count}} variabla",

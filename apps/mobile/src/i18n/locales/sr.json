@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Učitavanje MCP servera nije uspelo",
     "slashCommandsLoadFailed": "Učitavanje Slash komandi nije uspelo",
     "repoBindingsLoadFailed": "Učitavanje podrazumevanih profila nije uspelo",
+    "pinnedReposLoadFailed": "Učitavanje zakačenih spremišta nije uspelo",
     "counts": {
       "vars_one": "{{count}} promenljiva",
       "vars_few": "{{count}} promenljive",

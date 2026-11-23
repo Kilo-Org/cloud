@@ -4423,7 +4423,8 @@
     "instructionsLoadFailed": "Ohjeiden lataaminen epäonnistui",
     "mcpLoadFailed": "MCP-palvelimien lataaminen epäonnistui",
     "slashCommandsLoadFailed": "Vinoviivakomentojen lataaminen epäonnistui",
-    "repoBindingsLoadFailed": "Profiilin oletusten lataaminen epäonnistui",
+    "repoBindingsLoadFailed": "Koodivarastojen oletusprofiilien lataaminen epäonnistui",
+    "pinnedReposLoadFailed": "Kiinnitettyjen koodivarastojen lataaminen epäonnistui",
     "counts": {
       "vars_one": "{{count}} muuttuja",
       "vars_other": "{{count}} muuttujaa",

@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP serverlarini yuklab bo‘lmadi",
     "slashCommandsLoadFailed": "Slash buyruqlarini yuklab bo‘lmadi",
     "repoBindingsLoadFailed": "Standart profillarni yuklab bo‘lmadi",
+    "pinnedReposLoadFailed": "Mahkamlangan repozitoriylarni yuklab bo‘lmadi",
     "counts": {
       "vars_one": "{{count}} o'zgaruvchi",
       "vars_other": "{{count}} o'zgaruvchi",

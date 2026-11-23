@@ -4356,6 +4356,7 @@
     "mcpLoadFailed": "Enweghị ike ibunye ihe nkesa MCP",
     "slashCommandsLoadFailed": "Enweghị ike ibunye iwu slash",
     "repoBindingsLoadFailed": "Enweghị ike ibunye profaịlụ ndabara",
+    "pinnedReposLoadFailed": "Enweghị ike ibunye repo ndị etinyela ya",
     "counts": {
       "vars_other": "{{count}} mgbanwe",
       "mcp": "{{count}} MCP",

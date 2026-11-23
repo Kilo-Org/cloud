@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP-Server konnten nicht geladen werden",
     "slashCommandsLoadFailed": "Slash-Befehle konnten nicht geladen werden",
     "repoBindingsLoadFailed": "Standardprofile konnten nicht geladen werden",
+    "pinnedReposLoadFailed": "Angeheftete Repositorys konnten nicht geladen werden",
     "counts": {
       "vars_one": "{{count}} Variable",
       "vars_other": "{{count}} Variablen",

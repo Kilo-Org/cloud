@@ -4353,6 +4353,7 @@
     "mcpLoadFailed": "Tidak dapat memuatkan pelayan MCP",
     "slashCommandsLoadFailed": "Tidak dapat memuatkan arahan tebas",
     "repoBindingsLoadFailed": "Tidak dapat memuatkan profil lalai",
+    "pinnedReposLoadFailed": "Tidak dapat memuatkan repositori yang disematkan",
     "counts": {
       "vars_other": "{{count}} pembolehubah",
       "mcp": "{{count}} MCP",

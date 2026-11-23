@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Non se puideron cargar os servidores MCP",
     "slashCommandsLoadFailed": "Non se puideron cargar os comandos de barra",
     "repoBindingsLoadFailed": "Non se puideron cargar os perfís predeterminados",
+    "pinnedReposLoadFailed": "Non se puideron cargar os repositorios fixados",
     "counts": {
       "vars_one": "{{count}} variable",
       "vars_other": "{{count}} variables",

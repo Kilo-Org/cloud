@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Kon nie MCP-bedieners laai nie",
     "slashCommandsLoadFailed": "Kon nie slash opdragte laai nie",
     "repoBindingsLoadFailed": "Kon nie verstekprofiele laai nie",
+    "pinnedReposLoadFailed": "Kon nie vasgespelde bewaarplekke laai nie",
     "counts": {
       "vars_one": "{{count}} veranderlike",
       "vars_other": "{{count}} veranderlikes",

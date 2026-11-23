@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Impossibile caricare i server MCP",
     "slashCommandsLoadFailed": "Impossibile caricare i comandi barra",
     "repoBindingsLoadFailed": "Impossibile caricare i profili predefiniti",
+    "pinnedReposLoadFailed": "Impossibile caricare i repository bloccati",
     "counts": {
       "vars_one": "{{count}} variabile",
       "vars_many": "{{count}} di variabili",

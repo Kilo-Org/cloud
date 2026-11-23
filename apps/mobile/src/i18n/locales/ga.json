@@ -4661,6 +4661,7 @@
     "mcpLoadFailed": "Níorbh fhéidir freastalaithe MCP a lódáil",
     "slashCommandsLoadFailed": "Níorbh fhéidir orduithe slais a lódáil",
     "repoBindingsLoadFailed": "Níorbh fhéidir próifílí réamhshocraithe a lódáil",
+    "pinnedReposLoadFailed": "Níorbh fhéidir stórtha pionáilte a lódáil",
     "counts": {
       "vars_one": "{{count}} athróg",
       "vars_two": "{{count}} athróg",

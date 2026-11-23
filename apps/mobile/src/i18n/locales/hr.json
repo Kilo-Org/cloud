@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Nije moguće učitati MCP poslužitelje",
     "slashCommandsLoadFailed": "Nije moguće učitati naredbe kose crte",
     "repoBindingsLoadFailed": "Nije moguće učitati zadane profile",
+    "pinnedReposLoadFailed": "Nije moguće učitati prikvačena spremišta",
     "counts": {
       "vars_one": "{{count}} varijabla",
       "vars_few": "{{count}} varijable",

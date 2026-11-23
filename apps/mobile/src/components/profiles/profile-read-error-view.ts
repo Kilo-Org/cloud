@@ -60,6 +60,7 @@ export type ProfileReadLoadFailedKey =
   | 'profiles.mcpLoadFailed'
   | 'profiles.slashCommandsLoadFailed'
   | 'profiles.repoBindingsLoadFailed'
+  | 'profiles.pinnedReposLoadFailed'
   | 'common.couldNotLoadRepositories';
 
 export type ProfileReadErrorView = {

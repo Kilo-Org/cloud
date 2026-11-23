@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Serverele MCP nu au putut fi încărcate",
     "slashCommandsLoadFailed": "Comenzile Slash nu au putut fi încărcate",
     "repoBindingsLoadFailed": "Profilurile implicite nu au putut fi încărcate",
+    "pinnedReposLoadFailed": "Depozitele fixate nu au putut fi încărcate",
     "counts": {
       "vars_one": "{{count}} variabilă",
       "vars_few": "{{count}} variabile",

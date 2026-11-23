@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "An kasa loda sabar MCP",
     "slashCommandsLoadFailed": "An kasa loda slash umarni",
     "repoBindingsLoadFailed": "An kasa loda tsoffin bayanan martaba",
+    "pinnedReposLoadFailed": "An kasa loda ma'ajin da aka liƙa",
     "counts": {
       "vars_one": "{{count}} mai canji",
       "vars_other": "{{count}} masu canji",

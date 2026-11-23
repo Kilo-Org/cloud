@@ -4355,6 +4355,7 @@
     "mcpLoadFailed": "Tidak dapat memuat server MCP",
     "slashCommandsLoadFailed": "Tidak dapat memuat perintah garis miring",
     "repoBindingsLoadFailed": "Tidak dapat memuat profil bawaan",
+    "pinnedReposLoadFailed": "Tidak dapat memuat repositori yang disematkan",
     "counts": {
       "vars_other": "{{count}} variabel",
       "mcp": "{{count}} MCP",

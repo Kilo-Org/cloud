@@ -4582,6 +4582,7 @@
     "mcpLoadFailed": "MCP servery se nepodařilo načíst",
     "slashCommandsLoadFailed": "Příkazy lomítka se nepodařilo načíst",
     "repoBindingsLoadFailed": "Výchozí profily se nepodařilo načíst",
+    "pinnedReposLoadFailed": "Připnuté repozitáře se nepodařilo načíst",
     "counts": {
       "vars_one": "{{count}} proměnná",
       "vars_few": "{{count}} proměnné",

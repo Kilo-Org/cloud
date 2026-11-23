@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Ayikwazanga ukulayisha amaseva e-MCP",
     "slashCommandsLoadFailed": "Ayikwazanga ukulayisha imiyalo ye-Slash",
     "repoBindingsLoadFailed": "Ayikwazanga ukulayisha amaphrofayili azenzakalelayo",
+    "pinnedReposLoadFailed": "Ayikwazanga ukulayisha amakhosombe aphiniwe",
     "counts": {
       "vars_one": "{{count}} okuguquguqukayo",
       "vars_other": "{{count}} okuguquguqukayo",

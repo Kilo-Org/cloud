@@ -4582,6 +4582,7 @@
     "mcpLoadFailed": "Nepavyko įkelti MCP serverių",
     "slashCommandsLoadFailed": "Nepavyko įkelti pasvirųjų komandų",
     "repoBindingsLoadFailed": "Nepavyko įkelti numatytųjų profilių",
+    "pinnedReposLoadFailed": "Nepavyko įkelti prisegtų saugyklų",
     "counts": {
       "vars_one": "{{count}} kintamasis",
       "vars_few": "{{count}} kintamieji",

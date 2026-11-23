@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP serverlərini yükləmək mümkün olmadı",
     "slashCommandsLoadFailed": "Slash əmrlərini yükləmək mümkün olmadı",
     "repoBindingsLoadFailed": "Defolt profilləri yükləmək mümkün olmadı",
+    "pinnedReposLoadFailed": "Bərkidilmiş repozitoriyaları yükləmək mümkün olmadı",
     "counts": {
       "vars_one": "{{count}} dəyişən",
       "vars_other": "{{count}} dəyişən",

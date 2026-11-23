@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "No se pudieron cargar servidores MCP",
     "slashCommandsLoadFailed": "No se pudieron cargar comandos de barra diagonal",
     "repoBindingsLoadFailed": "No se pudieron cargar perfiles predeterminados",
+    "pinnedReposLoadFailed": "No se pudieron cargar los repositorios anclados",
     "counts": {
       "vars_one": "{{count}} variable",
       "vars_many": "{{count}} variables",

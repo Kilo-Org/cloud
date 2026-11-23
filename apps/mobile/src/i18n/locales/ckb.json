@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "نەتوانرا سێرڤەرەکانی MCP باربکرێت",
     "slashCommandsLoadFailed": "نەتوانرا فەرمانەکانی سلاش باربکرێت",
     "repoBindingsLoadFailed": "نەتوانرا پرۆفایلی پێشوەختە باربکرێت",
+    "pinnedReposLoadFailed": "نەتوانرا کۆگا پێن کراوەکان باربکرێت",
     "counts": {
       "vars_one": "{{count}} گۆڕاوە",
       "vars_other": "{{count}} گۆڕاوە",

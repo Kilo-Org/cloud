@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Sarvaroota MCP fe'uu hin dandeenye",
     "slashCommandsLoadFailed": "Ajajoota cirracha fe'uu hin dandeenye",
     "repoBindingsLoadFailed": "Profaayilota durtii fe'uu hin dandeenye",
+    "pinnedReposLoadFailed": "Kuusaawwan irratti kan maxxane fe'uu hin dandeenye",
     "counts": {
       "vars_one": "{{count}} jijjiirama",
       "vars_other": "{{count}} jijjiiramoota",

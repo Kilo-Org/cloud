@@ -4661,6 +4661,7 @@
     "mcpLoadFailed": "Ma setgħetx tagħbija servers MCP",
     "slashCommandsLoadFailed": "Ma setgħetx tagħbija slash jikkmanda",
     "repoBindingsLoadFailed": "Ma setgħetx tagħbija profili default",
+    "pinnedReposLoadFailed": "Ma setgħetx tagħbija repożitorji mmqabbin",
     "counts": {
       "vars_one": "{{count}} varjabbli",
       "vars_two": "{{count}} varjabbli",

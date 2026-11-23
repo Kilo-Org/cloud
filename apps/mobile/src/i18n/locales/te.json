@@ -4426,6 +4426,7 @@
     "mcpLoadFailed": "MCP సర్వర్లను లోడ్ చేయడం సాధ్యపడలేదు",
     "slashCommandsLoadFailed": "స్లాష్ ఆదేశాలను లోడ్ చేయడం సాధ్యపడలేదు",
     "repoBindingsLoadFailed": "డిఫాల్ట్ ప్రొఫైల్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
+    "pinnedReposLoadFailed": "పిన్ చేసిన రిపోజిటరీలను లోడ్ చేయడం సాధ్యపడలేదు",
     "counts": {
       "vars_one": "{{count}} వేరియబుల్",
       "vars_other": "{{count}} వేరియబుల్స్",

@@ -4582,6 +4582,7 @@
     "mcpLoadFailed": "Не ўдалося загрузіць MCP серверы",
     "slashCommandsLoadFailed": "Не ўдалося загрузіць каманды касой рысы",
     "repoBindingsLoadFailed": "Не ўдалося загрузіць профілі па змаўчанні",
+    "pinnedReposLoadFailed": "Не ўдалося загрузіць замацаваныя сховішчы",
     "counts": {
       "vars_one": "{{count}} зменная",
       "vars_few": "{{count}} зменныя",

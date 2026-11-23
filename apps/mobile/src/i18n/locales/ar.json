@@ -4740,6 +4740,7 @@
     "mcpLoadFailed": "تعذر تحميل خوادم MCP",
     "slashCommandsLoadFailed": "تعذر تحميل أوامر الشرطة المائلة",
     "repoBindingsLoadFailed": "تعذر تحميل الملفات الشخصية الافتراضية",
+    "pinnedReposLoadFailed": "تعذر تحميل المستودعات المثبتة",
     "counts": {
       "vars_zero": "{{count}} متغيرات",
       "vars_one": "{{count}} متغير",

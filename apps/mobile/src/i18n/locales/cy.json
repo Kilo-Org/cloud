@@ -4740,6 +4740,7 @@
     "mcpLoadFailed": "Methu llwytho gweinyddwyr MCP",
     "slashCommandsLoadFailed": "Methu llwytho gorchymynion slaes",
     "repoBindingsLoadFailed": "Methu llwytho proffiliau rhagosodedig",
+    "pinnedReposLoadFailed": "Methu llwytho ystorfeydd wedi'u binio",
     "counts": {
       "vars_zero": "{{count}} newidyn",
       "vars_one": "{{count}} newidyn",

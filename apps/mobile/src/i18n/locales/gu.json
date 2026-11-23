@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP સર્વર્સ લોડ કરી શકાઈ નથી",
     "slashCommandsLoadFailed": "સ્લેશ આદેશો લોડ કરી શકાઈ નથી",
     "repoBindingsLoadFailed": "ડિફોલ્ટ પ્રોફાઇલ લોડ કરી શકાઈ નથી",
+    "pinnedReposLoadFailed": "પિન કરેલ રિપોઝિટરીઓ લોડ કરી શકાઈ નથી",
     "counts": {
       "vars_one": "{{count}} ચલ",
       "vars_other": "{{count}} ચલો",

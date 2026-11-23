@@ -4579,9 +4579,10 @@
     "commandsLoadFailed": "Príkazy nastavenia sa nepodarilo načítať",
     "agentsLoadFailed": "Profiloví agenti sa nepodarilo načítať",
     "instructionsLoadFailed": "Pokyny sa nepodarilo načítať",
-    "mcpLoadFailed": "servery MCP sa nepodarilo načítať",
+    "mcpLoadFailed": "Servery MCP sa nepodarilo načítať",
     "slashCommandsLoadFailed": "Príkazy lomka sa nepodarilo načítať",
     "repoBindingsLoadFailed": "Predvolené profily sa nepodarilo načítať",
+    "pinnedReposLoadFailed": "Pripnuté úložiská sa nepodarilo načítať",
     "counts": {
       "vars_one": "{{count}} premenná",
       "vars_few": "{{count}} premenné",

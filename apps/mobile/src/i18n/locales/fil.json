@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Hindi ma-load ang mga MCP server",
     "slashCommandsLoadFailed": "Hindi ma-load ang mga slash command",
     "repoBindingsLoadFailed": "Hindi ma-load ang mga default na profile",
+    "pinnedReposLoadFailed": "Hindi ma-load ang mga naka-pin na repositoryo",
     "counts": {
       "vars_one": "{{count}} variable",
       "vars_other": "{{count}} variable",

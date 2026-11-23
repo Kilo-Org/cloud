@@ -4352,6 +4352,7 @@
     "mcpLoadFailed": "無法載入MCP伺服器",
     "slashCommandsLoadFailed": "無法載入斜槓命令",
     "repoBindingsLoadFailed": "無法載入預設設定檔",
+    "pinnedReposLoadFailed": "無法載入固定的儲存庫",
     "counts": {
       "vars_other": "{{count}} 個變數",
       "mcp": "{{count}} MCP",

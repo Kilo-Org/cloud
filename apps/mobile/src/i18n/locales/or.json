@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP ସର୍ଭରଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "slashCommandsLoadFailed": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "repoBindingsLoadFailed": "ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "pinnedReposLoadFailed": "ପିନ୍ ହୋଇଥିବା ସଂଗ୍ରହାଳୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "counts": {
       "vars_one": "{{count}} ଭେରିଏବଲ୍",
       "vars_other": "{{count}} ଭେରିଏବଲ୍",

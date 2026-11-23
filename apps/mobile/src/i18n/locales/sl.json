@@ -4582,6 +4582,7 @@
     "mcpLoadFailed": "MCP strežnikov ni bilo mogoče naložiti",
     "slashCommandsLoadFailed": "Ukazov za poševnico ni bilo mogoče naložiti",
     "repoBindingsLoadFailed": "Privzetih profilov ni bilo mogoče naložiti",
+    "pinnedReposLoadFailed": "Pripetih repozitorijev ni bilo mogoče naložiti",
     "counts": {
       "vars_one": "{{count}} spremenljivka",
       "vars_two": "{{count}} spremenljivki",

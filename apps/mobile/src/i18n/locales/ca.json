@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "No s'han pogut carregar els servidors MCP",
     "slashCommandsLoadFailed": "No s'han pogut carregar les ordres de barra",
     "repoBindingsLoadFailed": "No s'han pogut carregar els perfils predeterminats",
+    "pinnedReposLoadFailed": "No s'han pogut carregar els repositoris fixats",
     "counts": {
       "vars_one": "{{count}} variable",
       "vars_many": "{{count}} variables",

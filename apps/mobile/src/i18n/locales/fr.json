@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "Impossible de charger les serveurs MCP",
     "slashCommandsLoadFailed": "Impossible de charger les commandes slash",
     "repoBindingsLoadFailed": "Impossible de charger les profils par défaut",
+    "pinnedReposLoadFailed": "Impossible de charger les dépôts épinglés",
     "counts": {
       "vars_one": "{{count}} variable",
       "vars_many": "{{count}} variables",

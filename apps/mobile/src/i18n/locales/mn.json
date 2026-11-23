@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "MCP серверүүдийг ачаалж чадсангүй",
     "slashCommandsLoadFailed": "Slash командуудыг ачаалж чадсангүй",
     "repoBindingsLoadFailed": "Өгөгдмөл профайлыг ачаалж чадсангүй",
+    "pinnedReposLoadFailed": "Бэхлэгдсэн хадгалах газруудыг ачаалж чадсангүй",
     "counts": {
       "vars_one": "{{count}} хувьсагч",
       "vars_other": "{{count}} хувьсагч",

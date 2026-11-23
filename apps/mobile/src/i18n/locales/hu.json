@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Nem sikerült betölteni az MCP szervereket",
     "slashCommandsLoadFailed": "Nem sikerült betölteni a slash parancsokat",
     "repoBindingsLoadFailed": "Nem sikerült betölteni az alapértelmezett profilokat",
+    "pinnedReposLoadFailed": "Nem sikerült betölteni a rögzített adattárakat",
     "counts": {
       "vars_one": "{{count}} változó",
       "vars_other": "{{count}} változó",

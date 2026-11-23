@@ -4352,6 +4352,7 @@
     "mcpLoadFailed": "MCPサーバーを読み込めませんでした",
     "slashCommandsLoadFailed": "スラッシュコマンドを読み込めませんでした",
     "repoBindingsLoadFailed": "デフォルトのプロフィールを読み込めませんでした",
+    "pinnedReposLoadFailed": "固定されたリポジトリを読み込めませんでした",
     "counts": {
       "vars_other": "変数 {{count}} 件",
       "mcp": "MCP {{count}} 件",

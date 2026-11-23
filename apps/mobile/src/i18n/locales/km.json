@@ -4352,6 +4352,7 @@
     "mcpLoadFailed": "មិនអាចផ្ទុកម៉ាស៊ីនមេ MCP បានទេ។",
     "slashCommandsLoadFailed": "មិនអាចផ្ទុកពាក្យបញ្ជា slash បានទេ។",
     "repoBindingsLoadFailed": "មិនអាចផ្ទុកកម្រងព័ត៌មានលំនាំដើមបានទេ។",
+    "pinnedReposLoadFailed": "មិនអាចផ្ទុកឃ្លាំងកូដដែលបានខ្ទាស់បានទេ។",
     "counts": {
       "vars_other": "{{count}} អថេរ",
       "mcp": "{{count}} MCP",

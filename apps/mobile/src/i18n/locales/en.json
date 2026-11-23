@@ -4526,6 +4526,7 @@
     "mcpLoadFailed": "Couldn't load MCP servers",
     "slashCommandsLoadFailed": "Couldn't load slash commands",
     "repoBindingsLoadFailed": "Couldn't load default profiles",
+    "pinnedReposLoadFailed": "Couldn't load pinned repositories",
     "counts": {
       "vars_one": "{{count}} var",
       "vars_other": "{{count}} vars",

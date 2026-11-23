@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Det gick inte att läsa in MCP-servrar",
     "slashCommandsLoadFailed": "Det gick inte att läsa in snedstreckskommandon",
     "repoBindingsLoadFailed": "Det gick inte att läsa in standardprofiler",
+    "pinnedReposLoadFailed": "Det gick inte att läsa in fästa kodarkiv",
     "counts": {
       "vars_one": "{{count}} variabel",
       "vars_other": "{{count}} variabler",

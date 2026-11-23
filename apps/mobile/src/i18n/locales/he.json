@@ -4503,6 +4503,7 @@
     "mcpLoadFailed": "לא ניתן היה לטעון שרתי MCP",
     "slashCommandsLoadFailed": "לא ניתן היה לטעון פקודות סלאש",
     "repoBindingsLoadFailed": "לא ניתן היה לטעון פרופילים המוגדרים כברירת מחדל",
+    "pinnedReposLoadFailed": "לא ניתן היה לטעון מאגרים מוצמדים",
     "counts": {
       "vars_one": "{{count}} משתנה",
       "vars_two": "{{count}} משתנים",

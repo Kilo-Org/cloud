@@ -4424,6 +4424,7 @@
     "mcpLoadFailed": "Ekki tókst að hlaða MCP netþjónum",
     "slashCommandsLoadFailed": "Ekki tókst að hlaða Slash skipunum",
     "repoBindingsLoadFailed": "Ekki tókst að hlaða sjálfgefnum sniðum",
+    "pinnedReposLoadFailed": "Ekki tókst að hlaða festum geymslum",
     "counts": {
       "vars_one": "{{count}} breyta",
       "vars_other": "{{count}} breytur",

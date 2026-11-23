@@ -4582,6 +4582,7 @@
     "mcpLoadFailed": "Не вдалося завантажити MCP сервери",
     "slashCommandsLoadFailed": "Не вдалося завантажити команди косої риски",
     "repoBindingsLoadFailed": "Не вдалося завантажити профілі за замовчуванням",
+    "pinnedReposLoadFailed": "Не вдалося завантажити закріплені сховища",
     "counts": {
       "vars_one": "{{count}} змінна",
       "vars_few": "{{count}} змінні",

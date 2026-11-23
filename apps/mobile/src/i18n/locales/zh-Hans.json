@@ -4348,9 +4348,10 @@
     "commandsLoadFailed": "无法加载设置命令",
     "agentsLoadFailed": "无法加载配置文件代理",
     "instructionsLoadFailed": "无法加载指令",
-    "mcpLoadFailed": "无法加载MCP 服务器",
+    "mcpLoadFailed": "无法加载 MCP 服务器",
     "slashCommandsLoadFailed": "无法加载斜杠命令",
     "repoBindingsLoadFailed": "无法加载默认配置",
+    "pinnedReposLoadFailed": "无法加载已固定的仓库",
     "counts": {
       "vars_other": "{{count}} 个变量",
       "mcp": "{{count}} MCP",

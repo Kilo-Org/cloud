@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detaliile nu sunt disponibile.",
+      "detailsUnavailableDescription": "Acest element nu mai face parte din sesiune.",
       "textDisplay": "Afișarea textului",
       "thinking": "Se gândește",
       "thought": "Raționament",
@@ -3051,7 +3052,7 @@
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
       "tapToViewDetails": " Atinge pentru a vedea detaliile contextului.",
       "costClause": ", costul {{cost}}",
-      "loadingCostSpoken": "cost de {{cost}}.",
+      "loadingCostSpoken": "cost până acum {{cost}}.",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă{{costClause}}.",
       "tokensUsage": "Context: {{used}} din {{window}} tokenuri, {{percentage}} utilizat{{costClause}}.",
       "title": "Utilizarea contextului",

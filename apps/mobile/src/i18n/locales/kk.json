@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Мәліметтер қолжетімсіз.",
+      "detailsUnavailableDescription": "Бұл элемент енді сессияда жоқ.",
       "textDisplay": "Мәтін көрсетілетін аймақ",
       "thinking": "Ойлануда",
       "thought": "Ой",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Контекст терезесінің көлемі белгісіз",
       "tapToViewDetails": " Контекст мәліметтерін қарау үшін түртіңіз.",
       "costClause": ", құны {{cost}}",
-      "loadingCostSpoken": "құны {{cost}}.",
+      "loadingCostSpoken": "осы уақытқа дейінгі құны {{cost}}.",
       "tokensWindowUnavailable": "Контексте {{used}} токен бар, терезе көлемі белгісіз{{costClause}}.",
       "tokensUsage": "Контекст: барлығы {{window}} токен, қолданылғаны {{used}} токен, {{percentage}}{{costClause}}.",
       "title": "Контекст қолданысы",

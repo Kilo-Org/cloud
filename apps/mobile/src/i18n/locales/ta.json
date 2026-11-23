@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "விவரங்கள் கிடைக்கவில்லை.",
+      "detailsUnavailableDescription": "இந்த உருப்படி இனி அமர்வில் இல்லை.",
       "textDisplay": "உரைக் காட்சி",
       "thinking": "சிந்திக்கிறது",
       "thought": "சிந்தனை",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "சூழல் சாளரத்தின் அளவு கிடைக்கவில்லை",
       "tapToViewDetails": " சூழல் விவரங்களைப் பார்க்கத் தட்டவும்.",
       "costClause": ", செலவு {{cost}}",
-      "loadingCostSpoken": "செலவு {{cost}}.",
+      "loadingCostSpoken": "இதுவரை செலவு {{cost}}.",
       "tokensWindowUnavailable": "சூழலில் {{used}} டோக்கன்கள், சாளரத்தின் அளவு கிடைக்கவில்லை{{costClause}}.",
       "tokensUsage": "சூழல்: {{window}} டோக்கன்களில் {{used}} பயன்படுத்தப்பட்டுள்ளன, பயன்பாடு {{percentage}}{{costClause}}.",
       "title": "சூழல் பயன்பாடு",

@@ -2110,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Szczegóły są niedostępne.",
+      "detailsUnavailableDescription": "Tego elementu nie ma już w sesji.",
       "textDisplay": "Widok tekstu",
       "thinking": "Rozumowanie",
       "thought": "Tok rozumowania",
@@ -2494,7 +2495,7 @@
       "windowUnavailable": "Rozmiar okna kontekstu niedostępny",
       "tapToViewDetails": " Dotknij, aby zobaczyć szczegóły kontekstu.",
       "costClause": ", koszt {{cost}}",
-      "loadingCostSpoken": "koszt {{cost}}.",
+      "loadingCostSpoken": "dotychczasowy koszt {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokenów, rozmiar okna niedostępny{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} z {{window}} tokenów, wykorzystano {{percentage}}{{costClause}}.",
       "title": "Wykorzystanie kontekstu",

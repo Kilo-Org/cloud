@@ -2574,6 +2574,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "အသေးစိတ်ကို ရယူ၍မရပါ။",
+      "detailsUnavailableDescription": "ဤအရာသည် ဆက်ရှင်တွင် မရှိတော့ပါ။",
       "textDisplay": "စာသားပြသမှု",
       "thinking": "တွေးနေသည်",
       "thought": "စဉ်းစားချက်",
@@ -2947,7 +2948,7 @@
       "windowUnavailable": "နောက်ခံအချက်အလက် လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ",
       "tapToViewDetails": " နောက်ခံအချက်အလက်အသေးစိတ်ကို ကြည့်ရန် နှိပ်ပါ။",
       "costClause": "၊ ကုန်ကျစရိတ် {{cost}}",
-      "loadingCostSpoken": "ကုန်ကျစရိတ် {{cost}}။",
+      "loadingCostSpoken": "ယခုအထိ ကုန်ကျစရိတ် {{cost}}။",
       "tokensWindowUnavailable": "နောက်ခံအချက်အလက် တိုကင် {{used}} ခု၊ လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ{{costClause}}။",
       "tokensUsage": "နောက်ခံအချက်အလက် တိုကင် {{window}} ခုအနက် {{used}} ခု၊ {{percentage}} အသုံးပြုထားသည်{{costClause}}။",
       "title": "နောက်ခံအချက်အလက် အသုံးပြုမှု",

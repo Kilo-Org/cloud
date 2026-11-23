@@ -2083,6 +2083,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "הפרטים אינם זמינים.",
+      "detailsUnavailableDescription": "הפריט הזה כבר לא מופיע בסשן.",
       "textDisplay": "תצוגת טקסט",
       "thinking": "חושב",
       "thought": "מחשבה",
@@ -2463,7 +2464,7 @@
       "windowUnavailable": "גודל חלון ההקשר אינו זמין",
       "tapToViewDetails": " הקש כדי לצפות בפרטי ההקשר.",
       "costClause": ", עלות {{cost}}",
-      "loadingCostSpoken": "עלות {{cost}}.",
+      "loadingCostSpoken": "עלות עד כה {{cost}}.",
       "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין{{costClause}}.",
       "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש{{costClause}}.",
       "title": "שימוש בהקשר",

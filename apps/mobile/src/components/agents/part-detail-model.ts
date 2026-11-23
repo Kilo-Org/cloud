@@ -12,13 +12,10 @@ import { buildResultRowsModel, buildTodoListModel } from './tool-list-model';
 const stringSchema = z.string();
 
 export function shouldCenterPartDetail(
-  part: Part | null,
+  part: Part,
   hasCachedAttachment: boolean,
   imageFailed = false
 ): boolean {
-  if (part === null) {
-    return true;
-  }
   if (!isToolPart(part)) {
     return false;
   }

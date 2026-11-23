@@ -2575,6 +2575,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Àwọn àlàyé kò sí lárọ̀ọ́wọ́tó.",
+      "detailsUnavailableDescription": "Ohun yìí kò sí nínú ìgbà iṣẹ́ mọ́.",
       "textDisplay": "Ìfihàn ọ̀rọ̀",
       "thinking": "Ń ronú",
       "thought": "Ìrònú",
@@ -2948,7 +2949,7 @@
       "windowUnavailable": "Ìwọ̀n ààlà àyíká ìjíròrò kò sí",
       "tapToViewDetails": " Tẹ̀ ẹ́ láti wo àlàyé àyíká ìjíròrò.",
       "costClause": ", iye owó {{cost}}",
-      "loadingCostSpoken": "iye owó {{cost}}.",
+      "loadingCostSpoken": "iye owó títí di báyìí {{cost}}.",
       "tokensWindowUnavailable": "Àyíká ìjíròrò: ìpín ọ̀rọ̀ {{used}}, ààlà kò sí{{costClause}}.",
       "tokensUsage": "Àyíká ìjíròrò: ìpín ọ̀rọ̀ {{used}} nínú {{window}}, a ti lo {{percentage}}{{costClause}}.",
       "title": "Lílo àyíká ìjíròrò",

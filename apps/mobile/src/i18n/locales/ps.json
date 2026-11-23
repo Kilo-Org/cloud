@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "جزیات د لاسرسي وړ نه دي.",
+      "detailsUnavailableDescription": "دا توکی نور په ناسته کې نشته.",
       "textDisplay": "د متن ښودنه",
       "thinking": "فکر کوي",
       "thought": "فکر",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "د سیاق د کړکۍ اندازه نه ده معلومه",
       "tapToViewDetails": " د سیاق د جزیاتو د لیدلو لپاره ټک وکړئ.",
       "costClause": "، لګښت {{cost}}",
-      "loadingCostSpoken": "لګښت {{cost}}.",
+      "loadingCostSpoken": "تر اوسه لګښت {{cost}}.",
       "tokensWindowUnavailable": "سیاق: {{used}} ټوکنونه، د کړکۍ اندازه نه ده معلومه{{costClause}}.",
       "tokensUsage": "سیاق: له {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي{{costClause}}.",
       "title": "د سیاق کارونه",

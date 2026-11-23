@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Det finns ingen detaljinformation att visa.",
+      "detailsUnavailableDescription": "Det här objektet finns inte längre i sessionen.",
       "textDisplay": "Textvisning",
       "thinking": "Tänker",
       "thought": "Resonemang",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Kontextfönstrets storlek är inte tillgänglig",
       "tapToViewDetails": " Tryck för att visa kontextdetaljer.",
       "costClause": ", kostnad {{cost}}",
-      "loadingCostSpoken": "kostnad {{cost}}.",
+      "loadingCostSpoken": "kostnad hittills {{cost}}.",
       "tokensWindowUnavailable": "Kontext: {{used}} token, fönstrets storlek är inte tillgänglig{{costClause}}.",
       "tokensUsage": "Kontext: {{used}} av {{window}} token, {{percentage}} använt{{costClause}}.",
       "title": "Kontextanvändning",

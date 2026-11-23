@@ -2110,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Відомості недоступні.",
+      "detailsUnavailableDescription": "Цього елемента більше немає в сеансі.",
       "textDisplay": "Перегляд тексту",
       "thinking": "Обмірковування",
       "thought": "Міркування",
@@ -2494,7 +2495,7 @@
       "windowUnavailable": "Розмір контекстного вікна невідомий",
       "tapToViewDetails": " Торкніться, щоб переглянути відомості про контекст.",
       "costClause": ", вартість {{cost}}",
-      "loadingCostSpoken": "вартість {{cost}}.",
+      "loadingCostSpoken": "вартість наразі {{cost}}.",
       "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} із {{window}} токенів, використано {{percentage}}{{costClause}}.",
       "title": "Використання контексту",

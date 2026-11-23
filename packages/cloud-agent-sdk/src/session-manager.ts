@@ -766,9 +766,11 @@ type SessionManager = {
     /**
      * Fired synchronously after the optimistic user row is inserted, before the
      * transport round-trip. The composer uses it to clear the draft and unlock
-     * so the prompt never renders in both the transcript and the input.
+     * so the prompt never renders in both the transcript and the input. The
+     * argument is the message id the transport carried, so a caller can tie its
+     * own failure handling to this send.
      */
-    onOptimisticSend?: () => void;
+    onOptimisticSend?: (messageId: string) => void;
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
@@ -4170,7 +4172,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     attachmentParts?: RemoteAttachmentPart[];
-    onOptimisticSend?: () => void;
+    /** Receives the message id this send carries, so a caller can tie its own failure handling to it. */
+    onOptimisticSend?: (messageId: string) => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
     store.set(failedHistoryKindAtom, null);
@@ -4251,7 +4254,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         markSending(messageId, true);
         // Signal the composer exactly once, after the row is in the transcript.
-        input.onOptimisticSend?.();
+        input.onOptimisticSend?.(messageId);
       }
 
       if (!sessionAtSend) throw new Error('No active session');

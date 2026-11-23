@@ -1603,6 +1603,21 @@ export function SessionDetailContent({
       setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
     }
   }, [deliveredFailedPrompt]);
+  // The record names the message id the failed send carried, so the composer
+  // can ask whether the send that just failed is itself confirmed instead of
+  // matching on words: an earlier delivery with the same text has a different
+  // id and must never suppress the restore.
+  const deliveredFailedPromptRef = useRef(deliveredFailedPrompt);
+  deliveredFailedPromptRef.current = deliveredFailedPrompt;
+  const isPromptDelivered = useCallback((text: string, messageId: string) => {
+    const record = deliveredFailedPromptRef.current;
+    if (record === null) {
+      return false;
+    }
+    return (
+      record.messageId === messageId && composerPromptText(record.text) === composerPromptText(text)
+    );
+  }, []);
 
   // The record of unknown-outcome sends is the only thing that retires a
   // restored draft when its confirmation lands. When that record is truncated
@@ -3489,6 +3504,7 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 deliveredDraft={consumableDeliveredDraft}
+                isPromptDelivered={isPromptDelivered}
                 onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}

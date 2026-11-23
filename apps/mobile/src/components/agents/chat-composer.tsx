@@ -174,13 +174,22 @@ export type ChatComposerControl = {
   withdrawRestoredSend: (text: string) => void;
 };
 
+/** The id one send carried, as the host's `onOptimisticSend` reported it. */
+type SentMessageId = { messageId?: string };
+
 /** Optional send extras the composer threads through to the host's `onSend`. */
 export type ChatComposerSendOptions = {
   attachments?: AgentAttachmentWire;
   submission?: AgentAttachmentSubmissionPayload;
   /** The images read for `local` attachment delivery. */
   images?: readonly LocalImage[];
-  onOptimisticSend?: () => void;
+  /**
+   * Fired once this send's optimistic row exists. The argument is the message
+   * id the transport carried, which the composer keeps for its own failure
+   * handling. A host with no transport id for the send — the model chat asks
+   * immediately and mints its id further in — calls it without one.
+   */
+  onOptimisticSend?: (messageId?: string) => void;
 };
 
 type ChatComposerProps = {
@@ -282,6 +291,16 @@ type ChatComposerProps = {
    */
   deliveredDraft?: string | null;
   /**
+   * Asks the host whether THIS send — identified by its own message id — is
+   * already confirmed in the transcript, asked before a failed send is
+   * restored. A send the server confirmed resolves success and never reaches
+   * the restore path; the check only exists for the ordering where the
+   * confirmation is visible while the transport still reports failure. An
+   * earlier delivery with the same words has a different id and must not
+   * suppress the restore.
+   */
+  isPromptDelivered?: (text: string, messageId: string) => boolean;
+  /**
    * Called once the composer has consumed `deliveredDraft`. The host clears the
    * record with it, so the suppression cannot outlive the load it was published
    * for and take a later draft with the same words.
@@ -357,6 +376,7 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   deliveredDraft = null,
+  isPromptDelivered,
   onDeliveredDraftConsumed,
   sessionId = null,
   suggestion = null,
@@ -1328,12 +1348,20 @@ export function ChatComposer({
           confirmExitSession: confirmExit,
           onSendPrompt: async prompt => {
             const optimisticChips = upload.attachments;
+            // The message id the transport carried for this send, captured as
+            // the host reports it. Unset when the send failed before any
+            // optimistic row existed: nothing was delivered under an id, so
+            // nothing can suppress the restore. A holder rather than a local
+            // keeps control-flow narrowing out of the read below, because the
+            // write happens inside the callback.
+            const sent: SentMessageId = {};
             try {
               await onSend(prompt, {
                 attachments: uploaded?.wire,
                 submission: uploaded?.submission,
                 images: uploaded?.images,
-                onOptimisticSend: () => {
+                onOptimisticSend: messageId => {
+                  sent.messageId = messageId;
                   // The optimistic row is already in the transcript. Clear the
                   // draft and chips (non-destructively) and stop the spinner so
                   // the prompt never renders in both the transcript and the input.
@@ -1354,13 +1382,17 @@ export function ChatComposer({
               // path and submission messageUuid for the next message.
               upload.commitSent();
             } catch (error) {
-              // A delivered send resolves success, so it never reaches this
-              // catch and needs no delivered check here. The reverse ordering
-              // (the confirmed row landing first) leaves the prompt beside its
-              // row; that gap is tracked separately.
+              // A send the server confirmed resolves success and never reaches
+              // this catch. The check here only answers whether the send that
+              // just failed is itself confirmed under its own id, so a
+              // different, earlier message with the same words never suppresses
+              // the restore.
+              const { messageId: sentMessageId } = sent;
+              const delivered =
+                sentMessageId !== undefined && isPromptDelivered?.(prompt, sentMessageId) === true;
               // Transport failure: restore only when the composer is still
               // empty, so a newer draft is never overwritten.
-              if (!hasContentRef.current()) {
+              if (!delivered && !hasContentRef.current()) {
                 if (prompt !== '') {
                   applyComposerText(prompt);
                 }

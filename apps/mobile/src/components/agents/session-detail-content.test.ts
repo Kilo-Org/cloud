@@ -5045,6 +5045,36 @@ describe('session detail composer after a failed turn', () => {
     expect(control.withdrawRestoredSend).toHaveBeenCalledTimes(1);
   });
 
+  it('answers the delivered check only for the record’s own message id', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const ask = composer.props.isPromptDelivered as (text: string, messageId: string) => boolean;
+
+    // Nothing is confirmed yet, so no send can be withdrawn for delivery.
+    expect(ask('Delivered late', 'msg-delivered')).toBe(false);
+
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    // The callback reads the published record live, so the same handle answers
+    // for the record that arrived after the render.
+    expect(ask('Delivered late', 'msg-delivered')).toBe(true);
+    // Same words, different id: an earlier delivery that must not stand in for
+    // the send being restored.
+    expect(ask('Delivered late', 'msg-other')).toBe(false);
+    expect(ask('Another prompt', 'msg-delivered')).toBe(false);
+  });
+
   /**
    * A restored draft is the text of a send whose outcome the transport could
    * not confirm. The durable record of those sends retires it when the server

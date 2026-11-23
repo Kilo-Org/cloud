@@ -459,8 +459,8 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
       throw new Error('Failed to send message');
     });
     const sendThatClearsDraft = vi.fn(
-      async (_text: string, options?: { onOptimisticSend?: () => void }) => {
-        options?.onOptimisticSend?.();
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-1');
         await onSend();
       }
     );
@@ -492,6 +492,74 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
       controlRef.current?.withdrawRestoredSend('Restored prompt');
     });
     expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposer gates the delivered-send check on the failing send’s own id', () => {
+  it('restores the prompt when the delivered record belongs to a different id', async () => {
+    // The host holds a confirmed record for `msg-2`. This send carries `msg-3`,
+    // so that earlier message with the same words must not stand in for it.
+    const isPromptDelivered = vi.fn(
+      (text: string, id: string) => text === 'Delivered prompt' && id === 'msg-2'
+    );
+    const controlRef = createRef<ChatComposerControl>();
+    const onSend = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-3');
+        throw new Error('Failed to send message');
+      }
+    );
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        onSend,
+        isPromptDelivered,
+      })
+    );
+
+    await typeIntoComposer(renderer, 'Delivered prompt');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+
+    expect(isPromptDelivered).toHaveBeenCalledWith('Delivered prompt', 'msg-3');
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps the prompt out of the composer when the record is this send’s own id', async () => {
+    // This send carried `msg-2`, the id the host confirmed, so restoring the
+    // text beside its own delivered message would offer a duplicate.
+    const isPromptDelivered = vi.fn(
+      (text: string, id: string) => text === 'Delivered prompt' && id === 'msg-2'
+    );
+    const controlRef = createRef<ChatComposerControl>();
+    const onSend = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-2');
+        throw new Error('Failed to send message');
+      }
+    );
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        onSend,
+        isPromptDelivered,
+      })
+    );
+
+    await typeIntoComposer(renderer, 'Delivered prompt');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+
+    expect(isPromptDelivered).toHaveBeenCalledWith('Delivered prompt', 'msg-2');
+    expect(controlRef.current?.hasContent()).toBe(false);
 
     renderer.unmount();
   });

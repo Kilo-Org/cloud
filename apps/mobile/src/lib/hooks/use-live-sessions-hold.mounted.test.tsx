@@ -91,6 +91,29 @@ describe('useLiveSessionsHold', () => {
     expect(heldIds()).toBe('');
   });
 
+  it('releases when the window ends even if the monotonic clock reading never advances', async () => {
+    // A cached/memoized clock reading is modelled by a clock that never
+    // advances: the release must come from the tracked window input, not from
+    // a fresh reading taken during render.
+    const frozenNow = 1_000;
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(frozenNow);
+    try {
+      await render({ current: [row('a1')], scopeKey: 'k1', canHold: true });
+      await render({ current: [], scopeKey: 'k1', canHold: true });
+      expect(heldIds()).toBe('a1');
+
+      await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS - 1);
+      // The spy overrides the faked `performance` clock, not just the timer queue.
+      expect(performance.now()).toBe(frozenNow);
+      expect(heldIds()).toBe('a1');
+
+      await advanceBy(1);
+      expect(heldIds()).toBe('');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('retires the hold when the rows come back and keeps them past the window', async () => {
     await render({ current: [row('a1')], scopeKey: 'k1', canHold: true });
     await render({ current: [], scopeKey: 'k1', canHold: true });

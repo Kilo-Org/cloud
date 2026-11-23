@@ -195,7 +195,6 @@ function getSecureStore(): SecureStoreLike {
 // chain so a later delete (consume or sign-out) always lands after an earlier
 // persist. Each write stays fire-and-forget from the caller's view, but chains
 // onto the previous write so call order is preserved.
-// eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
 let pendingDeepLinkWriteChain: Promise<void> = Promise.resolve();
 
 function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
@@ -619,7 +618,6 @@ export function _resetDeepLinkLaunchForTests(): void {
   currentDeepLinkUserId = null;
   deepLinkUserSettled = false;
   deferredSystemSearchHref = null;
-  // eslint-disable-next-line prefer-await-to-then -- reset the chain to the empty sentinel
   pendingDeepLinkWriteChain = Promise.resolve();
 }
 

@@ -734,7 +734,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         rotationTimer: null,
         stopped: false,
         stopRequested: false,
-        // eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
         uploadChain: Promise.resolve(),
         uploadController: null,
       };

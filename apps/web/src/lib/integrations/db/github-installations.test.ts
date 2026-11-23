@@ -2960,6 +2960,248 @@ describe('GitHub installation persistence', () => {
       .from(operation_ledgers)
       .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
     expect(ledgerRow).toMatchObject({ status: 'admitted', settledAt: null });
+
+    // The provider deletion did not complete, so the canonical installation
+    // stays active.
+    const [canonical] = await db
+      .select({ lifecycleState: github_app_installations.lifecycle_state })
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '992002'));
+    expect(canonical?.lifecycleState).toBe('active');
+  });
+
+  test('completes the local cleanup when a write after the provider deletion fails', async () => {
+    const organization = await createTestOrganization('Uninstall completion org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('992003')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organization.id, userId: ownerId },
+      platformIntegrationId: connected.integrationId,
+      repoFullName: 'acme/uninstall-completion',
+      prNumber: 1,
+      prUrl: 'https://github.com/acme/uninstall-completion/pull/1',
+      prTitle: 'uninstall completion',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/uninstall-completion',
+      headSha: 'uninstall-completion-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    // A leftover from an aborted earlier run must not reach this test.
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS fail_github_uninstall_once ON public.github_app_installations;
+      DROP FUNCTION IF EXISTS public.fail_github_uninstall_once();
+      DROP SEQUENCE IF EXISTS public.github_uninstall_fail_once;
+    `);
+    // A sequence survives a transaction rollback, so exactly one canonical
+    // write fails.
+    await db.execute(sql`CREATE SEQUENCE public.github_uninstall_fail_once`);
+    await db.execute(sql`
+      CREATE FUNCTION public.fail_github_uninstall_once() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF nextval('public.github_uninstall_fail_once') = 1 THEN
+          RAISE EXCEPTION 'simulated local write failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER fail_github_uninstall_once
+        BEFORE INSERT OR UPDATE ON public.github_app_installations
+        FOR EACH ROW EXECUTE FUNCTION public.fail_github_uninstall_once();
+    `);
+    try {
+      let deleteUpstreamCalls = 0;
+      await expect(
+        uninstallExclusiveGitHubInstallation({
+          owner: { type: 'org', id: organization.id },
+          integrationId: connected.integrationId,
+          deleteUpstream: async () => {
+            deleteUpstreamCalls += 1;
+          },
+        })
+      ).resolves.toBeUndefined();
+      expect(deleteUpstreamCalls).toBe(1);
+
+      // Value 1 belongs to the aborted canonical write. Values 2 and 3 belong
+      // to the completion's single upsert, because the trigger fires once for
+      // its insert attempt and once for its update attempt. Without this line,
+      // the test also passes when the trigger never fires.
+      const [fires] = (
+        await db.execute<{ last_value: string }>(
+          sql`SELECT last_value FROM public.github_uninstall_fail_once`
+        )
+      ).rows;
+      expect(Number(fires?.last_value)).toBe(3);
+
+      const completionLogs = mockLogExceptInTest.mock.calls.filter(
+        ([message]) => message === '[uninstallExclusiveGitHubInstallation] completing local cleanup'
+      );
+      expect(completionLogs).toHaveLength(1);
+      // `RAISE EXCEPTION` carries SQLSTATE P0001, so the log payload names the
+      // injected condition and not an unknown error.
+      expect(completionLogs[0]?.[1]).toMatchObject({
+        integrationId: connected.integrationId,
+        sqlState: 'P0001',
+      });
+
+      const [integrationRow] = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integrationId));
+      expect(integrationRow).toBeUndefined();
+
+      const [canonical] = await db
+        .select({
+          lifecycleState: github_app_installations.lifecycle_state,
+          deletedAt: github_app_installations.deleted_at,
+        })
+        .from(github_app_installations)
+        .where(eq(github_app_installations.installation_id, '992003'));
+      expect(canonical).toMatchObject({ lifecycleState: 'deleted' });
+      expect(canonical?.deletedAt).toEqual(expect.any(String));
+
+      const [reviewRow] = await db
+        .select({
+          status: cloud_agent_code_reviews.status,
+          dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+        })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+      expect(reviewRow).toEqual({ status: 'cancelled', dispatchReservationId: null });
+
+      const [attemptRow] = await db
+        .select({ status: cloud_agent_code_review_attempts.status })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+      expect(attemptRow?.status).toBe('cancelled');
+
+      const [ledgerRow] = await db
+        .select({ status: operation_ledgers.status, settledAt: operation_ledgers.settled_at })
+        .from(operation_ledgers)
+        .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+      expect(ledgerRow).toMatchObject({ status: 'no_op', settledAt: expect.any(String) });
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER fail_github_uninstall_once ON public.github_app_installations;
+        DROP FUNCTION public.fail_github_uninstall_once();
+        DROP SEQUENCE public.github_uninstall_fail_once;
+      `);
+    }
+  });
+
+  test('reports a failed uninstall until the local cleanup can be committed', async () => {
+    const organization = await createTestOrganization(
+      'Uninstall completion refusal org',
+      ownerId,
+      0
+    );
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('992004')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organization.id, userId: ownerId },
+      platformIntegrationId: connected.integrationId,
+      repoFullName: 'acme/uninstall-completion-refusal',
+      prNumber: 1,
+      prUrl: 'https://github.com/acme/uninstall-completion-refusal/pull/1',
+      prTitle: 'uninstall completion refusal',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/uninstall-completion-refusal',
+      headSha: 'uninstall-completion-refusal-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    const reservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: reservationId })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS fail_github_uninstall_always ON public.github_app_installations;
+      DROP FUNCTION IF EXISTS public.fail_github_uninstall_always();
+    `);
+    await db.execute(sql`
+      CREATE FUNCTION public.fail_github_uninstall_always() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'simulated local write failure';
+      END;
+      $$;
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER fail_github_uninstall_always
+        BEFORE INSERT OR UPDATE ON public.github_app_installations
+        FOR EACH ROW EXECUTE FUNCTION public.fail_github_uninstall_always();
+    `);
+    try {
+      await expect(
+        uninstallExclusiveGitHubInstallation({
+          owner: { type: 'org', id: organization.id },
+          integrationId: connected.integrationId,
+          deleteUpstream: async () => {},
+        })
+      ).rejects.toMatchObject({ cause: { message: 'simulated local write failure' } });
+
+      const [integrationRow] = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integrationId));
+      expect(integrationRow).toBeDefined();
+
+      const [canonical] = await db
+        .select({ lifecycleState: github_app_installations.lifecycle_state })
+        .from(github_app_installations)
+        .where(eq(github_app_installations.installation_id, '992004'));
+      expect(canonical?.lifecycleState).toBe('active');
+
+      const [reviewRow] = await db
+        .select({
+          status: cloud_agent_code_reviews.status,
+          dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+        })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+      expect(reviewRow).toEqual({ status: 'queued', dispatchReservationId: reservationId });
+
+      const [attemptRow] = await db
+        .select({ status: cloud_agent_code_review_attempts.status })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+      expect(attemptRow?.status).toBe('queued');
+
+      const [ledgerRow] = await db
+        .select({ status: operation_ledgers.status, settledAt: operation_ledgers.settled_at })
+        .from(operation_ledgers)
+        .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+      expect(ledgerRow).toMatchObject({ status: 'admitted', settledAt: null });
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER fail_github_uninstall_always ON public.github_app_installations;
+        DROP FUNCTION public.fail_github_uninstall_always();
+      `);
+    }
   });
 
   test('revokes the real runtime authorization query on local disconnect', async () => {

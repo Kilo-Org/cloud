@@ -1694,28 +1694,42 @@ test('Cloud Agent e2e deploy refuses a run SHA whose runtime Worker config diffe
 });
 
 test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {
+  // The admission step reads origin/main, the remote-tracking ref the checkout
+  // action creates from `ref: refs/heads/main` with full history, so the
+  // fixture clones a bare origin instead of writing that ref by hand.
   const directory = mkdtempSync(join(tmpdir(), 'e2e-runtime-source-'));
-  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const source = join(directory, 'source');
+  const origin = join(directory, 'origin.git');
+  const work = join(directory, 'work');
+  const git = (...args) => execFileSync('git', args, { cwd: source, encoding: 'utf8' }).trim();
   const commit = message => {
     git('add', '.');
     git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
   };
+  mkdirSync(source);
   git('init', '-q', '--initial-branch=main', '.');
-  writeFileSync(join(directory, 'one.txt'), 'one');
+  writeFileSync(join(source, 'one.txt'), 'one');
   commit('one');
   const mainSha = git('rev-parse', 'HEAD');
-  git('update-ref', 'refs/remotes/origin/main', mainSha);
+  execFileSync('git', ['clone', '-q', '--bare', source, origin]);
+  git('remote', 'add', 'origin', origin);
+  git('push', '-q', 'origin', 'main');
+
   git('checkout', '-q', '-b', 'feature');
-  writeFileSync(join(directory, 'two.txt'), 'two');
+  writeFileSync(join(source, 'two.txt'), 'two');
   commit('two');
   const featureSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'feature');
+
+  execFileSync('git', ['clone', '-q', origin, work]);
+  const workGit = (...args) => execFileSync('git', args, { cwd: work, encoding: 'utf8' }).trim();
 
   const script = e2eDeploy.jobs.deploy.steps.find(step => step.id === 'runtime_source').run;
   const runAdmission = sourceSha => {
-    const outputPath = join(directory, '.git', 'source-output');
+    const outputPath = join(work, '.git', 'source-output');
     writeFileSync(outputPath, '');
     const result = spawnSync('bash', ['-e', '-c', script], {
-      cwd: directory,
+      cwd: work,
       encoding: 'utf8',
       env: { ...process.env, SOURCE_SHA: sourceSha, GITHUB_OUTPUT: outputPath },
     });
@@ -1761,6 +1775,27 @@ test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {
     assert.equal(nonHex.status, 1);
     assert.match(`${nonHex.stdout}${nonHex.stderr}`, /::error::.*40-character/);
     assert.doesNotMatch(nonHex.output, /runtime_source_sha=/);
+
+    // A dispatch expression may carry the SHA with surrounding whitespace, and
+    // the step writes the bare lowercase SHA the later git calls consume.
+    for (const padded of [`${mainSha} `, `${mainSha}\n`]) {
+      const stripped = runAdmission(padded);
+      assert.equal(stripped.status, 0, stripped.stderr);
+      assert.equal(stripped.output, `runtime_source_sha=${mainSha}\n`);
+    }
+
+    // Last, so nothing after it depends on the ref: a checkout without
+    // origin/main must say the main commit cannot be confirmed instead of
+    // blaming the input SHA.
+    workGit('update-ref', '-d', 'refs/remotes/origin/main');
+    const unconfirmed = runAdmission(mainSha);
+    assert.equal(unconfirmed.status, 1);
+    assert.match(
+      `${unconfirmed.stdout}${unconfirmed.stderr}`,
+      /::error::origin\/main is missing from the admission checkout/
+    );
+    assert.doesNotMatch(unconfirmed.output, /runtime_source_sha=/);
+    assert.doesNotMatch(`${unconfirmed.stdout}${unconfirmed.stderr}`, /not on origin\/main/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

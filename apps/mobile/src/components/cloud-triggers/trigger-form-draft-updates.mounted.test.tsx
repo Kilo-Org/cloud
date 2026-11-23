@@ -64,7 +64,7 @@ const SWITCH_ROW = 'TriggerSwitchRow' as ElementType;
 const SEGMENTED = 'SegmentedControl' as ElementType;
 const PROBE = 'DraftProbe' as ElementType;
 
-/** The longest prompt the field takes, matching the server's cap. */
+/** The long draft from the device report; the server allows 10,000 and the field sets no cap. */
 const LONG_PROMPT = 'p'.repeat(4454);
 
 let renderer: ReactTestRenderer | undefined = undefined;

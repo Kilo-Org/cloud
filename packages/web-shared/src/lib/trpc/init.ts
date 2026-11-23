@@ -327,9 +327,6 @@ export const timingMiddleware = async <TResult extends { ok: boolean }>({
   return result;
 };
 
-// Bounds a mobile query's procedure pipeline to whatever remains of the
-// control-plane budget started in `createTRPCContext`. Web/CLI callers and
-// mutations pass through untouched; see `control-plane-budget.ts`.
 const controlPlaneBudgetMiddleware = t.middleware(({ path, type, ctx, next }) =>
   withControlPlaneBudget({
     path,
@@ -444,10 +441,6 @@ function deriveContextCredential(ctx: {
   });
 }
 
-// Derives the credential and the privileged-inventory entry once per admin
-// request. The guard publishes the result on the context, so the step-up
-// enforcement that runs after it reuses it instead of deriving the same two
-// values from the same inputs.
 function resolveAdminAttribution(ctx: TRPCContext, path: string, type: string): AdminAttribution {
   if (ctx.adminAttribution) return ctx.adminAttribution;
   const credential = ctx.credential ?? deriveContextCredential(ctx);

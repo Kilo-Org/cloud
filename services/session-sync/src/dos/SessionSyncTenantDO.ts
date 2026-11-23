@@ -53,12 +53,7 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
         this.db
           .update(createdSessions)
           .set({ updated_at: sql`${createdSessions.created_at}` })
-          .where(
-            and(
-              eq(createdSessions.updated_at, 0),
-              sql`${createdSessions.created_at} > 0`
-            )
-          )
+          .where(and(eq(createdSessions.updated_at, 0), sql`${createdSessions.created_at} > 0`))
           .run();
         await ctx.storage.put('listMetadataBackfilled', true);
       }
@@ -153,7 +148,10 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
       .update(createdSessions)
       .set({
         ...(metadata.title !== undefined
-          ? { title: metadata.title, title_folded: metadata.title ? foldTitle(metadata.title) : null }
+          ? {
+              title: metadata.title,
+              title_folded: metadata.title ? foldTitle(metadata.title) : null,
+            }
           : {}),
         ...(metadata.directory !== undefined ? { directory: metadata.directory } : {}),
         // Producers can clock-skew; the index never moves backwards.
@@ -186,7 +184,8 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
       return ok({ items: [], next: null });
     }
     const { before, limit, q, client, directory, archived } = parsed.data;
-    const escaped = q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);
+    const escaped =
+      q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);
     const conditions = [
       before
         ? or(

@@ -332,7 +332,9 @@ describe('session list search folding', () => {
       updated: Date.now() - 1000,
     });
     for (const term of ['ecole', 'ÉCOLE', 'École']) {
-      expect((await listing(api, `?q=${encodeURIComponent(term)}`)).items.map(i => i.sessionID)).toEqual([id]);
+      expect(
+        (await listing(api, `?q=${encodeURIComponent(term)}`)).items.map(i => i.sessionID)
+      ).toEqual([id]);
     }
     expect((await listing(api, '?q=ecol')).items.map(i => i.sessionID)).toEqual([id]);
   });

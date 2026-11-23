@@ -1041,11 +1041,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     if (!listed.ok) {
       this.tx(() => {
         const hint = listed.error.details?.retryAt;
-        listMetadata.refused(
-          this.db,
-          Date.now(),
-          typeof hint === 'number' ? hint : undefined
-        );
+        listMetadata.refused(this.db, Date.now(), typeof hint === 'number' ? hint : undefined);
         return null;
       });
       await this.scheduleSweep();

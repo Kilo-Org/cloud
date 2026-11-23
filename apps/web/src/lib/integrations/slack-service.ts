@@ -881,9 +881,17 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 /**
  * Budget for the settlement of a retirement section: the token revoke and the
  * two Chat SDK removals. The section's `statement_timeout` bounds only its SQL,
- * so every step of the settlement carries this deadline. The section runs one
- * lookup at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its worst case is
- * `1 statement x 1s + 3s settlement = 4s < 5s wait`.
+ * so the settlement carries this deadline: the revoke and the identity scan are
+ * cut off at it, and a step whose turn comes after it is skipped. The section
+ * runs one lookup at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its
+ * normal worst case is `1 statement x 1s + 3s settlement = 4s < 5s wait`.
+ *
+ * One case is not bounded by this budget: the installation removal is one Redis
+ * command, and the Redis client has no command timeout, so a stalled transport
+ * holds the section past the budget until its own socket timeout ends it. A
+ * connection of the same workspace then waits on the workspace lock for that
+ * long; past `INSTALLATION_LOCK_WAIT_MS` it fails at the lock, so its callback
+ * answers with an error redirect and the connection can be retried.
  */
 export const SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS = 3_000;
 

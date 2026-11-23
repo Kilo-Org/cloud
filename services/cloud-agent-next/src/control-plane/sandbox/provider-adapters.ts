@@ -68,6 +68,14 @@ export function createProviderAdapter(
           persistRuntimeLocator: locator => deps.persistRuntimeLocator(allocationName, locator),
           readContainedGrants: deps.readContainedGrants,
           readAcceptedRuntimeProxyHandles: deps.readAcceptedRuntimeProxyHandles,
+          ...(pin.egressAllowlist === undefined
+            ? {}
+            : {
+                restrictedEgress: {
+                  allowlist: pin.egressAllowlist,
+                  logicalSandboxId: deps.sandboxId,
+                },
+              }),
         });
       }
       return unavailableVercelProviderAdapter();

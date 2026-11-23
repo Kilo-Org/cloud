@@ -465,6 +465,16 @@ describe('withoutLeadingDirectionMarks', () => {
     }
   );
 
+  // A heading can also sit inside a list item, and there the item's content
+  // indent decides whether the text after the marker is the item's prose or an
+  // indented code block. Five or more spaces after the marker pad to one and
+  // leave code, whose text keeps every character it holds.
+  it('keeps a mark in a list item whose padding makes an indented code block', () => {
+    const code = '-     # \u200FLatin';
+    expect(withoutLeadingDirectionMarks(code)).toBe(code);
+    expect(withoutLeadingDirectionMarks('-     Latin')).toBe('-     Latin');
+  });
+
   it('returns the same string when there is no mark to strip', () => {
     expect(withoutLeadingDirectionMarks('42 · 7\n\n- Latin bullet')).toBe(
       '42 · 7\n\n- Latin bullet'

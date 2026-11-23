@@ -664,11 +664,23 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     const code = inFence || (previousBlank && INDENTED_CODE.test(body));
     // A list item or heading's own marker is line machinery its content follows;
     // a continuation line has none and keeps its marks. A heading may sit inside
-    // a list item (`- # x`), so its marker is read after the list marker too.
+    // a list item (`- # x`), so its marker is read after the list marker too —
+    // but only within the item's content indent. Under CommonMark a marker
+    // followed by five or more spaces pads to one space and the rest is code, so
+    // `-     # x` is an indented code block whose text must keep every character.
     const list = LIST_START.exec(body);
-    const afterList = list === null ? body : body.slice(list[0].length);
-    const heading = HEADING_START.exec(afterList);
-    const marker = (list?.[0].length ?? 0) + (heading?.[0].length ?? 0);
+    let contentStart = 0;
+    if (list !== null) {
+      // `LIST_START` is greedy over the padding, so the marker's own width is
+      // read apart from it: the item's content starts after one to four spaces.
+      const markerEnd = /^ {0,3}(?:[-*+]|\d{1,9}[.)])/.exec(body)?.[0].length ?? 0;
+      const padding = /^[ \t]*/.exec(body.slice(markerEnd))?.[0].length ?? 0;
+      // Five or more spaces pad to one, leaving an indented code block: its text
+      // is code and the heading rule must not reach into it.
+      contentStart = padding >= 5 ? body.length : markerEnd + padding;
+    }
+    const heading = HEADING_START.exec(body.slice(contentStart));
+    const marker = contentStart + (heading?.[0].length ?? 0);
     const startsBlock = previousBlank || marker > 0;
     const stripped =
       opensFence || code || blank || !startsBlock

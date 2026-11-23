@@ -199,6 +199,7 @@ export function StoredSessionRow({
       statusKind,
       needsInput,
       status: session.status,
+      statusUpdatedAt: session.status_updated_at,
       totalCostMicrodollars: session.total_cost_microdollars,
       onCopySessionId: () => {
         // Load the clipboard/action module at press time: the mounted row test

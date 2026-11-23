@@ -22,6 +22,12 @@ export type SessionPreviewTarget = {
    * has no server status, which keeps `needsInput` as the answer.
    */
   status?: string | null;
+  /**
+   * The row's own raise time, so a preview that outlives the row reads the same
+   * raise identity its row used (`statusUpdatedAt ?? status`). Absent on a
+   * target that carries no status time, and on one that carries no status.
+   */
+  statusUpdatedAt?: string | null;
   totalCostMicrodollars: number | null;
   /** Absent → no Copy session ID item. */
   onCopySessionId?: () => void;

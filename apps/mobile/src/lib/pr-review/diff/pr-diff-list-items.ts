@@ -46,7 +46,6 @@ type FilePatchMissingItem = {
   kind: 'file-patch-missing';
   key: string;
   file: PrReviewFile;
-  viewed: boolean | null;
   link: { url: string; provider: ProviderPrPlatform } | null;
 };
 

@@ -276,6 +276,9 @@ describe('buildItems malformed patch', () => {
       kind: 'file-patch-missing',
       file: { path: 'bad.ts' },
     });
+    // The card names only the file and its provider link; it carries no viewed
+    // flag, because the file header row above it owns the mark-viewed toggle.
+    expect(Object.keys(missing[0] ?? {}).sort()).toEqual(['file', 'key', 'kind', 'link']);
   });
 });
 

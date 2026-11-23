@@ -74,7 +74,7 @@ describe('buildFileItems diff source', () => {
     expect(ofKind(items, 'expand-separator')).toHaveLength(0);
     expect(ofKind(items, 'file-header').map(item => item.viewed)).toEqual([null, null]);
     expect(ofKind(items, 'file-patch-missing')).toMatchObject([
-      { file: { path: 'logo.png' }, viewed: null, link: null },
+      { file: { path: 'logo.png' }, link: null },
     ]);
     expect(ofKind(items, 'diff-line').length).toBeGreaterThan(0);
   });
@@ -87,6 +87,14 @@ describe('buildFileItems diff source', () => {
       url: 'https://github.com/owner/repo/pull/1/files#diff-logo.png',
       provider: 'github',
     });
+    // The card carries no viewed flag of its own: the file header row above it
+    // owns the mark-viewed toggle.
+    expect(Object.keys(ofKind(items, 'file-patch-missing')[0] ?? {}).sort()).toEqual([
+      'file',
+      'key',
+      'kind',
+      'link',
+    ]);
   });
 
   it('passes the file path to the injected link callback', () => {

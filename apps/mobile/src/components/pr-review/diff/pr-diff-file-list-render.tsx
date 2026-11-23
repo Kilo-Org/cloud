@@ -223,13 +223,7 @@ export function useDiffRenderItem(args: UseDiffRenderItemArgs) {
           );
         }
         case 'file-patch-missing': {
-          return (
-            <PatchMissingRow
-              file={item.file}
-              viewedToggle={viewedToggleFor(item.file.path, item.viewed)}
-              link={item.link}
-            />
-          );
+          return <PatchMissingRow file={item.file} link={item.link} />;
         }
         case 'hunk-header': {
           return <HunkHeaderRow header={item.header} />;

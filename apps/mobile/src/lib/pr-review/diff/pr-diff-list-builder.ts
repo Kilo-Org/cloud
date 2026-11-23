@@ -118,7 +118,6 @@ function pushPatchMissingItems(
     kind: 'file-patch-missing',
     key: `file-pm:${file.path}`,
     file,
-    viewed: pr ? pr.viewed(file.path) : null,
     link: pr ? pr.link(file.path) : null,
   });
 }

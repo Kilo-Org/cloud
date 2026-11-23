@@ -184,14 +184,15 @@ const PATCH_MISSING_COPY_KEY = {
  * (`file.patchMissingCause`), and links to the provider's whole diff page when
  * the diff has one — every provider here except a session diff, which has no
  * web page at all.
+ *
+ * It says nothing the file header row above it already paints: that row owns
+ * the file's path and its mark-viewed toggle, so this one carries neither.
  */
 export function PatchMissingRow({
   file,
-  viewedToggle,
   link,
 }: {
   file: PrReviewFile;
-  viewedToggle: FileViewedToggle;
   link: { url: string; provider: ProviderPrPlatform } | null;
 }) {
   const colors = useThemeColors();
@@ -205,24 +206,9 @@ export function PatchMissingRow({
   const provider = link === null ? null : reviewerPlatformLabel(link.provider);
   return (
     <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
-      {/* The row spans 7 dp of the padding around it and cancels it again, so
-          the toggle's slop lands inside the row it touches in (46 dp) without
-          reaching the provider link's own `mt-2` gap below. */}
-      <View className="-my-2 flex-row items-center gap-2 py-2">
+      <View className="flex-row items-center gap-2">
         <File size={14} color={colors.mutedForeground} />
-        <View className="flex-1">
-          <Text className="text-sm text-foreground">{causeCopy}</Text>
-          <Text variant="muted" className="text-xs">
-            {isolateLtrBidiText(file.path)}
-          </Text>
-        </View>
-        {viewedToggle ? (
-          <MarkViewedToggle
-            path={file.path}
-            viewed={viewedToggle.viewed}
-            onToggle={viewedToggle.handleToggle}
-          />
-        ) : null}
+        <Text className="flex-1 text-sm text-foreground">{causeCopy}</Text>
       </View>
       {link === null || provider === null ? null : (
         <Pressable

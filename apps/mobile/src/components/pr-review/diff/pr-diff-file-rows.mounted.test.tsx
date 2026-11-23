@@ -11,7 +11,7 @@ import { type ProviderPrFileStatus } from '@kilocode/app-shared/provider-review'
 
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
-import { FileHeaderRow, PatchMissingRow } from './pr-diff-file-rows';
+import { FileHeaderRow, MarkViewedToggle, PatchMissingRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -185,7 +185,6 @@ function mountPatchlessRow(
     renderer = TestRenderer.create(
       createElement(PatchMissingRow, {
         file: patchlessFile(patchMissingCause),
-        viewedToggle: null,
         link,
       })
     );
@@ -208,6 +207,29 @@ describe('PatchMissingRow causes', () => {
     mountPatchlessRow(cause);
     const copy = i18n.t(key);
     expect(hostTexts().some(node => node.props.children === copy)).toBe(true);
+  });
+});
+
+/**
+ * The card sits directly under a file header row that already paints the path
+ * and carries the mark-viewed toggle, so it repeats neither: the one card-level
+ * control is the provider link.
+ */
+describe('PatchMissingRow repeats nothing from the file row above', () => {
+  it('paints the cause without the file path', () => {
+    mountPatchlessRow('binary');
+    const path = patchlessFile('binary').path;
+    // The row isolates the path's direction when it paints it, so the check is
+    // for the path inside whichever run holds it, not for the bare string.
+    const texts = hostTexts()
+      .map(node => node.props.children)
+      .filter((children): children is string => typeof children === 'string');
+    expect(texts.filter(text => text.includes(path))).toEqual([]);
+  });
+
+  it('renders no mark-viewed toggle', () => {
+    mountPatchlessRow('too_large');
+    expect(renderer?.root.findAll(node => Object.is(node.type, MarkViewedToggle))).toHaveLength(0);
   });
 });
 

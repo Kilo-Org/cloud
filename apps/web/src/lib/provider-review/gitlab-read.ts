@@ -13,6 +13,7 @@ import {
   providerPrFileStatus,
   type ProviderPrChecksResult,
   type ProviderPrFile,
+  type ProviderPrFilePatchMissingCause,
   type ProviderPrFilesPage,
   type ProviderPrInboxItem,
   type ProviderPrInboxPage,
@@ -72,6 +73,16 @@ type GitLabDiff = {
   renamed_file: boolean;
   deleted_file: boolean;
   diff: string;
+  /**
+   * GitLab excluded the diff because it is oversized and will not return it on
+   * request either (the API entity's `too_large?`).
+   */
+  too_large?: boolean;
+  /**
+   * GitLab excluded the diff but returns it on request (the API entity's
+   * `collapsed?`): the endpoint withholds it, the file is not binary.
+   */
+  collapsed?: boolean;
 };
 
 type GitLabPipeline = {
@@ -196,13 +207,22 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
   // `requestGitLabJson` casts the response without validating it, so `diff` may
   // be absent; the guard keeps one such file from failing the whole page.
   const patch = diff.diff ?? '';
-  const patchMissingCause = isBinaryPlaceholderDiff(patch)
-    ? 'binary'
-    : patch
-      ? null
-      : diff.renamed_file && !diff.new_file && !diff.deleted_file
-        ? 'content_unchanged'
-        : 'binary';
+  // The exclusion flags come first: GitLab withholds a diff it excluded for
+  // size or for collapsing, and an empty diff alone cannot tell that from a
+  // binary file — reading the flags is what keeps an oversized text file from
+  // being labelled binary.
+  const patchMissingCause: ProviderPrFilePatchMissingCause | null =
+    diff.too_large === true
+      ? 'too_large'
+      : diff.collapsed === true
+        ? 'provider_omitted'
+        : isBinaryPlaceholderDiff(patch)
+          ? 'binary'
+          : patch
+            ? null
+            : diff.renamed_file && !diff.new_file && !diff.deleted_file
+              ? 'content_unchanged'
+              : 'binary';
   return {
     path: diff.new_path,
     previousPath: diff.old_path !== diff.new_path ? diff.old_path : null,

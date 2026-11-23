@@ -528,6 +528,70 @@ describe('listChangedFiles', () => {
     });
   });
 
+  it("maps GitLab's excluded-diff flags ahead of the empty-diff causes", async () => {
+    // GitLab 18.4 flags a diff it withheld: `too_large` when it will not return
+    // the content at all, `collapsed` when it returns it on request. An empty
+    // diff alone reads as binary, so without the flags an oversized text file
+    // is mislabelled.
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'src/huge.sql',
+              new_path: 'src/huge.sql',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+              diff: '',
+              too_large: true,
+            },
+            {
+              old_path: 'src/long.ts',
+              new_path: 'src/long.ts',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+              diff: '',
+              collapsed: true,
+            },
+            {
+              old_path: 'src/plain.png',
+              new_path: 'src/plain.png',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+              diff: '',
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'src/huge.sql',
+      patch: null,
+      patchMissing: true,
+      patchMissingCause: 'too_large',
+    });
+    expect(page.files[1]).toMatchObject({
+      path: 'src/long.ts',
+      patch: null,
+      patchMissing: true,
+      patchMissingCause: 'provider_omitted',
+    });
+    // An instance that sends neither field keeps the empty-diff reading.
+    expect(page.files[2]).toMatchObject({
+      path: 'src/plain.png',
+      patch: null,
+      patchMissingCause: 'binary',
+    });
+  });
+
   it('labels a file whose diff field is absent instead of failing the page', async () => {
     // `requestGitLabJson` casts the response without validating it, so a body
     // that omits `diff` reaches the mapper as undefined; one such file must not

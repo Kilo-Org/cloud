@@ -102,7 +102,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       mutateAsync: (input: unknown) => state.mutateAsync(options.kind, input),
       isPending: false,
     }),
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+    useQueryClient: () => ({ invalidateQueries: vi.fn(), removeQueries: vi.fn() }),
   };
 });
 vi.mock('@/lib/a11y/announcing-toast', () => ({
@@ -123,6 +123,7 @@ vi.mock('@/lib/trpc', () => ({
       listProviders: { queryOptions: () => ({ kind: 'listProviders' }), queryKey: () => [] },
       credentialMethod: {
         queryOptions: () => ({ kind: 'credentialMethod' }),
+        queryKey: () => ['byok', 'credentialMethod'],
       },
       list: { queryKey: () => [] },
       create: { mutationOptions: (options: MutationOptions) => ({ ...options, kind: 'create' }) },

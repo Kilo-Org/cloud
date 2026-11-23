@@ -278,6 +278,13 @@ export function ProviderKeyNewScreen() {
     keyRef.current = '';
     valuesRef.current = {};
     mappingsRef.current.clear();
+    // The reused key may now hold the other method, so the next open reads it
+    // again instead of opening on the method this form already replaced.
+    if (keyId !== undefined) {
+      queryClient.removeQueries({
+        queryKey: trpc.byok.credentialMethod.queryKey({ ...scopeInput, id: keyId }),
+      });
+    }
     // The list the reader returns to is stale the moment this lands.
     void queryClient.invalidateQueries({ queryKey: trpc.byok.list.queryKey(scopeInput) });
     announcingToast.success(

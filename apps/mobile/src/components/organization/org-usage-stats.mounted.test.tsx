@@ -35,10 +35,19 @@ vi.mock('@/lib/format', () => ({
   formatNumber: (value: number, _locale: string, options?: Intl.NumberFormatOptions) =>
     options?.notation === 'compact' ? `compact:${value}` : String(value),
 }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The section header's action joins its eyebrow's display treatment, so the
+// stub carries that constant beside the text primitive.
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: 'uppercase' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+// The section-header action asks the interface direction for its display
+// treatment, so the stub carries it (the same shape the briefing-card suite
+// uses).
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  I18nManager: { isRTL: false, getConstants: () => ({ isRTL: false }) },
+}));
 
 beforeEach(() => {
   query.data = undefined;
@@ -74,8 +83,12 @@ describe('Organization usage availability', () => {
     async ({ connectivity: state, isError }) => {
       connectivity.value = state;
       query.isError = isError;
+      // A handler is given on purpose: a read that cannot answer offers no
+      // destination, so the header keeps its eyebrow alone and the grid stays
+      // the informational one.
+      const onPress = vi.fn<() => void>();
       const { renderer, unmount } = await renderWithProviders(
-        createElement(OrgUsageStats, { organizationId: 'org-1' })
+        createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
       );
       const text = renderer.root.findAllByType('Text').map(node => node.props.children);
       for (const key of [
@@ -87,6 +100,8 @@ describe('Organization usage availability', () => {
         expect(text).toContain(i18n.t(key));
       }
       expect(text.filter(value => value === '—')).toHaveLength(4);
+      expect(text).not.toContain(i18n.t('usage.viewDetails'));
+      expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
       // The offline wording only when the device is confirmed offline.
       expect(text).toContain(
         i18n.t(state === 'offline' ? 'queryError.offlineTitle' : 'common.somethingWentWrong')
@@ -96,6 +111,7 @@ describe('Organization usage availability', () => {
         (retry.props.onPress as () => void)();
       });
       expect(query.refetch).toHaveBeenCalledOnce();
+      expect(onPress).not.toHaveBeenCalled();
       unmount();
     }
   );
@@ -133,9 +149,12 @@ describe('Organization usage availability', () => {
       createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
     );
 
-    const grid = renderer.root.findAllByType('Pressable');
-    expect(grid).toHaveLength(1);
-    const [button] = grid;
+    // Two controls, one destination: the header link and the grid it names.
+    const pressables = renderer.root.findAllByType('Pressable');
+    expect(pressables).toHaveLength(2);
+    const button = pressables.find(
+      node => node.props.accessibilityLabel !== i18n.t('usage.viewDetails')
+    );
     if (button === undefined) {
       throw new Error('the grid is not one pressable');
     }
@@ -178,8 +197,10 @@ describe('Organization usage availability', () => {
       createElement(OrgUsageStats, { organizationId: 'org-1' })
     );
 
+    // No header link either: the informational grid keeps the header it had.
     expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
     const text = renderer.root.findAllByType('Text').map(node => node.props.children);
+    expect(text).not.toContain(i18n.t('usage.viewDetails'));
     expect(text).toEqual(
       expect.arrayContaining(['\u2066$2\u2069', '12', 'compact:34', 'compact:56'])
     );
@@ -249,7 +270,9 @@ describe('Organization usage stats accessibility', () => {
       createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
     );
 
-    const [button] = renderer.root.findAllByType('Pressable');
+    const button = renderer.root
+      .findAllByType('Pressable')
+      .find(node => node.props.accessibilityHint === i18n.t('usage.viewDetails'));
     if (button === undefined) {
       throw new Error('the grid is not one pressable');
     }
@@ -273,6 +296,43 @@ describe('Organization usage stats accessibility', () => {
     ).toHaveLength(0);
     act(() => {
       (button.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('paints the grid destination as a header link for a sighted member too', async () => {
+    query.data = {
+      totalCost: 2_000_000,
+      totalRequestCount: 12,
+      totalInputTokens: 34,
+      totalOutputTokens: 56,
+    };
+    const onPress = vi.fn<() => void>();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
+    );
+
+    const pressables = renderer.root.findAllByType('Pressable');
+    const action = pressables.find(
+      node => node.props.accessibilityLabel === i18n.t('usage.viewDetails')
+    );
+    if (action === undefined) {
+      throw new Error('the section header carries no usage link');
+    }
+    expect(action.props.accessibilityRole).toBe('button');
+    expect(action.props.testID).toBe('org-usage-action');
+    // The copy is painted, not only announced: that is the affordance a
+    // sighted member needed.
+    expect(
+      action.findAllByType('Text').some(node => node.props.children === i18n.t('usage.viewDetails'))
+    ).toBe(true);
+    // The link sits in the header, before the grid it names in render order,
+    // and it does not wrap it: the grid keeps its own button.
+    expect(pressables[0]).toBe(action);
+    expect(action.findAllByType('Pressable').filter(node => node !== action)).toHaveLength(0);
+    act(() => {
+      (action.props.onPress as () => void)();
     });
     expect(onPress).toHaveBeenCalledOnce();
     unmount();

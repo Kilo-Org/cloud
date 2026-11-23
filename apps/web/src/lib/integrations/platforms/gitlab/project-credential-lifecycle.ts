@@ -162,19 +162,22 @@ export async function markStoredProjectCredentialUnusable(input: {
   });
 }
 
+/** Revokes one stored credential at the provider; `signal` bounds that request. */
 export async function retireStoredProjectCredential(input: {
   integrationId: string;
   projectId: string;
   credential: StoredProjectCredential;
   userToken: string;
   instanceUrl: string;
+  signal?: AbortSignal;
 }): Promise<ProjectCredentialRetirement> {
   try {
     await revokeProjectAccessToken(
       input.userToken,
       input.projectId,
       input.credential.tokenId,
-      input.instanceUrl
+      input.instanceUrl,
+      input.signal
     );
   } catch (error) {
     logExceptInTest('[retireStoredProjectCredential] Retirement refused; marking unusable', {

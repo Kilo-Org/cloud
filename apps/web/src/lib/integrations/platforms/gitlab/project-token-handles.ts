@@ -1,11 +1,14 @@
 import 'server-only';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_access_token_credentials, type PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { GitLabProjectAccessTokenCredentialRowSchema } from '@kilocode/worker-utils/gitlab-credential';
+import {
+  GitLabProjectAccessTokenCredentialRowSchema,
+  GitLabProjectAccessTokenMetadataSchema,
+} from '@kilocode/worker-utils/gitlab-credential';
 import { revokeProjectAccessToken } from './adapter';
 import { normalizeGitLabInstanceUrl } from './instance-url';
 import {
@@ -566,24 +569,244 @@ export async function removeStoredProjectAccessToken(
 }
 
 /**
+ * Budget for one project-token walk inside one request. The settlement walk, the
+ * retirement walk, and each single-credential retirement create their own
+ * deadline at this value, so each bounds only its own provider work. One connect
+ * runs at most one of the two walks: settlement requires the stored account to
+ * match the caller, and retirement requires it to differ.
+ */
+export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
+
+/** What the mark statement did with one project the walk did not reach. */
+type UnreachedProjectOutcome =
+  /** Its row carried no marker and now does. */
+  | { projectId: string; outcome: 'marked' }
+  /** Its row already carried the marker, so it was left as it is. */
+  | { projectId: string; outcome: 'already-unusable' }
+  /** It holds only a metadata entry, so no row can carry a marker. */
+  | { projectId: string; outcome: 'no-credential' }
+  /** Its row belongs to the connected account, so it needs no marker. */
+  | { projectId: string; outcome: 'ignored' };
+
+/**
+ * Projects one mark batch reads and writes per statement, so one bind list stays
+ * far below the 65,535 parameters a Postgres statement accepts.
+ */
+const UNREACHED_MARK_BATCH_SIZE = 500;
+
+/**
+ * Marks the credentials the walk does not reach after the deadline in batches of
+ * one read and one statement, so every project the walk lists is accounted for.
+ * It reports what it did with each project, because the walk counts them as the
+ * loop would have: a project it marked or never could mark keeps a handle the
+ * walk did not settle, one already marked keeps a handle, and a project of the
+ * connected account is left alone.
+ *
+ * A batch whose rows cannot be read leaves its projects unclassified, and the
+ * caller must not count them as skipped. A failed marker write is reported per
+ * project, because the row itself was read and classified.
+ */
+async function markUnreachedProjectCredentialsUnusable(input: {
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
+  projectIds: readonly string[];
+  currentAccountId: string;
+}): Promise<{
+  outcomes: UnreachedProjectOutcome[];
+  /** Projects whose rows could not be read, so their account is unknown. */
+  unreadableProjectIds: string[];
+  /** Projects whose rows were read but whose marker did not store. */
+  unmarkedProjectIds: string[];
+  errors: unknown[];
+}> {
+  const outcomes: UnreachedProjectOutcome[] = [];
+  const unreadableProjectIds: string[] = [];
+  const unmarkedProjectIds: string[] = [];
+  const errors: unknown[] = [];
+  for (let start = 0; start < input.projectIds.length; start += UNREACHED_MARK_BATCH_SIZE) {
+    const batch = input.projectIds.slice(start, start + UNREACHED_MARK_BATCH_SIZE);
+    const rows = await readProjectCredentialRows(input.integration, batch).catch(
+      (error: unknown) => {
+        unreadableProjectIds.push(...batch);
+        errors.push(error);
+        return null;
+      }
+    );
+    if (rows === null) continue;
+    const marked = await markProjectCredentialRows({
+      integration: input.integration,
+      projectIds: batch,
+      currentAccountId: input.currentAccountId,
+      rows,
+    });
+    outcomes.push(...marked.outcomes);
+    for (const failure of marked.failures) {
+      unmarkedProjectIds.push(failure.projectId);
+      errors.push(failure.error);
+    }
+  }
+  return { errors, outcomes, unmarkedProjectIds, unreadableProjectIds };
+}
+
+/** One stored project credential read for the deadline marking. */
+type UnreachedProjectCredentialRow = {
+  credentialId: string;
+  credentialVersion: number;
+  projectId: string | null;
+  providerMetadata: unknown;
+};
+
+/** Reads the stored project credentials of one batch. */
+async function readProjectCredentialRows(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  projectIds: readonly string[]
+): Promise<UnreachedProjectCredentialRow[]> {
+  return db
+    .select({
+      credentialId: platform_access_token_credentials.id,
+      credentialVersion: platform_access_token_credentials.credential_version,
+      projectId: platform_access_token_credentials.provider_resource_id,
+      providerMetadata: platform_access_token_credentials.provider_metadata,
+    })
+    .from(platform_access_token_credentials)
+    .where(
+      and(
+        eq(platform_access_token_credentials.platform_integration_id, integration.id),
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
+        inArray(platform_access_token_credentials.provider_resource_id, [...projectIds])
+      )
+    );
+}
+
+/** Classifies one batch's rows and marks the ones that need it in one statement. */
+async function markProjectCredentialRows(input: {
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
+  projectIds: readonly string[];
+  currentAccountId: string;
+  rows: UnreachedProjectCredentialRow[];
+}): Promise<{
+  outcomes: UnreachedProjectOutcome[];
+  failures: { projectId: string; error: unknown }[];
+}> {
+  const rowsByProject = new Map(input.rows.map(row => [row.projectId ?? '', row]));
+  const outcomes: UnreachedProjectOutcome[] = [];
+  const pending: {
+    projectId: string;
+    credentialId: string;
+    credentialVersion: number;
+    providerMetadata: Record<string, unknown>;
+  }[] = [];
+  const failures: { projectId: string; error: unknown }[] = [];
+  for (const projectId of input.projectIds) {
+    const row = rowsByProject.get(projectId);
+    if (row === undefined) {
+      outcomes.push({ projectId, outcome: 'no-credential' });
+      continue;
+    }
+    const parsed = GitLabProjectAccessTokenMetadataSchema.safeParse(row.providerMetadata);
+    if (!parsed.success) {
+      failures.push({ projectId, error: parsed.error });
+      continue;
+    }
+    // The walk loop settles a project of the connected account when its metadata
+    // entry names an older token id, because only a revocation settles that id.
+    // The deadline leaves no time for the call, so such a row takes the marker
+    // and the next use replaces it, exactly as an unreached row of another
+    // account does.
+    if (
+      parsed.data.authorizedAccountId === input.currentAccountId &&
+      readLegacyProjectTokenId(input.integration.metadata, projectId) === null
+    ) {
+      outcomes.push({ projectId, outcome: 'ignored' });
+      continue;
+    }
+    if (parsed.data.unusableReason !== undefined) {
+      outcomes.push({ projectId, outcome: 'already-unusable' });
+      continue;
+    }
+    pending.push({
+      projectId,
+      credentialId: row.credentialId,
+      credentialVersion: row.credentialVersion,
+      providerMetadata: { ...parsed.data, unusableReason: 'account-changed' },
+    });
+  }
+  if (pending.length === 0) return { failures, outcomes };
+
+  const validatedAt = new Date().toISOString();
+  // The account change is already committed, so a failed statement must report the
+  // batch instead of rejecting the connect that carries it.
+  const updated = await db
+    .execute<{ id: string; credential_version: number }>(sql`
+    UPDATE ${platform_access_token_credentials}
+    SET provider_metadata = marks.provider_metadata,
+        last_validated_at = ${validatedAt},
+        updated_at = now()
+    FROM (VALUES ${sql.join(
+      pending.map(
+        entry =>
+          sql`(${entry.credentialId}::uuid, ${entry.credentialVersion}::integer, ${JSON.stringify(entry.providerMetadata)}::jsonb)`
+      ),
+      sql`, `
+    )}) AS marks(id, credential_version, provider_metadata)
+    WHERE ${platform_access_token_credentials.id} = marks.id
+      AND ${platform_access_token_credentials.credential_version} = marks.credential_version
+    RETURNING ${platform_access_token_credentials.id} AS id,
+      ${platform_access_token_credentials.credential_version} AS credential_version
+  `)
+    .catch((error: unknown) => {
+      for (const entry of pending) {
+        failures.push({ projectId: entry.projectId, error });
+      }
+      return null;
+    });
+  if (updated === null) return { failures, outcomes };
+
+  // A pending entry whose row did not come back lost a version race: its
+  // credential was replaced between the read and this statement.
+  const marked = new Set(updated.rows.map(row => `${row.id}:${row.credential_version}`));
+  for (const entry of pending) {
+    if (marked.has(`${entry.credentialId}:${entry.credentialVersion}`)) {
+      outcomes.push({ projectId: entry.projectId, outcome: 'marked' });
+      continue;
+    }
+    failures.push({ projectId: entry.projectId, error: new ProjectCredentialReplacedError() });
+  }
+  return { failures, outcomes };
+}
+
+/**
  * Retires every project token the integration stores for an account other than
  * the one now connected, using the credential the connect holds.
  *
  * A project keeps a handle that still belongs to the connected account, unless
  * its metadata entry names an older token id that only a revocation can settle.
- * A refusal keeps the handle and marks the credential unusable, so the connect
- * that replaced the account still succeeds.
+ * A stored credential that already carries the unusable marker is kept as it
+ * is. The walk marks a project it does not reach as unusable, together with
+ * every other project it left, so the connect that replaced the account still
+ * completes. A project whose stored row cannot be read counts as retained
+ * without being counted in `skippedWithinRetained`, because its account is
+ * unknown.
  */
 export async function retireProjectCredentialsForReplacedAccount(input: {
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
   userToken: string;
   currentAccountId: string;
-}): Promise<{ retired: number; retained: number }> {
+  signal?: AbortSignal;
+}): Promise<{ retired: number; retained: number; skippedWithinRetained: number }> {
+  const signal = input.signal ?? AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS);
   const projectIds = await listProjectIdsWithStoredTokens(input.integration);
 
   let retired = 0;
   let retained = 0;
-  for (const projectId of projectIds) {
+  let skippedWithinRetained = 0;
+  let unreachedProjectIds: string[] = [];
+  for (const [index, projectId] of projectIds.entries()) {
+    // Check the deadline before each row read.
+    if (signal.aborted) {
+      unreachedProjectIds = projectIds.slice(index);
+      break;
+    }
+
     const storedCredential = await getStoredProjectCredential(
       input.integration.id,
       projectId
@@ -603,8 +826,14 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
       continue;
     }
 
+    if (storedCredential !== null && storedCredential.unusable) {
+      retained += 1;
+      continue;
+    }
+
     const outcome = await removeStoredProjectAccessToken(input.integration, projectId, {
       userToken: input.userToken,
+      signal,
     }).catch(error => {
       logExceptInTest(
         '[retireProjectCredentialsForReplacedAccount] Row changed during retirement',
@@ -641,11 +870,51 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
     }
   }
 
+  if (unreachedProjectIds.length > 0) {
+    const marked = await markUnreachedProjectCredentialsUnusable({
+      integration: input.integration,
+      projectIds: unreachedProjectIds,
+      currentAccountId: input.currentAccountId,
+    });
+    // One statement covers a batch of projects, so a failure is reported once for
+    // the batch instead of once per project.
+    if (marked.errors.length > 0) {
+      logExceptInTest('[retireProjectCredentialsForReplacedAccount] Unusable marker not stored', {
+        integrationId: input.integration.id,
+        unreachedProjects: unreachedProjectIds.length,
+        unreadableProjects: marked.unreadableProjectIds.length,
+        unmarkedProjects: marked.unmarkedProjectIds.length,
+        error:
+          marked.errors[0] instanceof Error ? marked.errors[0].message : String(marked.errors[0]),
+      });
+    }
+    // A project of the connected account needs no marker, so it is left out of
+    // both counts exactly as the loop leaves it out above. Every other project
+    // the walk did not settle keeps its handle, including one whose marker did
+    // not store.
+    const ignoredProjectIds = new Set(
+      marked.outcomes
+        .filter(outcome => outcome.outcome === 'ignored')
+        .map(outcome => outcome.projectId)
+    );
+    const countedProjectIds = unreachedProjectIds.filter(
+      projectId => !ignoredProjectIds.has(projectId)
+    );
+    // A project whose row could not be read has no known account, so it counts
+    // as retained without being claimed as skipped.
+    const unreadableProjectIds = new Set(marked.unreadableProjectIds);
+    retained += countedProjectIds.length;
+    skippedWithinRetained += countedProjectIds.filter(
+      projectId => !unreadableProjectIds.has(projectId)
+    ).length;
+  }
+
   logExceptInTest('[retireProjectCredentialsForReplacedAccount] Retirement finished', {
     integrationId: input.integration.id,
     currentAccountId: input.currentAccountId,
     retired,
     retained,
+    skippedWithinRetained,
   });
-  return { retired, retained };
+  return { retired, retained, skippedWithinRetained };
 }

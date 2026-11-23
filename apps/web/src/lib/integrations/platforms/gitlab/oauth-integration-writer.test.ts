@@ -384,7 +384,7 @@ describe('GitLab OAuth integration writer', () => {
 
     expect(storeResult.accountChanged).toBe(true);
     expect(mockRevokeProjectAccessTokenCalls).toEqual([
-      ['new-access-secret', '42', 99, providerBaseUrl],
+      ['new-access-secret', '42', 99, providerBaseUrl, expect.any(AbortSignal)],
     ]);
     await expect(
       db
@@ -1158,8 +1158,8 @@ describe('GitLab OAuth integration writer', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, integration.id));
     expect(mockRevokeProjectAccessTokenCalls).toEqual([
-      ['new-access-secret', '42', 991, providerBaseUrl],
-      ['new-access-secret', '42', 991, providerBaseUrl],
+      ['new-access-secret', '42', 991, providerBaseUrl, expect.any(AbortSignal)],
+      ['new-access-secret', '42', 991, providerBaseUrl, expect.any(AbortSignal)],
     ]);
     expect(settled.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
   });

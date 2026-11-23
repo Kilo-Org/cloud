@@ -62,6 +62,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
   GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
+  PROJECT_TOKEN_WALK_BUDGET_MS,
   classifyCredentialResolutionFailure,
   describeInstanceChangeBlockers,
   describeProjectTokenReplacementBlocker,
@@ -432,14 +433,6 @@ const PROJECT_TOKEN_SETTLEMENT_ATTEMPTS = 2;
 /** Pause between settlement attempts, so a transient provider error can clear. */
 const PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS = 250;
 
-/**
- * Wall-clock budget for settling one integration's project tokens inside one
- * request. A settlement that reaches it stops attempting further projects and
- * skips its second attempt: the handles it did not reach stay stored, and a
- * reconnect of the same account settles them.
- */
-const PROJECT_TOKEN_SETTLEMENT_BUDGET_MS = 20_000;
-
 function waitForSettlementRetry(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS);
@@ -623,7 +616,7 @@ export async function settleStoredProjectTokens(
     };
   }
 
-  const signal = options.signal ?? AbortSignal.timeout(PROJECT_TOKEN_SETTLEMENT_BUDGET_MS);
+  const signal = options.signal ?? AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS);
   const outstandingProjectIds = new Set(projectIds);
   const attemptedProjectIds = new Set<string>();
   const retryProjectIds = new Set<string>();
@@ -1013,6 +1006,28 @@ export async function getOrCreateProjectAccessToken(
       projectId,
       tokenId: storedCredential.tokenId,
     });
+    // Retire the stored credential before its row is replaced.
+    if (storedCredential.authorizedAccountId !== integratingAccountId) {
+      try {
+        await retireStoredProjectCredential({
+          integrationId: integration.id,
+          projectId: projectIdStr,
+          credential: storedCredential,
+          userToken: await getValidGitLabToken(integration, actor),
+          instanceUrl,
+          signal: AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS),
+        });
+      } catch (error) {
+        logExceptInTest(
+          '[getOrCreateProjectAccessToken] Unusable stored token could not be settled',
+          {
+            projectId,
+            tokenId: storedCredential.tokenId,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+    }
     storedCredential = null;
   } else if (storedCredential && storedCredential.authorizedAccountId !== integratingAccountId) {
     const userToken = await getValidGitLabToken(integration, actor);
@@ -1022,6 +1037,7 @@ export async function getOrCreateProjectAccessToken(
       credential: storedCredential,
       userToken,
       instanceUrl,
+      signal: AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS),
     });
     storedCredential = null;
   }
@@ -1719,6 +1735,7 @@ export async function connectWithPAT(
         integrationId: existingIntegration.id,
         retired: retirement.retired,
         retained: retirement.retained,
+        skippedWithinRetained: retirement.skippedWithinRetained,
       });
     }
 

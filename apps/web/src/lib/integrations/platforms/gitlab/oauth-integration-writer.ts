@@ -299,6 +299,7 @@ export async function storeGitLabOAuthIntegration(
           currentAccountId: input.providerUser.id,
           retired: retirement.retired,
           retained: retirement.retained,
+          skippedWithinRetained: retirement.skippedWithinRetained,
         }
       );
     }

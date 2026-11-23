@@ -27,6 +27,8 @@ const world = vi.hoisted(() => ({
   hang: false,
   // Whether the response body read fails instead of returning the body.
   unreadable: false,
+  // Whether the token read rejects, as a failing keystore read does.
+  tokenReadFails: false,
   settings: new Map<string, string>(),
   toastError: vi.fn(),
 }));
@@ -35,6 +37,9 @@ vi.mock('@/lib/config', () => ({ API_BASE_URL: 'http://localhost:3000' }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: async () => {
     await Promise.resolve();
+    if (world.tokenReadFails) {
+      throw new Error('keystore read failed');
+    }
     return world.token;
   },
 }));
@@ -103,6 +108,7 @@ beforeEach(() => {
   world.transportFailures = 0;
   world.hang = false;
   world.unreadable = false;
+  world.tokenReadFails = false;
   world.settings.clear();
   world.toastError.mockClear();
 });
@@ -132,11 +138,9 @@ function askQuestionAtOnce(calls: number) {
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
-    Effect.forEach(
-      Array.from({ length: calls }),
-      () => Effect.result(tool.run(call)),
-      { concurrency: 'unbounded' }
-    ).pipe(Effect.provideService(questionSearches, spent))
+    Effect.forEach(Array.from({ length: calls }), () => Effect.result(tool.run(call)), {
+      concurrency: 'unbounded',
+    }).pipe(Effect.provideService(questionSearches, spent))
   );
   return { spent, answers };
 }
@@ -235,6 +239,18 @@ describe('a web search', () => {
     expect(outcome.every(answer => Result.isFailure(answer))).toBe(true);
     expect(world.requests).toEqual([]);
     // A signed-out call never reaches the proxy, so it reserves no attempt.
+    expect(spent.attempts).toBe(0);
+  });
+
+  it('keeps no attempt when the token read rejects and no search is sent', async () => {
+    world.tokenReadFails = true;
+
+    const { spent, answers } = askQuestion(3);
+    const outcome = await answers;
+
+    expect(outcome.every(answer => Result.isFailure(answer))).toBe(true);
+    expect(world.requests).toEqual([]);
+    // A keystore read that rejects sends no search, so it costs no attempt.
     expect(spent.attempts).toBe(0);
   });
 

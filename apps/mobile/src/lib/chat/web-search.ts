@@ -143,6 +143,26 @@ async function postSearch({
   }
 }
 
+/**
+ * The token for this attempt, with the reserved attempt given back whenever no
+ * search leaves the device: a signed-out caller, or a token read that rejects
+ * (a failing keystore read rethrows from `getAuthTokenForRequest` on Android).
+ * The reservation is taken before this await, so a call that never reaches the
+ * proxy must not keep it.
+ */
+async function tokenForSearch(spent: QuestionSearches | undefined): Promise<string | null> {
+  const token = await getAuthTokenForRequest().catch((error: unknown) => {
+    if (spent !== undefined) {
+      spent.attempts -= 1;
+    }
+    throw error;
+  });
+  if (token === null && spent !== undefined) {
+    spent.attempts -= 1;
+  }
+  return token;
+}
+
 type SearchContext = {
   readonly organizationId: string | undefined;
   readonly signal: AbortSignal;
@@ -169,15 +189,12 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
      stops it; the answered-search charge below is separate. It is reserved
      before the token await: a turn runs its calls at once, so charging after an
      await lets every call read the same count and overshoot the cap by one per
-     call. A signed-out call never reaches the proxy, so it gives it back. */
+     call. An attempt that never leaves the device gives it back. */
   if (spent !== undefined) {
     spent.attempts += 1;
   }
-  const token = await getAuthTokenForRequest();
+  const token = await tokenForSearch(spent);
   if (token === null) {
-    if (spent !== undefined) {
-      spent.attempts -= 1;
-    }
     return failed(SIGNED_OUT);
   }
   const response = await postSearch({ query: args.query, token, organizationId, signal });

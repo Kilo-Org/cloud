@@ -182,6 +182,13 @@ function loaderMapOf(root) {
   for (const match of block[1].matchAll(LOADER_MAP_ENTRY)) {
     map.set(match[1] ?? match[2], match[3]);
   }
+  if (map.size === 0) {
+    // The block is there but no entry in it reads as a data-file loader, so a
+    // quote or syntax change has silently emptied the map. Treating that as
+    // "no app data" would audit every language against the host's rules, the
+    // silent wrong answer this rule exists to prevent.
+    throw new Error(`${LOADER_MAP_SOURCE} declares no readable plural-data loader`);
+  }
   loaderMaps.set(root, map);
   return map;
 }

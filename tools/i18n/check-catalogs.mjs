@@ -2237,22 +2237,27 @@ function checkKeyParity({
 }
 
 /**
- * The categories a locale's plural families lack, judged by the categories the
- * catalog's runtime can both require and select.
+ * The categories a locale's plural families lack, judged by the categories its
+ * catalog's runtime can both require and render.
  *
- * `checkPluralCategories` demands a form and the unreachable-form rule rejects
- * one, so the two must read one truth source or they can contradict each other:
- * a category the host requires but the runtime cannot select would be demanded
- * by one rule and rejected by the other. The required list is therefore the
- * intersection of the host's categories and the shipped ones, which asks for
- * every category this locale renders and never for one it cannot. The host's
- * list alone stays in the audit for a catalog whose runtime is the host's own.
+ * This rule demands a form and the unreachable-form rule rejects one, so the two
+ * must read one truth source or they can contradict each other: a category the
+ * host requires but the runtime cannot select would be demanded by one rule and
+ * rejected by the other, leaving the audit unsatisfiable. The required list is
+ * the intersection of the host's categories and the catalog's own selectable
+ * set, minus `zero`, which i18next consults as a count-zero override rather
+ * than a plural category of the language.
+ *
+ * The demand therefore never includes a form the runtime cannot render. It also
+ * cannot demand a category only the shipped data selects, so a family a locale
+ * declares under a flat counted English key is not asked for that form; a
+ * family English declares is still covered by the key-parity rule.
  */
 function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
   const problems = [];
   const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
-  const shipped = selectableCategories(tag);
-  const required = host.filter(category => shipped.has(category));
+  const selectable = selectableCategories(tag);
+  const required = host.filter(category => category !== 'zero' && selectable.has(category));
   for (const [family, absent] of missingPluralCategories(english, translated, tag, required)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);

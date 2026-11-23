@@ -5,7 +5,9 @@
     let previous: [String: Any] = [
       "scopeKey": "org:one",
       "accountEpoch": 7,
-      "endpoint": "https://app.kilo.example/api/mobile/widgets/active-agent",
+      "endpoint": "https://app.kilo.example/api/mobile/widgets",
+      "token": "credential-one",
+      "organizationId": "org-1",
     ]
     let next: [String: Any] = [
       "scopeKey": "org:two",
@@ -42,8 +44,24 @@
     guard let organization else { preconditionFailure("a changed scope must retire its registration") }
     precondition(organization.token == "token-one")
     precondition(organization.config["scopeKey"] as? String == "org:one")
-    precondition(organization.config["token"] as? String == nil)
-    precondition(organization.config["endpoint"] as? String == "https://app.kilo.example/api/mobile/widgets/active-agent")
+    // The retirement posts with the replaced scope's own stored credential, so the
+    // captured configuration must still carry everything that request needs.
+    precondition(organization.config["token"] as? String == "credential-one")
+    precondition(organization.config["endpoint"] as? String == "https://app.kilo.example/api/mobile/widgets")
+    precondition(organization.config["organizationId"] as? String == "org-1")
+
+    // A stored scope predating the credential field still retires with the
+    // separately captured widget token, and adds no credential of its own.
+    var credentialless = previous
+    credentialless.removeValue(forKey: "token")
+    guard case .replace(let legacyCredential) = homeWidgetConfigureScope(
+      previous: credentialless,
+      token: "token-one",
+      config: next
+    ) else { preconditionFailure("a changed scope must be replaced") }
+    precondition(legacyCredential?.token == "token-one")
+    precondition(legacyCredential?.config["token"] as? String == nil)
+    precondition(legacyCredential?.config["endpoint"] as? String == "https://app.kilo.example/api/mobile/widgets")
 
     // An account epoch change alone retires it too.
     guard case .replace(let epoch) = homeWidgetConfigureScope(

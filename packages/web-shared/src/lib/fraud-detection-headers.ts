@@ -1,7 +1,7 @@
 /**
- * A finite decimal header value, or `null` when the header is absent, blank, or carries
- * trailing text. `Number` is used instead of `parseFloat`, which would silently drop that
- * trailing text and put a truncated coordinate in a field typed `number | null`.
+ * A finite decimal header value, or `null` for a header that is absent, blank, non-finite, or
+ * carries trailing text. `Number` is used rather than `parseFloat`, which would drop that
+ * trailing text and yield a truncated coordinate.
  */
 const parseFiniteDecimalOrNull = (value: string | null): number | null => {
   if (value === null) return null;

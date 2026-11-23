@@ -391,6 +391,13 @@ export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): P
  * The owner's recorded plan limit, when one is still current. An expired record
  * stays in the row and is filtered here instead of being cleared, so this read
  * never writes; a reconnect resets the columns.
+ *
+ * This read takes the primary, not the replica, for the same reason
+ * `getOpenAiChatGptStoredConnectionFromPrimary` does: the status query reports
+ * the connection to a person, so a limit a request recorded moments ago must be
+ * visible at once rather than after the replica lag. No gateway path reads this
+ * value: a gateway request records the limit only after the upstream response,
+ * so the gateway's pre-inference replica rule does not apply here.
  */
 export async function readOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,

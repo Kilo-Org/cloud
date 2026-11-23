@@ -13,6 +13,8 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -65,6 +67,8 @@ const setActive = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  // `textActionTargetClass` reads the platform to pick the shared frame.
+  Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
   useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
@@ -131,7 +135,6 @@ vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 
 const SWITCH = 'Switch' as ElementType;
 const PRESSABLE = 'Pressable' as ElementType;
-const ICON_BUTTON = 'IconButton' as ElementType;
 const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
@@ -159,14 +162,35 @@ describe('TriggersListScreen rows', () => {
     expect(shown).toContain('https://Inbound.example/trigger-a');
     expect(shown).not.toContain('https://Inbound.example/trigger-b');
 
-    const copyButtons = root.findAll(node => Object.is(node.type, ICON_BUTTON));
-    expect(copyButtons).toHaveLength(1);
-    const [copyButton] = copyButtons;
-    if (!copyButton) {
+    const copyControls = root.findAll(
+      node =>
+        Object.is(node.type, PRESSABLE) &&
+        String(node.props.accessibilityLabel ?? '').includes('Copy link for trigger-a') &&
+        typeof node.props.onPress === 'function'
+    );
+    expect(copyControls).toHaveLength(1);
+    const [copyControl] = copyControls;
+    if (!copyControl) {
       throw new Error('missing copy control');
     }
+    // The URL line itself is the control: React Native confines a touch to every
+    // ancestor's bounds, so a control on this one-text-line row must carry the
+    // target on its own box and declare no reach it cannot deliver.
+    expect(copyControl.props.accessibilityRole).toBe('button');
+    expect(copyControl.props.accessibilityLabel).toContain(i18n.t('common.copyLink'));
+    expect(copyControl.props.hitSlop).toBeUndefined();
+    // The platform target floor is on the control's own class, so dropping the
+    // glyph's box or shrinking the line cannot take the target under 44 pt
+    // without this failing.
+    expect(String(copyControl.props.className).split(' ')).toEqual(
+      expect.arrayContaining(TOUCH_TARGET_CLASS.split(' '))
+    );
+    // The glyph is decoration inside the line, not a nested pressable of its own.
+    expect(
+      copyControl.findAll(node => !Object.is(node, copyControl) && Object.is(node.type, PRESSABLE))
+    ).toEqual([]);
     act(() => {
-      (copyButton.props.onPress as () => void)();
+      (copyControl.props.onPress as () => void)();
     });
     expect(copyWebhookUrl).toHaveBeenCalledWith('https://Inbound.example/trigger-a');
   });
@@ -180,7 +204,13 @@ describe('TriggersListScreen rows', () => {
 
   it('keeps the switch outside the row press, as its sibling', async () => {
     const root = await mount();
-    const presses = root.findAll(node => Object.is(node.type, PRESSABLE));
+    // The row presses carry their trigger id; the copy control below a webhook
+    // row is a pressable of its own and is not one of them.
+    const presses = root.findAll(
+      node =>
+        Object.is(node.type, PRESSABLE) &&
+        /^trigger-[ab]$/.test(String(node.props.accessibilityLabel ?? ''))
+    );
     const switches = root.findAll(node => Object.is(node.type, SWITCH));
 
     expect(presses).toHaveLength(2);
@@ -216,11 +246,20 @@ describe('TriggersListScreen rows', () => {
     const switches = root.findAll(node => Object.is(node.type, SWITCH));
     const labels = switches.map(node => node.props.accessibilityLabel as string);
 
-    expect(labels[0]).toBe('Trigger active and trigger-a');
+    expect(labels[0]).toBe('Trigger active: trigger-a');
     for (const [index, label] of labels.entries()) {
-      expect(label).toContain('Trigger active');
+      expect(label).toContain('Trigger active: ');
       expect(label).toContain(index === 0 ? 'trigger-a' : 'trigger-b');
     }
+
+    // Only the webhook row has a copy control; it names its own trigger too.
+    const copyButtons = root.findAll(
+      node =>
+        Object.is(node.type, PRESSABLE) &&
+        String(node.props.accessibilityLabel ?? '').startsWith('Copy link for ')
+    );
+    expect(copyButtons).toHaveLength(1);
+    expect(copyButtons[0]?.props.accessibilityLabel).toBe('Copy link for trigger-a');
 
     const [first] = switches;
     if (!first) {

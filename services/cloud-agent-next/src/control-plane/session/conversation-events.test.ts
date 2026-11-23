@@ -3,6 +3,11 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { expect, it, onTestFinished } from 'vitest';
 import type { SandboxControlSessionEventInput } from '../../sandbox-session/sandbox-control-event.js';
+import {
+  materializePreparationEvent,
+  readLatestPreparationAttemptForMessage,
+} from '../../session/preparation-history.js';
+import type { PreparingEventDataV2 } from '../../shared/protocol.js';
 import migrations from './drizzle/migrations.js';
 import { createSessionEventQueries } from './event-queries.js';
 import { persistSessionEvent } from './native-events.js';
@@ -104,7 +109,7 @@ it.each([
   ).toEqual([{ text: 'Earlier activity', tools: [] }, answer]);
 });
 
-it('answers with the last assistant message after a mid-turn synthetic message', async () => {
+it('reads the same final answer by turn or by assistant ID after a mid-turn synthetic message', async () => {
   const { queries, publish } = await fixture();
   const conversationMessage = (message: Record<string, unknown>) => ({
     type: 'conversation.message.updated',
@@ -158,6 +163,12 @@ it('answers with the last assistant message after a mid-turn synthetic message',
   expect(queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, userMessageId)).toEqual(
     answer
   );
+  expect(
+    queries.getAssistantAnswerMessageIdForUserMessage(sessionId, kiloSessionId, userMessageId)
+  ).toBe('msg_assistant_2');
+  expect(queries.getAssistantAnswerByMessageId(sessionId, 'msg_assistant_2')).toEqual(answer);
+  expect(queries.getAssistantAnswerByMessageId(sessionId, userMessageId)).toBeNull();
+  expect(queries.getAssistantAnswerByMessageId('workspace_other', 'msg_assistant_2')).toBeNull();
   expect(
     queries.getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, userMessageId)
   ).toEqual([{ text: 'Start Docker in the background.', tools: [] }, answer]);
@@ -226,3 +237,74 @@ it('does not inherit a callback parent from another Kilo session', async () => {
     queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, userMessageId)
   ).toBeNull();
 });
+
+it.each([
+  { order: 'start time', laterRowStartedAt: 100, expectedAttempt: 'attempt-a-first' },
+  {
+    order: 'row ID on a start time tie',
+    laterRowStartedAt: 200,
+    expectedAttempt: 'attempt-a-last',
+  },
+])(
+  'reads only the requested message’s latest preparation attempt and steps by $order',
+  async ({ laterRowStartedAt, expectedAttempt }) => {
+    const { queries } = await fixture();
+    const messageA = 'msg_a';
+    const messageB = 'msg_b';
+    const attempts = [
+      { attemptId: 'attempt-a-first', triggerMessageId: messageA, startedAt: 200, outputAt: 210 },
+      { attemptId: 'attempt-b', triggerMessageId: messageB, startedAt: 300, outputAt: 310 },
+      {
+        attemptId: 'attempt-a-last',
+        triggerMessageId: messageA,
+        startedAt: laterRowStartedAt,
+        outputAt: 320,
+      },
+    ];
+    for (const { attemptId, triggerMessageId, startedAt, outputAt } of attempts) {
+      const common = {
+        version: 2,
+        attemptId,
+        triggerMessageId,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+      } as const;
+      const events: PreparingEventDataV2[] = [
+        { ...common, action: 'attempt_started', revision: 1, timestamp: startedAt },
+        {
+          ...common,
+          action: 'step_started',
+          stepId: 'setup-command',
+          kind: 'setup_command',
+          label: 'Setup command',
+          revision: 2,
+          timestamp: startedAt + 1,
+        },
+        {
+          ...common,
+          action: 'step_output',
+          stepId: 'setup-command',
+          output: `Output from ${attemptId}`,
+          revision: 3,
+          timestamp: outputAt,
+        },
+      ];
+      for (const event of events) {
+        expect(
+          materializePreparationEvent(
+            queries,
+            { session_id: sessionId, execution_id: '', timestamp: event.timestamp },
+            event
+          )
+        ).toBe(true);
+      }
+    }
+
+    expect(readLatestPreparationAttemptForMessage(queries, messageA)).toMatchObject({
+      id: expectedAttempt,
+      triggerMessageId: messageA,
+      steps: [{ id: 'setup-command', outputTail: `Output from ${expectedAttempt}` }],
+    });
+    expect(readLatestPreparationAttemptForMessage(queries, 'msg_unknown')).toBeNull();
+  }
+);

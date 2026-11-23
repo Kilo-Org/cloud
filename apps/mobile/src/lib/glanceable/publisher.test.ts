@@ -340,9 +340,6 @@ describe('GlanceablePublisher', () => {
     expect(glanceableRenewRetryDelayMs(2)).toBe(2 * GLANCEABLE_COALESCE_MS);
     expect(glanceableRenewRetryDelayMs(20)).toBe(GLANCEABLE_RENEW_RETRY_MAX_MS);
 
-    // A sink that rejects every write never advances the published deadline, so
-    // without a bound the unchanged-content renewal would re-emit on every
-    // heartbeat.
     vi.useFakeTimers();
     let now = NOW;
     let attempts = 0;
@@ -418,12 +415,6 @@ describe('GlanceablePublisher', () => {
   });
 
   it('renders the first heartbeat after a restart even when the persisted snapshot matches', () => {
-    // The native surfaces outlive the JS process. A death inside the 8 s
-    // terminal window leaves the ongoing card in the shade while the persisted
-    // snapshot is already empty, so an unchanged empty heartbeat must still
-    // reach the sinks: that is where the Android sink dismisses the orphan
-    // (`!notificationActive -> endNotification`). Suppressing it strands the
-    // card until the counts next change.
     const { sink, calls } = makeSink();
     const restored = snapshotFor([], NOW - 60_000, 7);
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial: restored });

@@ -91,6 +91,7 @@
     "draft": "Чернова",
     "enabled": "Включено",
     "github": "GitHub",
+    "image": "Изображение",
     "imageUnavailable": "Изображението е недостъпно.",
     "loading": "Зареждане…",
     "loadMore": "Зареди още",
@@ -122,10 +123,10 @@
     "connectProvider": "Свържи доставчик",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
+    "couldNotLoad": "Не успяхме да заредим.",
+    "couldNotLoadMore": "Не успяхме да заредим още резултати.",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
     "couldNotLoadSessions": "Сесиите не се заредиха.",
-    "couldnTLoad": "Не успяхме да заредим.",
-    "couldnTLoadMore": "Не успяхме да заредим още резултати.",
     "deviceSessions": "Сесии на устройства",
     "disabled": "Изключено",
     "email": "Имейл",
@@ -399,7 +400,7 @@
       "title": "Ключове на доставчици",
       "rowSubtitle": "Използвай собственото си таксуване при доставчика",
       "orgDescription": "Тези ключове се споделят с всички в организацията и се таксуват в нейните акаунти при доставчиците.",
-      "viewOnly": "Само собственик, администратор или мениджър по таксуването в организацията може да променя ключовете ѝ.",
+      "viewOnly": "Само собственик, администратор или отговорник за плащанията в организацията може да променя ключовете ѝ.",
       "description": "Заявките през тези ключове се таксуват в акаунта ти при доставчика, а не от наличността ти в Kilo.",
       "managedByPlan": "Управлява се от плана ти за кодиране",
       "enableKey": "Активирай ключа за {{provider}}",
@@ -1238,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Заявката е одобрена",
       "replied": "Отговорът е изпратен",
+      "empty": "Напишете отговор, след което го изпратете.",
       "failed": "Не можа да се отговори. Докоснете отново, за да опитате пак.",
       "unavailable": "Тази заявка вече не чака."
     }
@@ -1502,7 +1504,9 @@
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
       "gitlabAccount": "акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
-      "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане."
+      "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане.",
+      "notConnectedTitle": "Няма връзка с {{platform}}",
+      "githubAdminOnlyDescription": "Само собствениците на организацията и администраторите могат да я установят."
     },
     "overview": {
       "allAreas": "Всички области",
@@ -2176,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сесии",
       "sectionAccessibility": "{{title}}: {{displayCount}} сесии",
       "live": "НА ЖИВО",
-      "updating": "Актуализиране"
+      "updating": "Актуализиране",
+      "retentionLimit": "Показват се най-новите сесии."
     },
     "sessionRow": {
       "deleteTitle": "Да се изтрие ли сесията?",
@@ -2246,11 +2251,11 @@
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
       "emptyReadOnlyTitle": "В тази сесия няма съобщения",
-      "renameAccessibility": "Преименувай сесията: {{title}}",
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
       "historyTooLarge": "Записът на тази сесия е твърде голям за зареждане.",
       "historyUnavailable": "Записът на тази сесия не може да бъде прочетен.",
+      "historyTemporarilyUnavailable": "Записът на тази сесия временно не е наличен.",
       "cloneFailedRetry": "Не успяхме да клонираме тази сесия. Опитай отново.",
       "notEnoughCredits": "Нямаш достатъчно кредити за тази заявка. Добави кредити и опитай отново.",
       "previousTaskFinishing": "Предишната задача още не е приключила. Изчакай малко.",
@@ -2613,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Подробностите са недостъпни.",
+      "detailsUnavailableDescription": "Този елемент вече не е в сесията.",
       "textDisplay": "Преглед на текста",
       "thinking": "Разсъждава",
       "thought": "Разсъждения",
@@ -2656,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Зареждане на изображението",
       "imageUnavailableRetry": "Изображението е недостъпно. Опитай да го заредиш отново",
+      "imageUnavailableRetryWithAlt": "Изображението е недостъпно. {{alt}}. Опитай да го заредиш отново",
       "imagePreviewUnavailableInSession": "Прегледът на изображението е недостъпен в тази сесия.",
       "viewImage": "Прегледай изображението",
       "viewImageWithAlt": "Прегледай изображението {{alt}}",
@@ -2787,7 +2794,9 @@
       "skip": "Пропусни",
       "retrySkip": "Опитай да пропуснеш отново",
       "submitting": "Изпращане…",
-      "sendAnswers": "Изпрати отговорите"
+      "sendAnswers": "Изпрати отговорите",
+      "unreadableTitle": "Този въпрос не може да бъде показан",
+      "unreadableBody": "Агентът чака въпрос, който това приложение не може да покаже. Отговорете на въпроса в CLI, за да продължите."
     },
     "blockingCard": {
       "questionUnavailable": "Този въпрос вече не е наличен.",
@@ -2814,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Не успяхме да заредим сесията на подагента.",
+      "historyTooLarge": "Историята на този подагент е твърде голяма за зареждане.",
+      "historyUnavailable": "Историята на този подагент не е налична.",
+      "historyTemporarilyUnavailable": "Историята на този подагент временно не е налична.",
       "failed": "Сесията на подагента завърши с грешка.",
       "noMessages": "Няма съобщения от подагента",
       "noMessagesDescription": "Сесията на подагента приключи без запис на разговора.",
@@ -2983,7 +2995,7 @@
       "windowUnavailable": "Неизвестен размер на контекстния прозорец",
       "tapToViewDetails": " Докосни, за да видиш подробностите за контекста.",
       "costClause": ", разход {{cost}}",
-      "loadingCostSpoken": "разход {{cost}}.",
+      "loadingCostSpoken": "разход досега {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токена, размерът на прозореца е неизвестен{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}{{costClause}}.",
       "title": "Използване на контекста",
@@ -3173,8 +3185,7 @@
     "timeoutDescription": "Заявката не приключи в определеното време. Опитай отново."
   },
   "screenHeader": {
-    "openMenu": "Отвори менюто",
-    "openMenuFor": "Отвори менюто за {{title}}"
+    "openMenu": "Отвори менюто"
   },
   "picker": {
     "optionsExpired": "Опциите вече не са достъпни",
@@ -3393,6 +3404,8 @@
     "voiceTranscriptionWho": "Твоето устройство, Kilo Gateway с избрания от теб модел за транскрипция или Apple или Google за онлайн разпознаване.",
     "installAttributionPromptTitle": "Да се разреши ли отчитането на източника на инсталацията?",
     "installAttributionPromptMessage": "Kilo използва разрешението за проследяване на Apple само за да разбере чрез кой канал си открил приложението. Подканите и разговорите ти никога не се използват за това.",
+    "installAttributionRequestFailedTitle": "Заявката за проследяване не можа да бъде показана",
+    "installAttributionRequestFailedMessage": "Kilo не успя да покаже системната заявка, затова отчитането на източника на инсталацията остава изключено.",
     "what": "Какво",
     "why": "Защо",
     "who": "Кой"
@@ -3408,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "Одитен журнал",
-      "permissionDenied": "Само собственик, администратор или мениджър по фактурирането на организация с плана Enterprise може да преглежда одитния ѝ журнал.",
+      "permissionDenied": "Само собственик, администратор или отговорник за плащанията на организация с плана Enterprise може да преглежда одитния ѝ журнал. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Няма одитни събития",
       "emptyDescription": "Тук се показват действията, извършени в тази организация.",
       "truncated": "Показани са най-скорошните събития.",
@@ -3458,11 +3471,147 @@
         "guardrailUpdate": "Защитното ограничение е актуализирано",
         "guardrailRemove": "Защитното ограничение е премахнато",
         "unknown": "Одитно събитие"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Режим \"{{name}}\" (идентификатор: {{slug}})",
+        "modeUpdate": "Режим \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Автоматично маршрутизиране",
+          "defaultModel": "Модел по подразбиране"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Добавен {{email}} като {{role}}",
+        "memberRemoved": "Премахнат {{email}}",
+        "memberParentAdded": "Добавен {{email}} от организацията майка {{parent}}",
+        "memberParentRemoved": "Премахнат {{email}} от организацията майка {{parent}}",
+        "inviteSent": "{{email}} като {{role}}",
+        "inviteRevoked": "Оттеглена поканата за {{email}}",
+        "inviteAccepted": "Приета от {{email}}",
+        "groupIdentity": "Група \"{{name}}\"",
+        "groupMembers": "Група \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} групи",
+        "groupMemberGroups_one": "{{displayCount}} група",
+        "groupMemberGroups_other": "{{displayCount}} групи",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} групи",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} група",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} групи",
+        "groupPolicySet": "Група \"{{name}}\": зададена {{policy}} политика",
+        "groupPolicyRemoved": "Група \"{{name}}\": премахната {{policy}} политика",
+        "groupDefaultPolicySet": "Зададена {{policy}} политика по подразбиране",
+        "groupDefaultPolicyRemoved": "Премахната {{policy}} политика по подразбиране",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Защитни ограничения за AI: {{state}}",
+        "guardrailConfigGroup": "{{state}} за група \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO домейн {{domain}}",
+        "ssoDomainChanged": "{{domain}} (беше {{previous}})",
+        "ssoDomainRemoved": "Изчистен SSO домейн {{domain}}",
+        "fundsPurchased": "{{amount}} чрез {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} към {{displayCount}} дъщерни организации",
+        "fundsDistributed_one": "{{amount}} към {{displayCount}} дъщерна организация",
+        "fundsDistributed_other": "{{amount}} към {{displayCount}} дъщерни организации",
+        "fundsReceived": "{{amount}} от {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} конфигурация",
+        "reviewAgentConfigStyle": "{{platform}}: стил {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} обновени",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} обновен",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} обновени",
+        "reviewAgentSecretsFailed": "{{displayCount}} грешки",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} грешка",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} грешки",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Регион за инференция: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Режим \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Глобално по подразбиране",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Разрешено",
+          "denied": "Забранено",
+          "followSetting": "Следва настройката на разширението"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI: {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} към {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Дайджест с препоръки: {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: няма разрешени източници",
+        "settingName": "Преименувано от {{previous}} на {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Сканиране преди употреба включено",
+        "scanBeforeUseOff": "Сканиране преди употреба изключено",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Премахнати: {{models}}",
+        "browserPolicyOff": "Използването на браузър е блокирано",
+        "browserPolicyAllow": "Само разрешени източници",
+        "browserPolicyPlaywrightOnly": "Само вграденият браузър",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Променени модели: {{values}}",
+        "integrationConnected": "{{integration}} е свързан",
+        "integrationDisconnected": "{{integration}} е прекъснат",
+        "integrationRefreshed": "{{integration}} е обновен",
+        "integrationCancelled": "{{integration}} е отменен",
+        "integrationModelUpdated": "{{integration}}: модел {{model}}",
+        "integrationKeyAdded": "Добавен ключ за {{provider}}",
+        "integrationKeyUpdated": "Актуализиран ключ за {{provider}}",
+        "integrationKeyDeleted": "Премахнат ключ за {{provider}}",
+        "integrationKeyToggled": "Ключ за {{provider}}: {{state}}",
+        "namedPolicyCreated": "Създадена {{kind}} политика {{id}}",
+        "namedPolicyUpdated": "Актуализирана {{kind}} политика {{id}}",
+        "namedPolicyDeleted": "Премахната {{kind}} политика {{id}}",
+        "namedPolicyLinked": "Свързана {{kind}} политика {{next}}",
+        "webhookTriggerUpdated": "Тригер {{trigger}}",
+        "organizationRenamed": "Организацията е преименувана от {{previous}} на {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Собствен API ключ"
+        }
       }
     },
     "billing": {
       "title": "Плащания",
-      "permissionDenied": "Само собственик, администратор или мениджър по плащанията на организацията може да вижда плащанията ѝ.",
+      "permissionDenied": "Само собственик, администратор или отговорник за плащанията на организацията може да вижда плащанията ѝ. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Абонамент",
       "state": "Състояние",
       "stateNone": "Няма абонамент",
@@ -3540,11 +3689,11 @@
       "pendingInvitation": "За този имейл вече има чакаща покана.",
       "alreadyMember": "Този човек вече е член на тази организация.",
       "seatsFull": "Всички места са заети ({{used}}/{{total}}). Помоли собственик на организацията да добави места, преди да каниш още членове.",
-      "seatsFullCanInviteBilling": "Всички места са заети ({{used}}/{{total}}). Все още можеш да каниш мениджъри по фактурирането, които не заемат място.",
+      "seatsFullCanInviteBilling": "Всички места са заети ({{used}}/{{total}}). Все още можеш да каниш отговорници за плащанията, които не заемат място.",
       "noSeatsAvailable": "Всички места са заети. Помоли собственик на организацията да добави места, преди да каниш още членове."
     },
     "invoices": {
-      "downloadA11y": "Изтегли фактура {{number}}",
+      "downloadA11y": "Изтегли фактура {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Фактурите се издават автоматично за всеки отчетен период и се показват тук след начисляване на сумата за организацията ти.",
       "emptyTitle": "Няма фактури",
       "invoiceFallback": "Фактура",
@@ -3624,7 +3773,6 @@
       "usageDetails": "Подробности за използването",
       "providersAndModels": "Доставчици и модели",
       "groups": "Групи",
-      "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
       "ssoAndDomain": "SSO и домейн",
       "dataCollection": "Събиране на данни",
@@ -3639,7 +3787,7 @@
       "emptyDescription": "Използвайте „По-ранен час“, за да видите по-ранни заявки.",
       "emptyBoundDescription": "Записите на заявките не стигат по-назад от това.",
       "loadError": "Журналите на заявките не можаха да се заредят.",
-      "permissionDenied": "Само собственик, администратор или мениджър по фактурирането на организацията може да преглежда журналите на заявките ѝ.",
+      "permissionDenied": "Само собственик, администратор или отговорник за плащанията на организацията може да преглежда журналите на заявките ѝ. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} вх. · {{output}} изх.",
       "byok": "BYOK"
     },
@@ -3744,7 +3892,7 @@
     "signupStepUpApple": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да завършиш създаването на акаунта си, върни се назад и използвай „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодът е неправилен или е изтекъл. Опитай отново или използвай „$t(login.resendCode)“.",
+    "invalidCode": "Кодът е неправилен или е изтекъл. Използвай „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Кодът ти се обработва. Изчакай малко и опитай отново.",
     "tooManyAttempts": "Твърде много опити. Поискай нов код.",
     "invalidToken": "Влизането беше неуспешно. Опитай отново.",
@@ -3909,7 +4057,10 @@
     "list": {
       "loadFailed": "Не можа да се зареди историята на чата.",
       "new": "Нов чат",
-      "deleteTitle": "Изтриване на този чат?"
+      "deleteTitle": "Изтриване на този чат?",
+      "resetNoticeTitle": "Локалните чатове и чернови бяха изчистени",
+      "resetNoticeBody": "Kilo не можа да зареди историята на чата, запазена на това устройство. Сесиите ви в облака не са засегнати.",
+      "resetNoticeDismiss": "Отхвърли известието"
     },
     "rename": {
       "title": "Преименувай чата",
@@ -3959,6 +4110,9 @@
       "fieldName": "Показвано име",
       "fieldUrl": "URL на сървъра",
       "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
+      "fieldUrlCredentials": "Премахнете потребителското име и паролата от адреса.",
+      "fieldUrlFragment": "Премахнете частта с # от адреса.",
+      "fieldUrlInsecure": "Въведете адрес с https или http само за localhost.",
       "duplicateUrl": "Този URL вече е запазен.",
       "serverNotFound": "Този сървър вече не е запазен.",
       "enableServer": "Активиране на този сървър: {{name}}",
@@ -3984,6 +4138,7 @@
       "app": {
         "label": "Интерфейс на инструмента",
         "failed": "Интерфейсът на този инструмент не успя да се зареди.",
+        "tooLarge": "Интерфейсът на този инструмент надвишава ограничението от {{size}}.",
         "empty": "Интерфейсът на този инструмент няма нищо за показване."
       }
     },
@@ -4051,6 +4206,8 @@
       "discoveryNoModels": "Крайната точка не показа никакви модели. Въведете моделите ръчно.",
       "connectionIncomplete": "Моделът отговори, но не завърши. Опитайте отново или проверете идентификатора на модела и протокола.",
       "invalidInput": "Въведете име на сървъра, валидни заглавки и поне един модел с уникален идентификатор и име. Ограниченията за броя токени трябва да са положителни цели числа.",
+      "invalidApiKey": "API ключът съдържа символ, който не може да бъде изпратен. Използвайте само букви, цифри и стандартни символи, без прекъсвания на реда.",
+      "invalidHeaders": "Персонализирана заглавка не може да бъде изпратена. Проверете името ѝ и използвайте само букви, цифри и стандартни символи, без прекъсвания на реда.",
       "invalidUrl": "Въведете основен URL на API с HTTP или HTTPS без данни за удостоверяване, параметри на заявката или фрагмент.",
       "publicHttp": "Публичните HTTP крайни точки не са разрешени. Използвайте HTTPS или частна локална крайна точка.",
       "httpApprovalRequired": "Одобрете тази локална HTTP крайна точка, преди да запазите или да се свържете.",
@@ -4099,6 +4256,7 @@
         "network": "Изтеглянето не завърши. Проверете интернет връзката си и опитайте отново.",
         "invalidFile": "Изтегленият файл не е модел, който това приложение може да стартира, затова беше премахнат.",
         "checksum": "Изтегленият файл не съвпада с публикуваната си контролна сума, затова беше премахнат. Опитайте да го изтеглите отново.",
+        "unreadable": "Това устройство не успя да провери изтегления файл, затова той беше премахнат. Опитайте да го изтеглите отново.",
         "writeFailed": "Това устройство не успя да запази модела. Опитайте да го изтеглите отново."
       }
     },
@@ -4184,7 +4342,15 @@
       "download": "Изтегляне на модела на устройството",
       "downloading": "Изтегляне…",
       "downloadProgress": "Изтегляне… {{percent}}%",
-      "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново."
+      "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново.",
+      "cannotUse": "Не може да се стартира: {{items}}.",
+      "cannotUseOptions": "Не може да се попълнят: някои опции на инструмент.",
+      "limitations": "Ограничения",
+      "tools": {
+        "time": "Време",
+        "settingsList": "Покажи настройки",
+        "settingsSet": "Промени настройки"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
@@ -4363,6 +4529,7 @@
     "instructionSaveFailed": "Инструкцията не можа да се запази",
     "instructionDeleteFailed": "Инструкцията не можа да се изтрие",
     "instructionToggleFailed": "Инструкцията не можа да се обнови",
+    "instructionViewTitle": "Файл с инструкции",
     "instructionLimitReached": "Профилът може да съдържа до {{max}} инструкции. Изтрийте една, за да добавите друга.",
     "mcp": {
       "title": "MCP сървъри",
@@ -4533,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Неуспешно зареждане на кредитната активност.",
       "appStoreReceipt": "Разписка от App Store",
+      "deduction": {
+        "adminCancel": "Балансът е закрит от администратор",
+        "adminDebit": "Кредити, премахнати от администратор",
+        "codingPlan": "План за програмиране: {{plan}}",
+        "correction": "Корекция на баланса",
+        "dispute": "Спор за плащане",
+        "refundAppStore": "Възстановяване на пакет кредити от App Store",
+        "refundGooglePlay": "Възстановяване на пакет кредити от Google Play"
+      },
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
       "emptyTitle": "Няма история на кредитите",
       "expiredGrant": "Изтекъл срок: {{description}}",
+      "expiredStatus": "Изтекъл срок",
       "googlePlayReceipt": "Разписка от Google Play",
       "kind": {
         "adjustment": "Корекция",
@@ -4563,7 +4740,8 @@
       "receiptA11y": "Отваряне на разписката за {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Няма налична разписка за тази покупка.",
       "retentionLimit": "Показва се най-новата история на кредитите.",
-      "voidedGrant": "Анулиран: {{description}}"
+      "voidedGrant": "Анулиран: {{description}}",
+      "voidedStatus": "Анулиран"
     },
     "title": "Купи кредити",
     "description": "Кредитите са еднократна покупка, добавена към вашия Kilo баланс за стартиране на AI сесии за кодиране в приложението Kilo. Магазинът таксува акаунта ви и кредитите се добавят, след като магазинът потвърди плащането.",
@@ -4709,6 +4887,7 @@
     "contextAll": "Всички контексти",
     "dismiss": "Отхвърли брифинга",
     "dismissFailed": "Брифингът все още не може да бъде отхвърлен. Ще се повтори опитът на заден план.",
+    "readMarkFailed": "Брифингът не можа да бъде отбелязан като прочетен. Ще се опита отново при следващото му зареждане.",
     "offline": "Офлайн · запазен брифинг",
     "cached": "Запазен брифинг · опресняването не е налично",
     "summary": "AI обобщение",
@@ -4728,12 +4907,15 @@
     "morningEnd": "Брифингът е наличен до",
     "timeHint": "Картата на началния екран възстановява текущия статус, когато периодът на брифинга приключи, дори офлайн.",
     "invalidSchedule": "Изберете валидна часова зона и непразен период на брифинга.",
+    "scheduleEmptyNight": "Периодът на брифинга е празен. Изберете време на готовност по-късно от началото на периода.",
+    "scheduleEmptyMorning": "Времето на готовност и времето, до което брифингът е наличен, съвпадат. Изберете колко дълго брифингът остава наличен.",
+    "scheduleFullDay": "Двата периода покриват цяло денонощие. Оставете част от денонощието извън брифинга.",
     "notificationsHint": "Едно общо известие за всеки планиран брифинг. Независимо от платените AI обобщения.",
     "notificationPermission": "Включете push известията, за да получавате брифинга си.",
     "defaultModel": "Използвай модела по подразбиране на Kilo",
     "duration": "Времево ограничение (минути)",
     "spendLimit": "Ограничение на разходите (USD)",
-    "invalidSafeguards": "Въведете положителни, крайни ограничения за време и разходи.",
+    "invalidSafeguards": "Въведете положително число в разрешения обхват.",
     "estimate": "Прогноза {{estimate}} · максимум {{maximum}}",
     "estimateUnavailable": "Платено обобщение не е налично за тези настройки. Променете модела или лимитите, или опитайте отново по-късно.",
     "estimatePricingUnavailable": "Ценообразуването за този модел не е налично. Изберете друг модел.",
@@ -4741,6 +4923,8 @@
     "estimateModelNotAllowed": "Този модел не е разрешен в този контекст. Изберете друг модел.",
     "estimateSpendLimitTooLow": "Повишете лимита за разходи, за да разрешите това резюме.",
     "confirmPaid": "Включване на платени обобщения за {{context}}?",
+    "paidDisclosure_one": "Прогноза {{estimate}}, до {{maximum}}, с ограничение от {{minutes}} мин. Таксува се дори при неуспешно генериране.",
+    "paidDisclosure_other": "Прогноза {{estimate}}, до {{maximum}}, с ограничение от {{minutes}} мин. Таксува се дори при неуспешно генериране.",
     "paidDisclosure": "Прогноза {{estimate}}, до {{maximum}}, с ограничение от {{minutes}} мин. Таксува се дори при неуспешно генериране.",
     "enable": "Включи платени обобщения",
     "allContexts": "Личните и организационните брифинги остават отделни.",
@@ -4748,8 +4932,8 @@
     "estimatePermissionUnavailable": "Нямаш разрешение да използваш баланса на този контекст. Поискай от собственик на организацията да го активира.",
     "saved": "Настройките на брифинга са запазени",
     "selectedSessions": "Избрани сесии",
-    "snapshotPullRequests": "PR-и в избраните сесии",
-    "snapshotBlockers": "Блокери в избраните сесии",
+    "snapshotPullRequests": "PR-и",
+    "snapshotBlockers": "Блокери",
     "capturedAt": "Запазена {{time}}",
     "snapshotHint": "Моментна снимка на последното налично състояние на сесиите, запазена в планирания сутрешен час. Възможни са пропуски. Показаните бройки се отнасят за избраните сесии, а не за цялата активност през нощта.",
     "snapshotTruncated": "Някои сесии или доказателства са пропуснати, за да се ограничи размерът на тази моментна снимка.",
@@ -4780,7 +4964,7 @@
     "sourceActivity": "Дейност без заглавие",
     "metadataFailureProvider": "грешка на доставчика",
     "metadataFailureTool": "грешка на инструмента",
-    "metadataFailureCancelled": "Отменено",
+    "metadataStopped": "Последният ход беше спрян",
     "metadataFailureOther": "неуточнена грешка"
   },
   "systemSearch": {
@@ -4788,6 +4972,7 @@
   },
   "usage": {
     "title": "Потребление",
+    "personalTitle": "Потребление на личния акаунт",
     "orgTitle": "Потребление на организацията",
     "entrySubtitle": "Разходи, заявки и токени",
     "rangePicker": "Период",
@@ -4801,7 +4986,8 @@
     "unavailableTitle": "Потреблението не е достъпно",
     "unavailableDescription": "Потреблението не е настроено за това работно пространство. Свържете се с поддръжката, ако очаквате да виждате потребление тук.",
     "orgSelfNotice": "Виждате собственото си потребление в тази организация.",
-    "viewDetails": "Подробности за потреблението"
+    "viewDetails": "Подробности за потреблението",
+    "orgSelfEntryTitle": "Вашето потребление"
   },
   "integrations": {
     "title": "Интеграции",
@@ -4897,6 +5083,8 @@
       "autoCommit": "Записвай промените, когато изпълнението приключи",
       "condenseOnComplete": "Свивай контекста, когато изпълнението приключи",
       "activeTitle": "Тригерът е активен",
+      "activeSwitchA11y": "Активен тригер: {{name}}",
+      "copyLinkA11y": "Копирай връзката за {{name}}",
       "activeDescription": "Паузираните уебхукове отговарят с 404.",
       "runAsCreator": "Изпълнявай като мен",
       "runAsCreatorDescription": "Всяко изпълнение използва вашия акаунт, затова тайната заглавка е задължителна.",

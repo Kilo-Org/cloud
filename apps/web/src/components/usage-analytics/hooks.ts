@@ -236,6 +236,17 @@ export function useUsageTable(
   });
 }
 
+export function useBenchmarkCharges(args: CommonArgs & { enabled?: boolean }) {
+  const trpc = useTRPC();
+  // Every sidebar filter applies, including the project filter. A project
+  // filter that names a real workspace therefore leaves this view empty
+  // instead of showing pools that the filter excluded.
+  return useQuery({
+    ...trpc.usageAnalytics.getBenchmarkCharges.queryOptions(commonFilters(args)),
+    enabled: args.enabled ?? true,
+  });
+}
+
 export function useResolveOrgUsers(organizationIds: string[], userIds: string[]) {
   const trpc = useTRPC();
   const dedupedIds = useMemo(() => Array.from(new Set(userIds)).sort(), [userIds]);

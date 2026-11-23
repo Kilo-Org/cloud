@@ -279,12 +279,13 @@ async function loadNotifications() {
     deleteItemAsync: vi.fn().mockResolvedValue(undefined),
     getItemAsync: vi.fn().mockResolvedValue(null),
   });
-  const [notifications, registry, persist] = await Promise.all([
+  const [notifications, registry, persist, replyDraft] = await Promise.all([
     import('./notifications'),
     import('@/lib/glanceable/sink-registry'),
     import('@/lib/glanceable/persist'),
+    import('@/lib/needs-input-reply-draft'),
   ]);
-  return { ...notifications, pending, persist, registry };
+  return { ...notifications, pending, persist, registry, replyDraft };
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -854,6 +855,37 @@ describe('cold-start body tap carries the session organization', () => {
       href: '/(app)/agent-chat/cli1?via=push',
       organizationId: 'org-2',
     });
+  });
+
+  // A launcher tap on a failed reply's result is the one tap that arrives
+  // before the app has a response listener, so it builds its destination here.
+  // The answer that reply could not deliver has to be handed over on this path
+  // too, or the card it opens starts empty.
+  it('hands over the answer a failed reply carried', async () => {
+    const { checkInitialNotification, pending, replyDraft } = await loadNotifications();
+    mocks.lastResponse = {
+      notification: {
+        request: {
+          content: {
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'cli1',
+              category: 'attention',
+              attentionKind: 'question',
+              answerDraft: 'ship to shadow',
+            },
+          },
+        },
+      },
+    };
+
+    checkInitialNotification();
+
+    expect(pending.consumePendingDeepLink()).toEqual({
+      href: '/(app)/agent-chat/cli1?via=push',
+      organizationId: null,
+    });
+    expect(replyDraft.takeNeedsInputReplyDraft('cli1')).toBe('ship to shadow');
   });
 
   it('stashes no organization for a Personal session push', async () => {

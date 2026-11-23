@@ -57,7 +57,10 @@ export function rememberSnapshotRows(
   snapshotRows = { scopeKey, rows };
 }
 
-/** The remembered rows of a scope, or null when none were kept for it. */
+/**
+ * The rows remembered for `scopeKey`. A record kept under a different scope key
+ * is never returned: the rows describe only the scope they were remembered under.
+ */
 export function getSnapshotRows(scopeKey: string): readonly FollowableSessionRow[] | null {
   return snapshotRows?.scopeKey === scopeKey ? snapshotRows.rows : null;
 }

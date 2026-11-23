@@ -1,4 +1,5 @@
 import { isCloudDataExportUIEnabled } from './user-data-export-ui';
+import { resetFeatureFlagCache } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
@@ -14,6 +15,9 @@ const mockGetFeatureFlag = jest.fn();
 describe('cloud data export UI flag', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The flag helper caches a resolved value per flag and distinct id, so each
+    // case starts from an empty cache.
+    resetFeatureFlagCache();
   });
 
   it.each([false, undefined, 'enabled'])('fails closed for %s', async value => {

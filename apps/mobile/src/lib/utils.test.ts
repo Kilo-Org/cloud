@@ -25,9 +25,6 @@ describe('timeAgo', () => {
   });
 
   it('derives the label from the passed clock so a tick can advance it', () => {
-    // The list row's label is memoized against its traced inputs: it must
-    // change when only the caller's clock advances, with the conversation
-    // untouched. An untracked `Date.now()` read freezes the on-screen text.
     const created = new Date('2026-08-23T11:59:30Z');
 
     expect(timeAgo(created, 'en', Date.parse('2026-08-23T12:00:00Z'))).toBe('Just now');
@@ -37,8 +34,6 @@ describe('timeAgo', () => {
   });
 
   it('reads a future instant forward, for a scheduled wake', () => {
-    // A glanceable's scheduled row formats a wake ahead of the clock; without
-    // the sign it would read "Just now", because the magnitude alone is small.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
 
@@ -48,9 +43,6 @@ describe('timeAgo', () => {
   });
 
   it('reads an event stamped after a trailing clock sample as now, never as ahead', () => {
-    // The list's minute ticker sampled the clock before the chat answered, and
-    // the timer can fire late, so the event can be more than a minute ahead of
-    // the sample.
     const sampled = Date.parse('2026-08-23T14:34:00Z');
     const answered = new Date('2026-08-23T14:35:05Z');
 

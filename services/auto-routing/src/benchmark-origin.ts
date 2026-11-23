@@ -2,8 +2,12 @@ import {
   BenchmarkRoutingTableResponseSchema,
   ClassifierWinnerResponseSchema,
   CustomRouterBenchmarkContextSchema,
+  CustomRouterTableVersionResponseSchema,
   CustomRoutingTableResponseSchema,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
+  CUSTOM_ROUTER_TABLE_VERSION_PATH,
+  CustomRouterEpochResponseSchema,
   DEFAULT_AUTO_ROUTER,
   customRouterEntryKey,
   type AutoRouter,
@@ -32,8 +36,12 @@ async function fetchBenchmark(
   });
 }
 
-async function fetchBenchmarkJson(env: BenchmarkEnv, path: string): Promise<unknown> {
-  const res = await fetchBenchmark(env, path);
+async function fetchBenchmarkJson(
+  env: BenchmarkEnv,
+  path: string,
+  init?: RequestInit
+): Promise<unknown> {
+  const res = await fetchBenchmark(env, path, init);
   if (!res.ok) {
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new Error(`benchmark origin ${path} responded ${res.status} ${detail}`);
@@ -88,10 +96,57 @@ export function customRouterBenchmarkContext(
   });
 }
 
+/**
+ * The router's readiness epoch through the existing benchmark service binding. `null` means "this
+ * deployment cannot prove the epoch" (an older benchmark Worker answering 404, a 5xx, or an
+ * unreadable body), which the caller must treat as unproven rather than as an unchanged value.
+ */
+export async function fetchCustomRouterEpoch(
+  env: BenchmarkEnv,
+  router: AutoRouter
+): Promise<number | null> {
+  try {
+    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_EPOCH_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ router }),
+    });
+    const parsed = CustomRouterEpochResponseSchema.safeParse(body);
+    return parsed.success ? parsed.data.epoch : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCustomRouterTableVersion(
+  env: BenchmarkEnv,
+  context: CustomRouterBenchmarkContext
+): Promise<string | null> {
+  try {
+    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_TABLE_VERSION_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(context),
+    });
+    const parsed = CustomRouterTableVersionResponseSchema.safeParse(body);
+    return parsed.success ? parsed.data.readinessVersion : null;
+  } catch {
+    // A version probe failure is not a routing failure: the caller keeps its current table.
+    return null;
+  }
+}
+
+export type CustomRouterTableLoad = {
+  table: CustomRoutingTable | null;
+  servingPins: ReadonlyMap<string, string>;
+  /** Entry keys whose saved pin target left the catalog; the live alias serves instead. */
+  servingFallback: ReadonlySet<string>;
+};
+
 export async function fetchCustomRouterTable(
   env: BenchmarkEnv,
   context: CustomRouterBenchmarkContext
-): Promise<CustomRoutingTable | null> {
+): Promise<CustomRouterTableLoad> {
   const res = await fetchBenchmark(env, CUSTOM_ROUTER_TABLE_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -109,7 +164,11 @@ export async function fetchCustomRouterTable(
       `benchmark custom router table response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
     );
   }
-  return parsed.data.table;
+  return {
+    table: parsed.data.table,
+    servingPins: new Map(Object.entries(parsed.data.servingPins ?? {})),
+    servingFallback: new Set(parsed.data.servingFallback ?? []),
+  };
 }
 
 // The benchmark worker owns eval validation and error codes; its status and body pass through.

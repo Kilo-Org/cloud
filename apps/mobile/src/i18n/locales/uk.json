@@ -93,6 +93,7 @@
     "draft": "Чернетка",
     "enabled": "Увімкнено",
     "github": "GitHub",
+    "image": "Зображення",
     "imageUnavailable": "Зображення недоступне.",
     "loading": "Завантаження…",
     "loadMore": "Завантажити ще",
@@ -124,10 +125,10 @@
     "connectProvider": "Підключіть сервіс",
     "contentTruncated": "Вміст обрізано",
     "copyLink": "Скопіювати посилання",
+    "couldNotLoad": "Не вдалося завантажити.",
+    "couldNotLoadMore": "Не вдалося завантажити більше даних.",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",
     "couldNotLoadSessions": "Не вдалося завантажити сеанси.",
-    "couldnTLoad": "Не вдалося завантажити.",
-    "couldnTLoadMore": "Не вдалося завантажити більше даних.",
     "deviceSessions": "Сеанси на пристроях",
     "disabled": "Вимкнено",
     "email": "Електронна пошта",
@@ -680,6 +681,7 @@
     "needsInputAction": {
       "approved": "Запит схвалено",
       "replied": "Відповідь надіслано",
+      "empty": "Напишіть відповідь, а потім надішліть її.",
       "failed": "Не вдалося відповісти. Торкніться ще раз, щоб повторити.",
       "unavailable": "Цей запит більше не чекає."
     }
@@ -821,6 +823,8 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
+      "notConnectedTitle": "{{platform}} не підключено",
+      "githubAdminOnlyDescription": "Підключити його можуть лише власники та адміністратори організації.",
       "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
       "gitlabAccount": "обліковий запис GitLab",
@@ -1032,7 +1036,7 @@
       "empty": "Ще немає перевірок з аналітикою",
       "emptyDescription": "Аналітика записує завершені перевірки, поки її ввімкнено для організації.",
       "offTitle": "Аналітику вимкнено для {{platform}}",
-      "offDescription": "Увімкнути аналітику можуть власники, адміністратори та менеджери з виставлення рахунків у налаштуваннях організації у вебверсії, щоб записувати завершені перевірки.",
+      "offDescription": "Увімкнути аналітику можуть власники, адміністратори та менеджери з оплати у налаштуваннях організації у вебверсії, щоб записувати завершені перевірки.",
       "couldNotLoad": "Не вдалося завантажити аналітику",
       "trackedReviewsCaption": "Завершені перевірки, що закінчилися в цьому періоді з увімкненою аналітикою. Перевірки, що виконуються, та невдалі перевірки ніколи не враховуються.",
       "trackedReviewsUncounted": "Не враховано: {{displayCount}} із {{displayTotal}} завершених перевірок організації, результат яких не було зафіксовано.",
@@ -1656,7 +1660,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} сеансу",
       "sectionAccessibility": "{{title}}: {{displayCount}} сеансу",
       "live": "НАЖИВО",
-      "updating": "Оновлення"
+      "updating": "Оновлення",
+      "retentionLimit": "Показано ваші найновіші сеанси."
     },
     "sessionRow": {
       "deleteTitle": "Видалити сеанс?",
@@ -1730,11 +1735,11 @@
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
-      "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
       "historyTooLarge": "Транскрипт цього сеанса завеликий для завантаження.",
       "historyUnavailable": "Не вдалося прочитати транскрипт цього сеанса.",
+      "historyTemporarilyUnavailable": "Транскрипт цього сеансу тимчасово недоступний.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
       "notEnoughCredits": "Недостатньо кредитів для цього запиту. Поповніть баланс і спробуйте ще раз.",
       "previousTaskFinishing": "Попереднє завдання ще не завершено. Зачекайте трохи.",
@@ -2105,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Відомості недоступні.",
+      "detailsUnavailableDescription": "Цього елемента більше немає в сеансі.",
       "textDisplay": "Перегляд тексту",
       "thinking": "Обмірковування",
       "thought": "Міркування",
@@ -2148,6 +2154,7 @@
     "filePart": {
       "loadingImage": "Завантаження зображення",
       "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
+      "imageUnavailableRetryWithAlt": "Зображення недоступне, {{alt}}, повторіть завантаження",
       "imagePreviewUnavailableInSession": "Попередній перегляд зображення недоступний у цьому сеансі.",
       "viewImage": "Переглянути зображення",
       "viewImageWithAlt": "Переглянути зображення {{alt}}",
@@ -2279,7 +2286,9 @@
       "skip": "Пропустити",
       "retrySkip": "Спробувати пропустити ще раз",
       "submitting": "Надсилання…",
-      "sendAnswers": "Надіслати відповіді"
+      "sendAnswers": "Надіслати відповіді",
+      "unreadableTitle": "Не вдалося показати запитання",
+      "unreadableBody": "Агент очікує на запитання, яке цей застосунок не може показати. Дайте відповідь на запитання в CLI, щоб продовжити."
     },
     "blockingCard": {
       "questionUnavailable": "Це запитання більше недоступне.",
@@ -2306,6 +2315,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Не вдалося завантажити сеанс субагента.",
+      "historyTooLarge": "Історія цього субагента завелика для завантаження.",
+      "historyUnavailable": "Історія цього субагента недоступна.",
+      "historyTemporarilyUnavailable": "Історія цього субагента тимчасово недоступна.",
       "failed": "Сеанс субагента завершився з помилкою.",
       "noMessages": "Немає повідомлень субагента",
       "noMessagesDescription": "Сеанс субагента завершився без історії повідомлень.",
@@ -2483,7 +2495,7 @@
       "windowUnavailable": "Розмір контекстного вікна невідомий",
       "tapToViewDetails": " Торкніться, щоб переглянути відомості про контекст.",
       "costClause": ", вартість {{cost}}",
-      "loadingCostSpoken": "вартість {{cost}}.",
+      "loadingCostSpoken": "вартість наразі {{cost}}.",
       "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} із {{window}} токенів, використано {{percentage}}{{costClause}}.",
       "title": "Використання контексту",
@@ -2681,8 +2693,7 @@
     "timeoutDescription": "Час очікування запиту минув, і він не завершився. Спробуйте ще раз."
   },
   "screenHeader": {
-    "openMenu": "Відкрити меню",
-    "openMenuFor": "Відкрити меню для {{title}}"
+    "openMenu": "Відкрити меню"
   },
   "picker": {
     "optionsExpired": "Варіанти застаріли",
@@ -2907,6 +2918,8 @@
     "why": "Навіщо",
     "who": "Хто отримує дані",
     "installAttributionPromptMessage": "Kilo використовує дозвіл Apple на відстеження лише для того, щоб дізнатися, звідки ви прийшли. Ваші запити та розмови для цього ніколи не використовуються.",
+    "installAttributionRequestFailedTitle": "Не вдалося показати запит на відстеження",
+    "installAttributionRequestFailedMessage": "Kilo не вдалося показати системний запит, тому визначення джерела встановлення залишається вимкненим.",
     "installAttributionPromptTitle": "Дозволити визначення джерела встановлення?"
   },
   "prReview": {
@@ -3526,7 +3539,7 @@
   "organization": {
     "auditLog": {
       "title": "Журнал аудиту",
-      "permissionDenied": "Журнал аудиту організації на плані Enterprise можуть переглядати лише її власник, адміністратор або менеджер з оплати.",
+      "permissionDenied": "Журнал аудиту організації на плані Enterprise можуть переглядати лише її власник, адміністратор або менеджер з оплати. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Немає подій аудиту",
       "emptyDescription": "Тут з’являтимуться дії, виконані в цій організації.",
       "truncated": "Показано найновіші події.",
@@ -3576,11 +3589,157 @@
         "guardrailUpdate": "Запобіжник оновлено",
         "guardrailRemove": "Запобіжник видалено",
         "unknown": "Подія аудиту"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Режим «{{name}}» (ідентифікатор: {{slug}})",
+        "modeUpdate": "Режим «{{name}}»: {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Автоматична маршрутизація",
+          "defaultModel": "Модель за замовчуванням"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Додано {{email}} як {{role}}",
+        "memberRemoved": "Видалено {{email}}",
+        "memberParentAdded": "Додано {{email}} з батьківської організації {{parent}}",
+        "memberParentRemoved": "Видалено {{email}} з батьківської організації {{parent}}",
+        "inviteSent": "{{email}} як {{role}}",
+        "inviteRevoked": "Запрошення для {{email}} відкликано",
+        "inviteAccepted": "Прийнято {{email}}",
+        "groupIdentity": "Група «{{name}}»",
+        "groupMembers": "Група «{{name}}»: {{members}}",
+        "groupMemberGroups": "{{displayCount}} групи",
+        "groupMemberGroups_few": "{{displayCount}} групи",
+        "groupMemberGroups_many": "{{displayCount}} груп",
+        "groupMemberGroups_one": "{{displayCount}} група",
+        "groupMemberGroups_other": "{{displayCount}} групи",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} групи",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} групи",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} груп",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} група",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} групи",
+        "groupPolicySet": "Група «{{name}}»: встановлено політику {{policy}}",
+        "groupPolicyRemoved": "Група «{{name}}»: видалено політику {{policy}}",
+        "groupDefaultPolicySet": "Встановлено стандартну політику {{policy}}",
+        "groupDefaultPolicyRemoved": "Видалено стандартну політику {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Захисні механізми ШІ {{state}}",
+        "guardrailConfigGroup": "{{state}} для групи «{{group}}»",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Домен SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (був {{previous}})",
+        "ssoDomainRemoved": "Домен SSO {{domain}} очищено",
+        "fundsPurchased": "{{amount}} через {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} для {{displayCount}} дочірньої організації",
+        "fundsDistributed_few": "{{amount}} для {{displayCount}} дочірніх організацій",
+        "fundsDistributed_many": "{{amount}} для {{displayCount}} дочірніх організацій",
+        "fundsDistributed_one": "{{amount}} для {{displayCount}} дочірньої організації",
+        "fundsDistributed_other": "{{amount}} для {{displayCount}} дочірньої організації",
+        "fundsReceived": "{{amount}} від {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Конфігурація {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: стиль {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} оновлено",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} оновлено",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} оновлено",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} оновлено",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} оновлено",
+        "reviewAgentSecretsFailed": "{{displayCount}} помилки",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} помилки",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} помилок",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} помилка",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} помилки",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Регіон інференсу: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Режим «{{mode}}»: {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Глобальне значення за замовчуванням",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Дозволено",
+          "denied": "Заборонено",
+          "followSetting": "Відповідає налаштуванню розширення"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Проєкт UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} до {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Дайджест рекомендацій {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: немає дозволених джерел",
+        "settingName": "Перейменовано з {{previous}} на {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Сканування перед використанням увімкнено",
+        "scanBeforeUseOff": "Сканування перед використанням вимкнено",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Видалено: {{models}}",
+        "browserPolicyOff": "Використання браузера заблоковано",
+        "browserPolicyAllow": "Лише дозволені джерела",
+        "browserPolicyPlaywrightOnly": "Лише використання браузера",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Моделі змінено: {{values}}",
+        "integrationConnected": "{{integration}} підключено",
+        "integrationDisconnected": "{{integration}} від’єднано",
+        "integrationRefreshed": "{{integration}} оновлено",
+        "integrationCancelled": "{{integration}} скасовано",
+        "integrationModelUpdated": "{{integration}}: модель {{model}}",
+        "integrationKeyAdded": "Ключ для {{provider}} додано",
+        "integrationKeyUpdated": "Ключ для {{provider}} оновлено",
+        "integrationKeyDeleted": "Ключ для {{provider}} видалено",
+        "integrationKeyToggled": "Ключ для {{provider}}: {{state}}",
+        "namedPolicyCreated": "Політику {{kind}} {{id}} створено",
+        "namedPolicyUpdated": "Політику {{kind}} {{id}} оновлено",
+        "namedPolicyDeleted": "Політику {{kind}} {{id}} видалено",
+        "namedPolicyLinked": "Політику {{kind}} {{next}} прив’язано",
+        "webhookTriggerUpdated": "Тригер {{trigger}}",
+        "organizationRenamed": "Організацію перейменовано з {{previous}} на {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Власний ключ API"
+        }
       }
     },
     "billing": {
       "title": "Оплата",
-      "permissionDenied": "Інформацію про оплату організації можуть переглядати лише її власник, адміністратор або менеджер з оплати.",
+      "permissionDenied": "Інформацію про оплату організації можуть переглядати лише її власник, адміністратор або менеджер з оплати. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Підписка",
       "state": "Стан",
       "stateNone": "Немає підписки",
@@ -3670,11 +3829,11 @@
       "pendingInvitation": "Для цієї адреси електронної пошти вже є очікуване запрошення.",
       "alreadyMember": "Ця особа вже є учасником цієї організації.",
       "seatsFull": "Усі місця зайнято ({{used}}/{{total}}). Попросіть власника організації додати місця, перш ніж запрошувати нових учасників.",
-      "seatsFullCanInviteBilling": "Усі місця зайнято ({{used}}/{{total}}). Ви все одно можете запрошувати менеджерів із питань оплати, оскільки вони не займають місць.",
+      "seatsFullCanInviteBilling": "Усі місця зайнято ({{used}}/{{total}}). Ви все одно можете запрошувати менеджерів з оплати, оскільки вони не займають місць.",
       "noSeatsAvailable": "Усі місця зайнято. Попросіть власника організації додати місця, перш ніж запрошувати нових учасників."
     },
     "invoices": {
-      "downloadA11y": "Завантажити рахунок {{number}}",
+      "downloadA11y": "Завантажити рахунок {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Рахунки створюються автоматично кожного розрахункового періоду. Вони з'являться тут, щойно їх буде виставлено вашій організації.",
       "emptyTitle": "Немає рахунків",
       "invoiceFallback": "Рахунок",
@@ -3754,7 +3913,6 @@
       "usageDetails": "Деталі використання",
       "providersAndModels": "Постачальники та моделі",
       "groups": "Групи",
-      "guardrails": "Запобіжники",
       "byok": "Власний ключ",
       "ssoAndDomain": "SSO і домен",
       "dataCollection": "Збір даних",
@@ -3769,7 +3927,7 @@
       "emptyDescription": "Натисніть «Попередня година», щоб переглянути попередні запити.",
       "emptyBoundDescription": "Це найдавніші доступні журнали запитів.",
       "loadError": "Не вдалося завантажити журнали запитів.",
-      "permissionDenied": "Журнали запитів організації можуть переглядати лише її власник, адміністратор або менеджер з оплати.",
+      "permissionDenied": "Журнали запитів організації можуть переглядати лише її власник, адміністратор або менеджер з оплати. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} вх. · {{output}} вих.",
       "byok": "BYOK"
     },
@@ -3874,7 +4032,7 @@
     "signupStepUpApple": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Щоб завершити створення облікового запису, поверніться назад і виберіть «$t(login.moreSignInOptions)».",
-    "invalidCode": "Код неправильний або термін його дії минув. Спробуйте ще раз або натисніть «$t(login.resendCode)».",
+    "invalidCode": "Код неправильний або термін його дії минув. Скористайтеся «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Ваш код опрацьовується. Зачекайте трохи та спробуйте ще раз.",
     "tooManyAttempts": "Забагато спроб. Надішліть запит на новий код.",
     "invalidToken": "Не вдалося ввійти. Спробуй ще раз.",
@@ -4055,7 +4213,10 @@
     "list": {
       "loadFailed": "Не вдалося завантажити історію чату.",
       "new": "Новий чат",
-      "deleteTitle": "Видалити цей чат?"
+      "deleteTitle": "Видалити цей чат?",
+      "resetNoticeTitle": "Локальні чати й чернетки видалено",
+      "resetNoticeBody": "Kilo не вдалося відкрити чати, збережені на цьому пристрої. Ваші хмарні сеанси не постраждали.",
+      "resetNoticeDismiss": "Відхилити сповіщення"
     },
     "rename": {
       "title": "Перейменувати чат",
@@ -4105,6 +4266,9 @@
       "fieldName": "Відображувана назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введіть дійсну URL-адресу сервера.",
+      "fieldUrlCredentials": "Видаліть ім’я користувача та пароль з адреси.",
+      "fieldUrlFragment": "Видаліть частину адреси з #.",
+      "fieldUrlInsecure": "Введіть https-адресу або http лише для localhost.",
       "duplicateUrl": "Ця URL-адреса вже збережена.",
       "serverNotFound": "Цей сервер більше не збережено.",
       "enableServer": "Увімкнути цей сервер: {{name}}",
@@ -4132,6 +4296,7 @@
       "app": {
         "label": "Інтерфейс інструменту",
         "failed": "Не вдалося завантажити інтерфейс цього інструменту.",
+        "tooLarge": "Інтерфейс цього інструменту перевищує обмеження {{size}}.",
         "empty": "В інтерфейсі цього інструменту немає чого показувати."
       }
     },
@@ -4199,6 +4364,8 @@
       "discoveryNoModels": "Кінцева точка не показала жодної моделі. Додайте моделі вручну.",
       "connectionIncomplete": "Модель відповіла, але не завершила. Спробуйте ще раз або перевірте ідентифікатор моделі та протокол.",
       "invalidInput": "Введіть назву сервера, дійсні заголовки та додайте принаймні одну модель з унікальним ідентифікатором і назвою. Обмеження кількості токенів мають бути додатними цілими числами.",
+      "invalidApiKey": "Ключ API містить символ, який неможливо надіслати. Використовуйте лише літери, цифри та стандартні символи, без розривів рядків.",
+      "invalidHeaders": "Власний заголовок неможливо надіслати. Перевірте його назву та використовуйте лише літери, цифри та стандартні символи, без розривів рядків.",
       "invalidUrl": "Введіть базову URL-адресу API з HTTP або HTTPS без облікових даних, параметрів запиту чи фрагмента.",
       "publicHttp": "Публічні кінцеві точки HTTP не дозволені. Використовуйте HTTPS або приватну локальну кінцеву точку.",
       "httpApprovalRequired": "Дозвольте використання цієї локальної кінцевої точки HTTP, перш ніж зберігати її чи підключатися.",
@@ -4247,6 +4414,7 @@
         "network": "Завантаження не завершилося. Перевірте з'єднання й спробуйте знову.",
         "invalidFile": "Завантажений файл не є моделлю, яку цей застосунок може запустити, тому його видалено.",
         "checksum": "Завантажений файл не відповідає опублікованій контрольній сумі, тому його видалено. Спробуйте завантажити його ще раз.",
+        "unreadable": "Цей пристрій не зміг перевірити завантажений файл, тому його видалено. Спробуйте завантажити його ще раз.",
         "writeFailed": "Цей пристрій не зміг зберегти модель. Спробуйте завантажити її ще раз."
       }
     },
@@ -4332,7 +4500,15 @@
       "download": "Завантажити модель на пристрій",
       "downloading": "Завантаження…",
       "downloadProgress": "Завантаження… {{percent}}%",
-      "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз."
+      "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз.",
+      "cannotUse": "Не вдається запустити: {{items}}.",
+      "cannotUseOptions": "Не вдається заповнити: деякі параметри інструмента.",
+      "limitations": "Обмеження",
+      "tools": {
+        "time": "Час",
+        "settingsList": "Показати налаштування",
+        "settingsSet": "Змінити налаштування"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
@@ -4521,6 +4697,7 @@
     "instructionSaveFailed": "Не вдалося зберегти інструкцію",
     "instructionDeleteFailed": "Не вдалося видалити інструкцію",
     "instructionToggleFailed": "Не вдалося оновити інструкцію",
+    "instructionViewTitle": "Файл інструкції",
     "instructionLimitReached": "Профіль може містити до {{max}} інструкцій. Видаліть одну, щоб додати іншу.",
     "mcp": {
       "title": "MCP сервери",
@@ -4693,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Не вдалося завантажити кредитну активність.",
       "appStoreReceipt": "Квитанція в App Store",
+      "deduction": {
+        "adminCancel": "Баланс закрито адміністратором",
+        "adminDebit": "Кредити вилучено адміністратором",
+        "codingPlan": "План для програмування: {{plan}}",
+        "correction": "Коригування балансу",
+        "dispute": "Спір щодо платежу",
+        "refundAppStore": "Повернення коштів за пакет кредитів з App Store",
+        "refundGooglePlay": "Повернення коштів за пакет кредитів з Google Play"
+      },
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
       "expiredGrant": "Термін дії минув: {{description}}",
+      "expiredStatus": "Термін дії минув",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
         "adjustment": "Коригування",
@@ -4723,7 +4910,8 @@
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
       "retentionLimit": "Показано найновішу історію кредитів.",
-      "voidedGrant": "Анульовано: {{description}}"
+      "voidedGrant": "Анульовано: {{description}}",
+      "voidedStatus": "Анульовано"
     },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",
@@ -4877,6 +5065,7 @@
     "contextAll": "Усі контексти",
     "dismiss": "Відхилити звіт",
     "dismissFailed": "Наразі не вдалося відхилити цей звіт. Спроба повторюватиметься у фоновому режимі.",
+    "readMarkFailed": "Наразі не вдалося позначити цей звіт як прочитаний. Спроба повториться, коли звіт завантажиться знову.",
     "offline": "Офлайн · збережений звіт",
     "cached": "Збережений звіт · оновлення недоступне",
     "summary": "Підсумок AI",
@@ -4896,16 +5085,23 @@
     "morningEnd": "Звіт доступний до",
     "timeHint": "Коли завершується період звіту, картка на головному екрані знову показує поточний стан, навіть офлайн.",
     "invalidSchedule": "Виберіть дійсний часовий пояс і ненульову тривалість періоду звіту.",
+    "scheduleEmptyNight": "Період звіту порожній. Виберіть час готовності звіту пізніше за його початок.",
+    "scheduleEmptyMorning": "Час готовності звіту та час, до якого звіт доступний, збігаються. Виберіть, як довго звіт залишається доступним.",
+    "scheduleFullDay": "Два періоди охоплюють повну добу. Залиште частину доби поза періодом звіту.",
     "notificationsHint": "Одне загальне сповіщення на кожен запланований звіт. Не залежить від платних підсумків AI.",
     "notificationPermission": "Увімкніть push-сповіщення, щоб отримувати звіт.",
     "defaultModel": "Стандартна модель Kilo",
     "duration": "Обмеження часу (хвилини)",
     "spendLimit": "Обмеження витрат (USD)",
-    "invalidSafeguards": "Введіть додатні скінченні обмеження часу та витрат.",
+    "invalidSafeguards": "Введіть додатне число в дозволених межах.",
     "estimate": "Оцінка {{estimate}} · максимум {{maximum}}",
     "estimateUnavailable": "Платний підсумок недоступний для цих налаштувань. Змініть модель чи обмеження, або спробуйте пізніше.",
     "confirmPaid": "Увімкнути платні підсумки для {{context}}?",
-    "paidDisclosure": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хв. Оплата стягується, навіть якщо створення не вдасться.",
+    "paidDisclosure_one": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хвилина. Оплата стягується, навіть якщо створення не вдасться.",
+    "paidDisclosure_few": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хвилини. Оплата стягується, навіть якщо створення не вдасться.",
+    "paidDisclosure_many": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хвилин. Оплата стягується, навіть якщо створення не вдасться.",
+    "paidDisclosure": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хвилини. Оплата стягується, навіть якщо створення не вдасться.",
+    "paidDisclosure_other": "Орієнтовно {{estimate}}, до {{maximum}}, обмеження {{minutes}} хвилини. Оплата стягується, навіть якщо створення не вдасться.",
     "enable": "Увімкнути платні підсумки",
     "allContexts": "Особисті звіти та звіти організації зберігаються окремо.",
     "emptyHistory": "Немає збережених звітів",
@@ -4916,8 +5112,8 @@
     "estimateSpendLimitTooLow": "Підніміть ліміт витрат, щоб дозволити цей підсумок.",
     "saved": "Налаштування звіту збережено.",
     "selectedSessions": "Вибрані сесії",
-    "snapshotPullRequests": "PRs у вибраних сесіях",
-    "snapshotBlockers": "Блокери у вибраних сесіях",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Блокери",
     "capturedAt": "Зафіксовано {{time}}",
     "snapshotHint": "Знімок останнього доступного стану сесій, зафіксований у запланований ранковий час. Дані можуть бути неповними. Кількісні показники стосуються вибраних сесій, а не всієї нічної активності.",
     "snapshotTruncated": "Деякі сесії або матеріали не включено, щоб обмежити обсяг цього знімка.",
@@ -4956,7 +5152,7 @@
     "sourceActivity": "Діяльність без назви",
     "metadataFailureProvider": "помилка провайдера",
     "metadataFailureTool": "помилка інструмента",
-    "metadataFailureCancelled": "Скасовано",
+    "metadataStopped": "Останній цикл зупинено",
     "metadataFailureOther": "неуточнена помилка"
   },
   "systemSearch": {
@@ -4964,6 +5160,7 @@
   },
   "usage": {
     "title": "Використання",
+    "personalTitle": "Використання особистого акаунта",
     "orgTitle": "Використання організації",
     "entrySubtitle": "Витрати, запити й токени",
     "rangePicker": "Період",
@@ -4977,7 +5174,8 @@
     "unavailableTitle": "Використання недоступне",
     "unavailableDescription": "Використання не налаштовано для цього робочого простору. Зверніться до служби підтримки, якщо очікуєте побачити тут дані про використання.",
     "orgSelfNotice": "Ви бачите власне використання в цій організації.",
-    "viewDetails": "Докладніше про використання"
+    "viewDetails": "Докладніше про використання",
+    "orgSelfEntryTitle": "Ваше використання"
   },
   "integrations": {
     "title": "Інтеграції",
@@ -5073,6 +5271,8 @@
       "autoCommit": "Фіксувати зміни після завершення запуску",
       "condenseOnComplete": "Стискати контекст після завершення запуску",
       "activeTitle": "Тригер активний",
+      "activeSwitchA11y": "Тригер активний: {{name}}",
+      "copyLinkA11y": "Скопіювати посилання: {{name}}",
       "activeDescription": "Призупинені вебхуки відповідають 404.",
       "runAsCreator": "Запускати від мого імені",
       "runAsCreatorDescription": "Кожен запуск використовує ваш обліковий запис, тому секретний заголовок обов’язковий.",

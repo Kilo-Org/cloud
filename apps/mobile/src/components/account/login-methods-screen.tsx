@@ -247,6 +247,7 @@ export function LoginMethodsScreen() {
             icon={Plus}
             title={t('profile.signInMethods.linkAnother')}
             subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
+            subtitleNumberOfLines={2}
             onPress={() => {
               void openAppShellHandoff(
                 { page: 'connected-accounts' },

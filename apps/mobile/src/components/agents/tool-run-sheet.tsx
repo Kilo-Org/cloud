@@ -3,15 +3,14 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
-import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 import { MessageErrorBoundary } from './message-error-boundary';
 import { SessionPageSheet } from './session-page-sheet';
 import { ToolOneLineRow } from './tool-run-rows';
+import { VanishedPartState } from './vanished-part-state';
 
 type ToolRunSheetProps = {
   visible: boolean;
@@ -23,7 +22,7 @@ type ToolRunSheetProps = {
 /**
  * Sheet listing every tool call of a condensed run, in run order, each rendered
  * one-line exactly as it would appear on the session page. A vanished run (no
- * live parts left) shows the shared "Details unavailable" state. The sheet does
+ * live parts left) shows the shared `VanishedPartState` block. The sheet does
  * no I/O: a failed call's surface lives in its own part detail sheet.
  */
 export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<ToolRunSheetProps>) {
@@ -40,13 +39,7 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
       />
 
       {parts.length === 0 ? (
-        <CenteredState contentContainerClassName="px-4">
-          <View className="items-center py-6">
-            <Text className="text-sm text-muted-foreground">
-              {t('agentChat.partDetail.detailsUnavailable')}
-            </Text>
-          </View>
-        </CenteredState>
+        <VanishedPartState />
       ) : (
         <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
           {parts.map(part => (

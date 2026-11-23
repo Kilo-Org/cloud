@@ -320,8 +320,6 @@ function firstAndLatestPromptPrefix(
 }
 
 function textPrefix(value: unknown): string | null {
-  // Cleaning is linear in the text it receives, so the walk stops at the
-  // window and only that much text reaches it.
   const text = cleanPromptText(textFromValue(value));
 
   if (text.length === 0) {
@@ -620,9 +618,6 @@ function isSensitiveToken(token: string) {
       // A token that starts with a credential word is a credential key, unless
       // the word is one that also begins ordinary words.
       if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
-      // A qualifier counts only when it ends immediately before the occurrence,
-      // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
-      // can match one.
       const window = token.slice(Math.max(0, index - MAX_QUALIFIER_LENGTH), index);
       if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => window.endsWith(qualifier))) return true;
     }

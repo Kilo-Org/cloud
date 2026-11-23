@@ -329,12 +329,10 @@ describe('syncArtifactMirror gating', () => {
     h.sessions.push({ id: 's1', updatedAt: T1 });
 
     expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({ status: 'synced' });
-    // One list page is the whole known session set.
     expect(h.listSessions).toHaveBeenCalledWith({
       limit: MIRROR_SESSION_LIMIT,
       orderBy: 'updated_at',
     });
-    // A completed run tells the platform provider the tree changed.
     expect(h.notify).toHaveBeenCalledOnce();
 
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS - 1);
@@ -494,10 +492,6 @@ describe('syncArtifactMirror crawling', () => {
   });
 
   it('re-reads a session whose mirrored bytes are gone and keeps the ones left', async () => {
-    // The mirror is derived data: the file browser or the OS can remove it.
-    // Stored crawl state that still names the file would skip re-materializing
-    // it and publish it in the index anyway, so the run checks the disk first.
-    // The session's surviving files stay indexed and are not fetched again.
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
     setFiles(h, 's1', [
@@ -552,8 +546,6 @@ describe('syncArtifactMirror crawling', () => {
   });
 
   it('keeps reconciling the other sessions when one cannot be inspected', async () => {
-    // The probe reads the filesystem, so one folder can refuse it. That session
-    // keeps its stored state; every other session is still checked.
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
     setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
@@ -692,8 +684,6 @@ describe('syncArtifactMirror crawling', () => {
     });
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
 
-    // The persisted crawl state holds only what the manifest rebuild reads; the
-    // URL is dead weight, and a data: URL is the whole payload.
     const persisted = [...h.store.values()].join('\n');
     expect(persisted).not.toContain('"url"');
     expect(persisted).not.toContain('base64');
@@ -862,8 +852,6 @@ describe('syncArtifactMirror crawling', () => {
     });
 
     expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'discarded' });
-    // The teardown clears the mirror, so the run stops before telling an open
-    // browser to re-query a location that no longer holds anything.
     expect(h.notify).not.toHaveBeenCalled();
   });
 });

@@ -33,7 +33,6 @@ import {
   type PolicySettingValue,
   resolvePolicySettings,
   type BenchmarkRunProgress,
-  type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -76,95 +75,16 @@ import { parseAdminResponse } from './admin-fetch';
 import { entryMentionsModel, runMentionsModel } from './admin-time';
 import { AdminTimeLabel } from './AdminTimeLabel';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
+import { BenchmarkRequestsSection } from './BenchmarkRequestsSection';
 import { FailedModels } from './FailedModelsTable';
+import {
+  formatAccuracy,
+  formatRunProgress,
+  formatTotalUsd,
+  formatUsd,
+  RoutingTableView,
+} from './benchmark-formatting';
 import { useSystemOneModelOptions } from './system-one-models';
-
-export function formatAccuracy(n: number): string {
-  return `${(n * 100).toFixed(1)}%`;
-}
-
-export function formatUsd(n: number | null): string {
-  if (n === null) return '—';
-  // 6 dp, remove trailing zeros, but keep at least $0.000001 precision
-  const fixed = n.toFixed(6);
-  // Trim trailing zeros after decimal, but leave at least one digit after dot
-  const trimmed = fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '.0');
-  return `$${trimmed}`;
-}
-
-export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
-  return candidate.accuracy > 0
-    ? candidate.avgCostUsd / candidate.accuracy
-    : Number.POSITIVE_INFINITY;
-}
-
-/**
- * A run or pair total, which is a sum of many small case costs: two decimals
- * would render every real run as $0.00, so a sub-cent total keeps its own
- * precision. A non-zero total below that precision never reads as free.
- */
-export function formatTotalUsd(n: number | null): string {
-  if (n === null) return '—';
-  if (n === 0) return '$0';
-  if (n >= 0.01) return `$${n.toFixed(2)}`;
-  // Small totals stay readable to the sixth decimal, without trailing zeros.
-  const small = Number(n.toFixed(6));
-  return small === 0 ? '<$0.000001' : `$${small}`;
-}
-
-// Below this share of the expected cases the completion rate is still noise, so
-// no finish time is projected from it.
-const ETA_MIN_PERCENT = 5;
-
-export type RunProgressDisplay = {
-  /** Null when the run's expected total is unknown; render counts without a bar. */
-  percent: number | null;
-  counts: string;
-  eta: string | null;
-};
-
-function formatDuration(ms: number): string {
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return '<1 min';
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
-}
-
-export function formatRunProgress(
-  progress: BenchmarkRunProgress,
-  startedAt: string,
-  now: number = Date.now()
-): RunProgressDisplay {
-  const { completedCases, totalCases } = progress;
-  const failed = progress.failedCases > 0 ? ` · ${progress.failedCases} failed` : '';
-  if (totalCases === null || totalCases <= 0) {
-    return { percent: null, counts: `${completedCases} / ? cases${failed}`, eta: null };
-  }
-  const percent = Math.min(100, (completedCases / totalCases) * 100);
-  const startedMs = Date.parse(startedAt);
-  const elapsedMs = now - startedMs;
-  const remainingCases = totalCases - completedCases;
-  const eta =
-    completedCases > 0 &&
-    remainingCases > 0 &&
-    percent >= ETA_MIN_PERCENT &&
-    Number.isFinite(startedMs) &&
-    elapsedMs > 0
-      ? formatDuration((elapsedMs / completedCases) * remainingCases)
-      : null;
-  return {
-    percent,
-    counts: `${completedCases} / ${totalCases} cases${failed}`,
-    eta,
-  };
-}
-
-export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
-  const value = costPerAccuracy(candidate);
-  return Number.isFinite(value) ? formatUsd(value) : '—';
-}
 
 export function formatPolicyValue(value: PolicySettingValue): string {
   if (value === null) return 'off';
@@ -1286,15 +1206,7 @@ function RunTotalsLine({ run }: { run: BenchmarkRun }) {
   );
 }
 
-export function RunSummariesTable({
-  run,
-  router,
-  id,
-}: {
-  run: BenchmarkRun;
-  router: AutoRouter;
-  id: string;
-}) {
+export function RunSummariesPanel({ run, router }: { run: BenchmarkRun; router: AutoRouter }) {
   const isDecider = run.kind === 'decider';
   const running = run.status === 'running';
   // Mounted only while the row is expanded, so a running run polls only then.
@@ -1318,115 +1230,128 @@ export function RunSummariesTable({
     : summaries;
 
   return (
+    <>
+      {/* Full error text; the collapsed row's Error cell wraps, and this reads
+            the whole message without hunting for the tooltip. */}
+      {run.error ? (
+        <div
+          className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words"
+          title={run.error}
+        >
+          {run.error}
+        </div>
+      ) : null}
+      <RunTotalsLine run={run} />
+      {summariesQuery.isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : summariesQuery.error ? (
+        <p className="text-destructive py-1 text-center text-xs">
+          Summaries unavailable:{' '}
+          {summariesQuery.error instanceof Error ? summariesQuery.error.message : 'request failed'}
+        </p>
+      ) : modelTotals.length === 0 ? (
+        <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div>
+            <h4 className="mb-1 text-xs font-medium">Models</h4>
+            <Table className="w-full table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Model</TableHead>
+                  <TableHead className="w-24 text-right text-xs">Accuracy</TableHead>
+                  {isDecider ? null : (
+                    <TableHead className="w-28 text-right text-xs">Route accuracy</TableHead>
+                  )}
+                  <TableHead className="w-28 text-right text-xs">Cost / case</TableHead>
+                  <TableHead className="w-28 text-right text-xs">Total cost</TableHead>
+                  <TableHead className="w-20 text-right text-xs">Cases</TableHead>
+                  <TableHead className="w-20 text-right text-xs">Errors</TableHead>
+                  <TableHead className="w-20 text-right text-xs">Timeouts</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {modelTotals.map(totals => (
+                  <TableRow key={`${totals.model}-${totals.variant ?? ''}`}>
+                    <TableCell className="max-w-0 text-xs">
+                      <span className="block truncate font-mono" title={totals.model}>
+                        {totals.model}
+                      </span>
+                      {totals.variant ? (
+                        <span className="text-muted-foreground block truncate text-[11px]">
+                          {totals.variant}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {formatAccuracy(totals.accuracy)}
+                    </TableCell>
+                    {isDecider ? null : (
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.routeAccuracy !== null ? formatAccuracy(totals.routeAccuracy) : '—'}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {formatUsd(totals.costPerCaseUsd)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {formatTotalUsd(totals.totalCostUsd)}
+                      {totals.uncostedCases > 0 ? (
+                        <span className="text-muted-foreground block text-[11px]">
+                          {totals.uncostedCases} uncosted
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {totals.cases}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {totals.errors}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {totals.timeouts}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground h-8 justify-start gap-1 px-2 text-xs [&[data-state=open]>svg]:rotate-90"
+              >
+                <ChevronRight className="size-4" />
+                Per-route detail ({sortedSummaries.length}{' '}
+                {sortedSummaries.length === 1 ? 'route' : 'routes'})
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <RunRouteTable summaries={sortedSummaries} isDecider={isDecider} />
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** The expanded row of the runs table: the same panel the narrow layout renders inline. */
+export function RunSummariesTable({
+  run,
+  router,
+  id,
+}: {
+  run: BenchmarkRun;
+  router: AutoRouter;
+  id: string;
+}) {
+  return (
     <TableRow className="bg-muted/30">
       <TableCell colSpan={RUN_TABLE_COLUMNS} id={id} className="px-4 py-2">
-        {/* Full error text; the collapsed row's Error cell wraps, and this reads
-            the whole message without hunting for the tooltip. */}
-        {run.error ? (
-          <div
-            className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words"
-            title={run.error}
-          >
-            {run.error}
-          </div>
-        ) : null}
-        <RunTotalsLine run={run} />
-        {summariesQuery.isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : summariesQuery.error ? (
-          <p className="text-destructive py-1 text-center text-xs">
-            Summaries unavailable:{' '}
-            {summariesQuery.error instanceof Error
-              ? summariesQuery.error.message
-              : 'request failed'}
-          </p>
-        ) : modelTotals.length === 0 ? (
-          <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div>
-              <h4 className="mb-1 text-xs font-medium">Models</h4>
-              <Table className="w-full table-fixed">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Model</TableHead>
-                    <TableHead className="w-24 text-right text-xs">Accuracy</TableHead>
-                    {isDecider ? null : (
-                      <TableHead className="w-28 text-right text-xs">Route accuracy</TableHead>
-                    )}
-                    <TableHead className="w-28 text-right text-xs">Cost / case</TableHead>
-                    <TableHead className="w-28 text-right text-xs">Total cost</TableHead>
-                    <TableHead className="w-20 text-right text-xs">Cases</TableHead>
-                    <TableHead className="w-20 text-right text-xs">Errors</TableHead>
-                    <TableHead className="w-20 text-right text-xs">Timeouts</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {modelTotals.map(totals => (
-                    <TableRow key={`${totals.model}-${totals.variant ?? ''}`}>
-                      <TableCell className="max-w-0 text-xs">
-                        <span className="block truncate font-mono" title={totals.model}>
-                          {totals.model}
-                        </span>
-                        {totals.variant ? (
-                          <span className="text-muted-foreground block truncate text-[11px]">
-                            {totals.variant}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatAccuracy(totals.accuracy)}
-                      </TableCell>
-                      {isDecider ? null : (
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {totals.routeAccuracy !== null
-                            ? formatAccuracy(totals.routeAccuracy)
-                            : '—'}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatUsd(totals.costPerCaseUsd)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatTotalUsd(totals.totalCostUsd)}
-                        {totals.uncostedCases > 0 ? (
-                          <span className="text-muted-foreground block text-[11px]">
-                            {totals.uncostedCases} uncosted
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {totals.cases}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {totals.errors}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {totals.timeouts}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground h-8 justify-start gap-1 px-2 text-xs [&[data-state=open]>svg]:rotate-90"
-                >
-                  <ChevronRight className="size-4" />
-                  Per-route detail ({sortedSummaries.length}{' '}
-                  {sortedSummaries.length === 1 ? 'route' : 'routes'})
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <RunRouteTable summaries={sortedSummaries} isDecider={isDecider} />
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
+        <RunSummariesPanel run={run} router={router} />
       </TableCell>
     </TableRow>
   );
@@ -1511,7 +1436,45 @@ export function RunRouteTable({
 }
 
 /** Column count of the runs table, shared by its empty and expanded rows. */
-const RUN_TABLE_COLUMNS = 7;
+const RUN_TABLE_COLUMNS = 8;
+
+/**
+ * Who asked for a run and who pays for it. Platform runs are Kilo's own; a run of the
+ * legacy user queue drew on owner subscriptions, and the paid requests in the requests
+ * card name the exact owner and payer.
+ */
+export function runRequesterLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): {
+  requester: string;
+  payer: string;
+} {
+  return run.kind === 'classifier' || run.purpose === 'platform'
+    ? { requester: 'Kilo platform', payer: 'Kilo pays' }
+    : { requester: 'Owner pools', payer: 'Owners pay' };
+}
+
+export function visibleRuns(
+  runs: readonly BenchmarkRun[],
+  matchedIds: ReadonlySet<string> | null
+): BenchmarkRun[] {
+  return matchedIds === null ? [...runs] : runs.filter(run => matchedIds.has(run.id));
+}
+
+/**
+ * The message an empty runs list shows, or null when it has something to render. An
+ * empty page and a page whose runs never reported their models look the same to the model
+ * filter but mean different things: one is "this model did not run", the other is
+ * "nothing here can answer".
+ */
+export function runsListEmptyMessage(
+  runs: readonly BenchmarkRun[],
+  matchedIds: ReadonlySet<string> | null
+): string | null {
+  if (runs.length === 0) return 'No runs yet';
+  if (visibleRuns(runs, matchedIds).length > 0) return null;
+  return runs.some(run => (run.models?.length ?? 0) > 0)
+    ? 'No run of this list measured that model'
+    : 'No run on this page reports its models yet, so the filter cannot match. Expand a run or reload.';
+}
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1579,28 +1542,13 @@ export function BenchmarkRunsTable({
     });
   }, []);
 
-  if (runs.length === 0) {
+  const visible = visibleRuns(runs, matchedIds);
+  const emptyMessage = runsListEmptyMessage(runs, matchedIds);
+  if (emptyMessage !== null) {
     return (
       <TableRow>
         <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
-          No runs yet
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  const visible = matchedIds === null ? runs : runs.filter(run => matchedIds.has(run.id));
-  if (visible.length === 0) {
-    // An empty page and a page whose runs never reported their models look the
-    // same to the filter, but they mean different things: one is "this model
-    // did not run", the other is "nothing here can answer".
-    const searchable = runs.some(run => (run.models?.length ?? 0) > 0);
-    return (
-      <TableRow>
-        <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
-          {searchable
-            ? 'No run of this list measured that model'
-            : 'No run on this page reports its models yet, so the filter cannot match. Expand a run or reload.'}
+          {emptyMessage}
         </TableCell>
       </TableRow>
     );
@@ -1611,6 +1559,7 @@ export function BenchmarkRunsTable({
       {visible.map(run => {
         const expanded = expandedIds.has(run.id);
         const summariesId = `run-summaries-${run.id}`;
+        const { requester, payer } = runRequesterLabel(run);
         return (
           <React.Fragment key={run.id}>
             {/* Row click is a mouse convenience; the button in the first cell is
@@ -1648,6 +1597,10 @@ export function BenchmarkRunsTable({
                   </span>
                 ) : null}
               </TableCell>
+              <TableCell className="py-2 text-xs">
+                <div>{requester}</div>
+                <div className="text-muted-foreground text-[11px]">{payer}</div>
+              </TableCell>
               <TableCell className="py-2">
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
@@ -1681,6 +1634,109 @@ export function BenchmarkRunsTable({
   );
 }
 
+/**
+ * The runs list at narrow widths: the same fields stacked instead of squeezed into eight
+ * columns, with the expanded detail rendered inline below the card.
+ */
+export function BenchmarkRunsCards({
+  runs,
+  router,
+  matchedIds,
+}: {
+  runs: BenchmarkRun[];
+  router: AutoRouter;
+  matchedIds: ReadonlySet<string> | null;
+}) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(previous => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const visible = visibleRuns(runs, matchedIds);
+  const emptyMessage = runsListEmptyMessage(runs, matchedIds);
+  if (emptyMessage !== null) {
+    return <p className="text-muted-foreground text-sm">{emptyMessage}</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {visible.map(run => {
+        const expanded = expandedIds.has(run.id);
+        const { requester, payer } = runRequesterLabel(run);
+        return (
+          <li key={run.id} className="rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Badge variant={run.kind === 'classifier' ? 'outline' : 'secondary'}>
+                {runTypeLabel(run)}
+              </Badge>
+              <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
+                {run.status}
+              </Badge>
+            </div>
+            {run.models && run.models.length > 0 ? (
+              <p
+                className="text-muted-foreground mt-1 break-all font-mono text-[11px]"
+                title={run.models.join(', ')}
+              >
+                {run.models.join(', ')}
+              </p>
+            ) : null}
+            {run.progress ? (
+              <RunProgress progress={run.progress} startedAt={run.startedAt} />
+            ) : null}
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+              <dt className="text-muted-foreground">Requester</dt>
+              <dd>{requester}</dd>
+              <dt className="text-muted-foreground">Payer</dt>
+              <dd>{payer}</dd>
+              <dt className="text-muted-foreground">Cost</dt>
+              <dd className="tabular-nums">
+                {run.totals
+                  ? `${formatTotalUsd(run.totals.totalCostUsd)} · ${run.totals.measuredCases} cases${
+                      run.totals.erroredCases > 0 ? ` · ${run.totals.erroredCases} errored` : ''
+                    }`
+                  : '—'}
+              </dd>
+              <dt className="text-muted-foreground">Started</dt>
+              <dd>
+                <AdminTimeLabel iso={run.startedAt} />
+              </dd>
+              <dt className="text-muted-foreground">Completed</dt>
+              <dd>{run.completedAt ? <AdminTimeLabel iso={run.completedAt} /> : '—'}</dd>
+            </dl>
+            {run.error ? (
+              <p className="text-destructive mt-2 text-xs break-words whitespace-pre-wrap">
+                {run.error}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 min-h-11"
+              aria-expanded={expanded}
+              onClick={() => toggleExpand(run.id)}
+            >
+              {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+              {expanded ? 'Hide details' : 'Details'}
+            </Button>
+            {expanded ? (
+              <div className="mt-3">
+                <RunSummariesPanel run={run} router={router} />
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
   if (!table) return null;
 
@@ -1708,98 +1764,6 @@ function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['
       <dt className="text-muted-foreground">Source</dt>
       <dd className="capitalize">{table.source}</dd>
     </dl>
-  );
-}
-
-export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
-  if (!data.table) {
-    return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
-  }
-
-  const { table } = data;
-  const routeEntries = Object.entries(table.routes).sort(([a], [b]) => a.localeCompare(b));
-
-  return (
-    <div className="flex flex-col gap-3">
-      {routeEntries.map(([routeKey, candidates]) => {
-        const first = candidates[0];
-        return (
-          <Collapsible key={routeKey} className="rounded-md border">
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size={null}
-                className="min-h-11 w-full justify-start gap-3 whitespace-normal px-3 py-2 text-left [&[data-state=open]>svg]:rotate-90"
-              >
-                <ChevronRight className="size-4 shrink-0" />
-                <span className="grid flex-1 gap-x-4 gap-y-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]">
-                  <span className="break-all font-mono text-xs">{routeKey}</span>
-                  <span className="break-all text-xs">
-                    <span className="text-muted-foreground">First-ranked: </span>
-                    {first
-                      ? `${first.model} · ${first.variant ?? first.reasoningEffort ?? 'default'}`
-                      : 'No ranked pairs'}
-                  </span>
-                  <span className="text-xs tabular-nums">
-                    {first ? `Accuracy ${formatAccuracy(first.accuracy)}` : '—'}
-                  </span>
-                  <span className="text-xs tabular-nums">
-                    {first ? `Avg cost ${formatUsd(first.avgCostUsd)}` : '—'}
-                  </span>
-                  <span className="text-xs">
-                    {first ? (first.meetsThreshold ? 'Meets threshold' : 'Below threshold') : '—'}
-                  </span>
-                </span>
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="overflow-x-auto border-t">
-                <Table className="min-w-max">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rank</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead className="w-36">Effort</TableHead>
-                      <TableHead className="text-right">Accuracy</TableHead>
-                      <TableHead className="text-right">Avg cost</TableHead>
-                      <TableHead className="text-right">Cost / accuracy</TableHead>
-                      <TableHead>Threshold</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {candidates.map((c, i) => (
-                      <TableRow key={`${routeKey}-${c.model}-${i}`}>
-                        <TableCell className="text-xs tabular-nums">{i + 1}</TableCell>
-                        <TableCell className="max-w-56 break-all font-mono text-xs">
-                          {c.model}
-                        </TableCell>
-                        <TableCell className="capitalize text-xs">
-                          {c.variant ?? c.reasoningEffort ?? 'default'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {formatAccuracy(c.accuracy)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {formatUsd(c.avgCostUsd)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {formatCostPerAccuracy(c)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
-                            {c.meetsThreshold ? 'meets' : 'below'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
-    </div>
   );
 }
 
@@ -2068,6 +2032,12 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
         <SchedulerConfigCard />
 
+        <BenchmarkRequestsSection
+          router={router}
+          runs={runsQuery.data?.runs ?? []}
+          runningRunIds={runningRunIds ?? []}
+        />
+
         <Card className="rounded-lg">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base">Find a model</CardTitle>
@@ -2140,45 +2110,21 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                 <Play className="size-4" />
                 Run platform queue
               </Button>
-              {router === 'efficient' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={startRunMutation.isPending}
-                    onClick={() =>
-                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
-                    }
-                  >
-                    <Play className="size-4" />
-                    Run user queue
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={startRunMutation.isPending}
-                    onClick={() =>
-                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
-                    }
-                  >
-                    <Play className="size-4" />
-                    Run both queues
-                  </Button>
-                </>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"
                 disabled={requeueMutation.isPending}
-                onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
+                onClick={() => requeueMutation.mutate('platform')}
               >
                 <RotateCcw className="size-4" />
                 Requeue retryable
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Queues also drain on a timer. A queue starts one run at a time and holds up to 4
-              active runs.
+              This button starts the platform queue, which is the only queue this console can start;
+              it also drains on a timer and holds up to 4 active runs. User work is not started
+              here: a user starts their own pool benchmark from the pool, and it appears in
+              Benchmark requests above once they confirm it.
             </p>
           </CardContent>
         </Card>
@@ -2256,26 +2202,38 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                   : 'Failed to load benchmark runs'}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8" />
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead>Error</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <BenchmarkRunsTable
+              <>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8" />
+                        <TableHead>Type</TableHead>
+                        <TableHead>Requested by</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
+                        <TableHead>Started</TableHead>
+                        <TableHead>Completed</TableHead>
+                        <TableHead>Error</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <BenchmarkRunsTable
+                        runs={runsQuery.data?.runs ?? []}
+                        router={router}
+                        matchedIds={runIdsByModel}
+                      />
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="md:hidden">
+                  <BenchmarkRunsCards
                     runs={runsQuery.data?.runs ?? []}
                     router={router}
                     matchedIds={runIdsByModel}
                   />
-                </TableBody>
-              </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

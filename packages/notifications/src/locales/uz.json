@@ -7,6 +7,7 @@
       "spendAlert": "Xarajatingiz e'tibor talab qiladi",
       "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
       "securityUpdate": "Xavfsizlik tekshiruvida yangilanish bor",
+      "agentBriefing": "Agent brifingingiz tayyor",
       "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
     }
   },

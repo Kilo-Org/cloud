@@ -124,8 +124,6 @@ describe('pr-review-footer store', () => {
     const mod = await loadModule();
     const renderer = await renderProbe(mod.usePrReviewFooterPreference);
 
-    // The shipped default shows before the read settles, and the read uses the
-    // shipped key.
     expect(probeText(renderer)).toBe('true:false');
     expect(getItemAsync).toHaveBeenCalledWith(PR_REVIEW_FOOTER_KEY);
 
@@ -136,7 +134,6 @@ describe('pr-review-footer store', () => {
       expect(probeText(renderer)).toBe('true:true');
     });
 
-    // The settled read keeps the shipped default and writes nothing back.
     expect(mod.getPrReviewFooter()).toBe(true);
     expect(setItemAsync).not.toHaveBeenCalled();
   });

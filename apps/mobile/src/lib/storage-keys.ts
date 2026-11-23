@@ -93,6 +93,12 @@ export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**
+ * Records that the encrypted store was reset, so the app can explain the loss
+ * once. It lives in SecureStore, which survives the database deletion: the
+ * marker outlives the file whose contents it is about.
+ */
+export const PERSIST_RESET_NOTICE_KEY = 'persist-reset-notice';
+/**
  * Consecutive encrypted-store migration failures across launches, beside
  * `PERSIST_DB_KEY`. Durable outside the database on purpose: the failing
  * database cannot hold its own counter. A successful migration deletes the

@@ -86,6 +86,15 @@ export function getProfileOverviewRouteName(stack: ProfileManagementStack = 'pro
   return PROFILE_SCREEN_ROUTE_NAMES[stack].overview;
 }
 
+/**
+ * The route name the profile create screen registers under in the given Stack.
+ * A hand-off that replaced the form with the new profile names it to remove
+ * the covered form (`retire-covered-source.ts`).
+ */
+export function getNewProfileRouteName(stack: ProfileManagementStack = 'profileTab'): string {
+  return PROFILE_SCREEN_ROUTE_NAMES[stack].new;
+}
+
 /** The route name a profile section registers under in the given Stack. */
 export function getProfileSectionRouteName(
   section: ProfileSectionName,

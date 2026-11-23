@@ -197,21 +197,36 @@ function durationFields(seconds: number) {
   };
 }
 
+/** The unit steps. The byte step is whole; every larger step shows two digits. */
+const FILE_SIZE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
+
 export function formatFileSize(bytes: number, locale: string): string {
-  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
   let value = bytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  let fractionDigits = 0;
+  // The step is 1000 because these are the ECMA-402 decimal unit identifiers.
+  // ECMA-402 sanctions no kibibyte, mebibyte or gibibyte identifier, so a 1024
+  // step could not keep the locale's own unit word and placement.
+  //
+  // The step is taken from the value as it will be displayed at that step, so
+  // "999,999" would print "1,000 kB" and instead takes the next unit's name: a
+  // reader never sees a figure the unit cannot hold. The last step is the top
+  // one, so a larger count keeps it.
+  while (unit < FILE_SIZE_UNITS.length - 1) {
+    if (Number(value.toFixed(fractionDigits)) < 1000) {
+      break;
+    }
+    value /= 1000;
     unit += 1;
+    fractionDigits = 2;
   }
   return formatNumber(value, locale, {
     style: 'unit',
-    unit: units[unit],
+    unit: FILE_SIZE_UNITS[unit] ?? 'terabyte',
     // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
     // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
-    unitDisplay: unit === 0 ? 'long' : 'short',
-    maximumFractionDigits: unit === 0 ? 0 : 2,
+    unitDisplay: fractionDigits === 0 ? 'long' : 'short',
+    maximumFractionDigits: fractionDigits,
   });
 }
 
@@ -220,6 +235,42 @@ export function firstGrapheme(value: string, locale: string): string {
     segmenter(locale, { granularity: 'grapheme' }).segment(value)[Symbol.iterator]().next().value
       ?.segment ?? ''
   );
+}
+
+const ELLIPSIS = '…';
+
+/**
+ * `text` as a single line of at most `maxGraphemes` user-perceived characters:
+ * whitespace runs (line breaks included) collapse to single spaces, the ends
+ * are trimmed, and a line longer than the cap is cut short at the cap with a
+ * trailing ellipsis. A line that fits keeps its characters: the ellipsis means
+ * a cut happened, never that the cap was counted in a different unit.
+ *
+ * A string no longer than the cap in code units holds no more characters than
+ * that, so the common short case never reaches the segmenter. A real cut must
+ * not split a character the reader sees as one: counted in code units it could
+ * end on half a surrogate pair, and counted in code points it would still split
+ * a family emoji or a Devanagari syllable with its vowel sign. The segmenter is
+ * iterated only as far as the cap, so a long text costs the cap rather than its
+ * own length.
+ */
+export function boundedOneLineExcerpt(text: string, maxGraphemes: number, locale: string): string {
+  const oneLine = text.replaceAll(/\s+/gu, ' ').trim();
+  if (oneLine.length <= maxGraphemes) {
+    return oneLine;
+  }
+  let cut = '';
+  let seen = 0;
+  for (const { segment } of segmenter(locale, { granularity: 'grapheme' }).segment(oneLine)) {
+    if (seen === maxGraphemes) {
+      return `${cut.trimEnd()}${ELLIPSIS}`;
+    }
+    if (seen < maxGraphemes - 1) {
+      cut += segment;
+    }
+    seen += 1;
+  }
+  return oneLine;
 }
 
 /** Characters with no bearing on a number's value but present in locale output. */

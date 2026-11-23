@@ -2,10 +2,20 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CatalogModel } from '../platform-models';
-import { isExactModelUnavailableResult, isUnbilledTransientProviderResult } from '../cli-runner';
+import {
+  BenchmarkCaseCancelledError,
+  isExactModelUnavailableResult,
+  isUnbilledTransientProviderResult,
+} from '../cli-runner';
+import { BENCHMARK_CASE_HEADER, issueCaseInferenceCapability } from '../case-inference-capability';
 import { gradeProbeOutput } from '../grading';
 import { PROBE_CASES } from '../datasets/probe-cases';
-import { BenchmarkProbeFamilyError, PROBE_TIMEOUT_MS, runProbeCaseViaGateway } from './executor';
+import {
+  BenchmarkProbeFamilyError,
+  PROBE_TIMEOUT_MS,
+  runCancellableProbeCase,
+  runProbeCaseViaGateway,
+} from './executor';
 import { PROBE_TEMPLATES, probeTemplate } from './request';
 import { probeFamily } from './family';
 
@@ -17,6 +27,8 @@ type Reply = {
   contentType?: string;
   delayMs?: number;
   hold?: 'before-headers' | 'after-headers';
+  /** Extra response headers, so a test can drive the trusted stop marker and its spoofing. */
+  headers?: Record<string, string>;
 };
 
 type Recorded = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
@@ -283,6 +295,7 @@ beforeEach(async () => {
       if (reply.hold === 'before-headers') return;
       res.writeHead(reply.status, {
         'content-type': reply.contentType ?? 'text/event-stream',
+        ...(reply.headers ?? {}),
       });
       res.flushHeaders();
       if (reply.hold === 'after-headers') return;
@@ -635,6 +648,88 @@ describe('probe executor — anthropic messages endpoint', () => {
   });
 });
 
+describe('probe executor — trusted stop is preserved and cannot be forged', () => {
+  const STOP = 'x-kilo-benchmark-stop';
+  const ADMISSION = 'x-kilo-benchmark-admission';
+
+  it('keeps a payer refusal as a typed no_payer stop instead of grading it as a model failure', async () => {
+    replies.push({
+      status: 402,
+      contentType: 'application/json',
+      body: '{"error":{"code":"no_payer"}}',
+      headers: { [STOP]: 'no_payer', [ADMISSION]: 'refused' },
+    });
+
+    const result = await run();
+
+    // The active half of the proof: the stop survives the probe transport, so the caller
+    // classifies a funding refusal instead of recording a zero against the model.
+    expect(result.stop).toEqual({ reason: 'no_payer', status: 402 });
+    expect(result.costUsd).toBe(0);
+    expect(result.unavailableModelId).toBeUndefined();
+    // With the stop present the result is terminal for the paid start, never a free retry.
+    expect(isUnbilledTransientProviderResult(result)).toBe(false);
+  });
+
+  it('keeps a permanently failed model distinct from an unknown-model status', async () => {
+    // 409 is not in UNKNOWN_MODEL_STATUS, so only the stop can name this correctly.
+    replies.push({
+      status: 409,
+      contentType: 'application/json',
+      body: '{"error":{"code":"permanently_failed"}}',
+      headers: { [STOP]: 'model_permanently_failed', [ADMISSION]: 'refused' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toEqual({ reason: 'model_permanently_failed', status: 409 });
+    expect(result.unavailableModelId).toBeUndefined();
+  });
+
+  it('keeps an infrastructure stop from becoming a model failure', async () => {
+    replies.push({
+      status: 503,
+      contentType: 'application/json',
+      body: '{"error":{"code":"admission_unknown"}}',
+      headers: { [STOP]: 'infra_unavailable' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toEqual({ reason: 'infra_unavailable', status: 503 });
+    expect(result.costUsd).toBe(0);
+  });
+
+  it('does not honor the stop on an admitted reply, so a provider cannot forge one', async () => {
+    // The negative half: an admitted reply has seen a provider, so the marker is exempt even
+    // though the header is present. A model that echoes it must not stop a funded case.
+    replies.push({
+      status: 200,
+      body: responsesCall(0.0012, 7),
+      headers: { [STOP]: 'no_payer', [ADMISSION]: 'admitted' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toBeUndefined();
+    expect(result.costUsd).toBe(0.0012);
+  });
+
+  it('ignores a stop header in the body or on a plain 402 without the marker', async () => {
+    // A raw provider 402 is a provider failure with possible usage, never a money verdict:
+    // the text of the reply cannot create a stop.
+    replies.push({
+      status: 402,
+      contentType: 'application/json',
+      body: '{"error":{"code":"no_payer","message":"x-kilo-benchmark-stop: no_payer"}}',
+    });
+
+    const result = await run();
+
+    expect(result.stop).toBeUndefined();
+  });
+});
+
 describe('probe executor — failures keep the paid-call policy', () => {
   it('defers a 429 without scoring it', async () => {
     replies.push({ status: 429, body: '{"error":{"message":"rate limit"}}' });
@@ -752,5 +847,102 @@ describe('probe executor — failures keep the paid-call policy', () => {
       stream: true,
       tool_choice: 'auto',
     });
+  });
+});
+
+type RunnerFetch = (request: Request) => Promise<Response>;
+
+function probeEnv(fetchRunner: RunnerFetch): Env {
+  return {
+    BENCH_RUNNER: {
+      idFromName: (name: string) => `id:${name}`,
+      get: () => ({ fetch: fetchRunner }),
+    },
+  } as unknown as Env;
+}
+
+const cancellableExecution = {
+  runId: 'run-1',
+  model,
+  variant: 'high',
+  rep: 0,
+  caseId: probeCase.id,
+  token: 'claim-token',
+  attemptStartedAt: 1_700_000_000_000,
+};
+
+// The real issued pair for this generation, from the same issuer the worker uses, so the
+// fixture cannot drift from the capability format and the executor never sees a provider
+// token.
+const issuedCapability = await issueCaseInferenceCapability('probe-test-secret', {
+  engineIdentity: 'engine-1',
+  runId: cancellableExecution.runId,
+  model: cancellableExecution.model,
+  variant: cancellableExecution.variant,
+  caseId: cancellableExecution.caseId,
+  repetition: cancellableExecution.rep,
+  generation: 1,
+  startedAt: cancellableExecution.attemptStartedAt,
+});
+
+const cancellableInference = {
+  url: 'https://worker.test/case-inference',
+  // The issuer's `invocationHeader` is the encoded value; the envelope names it `invocation`
+  // and reserves `invocationHeader` for the header NAME, matching run.ts' mapping.
+  authorization: issuedCapability.authorization,
+  invocation: issuedCapability.invocationHeader,
+  invocationHeader: BENCHMARK_CASE_HEADER,
+};
+
+function cancellableProbe(env: Env) {
+  return runCancellableProbeCase(env, {
+    instanceName: 'run:model:0',
+    execution: cancellableExecution,
+    inference: cancellableInference,
+    model,
+    variant: 'high',
+    benchCase: probeCase,
+    catalogModel: catalogModel(),
+    kiloToken: 'user-token',
+    kiloApiUrl: 'https://api.test',
+    orgId: 'org-1',
+    now: new Date('2026-11-20T09:00:00.000Z').getTime(),
+  });
+}
+
+describe('runCancellableProbeCase', () => {
+  it('runs the probe through the runner object that owns its generation', async () => {
+    const sent: Request[] = [];
+    const env = probeEnv(async request => {
+      sent.push(request);
+      return new Response(responsesCall(0.0012, 7), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    });
+
+    const result = await cancellableProbe(env);
+
+    expect(result.costUsd).toBe(0.0012);
+    expect(result.tools.calls).toBe(1);
+    expect(sent).toHaveLength(1);
+    const forwarded = JSON.parse(await sent[0].clone().text());
+    expect(forwarded.endpoint).toBe('responses');
+    expect(forwarded.execution).toEqual(cancellableExecution);
+    expect(forwarded.inference).toEqual(cancellableInference);
+    expect(forwarded.timeoutMs).toBe(PROBE_TIMEOUT_MS);
+    expect(JSON.stringify(forwarded)).not.toContain('user-token');
+    expect(JSON.parse(forwarded.body)).toMatchObject({ model });
+  });
+
+  it('reports a cancelled generation as terminal instead of a timed-out probe', async () => {
+    const env = probeEnv(async () =>
+      Response.json(
+        { error: 'case cancelled', cancelled: true },
+        { status: 409, headers: { 'x-benchmark-runner': 'cancelled' } }
+      )
+    );
+
+    await expect(cancellableProbe(env)).rejects.toBeInstanceOf(BenchmarkCaseCancelledError);
   });
 });

@@ -1,6 +1,7 @@
 import { type ElementType } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BRIEFING_PREVIEW_MAX_GRAPHEMES } from '@/lib/agent-briefing-format';
 import { formatNumber } from '@/lib/format';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
@@ -128,6 +129,10 @@ function pressablesIn(renderer: ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as ElementType);
 }
 
+function graphemeCount(value: string): number {
+  return [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(value)].length;
+}
+
 describe('BriefingCard in the Home card frame', () => {
   it('names the scorecard control after its action with the three counts', () => {
     const label = pressablesIn(renderCardInFrame('drawn'))[0]?.props.accessibilityLabel;
@@ -153,6 +158,35 @@ describe('BriefingCard in the Home card frame', () => {
 
   it('renders no pressable at all in the layer that only reserves height', () => {
     expect(pressablesIn(renderCardInFrame('reserved'))).toHaveLength(0);
+  });
+
+  it('names the summary control with a bounded excerpt of a long summary', () => {
+    const summary = 'Word '.repeat(80).trim();
+    expect(summary.length).toBe(399);
+    const longReport = {
+      ...briefingReport,
+      summary: { status: 'ready', text: summary },
+    } as unknown as Parameters<typeof BriefingCard>[0]['report'];
+    const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(<BriefingCard report={longReport} />);
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('BriefingCard did not mount');
+    }
+    const summaryControl = pressablesIn(renderer)[1];
+    const label = String(summaryControl?.props.accessibilityLabel);
+    const wrapper = 'agentBriefing.viewWithPreview:';
+    expect(label.startsWith(wrapper)).toBe(true);
+    const { preview } = JSON.parse(label.slice(wrapper.length)) as { preview: string };
+    expect(preview.endsWith('…')).toBe(true);
+    expect(graphemeCount(preview)).toBeLessThanOrEqual(BRIEFING_PREVIEW_MAX_GRAPHEMES);
+    // The visible line still carries the whole summary, wrapped to two lines.
+    const visible = renderer.root
+      .findAllByType('Text' as ElementType)
+      .find(node => node.props.children === summary);
+    expect(visible?.props.numberOfLines).toBe(2);
   });
 });
 

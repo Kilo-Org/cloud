@@ -29,11 +29,6 @@ describe('resolveProviderStatus', () => {
   });
 
   it('returns loading while the provider query has produced no data yet', () => {
-    // A paused query (iOS boot / NetInfo probe not settled) reports
-    // `isLoading === false` and leaves `data` undefined, so
-    // `integrationInstalled` is undefined. That provider's list is not known
-    // yet and must never read as settled (`'repos'`), or the section renders a
-    // heading with no control under it.
     expect(
       resolveProviderStatus({
         isLoading: false,

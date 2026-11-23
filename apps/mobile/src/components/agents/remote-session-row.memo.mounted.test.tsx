@@ -93,6 +93,7 @@ vi.mock('@/lib/session-attention', () => ({
   isAttentionAcked: () => false,
   reconcileSessionAttention: vi.fn(),
   shouldShowNeedsInput: () => false,
+  useSessionAttentionHydration: () => 'ready',
   useSessionAttentionRevision: () => 0,
 }));
 

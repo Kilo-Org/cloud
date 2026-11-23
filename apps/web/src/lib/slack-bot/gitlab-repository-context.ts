@@ -5,6 +5,7 @@ import {
 } from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { renderBoundedRepositoryList } from './repository-prompt-budget';
 
 export type GitLabRepositoryContext = {
   accountLogin: string | null;
@@ -84,9 +85,13 @@ When the user asks you to work on a GitLab project, ask them to specify the proj
 - No GitLab repositories are currently connected. The user will need to specify a project manually.`;
   }
 
-  const repoList = context.repositories
-    .map(repo => `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}]`)
-    .join('\n');
+  const repoList = renderBoundedRepositoryList(
+    context.repositories.map(
+      repo => `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}]`
+    ),
+    omitted =>
+      `- Projects not listed here: ${omitted}. Ask the user for the exact group/project path of the project they want to use.`
+  );
 
   return `${header}
 

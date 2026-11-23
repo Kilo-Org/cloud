@@ -80,8 +80,8 @@ type KvRowProps = {
    */
   trailing?: ReactNode;
   /**
-   * The label gives up width to the value instead of holding its natural one,
-   * so a long label truncates rather than pushing the value out of the row.
+   * The label gives up width instead of holding its natural one, so a long
+   * label truncates; the value and whatever trails it keep their natural width.
    */
   labelShrink?: boolean;
   /**
@@ -178,6 +178,10 @@ export function KvRow({
       className={valueClassName}
       status={valueStatus}
       placement={stacked ? 'below' : 'trailing'}
+      // On one line the value holds its own width while the label yields to it;
+      // under the label it already has the row's full width, so it keeps the
+      // default.
+      shrink={stacked || !labelShrinks}
     />
   );
 
@@ -208,9 +212,15 @@ export function KvRow({
           : {
               // The value keeps its right edge beside the control, so the pair
               // reads as one trailing group on the row the control belongs to.
+              // That group holds its natural width when the label yields.
               kind: 'node',
               node: (
-                <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+                <View
+                  className={cn(
+                    'flex-row items-center justify-end gap-3',
+                    labelShrinks ? 'shrink-0' : 'min-w-0 shrink'
+                  )}
+                >
                   {valueNode}
                   {trailing}
                 </View>

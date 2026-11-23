@@ -18,8 +18,13 @@ import {
 } from '@kilocode/db/schema';
 import {
   getCustomRouterStatus,
+  getPaidBenchmarkProgress,
   getPlatformMeasurements,
+  lookupCustomRouterBlockedModels,
+  pausePoolBenchmark,
   registerOwnerBenchmarkProfiles,
+  requestPaidBenchmarkQuote,
+  startPaidBenchmark,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   getDirectByokModelsForOrganization,
@@ -52,7 +57,12 @@ jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getCustomRouterStatus: jest.fn(),
   getPlatformMeasurements: jest.fn(),
+  getPaidBenchmarkProgress: jest.fn(),
+  lookupCustomRouterBlockedModels: jest.fn(),
+  pausePoolBenchmark: jest.fn(),
   registerOwnerBenchmarkProfiles: jest.fn(),
+  requestPaidBenchmarkQuote: jest.fn(),
+  startPaidBenchmark: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
@@ -69,6 +79,11 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedGetPlatformMeasurements = jest.mocked(getPlatformMeasurements);
+const mockedBenchmarkProgress = jest.mocked(getPaidBenchmarkProgress);
+const mockedPoolPause = jest.mocked(pausePoolBenchmark);
+const mockedQuote = jest.mocked(requestPaidBenchmarkQuote);
+const mockedStart = jest.mocked(startPaidBenchmark);
+const mockedBlocked = jest.mocked(lookupCustomRouterBlockedModels);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
 const mockedGetEnhanced = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
@@ -167,24 +182,6 @@ function variants(statuses: CustomRouterVariantStatus['status'][]): CustomRouter
   }));
 }
 
-function holdSecondCatalogRequest() {
-  let calls = 0;
-  const arrived = Promise.withResolvers<void>();
-  const release = Promise.withResolvers<void>();
-  mockedGetEnhanced.mockImplementation(async () => {
-    if (++calls === 2) {
-      arrived.resolve();
-      await release.promise;
-    }
-    return { data: [model(SONNET), model(FLASH), model(DENIED)] };
-  });
-  return { arrived: arrived.promise, release: release.resolve };
-}
-
-async function flushMicrotasks(turns = 10) {
-  for (let turn = 0; turn < turns; turn++) await Promise.resolve();
-}
-
 /** Proves whether the owner lock is held right now without throwing on a held lock. */
 async function probeOwnerLock(
   owner: User
@@ -208,7 +205,13 @@ describe('/api/auto-routing/custom-routers', () => {
     user = await insertTestUser();
     signIn(user);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
-    mockedRegister.mockResolvedValue({ ok: true });
+    mockedBenchmarkProgress.mockResolvedValue({ ok: true, body: { status: 'empty' } });
+    // A fence pause that finds nothing live answers `empty`; a live one answers `paused`.
+    mockedPoolPause.mockResolvedValue({ ok: true, body: { status: 'empty' } });
+    mockedBlocked.mockImplementation(async request => ({
+      router: request.router,
+      blocked: [],
+    }));
     mockedGetPlatformMeasurements.mockResolvedValue({
       status: 200,
       body: { baseRouter: 'efficient', models: [{ model: SONNET, variants: [null] }] },
@@ -535,171 +538,291 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
     });
 
-    test('admits only platform-servable gateway entries for platform benchmarks', async () => {
-      const entries = [gateway(SONNET), gateway(BYOK), clientEntry('qwen3:8b')];
+    test('does not enroll the owner in platform benchmarks on create, update, or a client entry', async () => {
+      expect((await create(routerBody())).status).toBe(201);
+
+      const updated = await updateRouter(
+        request('/user/coding', {
+          method: 'PATCH',
+          body: {
+            entries: [gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+          },
+        }),
+        params('user', 'coding')
+      );
+      expect(updated.status).toBe(200);
+
+      const registered = await registerClientEntry(
+        request('/user/coding/client-entries', {
+          method: 'POST',
+          body: { entry: clientEntry('qwen3:8b') },
+        }),
+        params('user', 'coding')
+      );
+      expect(registered.status).toBe(200);
+
+      // Benchmarking a user pool now needs the owner's explicit paid confirmation, so a save must
+      // never request platform benchmarks on the owner's behalf.
+      expect(mockedRegister).not.toHaveBeenCalled();
+    });
+
+    test('refuses a newly added model that is permanently unavailable', async () => {
+      mockedBlocked.mockResolvedValueOnce({
+        router: 'efficient',
+        blocked: [
+          {
+            model: FLASH,
+            pair: { model: FLASH, variant: null },
+            failure: {
+              kind: 'permanent',
+              failureClass: 'catalog_absent',
+              reason: 'model is gone from the catalog',
+              attempts: 6,
+              firstFailedAt: '2026-11-19T00:00:00.000Z',
+              lastFailedAt: '2026-11-19T01:00:00.000Z',
+              cause: 'terminal_class',
+            },
+          },
+        ],
+      });
 
       const created = await create(
         routerBody({
-          baseRouter: 'frontier',
-          entries,
-          defaultEntryKey: customRouterEntryKey(entries[0]),
+          entries: [gateway(SONNET), gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
         })
       );
-
-      expect(created.status).toBe(201);
-      expect(mockedRegister).toHaveBeenCalledTimes(1);
-      expect(mockedRegister).toHaveBeenCalledWith(
-        {
-          router: 'frontier',
-          ownerType: 'user',
-          ownerId: user.id,
-          entries: [{ model: SONNET }],
-        },
-        expect.any(AbortSignal)
-      );
-    });
-
-    test('uses one deadline across benchmark registration batches', async () => {
-      const entries = Array.from({ length: 11 }, (_, index) => gateway(`vendor/model-${index}`));
-      mockedGetEnhanced.mockResolvedValue({
-        data: entries.map(entry => model(entry.model)),
-      });
-
-      const created = await create(
-        routerBody({ entries, defaultEntryKey: customRouterEntryKey(entries[0]) })
-      );
-
-      expect(created.status).toBe(201);
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
-      expect(
-        mockedRegister.mock.calls.map(([registration]) => registration.entries.length)
-      ).toEqual([10, 1]);
-      const firstSignal = mockedRegister.mock.calls[0]?.[1];
-      expect(firstSignal).toBeInstanceOf(AbortSignal);
-      expect(mockedRegister.mock.calls[1]?.[1]).toBe(firstSignal);
-    });
-
-    test('fails the save when admission times out and releases the owner admission slot', async () => {
-      const controller = new AbortController();
-      const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
-      const admissionStarted = Promise.withResolvers<void>();
-      mockedRegister.mockImplementationOnce(async (_registration, signal) => {
-        if (!signal) throw new Error('Missing admission deadline');
-        await new Promise<void>((_resolve, reject) => {
-          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-          admissionStarted.resolve();
-        });
-        return { ok: true };
-      });
-
-      try {
-        const pending = create(routerBody());
-        await admissionStarted.promise;
-        controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
-        const created = await pending;
-
-        expect(timeout).toHaveBeenCalledWith(10_000);
-        expect(mockedRegister).toHaveBeenCalledTimes(1);
-        expect(created.status).toBe(500);
-        expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
-        expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      } finally {
-        timeout.mockRestore();
-      }
-
-      expect((await create(routerBody())).status).toBe(201);
-    });
-
-    test.each([
-      [
-        'a rejected request',
-        () => mockedRegister.mockRejectedValueOnce(new TypeError('fetch failed')),
-      ],
-      [
-        'a worker 503',
-        () =>
-          mockedRegister.mockResolvedValueOnce({
-            ok: false,
-            status: 503,
-            error: { error: 'Service unavailable' },
-          }),
-      ],
-    ])('retries %s once before saving', async (_failure, failOnce) => {
-      failOnce();
-
-      const created = await create(routerBody());
-
-      expect(created.status).toBe(201);
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
-    });
-
-    test('does not save when the registration retry also fails', async () => {
-      mockedRegister.mockRejectedValue(new TypeError('fetch failed'));
-
-      const created = await create(routerBody());
-
-      expect(created.status).toBe(500);
-      expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-    });
-
-    test('does not create the router when benchmark admission hits the owner quota', async () => {
-      mockedRegister.mockResolvedValue({
-        ok: false,
-        status: 429,
-        quota: { error: 'Benchmark limit reached.', retryAt: '2026-10-17T00:00:00.000Z' },
-      });
-
-      const created = await create(routerBody());
-
-      expect(created.status).toBe(429);
-      expect(created.body).toMatchObject({
-        error: { code: 'quota_exceeded', retryAt: '2026-10-17T00:00:00.000Z' },
-      });
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-    });
-
-    test.each([
-      'Custom profiles are only supported by the efficient router',
-      'benchmark config not set: save it in the admin panel before registering profiles',
-    ])('maps the benchmark worker rejection "%s" to a base router error', async message => {
-      mockedRegister.mockResolvedValue({
-        ok: false,
-        status: 400,
-        error: { error: message },
-      });
-
-      const created = await create(routerBody({ baseRouter: 'frontier' }));
 
       expect(created.status).toBe(400);
       expect(created.body).toMatchObject({
         error: {
           code: 'invalid_request',
-          message: expect.stringContaining('frontier benchmark difficulty are not available yet'),
+          message: expect.stringContaining('permanently unavailable'),
         },
       });
-      expect(mockedRegister).toHaveBeenCalledWith(
-        expect.objectContaining({ router: 'frontier' }),
-        expect.any(AbortSignal)
-      );
+      expect(mockedBlocked).toHaveBeenCalledWith({ router: 'efficient', models: [SONNET, FLASH] });
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
-    test('reports other benchmark worker failures as internal errors without saving', async () => {
-      mockedRegister.mockResolvedValue({
-        ok: false,
-        status: 503,
-        error: { error: 'Service unavailable' },
-      });
+    test('refuses a new model when the availability check cannot answer', async () => {
+      mockedBlocked.mockRejectedValueOnce(new Error('benchmark worker is not configured'));
 
-      const created = await create(routerBody());
+      const created = await create(
+        routerBody({
+          entries: [gateway(SONNET), gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
+        })
+      );
 
       expect(created.status).toBe(500);
       expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
+    test('still saves a pool that adds no gateway model while the check is unavailable', async () => {
+      await create(
+        routerBody({
+          entries: [gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+        })
+      );
+      // The fixture create added the only gateway model, so it made the one lookup. Clear that
+      // history before making the lookup fail, then prove the rename save checks nothing.
+      mockedBlocked.mockClear();
+      mockedBlocked.mockRejectedValue(new Error('benchmark worker is not configured'));
+
+      const updated = await updateRouter(
+        request('/user/coding', { method: 'PATCH', body: { name: 'Renamed' } }),
+        params('user', 'coding')
+      );
+
+      expect(updated.status).toBe(200);
+      expect(mockedBlocked).not.toHaveBeenCalled();
+    });
+
+    test('keeps a model the pool already has without checking it again', async () => {
+      await create(
+        routerBody({
+          entries: [gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+        })
+      );
+      mockedBlocked.mockClear();
+
+      const updated = await updateRouter(
+        request('/user/coding', {
+          method: 'PATCH',
+          body: {
+            name: 'Renamed',
+            entries: [gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+          },
+        }),
+        params('user', 'coding')
+      );
+
+      expect(updated.status).toBe(200);
+      expect(mockedBlocked).not.toHaveBeenCalled();
+    });
+
+    test('pauses the pool’s latest request before the delete commits', async () => {
+      await create(routerBody());
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row).toBeDefined();
+      mockedPoolPause.mockResolvedValueOnce({
+        ok: true,
+        body: {
+          status: 'paused',
+          id: '3f1c0c3e-1d15-4e3e-9d4a-32f6b0a1c111',
+          estimateMicrodollars: 100,
+          maximumMicrodollars: 200,
+          chargedMicrodollars: 0,
+          billedModelRequests: 0,
+          kiloCoveredModelRequests: 0,
+          kiloCoveredMicrodollars: 0,
+          counts: { queued: 0, running: 0, reused: 0, done: 0, failed: 0, paused: 0 },
+          cases: [],
+          nextCursor: null,
+          reason: null,
+        },
+      });
+
+      const deleted = await deleteRouter(
+        request('/user/coding', { method: 'DELETE' }),
+        params('user', 'coding')
+      );
+
+      expect(deleted.status).toBe(204);
+      // Pause by pool: the Worker resolves the latest request itself, so the web never reads
+      // progress (which could stage the next plan) before stopping work.
+      expect(mockedPoolPause).toHaveBeenCalledWith({
+        ownerType: 'user',
+        ownerId: user.id,
+        routerId: row?.id,
+      });
+      expect(mockedBenchmarkProgress).not.toHaveBeenCalled();
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
+    test('refuses the delete when the running benchmark cannot be stopped', async () => {
+      await create(routerBody());
+      mockedPoolPause.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        error: {
+          code: 'invalid_response',
+          message: 'The benchmark worker returned an invalid response',
+        },
+      });
+
+      const deleted = await errorOf(
+        await deleteRouter(request('/user/coding', { method: 'DELETE' }), params('user', 'coding'))
+      );
+
+      expect(deleted).toMatchObject({
+        status: 500,
+        body: { error: { code: 'internal_error' } },
+      });
+      // Rolled back: the pool and everything in it are intact.
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
+    });
+
+    test('deletes the pool when the deployed worker predates the paid path', async () => {
+      await create(routerBody());
+      mockedPoolPause.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        error: { code: null, message: 'Request failed: 404' },
+      });
+
+      const deleted = await deleteRouter(
+        request('/user/coding', { method: 'DELETE' }),
+        params('user', 'coding')
+      );
+
+      expect(deleted.status).toBe(204);
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
+    test('refuses a risky edit that removes a model while the running benchmark cannot be stopped', async () => {
+      await create(routerBody({ entries: [gateway(SONNET), gateway(FLASH)] }));
+      mockedPoolPause.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        error: {
+          code: 'invalid_response',
+          message: 'The benchmark worker returned an invalid response',
+        },
+      });
+
+      const updated = await errorOf(
+        await updateRouter(
+          request('/user/coding', {
+            method: 'PATCH',
+            body: {
+              entries: [gateway(SONNET)],
+              defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
+            },
+          }),
+          params('user', 'coding')
+        )
+      );
+
+      expect(updated).toMatchObject({
+        status: 500,
+        body: { error: { code: 'internal_error' } },
+      });
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row?.entries).toEqual([gateway(SONNET), gateway(FLASH)]);
+      expect(mockedPoolPause).toHaveBeenCalledTimes(1);
+    });
+
+    test('pauses before a base-router move and keeps the owner and link intact', async () => {
+      const linked = { ...gateway(BYOK), measuredAs: SONNET };
+      await create(
+        routerBody({ entries: [linked], defaultEntryKey: customRouterEntryKey(linked) })
+      );
+      mockedPoolPause.mockResolvedValueOnce({
+        ok: true,
+        body: { status: 'empty' },
+      });
+
+      const updated = await updateRouter(
+        request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+        params('user', 'coding')
+      );
+
+      expect(updated.status).toBe(200);
+      expect(mockedPoolPause).toHaveBeenCalledTimes(1);
+      const [row] = await db
+        .select()
+        .from(auto_routing_custom_routers)
+        .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+      expect(row).toMatchObject({ base_router: 'frontier' });
+      expect(row?.entries).toEqual([linked]);
+    });
+
+    test('an add-only edit neither pauses nor starts work', async () => {
+      await create(routerBody());
+      mockedPoolPause.mockClear();
+
+      const updated = await updateRouter(
+        request('/user/coding', {
+          method: 'PATCH',
+          body: {
+            entries: [gateway(SONNET), gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
+          },
+        }),
+        params('user', 'coding')
+      );
+
+      expect(updated.status).toBe(200);
+      expect(mockedPoolPause).not.toHaveBeenCalled();
+      expect(mockedRegister).not.toHaveBeenCalled();
+      expect(mockedQuote).not.toHaveBeenCalled();
+      expect(mockedStart).not.toHaveBeenCalled();
     });
 
     test('lists only personal routers outside an organization context', async () => {
@@ -1096,7 +1219,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(eleventh.body).toMatchObject({
         error: { code: 'invalid_request', message: expect.stringContaining('at most 10') },
       });
-      expect(mockedRegister).toHaveBeenCalledTimes(10);
+      expect(mockedRegister).not.toHaveBeenCalled();
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(10);
     });
 
@@ -1131,7 +1254,10 @@ describe('/api/auto-routing/custom-routers', () => {
           params('user', 'coding')
         )
       );
-      expect(mockedRegister).toHaveBeenCalledTimes(1);
+      expect(entriesOnly.status).toBe(400);
+      expect(defaultOutsidePool.status).toBe(400);
+      expect(unknownModel.status).toBe(400);
+      expect(mockedRegister).not.toHaveBeenCalled();
       const moved = await updateRouter(
         request('/user/coding', {
           method: 'PATCH',
@@ -1147,7 +1273,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(defaultOutsidePool.status).toBe(400);
       expect(unknownModel.status).toBe(400);
       expect(moved.status).toBe(200);
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
+      expect(mockedRegister).not.toHaveBeenCalled();
       const { router } = (await moved.json()) as CustomRouterResponse;
       expect(router.defaultEntryKey).toBe(customRouterEntryKey(gateway(FLASH)));
       expect(router.entries.map(entry => entry.key)).toEqual([
@@ -1156,7 +1282,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
   });
 
-  describe('concurrent admission', () => {
+  describe('concurrent saves', () => {
     test.each(['duplicate slug', 'last owner slot'])(
       'persists one router when concurrent creates collide on the %s',
       async race => {
@@ -1165,7 +1291,6 @@ describe('/api/auto-routing/custom-routers', () => {
             expect((await create(routerBody({ slug: `router-${index}` }))).status).toBe(201);
           }
         }
-        mockedRegister.mockClear();
         const catalogReady = Promise.withResolvers<void>();
         const releaseCatalog = Promise.withResolvers<void>();
         let catalogRequests = 0;
@@ -1190,191 +1315,57 @@ describe('/api/auto-routing/custom-routers', () => {
         const results = await pending;
 
         expect(results.map(result => result.status).sort()).toEqual([201, 400]);
-        const winner = results.find(result => result.status === 201);
-        if (!winner) throw new Error('expected one create to win');
-        const { router } = winner.body as CustomRouterResponse;
-        expect(mockedRegister).toHaveBeenCalledWith(
-          expect.objectContaining({
-            router: router.baseRouter,
-            entries: router.entries.map(({ entry }) =>
-              entry.kind === 'gateway' ? { model: entry.model } : entry
-            ),
-          }),
-          expect.any(AbortSignal)
-        );
+        // A save never admits platform benchmarks, so the losing save cannot have spent anything.
+        expect(mockedRegister).not.toHaveBeenCalled();
         expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(
           race === 'duplicate slug' ? 1 : 10
         );
       }
     );
 
-    test('registers benchmarks before the owner lock, so no connection waits on it', async () => {
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementationOnce(async () => {
-        admissionStarted.resolve();
-        await releaseAdmission.promise;
-        return { ok: true };
-      });
+    test('keeps one saved pool when two updates race on the owner lock', async () => {
+      await create(routerBody({ entries: [gateway(SONNET), gateway(FLASH)] }));
 
-      const pending = create(routerBody());
-      await admissionStarted.promise;
-
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      await db.transaction(async tx => {
-        await tx.execute(sql`SET LOCAL statement_timeout = '500ms'`);
-        await lockOwner(tx, { type: 'user', id: user.id });
-      });
-
-      releaseAdmission.resolve();
-      expect((await pending).status).toBe(201);
-    });
-
-    test('admits one benchmark request at a time per owner', async () => {
-      let active = 0;
-      let maxActive = 0;
-      const order: string[] = [];
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementation(async () => {
-        active += 1;
-        maxActive = Math.max(maxActive, active);
-        order.push('start');
-        admissionStarted.resolve();
-        if (order.length === 1) await releaseAdmission.promise;
-        order.push('end');
-        active -= 1;
-        return { ok: true };
-      });
-      const secondCatalog = holdSecondCatalogRequest();
-
-      const first = create(routerBody({ slug: 'one' }));
-      await admissionStarted.promise;
-      const second = create(routerBody({ slug: 'two' }));
-      await secondCatalog.arrived;
-      secondCatalog.release();
-      await flushMicrotasks();
-
-      expect(order).toEqual(['start']);
-
-      releaseAdmission.resolve();
-      const results = await Promise.all([first, second]);
-
-      expect(results.map(result => result.status)).toEqual([201, 201]);
-      expect(order).toEqual(['start', 'end', 'start', 'end']);
-      expect(maxActive).toBe(1);
-    });
-
-    test('admits different owners independently', async () => {
-      const organization = await createTestOrganization('Acme', user.id, 0);
-      signIn(user, organization.id);
-      const order: string[] = [];
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementation(async () => {
-        order.push('start');
-        admissionStarted.resolve();
-        if (order.length === 1) await releaseAdmission.promise;
-        order.push('end');
-        return { ok: true };
-      });
-      const secondCatalog = holdSecondCatalogRequest();
-
-      const personal = create(routerBody({ slug: 'personal' }));
-      await admissionStarted.promise;
-      const orgRouter = create(routerBody({ scope: 'org', slug: 'team' }));
-      await secondCatalog.arrived;
-      secondCatalog.release();
-      await flushMicrotasks();
-
-      expect(order.slice(0, 2)).toEqual(['start', 'start']);
-
-      releaseAdmission.resolve();
-      const results = await Promise.all([personal, orgRouter]);
-
-      expect(results.map(result => result.status)).toEqual([201, 201]);
-    });
-
-    test('admits the latest locked base router when a concurrent update changes the pool', async () => {
-      await create(routerBody());
-      mockedRegister.mockClear();
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementationOnce(async () => {
-        admissionStarted.resolve();
-        await releaseAdmission.promise;
-        return { ok: true };
-      });
+      const rename = updateRouter(
+        request('/user/coding', { method: 'PATCH', body: { name: 'Renamed' } }),
+        params('user', 'coding')
+      );
       const baseChange = updateRouter(
         request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
         params('user', 'coding')
       );
-      await admissionStarted.promise;
+      const results = await Promise.all([rename, baseChange]);
 
-      const catalogReady = Promise.withResolvers<void>();
-      mockedGetEnhanced.mockImplementationOnce(async () => {
-        catalogReady.resolve();
-        return { data: [model(SONNET), model(FLASH)] };
-      });
-      const poolChange = updateRouter(
-        request('/user/coding', {
-          method: 'PATCH',
-          body: {
-            entries: [gateway(SONNET), gateway(FLASH)],
-            defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
-          },
-        }),
-        params('user', 'coding')
-      );
-      await catalogReady.promise;
-      releaseAdmission.resolve();
-      const [baseResponse, poolResponse] = await Promise.all([baseChange, poolChange]);
-
-      expect([baseResponse.status, poolResponse.status]).toEqual([200, 200]);
-      expect(mockedRegister).toHaveBeenLastCalledWith(
-        {
-          router: 'frontier',
-          ownerType: 'user',
-          ownerId: user.id,
-          entries: [{ model: SONNET }, { model: FLASH }],
-        },
-        expect.any(AbortSignal)
-      );
+      expect(results.map(result => result.status)).toEqual([200, 200]);
+      // Neither racing save admitted platform benchmarks or requested an estimate.
+      expect(mockedRegister).not.toHaveBeenCalled();
       const [row] = await db.select().from(auto_routing_custom_routers);
       expect(row).toMatchObject({
+        name: 'Renamed',
         base_router: 'frontier',
         entries: [gateway(SONNET), gateway(FLASH)],
       });
     });
 
-    test('rejects a save whose router was deleted after admission', async () => {
+    test('rejects a save whose router was deleted while it waited for the lock', async () => {
       await create(routerBody({ entries: [gateway(SONNET), gateway(FLASH)] }));
-      mockedRegister.mockClear();
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementationOnce(async () => {
-        admissionStarted.resolve();
-        await releaseAdmission.promise;
-        return { ok: true };
-      });
-      const pendingUpdate = updateRouter(
-        request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
-        params('user', 'coding')
-      );
-      await admissionStarted.promise;
-
       const removed = await deleteRouter(
         request('/user/coding', { method: 'DELETE' }),
         params('user', 'coding')
       );
       expect(removed.status).toBe(204);
-      releaseAdmission.resolve();
 
-      const updated = await pendingUpdate;
+      const updated = await updateRouter(
+        request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+        params('user', 'coding')
+      );
+
       expect(await errorOf(updated)).toMatchObject({
         status: 404,
         body: { error: { code: 'router_not_found' } },
       });
+      // A delete previews and pauses the pool's request and never starts work.
+      expect(mockedRegister).not.toHaveBeenCalled();
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
   });
@@ -1603,7 +1594,8 @@ describe('/api/auto-routing/custom-routers', () => {
         gateway(SONNET),
         { ...local, variants: ['think'] },
       ]);
-      expect(mockedRegister).toHaveBeenCalledTimes(1);
+      // A client entry is measured by the owner's CLI; the save never enrolls platform benchmarks.
+      expect(mockedRegister).not.toHaveBeenCalled();
       expect(removed.status).toBe(200);
       const [row] = await db.select().from(auto_routing_custom_routers);
       expect(row?.entries).toEqual([gateway(SONNET)]);

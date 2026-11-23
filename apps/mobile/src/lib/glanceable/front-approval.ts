@@ -29,9 +29,8 @@ export function pickFrontApprovableSession<T extends FrontApprovableRow>(
 
 /**
  * Every permission row, front first, under the `pickFrontApprovableSession`
- * rule: earliest usable `statusUpdatedAt`, rows without one last, list order
- * breaking ties. The server binds the widget's approval key to the row this
- * rule puts first (`pickFrontPermissionRow` in
+ * rule. The server binds the widget's approval key to the row that rule puts
+ * first (`pickFrontPermissionRow` in
  * `apps/web/src/lib/glanceable-agents-snapshot-server.ts`), so a bounded scan
  * of this ranking always includes the displayed request.
  */

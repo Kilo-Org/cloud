@@ -59,7 +59,9 @@ function NewSessionConsumer() {
       <Text accessibilityLabel="Linked to-do">{prefill.todoId}</Text>
       <Text accessibilityLabel="Session title">{prefill.todoTitle}</Text>
       <Text accessibilityLabel="Organization">{organizationId ?? 'personal'}</Text>
-      <Text accessibilityLabel="Usual model">{usualSelection.model}</Text>
+      <Text accessibilityLabel="Usual model">
+        {usualSelection.kind === 'selected' ? usualSelection.model : ''}
+      </Text>
     </View>
   );
 }

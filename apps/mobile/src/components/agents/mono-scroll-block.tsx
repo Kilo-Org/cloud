@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { codeFieldTextStyle } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
@@ -102,9 +103,9 @@ export function MonoScrollBlock({
   const { t } = useTranslation();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
-  const { displayText, isTruncated } = prepareMonoScrollContent(
-    content,
-    resolveMonoScrollMaxLength(maxLength)
+  const { displayText, isTruncated } = useMemo(
+    () => prepareMonoScrollContent(content, resolveMonoScrollMaxLength(maxLength)),
+    [content, maxLength]
   );
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);
@@ -131,7 +132,10 @@ export function MonoScrollBlock({
             {displayText}
           </Text>
         ) : (
-          <SelectableText className={cn(wrapContentClasses, textClassName)}>
+          <SelectableText
+            className={cn(wrapContentClasses, textClassName)}
+            style={codeFieldTextStyle()}
+          >
             {displayText}
           </SelectableText>
         )}
@@ -168,6 +172,7 @@ export function MonoScrollBlock({
           <SelectableText
             onLayout={handleContentLayout}
             className={cn(contentClasses, textClassName)}
+            style={codeFieldTextStyle()}
           >
             {displayText}
           </SelectableText>

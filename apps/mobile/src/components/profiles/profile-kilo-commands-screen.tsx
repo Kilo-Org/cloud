@@ -34,6 +34,7 @@ import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -82,6 +83,8 @@ export function ProfileKiloCommandsScreen({
   const atCommandCap = commands.length >= MAX_PROFILE_KILO_COMMANDS;
   // The open form comes from the sibling screens' draft contract: it survives a
   // remount, and its generation is what proves a settling save still owns it.
+  // The screen offers the sheet only while the permission allows the write, and
+  // a denial closes it and drops that draft, so a remount cannot reopen it.
   const draftScope = `profiles:slash-commands:${profileId}`;
   const form = useProfileFormDraft<KiloCommandSource, null>(draftScope, commands, null);
   // The open form's key; the handlers below pass their own destination instead,
@@ -119,6 +122,8 @@ export function ProfileKiloCommandsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const runDelete = async (commandId: string) => {
     try {
@@ -161,18 +166,7 @@ export function ProfileKiloCommandsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <SlashCommandsSkeleton />;
   } else if (rows.length === 0) {
     content = (
@@ -281,17 +275,30 @@ export function ProfileKiloCommandsScreen({
         title={t('profiles.slashCommands.title')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <KiloCommandFormSheet
           draftScope={draftScope}
           command={form.editing}

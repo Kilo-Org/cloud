@@ -92,6 +92,7 @@
     "draft": "Melnraksts",
     "enabled": "Iespējots",
     "github": "GitHub",
+    "image": "Attēls",
     "imageUnavailable": "Attēls nav pieejams.",
     "loading": "Ielādē…",
     "loadMore": "Ielādēt vairāk",
@@ -123,10 +124,10 @@
     "connectProvider": "Pievieno pakalpojuma sniedzēju",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
+    "couldNotLoad": "Neizdevās ielādēt.",
+    "couldNotLoadMore": "Neizdevās ielādēt vairāk.",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldnTLoad": "Neizdevās ielādēt.",
-    "couldnTLoadMore": "Neizdevās ielādēt vairāk.",
     "deviceSessions": "Ierīču sesijas",
     "disabled": "Atspējots",
     "email": "E-pasts",
@@ -1266,6 +1267,7 @@
     "needsInputAction": {
       "approved": "Pieprasījums apstiprināts",
       "replied": "Atbilde nosūtīta",
+      "empty": "Ievadiet atbildi un pēc tam to nosūtiet.",
       "failed": "Neizdevās atbildēt. Pieskarieties vēlreiz, lai mēģinātu vēlreiz.",
       "unavailable": "Šis pieprasījums vairs negaida."
     }
@@ -1530,7 +1532,9 @@
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģini vēlreiz.",
-      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus."
+      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus.",
+      "notConnectedTitle": "{{platform}} nav pievienots",
+      "githubAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki un administratori."
     },
     "overview": {
       "allAreas": "Visas jomas",
@@ -2223,7 +2227,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} sesijas",
       "sectionAccessibility": "{{title}}: {{displayCount}} sesijas",
       "live": "REĀLLAIKĀ",
-      "updating": "Notiek atjaunināšana"
+      "updating": "Notiek atjaunināšana",
+      "retentionLimit": "Tiek rādītas jūsu jaunākās sesijas."
     },
     "sessionRow": {
       "deleteTitle": "Dzēst sesiju?",
@@ -2295,11 +2300,11 @@
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "emptyReadOnlyTitle": "Šajā sesijā nav ziņojumu",
-      "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
       "historyUnavailable": "Šīs sesijas ierakstu nevar nolasīt.",
+      "historyTemporarilyUnavailable": "Šīs sesijas ieraksts īslaicīgi nav pieejams.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
       "notEnoughCredits": "Nepietiek kredītu šim pieprasījumam. Papildini kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējā uzdevuma izpilde vēl nav beigusies. Lūdzu, nedaudz uzgaidi.",
@@ -2666,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detalizēta informācija nav pieejama.",
+      "detailsUnavailableDescription": "Šis vienums sesijā vairs nav.",
       "textDisplay": "Teksta attēlojums",
       "thinking": "Domā",
       "thought": "Domas",
@@ -2709,6 +2715,7 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
+      "imageUnavailableRetryWithAlt": "Attēls nav pieejams, {{alt}}, mēģināt ielādēt vēlreiz",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",
@@ -2840,7 +2847,9 @@
       "skip": "Izlaist",
       "retrySkip": "Mēģināt izlaist vēlreiz",
       "submitting": "Nosūta…",
-      "sendAnswers": "Nosūtīt atbildes"
+      "sendAnswers": "Nosūtīt atbildes",
+      "unreadableTitle": "Šo jautājumu nevarēja parādīt",
+      "unreadableBody": "Aģents gaida jautājumu, ko šī lietotne nevar parādīt. Atbildēt uz to CLI, lai turpinātu."
     },
     "blockingCard": {
       "questionUnavailable": "Šis jautājums vairs nav pieejams.",
@@ -2867,6 +2876,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Neizdevās ielādēt apakšaģenta sesiju.",
+      "historyTooLarge": "Šī apakšaģenta vēsture ir pārāk liela, lai to ielādētu.",
+      "historyUnavailable": "Šī apakšaģenta vēsture nav pieejama.",
+      "historyTemporarilyUnavailable": "Šī apakšaģenta vēsture īslaicīgi nav pieejama.",
       "failed": "Apakšaģenta sesija beidzās ar kļūdu.",
       "noMessages": "Nav apakšaģenta ziņojumu",
       "noMessagesDescription": "Šī apakšaģenta sesija beidzās bez sarakstes.",
@@ -3040,7 +3052,7 @@
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
       "tapToViewDetails": " Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
       "costClause": ", izmaksas {{cost}}",
-      "loadingCostSpoken": "izmaksas {{cost}}.",
+      "loadingCostSpoken": "līdzšinējās izmaksas {{cost}}.",
       "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams{{costClause}}.",
       "tokensUsage": "Konteksts: {{used}} no {{window}} tokeniem, izmantoti {{percentage}}{{costClause}}.",
       "title": "Konteksta izmantojums",
@@ -3234,8 +3246,7 @@
     "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
-    "openMenu": "Atvērt izvēlni",
-    "openMenuFor": "Atvērt {{title}} izvēlni"
+    "openMenu": "Atvērt izvēlni"
   },
   "picker": {
     "optionsExpired": "Izvēles vairs nav pieejamas",
@@ -3456,6 +3467,8 @@
     "voiceTranscriptionWho": "Jūsu ierīce, Kilo Gateway ar jūsu izvēlēto transkripcijas modeli, vai Apple vai Google tiešsaistes atpazīšanai.",
     "installAttributionPromptTitle": "Atļaut noteikt instalēšanas avotu?",
     "installAttributionPromptMessage": "Kilo izmanto Apple izsekošanas atļauju tikai tam, lai noteiktu, kurā kanālā uzzināji par lietotni. Tavas uzvednes un sarunas šim nolūkam nekad netiek izmantotas.",
+    "installAttributionRequestFailedTitle": "Neizdevās parādīt izsekošanas uzvedni",
+    "installAttributionRequestFailedMessage": "Kilo neizdevās parādīt sistēmas uzvedni, tāpēc instalēšanas avota noteikšana paliek izslēgta.",
     "what": "Kādi dati",
     "why": "Kāpēc",
     "who": "Kas saņem datus"
@@ -3471,7 +3484,7 @@
   "organization": {
     "auditLog": {
       "title": "Audita žurnāls",
-      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns.",
+      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nav audita notikumu",
       "emptyDescription": "Šeit tiek rādītas šajā organizācijā veiktās darbības.",
       "truncated": "Tiek rādīti jaunākie notikumi.",
@@ -3521,11 +3534,152 @@
         "guardrailUpdate": "Drošības ierobežojums atjaunināts",
         "guardrailRemove": "Drošības ierobežojums noņemts",
         "unknown": "Audita notikums"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Režīms \"{{name}}\" (identifikators: {{slug}})",
+        "modeUpdate": "Režīms \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automātiskā maršrutēšana",
+          "defaultModel": "Noklusējuma modelis"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Pievienots {{email}} kā {{role}}",
+        "memberRemoved": "Noņemts {{email}}",
+        "memberParentAdded": "Pievienots {{email}} no mātes organizācijas {{parent}}",
+        "memberParentRemoved": "Noņemts {{email}} no mātes organizācijas {{parent}}",
+        "inviteSent": "{{email}} kā {{role}}",
+        "inviteRevoked": "Atsaukts uzaicinājums {{email}}",
+        "inviteAccepted": "Pieņemts {{email}}",
+        "groupIdentity": "Grupa \"{{name}}\"",
+        "groupMembers": "Grupa \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grupas",
+        "groupMemberGroups_one": "{{displayCount}} grupa",
+        "groupMemberGroups_other": "{{displayCount}} grupas",
+        "groupMemberGroups_zero": "{{displayCount}} grupu",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grupas",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grupa",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grupas",
+        "groupMemberGroupsOf_zero": "{{email}}: {{displayCount}} grupu",
+        "groupPolicySet": "Grupa \"{{name}}\": iestatīta politika \"{{policy}}\"",
+        "groupPolicyRemoved": "Grupa \"{{name}}\": noņemta politika \"{{policy}}\"",
+        "groupDefaultPolicySet": "Iestatīta noklusējuma politika \"{{policy}}\"",
+        "groupDefaultPolicyRemoved": "Noņemta noklusējuma politika \"{{policy}}\"",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "MI aizsargbarjeras {{state}}",
+        "guardrailConfigGroup": "{{state}} grupai \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domēns {{domain}}",
+        "ssoDomainChanged": "{{domain}} (iepriekš {{previous}})",
+        "ssoDomainRemoved": "Notīrīts SSO domēns {{domain}}",
+        "fundsPurchased": "{{amount}} ar {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} uz {{displayCount}} meitas organizācijām",
+        "fundsDistributed_one": "{{amount}} uz {{displayCount}} meitas organizāciju",
+        "fundsDistributed_other": "{{amount}} uz {{displayCount}} meitas organizācijām",
+        "fundsDistributed_zero": "{{amount}} uz {{displayCount}} meitas organizācijām",
+        "fundsReceived": "{{amount}} no {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfigurācija",
+        "reviewAgentConfigStyle": "{{platform}}: stils {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} atjaunināti",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} atjaunināta",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} atjaunināti",
+        "reviewAgentSecretsUpdated_zero": "{{displayCount}} atjaunināti",
+        "reviewAgentSecretsFailed": "{{displayCount}} kļūdas",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} kļūda",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} kļūdas",
+        "reviewAgentSecretsFailed_zero": "{{displayCount}} kļūdas",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Secināšanas reģions: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Režīms \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globālais noklusējums",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Atļauta",
+          "denied": "Aizliegta",
+          "followSetting": "Ievēro paplašinājuma iestatījumu"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projekts UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} uz {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Ieteikumu kopsavilkums {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: nav atļautu izcelsmju",
+        "settingName": "Pārdēvēts no {{previous}} par {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skenēšana pirms lietošanas ieslēgta",
+        "scanBeforeUseOff": "Skenēšana pirms lietošanas izslēgta",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Noņemti: {{models}}",
+        "browserPolicyOff": "Pārlūka lietošana bloķēta",
+        "browserPolicyAllow": "Tikai atļautās izcelsmes",
+        "browserPolicyPlaywrightOnly": "Tikai pārlūka lietošana",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Mainīti modeļi: {{values}}",
+        "integrationConnected": "{{integration}} pievienots",
+        "integrationDisconnected": "{{integration}} atvienots",
+        "integrationRefreshed": "{{integration}} atjaunināts",
+        "integrationCancelled": "{{integration}} atcelts",
+        "integrationModelUpdated": "{{integration}}: modelis {{model}}",
+        "integrationKeyAdded": "{{provider}} API atslēga pievienota",
+        "integrationKeyUpdated": "{{provider}} API atslēga atjaunināta",
+        "integrationKeyDeleted": "{{provider}} API atslēga noņemta",
+        "integrationKeyToggled": "{{provider}} API atslēga: {{state}}",
+        "namedPolicyCreated": "{{kind}} politika {{id}} izveidota",
+        "namedPolicyUpdated": "{{kind}} politika {{id}} atjaunināta",
+        "namedPolicyDeleted": "{{kind}} politika {{id}} noņemta",
+        "namedPolicyLinked": "{{kind}} politika saistīta ar {{next}}",
+        "webhookTriggerUpdated": "Trigeris {{trigger}}",
+        "organizationRenamed": "Organizācija pārdēvēta no {{previous}} uz {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Sava API atslēga"
+        }
       }
     },
     "billing": {
       "title": "Norēķini",
-      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonements",
       "state": "Statuss",
       "stateNone": "Nav abonementa",
@@ -3607,7 +3761,7 @@
       "noSeatsAvailable": "Visas vietas ir aizņemtas. Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku."
     },
     "invoices": {
-      "downloadA11y": "Lejupielādēt rēķinu {{number}}",
+      "downloadA11y": "Lejupielādēt rēķinu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Rēķini tiek izveidoti automātiski katrā norēķinu periodā. Tie būs redzami šeit, kad tavai organizācijai būs izrakstīts rēķins.",
       "emptyTitle": "Nav rēķinu",
       "invoiceFallback": "Rēķins",
@@ -3687,7 +3841,6 @@
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
-      "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
@@ -3702,7 +3855,7 @@
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
       "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
-      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ievade · {{output}} izvade",
       "byok": "BYOK"
     },
@@ -3809,7 +3962,7 @@
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
-    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Izmanto “$t(login.resendCode)” vai “$t(login.moreSignInOptions)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",
@@ -3982,7 +4135,10 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+      "deleteTitle": "Vai dzēst šo tērzēšanu?",
+      "resetNoticeTitle": "Vietējās tērzēšanas un melnraksti notīrīti",
+      "resetNoticeBody": "Kilo nevarēja atvērt šajā ierīcē saglabātās tērzēšanas. Jūsu sesijas mākonī nav skartas.",
+      "resetNoticeDismiss": "Noraidīt paziņojumu"
     },
     "rename": {
       "title": "Pārdēvēt tērzēšanu",
@@ -4032,6 +4188,9 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
+      "fieldUrlCredentials": "Noņem lietotājvārdu un paroli no adreses.",
+      "fieldUrlFragment": "Noņem no adreses # daļu.",
+      "fieldUrlInsecure": "Ievadi https adresi; http drīkst izmantot tikai localhost.",
       "duplicateUrl": "Šis URL jau ir saglabāts.",
       "serverNotFound": "Šis serveris vairs nav saglabāts.",
       "enableServer": "Iespējot šo serveri: {{name}}",
@@ -4055,6 +4214,7 @@
       "app": {
         "label": "Rīka saskarne",
         "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "tooLarge": "Šī rīka saskarne ir lielāka par {{size}} ierobežojumu.",
         "empty": "Šī rīka saskarnē nav ko parādīt."
       },
       "serverToolCount_zero": "{{count}} rīku",
@@ -4125,6 +4285,8 @@
       "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
       "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
+      "invalidApiKey": "API atslēga satur rakstzīmi, kuru nevar nosūtīt. Izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
+      "invalidHeaders": "Pielāgotu galveni nevar nosūtīt. Pārbaudi tās nosaukumu un izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
       "httpApprovalRequired": "Pirms saglabāšanas vai savienošanās apstiprini šo lokālo HTTP galapunktu.",
@@ -4173,6 +4335,7 @@
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
         "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
         "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz.",
+        "unreadable": "Šī ierīce nevarēja pārbaudīt lejupielādēto failu, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz.",
         "writeFailed": "Šī ierīce nevarēja saglabāt modeli. Mēģiniet lejupielādēt vēlreiz."
       }
     },
@@ -4258,7 +4421,15 @@
       "download": "Lejupielādēt ierīces modeli",
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
-      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
+      "cannotUse": "Nevar palaist: {{items}}.",
+      "cannotUseOptions": "Nevar aizpildīt: dažas rīka opcijas.",
+      "limitations": "Ierobežojumi",
+      "tools": {
+        "time": "Laiks",
+        "settingsList": "Rādīt iestatījumus",
+        "settingsSet": "Mainīt iestatījumus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
@@ -4442,6 +4613,7 @@
     "instructionSaveFailed": "Instrukciju neizdevās saglabāt",
     "instructionDeleteFailed": "Instrukciju neizdevās dzēst",
     "instructionToggleFailed": "Instrukciju neizdevās atjaunināt",
+    "instructionViewTitle": "Instrukcijas fails",
     "instructionLimitReached": "Profils var ietvert līdz {{max}} instrukcijām. Dzēsiet vienu, lai pievienotu citu.",
     "mcp": {
       "title": "MCP serveri",
@@ -4613,10 +4785,20 @@
     "history": {
       "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
       "appStoreReceipt": "Kvīts veikalā App Store",
+      "deduction": {
+        "adminCancel": "Administratora slēgta bilance",
+        "adminDebit": "Administratora noņemti kredīti",
+        "codingPlan": "Kodēšanas plāns: {{plan}}",
+        "correction": "Bilances korekcija",
+        "dispute": "Maksājuma strīds",
+        "refundAppStore": "Kredītu paketes atmaksa no App Store",
+        "refundGooglePlay": "Kredītu paketes atmaksa no Google Play"
+      },
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
       "expiredGrant": "Termiņš beidzies: {{description}}",
+      "expiredStatus": "Termiņš beidzies",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
@@ -4643,7 +4825,8 @@
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
       "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
-      "voidedGrant": "Anulēts: {{description}}"
+      "voidedGrant": "Anulēts: {{description}}",
+      "voidedStatus": "Anulēts"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4793,6 +4976,7 @@
     "contextAll": "Visi konteksti",
     "dismiss": "Noraidīt atskaiti",
     "dismissFailed": "Šo atskaiti vēl neizdevās noraidīt. Mēģinājums tiks atkārtots fonā.",
+    "readMarkFailed": "Neizdevās atzīmēt šo atskaiti kā lasītu. Mēģinājums tiks atkārtots, kad atskaite pārlādēsies.",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "summary": "AI kopsavilkums",
@@ -4812,16 +4996,22 @@
     "morningEnd": "Atskaite pieejama līdz",
     "timeHint": "Sākuma kartīte atjauno aktuālo statusu, kad atskaites periods beidzas, arī bezsaistē.",
     "invalidSchedule": "Izvēlieties derīgu laika joslu un netukšu atskaites periodu.",
+    "scheduleEmptyNight": "Atskaites periods ir tukšs. Izvēlieties gatavības laiku, kas ir vēlāks par perioda sākumu.",
+    "scheduleEmptyMorning": "Gatavības laiks un laiks, līdz kuram atskaite ir pieejama, sakrīt. Izvēlieties, cik ilgi atskaite paliek pieejama.",
+    "scheduleFullDay": "Abi periodi nosedz visu dienu. Atstājiet daļu dienas ārpus atskaites.",
     "notificationsHint": "Viens vispārīgs paziņojums par katru plānoto atskaiti. Neatkarīgs no maksas AI kopsavilkumiem.",
     "notificationPermission": "Ieslēdziet push paziņojumus, lai saņemtu savu atskaiti.",
     "defaultModel": "Izmantot Kilo noklusējuma modeli",
     "duration": "Laika ierobežojums (minūtes)",
     "spendLimit": "Izdevumu ierobežojums (USD)",
-    "invalidSafeguards": "Ievadiet pozitīvus, galīgus laika un izdevumu ierobežojumus.",
+    "invalidSafeguards": "Ievadiet pozitīvu skaitli atļautajā intervālā.",
     "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
     "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams. Mainiet modeli vai ierobežojumus, vai arī mēģiniet vēlreiz vēlāk.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",
-    "paidDisclosure": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} min ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
+    "paidDisclosure_zero": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūšu ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
+    "paidDisclosure_one": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūtes ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
+    "paidDisclosure": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūšu ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
+    "paidDisclosure_other": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūšu ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
     "enable": "Iespējot maksas kopsavilkumus",
     "allContexts": "Personīgās un organizācijas atskaites tiek glabātas atsevišķi.",
     "emptyHistory": "Nav saglabātu atskaišu",
@@ -4832,8 +5022,8 @@
     "estimateSpendLimitTooLow": "Palieliniet tēriņu ierobežojumu, lai atļautu šo kopsavilkumu.",
     "saved": "Atskaites iestatījumi saglabāti",
     "selectedSessions": "Atlasītās sesijas",
-    "snapshotPullRequests": "PRs atlasītajās sesijās",
-    "snapshotBlockers": "Šķēršļi atlasītajās sesijās",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Šķēršļi",
     "capturedAt": "Fiksēts {{time}}",
     "snapshotHint": "Plānotajā rīta laikā fiksēts jaunākā pieejamā sesiju stāvokļa momentuzņēmums, kas var būt nepilnīgs. Skaitļi attiecas uz atlasītajām sesijām, nevis visu nakts aktivitāti.",
     "snapshotTruncated": "Dažas sesijas vai pierādījumi nav iekļauti, lai ierobežotu šī momentuzņēmuma apjomu.",
@@ -4868,7 +5058,7 @@
     "sourceActivity": "Aktivitāte bez nosaukuma",
     "metadataFailureProvider": "nodrošinātāja kļūda",
     "metadataFailureTool": "rīka kļūda",
-    "metadataFailureCancelled": "Atcelts",
+    "metadataStopped": "Pēdējais gājiens tika apturēts",
     "metadataFailureOther": "nenorādīta kļūda"
   },
   "systemSearch": {
@@ -4876,6 +5066,7 @@
   },
   "usage": {
     "title": "Lietojums",
+    "personalTitle": "Personīgā konta lietojums",
     "orgTitle": "Organizācijas lietojums",
     "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
     "rangePicker": "Laika periods",
@@ -4889,7 +5080,8 @@
     "unavailableTitle": "Lietojums nav pieejams",
     "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
-    "viewDetails": "Skatīt lietojuma informāciju"
+    "viewDetails": "Skatīt lietojuma informāciju",
+    "orgSelfEntryTitle": "Jūsu lietojums"
   },
   "integrations": {
     "title": "Integrācijas",
@@ -4985,6 +5177,8 @@
       "autoCommit": "Fiksēt izmaiņas, kad palaišana beidzas",
       "condenseOnComplete": "Saspiest kontekstu, kad palaišana beidzas",
       "activeTitle": "Trigeris aktīvs",
+      "activeSwitchA11y": "Trigeris aktīvs: {{name}}",
+      "copyLinkA11y": "Kopēt trigera saiti: {{name}}",
       "activeDescription": "Apturēti tīmekļa āķi atbild ar 404.",
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",

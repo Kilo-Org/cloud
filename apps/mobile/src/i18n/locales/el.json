@@ -91,6 +91,7 @@
     "draft": "Πρόχειρο",
     "enabled": "Ενεργοποιημένο",
     "github": "GitHub",
+    "image": "Εικόνα",
     "imageUnavailable": "Η εικόνα δεν είναι διαθέσιμη.",
     "loading": "Φόρτωση…",
     "loadMore": "Φόρτωση περισσότερων",
@@ -122,10 +123,10 @@
     "connectProvider": "Σύνδεση παρόχου",
     "contentTruncated": "Το περιεχόμενο έχει περικοπεί",
     "copyLink": "Αντιγραφή συνδέσμου",
+    "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση.",
+    "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων στοιχείων.",
     "couldNotLoadOrganizations": "Δεν ήταν δυνατή η φόρτωση των οργανισμών.",
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση των συνεδριών.",
-    "couldnTLoad": "Δεν ήταν δυνατή η φόρτωση.",
-    "couldnTLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων στοιχείων.",
     "deviceSessions": "Συνεδρίες συσκευών",
     "disabled": "Απενεργοποιημένο",
     "email": "Ηλεκτρονική διεύθυνση",
@@ -181,7 +182,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Αλλαγές",
-    "organizationTrialEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Ένας ιδιοκτήτης οργανισμού μπορεί να ενημερώσει τη χρέωση στο kilo.ai και μετά να δοκιμάσει ξανά.",
+    "organizationTrialEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Ένας κάτοχος οργανισμού μπορεί να ενημερώσει τη χρέωση στο kilo.ai και μετά να δοκιμάσει ξανά.",
     "privateRepositoryA11y": "{{name}}, ιδιωτικό αποθετήριο",
     "legalDocumentEnglishOnly": "Αυτό το έγγραφο είναι διαθέσιμο μόνο στα αγγλικά.",
     "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά.",
@@ -399,7 +400,7 @@
       "title": "Κλειδιά παρόχων",
       "rowSubtitle": "Χρήση της δικής σου χρέωσης παρόχου",
       "orgDescription": "Αυτά τα κλειδιά είναι κοινά για όλους στον οργανισμό και χρεώνονται στους λογαριασμούς παρόχων του.",
-      "viewOnly": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας υπεύθυνος χρεώσεων του οργανισμού μπορεί να αλλάξει τα κλειδιά του.",
+      "viewOnly": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας διαχειριστής χρέωσης του οργανισμού μπορεί να αλλάξει τα κλειδιά του.",
       "description": "Τα αιτήματα μέσω αυτών των κλειδιών χρεώνονται στον λογαριασμό του παρόχου σου αντί για το υπόλοιπο Kilo.",
       "managedByPlan": "Το διαχειρίζεται το πρόγραμμα coding σου",
       "enableKey": "Ενεργοποίηση του κλειδιού {{provider}}",
@@ -1238,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Το αίτημα εγκρίθηκε",
       "replied": "Η απάντηση στάλθηκε",
+      "empty": "Γράψτε μια απάντηση και στη συνέχεια στείλτε την.",
       "failed": "Δεν ήταν δυνατή η απάντηση. Πατήστε ξανά για επανάληψη.",
       "unavailable": "Αυτό το αίτημα δεν περιμένει πλέον."
     }
@@ -1460,7 +1462,7 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnlyPlan": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει, οπότε ένας ιδιοκτήτης πρέπει να ενημερώσει τη χρέωση στο kilo.ai."
+      "notConnectedReadOnlyPlan": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει, οπότε ένας κάτοχος πρέπει να ενημερώσει τη χρέωση στο kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για {{organization}} γίνεται από τον ιστότοπο, σε υπολογιστή.",
@@ -1502,7 +1504,9 @@
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitHub. Δοκίμασε ξανά.",
       "gitlabAccount": "λογαριασμός GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitLab. Δοκίμασε ξανά.",
-      "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR."
+      "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR.",
+      "notConnectedTitle": "Το {{platform}} δεν είναι συνδεδεμένο",
+      "githubAdminOnlyDescription": "Μόνο οι κάτοχοι του οργανισμού και οι διαχειριστές μπορούν να το συνδέσουν."
     },
     "overview": {
       "allAreas": "Όλοι οι τομείς",
@@ -1606,7 +1610,7 @@
       "unavailableForOrganization": "Ο έλεγχος από συμβούλιο απαιτεί το πλάνο Enterprise με ενεργή συνδρομή ή δοκιμαστική περίοδο. Αυτός ο οργανισμός δεν το έχει αυτή τη στιγμή.",
       "unavailablePlanCheck": "Ο έλεγχος από συμβούλιο δεν μπόρεσε να ελέγξει το πλάνο αυτού του οργανισμού. Δοκιμάστε ξανά για να γίνει νέος έλεγχος.",
       "unavailableFlagRollout": "Ο έλεγχος από συμβούλιο δεν είναι ακόμη διαθέσιμος για αυτόν τον οργανισμό. Ενημερώστε την εφαρμογή στην τελευταία έκδοση για να το αποκτήσετε.",
-      "unavailableForOrganizationMember": "Ο έλεγχος από συμβούλιο απαιτεί το πλάνο Enterprise με ενεργή συνδρομή ή δοκιμαστική περίοδο. Ένας ιδιοκτήτης οργανισμού μπορεί να αλλάξει το πλάνο.",
+      "unavailableForOrganizationMember": "Ο έλεγχος από συμβούλιο απαιτεί το πλάνο Enterprise με ενεργή συνδρομή ή δοκιμαστική περίοδο. Ένας κάτοχος οργανισμού μπορεί να αλλάξει το πλάνο.",
       "unavailableOnBitbucket": "Ο έλεγχος από συμβούλιο δεν είναι διαθέσιμος για αποθετήρια Bitbucket.",
       "noRepositories": "Δεν έχουν επιλεγεί ακόμη αποθετήρια. Επίλεξε πρώτα αποθετήρια στις ρυθμίσεις αποθετηρίων.",
       "specialists": "Ειδικοί",
@@ -1990,7 +1994,7 @@
     },
     "notifications": {
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων ειδοποιήσεων.",
-      "emailOwners": "Αποστολή ηλεκτρονικών μηνυμάτων στους ιδιοκτήτες του οργανισμού",
+      "emailOwners": "Αποστολή ηλεκτρονικών μηνυμάτων στους κατόχους του οργανισμού",
       "newFindingPersonalTitle": "Λήψη ηλεκτρονικών μηνυμάτων για νέα ευρήματα",
       "newFindingSection": "Ειδοποιήσεις για νέα ευρήματα",
       "newFindingSeverityLabel": "Ελάχιστη σοβαρότητα νέων ευρημάτων",
@@ -2176,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} συνεδρίες",
       "sectionAccessibility": "{{title}}: {{displayCount}} συνεδρίες",
       "live": "ΣΕ ΠΡΑΓΜΑΤΙΚΟ ΧΡΟΝΟ",
-      "updating": "Ενημέρωση"
+      "updating": "Ενημέρωση",
+      "retentionLimit": "Εμφανίζονται οι πιο πρόσφατες συνεδρίες σας."
     },
     "sessionRow": {
       "deleteTitle": "Διαγραφή συνεδρίας;",
@@ -2246,11 +2251,11 @@
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
       "emptyReadOnlyTitle": "Δεν υπάρχουν μηνύματα σε αυτή τη συνεδρία",
-      "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
       "cloningSession": "Κλωνοποίηση συνεδρίας…",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας.",
       "historyTooLarge": "Η μεταγραφή αυτής της συνεδρίας είναι πολύ μεγάλη για φόρτωση.",
       "historyUnavailable": "Δεν είναι δυνατή η ανάγνωση της μεταγραφής αυτής της συνεδρίας.",
+      "historyTemporarilyUnavailable": "Η μεταγραφή αυτής της συνεδρίας δεν είναι προσωρινά διαθέσιμη.",
       "cloneFailedRetry": "Δεν ήταν δυνατή η κλωνοποίηση αυτής της συνεδρίας. Δοκίμασε ξανά.",
       "notEnoughCredits": "Δεν υπάρχουν αρκετές πιστώσεις για αυτό το αίτημα. Πρόσθεσε πιστώσεις και δοκίμασε ξανά.",
       "previousTaskFinishing": "Η προηγούμενη εργασία δεν έχει ολοκληρωθεί ακόμα. Περίμενε λίγο.",
@@ -2613,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Οι λεπτομέρειες δεν είναι διαθέσιμες.",
+      "detailsUnavailableDescription": "Αυτό το στοιχείο δεν βρίσκεται πλέον στη συνεδρία.",
       "textDisplay": "Εμφάνιση κειμένου",
       "thinking": "Σκέφτεται",
       "thought": "Σκέψη",
@@ -2656,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Φόρτωση εικόνας",
       "imageUnavailableRetry": "Η εικόνα δεν είναι διαθέσιμη. Νέα προσπάθεια φόρτωσης",
+      "imageUnavailableRetryWithAlt": "Η εικόνα δεν είναι διαθέσιμη. {{alt}}. Νέα προσπάθεια φόρτωσης",
       "imagePreviewUnavailableInSession": "Η προεπισκόπηση εικόνας δεν είναι διαθέσιμη σε αυτή τη συνεδρία.",
       "viewImage": "Προβολή εικόνας",
       "viewImageWithAlt": "Προβολή εικόνας {{alt}}",
@@ -2787,7 +2794,9 @@
       "skip": "Παράλειψη",
       "retrySkip": "Επανάληψη παράλειψης",
       "submitting": "Υποβολή…",
-      "sendAnswers": "Αποστολή απαντήσεων"
+      "sendAnswers": "Αποστολή απαντήσεων",
+      "unreadableTitle": "Δεν ήταν δυνατή η εμφάνιση αυτής της ερώτησης",
+      "unreadableBody": "Ο agent περιμένει μια ερώτηση που αυτή η εφαρμογή δεν μπορεί να εμφανίσει. Απαντήστε στην ερώτηση μέσω του CLI για να συνεχίσετε."
     },
     "blockingCard": {
       "questionUnavailable": "Αυτή η ερώτηση δεν είναι πλέον διαθέσιμη.",
@@ -2814,6 +2823,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της συνεδρίας του υποπράκτορα.",
+      "historyTooLarge": "Το ιστορικό αυτού του υποπράκτορα είναι πολύ μεγάλο για φόρτωση.",
+      "historyUnavailable": "Το ιστορικό αυτού του υποπράκτορα δεν είναι διαθέσιμο.",
+      "historyTemporarilyUnavailable": "Το ιστορικό αυτού του υποπράκτορα δεν είναι προσωρινά διαθέσιμο.",
       "failed": "Η συνεδρία του υποπράκτορα απέτυχε.",
       "noMessages": "Δεν υπάρχουν μηνύματα υποπράκτορα",
       "noMessagesDescription": "Αυτή η συνεδρία του υποπράκτορα ολοκληρώθηκε χωρίς να καταγραφεί ιστορικό συνομιλίας.",
@@ -2983,7 +2995,7 @@
       "windowUnavailable": "Μη διαθέσιμο μέγεθος παραθύρου συμφραζομένων",
       "tapToViewDetails": " Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
       "costClause": ", κόστος {{cost}}",
-      "loadingCostSpoken": "κόστος {{cost}}.",
+      "loadingCostSpoken": "κόστος μέχρι τώρα {{cost}}.",
       "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου{{costClause}}.",
       "tokensUsage": "Συμφραζόμενα: {{used}} από {{window}} διακριτικά, χρήση {{percentage}}{{costClause}}.",
       "title": "Χρήση συμφραζομένων",
@@ -3173,8 +3185,7 @@
     "timeoutDescription": "Το αίτημα έληξε πριν ολοκληρωθεί. Δοκίμασε ξανά."
   },
   "screenHeader": {
-    "openMenu": "Άνοιγμα μενού",
-    "openMenuFor": "Άνοιγμα μενού για {{title}}"
+    "openMenu": "Άνοιγμα μενού"
   },
   "picker": {
     "optionsExpired": "Οι επιλογές έληξαν",
@@ -3393,6 +3404,8 @@
     "voiceTranscriptionWho": "Η συσκευή σου, το Kilo Gateway με το μοντέλο απομαγνητοφώνησης που έχεις επιλέξει, ή η Apple ή η Google για αναγνώριση στο διαδίκτυο.",
     "installAttributionPromptTitle": "Να επιτραπεί ο προσδιορισμός της πηγής εγκατάστασης;",
     "installAttributionPromptMessage": "Το Kilo χρησιμοποιεί την άδεια παρακολούθησης της Apple μόνο για να μάθει από ποιο κανάλι έφτασες εδώ. Τα μηνύματα και οι συνομιλίες σου δεν χρησιμοποιούνται ποτέ.",
+    "installAttributionRequestFailedTitle": "Δεν ήταν δυνατή η εμφάνιση του μηνύματος παρακολούθησης",
+    "installAttributionRequestFailedMessage": "Το Kilo δεν μπόρεσε να εμφανίσει το μήνυμα του συστήματος, οπότε ο προσδιορισμός της πηγής εγκατάστασης παραμένει απενεργοποιημένος.",
     "what": "Τι",
     "why": "Γιατί",
     "who": "Ποιος"
@@ -3408,7 +3421,7 @@
   "organization": {
     "auditLog": {
       "title": "Αρχείο ελέγχου",
-      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας υπεύθυνος χρέωσης ενός οργανισμού με πλάνο Enterprise μπορεί να δει το αρχείο ελέγχου του.",
+      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας διαχειριστής χρέωσης ενός οργανισμού με πλάνο Enterprise μπορεί να δει το αρχείο ελέγχου του. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Δεν υπάρχουν συμβάντα ελέγχου",
       "emptyDescription": "Οι ενέργειες που γίνονται σε αυτόν τον οργανισμό εμφανίζονται εδώ.",
       "truncated": "Εμφανίζονται τα πιο πρόσφατα συμβάντα.",
@@ -3458,11 +3471,147 @@
         "guardrailUpdate": "Ενημερώθηκε όριο ασφαλείας",
         "guardrailRemove": "Αφαιρέθηκε όριο ασφαλείας",
         "unknown": "Συμβάν ελέγχου"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Λειτουργία \"{{name}}\" (αναγνωριστικό: {{slug}})",
+        "modeUpdate": "Λειτουργία \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Αυτόματη δρομολόγηση",
+          "defaultModel": "Προεπιλεγμένο μοντέλο"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Προστέθηκε {{email}} ως {{role}}",
+        "memberRemoved": "Αφαιρέθηκε {{email}}",
+        "memberParentAdded": "Προστέθηκε {{email}} από τον μητρικό οργανισμό {{parent}}",
+        "memberParentRemoved": "Αφαιρέθηκε {{email}} από τον μητρικό οργανισμό {{parent}}",
+        "inviteSent": "{{email}} ως {{role}}",
+        "inviteRevoked": "Ανακλήθηκε η πρόσκληση για {{email}}",
+        "inviteAccepted": "Έγινε αποδεκτή από {{email}}",
+        "groupIdentity": "Ομάδα \"{{name}}\"",
+        "groupMembers": "Ομάδα \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ομάδες",
+        "groupMemberGroups_one": "{{displayCount}} ομάδα",
+        "groupMemberGroups_other": "{{displayCount}} ομάδες",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ομάδες",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ομάδα",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ομάδες",
+        "groupPolicySet": "Ομάδα \"{{name}}\": ορίστηκε πολιτική {{policy}}",
+        "groupPolicyRemoved": "Ομάδα \"{{name}}\": αφαιρέθηκε πολιτική {{policy}}",
+        "groupDefaultPolicySet": "Ορίστηκε προεπιλεγμένη πολιτική {{policy}}",
+        "groupDefaultPolicyRemoved": "Αφαιρέθηκε προεπιλεγμένη πολιτική {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Όρια ασφαλείας AI {{state}}",
+        "guardrailConfigGroup": "{{state}} για την ομάδα \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Τομέας SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (ήταν {{previous}})",
+        "ssoDomainRemoved": "Διαγράφηκε ο τομέας SSO {{domain}}",
+        "fundsPurchased": "{{amount}} με {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} σε {{displayCount}} θυγατρικούς οργανισμούς",
+        "fundsDistributed_one": "{{amount}} σε {{displayCount}} θυγατρικό οργανισμό",
+        "fundsDistributed_other": "{{amount}} σε {{displayCount}} θυγατρικούς οργανισμούς",
+        "fundsReceived": "{{amount}} από {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Διαμόρφωση {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: στυλ {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} ενημερώθηκαν",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} ενημερώθηκε",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} ενημερώθηκαν",
+        "reviewAgentSecretsFailed": "{{displayCount}} σφάλματα",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} σφάλμα",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} σφάλματα",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Περιοχή εξαγωγής συμπερασμάτων: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Λειτουργία \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Καθολική προεπιλογή",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Επιτρέπεται",
+          "denied": "Δεν επιτρέπεται",
+          "followSetting": "Ακολουθεί τη ρύθμιση της επέκτασης"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Διεπαφή Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} σε {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Σύνοψη συστάσεων {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: καμία επιτρεπόμενη προέλευση",
+        "settingName": "Μετονομάστηκε από {{previous}} σε {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Σάρωση πριν τη χρήση ενεργή",
+        "scanBeforeUseOff": "Σάρωση πριν τη χρήση ανενεργή",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Αφαιρέθηκαν: {{models}}",
+        "browserPolicyOff": "Αποκλείστηκε η χρήση περιηγητή",
+        "browserPolicyAllow": "Μόνο επιτρεπόμενες προελεύσεις",
+        "browserPolicyPlaywrightOnly": "Μόνο χρήση περιηγητή",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Άλλαξαν τα μοντέλα: {{values}}",
+        "integrationConnected": "{{integration}} συνδέθηκε",
+        "integrationDisconnected": "{{integration}} αποσυνδέθηκε",
+        "integrationRefreshed": "{{integration}} ανανεώθηκε",
+        "integrationCancelled": "{{integration}} ακυρώθηκε",
+        "integrationModelUpdated": "{{integration}}: μοντέλο {{model}}",
+        "integrationKeyAdded": "Προστέθηκε κλειδί για {{provider}}",
+        "integrationKeyUpdated": "Ενημερώθηκε κλειδί για {{provider}}",
+        "integrationKeyDeleted": "Αφαιρέθηκε κλειδί για {{provider}}",
+        "integrationKeyToggled": "Κλειδί για {{provider}}: {{state}}",
+        "namedPolicyCreated": "Δημιουργήθηκε πολιτική {{kind}} {{id}}",
+        "namedPolicyUpdated": "Ενημερώθηκε πολιτική {{kind}} {{id}}",
+        "namedPolicyDeleted": "Αφαιρέθηκε πολιτική {{kind}} {{id}}",
+        "namedPolicyLinked": "Συνδέθηκε πολιτική {{kind}} {{next}}",
+        "webhookTriggerUpdated": "Έναυσμα {{trigger}}",
+        "organizationRenamed": "Ο οργανισμός μετονομάστηκε από {{previous}} σε {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Δικό σας κλειδί API"
+        }
       }
     },
     "billing": {
       "title": "Χρέωση",
-      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας υπεύθυνος χρεώσεων του οργανισμού μπορεί να δει τη χρέωσή του.",
+      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας διαχειριστής χρέωσης του οργανισμού μπορεί να δει τη χρέωσή του. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Συνδρομή",
       "state": "Κατάσταση",
       "stateNone": "Χωρίς συνδρομή",
@@ -3540,11 +3689,11 @@
       "pendingInvitation": "Αυτό το email έχει ήδη μια εκκρεμή πρόσκληση.",
       "alreadyMember": "Αυτό το άτομο είναι ήδη μέλος αυτού του οργανισμού.",
       "seatsFull": "Όλες οι θέσεις χρησιμοποιούνται ({{used}}/{{total}}). Ζήτησε από έναν κάτοχο του οργανισμού να προσθέσει θέσεις πριν προσκαλέσεις περισσότερα μέλη.",
-      "seatsFullCanInviteBilling": "Όλες οι θέσεις χρησιμοποιούνται ({{used}}/{{total}}). Μπορείς ακόμη να προσκαλέσεις υπεύθυνους χρεώσεων, οι οποίοι δεν καταλαμβάνουν θέση.",
+      "seatsFullCanInviteBilling": "Όλες οι θέσεις χρησιμοποιούνται ({{used}}/{{total}}). Μπορείς ακόμη να προσκαλέσεις διαχειριστές χρέωσης, οι οποίοι δεν καταλαμβάνουν θέση.",
       "noSeatsAvailable": "Όλες οι θέσεις χρησιμοποιούνται. Ζήτησε από έναν κάτοχο του οργανισμού να προσθέσει θέσεις πριν προσκαλέσεις περισσότερα μέλη."
     },
     "invoices": {
-      "downloadA11y": "Λήψη τιμολογίου {{number}}",
+      "downloadA11y": "Λήψη τιμολογίου {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Τα τιμολόγια δημιουργούνται αυτόματα σε κάθε κύκλο χρέωσης και θα εμφανιστούν εδώ μόλις χρεωθεί ο οργανισμός σου.",
       "emptyTitle": "Κανένα τιμολόγιο",
       "invoiceFallback": "Τιμολόγιο",
@@ -3624,7 +3773,6 @@
       "usageDetails": "Λεπτομέρειες χρήσης",
       "providersAndModels": "Πάροχοι και μοντέλα",
       "groups": "Ομάδες",
-      "guardrails": "Όρια ασφαλείας",
       "byok": "Χρήση δικού σας κλειδιού",
       "ssoAndDomain": "SSO και τομέας",
       "dataCollection": "Συλλογή δεδομένων",
@@ -3639,7 +3787,7 @@
       "emptyDescription": "Χρησιμοποιήστε την «Προηγούμενη ώρα» για να δείτε προηγούμενα αιτήματα.",
       "emptyBoundDescription": "Τα αρχεία καταγραφής αιτημάτων δεν φτάνουν πιο πίσω από αυτό το σημείο.",
       "loadError": "Δεν ήταν δυνατή η φόρτωση των αρχείων αιτημάτων.",
-      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας υπεύθυνος χρέωσης ενός οργανισμού μπορεί να δει τα αρχεία αιτημάτων του.",
+      "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας διαχειριστής χρέωσης ενός οργανισμού μπορεί να δει τα αρχεία αιτημάτων του. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} εισόδου · {{output}} εξόδου",
       "byok": "BYOK"
     },
@@ -3744,7 +3892,7 @@
     "signupStepUpApple": "Για να ολοκληρώσεις τη δημιουργία του λογαριασμού σου, επίλεξε «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Για να ολοκληρώσεις τη δημιουργία του λογαριασμού σου, επίλεξε «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Για να ολοκληρώσεις τη δημιουργία του λογαριασμού σου, επίστρεψε στην προηγούμενη οθόνη και επίλεξε «$t(login.moreSignInOptions)».",
-    "invalidCode": "Ο κωδικός είναι λανθασμένος ή έχει λήξει. Δοκίμασε ξανά ή επίλεξε «$t(login.resendCode)».",
+    "invalidCode": "Ο κωδικός είναι λανθασμένος ή έχει λήξει. Χρησιμοποίησε «$t(login.resendCode)» ή «$t(login.moreSignInOptions)».",
     "codeInProgress": "Γίνεται επεξεργασία του κωδικού σου. Περίμενε λίγο και δοκίμασε ξανά.",
     "tooManyAttempts": "Έγιναν πάρα πολλές προσπάθειες. Ζήτησε νέο κωδικό.",
     "invalidToken": "Η σύνδεση απέτυχε. Δοκίμασε ξανά.",
@@ -3909,7 +4057,10 @@
     "list": {
       "loadFailed": "Δεν ήταν δυνατή η φόρτωση του ιστορικού συνομιλίας.",
       "new": "Νέα συνομιλία",
-      "deleteTitle": "Διαγραφή αυτής της συνομιλίας;"
+      "deleteTitle": "Διαγραφή αυτής της συνομιλίας;",
+      "resetNoticeTitle": "Τοπικές συνομιλίες και πρόχειρα διαγράφηκαν",
+      "resetNoticeBody": "Το Kilo δεν μπόρεσε να ανοίξει τις συνομιλίες που είναι αποθηκευμένες σε αυτή τη συσκευή. Οι συνεδρίες σας στο νέφος δεν έχουν επηρεαστεί.",
+      "resetNoticeDismiss": "Απόρριψη ειδοποίησης"
     },
     "rename": {
       "title": "Μετονομασία συνομιλίας",
@@ -3959,6 +4110,9 @@
       "fieldName": "Εμφανιζόμενο όνομα",
       "fieldUrl": "URL διακομιστή",
       "fieldUrlInvalid": "Εισαγάγετε ένα έγκυρο URL διακομιστή.",
+      "fieldUrlCredentials": "Αφαιρέστε το όνομα χρήστη και τον κωδικό πρόσβασης από το URL.",
+      "fieldUrlFragment": "Αφαιρέστε το τμήμα # από το URL.",
+      "fieldUrlInsecure": "Εισαγάγετε ένα URL https ή http μόνο για localhost.",
       "duplicateUrl": "Αυτό το URL είναι ήδη αποθηκευμένο.",
       "serverNotFound": "Αυτός ο διακομιστής δεν είναι πλέον αποθηκευμένος.",
       "enableServer": "Ενεργοποίηση αυτού του διακομιστή: {{name}}",
@@ -3984,6 +4138,7 @@
       "app": {
         "label": "Διεπαφή εργαλείου",
         "failed": "Δεν ήταν δυνατή η φόρτωση της διεπαφής αυτού του εργαλείου.",
+        "tooLarge": "Η διεπαφή αυτού του εργαλείου είναι μεγαλύτερη από το όριο {{size}}.",
         "empty": "Η διεπαφή αυτού του εργαλείου δεν έχει τίποτα να εμφανίσει."
       }
     },
@@ -4051,6 +4206,8 @@
       "discoveryNoModels": "Το τελικό σημείο δεν εμφάνισε κανένα μοντέλο. Εισαγάγετε μοντέλα μη αυτόματα.",
       "connectionIncomplete": "Το μοντέλο απάντησε αλλά δεν ολοκλήρωσε την απάντηση. Δοκιμάστε ξανά ή ελέγξτε το αναγνωριστικό μοντέλου και το πρωτόκολλο.",
       "invalidInput": "Εισαγάγετε ένα όνομα υπηρεσίας, έγκυρες κεφαλίδες και τουλάχιστον ένα μοντέλο με μοναδικό αναγνωριστικό και όνομα. Τα όρια διακριτικών πρέπει να είναι θετικοί ακέραιοι αριθμοί.",
+      "invalidApiKey": "Το κλειδί API περιέχει έναν χαρακτήρα που δεν μπορεί να σταλεί. Χρησιμοποιήστε μόνο γράμματα, ψηφία και τυπικά σύμβολα, χωρίς αλλαγές γραμμής.",
+      "invalidHeaders": "Δεν είναι δυνατή η αποστολή προσαρμοσμένης κεφαλίδας. Ελέγξτε το όνομά της και χρησιμοποιήστε μόνο γράμματα, ψηφία και τυπικά σύμβολα, χωρίς αλλαγές γραμμής.",
       "invalidUrl": "Εισαγάγετε ένα βασικό URL του API με HTTP ή HTTPS, χωρίς διαπιστευτήρια, παραμέτρους ερωτήματος ή αναγνωριστικό τμήματος.",
       "publicHttp": "Δεν επιτρέπονται δημόσια τελικά σημεία HTTP. Χρησιμοποιήστε HTTPS ή ένα ιδιωτικό τοπικό τελικό σημείο.",
       "httpApprovalRequired": "Εγκρίνετε αυτό το τοπικό τελικό σημείο HTTP πριν από την αποθήκευση ή τη σύνδεση.",
@@ -4099,6 +4256,7 @@
         "network": "Η λήψη δεν ολοκληρώθηκε. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
         "invalidFile": "Το ληφθέν αρχείο δεν είναι μοντέλο που μπορεί να εκτελέσει αυτή η εφαρμογή, οπότε αφαιρέθηκε.",
         "checksum": "Το ληφθέν αρχείο δεν ταιριάζει με το δημοσιευμένο άθροισμα ελέγχου του, οπότε αφαιρέθηκε. Δοκιμάστε ξανά τη λήψη.",
+        "unreadable": "Αυτή η συσκευή δεν μπόρεσε να ελέγξει το ληφθέν αρχείο, οπότε αφαιρέθηκε. Δοκιμάστε ξανά τη λήψη.",
         "writeFailed": "Αυτή η συσκευή δεν μπόρεσε να αποθηκεύσει το μοντέλο. Δοκιμάστε ξανά τη λήψη."
       }
     },
@@ -4184,7 +4342,15 @@
       "download": "Λήψη μοντέλου στη συσκευή",
       "downloading": "Λήψη…",
       "downloadProgress": "Λήψη… {{percent}}%",
-      "downloadFailed": "Η λήψη δεν ολοκληρώθηκε. Ελέγξτε τη σύνδεσή σας και τον ελεύθερο χώρο αποθήκευσης και δοκιμάστε ξανά."
+      "downloadFailed": "Η λήψη δεν ολοκληρώθηκε. Ελέγξτε τη σύνδεσή σας και τον ελεύθερο χώρο αποθήκευσης και δοκιμάστε ξανά.",
+      "cannotUse": "Δεν μπορεί να εκτελεστεί: {{items}}.",
+      "cannotUseOptions": "Δεν μπορούν να συμπληρωθούν: ορισμένες επιλογές εργαλείου.",
+      "limitations": "Περιορισμοί",
+      "tools": {
+        "time": "Ώρα",
+        "settingsList": "Εμφάνιση ρυθμίσεων",
+        "settingsSet": "Αλλαγή ρυθμίσεων"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Αυτό το μοντέλο υποστηρίζει ένταση σκέψης"
@@ -4363,6 +4529,7 @@
     "instructionSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της οδηγίας",
     "instructionDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της οδηγίας",
     "instructionToggleFailed": "Δεν ήταν δυνατή η ενημέρωση της οδηγίας",
+    "instructionViewTitle": "Αρχείο οδηγίας",
     "instructionLimitReached": "Ένα προφίλ μπορεί να έχει έως {{max}} οδηγίες. Διαγράψτε μία για να προσθέσετε άλλη.",
     "mcp": {
       "title": "Διακομιστές MCP",
@@ -4533,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Δεν ήταν δυνατή η φόρτωση της δραστηριότητας μονάδων.",
       "appStoreReceipt": "Απόδειξη από το App Store",
+      "deduction": {
+        "adminCancel": "Το υπόλοιπο έκλεισε από διαχειριστή",
+        "adminDebit": "Μονάδες αφαιρέθηκαν από διαχειριστή",
+        "codingPlan": "Πρόγραμμα coding: {{plan}}",
+        "correction": "Διόρθωση υπολοίπου",
+        "dispute": "Αμφισβήτηση πληρωμής",
+        "refundAppStore": "Επιστροφή πακέτου μονάδων από το App Store",
+        "refundGooglePlay": "Επιστροφή πακέτου μονάδων από το Google Play"
+      },
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
       "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",
       "expiredGrant": "Έληξε: {{description}}",
+      "expiredStatus": "Έληξε",
       "googlePlayReceipt": "Απόδειξη από το Google Play",
       "kind": {
         "adjustment": "Προσαρμογή",
@@ -4563,7 +4740,8 @@
       "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}, {{amount}}, από {{date}}",
       "receiptUnavailable": "Δεν υπάρχει διαθέσιμη απόδειξη για αυτήν την αγορά.",
       "retentionLimit": "Εμφανίζεται το πιο πρόσφατο ιστορικό μονάδων.",
-      "voidedGrant": "Ακυρωμένο: {{description}}"
+      "voidedGrant": "Ακυρωμένο: {{description}}",
+      "voidedStatus": "Ακυρωμένο"
     },
     "title": "Αγορά πιστώσεων",
     "description": "Οι πιστώσεις είναι μια εφάπαξ αγορά που προστίθεται στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo. Το κατάστημα χρεώνει τον λογαριασμό σας και οι πιστώσεις προστίθενται αφού το κατάστημα επιβεβαιώσει την πληρωμή.",
@@ -4709,6 +4887,7 @@
     "contextAll": "Όλα τα πλαίσια",
     "dismiss": "Απόρριψη αναφοράς",
     "dismissFailed": "Δεν ήταν δυνατή η απόρριψη αυτής της αναφοράς. Η ενέργεια θα δοκιμαστεί ξανά στο παρασκήνιο.",
+    "readMarkFailed": "Δεν ήταν δυνατή η επισήμανση αυτής της αναφοράς ως αναγνωσμένης. Θα γίνει νέα προσπάθεια όταν φορτωθεί ξανά η αναφορά.",
     "offline": "Εκτός σύνδεσης · αποθηκευμένη αναφορά",
     "cached": "Αποθηκευμένη αναφορά · η ανανέωση δεν είναι διαθέσιμη",
     "summary": "Σύνοψη AI",
@@ -4728,12 +4907,15 @@
     "morningEnd": "Η αναφορά είναι διαθέσιμη έως",
     "timeHint": "Η κάρτα της Αρχικής επαναφέρει την τρέχουσα κατάσταση όταν τελειώνει το διάστημα αναφοράς, ακόμη και εκτός σύνδεσης.",
     "invalidSchedule": "Επιλέξτε έγκυρη ζώνη ώρας και μη κενό διάστημα αναφοράς.",
+    "scheduleEmptyNight": "Το παράθυρο της αναφοράς είναι κενό. Επιλέξτε ώρα ετοιμότητας μετά την έναρξη του παραθύρου.",
+    "scheduleEmptyMorning": "Η ώρα ετοιμότητας και η ώρα λήξης διαθεσιμότητας ταυτίζονται. Επιλέξτε για πόσο χρονικό διάστημα η αναφορά παραμένει διαθέσιμη.",
+    "scheduleFullDay": "Τα δύο παράθυρα καλύπτουν μια πλήρη ημέρα. Αφήστε ένα μέρος της ημέρας εκτός της αναφοράς.",
     "notificationsHint": "Μία γενική ειδοποίηση ανά προγραμματισμένη αναφορά. Ανεξάρτητη από τις επί πληρωμή συνόψεις AI.",
     "notificationPermission": "Ενεργοποιήστε τις ειδοποιήσεις push για να λαμβάνετε την αναφορά σας.",
     "defaultModel": "Χρήση του προεπιλεγμένου μοντέλου του Kilo",
     "duration": "Όριο χρόνου (λεπτά)",
     "spendLimit": "Όριο δαπάνης (USD)",
-    "invalidSafeguards": "Εισαγάγετε θετικά, πεπερασμένα όρια χρόνου και δαπάνης.",
+    "invalidSafeguards": "Εισαγάγετε θετικό αριθμό εντός του επιτρεπόμενου εύρους.",
     "estimate": "Εκτίμηση {{estimate}} · μέγιστο {{maximum}}",
     "estimateUnavailable": "Δεν είναι διαθέσιμη επί πληρωμή σύνοψη για αυτές τις ρυθμίσεις. Αλλάξτε το μοντέλο ή τα όρια, ή δοκιμάστε ξανά αργότερα.",
     "estimatePricingUnavailable": "Η τιμολόγηση για αυτό το μοντέλο δεν είναι διαθέσιμη. Επιλέξτε άλλο μοντέλο.",
@@ -4741,15 +4923,17 @@
     "estimateModelNotAllowed": "Αυτό το μοντέλο δεν επιτρέπεται σε αυτό το πλαίσιο. Επιλέξτε άλλο μοντέλο.",
     "estimateSpendLimitTooLow": "Αυξήστε το όριο δαπάνης για να επιτραπεί αυτή η σύνοψη.",
     "confirmPaid": "Ενεργοποίηση επί πληρωμή συνόψεων για {{context}};",
+    "paidDisclosure_one": "Εκτίμηση {{estimate}}, έως {{maximum}}, με χρονικό όριο (σε λεπτό): {{minutes}}. Οι χρεώσεις ισχύουν ακόμη κι αν η δημιουργία αποτύχει.",
+    "paidDisclosure_other": "Εκτίμηση {{estimate}}, έως {{maximum}}, με χρονικό όριο (σε λεπτά): {{minutes}}. Οι χρεώσεις ισχύουν ακόμη κι αν η δημιουργία αποτύχει.",
     "paidDisclosure": "Εκτίμηση {{estimate}}, έως {{maximum}}, με χρονικό όριο (σε λεπτά): {{minutes}}. Οι χρεώσεις ισχύουν ακόμη κι αν η δημιουργία αποτύχει.",
     "enable": "Ενεργοποίηση επί πληρωμή συνόψεων",
     "allContexts": "Οι προσωπικές και οι οργανωσιακές αναφορές παραμένουν ξεχωριστές.",
     "emptyHistory": "Δεν υπάρχουν αποθηκευμένες αναφορές",
-    "estimatePermissionUnavailable": "Δεν έχετε άδεια να χρησιμοποιήσετε το υπόλοιπο αυτού του πλαισίου. Ζητήστε από έναν ιδιοκτήτη οργανισμού να το ενεργοποιήσει.",
+    "estimatePermissionUnavailable": "Δεν έχετε άδεια να χρησιμοποιήσετε το υπόλοιπο αυτού του πλαισίου. Ζητήστε από έναν κάτοχο οργανισμού να το ενεργοποιήσει.",
     "saved": "Οι ρυθμίσεις αναφοράς αποθηκεύτηκαν",
     "selectedSessions": "Επιλεγμένες συνεδρίες",
-    "snapshotPullRequests": "PRs στις επιλεγμένες συνεδρίες",
-    "snapshotBlockers": "Εμπόδια στις επιλεγμένες συνεδρίες",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Εμπόδια",
     "capturedAt": "Καταγράφηκε {{time}}",
     "snapshotHint": "Στιγμιότυπο της τελευταίας διαθέσιμης κατάστασης των συνεδριών, όπως καταγράφηκε την προγραμματισμένη πρωινή ώρα, με πιθανές ελλείψεις. Οι αριθμοί αφορούν τις επιλεγμένες συνεδρίες, όχι ολόκληρη τη νυχτερινή δραστηριότητα.",
     "snapshotTruncated": "Ορισμένες συνεδρίες ή τεκμήρια παραλείφθηκαν για να περιοριστεί το μέγεθος του στιγμιότυπου.",
@@ -4780,7 +4964,7 @@
     "sourceActivity": "Δραστηριότητα χωρίς τίτλο",
     "metadataFailureProvider": "σφάλμα παρόχου",
     "metadataFailureTool": "σφάλμα εργαλείου",
-    "metadataFailureCancelled": "Ακυρώθηκε",
+    "metadataStopped": "Ο τελευταίος κύκλος διακόπηκε",
     "metadataFailureOther": "απροσδιόριστο σφάλμα"
   },
   "systemSearch": {
@@ -4788,6 +4972,7 @@
   },
   "usage": {
     "title": "Χρήση",
+    "personalTitle": "Χρήση προσωπικού λογαριασμού",
     "orgTitle": "Χρήση οργανισμού",
     "entrySubtitle": "Δαπάνες, αιτήματα και διακριτικά",
     "rangePicker": "Χρονικό διάστημα",
@@ -4801,7 +4986,8 @@
     "unavailableTitle": "Η χρήση δεν είναι διαθέσιμη",
     "unavailableDescription": "Η χρήση δεν έχει ρυθμιστεί για αυτόν τον χώρο εργασίας. Επικοινωνήστε με την υποστήριξη αν περιμένετε να βλέπετε χρήση εδώ.",
     "orgSelfNotice": "Βλέπετε τη δική σας χρήση σε αυτόν τον οργανισμό.",
-    "viewDetails": "Προβολή λεπτομερειών χρήσης"
+    "viewDetails": "Προβολή λεπτομερειών χρήσης",
+    "orgSelfEntryTitle": "Η χρήση σας"
   },
   "integrations": {
     "title": "Ενσωματώσεις",
@@ -4897,6 +5083,8 @@
       "autoCommit": "Υποβολή αλλαγών όταν ολοκληρωθεί η εκτέλεση",
       "condenseOnComplete": "Συμπύκνωση του πλαισίου όταν ολοκληρωθεί η εκτέλεση",
       "activeTitle": "Ενεργό έναυσμα",
+      "activeSwitchA11y": "Ενεργό έναυσμα: {{name}}",
+      "copyLinkA11y": "Αντιγραφή συνδέσμου για {{name}}",
       "activeDescription": "Τα διαδικτυακά άγκιστρα σε παύση απαντούν με 404.",
       "runAsCreator": "Εκτέλεση ως εμένα",
       "runAsCreatorDescription": "Κάθε εκτέλεση χρησιμοποιεί τον λογαριασμό σας, επομένως απαιτείται η μυστική κεφαλίδα.",

@@ -7,13 +7,22 @@ import { BriefingDetailScreen } from './briefing-detail-screen';
 
 const state = vi.hoisted(() => ({
   report: undefined as BriefingReport | undefined,
+  dataUpdatedAt: 1,
   options: undefined as
     | undefined
     | {
         refetchInterval: (query: { state: { data?: BriefingReport } }) => number | false;
       },
-  timestamp: vi.fn(() => 'formatted source time'),
+  timestamp: vi.fn(() => ({ text: 'formatted source time', timeZone: 'Europe/Berlin' })),
 }));
+const readMark = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  options: undefined as
+    | undefined
+    | { onError?: (error: Error, variables: { reportId: string }) => void },
+}));
+const announce = vi.hoisted(() => ({ error: vi.fn() }));
+const sonner = vi.hoisted(() => ({ error: vi.fn() }));
 const formatNumber = vi.hoisted(() => vi.fn(String));
 vi.mock('@/lib/format', () => ({ formatNumber }));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
@@ -27,12 +36,24 @@ vi.mock('react-i18next', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: typeof state.options) => {
     state.options = options;
-    return { data: state.report, isPending: false, isError: false, refetch: vi.fn() };
+    return {
+      data: state.report,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+      dataUpdatedAt: state.dataUpdatedAt,
+    };
   },
-  useMutation: () => ({ mutate: vi.fn() }),
+  useMutation: (options: typeof readMark.options) => {
+    readMark.options = options;
+    return { mutate: readMark.mutate };
+  },
   useQueryClient: () => ({ removeQueries: vi.fn() }),
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: announce }));
+// The failed read mark used to raise a bare `sonner-native` toast; spy on it so
+// a regression back to that path fails here instead of going unnoticed.
+vi.mock('sonner-native', () => ({ toast: sonner }));
 vi.mock('@/lib/agent-briefing', () => ({
   BRIEFING_PATH: '/(app)/agent-briefing',
   useBriefingAccess: () => ({ enabled: true, canRead: () => true }),
@@ -43,7 +64,7 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentBriefing: {
       get: { queryOptions: () => ({}), queryKey: () => [] },
-      read: { mutationOptions: () => ({}) },
+      read: { mutationOptions: (options: unknown) => options },
     },
   }),
 }));
@@ -105,7 +126,9 @@ const report: BriefingReport = {
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 beforeEach(() => {
   state.report = report;
+  state.dataUpdatedAt = 1;
   state.options = undefined;
+  readMark.options = undefined;
   vi.clearAllMocks();
 });
 afterEach(() => act(() => renderer?.unmount()));
@@ -227,4 +250,59 @@ it('keeps the stored excerpt for a row without structured metadata', () => {
   const texts = mounted.root.findAllByType('Text' as ElementType).map(node => node.props.children);
   expect(texts).toContain('Plan: one step remaining.');
   expect(texts).not.toContain('agentBriefing.metadataPlan');
+});
+
+const unreadReport: BriefingReport = { ...report, readAt: null };
+
+it('announces one localized failure when the read mark fails', () => {
+  state.report = unreadReport;
+  mount();
+  readMark.options?.onError?.(new Error('read mark failed'), { reportId: 'report-1' });
+  expect(announce.error).toHaveBeenCalledTimes(1);
+  expect(announce.error).toHaveBeenCalledWith('agentBriefing.readMarkFailed');
+  expect(announce.error).not.toHaveBeenCalledWith('common.somethingWentWrong');
+  expect(sonner.error).not.toHaveBeenCalled();
+});
+
+it('announces a failing mark once per report in the visit', () => {
+  state.report = unreadReport;
+  mount();
+  readMark.options?.onError?.(new Error('first failure'), { reportId: 'report-1' });
+  readMark.options?.onError?.(new Error('second failure'), { reportId: 'report-1' });
+  expect(announce.error).toHaveBeenCalledTimes(1);
+});
+
+it('does not announce the same report again after a later payload fails', () => {
+  state.report = unreadReport;
+  const mounted = mount();
+  readMark.options?.onError?.(new Error('first failure'), { reportId: 'report-1' });
+  state.dataUpdatedAt = 2;
+  act(() => {
+    mounted.update(createElement(BriefingDetailScreen));
+  });
+  expect(readMark.mutate).toHaveBeenCalledTimes(2);
+  readMark.options?.onError?.(new Error('polled failure'), { reportId: 'report-1' });
+  expect(announce.error).toHaveBeenCalledTimes(1);
+});
+
+it('marks an unread report once per mount and payload', () => {
+  state.report = unreadReport;
+  const mounted = mount();
+  expect(readMark.mutate).toHaveBeenCalledTimes(1);
+  expect(readMark.mutate).toHaveBeenCalledWith({ reportId: 'report-1' });
+  act(() => {
+    mounted.update(createElement(BriefingDetailScreen));
+  });
+  expect(readMark.mutate).toHaveBeenCalledTimes(1);
+});
+
+it('tries the mark again when the payload is fetched anew', () => {
+  state.report = unreadReport;
+  const mounted = mount();
+  expect(readMark.mutate).toHaveBeenCalledTimes(1);
+  state.dataUpdatedAt = 2;
+  act(() => {
+    mounted.update(createElement(BriefingDetailScreen));
+  });
+  expect(readMark.mutate).toHaveBeenCalledTimes(2);
 });

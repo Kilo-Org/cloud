@@ -23,7 +23,6 @@ import {
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationMetadataForOwner,
-  updateIntegrationRepositories,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
@@ -912,36 +911,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       ]);
     }
 
-    // The installation-scoped update matches by installation id, so its
-    // app-type predicate only matters when two rows share one installation id.
-    // That arrangement is legal only across owners (one row per app type).
-    async function seedOrgInstallationSiblings() {
-      await db.insert(platform_integrations).values([
-        {
-          owned_by_organization_id: orgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '1000',
-          platform_account_login: 'org-a',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'standard',
-        },
-        {
-          owned_by_organization_id: otherOrgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '2000',
-          platform_account_login: 'org-b',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'lite',
-        },
-      ]);
-    }
-
     test('deleteIntegration with app type leaves the owner sibling app-type row', async () => {
       await seedOrgSiblings();
 
@@ -1297,26 +1266,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       const lite = rows.find(row => row.github_app_type === 'lite');
       expect(standard?.integration_status).toBe('active');
       expect(lite?.integration_status).toBe('suspended');
-    });
-
-    test('updateIntegrationRepositories with app type updates only the matched row', async () => {
-      await seedOrgInstallationSiblings();
-
-      await updateIntegrationRepositories(
-        'github',
-        destructiveInstallId,
-        [{ id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false }],
-        'standard'
-      );
-
-      const rows = await getRowsByInstallId();
-      expect(rows).toHaveLength(2);
-      const standard = rows.find(row => row.github_app_type === 'standard');
-      const lite = rows.find(row => row.github_app_type === 'lite');
-      expect(standard?.repositories).toEqual([
-        { id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false },
-      ]);
-      expect(lite?.repositories).toBeNull();
     });
 
     // Two rows for the same owner, same app type, but different installation

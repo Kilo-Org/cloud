@@ -42,11 +42,6 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
   return limit !== 'allowed';
 }
 
-/**
- * True when one account is exchanging device credentials too fast. The shared
- * check reports a rule that is not configured or an answer the firewall
- * blocked, and only a limited answer refuses the exchange.
- */
 export async function isNativeTokenUserRateLimited(
   request: Request,
   kiloUserId: string

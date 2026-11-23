@@ -86,24 +86,58 @@ function insertCase(
   sqlite: DatabaseSync,
   runId: string,
   caseId: string,
-  overrides: { promptRevision?: number; routeKey?: string | null } = {}
+  overrides: {
+    promptRevision?: number;
+    routeKey?: string | null;
+    rep?: number;
+    model?: string;
+    variant?: string;
+  } = {}
 ) {
   sqlite
     .prepare(
       `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
         cost_usd, error, exit_code, tool_calls, tool_names, step_count, final_finish_reason,
         rep, timed_out, prompt_revision)
-       VALUES (?, ?, ?, ?, ?, 1, 100, 0.01, NULL, 0, 1, '["bash"]', 1, 'tool-calls', 0, 0, ?)`
+       VALUES (?, ?, ?, ?, ?, 1, 100, 0.01, NULL, 0, 1, '["bash"]', 1, 'tool-calls', ?, 0, ?)`
     )
     .run(
       runId,
-      MODEL,
-      VARIANT,
+      overrides.model ?? MODEL,
+      overrides.variant ?? VARIANT,
       caseId,
       overrides.routeKey === undefined ? 'implementation/code_generation' : overrides.routeKey,
+      overrides.rep ?? 0,
       overrides.promptRevision ?? 2
     );
 }
+
+/** The run-scoped statement this pair-scoped count replaced, kept to diff the two on real rows. */
+function countProbeCasesByRun(
+  sqlite: DatabaseSync,
+  runIds: readonly string[],
+  caseIds: readonly string[],
+  revision: number
+) {
+  return sqlite
+    .prepare(
+      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
+       FROM case_results
+       WHERE run_id IN (SELECT value FROM json_each(?))
+         AND case_id IN (SELECT value FROM json_each(?))
+         AND prompt_revision >= ?
+       GROUP BY run_id, model, variant`
+    )
+    .all(JSON.stringify(runIds), JSON.stringify(caseIds), revision) as {
+    run_id: string;
+    model: string;
+    variant: string;
+    probes: number;
+  }[];
+}
+
+const probeRowKey = (row: { run_id: string; model: string; variant: string }) =>
+  `${row.run_id}\u0000${row.model}\u0000${row.variant}`;
 
 describe('probe eligibility (real SQLite)', () => {
   let sqlite: DatabaseSync;
@@ -168,11 +202,111 @@ describe('probe eligibility (real SQLite)', () => {
     insertCase(sqlite, 'rev2', first!.id, { promptRevision: 2 });
     insertCase(sqlite, 'rev2', second!.id, { promptRevision: 3 });
     const rows = await countProbeCaseResults(db, {
-      runIds: ['rev2'],
+      pairs: [{ runId: 'rev2', model: MODEL, variant: VARIANT }],
       caseIds: PROBE_CASES.map(probeCase => probeCase.id),
       revision: PROBE_REVISION,
     });
     expect(rows).toEqual([{ run_id: 'rev2', model: MODEL, variant: VARIANT, probes: 1 }]);
+  });
+
+  it('counts each named pair separately, including one with no results at all', async () => {
+    // A second pair of the same run must not contribute to the first pair's count, and a
+    // pair with no rows must still come back (LEFT JOIN) with zero rather than vanishing.
+    const [first, second] = PROBE_CASES;
+    insertCase(sqlite, 'rev2', first!.id, { promptRevision: PROBE_REVISION });
+    insertCase(sqlite, 'rev2', second!.id, {
+      model: 'vendor/other',
+      variant: 'low',
+      promptRevision: PROBE_REVISION,
+    });
+    const rows = await countProbeCaseResults(db, {
+      pairs: [
+        { runId: 'rev2', model: MODEL, variant: VARIANT },
+        { runId: 'rev2', model: 'vendor/other', variant: 'low' },
+        { runId: 'rev2', model: 'vendor/absent', variant: '' },
+      ],
+      caseIds: PROBE_CASES.map(probeCase => probeCase.id),
+      revision: PROBE_REVISION,
+    });
+    expect(
+      rows
+        .toSorted((a, b) => a.model.localeCompare(b.model))
+        .map(row => [row.model, row.variant, row.probes])
+    ).toEqual([
+      [MODEL, VARIANT, 1],
+      ['vendor/absent', '', 0],
+      ['vendor/other', 'low', 1],
+    ]);
+  });
+
+  it('returns the run-scoped count it replaced on real rows: repetitions and stale revisions', async () => {
+    // Differential over the rows that make the two shapes disagree if the pairing is wrong:
+    // repetitions of one case (COUNT(DISTINCT case_id) must not grow), a probe case stored at
+    // an older prompt revision (must not count), a second pair in the same run, and a pair
+    // whose run holds nothing.
+    const [first, second] = PROBE_CASES;
+    const caseIds = PROBE_CASES.map(probeCase => probeCase.id);
+    for (const rep of [0, 1, 2]) {
+      insertCase(sqlite, 'rev2', first!.id, { rep, promptRevision: PROBE_REVISION });
+    }
+    insertCase(sqlite, 'rev2', second!.id, { promptRevision: PROBE_REVISION - 1 });
+    insertCase(sqlite, 'rev2', second!.id, { model: 'vendor/other', variant: 'low', rep: 0 });
+    insertCase(sqlite, 'rev2', second!.id, { model: 'vendor/other', variant: 'low', rep: 1 });
+    insertCase(sqlite, 'rev3', first!.id, { model: 'vendor/other', variant: 'high' });
+
+    const pairs = [
+      { runId: 'rev2', model: MODEL, variant: VARIANT },
+      { runId: 'rev2', model: 'vendor/other', variant: 'low' },
+      { runId: 'rev2', model: 'vendor/absent', variant: '' },
+      { runId: 'rev3', model: 'vendor/other', variant: 'high' },
+      { runId: 'rev3', model: 'vendor/other', variant: 'low' },
+    ];
+    const pairScoped = await countProbeCaseResults(db, {
+      pairs,
+      caseIds,
+      revision: PROBE_REVISION,
+    });
+    const runScoped = new Map(
+      countProbeCasesByRun(sqlite, ['rev2', 'rev3'], caseIds, PROBE_REVISION).map(row => [
+        probeRowKey(row),
+        row.probes,
+      ])
+    );
+
+    expect(pairScoped.map(probeRowKey).toSorted()).toEqual(
+      pairs
+        .map(pair => probeRowKey({ run_id: pair.runId, model: pair.model, variant: pair.variant }))
+        .toSorted()
+    );
+    for (const row of pairScoped) {
+      expect(row.probes).toBe(runScoped.get(probeRowKey(row)) ?? 0);
+    }
+    // Same "complete" predicate: one distinct probe case is not every probe case.
+    expect(pairScoped.find(row => row.model === MODEL)!.probes).toBe(1);
+  });
+
+  it('counts across more pairs than one statement binds', async () => {
+    // 31 pairs crosses PROBE_CASE_PAIR_BATCH_SIZE (30) while staying under D1's 100 variables;
+    // every pair must still be reported exactly once.
+    const pairs = Array.from({ length: 31 }, (_, index) => ({
+      runId: 'rev2',
+      model: `vendor/model-${index}`,
+      variant: 'low',
+    }));
+    insertCase(sqlite, 'rev2', PROBE_CASES[0]!.id, {
+      model: 'vendor/model-30',
+      variant: 'low',
+      promptRevision: PROBE_REVISION,
+    });
+    const rows = await countProbeCaseResults(db, {
+      pairs,
+      caseIds: PROBE_CASES.map(probeCase => probeCase.id),
+      revision: PROBE_REVISION,
+    });
+    expect(rows).toHaveLength(31);
+    expect(new Set(rows.map(probeRowKey)).size).toBe(31);
+    expect(rows.find(row => row.model === 'vendor/model-30')!.probes).toBe(1);
+    expect(rows.filter(row => row.probes === 0)).toHaveLength(30);
   });
 
   it('declares a pair probe-complete only with every probe case, and re-admits it once measured', async () => {

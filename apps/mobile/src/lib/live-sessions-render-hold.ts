@@ -73,9 +73,7 @@ export function resolveLiveSessionsHold<T>(input: {
   if (!canHold || previousHold?.key !== scopeKey || previousHold.sessions.length === 0) {
     return { sessions: current, hold: null, releaseDelayMs: null };
   }
-  // A reading behind the recorded one means the caller's clock stepped
-  // backwards (an NTP correction, a manual clock change): start the window
-  // over from here instead of letting the step stretch it past its end.
+  // A step backwards here is an NTP correction or a manual clock change.
   const emptySince =
     previousHold.emptySince !== null && previousHold.emptySince <= now
       ? previousHold.emptySince

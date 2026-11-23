@@ -2626,6 +2626,27 @@
       "when": 1795211305804,
       "tag": "0374_organization_named_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 375,
+      "version": "7",
+      "when": 1795343198516,
+      "tag": "0375_stiff_risque",
+      "breakpoints": true
+    },
+    {
+      "idx": 376,
+      "version": "7",
+      "when": 1795387642805,
+      "tag": "0376_alias_promotion_entries_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 377,
+      "version": "7",
+      "when": 1795428129892,
+      "tag": "0377_environment_setup_runs",
+      "breakpoints": true
     }
   ]
 }

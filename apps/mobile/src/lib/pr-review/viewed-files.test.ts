@@ -207,8 +207,6 @@ describe('viewed-files', () => {
     expect(getItemMock.mock.calls.length).toBe(callsBefore);
   });
 
-  // s6 (identity rule 17): a provider ref folds the s1 collision-free key
-  // into the storage key, while the legacy GitHub bytes never change.
   describe('provider refs', () => {
     const GITLAB_A = {
       platform: 'gitlab' as const,

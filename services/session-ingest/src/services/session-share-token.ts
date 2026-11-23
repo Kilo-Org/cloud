@@ -210,10 +210,10 @@ export async function resolveSessionShareToken(
     .leftJoin(kilocode_users, eq(cli_sessions_v2.kilo_user_id, kilocode_users.id))
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(
-        cli_sessions_v2.kilo_user_id,
-        cli_sessions_v2.organization_id
-      )
+      organizationMembershipJoinCondition({
+        kiloUserId: cli_sessions_v2.kilo_user_id,
+        organizationIdColumn: cli_sessions_v2.organization_id,
+      })
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())

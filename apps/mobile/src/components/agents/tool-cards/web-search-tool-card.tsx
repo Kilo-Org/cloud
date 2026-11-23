@@ -8,8 +8,9 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
+import { useToolDisplay } from '../use-tool-display';
 
 /**
  * Sheet body for a websearch/codesearch/webfetch tool part: the output block
@@ -32,7 +33,7 @@ export function WebSearchToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function WebSearchToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

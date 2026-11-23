@@ -277,18 +277,7 @@ export function ProfileCommandsScreen({
   };
 
   let content: ReactNode = null;
-  if (commandsQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void commandsQuery.refetch() : undefined}
-        isRetrying={commandsQuery.isRefetching}
-      />
-    );
-  } else if (commandsQuery.isPending) {
+  if (commandsQuery.isPending) {
     content = <CommandsSkeleton />;
   } else if (commands.length === 0) {
     content = (
@@ -333,15 +322,28 @@ export function ProfileCommandsScreen({
         backFallback={backFallback}
         onBack={leaveScreen}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {commandsQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void commandsQuery.refetch() : undefined}
+          isRetrying={commandsQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

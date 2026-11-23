@@ -294,7 +294,12 @@ export function LoginScreen() {
         // differ in height (the code card, the starting row, the form with or
         // without a refusal above it), and a centered column moved the logo and
         // the heading by that difference each time the status changed.
-        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'flex-grow items-center py-8')}
+        // The contract's body pad above the logo, and the screen's own air
+        // below the form: a 28dp pad on both sides left a 28.2dp hole between
+        // the globe row and the logo, past the 24dp the leading-gap rule
+        // allows, because the scroller's top pad is the whole gap under the
+        // header.
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'flex-grow items-center pb-8')}
         keyboardShouldPersistTaps="handled"
         // The space the form keeps below the focused field while the keyboard is
         // up: its own measured height, floored at the primary action plus the

@@ -474,6 +474,38 @@ describe('preview tunnel client: tunnel lifecycle', () => {
     expect(logs).toHaveLength(1);
     expect(local.openStreams()).toBeNull();
   });
+
+  it('opens the tunnel socket through the configured proxy', () => {
+    const proxies: Array<string | undefined> = [];
+    const original = globalThis.WebSocket;
+    class RecordingSocket {
+      constructor(_url: string, options: { proxy?: string }) {
+        proxies.push(options.proxy);
+        throw new Error('recorded');
+      }
+    }
+    Object.assign(globalThis, { WebSocket: RecordingSocket });
+    try {
+      for (const proxyUrl of [undefined, 'http://proxy.test:3128']) {
+        const logs: string[] = [];
+        createPreviewTunnelClient({
+          url: 'ws://worker.test/preview',
+          credential: 'launch-jwt',
+          proxyUrl,
+          forwarder: createPreviewForwarder({
+            refusedPorts: () => [],
+            headTimeoutMs: 1,
+            socketTimeoutMs: 1,
+          }),
+          log: message => logs.push(message),
+        }).demand();
+        expect(logs).toEqual(['preview tunnel connect failed']);
+      }
+    } finally {
+      Object.assign(globalThis, { WebSocket: original });
+    }
+    expect(proxies).toEqual([undefined, 'http://proxy.test:3128']);
+  });
 });
 
 /** A socket that answers pings only when told to. */

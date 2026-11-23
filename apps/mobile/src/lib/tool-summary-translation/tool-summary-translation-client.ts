@@ -168,7 +168,6 @@ export async function requestToolSummaryTranslations({
     controller.abort();
   };
   scope.signal.addEventListener('abort', abortRequest, { once: true });
-  // A big batch needs longer than a single text; the scale stays bounded.
   const timeoutMs = Math.min(
     TOOL_SUMMARY_TRANSLATION_TIMEOUT_MS + PER_TEXT_TIMEOUT_MS * (texts.length - 1),
     MAX_BATCH_TIMEOUT_MS

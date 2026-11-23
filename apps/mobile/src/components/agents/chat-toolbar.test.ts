@@ -216,6 +216,16 @@ describe('ChatToolbar', () => {
     expect(modeProps.disabled).toBe(false);
   });
 
+  it('forwards onRetryModels to the model chip', () => {
+    const onRetryModels = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onRetryModels }) as Node;
+
+    const modelSelectorProps = findElementByType(element, 'ModelSelector');
+    expect(modelSelectorProps).not.toBeNull();
+    expect(modelSelectorProps?.onRetryModels).toBe(onRetryModels);
+  });
+
   it.each(['mode-first', 'model-first'] as const)(
     'renders no mode chip without modeControl and starts the row with the model chip (%s)',
     order => {

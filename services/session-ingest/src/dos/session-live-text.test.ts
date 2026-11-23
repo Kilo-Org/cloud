@@ -4,6 +4,7 @@ import {
   characterCut,
   sessionDisplayLine,
   sessionLiveText,
+  sessionLiveToolStep,
 } from '@kilocode/session-ingest-contracts';
 
 describe('sessionLiveText', () => {
@@ -180,5 +181,34 @@ describe('sessionLiveText', () => {
     // The smallest usable limit still draws: the guard only rejects what has no room.
     expect(sessionLiveText('abcdef', 1)).toBe('…');
     expect(sessionLiveText('a', 1)).toBe('a');
+  });
+});
+
+describe('sessionLiveToolStep', () => {
+  it('resolves the last segment of a path with a long separator run within the step budget', () => {
+    const path = '/' + '/'.repeat(200_000) + 'file.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'file.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('resolves the last segment of a long nested path', () => {
+    const path = 'x/'.repeat(100_000) + 'index.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'index.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('ignores trailing separators on a long path', () => {
+    const path = 'x/'.repeat(100_000) + 'b.ts' + '/'.repeat(1000);
+    const started = performance.now();
+    const step = sessionLiveToolStep('list', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'searching', target: 'b.ts' });
+    expect(elapsed).toBeLessThan(2000);
   });
 });

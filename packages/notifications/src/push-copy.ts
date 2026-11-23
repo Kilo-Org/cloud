@@ -14,6 +14,11 @@ const SESSION_UPDATE_LEAF: GenericBodyLeaf = 'cloudAgentSession';
 // leaks how many agents are running or which sessions they are.
 const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
 
+// A scheduled brief is not the ongoing agents card: it announces one report the
+// reader can open, so it must not tell the reader their running agents changed.
+// It still names no session, count, amount, or brief content.
+const BRIEFING_LEAF: GenericBodyLeaf = 'agentBriefing';
+
 /**
  * The one body per `PushData` variant, named by the leaf its sentence lives
  * under in `en.generic.body`. The map is total over `PushData['type']`, so a new
@@ -30,7 +35,7 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
   security_lifecycle: SECURITY_LIFECYCLE_BODY_LEAF,
-  agent_briefing: ACTIVE_AGENTS_LEAF,
+  agent_briefing: BRIEFING_LEAF,
   active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };
 
@@ -48,9 +53,8 @@ export function genericPushTitle(locale: string | null | undefined): string {
  * session title, message body, org name, amount, or id — the OS lock-screen
  * text must not leak private content.
  *
- * It is the only push module that reads the locale catalogs, so it stays out of
- * the `./schemas` entry: a consumer that only routes or validates a payload
- * must not load them.
+ * It reads the locale catalogs, so it stays out of the `./schemas` entry: a
+ * consumer that only routes or validates a payload must not load them.
  */
 export function genericPushContentForPushData(
   data: PushData,

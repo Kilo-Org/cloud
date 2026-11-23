@@ -8,13 +8,16 @@ export enum ReasoningDetailType {
   Text = 'reasoning.text',
 }
 
-export const CommonReasoningDetailSchema = z
-  .object({
-    id: z.string().nullish(),
-    format: z.enum(ReasoningFormat).nullish(),
-    index: z.number().optional(),
-  })
-  .loose();
+/**
+ * Fields every detail shares. The detail schemas below merge its shape with `.extend`, which copies
+ * only the shape and not an object's unknown-key policy, so they strip unknown keys: declare a
+ * provider field here or in a detail schema to keep it through a parse.
+ */
+export const CommonReasoningDetailSchema = z.object({
+  id: z.string().nullish(),
+  format: z.enum(ReasoningFormat).nullish(),
+  index: z.number().optional(),
+});
 
 export const ReasoningDetailSummarySchema = z
   .object({

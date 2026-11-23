@@ -43,10 +43,8 @@ const EnkryptApiKindSchema = GatewayApiKindSchema.extract([
 /**
  * Wire contract for the Enkrypt usage record endpoint:
  *
- * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key, so
- * every resend must reuse them. `organizationId` follows the `organizations.id` column contract:
- * every stored id is accepted, and the check matches the column's shape rather than a stricter
- * form, so a stored organization keeps working across releases.
+ * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key,
+ * so every resend must reuse them.
  */
 export const EnkryptUsageWriteSchema = z.strictObject({
   id: z.uuid(),
@@ -55,6 +53,11 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
   microdollarUsageId: z.uuid().optional(),
+  /**
+   * The call belongs to an authenticated benchmark case. Optional so a gateway or web app
+   * deployed before the field stays compatible.
+   */
+  benchmarkCase: z.boolean().optional(),
   apiKind: EnkryptApiKindSchema,
   decision: z.enum(['allowed', 'blocked', 'error']),
   creditsCost: z.number().nonnegative().max(MAX_ENKRYPT_CREDITS_PER_CALL).nullable(),

@@ -74,10 +74,9 @@ function stateOf(
  *
  * A disabled server is always `idle` with no tools, whatever a stale entry
  * says: it is the list that decides, and the entry is left for `reconcile` to
- * drop. A server with no entry has not been asked yet. A failed discovery shows
- * as `failed` with no tools. A failed discovery and one that answered with no
- * tools are both retryable, so a screen never leaves a server that was asked
- * without tools and without a way to ask it again.
+ * drop. A failed discovery and one that answered with no tools are both
+ * retryable, so a screen never leaves a server that was asked without tools and
+ * without a way to ask it again.
  */
 export function remoteServerStates(
   servers: readonly StoredRemoteMcpServer[],
@@ -160,9 +159,8 @@ export function remoteServerToolsFor(
 }
 
 /**
- * What a server's offered tools look like once kept: the tools themselves, the
- * view each one carries, and the server's own names, which is what a view calls
- * its tools by.
+ * A tool contributes a view only when the server attached a `uiResourceUri`,
+ * keyed by the name the model calls the tool by.
  */
 export function discoveryOf(
   serverId: string,

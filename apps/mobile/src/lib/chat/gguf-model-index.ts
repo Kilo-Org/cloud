@@ -3,6 +3,7 @@ import {
   type GgufStorage,
   keepStoredModels,
   modelIndexFullyParsed,
+  modelIndexIsReadable,
 } from './gguf-records';
 
 /**
@@ -39,6 +40,11 @@ type SavedModels = {
  * OS would not read (permission, full disk, I/O) is a state the picker reports,
  * not a crash, and this list is read while rendering.
  *
+ * A list that exists but cannot be read - text `JSON.parse` rejects, or a value
+ * that is not an array - is the same reported state: it says nothing about what
+ * is downloaded, so the cleanup must not run on it, and publishing it as no
+ * models would tell the person their downloads are gone.
+ *
  * The pruned list is written back only when the saved one parsed in full, since
  * a rewrite of a list this build could not read would drop that entry and the
  * next launch would delete its file. That rewrite is best effort: the list just
@@ -52,6 +58,11 @@ export function loadSavedModels(input: {
 }): SavedModels {
   try {
     const index = input.storage.readIndex();
+    if (!modelIndexIsReadable(index)) {
+      // Nothing here may touch the files or the list: an unreadable index is not a
+      // list of nothing, and rewriting it would drop every entry it holds.
+      return { models: [], failed: true };
+    }
     const models = keepStoredModels({ ...input, index });
     if (modelIndexFullyParsed(index)) {
       writeSavedModels(input.storage, models);

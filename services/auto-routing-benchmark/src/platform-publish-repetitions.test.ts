@@ -30,6 +30,9 @@ describe('platform publish under router decider repetitions (migrated SQLite)', 
   beforeEach(() => {
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('2026-11-20T00:00:00.000Z');
     env = {
       BENCH_DB: sqliteD1(sqlite),
       AUTO_ROUTING_CONFIG: { delete: vi.fn(), put: vi.fn() },

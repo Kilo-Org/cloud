@@ -66,6 +66,7 @@ import {
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_environment_setup_runs,
   security_findings,
   security_finding_notifications,
   security_remediation_attempts,
@@ -1207,6 +1208,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   grants, agent_configs, webhook_events, webhook_events_v2,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
+ *   cloud_agent_environment_setup_runs (user-owned runs are deleted; runs the
+ *   deleted user created for an organization are retained with `requirements`
+ *   cleared and `created_by_user_id` kept),
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
  *   security_remediation_attempts actor references,
@@ -1530,6 +1534,15 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_sandbox_allocation_settings)
     .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, userId));
+  await tx
+    .delete(cloud_agent_environment_setup_runs)
+    .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, userId));
+  await tx
+    .update(cloud_agent_environment_setup_runs)
+    .set({
+      data: sql`jsonb_set(${cloud_agent_environment_setup_runs.data}, '{requirements}', '""'::jsonb)`,
+    })
+    .where(eq(cloud_agent_environment_setup_runs.created_by_user_id, userId));
   await tx
     .delete(cloud_agent_environments)
     .where(eq(cloud_agent_environments.owned_by_user_id, userId));
@@ -1954,11 +1967,60 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // Organization audit logs: keep the log entries, strip actor PII
+  // Organization audit logs: keep the log entries, strip the deleted user's PII.
+  //
+  // The actor columns belong to the person who acted, so they are cleared on
+  // the rows that person authored.
   await tx
     .update(organization_audit_logs)
     .set({ actor_email: null, actor_name: null })
     .where(eq(organization_audit_logs.actor_id, userId));
+
+  // A structured detail names its *subject*, which is usually someone else, so
+  // it is redacted by the address it holds rather than by the row's author.
+  // Clearing it where the author matched instead would have erased another
+  // member's address while leaving this one's in the rows about them. The
+  // detail schema requires `email`, so a redacted row's detail no longer parses
+  // and falls back to its event name — as a row written before the column did.
+  if (user.google_user_email) {
+    const address = user.google_user_email;
+    await tx
+      .update(organization_audit_logs)
+      .set({
+        details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
+      })
+      .where(eq(sql`${organization_audit_logs.details}->>'email'`, address));
+
+    // The same address can sit in a detail's `emails` list rather than in its
+    // `email` field: `setting.minimumBalanceAlert` stores the alert's recipients
+    // as an array. Those rows are selected by containment — the list holds the
+    // address — and the list is rebuilt without it. Every other detail key
+    // survives. A list the scrub empties is dropped rather than written as
+    // `[]`: the row's sentence names the recipients, so an empty list would
+    // leave it dangling, while the absent key states the threshold alone. A
+    // null detail is left null, and so is one that did not hold the address.
+    await tx.execute(sql`
+      UPDATE organization_audit_logs
+      SET details = (${organization_audit_logs.details} - 'emails') || jsonb_strip_nulls(
+        jsonb_build_object(
+          'emails',
+          NULLIF(
+            COALESCE(
+              (
+                SELECT jsonb_agg(entry.recipient)
+                FROM jsonb_array_elements_text(${organization_audit_logs.details}->'emails') AS entry(recipient)
+                WHERE entry.recipient <> ${address}::text
+              ),
+              '[]'::jsonb
+            ),
+            '[]'::jsonb
+          )
+        )
+      )
+      WHERE jsonb_typeof(${organization_audit_logs.details}->'emails') = 'array'
+        AND ${organization_audit_logs.details}->'emails' ? ${address}::text
+    `);
+  }
 
   await tx
     .update(organization_groups)

@@ -296,10 +296,6 @@ describe('SheetHeader', () => {
   });
 
   it('spends the body inset above a card that draws its own top edge', async () => {
-    // The content-sized confirm card has no handle and no page chrome over the
-    // header, so the header's padding is the whole band above the title. The
-    // body's `pt-3` gives the title the same room over it as the divider
-    // leaves under it, instead of the `pt-4` the default keeps.
     const renderer = await mount({
       title: 'Discard draft?',
       onDone: () => undefined,

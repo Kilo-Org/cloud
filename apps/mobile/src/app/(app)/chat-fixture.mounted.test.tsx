@@ -14,9 +14,10 @@ const mocks = vi.hoisted(() => {
   const personal: Place = { chatScope: 'me:personal', org: { kind: 'personal' } };
   return {
     replace,
-    // `useRouter` and `useChatPlace` answer the same object on every render, so
-    // the mocks do too, until a test moves the place.
-    router: { replace },
+    // The hand-off goes through the stack-safe replace, and `useChatPlace`
+    // answers the same object on every render, so the doubles do too, until a
+    // test moves the place.
+    stackSafeReplace: { replace },
     personal,
     place: { current: personal },
     write: vi.fn<(place: Place, state: string) => Promise<string>>(),
@@ -28,7 +29,9 @@ const shown = vi.hoisted((): { retry: (() => void) | undefined } => ({ retry: un
 vi.mock('expo-router', () => ({
   Redirect: () => null,
   useLocalSearchParams: () => ({ state: 'failed' }),
-  useRouter: () => mocks.router,
+}));
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => mocks.stackSafeReplace,
 }));
 vi.mock('@/components/bootstrap-loading-surface', () => ({
   BootstrapLoadingSurface: mocks.Loading,

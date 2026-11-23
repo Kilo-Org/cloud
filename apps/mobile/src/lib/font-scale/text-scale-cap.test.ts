@@ -15,8 +15,6 @@ describe('resolveFontScaleCap', () => {
   });
 
   it('tracks the live scale while it stays below the caller cap', () => {
-    // The cap is not reached, so the node must follow the scale: the value has
-    // to change with it for the native text to re-measure.
     expect(resolveFontScaleCap(1.1, 1.5)).toBe(1.1);
     expect(resolveFontScaleCap(1.4, 1.5)).toBe(1.4);
   });

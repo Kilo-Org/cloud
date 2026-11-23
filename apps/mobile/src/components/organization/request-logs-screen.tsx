@@ -1,6 +1,6 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
@@ -26,6 +26,7 @@ import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
 import { formatClockTime, formatDate } from '@/lib/format';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -123,6 +124,13 @@ export function OrganizationRequestLogsScreen() {
   // The screen's own read can be pulled in place, and a failed pull is
   // announced: the inert reduced-motion indicator cannot say it.
   const [refreshing, onRefresh] = useManualRefresh(logs.refetch, t('common.couldNotRefresh'));
+  // The tick is the traced input: React Compiler memoizes a call against its own
+  // arguments, and `deviceTimeZone()` takes none, so an untracked probe would
+  // freeze the caption's zone for the life of the screen while the header's
+  // clock range re-formats in the zone the device moved to.
+  const zoneNow = useRelativeTimeNow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the tick is the dependency, not an input the body reads
+  const timeZone = useMemo(() => deviceTimeZone(), [zoneNow]);
 
   // `RequestLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering.
@@ -290,7 +298,7 @@ export function OrganizationRequestLogsScreen() {
                 instead of clipping, so a long id stays whole. */}
             <Text variant="caption">
               {t('organization.requestLogs.timeZoneNote', {
-                zone: isolateBidiText(deviceTimeZone()),
+                zone: isolateBidiText(timeZone),
               })}
             </Text>
           </View>

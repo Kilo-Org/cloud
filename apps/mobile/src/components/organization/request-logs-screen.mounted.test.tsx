@@ -20,7 +20,7 @@ import { i18n } from '@/i18n';
 // importing the mocked module here is how the test reads its spy.
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { isolateBidiText } from '@/lib/bidi';
-import { deviceTimeZone } from '@/lib/intl-cache';
+import type * as IntlCache from '@/lib/intl-cache';
 import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
 import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
@@ -40,6 +40,62 @@ const boundary = {
   role: 'owner' as string | null,
   isResolving: false,
 };
+
+// The screen reads the device zone against the shared tick, so the suite pins
+// the tick and moves it: the caption must re-read the probe on each tick rather
+// than freeze the zone it saw at mount. React Compiler memoizes a call with no
+// traced argument, which is the defect this pins. The mock keeps a listener set
+// so advancing the tick re-renders its subscribers the way the shared store's
+// `useSyncExternalStore` does on a device.
+const tick = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const store = {
+    now: Date.parse('2026-01-01T10:00:00.000Z'),
+    advance(ms: number) {
+      store.now += ms;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    // Handed straight to `useSyncExternalStore`, which calls it with one
+    // argument and keeps the returned unsubscribe.
+    listen(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    snapshot() {
+      return store.now;
+    },
+  };
+  return store;
+});
+const zone = vi.hoisted(() => ({ current: 'Etc/UTC', probes: 0 }));
+
+// `vi.mock` factories are hoisted above this file's imports, so the hook is
+// reached through a dynamic import: a static `react` binding is not initialised
+// when the factory runs.
+vi.mock('@/lib/hooks/use-now-ticker', async () => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    useRelativeTimeNow: () =>
+      useSyncExternalStore(
+        listener => tick.listen(listener),
+        () => tick.snapshot()
+      ),
+  };
+});
+
+// The probe itself, so the test can move the device zone under a mounted screen.
+// The rest of the module stays real: the formatters a list reads live there.
+vi.mock('@/lib/intl-cache', async importOriginal => ({
+  ...(await importOriginal<typeof IntlCache>()),
+  deviceTimeZone: () => {
+    zone.probes += 1;
+    return zone.current;
+  },
+}));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
@@ -257,6 +313,10 @@ beforeEach(() => {
   boundary.organizationId = 'org-1';
   boundary.role = 'owner';
   boundary.isResolving = false;
+  // One test moves both the tick and the zone; every other test starts from the
+  // same instant and zone a device reports.
+  tick.now = Date.parse('2026-01-01T10:00:00.000Z');
+  zone.current = 'Etc/UTC';
 });
 
 describe('OrganizationRequestLogsScreen', () => {
@@ -486,26 +546,59 @@ describe('OrganizationRequestLogsScreen', () => {
     unmount();
   });
 
-  it('names the clock the header times are read on', async () => {
+  it('names the clock the header times are read on, once per tick', async () => {
+    zone.current = 'Etc/UTC';
+    zone.probes = 0;
     const { renderer, unmount } = await mount();
 
-    const deviceZone = deviceTimeZone();
-    const caption = texts(renderer).find(text => text.includes(deviceZone));
-    if (!caption) {
+    const caption = () => texts(renderer).find(text => text.includes('time zone'));
+    const first = caption();
+    if (!first) {
       throw new Error('the header rendered no time-zone caption');
     }
-    // The caption is the catalog's sentence around the probed zone, so a zone
-    // the device moved to reaches the header without the formatters freezing.
-    expect(caption).toBe(
-      i18n.t('organization.requestLogs.timeZoneNote', { zone: isolateBidiText(deviceZone) })
+    // The caption is the catalog's sentence around the probed zone.
+    expect(first).toBe(
+      i18n.t('organization.requestLogs.timeZoneNote', { zone: isolateBidiText('Etc/UTC') })
     );
     // The zone run is a first-strong isolate: an IANA id is Latin by design, so
     // a right-to-left reader must not have its segments reordered.
-    const open = caption.indexOf('\u2068');
-    const close = caption.indexOf('\u2069');
+    const open = first.indexOf('\u2068');
+    const close = first.indexOf('\u2069');
     expect(open).toBeGreaterThan(-1);
     expect(close).toBeGreaterThan(open);
-    expect(caption.slice(open, close + 1)).toBe(`\u2068${deviceZone}\u2069`);
+    expect(first.slice(open, close + 1)).toBe('\u2068Etc/UTC\u2069');
+
+    // The probe takes no argument, so React Compiler memoizes it against its
+    // traced input: the caption must hold one read per tick, not one per
+    // render, and a tick must re-read it. Both halves matter — a probe read on
+    // every render would thrash a formatter construction per row, and a probe
+    // read once per mount would keep the zone the device has left.
+    // A re-render that is not a tick keeps the memoized zone: stepping the
+    // window back re-renders the header, and the probe must not run again.
+    const afterMount = zone.probes;
+    expect(afterMount).toBeGreaterThan(0);
+    const stepBack = renderer.root
+      .findAllByType('Button')
+      .find(node => node.props.accessibilityLabel === 'Older hour');
+    await act(() => {
+      if (stepBack) {
+        handlerOf(stepBack, 'onPress')?.();
+      }
+    });
+    expect(zone.probes).toBe(afterMount);
+
+    // A tick re-reads it, so the move reaches the header.
+    zone.current = 'Pacific/Auckland';
+    await act(async () => {
+      tick.advance(60_000);
+      await Promise.resolve();
+    });
+    expect(zone.probes).toBeGreaterThan(afterMount);
+    expect(caption()).toBe(
+      i18n.t('organization.requestLogs.timeZoneNote', {
+        zone: isolateBidiText('Pacific/Auckland'),
+      })
+    );
     unmount();
   });
 

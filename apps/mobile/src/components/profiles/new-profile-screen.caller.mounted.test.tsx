@@ -35,6 +35,11 @@ const guard = vi.hoisted(() => ({
   backSawEnabled: [] as boolean[],
   replaceSawEnabled: [] as boolean[],
 }));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the render case below.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => mutationState,
@@ -62,9 +67,10 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: routerReplace }),
 }));
 // The screen arms its leave guard for the write window; the confirm branch is
-// unreachable here (no dirty path), so the dialog is a marker.
+// unreachable here (no dirty path), so the dialog is a marker the suite asserts
+// the screen renders.
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (organizationId?: string) => {
@@ -162,6 +168,17 @@ describe('NewProfileScreen caller request', () => {
     boundaryState.role = 'owner';
     boundaryState.org = { organizationName: 'First test organization' };
     boundaryState.isResolving = false;
+  });
+
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await mount({});
+
+    expect(findAll(renderer.root, DISCARD_DIALOG)).toHaveLength(1);
+
+    unmount();
   });
 
   it('starts on the owner its caller asked for and hands the form back on save', async () => {

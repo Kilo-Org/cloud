@@ -32,6 +32,11 @@ const guard = vi.hoisted(() => ({
   repeatSawEnabled: [] as boolean[],
   replaceSawEnabled: [] as boolean[],
 }));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the mounted suite's render case.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => mutationState,
@@ -53,9 +58,10 @@ vi.mock('expo-router', () => ({
 }));
 
 // The form arms its leave guard for the write window; the confirm branch is
-// unreachable here (the name is committed once), so the dialog is a marker.
+// unreachable here (the name is committed once), so the dialog is a marker the
+// mounted suite asserts the screen renders.
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 
 // The post-create hand-off goes through the push-then-retire hook that keeps
@@ -92,6 +98,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 export {
   boundaryState,
   createMutate,
+  DISCARD_DIALOG,
   guard,
   mutationState,
   routerReplace,

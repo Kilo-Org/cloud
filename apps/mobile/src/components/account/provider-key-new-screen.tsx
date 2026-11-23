@@ -45,6 +45,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
@@ -103,8 +104,12 @@ export function ProviderKeyNewScreen() {
     []
   );
 
-  const create = useMutation(trpc.byok.create.mutationOptions({}));
-  const update = useMutation(trpc.byok.update.mutationOptions({}));
+  // A save is an outcome to attempt, not a precondition on connectivity: on the
+  // default `networkMode: 'online'` a save tapped while the device reports
+  // itself offline pauses, so `pending` never clears and the leave guard holds
+  // Back until the connection returns. The attempt settles either way.
+  const create = useMutation(trpc.byok.create.mutationOptions({ ...MUTATE_WHILE_OFFLINE }));
+  const update = useMutation(trpc.byok.update.mutationOptions({ ...MUTATE_WHILE_OFFLINE }));
 
   const backHref = providerKeysHref(scope);
   const title = t(keyId ? 'profile.providerKeys.editKeyTitle' : 'profile.providerKeys.newKeyTitle');

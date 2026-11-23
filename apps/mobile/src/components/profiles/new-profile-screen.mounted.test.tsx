@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   boundaryState,
   createMutate,
+  DISCARD_DIALOG,
   findAll,
   findField,
   findOwnerControl,
@@ -288,6 +289,17 @@ describe('NewProfileScreen', () => {
     expect(toastError).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Profile name').props.error).toBeUndefined();
     expect(routerReplace).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(findAll(renderer.root, DISCARD_DIALOG)).toHaveLength(1);
 
     unmount();
   });

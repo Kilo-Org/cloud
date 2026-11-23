@@ -57,6 +57,11 @@ const guard = vi.hoisted(() => ({
   repeatSawEnabled: [] as boolean[],
   replaceSawEnabled: [] as boolean[],
 }));
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the guard suite's render case.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 /** The review detail route the settled start opens, dispatched by the guard's leave. */
 // The footer reads its keyboard lift from the root `KeyboardProvider` instead of
 // listening to React Native's keyboard events. The store below is driven per
@@ -174,9 +179,9 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
 }));
 // The screen's leave guard renders its discard confirmation through this hook;
 // the confirm branch is unreachable here (no dirty path), so the dialog is a
-// marker the new cases can look for when they assert the guard is wired.
+// marker the guard suite asserts the screen renders.
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 // The connect actions read the reader's organization role for a trial refusal.
 vi.mock('@/lib/organization-context', () => ({
@@ -1455,8 +1460,22 @@ describe('ManualReviewScreen leave guard', () => {
     unmount();
   });
 
+  // The guard hands the screen its discard confirmation as an element the
+  // screen must render: without it a dirty Back stores a request no dialog ever
+  // shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const { renderer, unmount } = await renderScreen();
+
+    expect(renderer.root.findAll(node => Object.is(node.type, DISCARD_DIALOG))).toHaveLength(1);
+
+    unmount();
+  });
+
   // A withdrawn attempt's late success describes a draft that is no longer on
-  // screen, so it neither ends the current intent's key nor navigates.
+  // screen, so it neither ends the current intent's key nor navigates. The
+  // leave is dispatched a task after the guard's disarm render, so the case
+  // yields one macrotask before it asserts the absence of both side effects:
+  // an assertion made in the same turn as the settle would miss the dispatch.
   it('does not open a review for a withdrawn attempt that succeeds late', async () => {
     const calls = captureStarts();
     const { renderer, unmount } = await renderScreen();
@@ -1471,8 +1490,18 @@ describe('ManualReviewScreen leave guard', () => {
     });
 
     act(() => calls[0]?.onSuccess?.({ reviewId: 'review-old-draft' }));
+    // One macrotask, because the leave dispatches a task after the guard's
+    // disarm render.
+    const leaveTask = Promise.withResolvers<undefined>();
+    setTimeout(() => {
+      leaveTask.resolve(undefined);
+    }, 0);
+    await act(async () => {
+      await leaveTask.promise;
+    });
 
     expect(status.replace).not.toHaveBeenCalled();
+    expect(operationKey.rotateKey).not.toHaveBeenCalled();
 
     unmount();
   });

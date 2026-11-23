@@ -99,6 +99,7 @@ const ActionButtonSchema = z.object({
 const QueryErrorPropsSchema = z.object({
   variant: z.string().optional(),
   title: z.string().optional(),
+  placement: z.string().optional(),
   onRetry: z.custom<() => void>(value => typeof value === 'function').optional(),
   action: ActionButtonSchema.optional(),
 });

@@ -84,6 +84,9 @@ export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect
 };
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
+// Every row-count constant below is bounded by this one number.
+export { D1_MAX_BOUND_PARAMETERS } from './d1-limits';
+
 // D1 rejects statements with too many bound variables. A model summary insert
 // binds 18 values per row (including variant), so 5 rows keeps each INSERT
 // below the 100-variable ceiling while still batching the delete plus inserts.

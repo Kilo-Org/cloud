@@ -115,7 +115,7 @@ describe('usePersistedAgentSessionFilters persistence', () => {
     await flush();
 
     expect(store.write).not.toHaveBeenCalled();
-    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldnTLoad');
+    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldNotLoad');
     // The page still works: the defaults are on screen.
     expect(api().hasLoaded).toBe(true);
     expect(api().platformFilter).toEqual([]);
@@ -128,7 +128,7 @@ describe('usePersistedAgentSessionFilters persistence', () => {
     store.read.mockRejectedValue(new Error('the keychain is locked'));
     const api = mount();
     await flush();
-    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldnTLoad');
+    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldNotLoad');
 
     act(() => {
       api().setFilters({ platformFilter: [], projectFilter: [] });

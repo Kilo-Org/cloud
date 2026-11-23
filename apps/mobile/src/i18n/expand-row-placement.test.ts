@@ -252,7 +252,7 @@ describe('counted expand rows', () => {
     ['el', MORE_ABOVE, '… υπάρχει N επιπλέον γραμμή παραπάνω.'],
     ['am', MORE_ABOVE, '… ከላይ ተጨማሪ N መስመር አለ።'],
     ['eu', MORE_ABOVE, '… Beste N lerro dago goian.'],
-    ['hi', MORE_ABOVE, '… ऊपर N और पंक्ति है।'],
+    ['hi', MORE_ABOVE, '… ऊपर N और पंक्ति है'],
     ['mr', MORE_ABOVE, '… वर आणखी N ओळ आहे.'],
     ['ne', MORE_ABOVE, '… माथि थप N पङ्क्ति छ।'],
     ['pa', MORE_ABOVE, '… ਉੱਪਰ N ਹੋਰ ਲਾਈਨ ਹੈ।'],

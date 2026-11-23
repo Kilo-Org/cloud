@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -81,6 +81,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function renderRow(
   props:
     | {
+        label?: string;
         value: string;
         selectable?: boolean;
         testID?: string;
@@ -88,6 +89,8 @@ function renderRow(
         valueDirection?: 'ltr';
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
+        labelShrink?: boolean;
+        trailing?: ReactNode;
       }
     | undefined
 ) {
@@ -126,6 +129,16 @@ function valueStyle(node: TestRenderer.ReactTestInstance): Record<string, unknow
   return flattened;
 }
 
+/** The trailing group View that holds the value and the part after it. */
+function trailingGroupClasses(root: TestRenderer.ReactTestInstance): string[] {
+  const group = root.find(
+    node =>
+      Object.is(node.type, 'View') &&
+      String(node.props.className).split(' ').includes('justify-end')
+  );
+  return String(group.props.className).split(' ');
+}
+
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -159,6 +172,42 @@ describe('KvRow mounted layout', () => {
     );
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
+  });
+
+  // The cost and the share are the columns a reader compares, so the name
+  // yields to them. The amount must then hold its natural width: it was cut to
+  // 15.3 pt of the 22.7 pt a "$1.30" paints while the name kept ~261 pt.
+  it('holds the value and its trailing part at their natural width when the label yields', () => {
+    const root = renderRow({
+      label: longRepository,
+      value: '$1.30',
+      valueFace: 'numeric',
+      labelShrink: true,
+      trailing: createElement('Text', { className: 'w-12 shrink-0' }, '12%'),
+    });
+    const text = valueText(root, '$1.30');
+
+    expect(String(text.props.className)).toContain('shrink-0');
+    const group = trailingGroupClasses(root);
+    expect(group).toContain('shrink-0');
+    expect(group).not.toContain('shrink');
+    expect(group).not.toContain('min-w-0');
+  });
+
+  it('lets the value give up width when the label holds its natural one', () => {
+    const root = renderRow({
+      label: longRepository,
+      value: '$1.30',
+      valueFace: 'numeric',
+      trailing: createElement('Text', { className: 'w-12 shrink-0' }, '12%'),
+    });
+    const text = valueText(root, '$1.30');
+
+    expect(String(text.props.className)).toContain('shrink');
+    expect(String(text.props.className)).not.toContain('shrink-0');
+    const group = trailingGroupClasses(root);
+    expect(group).toContain('shrink');
+    expect(group).toContain('min-w-0');
   });
 
   // A version range is written left to right, so a right-to-left interface lets

@@ -141,6 +141,7 @@ function InboxBody({
         <PrReviewReconnectNotice
           platform={reconnectPlatform ?? undefined}
           organizationId={organizationId}
+          offerReconnect
         />
       </View>
     );

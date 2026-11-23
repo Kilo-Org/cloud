@@ -125,6 +125,12 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  // The reconnect notice's offer reads the caller's organization role, and the
+  // memberships chain behind it pulls the whole auth provider into a suite that
+  // mounts none. No case here presses a check, so the value never renders.
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
 vi.mock('@/lib/pr-review/pending-review-provider', () => ({
   usePendingReview: () => ({ items: [] }),
 }));

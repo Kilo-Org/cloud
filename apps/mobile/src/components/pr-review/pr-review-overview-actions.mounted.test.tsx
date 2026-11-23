@@ -44,6 +44,12 @@ vi.mock('react-native', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: vi.fn() }));
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  // The reconnect notice's offer reads the caller's organization role; this
+  // suite mounts no check, and the memberships chain behind it pulls the auth
+  // provider in.
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
 vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one harness mounts the inbox list for every read state and drives the revoked-connection recovery through the notice. */
 import { parseTimestampSpy } from './use-provider-inbox.test-helpers';
 import { act, createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   authorization: vi.fn(),
   githubPage: vi.fn(),
   providerPage: vi.fn(),
+  connectUser: vi.fn(),
   gitlabConnected: true,
   organizationId: null as string | null,
 }));
@@ -20,11 +22,24 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useGitLabStatus: () => ({ data: { connected: mocks.gitlabConnected } }),
   useBitbucketReadiness: () => ({ data: { connected: false } }),
 }));
+// The offer's browser hand-off: the real launcher resolves once the reader is
+// back in the app, which a test reaches by calling `onReturn` at once.
+vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
+  launchConnectGateBrowser: async (
+    _url: string,
+    handlers: { onReturn: () => Promise<void> }
+  ): Promise<void> => {
+    await handlers.onReturn();
+  },
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubApps: {
       getUserAuthorization: {
         queryOptions: () => ({ queryKey: ['authorization'], queryFn: mocks.authorization }),
+      },
+      connectUserAuthorization: {
+        mutationOptions: () => ({ mutationFn: mocks.connectUser }),
       },
     },
     githubPrReview: {
@@ -72,6 +87,7 @@ beforeEach(() => {
   mocks.organizationId = null;
   mocks.gitlabConnected = true;
   mocks.authorization.mockResolvedValue({ connected: false });
+  mocks.connectUser.mockResolvedValue({ authorizationUrl: 'https://github.example/authorize' });
   mocks.githubPage.mockResolvedValue({ items: [githubItem], nextCursor: null });
   mocks.providerPage.mockResolvedValue({ items: [gitlabItem], nextCursor: null });
 });
@@ -284,11 +300,18 @@ describe('revoked GitHub inbox recovery', () => {
         (check.props.onPress as () => void)();
       });
       await waitFor(() => mounted.queryClient.isMutating() === 0);
+      // The settled check still finds the revocation, so the card now carries
+      // the reconnection this surface has no gate of its own to offer.
       expect(buttons()).toHaveLength(1);
       expect(mocks.githubPage).not.toHaveBeenCalled();
+      const reconnect = buttons().at(-1);
+      if (!reconnect) {
+        throw new Error('reconnect button missing');
+      }
       mocks.authorization.mockResolvedValue({ connected: true, revoked: false });
-      act(() => {
-        (check.props.onPress as () => void)();
+      await act(async () => {
+        (reconnect.props.onPress as () => void)();
+        await Promise.resolve();
       });
       await waitFor(() => buttons().length === 0);
       await waitFor(() => hosts(mounted, 'Row').length === gitlabRowCount + 1);

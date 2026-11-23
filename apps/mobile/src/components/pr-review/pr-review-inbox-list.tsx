@@ -145,7 +145,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
             {inbox.githubNeedsReconnect &&
             view.kind !== 'reconnect' &&
             !isOrganizationAccessView(view) ? (
-              <PrReviewReconnectNotice />
+              <PrReviewReconnectNotice offerReconnect />
             ) : null}
             {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
             <View className={PR_REVIEW_SECTION_LABEL_GAP}>

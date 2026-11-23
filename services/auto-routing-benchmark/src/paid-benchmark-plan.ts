@@ -352,18 +352,18 @@ export function caseCostMicrodollars(input: {
  * repetitions the plan measures, the case minimum revisions and the profile invalidation
  * rule — the same predicate the run's own prior-case copy uses. Optional case/repetition
  * filters keep a staging slice from rescanning the whole pair.
+ *
+ * The filters travel as two JSON arrays instead of one bound value per case and repetition: a
+ * slice of a wide pool names hundreds of cases, and D1 rejects any statement with more than 100
+ * bound parameters. One binding per list keeps the statement's total flat: eight values with
+ * both filters (router, engine identity, repetitions, model, variant, the case list, the
+ * repetition list and the minimum-revision map), six with no filter, seven with exactly one.
  */
-export function paidReuseDrawsSql(
-  filters: { caseIds?: readonly string[]; reps?: readonly number[] } = {}
-): string {
-  const caseFilter =
-    filters.caseIds && filters.caseIds.length > 0
-      ? ` AND source.case_id IN (${filters.caseIds.map(() => '?').join(', ')})`
-      : '';
-  const repFilter =
-    filters.reps && filters.reps.length > 0
-      ? ` AND source.rep IN (${filters.reps.map(() => '?').join(', ')})`
-      : '';
+export function paidReuseDrawsSql(filters: { caseIds?: boolean; reps?: boolean } = {}): string {
+  const caseFilter = filters.caseIds
+    ? ` AND source.case_id IN (SELECT value FROM json_each(?))`
+    : '';
+  const repFilter = filters.reps ? ` AND source.rep IN (SELECT value FROM json_each(?))` : '';
   return `
   WITH ranked AS (
     SELECT source.case_id, source.rep, source.cost_usd,
@@ -401,17 +401,11 @@ export function paidReuseDrawsSql(
  * false charge; this query mirrors that eligibility exactly (same run/engine/invalidation and
  * minimum-revision guards, valid exit code, no output already graded for that slot).
  */
-export function paidPendingOutputsSql(
-  filters: { caseIds?: readonly string[]; reps?: readonly number[] } = {}
-): string {
-  const caseFilter =
-    filters.caseIds && filters.caseIds.length > 0
-      ? ` AND source.case_id IN (${filters.caseIds.map(() => '?').join(', ')})`
-      : '';
-  const repFilter =
-    filters.reps && filters.reps.length > 0
-      ? ` AND source.rep IN (${filters.reps.map(() => '?').join(', ')})`
-      : '';
+export function paidPendingOutputsSql(filters: { caseIds?: boolean; reps?: boolean } = {}): string {
+  const caseFilter = filters.caseIds
+    ? ` AND source.case_id IN (SELECT value FROM json_each(?))`
+    : '';
+  const repFilter = filters.reps ? ` AND source.rep IN (SELECT value FROM json_each(?))` : '';
   return `
   SELECT DISTINCT source.case_id, source.rep FROM benchmark_runs AS run
   CROSS JOIN pending_decider_outputs AS source
@@ -501,16 +495,18 @@ export async function readPairStoredDraws(
     reps?: readonly number[];
   }
 ): Promise<StoredDraw[]> {
+  const caseIds = input.caseIds ?? [];
+  const reps = input.reps ?? [];
   const rows = await db
-    .prepare(paidReuseDrawsSql({ caseIds: input.caseIds, reps: input.reps }))
+    .prepare(paidReuseDrawsSql({ caseIds: caseIds.length > 0, reps: reps.length > 0 }))
     .bind(
       input.router,
       input.engineIdentity,
       input.repetitions,
       input.pair.model,
       variantToStorage(input.pair.variant),
-      ...(input.caseIds ?? []),
-      ...(input.reps ?? []),
+      ...(caseIds.length > 0 ? [JSON.stringify(caseIds)] : []),
+      ...(reps.length > 0 ? [JSON.stringify(reps)] : []),
       JSON.stringify(input.minimumRevisions)
     )
     .all<StoredDraw>();
@@ -542,16 +538,18 @@ export async function readPairPendingOutputs(
     reps?: readonly number[];
   }
 ): Promise<Array<{ case_id: string; rep: number }>> {
+  const caseIds = input.caseIds ?? [];
+  const reps = input.reps ?? [];
   const rows = await db
-    .prepare(paidPendingOutputsSql({ caseIds: input.caseIds, reps: input.reps }))
+    .prepare(paidPendingOutputsSql({ caseIds: caseIds.length > 0, reps: reps.length > 0 }))
     .bind(
       input.router,
       input.engineIdentity,
       input.repetitions,
       input.pair.model,
       variantToStorage(input.pair.variant),
-      ...(input.caseIds ?? []),
-      ...(input.reps ?? []),
+      ...(caseIds.length > 0 ? [JSON.stringify(caseIds)] : []),
+      ...(reps.length > 0 ? [JSON.stringify(reps)] : []),
       JSON.stringify(input.minimumRevisions)
     )
     .all<{ case_id: string; rep: number }>();
@@ -568,14 +566,11 @@ export async function readOpenCaseRuns(
     reps?: readonly number[];
   }
 ): Promise<OpenCaseRun[]> {
+  const caseIds = input.caseIds ?? [];
+  const reps = input.reps ?? [];
   const caseFilter =
-    input.caseIds && input.caseIds.length > 0
-      ? ` AND run.case_id IN (${input.caseIds.map(() => '?').join(', ')})`
-      : '';
-  const repFilter =
-    input.reps && input.reps.length > 0
-      ? ` AND run.rep IN (${input.reps.map(() => '?').join(', ')})`
-      : '';
+    caseIds.length > 0 ? ` AND run.case_id IN (SELECT value FROM json_each(?))` : '';
+  const repFilter = reps.length > 0 ? ` AND run.rep IN (SELECT value FROM json_each(?))` : '';
   const rows = await db
     .prepare(
       `SELECT run.case_id, run.rep, run.status, run.platform_covered, run.result_usable,
@@ -592,8 +587,8 @@ export async function readOpenCaseRuns(
       input.engineIdentity,
       input.pair.model,
       variantToStorage(input.pair.variant),
-      ...(input.caseIds ?? []),
-      ...(input.reps ?? [])
+      ...(caseIds.length > 0 ? [JSON.stringify(caseIds)] : []),
+      ...(reps.length > 0 ? [JSON.stringify(reps)] : [])
     )
     .all<OpenCaseRun>();
   return rows.results;

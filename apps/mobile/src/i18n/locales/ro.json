@@ -4661,6 +4661,8 @@
     "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
     "storeTimedOut": "App Store nu a răspuns la timp. Încearcă din nou.",
     "storeTimedOutPlay": "Google Play nu a răspuns la timp. Încearcă din nou.",
+    "storeUnreachable": "Nu am putut accesa App Store. Încearcă din nou.",
+    "storeUnreachablePlay": "Nu am putut accesa Google Play. Încearcă din nou.",
     "unresolvedPurchase": "Achiziția ta anterioară se poate finaliza în continuare și poate adăuga creditele aferente la soldul tău. Dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
     "unresolvedPurchaseFound": "Magazinul a găsit achiziția ta anterioară și vei primi creditele la finalizare; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
     "unresolvedPurchaseNotFound": "Magazinul nu a găsit achiziția ta anterioară, dar se poate finaliza ulterior și îți poate adăuga creditele; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",

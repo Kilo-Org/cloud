@@ -278,7 +278,7 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
 
     expect(await actions.purchase(creditPack)).toEqual({
       started: false,
-      failure: { kind: 'purchase-refused', messageKey: 'kiloPass.couldNotConnectToAppStore' },
+      failure: { kind: 'purchase-refused', messageKey: 'credits.storeUnreachable' },
     });
     // The owner publishes the failure inline; it never toasts from here.
     expect(showError).not.toHaveBeenCalled();
@@ -299,7 +299,7 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
 
     expect(await actions.purchase({ ...creditPack, storeProductId: GOOGLE_PRODUCT_ID })).toEqual({
       started: false,
-      failure: { kind: 'purchase-refused', messageKey: 'kiloPass.couldNotConnectToPlay' },
+      failure: { kind: 'purchase-refused', messageKey: 'credits.storeUnreachablePlay' },
     });
     expect(showError).not.toHaveBeenCalled();
   });
@@ -970,13 +970,13 @@ describe('getStoreCreditPurchaseErrorMessageKey', () => {
         { code: 'not-prepared', message: 'Billing client not ready' },
         'app_store'
       )
-    ).toBe('kiloPass.couldNotConnectToAppStore');
+    ).toBe('credits.storeUnreachable');
     expect(
       getStoreCreditPurchaseErrorMessageKey(
         { code: 'not-prepared', message: 'Billing client not ready' },
         'play'
       )
-    ).toBe('kiloPass.couldNotConnectToPlay');
+    ).toBe('credits.storeUnreachablePlay');
   });
 
   it('surfaces the Play account-mismatch key on an Android completion failure', async () => {

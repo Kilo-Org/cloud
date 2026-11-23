@@ -93,7 +93,7 @@ vi.mock('react-native-keyboard-controller', () => ({
 }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
-const CONNECTION_TILE = 'Could not connect to the App Store. Check your connection and try again.';
+const CONNECTION_TILE = "Couldn't reach the App Store. Try again.";
 const TIMEOUT_TILE = "App Store didn't respond in time. Try again.";
 
 function textOf(instance: TestRenderer.ReactTestInstance): string {
@@ -223,7 +223,7 @@ describe('CreditPackPricesFixture inline error tile', () => {
     await tapFirstPack(tree);
     expect(errorTileText(tree)).toBe('');
 
-    await waitUntil(() => errorTileText(tree).includes('Could not connect'));
+    await waitUntil(() => errorTileText(tree).includes(CONNECTION_TILE));
     expect(errorTileText(tree)).toBe(CONNECTION_TILE);
     expect(packRows(tree)).toHaveLength(4);
 
@@ -234,7 +234,7 @@ describe('CreditPackPricesFixture inline error tile', () => {
     const tree = await mountFixture('failed');
     await waitUntil(() => packRows(tree).length === 4);
     await tapFirstPack(tree);
-    await waitUntil(() => errorTileText(tree).includes('Could not connect'));
+    await waitUntil(() => errorTileText(tree).includes(CONNECTION_TILE));
 
     await showState(tree, 'timed-out');
     await waitUntil(() => errorTileText(tree).includes('respond in time'));

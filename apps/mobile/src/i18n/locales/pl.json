@@ -4741,6 +4741,8 @@
     "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
     "storeTimedOut": "App Store nie odpowiedział na czas. Spróbuj ponownie.",
     "storeTimedOutPlay": "Google Play nie odpowiedział na czas. Spróbuj ponownie.",
+    "storeUnreachable": "Nie można połączyć się z App Store. Spróbuj ponownie.",
+    "storeUnreachablePlay": "Nie można połączyć się z Google Play. Spróbuj ponownie.",
     "unresolvedPurchase": "Twój wcześniejszy zakup może jeszcze zostać zrealizowany, a kredyty z niego dodane do Twojego salda. Kupując ponownie, rozpoczynasz odrębny zakup, za który może zostać naliczona kolejna opłata.",
     "unresolvedPurchaseFound": "Sklep potwierdził Twój wcześniejszy zakup, a kredyty zostaną dodane po jego realizacji; kupując ponownie, rozpoczynasz osobny zakup, który może wiązać się z kolejną opłatą.",
     "unresolvedPurchaseNotFound": "Sklep nie znalazł Twojego wcześniejszego zakupu, ale może on jeszcze zostać zrealizowany, a kredyty dodane do salda; kupując ponownie, rozpoczynasz osobny zakup, który może wiązać się z kolejną opłatą.",

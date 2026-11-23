@@ -16,10 +16,11 @@ export const NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY = 'credits.noMatchingProductsP
 /**
  * The card body for a store call that failed, per storefront.
  *
- * Catalog keys, not copy: the screen translates them, and the Kilo Pass copy is
- * identical, so reusing its keys keeps `check:i18n` free of a duplicate string.
- * The screen's own connection bound renders these too, so both paths say the
- * same thing: the store did not answer.
+ * Catalog keys, not copy: the screen translates them. Two callers render them
+ * — this loader's store-unavailable card body, and the screen's own products
+ * connection bound (`useStoreCreditProducts`) — so both paths say the same
+ * thing. The purchase screen's inline tile is one line and carries its own
+ * shorter sentence instead (`creditStoreUnreachableKey`).
  */
 export const STORE_FAILURE_KEY = 'kiloPass.couldNotConnectToAppStore';
 export const STORE_FAILURE_PLAY_KEY = 'kiloPass.couldNotConnectToPlay';
@@ -266,8 +267,10 @@ export type StoreUnavailableCopyKeys = {
  * The three bodies keep the three outcomes apart: a store that priced no pack
  * is a catalog answer, a store that failed to answer is a failure, and a store
  * that never answered inside the deadline is a timeout. A timeout must not
- * read as a catalog claim, and the failure copy is shared with the screen's
- * own connection bound, which means "the store did not answer" too.
+ * read as a catalog claim. The purchase screen keeps its own shorter pair
+ * (`creditStoreUnreachableKey` and `creditStoreTimeoutKey`) because its inline
+ * tile is one line beside the pack rows, so this card's bodies are the only
+ * place this longer wording reaches.
  */
 export function getStoreUnavailableCopyKeys(
   storefront: 'app_store' | 'play'

@@ -8,11 +8,7 @@ import { z } from 'zod';
 import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type StoreCreditProduct } from './store-products';
-import {
-  getStoreUnavailableCopyKeys,
-  STORE_TIMEOUT_KEY,
-  STORE_TIMEOUT_PLAY_KEY,
-} from './store-products-loader';
+import { STORE_TIMEOUT_KEY, STORE_TIMEOUT_PLAY_KEY } from './store-products-loader';
 
 /**
  * The purchase's outcome as the owner publishes it. `messageKey` is a catalog
@@ -58,6 +54,24 @@ export type CreditPurchaseCompletion =
  */
 export function creditStoreTimeoutKey(storefront: 'app_store' | 'play'): string {
   return storefront === 'play' ? STORE_TIMEOUT_PLAY_KEY : STORE_TIMEOUT_KEY;
+}
+
+const CREDIT_STORE_UNREACHABLE_KEY = 'credits.storeUnreachable';
+const CREDIT_STORE_UNREACHABLE_PLAY_KEY = 'credits.storeUnreachablePlay';
+
+/**
+ * The catalog key for a store refusal that never reached the store: the billing
+ * client has no live connection, so the purchase can start again unchanged once
+ * it reconnects.
+ *
+ * The screen's inline tile is one `text-sm` band beside the pack rows, and the
+ * store-unavailable card's own connection sentence is too long to hold one line
+ * there on a compact window, where it would cover the last row it reports on.
+ * These keys are that sentence at tile length, and they belong to this flow
+ * alone: the card keeps its longer body.
+ */
+export function creditStoreUnreachableKey(storefront: 'app_store' | 'play'): string {
+  return storefront === 'play' ? CREDIT_STORE_UNREACHABLE_PLAY_KEY : CREDIT_STORE_UNREACHABLE_KEY;
 }
 
 /**
@@ -387,7 +401,7 @@ export function getStoreCreditPurchaseErrorMessageKey(
   // the same tap succeeds after `reconnect()`. Name the connection, not the
   // purchase.
   if (isStoreNotReadyError(error)) {
-    return getStoreUnavailableCopyKeys(storefront).failureBodyKey;
+    return creditStoreUnreachableKey(storefront);
   }
 
   const ownedByAnotherAccountKey =

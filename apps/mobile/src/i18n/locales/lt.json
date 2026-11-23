@@ -4741,6 +4741,8 @@
     "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
     "storeTimedOut": "App Store neatsakė laiku. Bandyti dar kartą.",
     "storeTimedOutPlay": "Google Play neatsakė laiku. Bandyti dar kartą.",
+    "storeUnreachable": "App Store nepasiekiama. Bandyti dar kartą.",
+    "storeUnreachablePlay": "Google Play nepasiekiama. Bandyti dar kartą.",
     "unresolvedPurchase": "Ankstesnis jūsų pirkimas dar gali būti užbaigtas, o už jį įsigyti kreditai – pridėti prie jūsų balanso. Pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
     "unresolvedPurchaseFound": "Parduotuvėje rastas ankstesnis jūsų pirkimas, kurį užbaigus jo kreditai bus pridėti prie jūsų balanso, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
     "unresolvedPurchaseNotFound": "Ankstesnis jūsų pirkimas parduotuvėje nerastas, bet jis dar gali būti užbaigtas ir jo kreditai pridėti, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",

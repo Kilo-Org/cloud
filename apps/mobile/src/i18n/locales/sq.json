@@ -4581,6 +4581,8 @@
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
     "storeTimedOut": "App Store nuk u përgjigj në kohë. Provo përsëri.",
     "storeTimedOutPlay": "Google Play nuk u përgjigj në kohë. Provoni përsëri.",
+    "storeUnreachable": "App Store nuk mund të arrihet. Provo përsëri.",
+    "storeUnreachablePlay": "Google Play nuk mund të arrihet. Provoni përsëri.",
     "unresolvedPurchase": "Blerja juaj e mëparshme mund të përfundojë më vonë dhe të shtojë kreditet e saj. Nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
     "unresolvedPurchaseFound": "Blerja juaj e mëparshme u gjet në dyqan dhe kreditet e saj do të shtohen kur të përfundojë; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
     "unresolvedPurchaseNotFound": "Blerja juaj e mëparshme nuk u gjet në dyqan, por mund të përfundojë më vonë dhe të shtojë kreditet e saj; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",

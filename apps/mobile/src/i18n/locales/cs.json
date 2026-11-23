@@ -4741,6 +4741,8 @@
     "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
     "storeTimedOut": "App Store neodpověděl včas. Zkusit znovu.",
     "storeTimedOutPlay": "Google Play neodpověděl včas. Zkusit znovu.",
+    "storeUnreachable": "App Store není dostupný. Zkusit znovu.",
+    "storeUnreachablePlay": "Google Play není dostupný. Zkusit znovu.",
     "unresolvedPurchase": "Váš předchozí nákup může být ještě dokončen a kredity z něj přidány do vašeho zůstatku. Opětovným nákupem zahájíte další samostatný nákup, za který vám může být znovu účtována platba.",
     "unresolvedPurchaseFound": "Váš předchozí nákup byl v obchodě nalezen a po dokončení vám budou přidány kredity; opětovným nákupem zahájíte další samostatný nákup, za který vám může být znovu účtována platba.",
     "unresolvedPurchaseNotFound": "Váš předchozí nákup nebyl v obchodě nalezen, ale může být ještě dokončen a kredity z něj přidány; opětovným nákupem zahájíte další samostatný nákup, za který vám může být znovu účtována platba.",

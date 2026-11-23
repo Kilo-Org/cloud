@@ -4581,6 +4581,8 @@
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
     "storeTimedOut": "App Store svarade inte i tid. Försök igen.",
     "storeTimedOutPlay": "Google Play svarade inte i tid. Försök igen.",
+    "storeUnreachable": "App Store kunde inte nås. Försök igen.",
+    "storeUnreachablePlay": "Google Play kunde inte nås. Försök igen.",
     "unresolvedPurchase": "Ditt tidigare köp kan fortfarande slutföras så att krediterna från det köpet läggs till på ditt saldo. Om du köper igen påbörjas ett separat köp och du kan debiteras igen.",
     "unresolvedPurchaseFound": "Butiken hittade ditt tidigare köp och krediterna läggs till när det slutförs; om du köper igen påbörjas ett separat köp och du kan debiteras igen.",
     "unresolvedPurchaseNotFound": "Butiken hittade inte ditt tidigare köp, men det kan fortfarande slutföras senare och ge dig krediterna; om du köper igen påbörjas ett separat köp och du kan debiteras igen.",

@@ -4581,6 +4581,8 @@
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
     "storeTimedOut": "App Store 未及时响应。请再试一次。",
     "storeTimedOutPlay": "Google Play 未及时响应。请再试一次。",
+    "storeUnreachable": "无法连接 App Store。请再试一次。",
+    "storeUnreachablePlay": "无法连接 Google Play。请再试一次。",
     "unresolvedPurchase": "你之前的购买仍可能完成，并将相应额度添加到你的余额。再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseFound": "商店已找到你之前的购买记录，购买完成后，相应额度将添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseNotFound": "商店未找到你之前的购买记录，但该笔购买仍可能稍后完成，并将相应额度添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",

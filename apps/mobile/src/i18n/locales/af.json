@@ -4581,6 +4581,8 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "storeTimedOut": "App Store het nie betyds gereageer nie. Probeer weer.",
     "storeTimedOutPlay": "Google Play het nie betyds gereageer nie. Probeer weer.",
+    "storeUnreachable": "Kon nie die App Store bereik nie. Probeer weer.",
+    "storeUnreachablePlay": "Kon nie Google Play bereik nie. Probeer weer.",
     "unresolvedPurchase": "Jou vorige aankoop kan steeds voltooi word en die krediete daarvan kan by jou saldo gevoeg word. As jy weer koop, begin jy 'n afsonderlike aankoop waarvoor jy dalk weer moet betaal.",
     "unresolvedPurchaseFound": "Jou vorige aankoop is by die winkel gevind; die krediete sal by voltooiing bygevoeg word; as jy weer koop, begin jy 'n aparte aankoop waarvoor jy dalk weer moet betaal.",
     "unresolvedPurchaseNotFound": "Jou vorige aankoop is nie by die winkel gevind nie, maar kan steeds later voltooi word en die krediete byvoeg; as jy weer koop, begin jy 'n aparte aankoop waarvoor jy dalk weer moet betaal.",

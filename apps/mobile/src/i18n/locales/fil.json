@@ -4581,6 +4581,8 @@
     "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
     "storeTimedOut": "Hindi tumugon sa oras ang App Store. Subukan muli.",
     "storeTimedOutPlay": "Hindi tumugon sa oras ang Google Play. Subukan muli.",
+    "storeUnreachable": "Hindi maabot ang App Store. Subukan muli.",
+    "storeUnreachablePlay": "Hindi maabot ang Google Play. Subukan muli.",
     "unresolvedPurchase": "Maaari pa ring makumpleto ang nauna mong pagbili at maidagdag ang kredito mula rito. Ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",
     "unresolvedPurchaseFound": "Nakita sa store ang nauna mong pagbili at idaragdag ang kredito kapag nakumpleto ito; ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",
     "unresolvedPurchaseNotFound": "Hindi nakita sa store ang nauna mong pagbili, pero maaari pa itong makumpleto kalaunan at maidagdag ang kredito; ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",

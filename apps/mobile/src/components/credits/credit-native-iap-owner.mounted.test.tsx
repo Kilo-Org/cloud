@@ -2152,7 +2152,7 @@ describe('CreditNativeIapOwner', () => {
       // names the store connection, and the reconnect lets the next tap buy.
       expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
       expect(handle.value?.completingProductId).toBeNull();
-      expect(handle.value?.errorMessageKey).toBe('kiloPass.couldNotConnectToPlay');
+      expect(handle.value?.errorMessageKey).toBe('credits.storeUnreachablePlay');
     });
   });
 });

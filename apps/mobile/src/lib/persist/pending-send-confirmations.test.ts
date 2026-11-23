@@ -166,14 +166,18 @@ describe('pending send confirmations', () => {
     expect(record.items.map(entry => entry.messageId)).not.toContain('msg-1');
   });
 
-  it('keeps the other entries readable when a send carried only attachments', async () => {
+  it('records an attachment-only send, whose text is empty', async () => {
     await persist(SESSION_ID, 'msg-text', 'hello');
-    // An attachment-only send carries no text; it is not recorded, and it must
-    // not make the stored list unreadable either.
+    // The composer restores the chips of an attachment-only send exactly like a
+    // text restore, so it must be recorded too — with the empty text the item
+    // schema admits — or nothing would retract that restore on a reopen.
     await persist(SESSION_ID, 'msg-files', '');
 
     await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual({
-      items: [{ messageId: 'msg-text', text: 'hello' }],
+      items: [
+        { messageId: 'msg-text', text: 'hello' },
+        { messageId: 'msg-files', text: '' },
+      ],
       complete: true,
     });
   });

@@ -282,11 +282,11 @@ export async function persistPendingSendConfirmation(input: {
   text: string;
 }): Promise<void> {
   const { messageId, text } = input;
-  // A send that carried no text restores nothing into the composer, so there is
-  // no duplicate to withdraw later.
-  if (text === '') {
-    return;
-  }
+  // An attachment-only send stores `text: ''` and is recorded like any other:
+  // the composer restores the chips (`restoreChips`) whether or not the send
+  // carried text, so an entry is the only thing that retires that restore when
+  // the server turns out to have accepted the send. Skipping it left the chips
+  // restored with no record, one reopen away from a duplicate send.
   await writePending({
     ...input,
     update: existing =>

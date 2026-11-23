@@ -54,6 +54,9 @@ const kvStore = vi.hoisted(
 );
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  getItemWithUpdatedAt: vi.fn(
+    async (_scope: string, _k: string): Promise<{ v: string; updatedAt: number } | null> => null
+  ),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
@@ -136,6 +139,10 @@ function armDraftStorage(): void {
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
+  kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
+    const entry = kvStore.get(storageKey(scope, k));
+    return entry === undefined ? null : { v: entry.v, updatedAt: entry.updatedAt };
+  });
   kvMock.setItem.mockImplementation(async (scope, k, v) => {
     kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
     nextUpdatedAt += 1;
@@ -1049,24 +1056,24 @@ describe('share payload account boundary', () => {
 
     // Hold the rewrite's draft read, so the scope change is guaranteed to land
     // between that read and the write it would otherwise make.
-    const armedRead = kvMock.getItem.getMockImplementation();
+    const armedRead = kvMock.getItemWithUpdatedAt.getMockImplementation();
     const readHeld = Promise.withResolvers<boolean>();
     let holdNextRead = true;
-    kvMock.getItem.mockImplementation(async (scope, k) => {
+    kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
       if (holdNextRead) {
         holdNextRead = false;
         await readHeld.promise;
       }
       return armedRead?.(scope, k) ?? null;
     });
-    const readsBefore = kvMock.getItem.mock.calls.length;
+    const readsBefore = kvMock.getItemWithUpdatedAt.mock.calls.length;
     const writesBefore = kvMock.setItem.mock.calls.length;
 
     clearAccountStagedSharePayloads();
     // The boundary returns synchronously while its rewrite is parked on the
     // draft read; the scope moves before that read settles.
     await vi.waitFor(() => {
-      expect(kvMock.getItem.mock.calls.length).toBeGreaterThan(readsBefore);
+      expect(kvMock.getItemWithUpdatedAt.mock.calls.length).toBeGreaterThan(readsBefore);
     });
     setSharePersistUserId('userB');
     readHeld.resolve(true);
@@ -1092,6 +1099,10 @@ describe('pending share id draft helpers', () => {
     kvMock.getItem.mockImplementation(
       async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
     );
+    kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
+      const entry = kvStore.get(storageKey(scope, k));
+      return entry === undefined ? null : { v: entry.v, updatedAt: entry.updatedAt };
+    });
     kvMock.setItem.mockImplementation(async (scope, k, v) => {
       kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
       nextUpdatedAt += 1;

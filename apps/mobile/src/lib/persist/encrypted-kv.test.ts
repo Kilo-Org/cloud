@@ -303,6 +303,7 @@ import {
   clearScope,
   clearScopePrefix,
   getItem,
+  getItemWithUpdatedAt,
   isValidDbKey,
   listEntries,
   listEntryValues,
@@ -1553,6 +1554,28 @@ describe('kv behavior', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+
+  it('getItemWithUpdatedAt returns the value with its write time in one statement', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1000);
+      await setItem('s', 'k', 'a');
+      vi.setSystemTime(2000);
+      await setItem('s', 'k', 'b');
+      sqlLog.length = 0;
+
+      await expect(getItemWithUpdatedAt('s', 'k')).resolves.toEqual({ v: 'b', updatedAt: 2000 });
+      expect(sqlLog).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('getItemWithUpdatedAt returns null for a missing key and rejects an empty scope or key', async () => {
+    await expect(getItemWithUpdatedAt('s', 'missing')).resolves.toBeNull();
+    await expect(getItemWithUpdatedAt('', 'k')).rejects.toThrow(TypeError);
+    await expect(getItemWithUpdatedAt('s', '')).rejects.toThrow(TypeError);
   });
 
   it('listEntryValues pairs each key with its stored value oldest-first', async () => {

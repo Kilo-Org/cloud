@@ -119,8 +119,8 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
-  isNewestMessageConfirmedPrompt,
   lastVisibleMessageFailure,
+  newestConfirmedPromptSentAt,
   resolveRetryPrompt,
   resolveRetryTarget,
   restoreCanceledQueuedMessages,
@@ -1622,26 +1622,50 @@ export function SessionDetailContent({
   // The record of unknown-outcome sends is the only thing that retires a
   // restored draft when its confirmation lands. When that record is truncated
   // or unreadable, the transcript stands in: a newest confirmed user row that
-  // carries this draft's prompt AND ends the transcript is that delivery, so
-  // the draft is withdrawn instead of offered for a second send. A row with an
-  // answer below it is an earlier turn the reader is repeating ("continue",
-  // "yes"), and withdrawing its draft would silently erase text nobody sent.
-  // The composer ignores a withdrawal of text that is not the unedited restored
+  // carries this draft's prompt AND ends the transcript may be that delivery.
+  //
+  // The text alone cannot settle it once the record is gone, so the times
+  // decide — and they run the opposite way to the obvious guess. The restore is
+  // what writes the draft: the server accepts the send at T0 and the confirmed
+  // row carries T0, while the transport failure only arrives later, so the
+  // composer puts the text back and that write stamps the draft at T1 > T0. A
+  // draft stored AFTER the row is therefore the restored duplicate of that
+  // delivery and is withdrawn. A draft stored BEFORE the row predates it, so it
+  // is a message of its own — the same words the person typed, or another
+  // client's identical row landing over an older draft — and stays.
+  //
+  // A null on either side (no stored timestamp, or no row answering the text)
+  // cannot be ordered, so the draft is kept: erasing text that may be unsent
+  // loses work, while keeping text that may be delivered is one visible tap
+  // away from being corrected. A row with an answer below it is an earlier turn
+  // the reader is repeating ("continue", "yes") and never withdraws either. The
+  // composer ignores a withdrawal of text that is not the unedited restored
   // draft, so a repeated run costs nothing and a draft the reader typed or
   // edited is never taken.
   const restoredDraftValue = composerDraft.value;
+  const restoredDraftStoredAt = composerDraft.storedAt;
   useEffect(() => {
     if (!pendingSendGuardIncomplete || !composerDraft.settled || !restoredDraftValue) {
       return;
     }
-    if (!isNewestMessageConfirmedPrompt(messages, restoredDraftValue)) {
+    if (restoredDraftStoredAt === null) {
+      return;
+    }
+    const sentAt = newestConfirmedPromptSentAt(messages, restoredDraftValue);
+    if (sentAt === null || !(restoredDraftStoredAt > sentAt)) {
       return;
     }
     // The comparison uses the prompt the send carries, so the withdrawal gets
     // that same value; the composer refuses a draft the reader edited away from
     // it, which is the guard this depends on.
     composerControlRef.current?.withdrawRestoredSend(composerPromptText(restoredDraftValue));
-  }, [pendingSendGuardIncomplete, composerDraft.settled, restoredDraftValue, messages]);
+  }, [
+    pendingSendGuardIncomplete,
+    composerDraft.settled,
+    restoredDraftValue,
+    restoredDraftStoredAt,
+    messages,
+  ]);
 
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads

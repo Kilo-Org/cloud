@@ -1368,7 +1368,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (sealed.type === 'failure') return sealed.failure;
 
     await this.enqueue(async () => {
-      if (validated.data.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
@@ -1432,7 +1431,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // Finish seeding before metadata can make a registration retry return success.
       if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
-      if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(metadata));

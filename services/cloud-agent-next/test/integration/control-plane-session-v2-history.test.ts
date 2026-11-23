@@ -1469,6 +1469,55 @@ describe('workspace DO history and mutation cursors', () => {
     });
   });
 
+  it('imports a registered session from ingest on its first page read', async () => {
+    const sessionId = `workspace_${crypto.randomUUID()}`;
+    const kiloSessionId = nativeId();
+    const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    // Registration rejects a legacy token, so the metadata carries a modern one.
+    const token = [
+      btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })),
+      btoa(JSON.stringify({ runtimeAuthorization: { id: 'ra_history' } })),
+      'sig',
+    ]
+      .join('.')
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replaceAll('=', '');
+    await stub.registerSessionFromMetadata({
+      metadata: parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId, userId: USER_ID, createdOnPlatform: 'cloud-agent-web' },
+        auth: { kiloSessionId, kilocodeToken: token },
+        agent: { mode: 'code', model: 'test/model' },
+        workspace: {
+          sandboxId: `ses-${crypto.randomUUID().replaceAll('-', '')}`,
+          sandboxProvider: 'cloudflare-containers',
+          branchName: 'kilo/history',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(readHistoryHydration(state.storage)).toBeUndefined();
+      instance.env.SESSION_INGEST = {
+        getCloudAgentRootSessionSnapshot: vi.fn().mockResolvedValue(null),
+        getCloudAgentRootSessionMessages: vi.fn().mockResolvedValue({
+          kiloSessionId,
+          cloudAgentSessionId: sessionId,
+          history: {
+            messages: [{ info: message(kiloSessionId, 'msg_ingest', 1), parts: [] }],
+            nextCursor: null,
+            omittedItemCount: 0,
+          },
+        }),
+      } as unknown as SessionIngestBinding;
+    });
+    expect((await stub.getSessionMessagesPage())?.messages.map(item => item.info.id)).toEqual([
+      'msg_ingest',
+    ]);
+  });
+
   it('hydrates only v1 sessions from session-ingest', async () => {
     for (const version of ['v1', 'v2'] as const) {
       const { stub, sessionId, kiloSessionId } = await fixture();

@@ -483,10 +483,19 @@ test('does not call a key unused when a source file could not be read', context 
 
 test('reports a missing source tree instead of naming every key unused', () => {
   // Inside the copied checker the fixture tree IS the repository root, so every
-  // declared source tree must be there. Without `services` the push catalog's
-  // keys would all read as dead; the run names the missing tree once and names
-  // no key, because the fixture's English keys are all called by SOURCE.
-  const root = cliFixture(standardFiles());
+  // declared source tree must be there. The push key below is called only from
+  // `services`, so removing that tree leaves the key invisible to the scan:
+  // without the completeness rule the run would name it dead, and the
+  // `doesNotMatch` below would fail. The assertion therefore reads the
+  // suppression and not just the missing-tree line.
+  const pushEnglish = { internal: { lowBalance: 'Low balance' } };
+  const pushTranslated = { internal: { lowBalance: 'Низкий баланс' } };
+  const root = cliFixture({
+    ...standardFiles(),
+    'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
+    'packages/notifications/src/locales/ru.json': JSON.stringify(pushTranslated),
+    'services/alert.ts': "translatePush('en', 'internal.lowBalance');",
+  });
   rmSync(join(root, 'services'), { recursive: true, force: true });
   const result = cli(root);
   assert.equal(result.status, 1);

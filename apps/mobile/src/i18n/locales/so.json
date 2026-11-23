@@ -91,6 +91,7 @@
     "draft": "Qabyo",
     "enabled": "La shiday",
     "github": "GitHub",
+    "image": "Sawir",
     "imageUnavailable": "Sawirka lama heli karo.",
     "loading": "Soo raraya…",
     "loadMore": "Soo rar kuwo kale",
@@ -122,10 +123,10 @@
     "connectProvider": "Ku xidh bixiye",
     "contentTruncated": "Nuxurka waa la gaabiyay",
     "copyLink": "Nuqul ka samee xiriiriyaha",
+    "couldNotLoad": "Lama soo rari karin.",
+    "couldNotLoadMore": "Kuwo kale lama soo rari karin.",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",
     "couldNotLoadSessions": "Kalfadhiyada lama soo rari karin.",
-    "couldnTLoad": "Lama soo rari karin.",
-    "couldnTLoadMore": "Kuwo kale lama soo rari karin.",
     "deviceSessions": "Kalfadhiyada aaladaha",
     "disabled": "La damiyay",
     "email": "Iimayl",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
+      "imageUnavailableRetryWithAlt": "Sawirka lama heli karo, {{alt}}, mar kale isku day inaad soo shubto",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",
@@ -2811,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Waxaa la gaaray xadka kalfadhiyada la isku dhex abuuri karo.",
+      "maxNestingDepth": "Waxaa la gaaray xadka qotada kalfadhiyada gudaha ah.",
       "modelAccessibility": "Moodeelka: {{modelLabel}}",
       "openHint": "Fur kalfadhiga wakiilka hoose",
       "subagent": "Wakiil hoose",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Dhammaan kuraasta waa la wada isticmaalayaa. Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale."
     },
     "invoices": {
-      "downloadA11y": "Soo deji qaansheegta {{number}}",
+      "downloadA11y": "Soo deji qaansheegta {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Qaansheegyada si toos ah ayaa loo sameeyaa xilli kasta oo biil bixin ah. Halkan ayay ka soo muuqan doonaan marka ururkaaga biil loo soo saaro.",
       "emptyTitle": "Ma jiraan qaansheegyo",
       "invoiceFallback": "Qaansheeg",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
-      "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
       "ssoAndDomain": "SSO iyo domain",
       "dataCollection": "Ururinta xogta",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Si aad u dhammaystirto abuurista akoonkaaga, dib u noqo oo isticmaal '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Mar kale isku day ama isticmaal '$t(login.resendCode)'.",
+    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Isticmaal '$t(login.resendCode)' ama '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Koodhkaaga waa la habaynayaa. Wax yar sug oo mar kale isku day.",
     "tooManyAttempts": "Isku dayo aad u badan. Fadlan codso koodh cusub.",
     "invalidToken": "Soo geliddu way fashilantay. Fadlan mar kale isku day.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Liiska barta adeegga ma ku jirin moodeellada. Moodeellada gacanta ku geli.",
       "connectionIncomplete": "Moodeelka jawaabu wuu bixiyay, laakiin waanu dhammeeyn. Isku dayna mar kale, ama hubi aqoonsiga moodeelka iyo hab-maamuuska.",
       "invalidInput": "Geli magaca adeegga gadaale, madaxyo sax ah, iyo ugu yaraan hal moodeel oo leh aqoonsi iyo magac u gaar ah. Xaddidaadaha unugyada qoraalku waa inay noqdaan tirooyin dhan oo ka weyn eber.",
+      "invalidApiKey": "Furaha API waxaa ku jira xaraf aan la diri karin. Isticmaal oo keliya xarfo, tirooyin, iyo calaamado caadi ah, oo aan lahayn jajab xariiqeed.",
+      "invalidHeaders": "Madax gaar ah lama diri karo. Hubi magaciisa oo isticmaal oo keliya xarfo, tirooyin, iyo calaamado caadi ah, oo aan lahayn jajab xariiqeed.",
       "invalidUrl": "Geli URL-ka asalka API ee HTTP ama HTTPS oo aan lahayn xogta aqoonsiga, qaybta weydiinta, ama jajabka URL-ka.",
       "publicHttp": "Baraha adeegga HTTP ee dadweynaha lama oggola. Isticmaal HTTPS, ama bar adeeg oo gaar ah oo shabakadda gudaha ah.",
       "httpApprovalRequired": "Oggolow bartan adeegga HTTP ee gudaha ka hor intaadan kaydin ama ku xirmin.",
@@ -4338,7 +4341,15 @@
       "download": "Soo deji moodeelka aaladda gudaheeda",
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
-      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale.",
+      "cannotUse": "Lama socodsan karo: {{items}}.",
+      "cannotUseOptions": "Lama buuxin karo: xulashooyin qalab oo qaar ah.",
+      "limitations": "Xaddidaadyo",
+      "tools": {
+        "time": "Waqti",
+        "settingsList": "Muuji dejinta",
+        "settingsSet": "Beddel dejinta"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Lama kaydin karin tilmaanta",
     "instructionDeleteFailed": "Lama tirtiri karin tilmaanta",
     "instructionToggleFailed": "Lama cusboonaysiin karin tilmaanta",
+    "instructionViewTitle": "Faylka tilmaanta",
     "instructionLimitReached": "Borofilku wuxuu qaadi karaa ilaa {{max}} tilmaamood. Tirtir mid si aad u darto mid kale.",
     "mcp": {
       "title": "Adeegayaasha MCP",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Dhaqdhaqaaqa kireditka lama rari karin.",
       "appStoreReceipt": "Rasiid ka yimid App Store",
+      "deduction": {
+        "adminCancel": "Hadhaaga waxaa xidhay maamule",
+        "adminDebit": "Kiredit waxaa ka saaray maamule",
+        "codingPlan": "Qorshaha codeynta: {{plan}}",
+        "correction": "Hagaajinta haraaga",
+        "dispute": "Muranka lacag-bixinta",
+        "refundAppStore": "Lacag celin xirmo kiredit oo ka timid App Store",
+        "refundGooglePlay": "Lacag celin xirmo kiredit oo ka timid Google Play"
+      },
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
       "expiredGrant": "Waqtigiisu dhacay: {{description}}",
+      "expiredStatus": "Waqtigiisu dhacay",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
         "adjustment": "Hagaajin",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
       "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
-      "voidedGrant": "La buriyay: {{description}}"
+      "voidedGrant": "La buriyay: {{description}}",
+      "voidedStatus": "La buriyay"
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Kordhi xadka kharashka si aad u oggolaato soo koobiddan.",
     "saved": "Dejinta warbixinta waa la kaydiyay",
     "selectedSessions": "Fadhiyada la doortay",
-    "snapshotPullRequests": "PRs ku jira fadhiyada la doortay",
-    "snapshotBlockers": "Caqabadaha ku jira fadhiyada la doortay",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Caqabadaha",
     "capturedAt": "La kaydiyay {{time}}",
     "snapshotHint": "Nuqul laga kaydiyay xaaladdii ugu dambaysay ee fadhiyada ee la heli karay subaxdii la jadwalay, intii suurtagal ahayd. Tirooyinku waxay khuseeyaan fadhiyada la doortay, ma aha dhammaan dhaqdhaqaaqii habeenkii.",
     "snapshotTruncated": "Fadhiyo ama caddaymo qaar ayaa laga reebay si cabbirka nuqulkan xaaladdu u ahaado mid xaddidan.",

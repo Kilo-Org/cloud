@@ -83,6 +83,14 @@ describe('foldSessionLiveSummary', () => {
       verb: 'searching',
       target: 'c',
     });
+    expect(run([part('list', 'running', { filePath: '/a/b/dir.ts' })]).step).toEqual({
+      verb: 'searching',
+      target: 'dir.ts',
+    });
+    expect(run([part('list', 'running', { file_path: 'x/y/z.md' })]).step).toEqual({
+      verb: 'searching',
+      target: 'z.md',
+    });
     expect(run([part('codesearch', 'running', { query: 'how does it work' })]).step?.verb).toBe(
       'searching'
     );

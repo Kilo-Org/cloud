@@ -51,6 +51,39 @@ function deductionTypeLabel(t: TFunction, kind: CreditDeduction['kind']): string
   return key ? t(key) : kind;
 }
 
+/** The row title each machine-readable deduction reason renders, in the reader's language. */
+const DEDUCTION_TITLE_KEYS = {
+  usage: 'usage.title',
+  coding_plan: 'credits.history.deduction.codingPlan',
+  refund_app_store: 'credits.history.deduction.refundAppStore',
+  refund_google_play: 'credits.history.deduction.refundGooglePlay',
+  dispute: 'credits.history.deduction.dispute',
+  admin_cancel: 'credits.history.deduction.adminCancel',
+  admin_debit: 'credits.history.deduction.adminDebit',
+  correction: 'credits.history.deduction.correction',
+} satisfies Record<NonNullable<CreditDeduction['reason']>, string>;
+
+function deductionTitle(t: TFunction, deduction: CreditDeduction): string | null {
+  const reason = deduction.reason;
+  if (reason == null) {
+    return null;
+  }
+  const key = lookup(DEDUCTION_TITLE_KEYS, reason);
+  if (key == null) {
+    return null;
+  }
+  // The coding plan is the row's own reason plus the plan it charged: the
+  // provider and plan names are proper nouns, kept as data and isolated
+  // left-to-right inside a right-to-left sentence. A row whose plan the
+  // server did not name keeps the ledger's sentence instead.
+  if (reason === 'coding_plan') {
+    return deduction.planName == null
+      ? null
+      : t(key, { plan: isolateLtrBidiText(deduction.planName) });
+  }
+  return t(key);
+}
+
 /**
  * The grant line's type, following the web credits page: the recorded channel
  * decides, and only a grant with none falls back to its free flag.
@@ -96,6 +129,26 @@ const GRANT_TITLE_KEYS = {
 function grantTitle(t: TFunction, reason: CreditGrantReason): string {
   return t(lookup(GRANT_TITLE_KEYS, reason) ?? 'credits.history.kind.grant');
 }
+
+/**
+ * The line that names an expiry as the whole event. Only a grant that already
+ * has its own purchase row above reaches it, and that row carries the grant's
+ * title, so the line has to name what ran out itself.
+ */
+const EXPIRY_TITLE_KEYS = {
+  expired: 'credits.history.expiredGrant',
+  voided: 'credits.history.voidedGrant',
+} satisfies Record<NonNullable<CreditDeduction['expiry']>, string>;
+
+/**
+ * The status alone, for the muted line under the grant it closed: the grant's
+ * own title sits directly above, so repeating the name would read as a second
+ * grant.
+ */
+const EXPIRY_STATUS_KEYS = {
+  expired: 'credits.history.expiredStatus',
+  voided: 'credits.history.voidedStatus',
+} satisfies Record<NonNullable<CreditDeduction['expiry']>, string>;
 
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {
@@ -287,19 +340,23 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   // Only a row whose own category is an expiry or a voidance, and whose grant
   // is loaded, gets the framed line: anything else keeps the ledger's own
   // description, which already names what happened. A voided grant was
-  // cancelled rather than left to run out, so it never reads as expired.
+  // cancelled rather than left to run out, so it never reads as expired. This
+  // full form is the main title below, where no grant title sits beside it.
   const expiryTitle =
     deduction.expiry == null || grant == null
       ? null
-      : t(
-          deduction.expiry === 'voided'
-            ? 'credits.history.voidedGrant'
-            : 'credits.history.expiredGrant',
-          { description: firstNonEmpty(grantName, storedDescription) }
-        );
+      : t(lookup(EXPIRY_TITLE_KEYS, deduction.expiry) ?? 'credits.history.expiredGrant', {
+          description: firstNonEmpty(grantName, storedDescription),
+        });
+  // The muted line sits under the grant's own title, so it carries the status
+  // alone: repeating the name there would paint the same grant twice.
+  const expiryStatus =
+    deduction.expiry == null
+      ? null
+      : t(lookup(EXPIRY_STATUS_KEYS, deduction.expiry) ?? 'credits.history.expiredStatus');
   // A paid grant keeps the description its receipt records, but an empty one
   // still names the row.
-  const rowTitle = firstNonEmpty(grantName, storedDescription);
+  const rowTitle = firstNonEmpty(grantName, deductionTitle(t, deduction), storedDescription);
   // Alone, the expiry line is the whole event: the grant it ended already has
   // its own purchase row above.
   const mainTitle = purchase != null ? rowTitle : (expiryTitle ?? rowTitle);
@@ -315,7 +372,7 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
       {purchase != null && (
         <LedgerLine
           title={
-            expiryTitle ??
+            expiryStatus ??
             firstNonEmpty(deduction.description, deductionTypeLabel(t, deduction.kind))
           }
           typeLabel={deductionTypeLabel(t, deduction.kind)}

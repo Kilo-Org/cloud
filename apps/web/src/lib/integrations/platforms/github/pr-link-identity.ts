@@ -61,7 +61,6 @@ function buildRepo(host: string, rawPath: string): NormalizedRepo | null {
     .trim()
     .replace(/\/+$/, '')
     .replace(/\.git$/i, '')
-    // Drop a trailing PR/issue suffix if a full PR URL slipped through.
     .replace(/\/pull\/\d+(?:\/.*)?$/i, '');
   const withoutLeading = path.replace(/^\/+/, '');
   const segments = withoutLeading.split('/').filter(Boolean);
@@ -289,14 +288,11 @@ export function verifySessionPullRequestLink(args: {
     return reject('pr_number_mismatch');
   }
 
-  // Base repository must be the session's repository.
   const baseRepoRef = parseRepoReference(pullRequest.baseRepoFullName);
   if (!baseRepoRef || baseRepoRef.key !== sessionRepoRef.key) {
     return reject('base_repo_mismatch');
   }
 
-  // Head repository must be the same repository: a fork or another repo with
-  // the same branch name never matches.
   const headRepoRef = parseRepoReference(pullRequest.headRepoFullName);
   if (!headRepoRef || headRepoRef.key !== sessionRepoRef.key) {
     return reject('head_repo_mismatch');

@@ -92,6 +92,7 @@
     "draft": "Melnraksts",
     "enabled": "Iespējots",
     "github": "GitHub",
+    "image": "Attēls",
     "imageUnavailable": "Attēls nav pieejams.",
     "loading": "Ielādē…",
     "loadMore": "Ielādēt vairāk",
@@ -123,10 +124,10 @@
     "connectProvider": "Pievieno pakalpojuma sniedzēju",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
+    "couldNotLoad": "Neizdevās ielādēt.",
+    "couldNotLoadMore": "Neizdevās ielādēt vairāk.",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldnTLoad": "Neizdevās ielādēt.",
-    "couldnTLoadMore": "Neizdevās ielādēt vairāk.",
     "deviceSessions": "Ierīču sesijas",
     "disabled": "Atspējots",
     "email": "E-pasts",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
+      "imageUnavailableRetryWithAlt": "Attēls nav pieejams, {{alt}}, mēģināt ielādēt vēlreiz",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",
@@ -3758,7 +3760,7 @@
       "noSeatsAvailable": "Visas vietas ir aizņemtas. Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku."
     },
     "invoices": {
-      "downloadA11y": "Lejupielādēt rēķinu {{number}}",
+      "downloadA11y": "Lejupielādēt rēķinu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Rēķini tiek izveidoti automātiski katrā norēķinu periodā. Tie būs redzami šeit, kad tavai organizācijai būs izrakstīts rēķins.",
       "emptyTitle": "Nav rēķinu",
       "invoiceFallback": "Rēķins",
@@ -3838,7 +3840,6 @@
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
-      "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
@@ -3960,7 +3961,7 @@
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
-    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Izmanto “$t(login.resendCode)” vai “$t(login.moreSignInOptions)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",
@@ -4283,6 +4284,8 @@
       "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
       "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
+      "invalidApiKey": "API atslēga satur rakstzīmi, kuru nevar nosūtīt. Izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
+      "invalidHeaders": "Pielāgotu galveni nevar nosūtīt. Pārbaudi tās nosaukumu un izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
       "httpApprovalRequired": "Pirms saglabāšanas vai savienošanās apstiprini šo lokālo HTTP galapunktu.",
@@ -4417,7 +4420,15 @@
       "download": "Lejupielādēt ierīces modeli",
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
-      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
+      "cannotUse": "Nevar palaist: {{items}}.",
+      "cannotUseOptions": "Nevar aizpildīt: dažas rīka opcijas.",
+      "limitations": "Ierobežojumi",
+      "tools": {
+        "time": "Laiks",
+        "settingsList": "Rādīt iestatījumus",
+        "settingsSet": "Mainīt iestatījumus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
@@ -4601,6 +4612,7 @@
     "instructionSaveFailed": "Instrukciju neizdevās saglabāt",
     "instructionDeleteFailed": "Instrukciju neizdevās dzēst",
     "instructionToggleFailed": "Instrukciju neizdevās atjaunināt",
+    "instructionViewTitle": "Instrukcijas fails",
     "instructionLimitReached": "Profils var ietvert līdz {{max}} instrukcijām. Dzēsiet vienu, lai pievienotu citu.",
     "mcp": {
       "title": "MCP serveri",
@@ -4772,10 +4784,20 @@
     "history": {
       "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
       "appStoreReceipt": "Kvīts veikalā App Store",
+      "deduction": {
+        "adminCancel": "Administratora slēgta bilance",
+        "adminDebit": "Administratora noņemti kredīti",
+        "codingPlan": "Kodēšanas plāns: {{plan}}",
+        "correction": "Bilances korekcija",
+        "dispute": "Maksājuma strīds",
+        "refundAppStore": "Kredītu paketes atmaksa no App Store",
+        "refundGooglePlay": "Kredītu paketes atmaksa no Google Play"
+      },
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
       "expiredGrant": "Termiņš beidzies: {{description}}",
+      "expiredStatus": "Termiņš beidzies",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
@@ -4802,7 +4824,8 @@
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
       "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
-      "voidedGrant": "Anulēts: {{description}}"
+      "voidedGrant": "Anulēts: {{description}}",
+      "voidedStatus": "Anulēts"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4996,8 +5019,8 @@
     "estimateSpendLimitTooLow": "Palieliniet tēriņu ierobežojumu, lai atļautu šo kopsavilkumu.",
     "saved": "Atskaites iestatījumi saglabāti",
     "selectedSessions": "Atlasītās sesijas",
-    "snapshotPullRequests": "PRs atlasītajās sesijās",
-    "snapshotBlockers": "Šķēršļi atlasītajās sesijās",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Šķēršļi",
     "capturedAt": "Fiksēts {{time}}",
     "snapshotHint": "Plānotajā rīta laikā fiksēts jaunākā pieejamā sesiju stāvokļa momentuzņēmums, kas var būt nepilnīgs. Skaitļi attiecas uz atlasītajām sesijām, nevis visu nakts aktivitāti.",
     "snapshotTruncated": "Dažas sesijas vai pierādījumi nav iekļauti, lai ierobežotu šī momentuzņēmuma apjomu.",

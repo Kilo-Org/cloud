@@ -92,6 +92,7 @@
     "draft": "Nacrt",
     "enabled": "Uključeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika nije dostupna.",
     "loading": "Učitavanje…",
     "loadMore": "Učitaj još",
@@ -123,10 +124,10 @@
     "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj je skraćen",
     "copyLink": "Kopiraj link",
+    "couldNotLoad": "Učitavanje nije uspelo.",
+    "couldNotLoadMore": "Učitavanje dodatnih stavki nije uspelo.",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldnTLoad": "Učitavanje nije uspelo.",
-    "couldnTLoadMore": "Učitavanje dodatnih stavki nije uspelo.",
     "deviceSessions": "Sesije na uređajima",
     "disabled": "Isključeno",
     "email": "Imejl adresa",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo da je učitaš",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj ponovo da je učitaš",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",
@@ -3758,7 +3760,7 @@
       "noSeatsAvailable": "Sva mesta su zauzeta. Zamoli vlasnika organizacije da doda mesta pre nego što pozoveš još članova."
     },
     "invoices": {
-      "downloadA11y": "Preuzmi fakturu {{number}}",
+      "downloadA11y": "Preuzmi fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakture se automatski izdaju za svaki obračunski period i prikazuju se ovde kada se tvojoj organizaciji naplati usluga.",
       "emptyTitle": "Nema faktura",
       "invoiceFallback": "Faktura",
@@ -3838,7 +3840,6 @@
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
-      "guardrails": "Zaštitna ograničenja",
       "byok": "Sopstveni ključ",
       "ssoAndDomain": "SSO i domen",
       "dataCollection": "Prikupljanje podataka",
@@ -3960,7 +3961,7 @@
     "signupStepUpApple": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Za dovršavanje kreiranja naloga vrati se nazad i izaberi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kod nije tačan ili je istekao. Pokušaj ponovo ili izaberi „$t(login.resendCode)“.",
+    "invalidCode": "Kod nije tačan ili je istekao. Koristi „$t(login.resendCode)“ ili „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspela. Pokušaj ponovo.",
@@ -4283,6 +4284,8 @@
       "discoveryNoModels": "Krajnja tačka nije prikazala nijedan model. Unesi modele ručno.",
       "connectionIncomplete": "Model je odgovorio, ali nije završio. Pokušaj ponovo ili proveri ID modela i protokol.",
       "invalidInput": "Unesi ime pozadinskog servisa, važeća zaglavlja i bar jedan model sa jedinstvenim ID-jem i imenom. Ograničenja broja tokena moraju biti pozitivni celi brojevi.",
+      "invalidApiKey": "API ključ sadrži karakter koji ne može da se pošalje. Koristi samo slova, cifre i standardne simbole, bez preloma redova.",
+      "invalidHeaders": "Prilagođeno zaglavlje ne može da se pošalje. Proveri njegovo ime i koristi samo slova, cifre i standardne simbole, bez preloma redova.",
       "invalidUrl": "Unesi osnovni HTTP ili HTTPS URL API-ja bez podataka za prijavu, upita ili fragmenta.",
       "publicHttp": "Javne HTTP krajnje tačke nisu dozvoljene. Koristi HTTPS ili privatnu lokalnu krajnju tačku.",
       "httpApprovalRequired": "Odobri ovu lokalnu HTTP krajnju tačku pre čuvanja ili povezivanja.",
@@ -4417,7 +4420,15 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
-      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo."
+      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo.",
+      "cannotUse": "Nije moguće pokrenuti: {{items}}.",
+      "cannotUseOptions": "Nije moguće popuniti: neke opcije alata.",
+      "limitations": "Ograničenja",
+      "tools": {
+        "time": "Vreme",
+        "settingsList": "Prikaži podešavanja",
+        "settingsSet": "Promeni podešavanja"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
@@ -4601,6 +4612,7 @@
     "instructionSaveFailed": "Čuvanje instrukcije nije uspelo",
     "instructionDeleteFailed": "Brisanje instrukcije nije uspelo",
     "instructionToggleFailed": "Ažuriranje instrukcije nije uspelo",
+    "instructionViewTitle": "Datoteka instrukcije",
     "instructionLimitReached": "Profil može da sadrži najviše {{max}} instrukcija. Obrišite jednu da biste dodali drugu.",
     "mcp": {
       "title": "MCP serveri",
@@ -4772,10 +4784,20 @@
     "history": {
       "activityUnavailable": "Aktivnost kredita nije moguće učitati.",
       "appStoreReceipt": "Račun iz prodavnice App Store",
+      "deduction": {
+        "adminCancel": "Saldo je zatvorio administrator",
+        "adminDebit": "Kredite je uklonio administrator",
+        "codingPlan": "Plan kodiranja: {{plan}}",
+        "correction": "Korekcija salda",
+        "dispute": "Spor o plaćanju",
+        "refundAppStore": "Povraćaj novca za paket kredita iz prodavnice App Store",
+        "refundGooglePlay": "Povraćaj novca za paket kredita iz prodavnice Google Play"
+      },
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, računi i potrošnja prikazaće se ovde.",
       "emptyTitle": "Nema istorije kredita",
       "expiredGrant": "Isteklo: {{description}}",
+      "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
@@ -4783,6 +4805,7 @@
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "voidedGrant": "Stornirano: {{description}}",
+      "voidedStatus": "Stornirano",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",
@@ -4996,8 +5019,8 @@
     "estimateSpendLimitTooLow": "Podignite ograničenje potrošnje da biste omogućili ovaj rezime.",
     "saved": "Podešavanja izveštaja su sačuvana",
     "selectedSessions": "Izabrane sesije",
-    "snapshotPullRequests": "PR-ovi u izabranim sesijama",
-    "snapshotBlockers": "Prepreke u izabranim sesijama",
+    "snapshotPullRequests": "PR-ovi",
+    "snapshotBlockers": "Prepreke",
     "capturedAt": "Zabeleženo {{time}}",
     "snapshotHint": "Snimak poslednjeg dostupnog stanja sesija, zabeležen u zakazano jutarnje vreme, može biti nepotpun. Brojevi se odnose na izabrane sesije, ne na celokupnu aktivnost tokom noći.",
     "snapshotTruncated": "Neke sesije ili dokazi su izostavljeni da bi obim snimka ostao ograničen.",

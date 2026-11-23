@@ -3,6 +3,7 @@ import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
   readKilo2Messages,
   hasUnresolvedKilo2Assets,
+  kilo2MessageFileId,
   kilo2ToolFileId,
   kilo2AssetKey,
 } from './kilo2-source-messages';
@@ -1081,22 +1082,22 @@ describe('canonical native snapshot projection', () => {
     expect(snapshot.entities).toContainEqual(sessionBlob);
 
     const projection = projectNativeSnapshot(snapshot);
-    // The absolute remote reference has no possible display, so only that message is
-    // dropped, and it is not reported as an incomplete or recoverable message.
-    const displayable = messages.filter(message => message.id !== 'msg_remote_result');
+    // An absolute remote reference is never fetched on purpose, so only its file part is
+    // withheld: the message still projects, and the transcript is NOT reported incomplete
+    // for it because that reference was never expected from content storage.
     expect(projection).toEqual({
       session: projectedSession,
       position: 20,
       revision: 4,
-      messages: readKilo2Messages(projectedSession, displayable, {
+      messages: readKilo2Messages(projectedSession, messages, {
         assetURLs: snapshot.assetURLs,
       }),
       incompleteMessageIDs: [],
     });
-    // A shell record has no display part of its own, so it is absent for the same
-    // reason it always was; only the remote-reference message is newly dropped.
+    // A shell record has no display part of its own, so it is absent from the
+    // projection for the same reason it always was.
     expect(projection.messages.map(message => message.info.id)).toEqual(
-      displayable.filter(message => message.type !== 'shell').map(message => message.id)
+      messages.filter(message => message.type !== 'shell').map(message => message.id)
     );
     expect(JSON.stringify(projection.messages)).not.toContain('https://fixture.invalid/image.png');
     // Empty bytes are absent bytes: the header-only file has no part at all, and the
@@ -1141,7 +1142,9 @@ describe('canonical native snapshot projection', () => {
     expect(projection.messages[2]?.parts[0]).toMatchObject({ type: 'compaction' });
     expect(projection.messages[4]?.info).toMatchObject({ id: 'msg_pending' });
     expect(projection.messages[5]?.info).toMatchObject({ error: { name: 'MessageAbortedError' } });
-    expect(projection.messages.at(-1)?.parts[1]).toEqual(
+    expect(
+      projection.messages.find(message => message.info.id === 'msg_media_user')?.parts[1]
+    ).toEqual(
       expect.objectContaining({
         id: kilo2PartId('msg_media_user', 1),
         type: 'file',
@@ -1149,6 +1152,12 @@ describe('canonical native snapshot projection', () => {
         url: 'data:image/png;base64,AQID',
       })
     );
+    // The remote-reference message now displays; only its unusable file part is missing.
+    expect(
+      projection.messages
+        .find(message => message.info.id === 'msg_remote_result')
+        ?.parts.filter(part => part.type === 'file')
+    ).toEqual([]);
   });
 
   it('retains incomplete native metadata but does not project it as an empty complete answer', async () => {
@@ -1261,6 +1270,18 @@ describe('native user file display fallbacks', () => {
     expect(hasUnresolvedKilo2Assets(message)).toBe(true);
     expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
       { id: kilo2PartId(message.id, 0), type: 'text' },
+    ]);
+    // Once that reference is authorized, its bytes are the display: the empty `data:` never
+    // becomes a zero-byte file, and the authorized mapping still renders a part.
+    const id = kilo2MessageFileId(message.id, 0);
+    const url = 'data:image/png;base64,AQID';
+    expect(
+      readKilo2Messages(session, [message], {
+        assetURLs: { [kilo2AssetKey(id, `media:${'a'.repeat(64)}`, 'image/png')]: url },
+      })[0]?.parts
+    ).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text' },
+      { id, type: 'file', url },
     ]);
   });
 });
@@ -1502,6 +1523,35 @@ describe('authorized native snapshot attachments', () => {
     ]);
   });
 
+  // The broken attachment has its own message so each case only ever mismatches its
+  // own mapping; the seeded valid message keeps a resolvable sibling in the same read.
+  const brokenHash = 'e'.repeat(64);
+  const brokenUser = {
+    id: 'msg_media_broken',
+    type: 'user',
+    time: { created: 2 },
+    text: 'broken',
+    files: [
+      {
+        mime: 'image/png',
+        name: 'broken.png',
+        uri: `media:${brokenHash}`,
+        source: { type: 'inline' },
+      },
+    ],
+  };
+  const brokenEntity = entity('message', brokenUser.id, { seq: 1, message: brokenUser });
+  const siblingKey = kilo2AssetKey(
+    kilo2PartId(storedUser.id, 1),
+    `media:${mediaHash}`,
+    'image/png'
+  );
+  const brokenKey = kilo2AssetKey(
+    kilo2PartId(brokenUser.id, 1),
+    `media:${brokenHash}`,
+    'image/png'
+  );
+
   it.each<[string, unknown[]]>([
     ['missing mapping', []],
     [
@@ -1510,10 +1560,10 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/1',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1527,8 +1577,8 @@ describe('authorized native snapshot attachments', () => {
           'message',
           'msg_other',
           '/message/files/0',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1540,10 +1590,10 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
           '/somewhere',
-          mediaHash,
+          brokenHash,
           3,
           'image/png'
         ),
@@ -1555,13 +1605,26 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
-          `media:${mediaHash}`,
-          mediaHash,
+          `media:${brokenHash}`,
+          brokenHash,
           3,
           'application/pdf'
         ),
+      ],
+    ],
+    // The resolver requires the mapping MIME to match the file's own type, so a mapping
+    // that states none cannot be bound to this attachment.
+    [
+      'absent MIME',
+      [
+        entity('asset', 'bad', {
+          entity: { kind: 'message', id: brokenUser.id },
+          pointer: '/message/files/0',
+          reference: `media:${brokenHash}`,
+          blob: { hash: brokenHash, bytes: 3 },
+        }),
       ],
     ],
     [
@@ -1570,24 +1633,49 @@ describe('authorized native snapshot attachments', () => {
         asset(
           'bad',
           'message',
-          storedUser.id,
+          brokenUser.id,
           '/message/files/0',
-          `media:${mediaHash}`,
+          `media:${brokenHash}`,
           pdfHash,
           3,
           'image/png'
         ),
       ],
     ],
-  ])('rejects %s before downloading private bytes', async (_name, mappings) => {
-    const { request } = snapshotFetch([userEntity, ...mappings]);
-    const readAsset = jest.fn(async () => new Uint8Array([1, 2, 3]).buffer);
-    await expect(
-      fetchNativeSnapshot(request, sessionID, undefined, readAsset)
-    ).rejects.toMatchObject({
-      code: 'native_asset_not_found',
+  ])('withholds %s while the rest of the transcript stays readable', async (_name, mappings) => {
+    const { request } = snapshotFetch([
+      entity('session', sessionID, nativeSession),
+      userEntity,
+      userMapping,
+      brokenEntity,
+      ...mappings,
+    ]);
+    const readAsset = jest.fn(async (path: string) =>
+      path === `${sessionPath}/blobs/${mediaHash}`
+        ? new Uint8Array([1, 2, 3]).buffer
+        : Promise.reject(new Error(`Unexpected binary route ${path}`))
+    );
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    // Both messages stay in the snapshot: an unbound reference withholds only its bytes.
+    expect(snapshot.messages.map(item => item.message.id)).toEqual([storedUser.id, brokenUser.id]);
+    // The valid sibling resolves from its own authorized mapping ...
+    expect(snapshot.assetURLs?.[siblingKey]).toBe('data:image/png;base64,AQID');
+    expect(projectNativeSnapshot(snapshot).messages[0]?.parts[1]).toMatchObject({
+      id: kilo2PartId(storedUser.id, 1),
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AQID',
     });
-    expect(readAsset).not.toHaveBeenCalled();
+    // ... while the broken reference gets no URL and is reported as unavailable.
+    expect(snapshot.assetURLs?.[brokenKey]).toBeUndefined();
+    expect(snapshot.unavailableAssetKeys).toEqual([brokenKey]);
+    // The broken message still displays its text, with only the unusable file withheld.
+    expect(projectNativeSnapshot(snapshot).messages[1]?.parts).toMatchObject([
+      { id: kilo2PartId(brokenUser.id, 0), type: 'text', text: 'broken' },
+    ]);
+    expect(readAsset.mock.calls.map(([path]) => path)).toEqual([
+      `${sessionPath}/blobs/${mediaHash}`,
+    ]);
   });
 
   it('rejects asset mappings that disagree about a blob size before any read', async () => {

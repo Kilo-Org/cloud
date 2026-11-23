@@ -91,6 +91,7 @@
     "draft": "Borrador",
     "enabled": "Activado",
     "github": "GitHub",
+    "image": "Imaxe",
     "imageUnavailable": "A imaxe non está dispoñible.",
     "loading": "Cargando…",
     "loadMore": "Cargar máis",
@@ -122,10 +123,10 @@
     "connectProvider": "Conecta un provedor",
     "contentTruncated": "Contido truncado",
     "copyLink": "Copiar a ligazón",
+    "couldNotLoad": "Non se puido cargar.",
+    "couldNotLoadMore": "Non se puideron cargar máis resultados.",
     "couldNotLoadOrganizations": "Non se puideron cargar as organizacións.",
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
-    "couldnTLoad": "Non se puido cargar.",
-    "couldnTLoadMore": "Non se puideron cargar máis resultados.",
     "deviceSessions": "Sesións nos dispositivos",
     "disabled": "Desactivado",
     "email": "Correo electrónico",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Cargando a imaxe",
       "imageUnavailableRetry": "Imaxe non dispoñible, volver tentar cargala",
+      "imageUnavailableRetryWithAlt": "Imaxe non dispoñible, {{alt}}, volver tentar cargala",
       "imagePreviewUnavailableInSession": "A vista previa da imaxe non está dispoñible nesta sesión.",
       "viewImage": "Ver imaxe",
       "viewImageWithAlt": "Ver imaxe {{alt}}",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Todas as prazas están en uso. Pídelle a un propietario da organización que engada prazas antes de convidar máis membros."
     },
     "invoices": {
-      "downloadA11y": "Descargar factura {{number}}",
+      "downloadA11y": "Descargar factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As facturas xéranse automaticamente en cada ciclo de facturación. Aparecerán aquí cando se lle facture á túa organización.",
       "emptyTitle": "Non hai facturas",
       "invoiceFallback": "Factura",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Detalles de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
-      "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Recollida de datos",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Para rematar de crear a túa conta, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Para rematar de crear a túa conta, usa \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "Para rematar de crear a túa conta, volve atrás e usa \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "Ese código é incorrecto ou caducou. Téntao de novo ou usa \"$t(login.resendCode)\".",
+    "invalidCode": "Ese código é incorrecto ou caducou. Usa \"$t(login.resendCode)\" ou \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "O teu código está a procesarse. Agarda un momento e téntao de novo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código novo.",
     "invalidToken": "Fallou o inicio de sesión. Téntao de novo.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "O punto de acceso non listou ningún modelo. Introduce os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu pero non rematou. Téntao de novo ou comproba o ID do modelo e o protocolo.",
       "invalidInput": "Introduce un nome de servizo, cabeceiras válidas e polo menos un modelo cun ID único e un nome. Os límites de tókens deben ser números enteiros positivos.",
+      "invalidApiKey": "A clave da API contén un carácter que non se pode enviar. Usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
+      "invalidHeaders": "Non se pode enviar unha cabeceira personalizada. Comproba o seu nome e usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
       "invalidUrl": "Introduce un URL raíz da API con HTTP ou HTTPS, sen credenciais, parámetros de consulta nin un fragmento.",
       "publicHttp": "Non se permiten puntos de acceso HTTP públicos. Usa HTTPS ou un punto de acceso local privado.",
       "httpApprovalRequired": "Autoriza este punto de acceso HTTP local antes de gardar ou conectar.",
@@ -4338,7 +4341,15 @@
       "download": "Descargar o modelo no dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
-      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo."
+      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo.",
+      "cannotUse": "Non se pode executar: {{items}}.",
+      "cannotUseOptions": "Non se poden encher: algunhas opcións de ferramenta.",
+      "limitations": "Limitacións",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Amosar configuración",
+        "settingsSet": "Cambiar configuración"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Non se puido gardar a instrución",
     "instructionDeleteFailed": "Non se puido eliminar a instrución",
     "instructionToggleFailed": "Non se puido actualizar a instrución",
+    "instructionViewTitle": "Ficheiro de instrución",
     "instructionLimitReached": "Un perfil pode ter ata {{max}} instrucións. Elimina unha para engadir outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Non se puido cargar a actividade de crédito.",
       "appStoreReceipt": "Recibo da App Store",
+      "deduction": {
+        "adminCancel": "Saldo pechado por un administrador",
+        "adminDebit": "Créditos eliminados por un administrador",
+        "codingPlan": "Plan de programación: {{plan}}",
+        "correction": "Corrección do saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso dun paquete de créditos da App Store",
+        "refundGooglePlay": "Reembolso dun paquete de créditos de Google Play"
+      },
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
       "expiredGrant": "Caducado: {{description}}",
+      "expiredStatus": "Caducado",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Axuste",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
       "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
       "retentionLimit": "Mostrando o historial de créditos máis recente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo.",
     "saved": "Configuración do informe gardada",
     "selectedSessions": "Sesións seleccionadas",
-    "snapshotPullRequests": "PRs nas sesións seleccionadas",
-    "snapshotBlockers": "Bloqueos nas sesións seleccionadas",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Bloqueos",
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantánea do último estado dispoñible das sesións, capturada á hora programada da mañá coa información que se puido obter. As cantidades refírense ás sesións seleccionadas, non a toda a actividade nocturna.",
     "snapshotTruncated": "Omitíronse algunhas sesións ou evidencias para manter esta instantánea dentro dos límites.",

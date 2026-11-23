@@ -91,6 +91,7 @@
     "draft": "Bản nháp",
     "enabled": "Đã bật",
     "github": "GitHub",
+    "image": "Hình ảnh",
     "imageUnavailable": "Không thể hiển thị ảnh.",
     "loading": "Đang tải…",
     "loadMore": "Tải thêm",
@@ -122,10 +123,10 @@
     "connectProvider": "Kết nối nhà cung cấp",
     "contentTruncated": "Nội dung bị cắt bớt",
     "copyLink": "Sao chép liên kết",
+    "couldNotLoad": "Không thể tải được.",
+    "couldNotLoadMore": "Không thể tải thêm.",
     "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
-    "couldnTLoad": "Không thể tải được.",
-    "couldnTLoadMore": "Không thể tải thêm.",
     "deviceSessions": "Phiên đăng nhập trên thiết bị",
     "disabled": "Đã tắt",
     "email": "Thư điện tử",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",
       "imageUnavailableRetry": "Không thể tải hình ảnh, thử tải lại",
+      "imageUnavailableRetryWithAlt": "Không thể tải hình ảnh, {{alt}}, thử tải lại",
       "imagePreviewUnavailableInSession": "Không thể xem trước hình ảnh trong phiên này.",
       "viewImage": "Xem hình ảnh",
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",
@@ -3694,7 +3696,7 @@
       "noSeatsAvailable": "Tất cả chỗ đã được sử dụng. Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên."
     },
     "invoices": {
-      "downloadA11y": "Tải xuống hóa đơn {{number}}",
+      "downloadA11y": "Tải xuống hóa đơn {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hóa đơn được tạo tự động theo từng chu kỳ thanh toán và xuất hiện tại đây khi có khoản phí tính cho tổ chức.",
       "emptyTitle": "Chưa có hóa đơn",
       "invoiceFallback": "Hóa đơn",
@@ -3774,7 +3776,6 @@
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
-      "guardrails": "Rào chắn an toàn",
       "byok": "Dùng khóa riêng của bạn",
       "ssoAndDomain": "SSO và tên miền",
       "dataCollection": "Thu thập dữ liệu",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Để hoàn tất việc tạo tài khoản, hãy quay lại và dùng '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mã đó không đúng hoặc đã hết hạn. Vui lòng thử lại hoặc dùng '$t(login.resendCode)'.",
+    "invalidCode": "Mã đó không đúng hoặc đã hết hạn. Vui lòng dùng '$t(login.resendCode)' hoặc '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mã của bạn đang được xử lý. Chờ một chút rồi thử lại.",
     "tooManyAttempts": "Quá nhiều lần thử. Vui lòng yêu cầu mã mới.",
     "invalidToken": "Đăng nhập thất bại. Vui lòng thử lại.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
       "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",
+      "invalidApiKey": "Khóa API chứa ký tự không thể gửi. Chỉ sử dụng chữ cái, chữ số và ký hiệu tiêu chuẩn, không có ngắt dòng.",
+      "invalidHeaders": "Không thể gửi trường tiêu đề tùy chỉnh. Hãy kiểm tra tên của trường tiêu đề và chỉ sử dụng chữ cái, chữ số và ký hiệu tiêu chuẩn, không có ngắt dòng.",
       "invalidUrl": "Nhập URL gốc của API dùng HTTP hoặc HTTPS, không có thông tin xác thực, chuỗi truy vấn hoặc phần định danh đoạn.",
       "publicHttp": "Không cho phép các điểm cuối HTTP công khai. Hãy dùng HTTPS hoặc một điểm cuối riêng trong mạng cục bộ.",
       "httpApprovalRequired": "Chấp thuận điểm cuối HTTP cục bộ này trước khi lưu hoặc kết nối.",
@@ -4338,7 +4341,15 @@
       "download": "Tải xuống mô hình trên thiết bị",
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
-      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại.",
+      "cannotUse": "Không thể chạy: {{items}}.",
+      "cannotUseOptions": "Không thể điền: một số tùy chọn công cụ.",
+      "limitations": "Hạn chế",
+      "tools": {
+        "time": "Thời gian",
+        "settingsList": "Hiển thị cài đặt",
+        "settingsSet": "Thay đổi cài đặt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Không thể lưu hướng dẫn",
     "instructionDeleteFailed": "Không thể xóa hướng dẫn",
     "instructionToggleFailed": "Không thể cập nhật hướng dẫn",
+    "instructionViewTitle": "Tệp hướng dẫn",
     "instructionLimitReached": "Mỗi hồ sơ có tối đa {{max}} hướng dẫn. Xóa một hướng dẫn để thêm hướng dẫn khác.",
     "mcp": {
       "title": "máy chủ MCP",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Không thể tải hoạt động tín dụng.",
       "appStoreReceipt": "Biên lai từ App Store",
+      "deduction": {
+        "adminCancel": "Số dư bị quản trị viên đóng",
+        "adminDebit": "Tín dụng bị quản trị viên gỡ bỏ",
+        "codingPlan": "Gói lập trình: {{plan}}",
+        "correction": "Điều chỉnh số dư",
+        "dispute": "Tranh chấp thanh toán",
+        "refundAppStore": "Hoàn tiền gói tín dụng từ App Store",
+        "refundGooglePlay": "Hoàn tiền gói tín dụng từ Google Play"
+      },
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
       "expiredGrant": "Đã hết hạn: {{description}}",
+      "expiredStatus": "Đã hết hạn",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
       "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
-      "voidedGrant": "Đã hủy: {{description}}"
+      "voidedGrant": "Đã hủy: {{description}}",
+      "voidedStatus": "Đã hủy"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Nâng giới hạn chi tiêu để cho phép tóm tắt này.",
     "saved": "Đã lưu cài đặt bản tin",
     "selectedSessions": "Các phiên đã chọn",
-    "snapshotPullRequests": "PRs trong các phiên đã chọn",
-    "snapshotBlockers": "Vướng mắc trong các phiên đã chọn",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Vướng mắc",
     "capturedAt": "Đã ghi lại {{time}}",
     "snapshotHint": "Bản chụp ghi lại trạng thái phiên mới nhất có sẵn vào buổi sáng theo lịch, trong phạm vi dữ liệu thu thập được. Số lượng chỉ phản ánh các phiên đã chọn, không phải toàn bộ hoạt động qua đêm.",
     "snapshotTruncated": "Một số phiên hoặc dữ liệu minh chứng đã được lược bỏ để giữ bản chụp này trong giới hạn.",

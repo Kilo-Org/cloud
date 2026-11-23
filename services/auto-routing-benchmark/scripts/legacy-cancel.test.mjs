@@ -1475,6 +1475,24 @@ test('post-cutover: --legacy-residue is read-only and diffs legacy from paid wor
       chunk: 0,
       status: 'pending',
     });
+    // A classifier run admitted after the cutover: it carries the marker, so the kind-agnostic
+    // legacy predicate must not report it as work to cancel.
+    f.sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, status, started_at, min_accuracy,
+           switch_cost_factor, best_accuracy_switch_threshold, max_concurrency, benchmark_user_id,
+           benchmark_org_id, repetitions, engine_identity, purpose, measurement_revision,
+           accuracy_noise_band, frontier_min_accuracy_delta, admission_marker)
+         VALUES ('run-classifier-1','efficient','classifier','running','2026-11-20T06:30:00.000Z',
+           0.9,1,0.05,250,'bench-user','bench-org',1,?, 'platform',3,0.05,0,?)`
+      )
+      .run(ENGINE, 'paid:req-classifier');
+    insertChunk(f.sqlite, {
+      runId: 'run-classifier-1',
+      model: 'vendor/classifier',
+      chunk: 0,
+      status: 'pending',
+    });
     const before = readAll(f.sqlite);
 
     const result = await run(f.path, ['--legacy-residue', ...BASE_ARGS]);
@@ -1482,15 +1500,15 @@ test('post-cutover: --legacy-residue is read-only and diffs legacy from paid wor
     const residue = result.last('legacy_residue');
     assert.equal(residue.legacy_running_runs, 1);
     assert.equal(residue.legacy_unfinished_chunks, 1);
-    assert.equal(residue.paid_running_runs, 1);
-    assert.equal(residue.paid_unfinished_chunks, 2);
+    assert.equal(residue.paid_running_runs, 2);
+    assert.equal(residue.paid_unfinished_chunks, 3);
     assert.match(
       result.last('legacy_residue_unexpected').action,
       /do not re-run the legacy cancel/
     );
     assert.deepEqual(readAll(f.sqlite), before, 'the residue report must never write');
 
-    // With the legacy run retired, only the expected paid run remains, and the check passes.
+    // With the legacy run retired, only the marked runs remain, and the check passes.
     f.sqlite.prepare("UPDATE benchmark_runs SET status='failed' WHERE id='run-legacy-1'").run();
     f.sqlite
       .prepare("UPDATE scheduler_chunks SET status='completed' WHERE run_id='run-legacy-1'")
@@ -1499,8 +1517,8 @@ test('post-cutover: --legacy-residue is read-only and diffs legacy from paid wor
     assert.equal(clean.code, EXIT.ok, JSON.stringify(clean.events));
     assert.equal(
       clean.last('legacy_residue').paid_running_runs,
-      1,
-      'a user click is expected, not cancelled'
+      2,
+      'admitted decider and classifier runs are expected, not cancelled'
     );
     assert.equal(clean.last('legacy_residue_ok').action, 'none');
   } finally {

@@ -799,6 +799,36 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
+### Environment setup sessions
+
+- Grouped metadata MAY carry `environmentSetup: { runId, environmentId, role }`
+  with role `setup` or `verification`. Preflight sets it; clients cannot.
+- `setup`: accepted only from a non-authority internal-key `prepareSession`
+  with `environmentSetupRunId`, verified against
+  `cloud_agent_environment_setup_runs` (owner match, open status, draft equals
+  `requestedEnvironment.id`). The session may resolve its draft environment.
+  This role uses full network access with egress auditing for setup discovery,
+  even when the draft is restricted. It requires a Cloudflare Containers allocation.
+- `verification`: accepted only under a Cloud Agent authority whose
+  `environmentSetup` claim matches `verificationOf.runId` and
+  `requestedEnvironment.id`, and whose parent workspace authority recorded the
+  same binding from the setup session. The child resolves the draft and its
+  network policy instead of inheriting the parent workspace's policy.
+- The agent can read the discovery audit through `get_environment_draft` and
+  cite setup or verification audit records when requesting hosts. Pending host
+  requests block verification. Discovery alone cannot satisfy the completion gate.
+- The workspace MCP grant adds `environmentSetup` to `cloudAgentAuthority`
+  only for the workspace created by the setup session.
+- Drafts cannot be built into environment snapshots. Setup and verification
+  sessions run the draft's setup commands during session preparation.
+- When an environment applies and the resolved egress mode is `allowlist`,
+  the environment's required hosts are added to the allowlist.
+- `getSession` exposes the admitted environment revision, the latest
+  preparation outcome, and the workspace egress policy. A command failure
+  fails the verification preparation outcome without preventing the session
+  from starting. A setup authority can use `getEgressAudit` for the setup
+  session or a direct child.
+
 ### Workspace tail snapshots
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`

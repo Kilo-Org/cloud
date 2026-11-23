@@ -13,6 +13,16 @@ import {
   rerender,
   WebViewType,
 } from './markdown-mermaid.mounted.test-helpers';
+import { lightPieThemeVariables } from './mermaid-pie-theme';
+
+/** What a light diagram's injection carries. Both themes now send their measured
+ * pie fills, so a light injection names them too; the fills' own contrast lives
+ * in `mermaid-pie-theme.test.ts`. */
+const LIGHT_THEME_VARIABLES = lightPieThemeVariables();
+
+function lightInjection(source: string, background = '#f4f4f4') {
+  return { source, dark: false, background, themeVariables: LIGHT_THEME_VARIABLES };
+}
 
 // The host-preparation step a case makes fail or succeed; see
 // `markdown-mermaid.mounted.test.tsx` for the same harness and why `exists` is
@@ -96,11 +106,9 @@ describe('MarkdownMermaid source changes', () => {
     expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(countOf(renderer.root, WebViewType)).toBe(1);
     await loadPage(renderer);
-    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
-      source: 'flowchart TD\n  c --> d',
-      dark: false,
-      background: '#f4f4f4',
-    });
+    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual(
+      lightInjection('flowchart TD\n  c --> d')
+    );
 
     act(() => {
       renderer.unmount();
@@ -188,11 +196,9 @@ describe('MarkdownMermaid source changes', () => {
     expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(hostMock.downloadAsync).toHaveBeenCalledTimes(3);
     await loadPage(renderer);
-    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
-      source: 'flowchart TD\n  e --> f',
-      dark: false,
-      background: '#f4f4f4',
-    });
+    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual(
+      lightInjection('flowchart TD\n  e --> f')
+    );
 
     // The recovered host is process state: a later source reuses it.
     await rerender(renderer, 'flowchart TD\n  g --> h');
@@ -256,11 +262,9 @@ describe('MarkdownMermaid source changes', () => {
     expect(countOf(renderer.root, FenceType)).toBe(0);
     expect(countOf(renderer.root, WebViewType)).toBe(1);
     await loadPage(renderer);
-    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
-      source: 'flowchart TD\n  a --> b',
-      dark: false,
-      background: '#f4f4f4',
-    });
+    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual(
+      lightInjection('flowchart TD\n  a --> b')
+    );
 
     act(() => {
       renderer.unmount();

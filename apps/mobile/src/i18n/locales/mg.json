@@ -91,6 +91,7 @@
     "draft": "Volavola",
     "enabled": "Mandeha",
     "github": "GitHub",
+    "image": "Sary",
     "imageUnavailable": "Tsy azo aseho ny sary.",
     "loading": "Mampiditra…",
     "loadMore": "Ampidiro ny manaraka",
@@ -122,10 +123,10 @@
     "connectProvider": "Ampifandraiso ny mpanome tolotra",
     "contentTruncated": "Nohafohy ny votoaty",
     "copyLink": "Adikao ny rohy",
+    "couldNotLoad": "Tsy tafiditra.",
+    "couldNotLoadMore": "Tsy tafiditra ny manaraka.",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",
     "couldNotLoadSessions": "Tsy tafiditra ny fotoam-piasana.",
-    "couldnTLoad": "Tsy tafiditra.",
-    "couldnTLoadMore": "Tsy tafiditra ny manaraka.",
     "deviceSessions": "Fotoam-piasana amin'ny fitaovana",
     "disabled": "Tsy mandeha",
     "email": "Mailaka",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Maka sary",
       "imageUnavailableRetry": "Tsy azo aseho ny sary, andramo alaina indray",
+      "imageUnavailableRetryWithAlt": "Tsy azo aseho ny sary, {{alt}}, andramo alaina indray",
       "imagePreviewUnavailableInSession": "Tsy azo jerena mialoha ny sary amin'ity fotoam-piasana ity.",
       "viewImage": "Jereo ny sary",
       "viewImageWithAlt": "Jereo ny sary {{alt}}",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
-      "downloadA11y": "Alao ny faktiora {{number}}",
+      "downloadA11y": "Alao ny faktiora {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Foronina ho azy isaky ny fe-potoana fandoavana ny faktiora. Hiseho eto izany rehefa ampandoavina ny fikambananao.",
       "emptyTitle": "Tsy misy faktiora",
       "invoiceFallback": "Faktiora",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
-      "guardrails": "Fefy fiarovana",
       "byok": "Ampiasao ny lakilenao manokana",
       "ssoAndDomain": "SSO sy sehatra",
       "dataCollection": "Fanangonana angona",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Ampiasao ny '$t(login.resendCode)' na ny '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
       "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",
+      "invalidApiKey": "Misy marika tsy azo alefa ao amin'ny fanalahidy API. Ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
+      "invalidHeaders": "Tsy azo alefa ny sahan-doha namboarina manokana. Hamarino ny anarany ary ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
       "invalidUrl": "Ampidiro ny fototry ny API mampiasa HTTP na HTTPS, tsy misy mombamomba ny fidirana, masontsivana fikarohana na sombin'ny URL.",
       "publicHttp": "Tsy azo ampiasaina ny adiresy fifandraisana HTTP ho an'ny daholobe. Mampiasà HTTPS na adiresy fifandraisana eo an-toerana tsy azon'ny daholobe idirana.",
       "httpApprovalRequired": "Ankatoavy ity adiresy fifandraisana HTTP eo an-toerana ity alohan'ny hitahirizana na hifandraisana.",
@@ -4338,7 +4341,15 @@
       "download": "Sintony ny modely ao amin'ny fitaovana",
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
-      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray.",
+      "cannotUse": "Tsy afaka mampandeha: {{items}}.",
+      "cannotUseOptions": "Tsy afaka mameno: safidy fitaovana sasany.",
+      "limitations": "Fetra",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Asehoy ny fikirana",
+        "settingsSet": "Ovao ny fikirana"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Tsy afaka nitahiry ny torolalana",
     "instructionDeleteFailed": "Tsy afaka namafa ny torolalana",
     "instructionToggleFailed": "Tsy afaka nanavao ny torolalana",
+    "instructionViewTitle": "Rakitra torolalana",
     "instructionLimitReached": "Ny profil iray dia mahazaka torolalana hatramin'ny {{max}}. Fafao ny iray hanampiana ny hafa.",
     "mcp": {
       "title": "Mpizara MCP",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
       "appStoreReceipt": "Rosia avy amin'ny App Store",
+      "deduction": {
+        "adminCancel": "Fanakatonana ambim-bola nataon'ny mpitantana",
+        "adminDebit": "Fanesorana kredita nataon'ny mpitantana",
+        "codingPlan": "Drafitra fandaharana: {{plan}}",
+        "correction": "Fanitsiana ambim-bola",
+        "dispute": "Fifandirana momba ny fandoavana",
+        "refundAppStore": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny App Store",
+        "refundGooglePlay": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny Google Play"
+      },
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
       "expiredGrant": "Lany fe-potoana: {{description}}",
+      "expiredStatus": "Lany fe-potoana",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
       "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra.",
-      "voidedGrant": "Nofoanana: {{description}}"
+      "voidedGrant": "Nofoanana: {{description}}",
+      "voidedStatus": "Nofoanana"
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Ampitomboy ny fetra fandaniana mba hahafahana mamorona ity famintinana ity.",
     "saved": "Voatahiry ny fikirakirana tatitra",
     "selectedSessions": "Fotoam-piasana voafantina",
-    "snapshotPullRequests": "PRs ao amin'ny fotoam-piasana voafantina",
-    "snapshotBlockers": "Sakana ao amin'ny fotoam-piasana voafantina",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Sakana",
     "capturedAt": "Noraketina {{time}}",
     "snapshotHint": "Tatitra raikitra momba ny sata farany misy amin'ny fotoam-piasana, voarakitra araka izay azo atao amin'ny maraina voalahatra. Ny isa dia momba ny fotoam-piasana voafantina, fa tsy ny hetsika rehetra nandritra ny alina.",
     "snapshotTruncated": "Nisy fotoam-piasana na porofo tsy nampidirina mba hamerana ny haben'ity tatitra raikitra ity.",

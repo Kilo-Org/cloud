@@ -91,6 +91,7 @@
     "draft": "Luonnos",
     "enabled": "Käytössä",
     "github": "GitHub",
+    "image": "Kuva",
     "imageUnavailable": "Kuva ei ole saatavilla",
     "loading": "Ladataan…",
     "loadMore": "Lataa lisää",
@@ -122,10 +123,10 @@
     "connectProvider": "Yhdistä palveluntarjoaja",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
+    "couldNotLoad": "Ei voitu ladata.",
+    "couldNotLoadMore": "Lisää ei voitu ladata.",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
     "couldNotLoadSessions": "Istuntojen lataaminen epäonnistui.",
-    "couldnTLoad": "Ei voitu ladata.",
-    "couldnTLoadMore": "Lisää ei voitu ladata.",
     "deviceSessions": "Laiteistunnot",
     "disabled": "Ei käytössä",
     "email": "Sähköposti",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ladataan kuvaa",
       "imageUnavailableRetry": "Kuva ei ole käytettävissä. Yritä ladata se uudelleen",
+      "imageUnavailableRetryWithAlt": "Kuva ei ole käytettävissä. {{alt}}. Yritä ladata se uudelleen",
       "imagePreviewUnavailableInSession": "Kuvan esikatselu ei ole käytettävissä tässä istunnossa.",
       "viewImage": "Näytä kuva",
       "viewImageWithAlt": "Näytä kuva {{alt}}",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
-      "downloadA11y": "Lataa lasku {{number}}",
+      "downloadA11y": "Lataa lasku {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Laskut luodaan automaattisesti joka laskutusjaksolla. Ne näkyvät tässä, kun organisaatiotasi on laskutettu.",
       "emptyTitle": "Ei laskuja",
       "invoiceFallback": "Lasku",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
-      "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
       "ssoAndDomain": "SSO ja verkkotunnus",
       "dataCollection": "Tiedonkeruu",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Palaa takaisin ja viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
-    "invalidCode": "Koodi on virheellinen tai vanhentunut. Yritä uudelleen tai valitse ”$t(login.resendCode)”.",
+    "invalidCode": "Koodi on virheellinen tai vanhentunut. Käytä ”$t(login.resendCode)” tai valitse ”$t(login.moreSignInOptions)”.",
     "codeInProgress": "Koodiasi käsitellään. Odota hetki ja yritä uudelleen.",
     "tooManyAttempts": "Liian monta yritystä. Pyydä uusi koodi.",
     "invalidToken": "Kirjautuminen epäonnistui. Yritä uudelleen.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
       "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
+      "invalidApiKey": "API-avain sisältää merkin, jota ei voi lähettää. Käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
+      "invalidHeaders": "Mukautettua otsaketta ei voi lähettää. Tarkista sen nimi ja käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
       "httpApprovalRequired": "Hyväksy tämä paikallinen HTTP-päätepiste ennen tallentamista tai yhteyden muodostamista.",
@@ -4338,7 +4341,15 @@
       "download": "Lataa laitteessa toimiva malli",
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
-      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen.",
+      "cannotUse": "Ei voi suorittaa: {{items}}.",
+      "cannotUseOptions": "Ei voi täyttää: joitakin työkalun valintoja.",
+      "limitations": "Rajoitukset",
+      "tools": {
+        "time": "Aika",
+        "settingsList": "Näytä asetukset",
+        "settingsSet": "Muuta asetuksia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Ohjeen tallennus epäonnistui",
     "instructionDeleteFailed": "Ohjeen poisto epäonnistui",
     "instructionToggleFailed": "Ohjetta ei voitu päivittää",
+    "instructionViewTitle": "Ohjetiedosto",
     "instructionLimitReached": "Profiiliin mahtuu enintään {{max}} ohjetta. Poista yksi lisätäksesi toisen.",
     "mcp": {
       "title": "MCP-palvelimet",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Krediittitapahtumia ei voitu ladata.",
       "appStoreReceipt": "Kuitti App Storessa",
+      "deduction": {
+        "adminCancel": "Ylläpitäjän sulkema saldo",
+        "adminDebit": "Ylläpitäjän poistamat krediitit",
+        "codingPlan": "Koodaustilaus: {{plan}}",
+        "correction": "Saldon oikaisu",
+        "dispute": "Maksukiista",
+        "refundAppStore": "Krediittipaketin hyvitys App Storesta",
+        "refundGooglePlay": "Krediittipaketin hyvitys Google Playsta"
+      },
       "deductionFallback": "Krediittien veloitus",
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",
       "expiredGrant": "Vanhentunut: {{description}}",
+      "expiredStatus": "Vanhentunut",
       "googlePlayReceipt": "Kuitti Google Playssa",
       "kind": {
         "adjustment": "Oikaisu",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
       "retentionLimit": "Näytetään uusin krediittihistoria.",
-      "voidedGrant": "Mitätöity: {{description}}"
+      "voidedGrant": "Mitätöity: {{description}}",
+      "voidedStatus": "Mitätöity"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
@@ -4906,8 +4929,8 @@
     "estimatePermissionUnavailable": "Sinulla ei ole oikeutta käyttää tämän kontekstin saldoa. Pyydä organisaation omistajaa ottamaan se käyttöön.",
     "saved": "Katsauksen asetukset tallennettu",
     "selectedSessions": "Valitut istunnot",
-    "snapshotPullRequests": "PR:t valituissa istunnoissa",
-    "snapshotBlockers": "Esteet valituissa istunnoissa",
+    "snapshotPullRequests": "PR:t",
+    "snapshotBlockers": "Esteet",
     "capturedAt": "Tallennettu {{time}}",
     "snapshotHint": "Ajastettuna aamuaikana tallennettu katsaus istuntojen viimeisimpään saatavilla olevaan tilaan. Tiedot voivat olla puutteellisia. Luvut kuvaavat valittuja istuntoja, eivät kaikkea yön aikaista toimintaa.",
     "snapshotTruncated": "Osa istunnoista tai aineistosta jätettiin pois katsauksen koon rajaamiseksi.",

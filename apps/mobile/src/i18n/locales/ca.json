@@ -92,6 +92,7 @@
     "draft": "Esborrany",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imatge",
     "imageUnavailable": "La imatge no està disponible.",
     "loading": "S'està carregant…",
     "loadMore": "Carrega'n més",
@@ -123,10 +124,10 @@
     "connectProvider": "Connecta un proveïdor",
     "contentTruncated": "Contingut truncat",
     "copyLink": "Copia l'enllaç",
+    "couldNotLoad": "No s'ha pogut carregar.",
+    "couldNotLoadMore": "No se n'han pogut carregar més.",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldnTLoad": "No s'ha pogut carregar.",
-    "couldnTLoadMore": "No se n'han pogut carregar més.",
     "deviceSessions": "Sessions als dispositius",
     "disabled": "Desactivat",
     "email": "Correu electrònic",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "La imatge no està disponible. Torna a provar de carregar-la",
+      "imageUnavailableRetryWithAlt": "La imatge no està disponible. {{alt}}. Torna a provar de carregar-la",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Mostra la imatge",
       "viewImageWithAlt": "Mostra la imatge {{alt}}",
@@ -3758,7 +3760,7 @@
       "noSeatsAvailable": "Totes les places estan en ús. Demana a un propietari de l'organització que afegeixi places abans de convidar més membres."
     },
     "invoices": {
-      "downloadA11y": "Baixa la factura {{number}}",
+      "downloadA11y": "Baixa la factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí quan es facturi a l'organització.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",
@@ -3838,7 +3840,6 @@
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
-      "guardrails": "Salvaguardes",
       "byok": "Utilitza la teva pròpia clau",
       "ssoAndDomain": "SSO i domini",
       "dataCollection": "Recollida de dades",
@@ -3960,7 +3961,7 @@
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Per acabar de crear el teu compte, torna enrere i utilitza «$t(login.moreSignInOptions)».",
-    "invalidCode": "Aquest codi és incorrecte o ha caducat. Torna-ho a provar o utilitza «$t(login.resendCode)».",
+    "invalidCode": "Aquest codi és incorrecte o ha caducat. Utilitza «$t(login.resendCode)» o «$t(login.moreSignInOptions)».",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
     "invalidToken": "L'inici de sessió ha fallat. Torna-ho a provar.",
@@ -4283,6 +4284,8 @@
       "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
       "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
+      "invalidApiKey": "La clau de l'API conté un caràcter que no es pot enviar. Utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
+      "invalidHeaders": "No es pot enviar una capçalera personalitzada. Comprova'n el nom i utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
       "httpApprovalRequired": "Autoritza aquest punt de connexió HTTP local abans de desar-lo o connectar-t'hi.",
@@ -4417,7 +4420,15 @@
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
-      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
+      "cannotUse": "No es pot executar: {{items}}.",
+      "cannotUseOptions": "No es poden emplenar: algunes opcions d'eina.",
+      "limitations": "Limitacions",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostra la configuració",
+        "settingsSet": "Canvia la configuració"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
@@ -4601,6 +4612,7 @@
     "instructionSaveFailed": "No s'ha pogut desar la instrucció",
     "instructionDeleteFailed": "No s'ha pogut eliminar la instrucció",
     "instructionToggleFailed": "No s'ha pogut actualitzar la instrucció",
+    "instructionViewTitle": "Fitxer d'instrucció",
     "instructionLimitReached": "Un perfil pot tenir fins a {{max}} instruccions. Elimina'n una per afegir-ne una altra.",
     "mcp": {
       "title": "Servidors MCP",
@@ -4772,10 +4784,20 @@
     "history": {
       "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
       "appStoreReceipt": "Rebut de l'App Store",
+      "deduction": {
+        "adminCancel": "Saldo tancat per un administrador",
+        "adminDebit": "Crèdits eliminats per un administrador",
+        "codingPlan": "Pla de programació: {{plan}}",
+        "correction": "Correcció del saldo",
+        "dispute": "Disputa de pagament",
+        "refundAppStore": "Reemborsament del paquet de crèdits de l'App Store",
+        "refundGooglePlay": "Reemborsament del paquet de crèdits de Google Play"
+      },
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
       "expiredGrant": "Caducat: {{description}}",
+      "expiredStatus": "Caducat",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
@@ -4802,7 +4824,8 @@
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
       "retentionLimit": "Es mostra l'historial de crèdits més recent.",
-      "voidedGrant": "Anul·lat: {{description}}"
+      "voidedGrant": "Anul·lat: {{description}}",
+      "voidedStatus": "Anul·lat"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -4996,8 +5019,8 @@
     "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum.",
     "saved": "S'ha desat la configuració de l'informe",
     "selectedSessions": "Sessions seleccionades",
-    "snapshotPullRequests": "PRs a les sessions seleccionades",
-    "snapshotBlockers": "Bloquejos a les sessions seleccionades",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Bloquejos",
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantània de l'últim estat disponible de les sessions, capturada al matí a l'hora programada. Pot ser incompleta. Els recomptes descriuen les sessions seleccionades, no tota l'activitat nocturna.",
     "snapshotTruncated": "S'han omès algunes sessions o proves per limitar la mida d'aquesta instantània.",

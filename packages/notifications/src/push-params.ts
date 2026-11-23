@@ -1,6 +1,6 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
-import { SECURITY_FINDING_PUSH_TITLE_KEYS } from './push-i18n-keys';
+import { SECURITY_FINDING_PUSH_TITLE_KEYS, type PushCatalogKey } from './push-i18n-keys';
 
 /** The severity values a security finding carries, as the finding enum spells them. */
 type SecurityFindingSeverity = keyof typeof en.internal.securityFindingSeverity;
@@ -16,7 +16,7 @@ export const SECURITY_FINDING_SEVERITY_KEYS = {
   high: 'internal.securityFindingSeverity.high',
   medium: 'internal.securityFindingSeverity.medium',
   low: 'internal.securityFindingSeverity.low',
-} as const satisfies Record<SecurityFindingSeverity, string>;
+} as const satisfies Record<SecurityFindingSeverity, PushCatalogKey>;
 
 /** The push kinds whose title interpolates a finding's severity. */
 const SECURITY_FINDING_PUSH_TITLE_KEY_SET: ReadonlySet<string> = new Set(

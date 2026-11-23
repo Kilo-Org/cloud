@@ -323,11 +323,12 @@ repository root fixed it.
 
 The transform needs the toolchain the root project installs, so install
 `--filter '@kilocode/harness-sdk...' --filter kilocode-monorepo`. That closure
-runs every `ttsx` step of `check:ci` — `check:migrations`, `check:package` and
-`check:platform` included — and the whole chain passed on 2026-11-11. CI uses
-the same command, in `kilo-app-ci.yml`, `mobile-native-build.yml` and the
-`harness-sdk` job of `ci.yml`. A bare `--filter @kilocode/harness-sdk` has
-failed this way, so never install the package alone.
+runs every `ttsx` step of `check:ci` — `check:boundaries`, `check:migrations`,
+`check:package` and `check:platform` — and the whole chain passed on
+2026-11-11. CI uses the same command, in `kilo-app-ci.yml`,
+`mobile-native-build.yml` and the `harness-sdk` job of `ci.yml`. A bare
+`--filter @kilocode/harness-sdk` has failed this way, so never install the
+package alone.
 
 ## Rules
 
@@ -917,13 +918,13 @@ same model varies by a factor of ten between runs — `xiaomi/mimo-v2.5` took
 1419 ms on one run, 20 s on the next, and 2023 ms on the one above.
 
 The ratios move too, and by more than the request does. `tencent/hy3` read
-0.79 of its input from the cache on one run and 0.99 on the next; `minimax/
-minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to 0.42, on
-the same prompts through the same code. What the ratio measures is whether the
-upstream provider still held the prefix, which is its decision and not this
-package's. Read one run as weather. The one number that is climate is the top
-of the table: a model whose provider caches at all lands above 0.99, and that
-has held on every run.
+0.79 of its input from the cache on one run and 0.99 on the next;
+`minimax/minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to
+0.42, on the same prompts through the same code. What the ratio measures is
+whether the upstream provider still held the prefix, which is its decision and
+not this package's. Read one run as weather. The one number that is climate is
+the top of the table: a model whose provider caches at all lands above 0.99,
+and that has held on every run.
 
 The prompts are identical between runs, so a ratio that fell is the provider
 having dropped a prefix it once held, not a change here. Do not chase one.
@@ -1635,9 +1636,10 @@ instead of the provider would be a change to what the provider sealed.
 
 **The gateway sends the reasoning under different names again.** Measured
 2026-09-04: the responses shape relays Anthropic's thinking as
-`response.reasoning.delta`, not the documented `response.reasoning_summary_text
-.delta`, so both are read. Two providers relayed through the chat shape name it
-`reasoning` and `reasoning_content`, so both are read there.
+`response.reasoning.delta`, not the documented
+`response.reasoning_summary_text.delta`, so both are read. Two providers
+relayed through the chat shape name it `reasoning` and `reasoning_content`, so
+both are read there.
 
 A turn holds as many reasoning parts as the model produced. The words and the
 signature arrive on separate events, so both land on the block still open, and
@@ -1941,7 +1943,8 @@ knows a model's own limit, so `ask.ts` reads
 
 `core/` holds the contracts and the pure domain. `plugins/` holds the
 implementations, including the ones this package owns. **A file in `core/` must
-never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
+never import from `plugins/`.** `pnpm check:boundaries` fails when one does,
+and when `src/core` cannot be read, so a scan that did not run is not a pass.
 It exempts `*.test.ts`: a core test needs a plugin to run against.
 
 | Path | Purpose |
@@ -2093,7 +2096,7 @@ Add a row when you turn one off, and give the reason.
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
 | `import/no-namespace` | Off for the two barrel tests only, `src/index.test.ts` and `src/plugins/tools/index.test.ts`. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 | `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
-| `import/no-nodejs-modules` | Off for the eleven files that import a Node built-in: the Node store, its four tests, `expo-fixture.ts`, the two remote-mcp fixtures, `conformance.test.ts`, `resume-fixture.ts` and `image.test.ts`. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`. The store is the package's own `/plugins/store/node` entry point, which a caller chooses to run on Node; the others are tests and fixtures. The root barrel reaches none of them. |
+| `import/no-nodejs-modules` | Off for the files the override names: `src/plugins/store/node.ts`, every store test matched by the glob `src/plugins/store/*.test.ts`, `src/plugins/store/expo-fixture.ts`, the two remote-mcp fixtures, `src/plugins/conformance.test.ts`, `src/core/resume-fixture.ts` and `src/core/image.test.ts`. The store-test glob deliberately covers every store test, so a new one is exempt without an edit to this row. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`. The store is the package's own `/plugins/store/node` entry point, which a caller chooses to run on Node; the others are tests and fixtures. The root barrel reaches none of them. |
 | `unicorn/no-null` | Off for `src/plugins/remote-mcp/app.ts` only. `AppBridge` names `null` as the value of its first argument when the caller registers the handlers by hand, and this file does exactly that, so the argument is the SDK's `null` and not one this package invents. |
 
 The block under `no-underscore-dangle` in `.oxlintrc.json` — `node/no-sync`,

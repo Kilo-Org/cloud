@@ -91,6 +91,7 @@
     "draft": "খসড়া",
     "enabled": "চালু",
     "github": "GitHub",
+    "image": "ছবি",
     "imageUnavailable": "ছবিটি পাওয়া যাচ্ছে না।",
     "loading": "লোড হচ্ছে…",
     "loadMore": "আরও লোড করুন",
@@ -122,10 +123,10 @@
     "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
     "contentTruncated": "বিষয়বস্তু আংশিক দেখানো হয়েছে",
     "copyLink": "লিঙ্ক কপি করুন",
+    "couldNotLoad": "লোড করা যায়নি।",
+    "couldNotLoadMore": "আরও লোড করা যায়নি।",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",
     "couldNotLoadSessions": "সেশন লোড করা যায়নি।",
-    "couldnTLoad": "লোড করা যায়নি।",
-    "couldnTLoadMore": "আরও লোড করা যায়নি।",
     "deviceSessions": "ডিভাইসের সেশন",
     "disabled": "বন্ধ",
     "email": "ইমেইল",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ছবি লোড হচ্ছে",
       "imageUnavailableRetry": "ছবি পাওয়া যাচ্ছে না, লোড করার জন্য আবার চেষ্টা করুন",
+      "imageUnavailableRetryWithAlt": "ছবি পাওয়া যাচ্ছে না, {{alt}}, লোড করার জন্য আবার চেষ্টা করুন",
       "imagePreviewUnavailableInSession": "এই সেশনে ছবির প্রিভিউ দেখা যায় না।",
       "viewImage": "ছবি দেখুন",
       "viewImageWithAlt": "{{alt}} ছবিটি দেখুন",
@@ -2811,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "এজেন্ট: {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "সেশনের ভেতরে আরও সেশন তৈরির সর্বোচ্চ সীমায় পৌঁছেছে।",
+      "maxNestingDepth": "নেস্টেড সেশনের সর্বোচ্চ গভীরতায় পৌঁছেছে।",
       "modelAccessibility": "মডেল: {{modelLabel}}",
       "openHint": "সাবএজেন্টের সেশন খুলুন",
       "subagent": "সাবএজেন্ট",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "সব আসন ব্যবহৃত হচ্ছে। আরও সদস্যদের আমন্ত্রণ জানানোর আগে আসন যোগ করতে সংস্থার একজন মালিককে বলুন।"
     },
     "invoices": {
-      "downloadA11y": "ইনভয়েস {{number}} ডাউনলোড করুন",
+      "downloadA11y": "ইনভয়েস {{number}}, {{amount}}, {{date}}, {{status}} ডাউনলোড করুন",
       "emptyDescription": "প্রতিটি বিলিং চক্রে স্বয়ংক্রিয়ভাবে ইনভয়েস তৈরি হয়। আপনার সংস্থার বিল তৈরি হলে ইনভয়েস এখানে দেখা যাবে।",
       "emptyTitle": "কোনো ইনভয়েস নেই",
       "invoiceFallback": "ইনভয়েস",
@@ -3770,7 +3772,6 @@
       "usageDetails": "ব্যবহারের বিবরণ",
       "providersAndModels": "প্রোভাইডার ও মডেল",
       "groups": "গ্রুপ",
-      "guardrails": "গার্ডরেল",
       "byok": "নিজের কী ব্যবহার করুন",
       "ssoAndDomain": "SSO ও ডোমেইন",
       "dataCollection": "ডেটা সংগ্রহ",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে '$t(login.signInWithApple)' ব্যবহার করুন।",
     "signupStepUpGoogle": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে '$t(login.signInWithGoogle)' ব্যবহার করুন।",
     "signupStepUpBack": "আপনার অ্যাকাউন্ট তৈরি সম্পূর্ণ করতে পেছনে ফিরে যান এবং '$t(login.moreSignInOptions)' ব্যবহার করুন।",
-    "invalidCode": "কোডটি সঠিক নয় অথবা এর মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন অথবা '$t(login.resendCode)' ব্যবহার করুন।",
+    "invalidCode": "কোডটি সঠিক নয় অথবা এর মেয়াদ শেষ হয়ে গেছে। '$t(login.resendCode)' অথবা '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "codeInProgress": "আপনার কোডটি যাচাই করা হচ্ছে। একটু অপেক্ষা করে আবার চেষ্টা করুন।",
     "tooManyAttempts": "অতিরিক্তবার চেষ্টা করা হয়েছে। নতুন কোডের অনুরোধ করুন।",
     "invalidToken": "সাইন ইন করা যায়নি। আবার চেষ্টা করুন।",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "এন্ডপয়েন্ট কোনো মডেল তালিকাভুক্ত করেনি। মডেলগুলি ম্যানুয়ালি লিখুন।",
       "connectionIncomplete": "মডেল উত্তর দিয়েছে কিন্তু সম্পন্ন করেনি। আবার চেষ্টা করুন, অথবা মডেল ID এবং প্রোটোকল পরীক্ষা করুন।",
       "invalidInput": "একটি ব্যাকএন্ডের নাম, বৈধ হেডার এবং স্বতন্ত্র ID ও নামসহ অন্তত একটি মডেল লিখুন। টোকেনের সীমা অবশ্যই ধনাত্মক পূর্ণসংখ্যা হতে হবে।",
+      "invalidApiKey": "API কী-তে এমন একটি অক্ষর রয়েছে যা পাঠানো যায় না। শুধুমাত্র অক্ষর, সংখ্যা এবং সাধারণ চিহ্ন ব্যবহার করুন, কোনো লাইন ব্রেক ছাড়া।",
+      "invalidHeaders": "একটি কাস্টম হেডার পাঠানো যায় না। এর নাম পরীক্ষা করুন এবং শুধুমাত্র অক্ষর, সংখ্যা এবং সাধারণ চিহ্ন ব্যবহার করুন, কোনো লাইন ব্রেক ছাড়া।",
       "invalidUrl": "প্রমাণীকরণের তথ্য, কোয়েরি বা ফ্র্যাগমেন্ট ছাড়া একটি HTTP বা HTTPS API রুট লিখুন।",
       "publicHttp": "সর্বজনীন HTTP এন্ডপয়েন্ট অনুমোদিত নয়। HTTPS অথবা একটি ব্যক্তিগত স্থানীয় এন্ডপয়েন্ট ব্যবহার করুন।",
       "httpApprovalRequired": "সংরক্ষণ বা সংযোগ করার আগে এই স্থানীয় HTTP এন্ডপয়েন্ট অনুমোদন করুন।",
@@ -4338,7 +4341,15 @@
       "download": "ডিভাইসে থাকা মডেল ডাউনলোড করুন",
       "downloading": "ডাউনলোড হচ্ছে…",
       "downloadProgress": "ডাউনলোড হচ্ছে… {{percent}}%",
-      "downloadFailed": "ডাউনলোড শেষ হয়নি। আপনার কানেকশন ও খালি স্টোরেজ দেখে নিয়ে আবার চেষ্টা করুন।"
+      "downloadFailed": "ডাউনলোড শেষ হয়নি। আপনার কানেকশন ও খালি স্টোরেজ দেখে নিয়ে আবার চেষ্টা করুন।",
+      "cannotUse": "চালানো যাবে না: {{items}}।",
+      "cannotUseOptions": "পূরণ করা যাবে না: টুলের কিছু বিকল্প।",
+      "limitations": "সীমাবদ্ধতা",
+      "tools": {
+        "time": "সময়",
+        "settingsList": "সেটিংস দেখান",
+        "settingsSet": "সেটিংস পরিবর্তন করুন"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "নির্দেশনা সংরক্ষণ করা যায়নি",
     "instructionDeleteFailed": "নির্দেশনা মোছা যায়নি",
     "instructionToggleFailed": "নির্দেশনা আপডেট করা যায়নি",
+    "instructionViewTitle": "নির্দেশনার ফাইল",
     "instructionLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি নির্দেশনা থাকতে পারে। আরেকটি যোগ করতে একটি মুছুন।",
     "mcp": {
       "title": "MCP সার্ভার",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "ক্রেডিট কার্যকলাপ লোড করা যায়নি।",
       "appStoreReceipt": "App Store-এর রসিদ",
+      "deduction": {
+        "adminCancel": "অ্যাডমিন কর্তৃক ব্যালেন্স বন্ধ করা হয়েছে",
+        "adminDebit": "অ্যাডমিন কর্তৃক ক্রেডিট সরানো হয়েছে",
+        "codingPlan": "কোডিং প্ল্যান: {{plan}}",
+        "correction": "ব্যালেন্স সংশোধন",
+        "dispute": "পেমেন্ট বিরোধ",
+        "refundAppStore": "App Store থেকে ক্রেডিট প্যাকের অর্থ ফেরত",
+        "refundGooglePlay": "Google Play থেকে ক্রেডিট প্যাকের অর্থ ফেরত"
+      },
       "deductionFallback": "ক্রেডিট কর্তন",
       "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",
       "emptyTitle": "কোনো ক্রেডিট ইতিহাস নেই",
       "expiredGrant": "মেয়াদ শেষ: {{description}}",
+      "expiredStatus": "মেয়াদ শেষ",
       "googlePlayReceipt": "Google Play-এর রসিদ",
       "kind": {
         "adjustment": "সমন্বয়",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "{{description}}-এর {{amount}} এবং {{date}} তারিখের রসিদ খুলুন",
       "receiptUnavailable": "এই কেনাকাটার জন্য কোনো রসিদ পাওয়া যাচ্ছে না।",
       "retentionLimit": "সাম্প্রতিকতম ক্রেডিট ইতিহাস দেখানো হচ্ছে।",
-      "voidedGrant": "বাতিল: {{description}}"
+      "voidedGrant": "বাতিল: {{description}}",
+      "voidedStatus": "বাতিল"
     },
     "title": "ক্রেডিট কিনুন",
     "description": "ক্রেডিট হলো Kilo App-এ AI কোডিং সেশন চালানোর জন্য আপনার Kilo ব্যালেন্সে যোগ করা এককালীন কেনাকাটা। স্টোর আপনার অ্যাকাউন্ট থেকে চার্জ নেয় এবং স্টোর পেমেন্ট নিশ্চিত করার পর ক্রেডিট যোগ করা হয়।",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "এই সারাংশের অনুমতি দিতে খরচের সুরক্ষা সীমা বাড়ান।",
     "saved": "ব্রিফিং সেটিংস সংরক্ষণ করা হয়েছে",
     "selectedSessions": "নির্বাচিত সেশন",
-    "snapshotPullRequests": "নির্বাচিত সেশনের PR",
-    "snapshotBlockers": "নির্বাচিত সেশনের বাধা",
+    "snapshotPullRequests": "PR",
+    "snapshotBlockers": "বাধা",
     "capturedAt": "সংরক্ষিত হয়েছে {{time}}",
     "snapshotHint": "নির্ধারিত সকালে সেশনের সর্বশেষ উপলব্ধ অবস্থা থেকে যথাসাধ্য তৈরি ও সংরক্ষিত স্ন্যাপশট। সংখ্যাগুলো নির্বাচিত সেশনের তথ্য বোঝায়, সারা রাতের সম্পূর্ণ কার্যকলাপ নয়।",
     "snapshotTruncated": "এই স্ন্যাপশটের আকার সীমিত রাখতে কিছু সেশন বা প্রমাণ বাদ দেওয়া হয়েছে।",

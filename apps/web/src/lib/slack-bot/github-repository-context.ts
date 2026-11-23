@@ -4,6 +4,7 @@ import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integ
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import { captureException } from '@sentry/nextjs';
+import { renderBoundedRepositoryList } from './repository-prompt-budget';
 
 export type GitHubRepositoryContext = {
   repositories: GitHubRepositoryChoice[] | null;
@@ -69,12 +70,14 @@ export function formatGitHubRepositoriesForPrompt(context: GitHubRepositoryConte
 - No GitHub repositories are currently available for this Kilo organization.`;
   }
 
-  const repoList = context.repositories
-    .map(
+  const repoList = renderBoundedRepositoryList(
+    context.repositories.map(
       repo =>
         `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}; association: ${repo.githubIntegrationId}; app: ${repo.githubAppType}]`
-    )
-    .join('\n');
+    ),
+    omitted =>
+      `- Repositories not listed here: ${omitted}. Ask the user for the exact owner/name of the repository they want to use.`
+  );
 
   return `${header}
 

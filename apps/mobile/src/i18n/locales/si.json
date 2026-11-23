@@ -91,6 +91,7 @@
     "draft": "කෙටුම්පත",
     "enabled": "සක්‍රීයයි",
     "github": "GitHub",
+    "image": "රූපය",
     "imageUnavailable": "රූපය ලබාගත නොහැක.",
     "loading": "පූරණය වෙමින්…",
     "loadMore": "තවත් පූරණය කරන්න",
@@ -122,10 +123,10 @@
     "connectProvider": "සැපයුම්කරුවෙකු සම්බන්ධ කරන්න",
     "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
     "copyLink": "සබැඳිය පිටපත් කරන්න",
+    "couldNotLoad": "පූරණය කළ නොහැකි විය.",
+    "couldNotLoadMore": "තවත් පූරණය කළ නොහැකි විය.",
     "couldNotLoadOrganizations": "සංවිධාන පූරණය කළ නොහැකි විය.",
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldnTLoad": "පූරණය කළ නොහැකි විය.",
-    "couldnTLoadMore": "තවත් පූරණය කළ නොහැකි විය.",
     "deviceSessions": "උපාංග සැසි",
     "disabled": "අක්‍රීයයි",
     "email": "ඊමේල්",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබා ගත නොහැක. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
+      "imageUnavailableRetryWithAlt": "රූපය ලබා ගත නොහැක. {{alt}}. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
       "viewImageWithAlt": "{{alt}} රූපය බලන්න",
@@ -2811,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "එකක් තුළ තවත් උපසැසියක් සෑදිය හැකි උපරිම මට්ටමට ළඟා වී ඇත.",
+      "maxNestingDepth": "කැදැලි සැසිවල උපරිම ගැඹුරට ළඟා වී ඇත.",
       "modelAccessibility": "මාදිලිය: {{modelLabel}}",
       "openHint": "උපනියෝජිත සැසිය විවෘත කරන්න",
       "subagent": "උපනියෝජිතයා",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "සියලුම ආසන භාවිතයේ ඇත. තවත් සාමාජිකයන්ට ආරාධනා කිරීමට පෙර ආසන එක් කරන ලෙස සංවිධාන හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න."
     },
     "invoices": {
-      "downloadA11y": "{{number}} ඉන්වොයිසිය බාගත කරන්න",
+      "downloadA11y": "ඉන්වොයිසිය {{number}}, {{amount}}, {{date}}, {{status}} බාගත කරන්න",
       "emptyDescription": "සෑම බිල්පත් කාල සීමාවකම ඉන්වොයිසි ස්වයංක්‍රීයව සාදයි. ඔබේ සංවිධානයට බිල්පත නිකුත් කළ පසු ඒවා මෙහි දිස්වේ.",
       "emptyTitle": "ඉන්වොයිසි නොමැත",
       "invoiceFallback": "ඉන්වොයිසිය",
@@ -3770,7 +3772,6 @@
       "usageDetails": "භාවිත විස්තර",
       "providersAndModels": "සපයන්නන් සහ මාදිලි",
       "groups": "කණ්ඩායම්",
-      "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
       "ssoAndDomain": "SSO සහ වසම",
       "dataCollection": "දත්ත එකතු කිරීම",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",
     "signupStepUpBack": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට ආපසු ගොස් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
-    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න, නැතහොත් '$t(login.resendCode)' භාවිත කරන්න.",
+    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර '$t(login.resendCode)' භාවිත කරන්න හෝ නැතහොත් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "codeInProgress": "ඔබේ කේතය සකසනු ලැබේ. මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න.",
     "tooManyAttempts": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර නව කේතයක් ඉල්ලන්න.",
     "invalidToken": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "අන්ත ලක්ෂ්‍යය ආකෘති කිසිවක් ලැයිස්තුගත නොකළේය. ආකෘති අතින් ඇතුළත් කරන්න.",
       "connectionIncomplete": "ආකෘතිය පිළිතුරු දුන් නමුත් සම්පූර්ණ කළේ නැත. නැවත උත්සාහ කරන්න, නැතහොත් ආකෘති හැඳුනුම් අංකය සහ ප්‍රොටෝකෝලය පරීක්ෂා කරන්න.",
       "invalidInput": "පසුපස සේවාවේ නමක්, වලංගු ශීර්ෂ සහ අනන්‍ය හැඳුනුම් අංකයක් හා නමක් ඇති අවම වශයෙන් එක් ආකෘතියක් ඇතුළත් කරන්න. ටෝකන සීමා ධන පූර්ණ සංඛ්‍යා විය යුතුය.",
+      "invalidApiKey": "API යතුරෙහි යැවිය නොහැකි අක්ෂරයක් අඩංගු වේ. අක්ෂර, අංක සහ සම්මත සංකේත පමණක් භාවිත කරන්න, පේළි බිඳීම් රහිතව.",
+      "invalidHeaders": "අභිරුචි ශීර්ෂයක් යැවිය නොහැක. එහි නම පරීක්ෂා කර අක්ෂර, අංක සහ සම්මත සංකේත පමණක් භාවිත කරන්න, පේළි බිඳීම් රහිතව.",
       "invalidUrl": "පිවිසුම් තොරතුරු, විමසුමක් හෝ ඛණ්ඩයක් නොමැති HTTP හෝ HTTPS API මූලයක් ඇතුළත් කරන්න.",
       "publicHttp": "පොදු HTTP අන්ත ලක්ෂ්‍ය සඳහා අවසර නැත. HTTPS හෝ පෞද්ගලික දේශීය අන්ත ලක්ෂ්‍යයක් භාවිත කරන්න.",
       "httpApprovalRequired": "සුරැකීමට හෝ සම්බන්ධ වීමට පෙර මෙම දේශීය HTTP අන්ත ලක්ෂ්‍යය අනුමත කරන්න.",
@@ -4338,7 +4341,15 @@
       "download": "උපාංගයේ ආකෘතිය බාගන්න",
       "downloading": "බාගත වෙමින්…",
       "downloadProgress": "බාගත වෙමින්… {{percent}}%",
-      "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+      "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "cannotUse": "ධාවනය කළ නොහැක: {{items}}.",
+      "cannotUseOptions": "පිරවිය නොහැක: මෙවලම් විකල්ප කිහිපයක්.",
+      "limitations": "සීමාවන්",
+      "tools": {
+        "time": "වේලාව",
+        "settingsList": "සැකසීම් පෙන්වන්න",
+        "settingsSet": "සැකසීම් වෙනස් කරන්න"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "උපදෙස සුරැකීමට නොහැකි විය",
     "instructionDeleteFailed": "උපදෙස මැකීමට නොහැකි විය",
     "instructionToggleFailed": "උපදෙස යාවත්කාලීන කිරීමට නොහැකි විය",
+    "instructionViewTitle": "උපදෙස් ගොනුව",
     "instructionLimitReached": "පැතිකඩකට උපදෙස් {{max}}ක් දක්වා තබා ගත හැක. තවත් එකක් එකතු කිරීමට එකක් මකන්න.",
     "mcp": {
       "title": "MCP සේවාදායකයන්",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "ක්‍රෙඩිට් ක්‍රියාකාරකම් පූරණය කළ නොහැක.",
       "appStoreReceipt": "App Store වෙතින් ලැබුණු රිසිට්පත",
+      "deduction": {
+        "adminCancel": "ශේෂය පරිපාලක විසින් වසා ඇත",
+        "adminDebit": "ක්‍රෙඩිට් පරිපාලක විසින් ඉවත් කර ඇත",
+        "codingPlan": "කේතීකරණ සැලැස්ම: {{plan}}",
+        "correction": "ශේෂය ගැලපීම",
+        "dispute": "ගෙවීම පිළිබඳ ආරවුල",
+        "refundAppStore": "App Store වෙතින් ක්‍රෙඩිට් පැකේජයක මුදල් ආපසු ගැනීම",
+        "refundGooglePlay": "Google Play වෙතින් ක්‍රෙඩිට් පැකේජයක මුදල් ආපසු ගැනීම"
+      },
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
       "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
+      "expiredStatus": "කල් ඉකුත් වී ඇත",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
       "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
-      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}",
+      "voidedStatus": "අවලංගු කර ඇත"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "මෙම සාරාංශයට ඉඩ දීමට වියදම් ආරක්ෂක සීමාව ඉහළ නංවන්න.",
     "saved": "වාර්තා සැකසීම් සුරකින ලදී",
     "selectedSessions": "තෝරාගත් සැසි",
-    "snapshotPullRequests": "තෝරාගත් සැසිවල PRs",
-    "snapshotBlockers": "තෝරාගත් සැසිවල බාධක",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "බාධක",
     "capturedAt": "සටහන් කළේ {{time}}",
     "snapshotHint": "නියමිත උදෑසන වේලාවේ ලබා ගත හැකි නවතම සැසි තත්ත්වය හැකි උපරිමයෙන් සටහන් කළ තත්ත්ව සටහනකි. ගණන් දැක්වෙන්නේ තෝරාගත් සැසි සඳහා මිස රාත්‍රිය පුරා සිදු වූ සියලු ක්‍රියාකාරකම් සඳහා නොවේ.",
     "snapshotTruncated": "මෙම තත්ත්ව සටහනේ ප්‍රමාණය සීමා කිරීමට සමහර සැසි හෝ සාක්ෂි ඇතුළත් කර නැත.",

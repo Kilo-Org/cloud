@@ -18,10 +18,22 @@ describe('orgGroupNameError', () => {
     expect(orgGroupNameError('   ')).toBe('required');
   });
 
+  it('requires a name whose characters draw nothing', () => {
+    expect(orgGroupNameError('\u200B\u200B')).toBe('required');
+  });
+
+  it('keeps a name that carries a visible character next to zero-width ones', () => {
+    expect(orgGroupNameError('\u200BDesign\u200B')).toBeNull();
+  });
+
   it('keeps the name inside the server bound', () => {
     expect(orgGroupNameError('Engineering')).toBeNull();
     expect(orgGroupNameError('a'.repeat(ORG_GROUP_NAME_MAX_LENGTH))).toBeNull();
     expect(orgGroupNameError('a'.repeat(ORG_GROUP_NAME_MAX_LENGTH + 1))).toBe('tooLong');
+  });
+
+  it('keeps the length bound when the name also holds a zero-width character', () => {
+    expect(orgGroupNameError(`${'a'.repeat(ORG_GROUP_NAME_MAX_LENGTH)}\u200B`)).toBe('tooLong');
   });
 });
 

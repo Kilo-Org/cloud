@@ -91,6 +91,7 @@
     "draft": "Mustand",
     "enabled": "Sisse lülitatud",
     "github": "GitHub",
+    "image": "Pilt",
     "imageUnavailable": "Pilt pole saadaval.",
     "loading": "Laadimine…",
     "loadMore": "Laadi veel",
@@ -122,10 +123,10 @@
     "connectProvider": "Ühenda teenusepakkuja",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
+    "couldNotLoad": "Andmeid ei õnnestunud laadida.",
+    "couldNotLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldnTLoad": "Andmeid ei õnnestunud laadida.",
-    "couldnTLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
     "deviceSessions": "Seadmete seansid",
     "disabled": "Välja lülitatud",
     "email": "E-post",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
+      "imageUnavailableRetryWithAlt": "Pilt pole saadaval, {{alt}}, proovi laadimist uuesti",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Kõik kohad on kasutusel. Palu organisatsiooni omanikul enne uute liikmete kutsumist kohti juurde lisada."
     },
     "invoices": {
-      "downloadA11y": "Laadi alla arve {{number}}",
+      "downloadA11y": "Laadi alla arve {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Arved koostatakse automaatselt igal arveldusperioodil ja kuvatakse siin pärast sinu organisatsioonile arve esitamist.",
       "emptyTitle": "Arveid pole",
       "invoiceFallback": "Arve",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
-      "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
       "ssoAndDomain": "SSO ja domeen",
       "dataCollection": "Andmete kogumine",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Konto loomise lõpetamiseks mine tagasi ja kasuta valikut „$t(login.moreSignInOptions)“.",
-    "invalidCode": "See kood on vale või aegunud. Proovi uuesti või kasuta valikut „$t(login.resendCode)“.",
+    "invalidCode": "See kood on vale või aegunud. Kasuta valikut „$t(login.resendCode)“ või „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
     "invalidToken": "Sisselogimine ebaõnnestus. Proovi uuesti.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
       "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
+      "invalidApiKey": "API võti sisaldab märki, mida ei saa saata. Kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
+      "invalidHeaders": "Kohandatud päist ei saa saata. Kontrolli selle nime ja kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
       "invalidUrl": "Sisesta HTTP või HTTPS API juur-URL ilma autentimisandmete, päringustringi ja fragmendita.",
       "publicHttp": "Avalikud HTTP lõpp-punktid pole lubatud. Kasuta HTTPS-i või privaatset kohalikku lõpp-punkti.",
       "httpApprovalRequired": "Enne salvestamist või ühenduse loomist kiida see kohalik HTTP lõpp-punkt heaks.",
@@ -4338,7 +4341,15 @@
       "download": "Laadi seadmesisene mudel alla",
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
-      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
+      "cannotUse": "Ei saa käivitada: {{items}}.",
+      "cannotUseOptions": "Ei saa täita: mõned tööriista valikud.",
+      "limitations": "Piirangud",
+      "tools": {
+        "time": "Aeg",
+        "settingsList": "Näita seadeid",
+        "settingsSet": "Muuda seadeid"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",
     "instructionToggleFailed": "Juhise uuendamine ebaõnnestus",
+    "instructionViewTitle": "Juhise fail",
     "instructionLimitReached": "Profiil mahutab kuni {{max}} juhist. Kustuta üks, et lisada veel.",
     "mcp": {
       "title": "MCP-serverid",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Krediiditegevust ei õnnestunud laadida.",
       "appStoreReceipt": "Kviitung App Store'ist",
+      "deduction": {
+        "adminCancel": "Administraatori suletud saldo",
+        "adminDebit": "Administraatori eemaldatud krediit",
+        "codingPlan": "Kodeerimispakett: {{plan}}",
+        "correction": "Saldo korrigeerimine",
+        "dispute": "Maksevaidlus",
+        "refundAppStore": "Krediidipaketi tagastus App Store'ist",
+        "refundGooglePlay": "Krediidipaketi tagastus Google Playst"
+      },
       "deductionFallback": "Krediidi mahaarvamine",
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
       "expiredGrant": "Aegunud: {{description}}",
+      "expiredStatus": "Aegunud",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
       "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu.",
-      "voidedGrant": "Tühistatud: {{description}}"
+      "voidedGrant": "Tühistatud: {{description}}",
+      "voidedStatus": "Tühistatud"
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
@@ -4906,8 +4929,8 @@
     "estimatePermissionUnavailable": "Sul pole õigust selle konteksti saldot kasutada. Palu organisatsiooni omanikul see lubada.",
     "saved": "Ülevaate seaded salvestatud",
     "selectedSessions": "Valitud seansid",
-    "snapshotPullRequests": "PR-id valitud seanssides",
-    "snapshotBlockers": "Takistused valitud seanssides",
+    "snapshotPullRequests": "PR-id",
+    "snapshotBlockers": "Takistused",
     "capturedAt": "Salvestatud {{time}}",
     "snapshotHint": "Saadaolevate andmete põhjal koostatud ülevaade seansside viimasest teadaolevast olekust, salvestatud ajastatud hommikusel ajal. Arvud kirjeldavad valitud seansse, mitte kogu öist tegevust.",
     "snapshotTruncated": "Ülevaate mahu piiramiseks jäeti osa seansse või tõendeid välja.",

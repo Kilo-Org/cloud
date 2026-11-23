@@ -1,4 +1,3 @@
-import { SETUP_SCRIPT_LIMITS } from '@kilocode/cloud-agent-profile/setup-script';
 import { z } from 'zod';
 import type { MCPServerConfig } from './persistence/types.js';
 
@@ -21,8 +20,6 @@ export const Limits = {
   MAX_ENV_VARS,
   MAX_ENV_VAR_KEY_LENGTH: 128, // Env var keys are typically short identifiers
   MAX_ENV_VAR_VALUE_LENGTH: 4096, // Env var values can be longer (connection strings, etc.)
-  MAX_SETUP_COMMANDS: SETUP_SCRIPT_LIMITS.MAX_SCRIPTS,
-  MAX_SETUP_COMMAND_LENGTH: SETUP_SCRIPT_LIMITS.MAX_LENGTH,
   MAX_MCP_SERVERS,
   ...RuntimeProfileLimits,
   SESSION_TTL_DAYS: 90,

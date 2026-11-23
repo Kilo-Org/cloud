@@ -18,21 +18,25 @@ export function ConsentRequiredRows() {
         icon={MessageSquare}
         title={t('consent.promptsTitle')}
         subtitle={t('consent.promptsDescription')}
+        subtitleNumberOfLines={2}
       />
       <ConfigureRow
         icon={User}
         title={t('consent.accountTitle')}
         subtitle={t('consent.accountDescription')}
+        subtitleNumberOfLines={2}
       />
       <ConfigureRow
         icon={Smartphone}
         title={t('consent.diagnosticsTitle')}
         subtitle={t('consent.diagnosticsDescription')}
+        subtitleNumberOfLines={2}
       />
       <ConfigureRow
         icon={Sparkles}
         title={t('consent.featureFlagsTitle')}
         subtitle={t('consent.featureFlagsDescription')}
+        subtitleNumberOfLines={2}
       />
     </RowGroup>
   );

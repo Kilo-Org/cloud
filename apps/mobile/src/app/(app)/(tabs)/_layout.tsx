@@ -20,6 +20,7 @@ import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { publishRenderedTabBarHeight, TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -140,6 +141,7 @@ export default function TabsLayout() {
     enabled: orgLoaded,
   });
   const attentionRevision = useSessionAttentionRevision();
+  const attentionHydration = useSessionAttentionHydration();
   useEffect(() => {
     if (!orgLoaded) {
       return;
@@ -151,15 +153,20 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
+    hydration: attentionHydration,
     isAcked: isAttentionAcked(session.id, {
       raiseId: session.statusUpdatedAt ?? session.status,
       status: session.status,
     }),
   }));
+  // A `hold` row is not counted: while the ack store is still loading it
+  // answers "not acked" for every raise, so the badge would appear and then
+  // disappear as a restored ack lands. `shouldShowNeedsInput` is false for a
+  // held row, which leaves the badge undefined until the phase settles.
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
       status: session.status,
-      raiseId: session.status,
+      hydration: session.hydration,
       isAcked: session.isAcked,
     })
   ).length;
@@ -171,7 +178,7 @@ export default function TabsLayout() {
   // session it created. The consumer lives in `usePendingAppAction` and is
   // mounted here because this layout owns both the router and the live session
   // list — the destination is decided here and nowhere else.
-  usePendingAppAction({ needsInputRows, orgLoaded, isLoading, isError });
+  usePendingAppAction({ attentionHydration, needsInputRows, orgLoaded, isLoading, isError });
 
   // The centered-state band ends at the tab bar's top edge, the region the bar
   // does not cover. The 16pt scroll-content gap (`TAB_SCREEN_BOTTOM_GAP`) is

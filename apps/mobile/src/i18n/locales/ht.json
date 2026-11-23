@@ -91,6 +91,7 @@
     "draft": "Bwouyon",
     "enabled": "Aktive",
     "github": "GitHub",
+    "image": "Imaj",
     "imageUnavailable": "Imaj la pa disponib.",
     "loading": "Ap chaje…",
     "loadMore": "Chaje plis",
@@ -122,10 +123,10 @@
     "connectProvider": "Konekte yon founisè",
     "contentTruncated": "Kontni koupe",
     "copyLink": "Kopye lyen an",
+    "couldNotLoad": "Nou pa t kapab chaje.",
+    "couldNotLoadMore": "Nou pa t kapab chaje plis.",
     "couldNotLoadOrganizations": "Nou pa t kapab chaje òganizasyon yo.",
     "couldNotLoadSessions": "Nou pa t kapab chaje sesyon yo.",
-    "couldnTLoad": "Nou pa t kapab chaje.",
-    "couldnTLoadMore": "Nou pa t kapab chaje plis.",
     "deviceSessions": "Sesyon aparèy",
     "disabled": "Dezaktive",
     "email": "Imèl",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ap chaje imaj la",
       "imageUnavailableRetry": "Imaj la pa disponib, eseye chaje li ankò",
+      "imageUnavailableRetryWithAlt": "Imaj la pa disponib, {{alt}}, eseye chaje li ankò",
       "imagePreviewUnavailableInSession": "Apèsi imaj la pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj la",
       "viewImageWithAlt": "Gade imaj {{alt}}",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Tout plas yo okipe. Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm."
     },
     "invoices": {
-      "downloadA11y": "Telechaje fakti {{number}}",
+      "downloadA11y": "Telechaje fakti {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakti yo kreye otomatikman nan chak sik faktirasyon. Yo ap parèt isit la lè òganizasyon ou a resevwa yon fakti.",
       "emptyTitle": "Pa gen fakti",
       "invoiceFallback": "Fakti",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
-      "guardrails": "Baryè sekirite",
       "byok": "Itilize pwòp kle ou",
       "ssoAndDomain": "SSO ak domèn",
       "dataCollection": "Koleksyon done",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Pou fini kreye kont ou a, itilize '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Pou fini kreye kont ou a, itilize '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Pou fini kreye kont ou a, retounen dèyè epi itilize '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Eseye ankò oswa itilize '$t(login.resendCode)'.",
+    "invalidCode": "Kòd sa a pa kòrèk oswa li ekspire. Itilize '$t(login.resendCode)' oswa '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kòd ou a ap trete. Tann yon ti moman epi eseye ankò.",
     "tooManyAttempts": "Twòp tantativ. Tanpri mande yon nouvo kòd.",
     "invalidToken": "Koneksyon an echwe. Tanpri eseye ankò.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Pwen aksè a pa t bay okenn modèl. Antre modèl yo alamen.",
       "connectionIncomplete": "Modèl la reponn men li pa t fini. Eseye ankò, oswa verifye ID modèl la ak pwotokòl la.",
       "invalidInput": "Antre yon non sèvis, antèt ki valab ak omwen yon modèl ki gen yon ID ak yon non ki pa repete. Limit jeton yo dwe nonb antye ki pi gran pase zewo.",
+      "invalidApiKey": "Kle API a gen yon karaktè ki pa ka voye. Sèvi sèlman ak lèt, chif, ak senbòl estanda, san okenn kase liy.",
+      "invalidHeaders": "Yon antèt pèsonalize pa ka voye. Tcheke non l epi sèvi sèlman ak lèt, chif, ak senbòl estanda, san okenn kase liy.",
       "invalidUrl": "Antre yon rasin API HTTP oswa HTTPS san enfòmasyon pou otantifikasyon, paramèt rechèch oswa fragman.",
       "publicHttp": "Pwen aksè HTTP piblik yo pa otorize. Sèvi ak HTTPS oswa yon pwen aksè lokal prive.",
       "httpApprovalRequired": "Apwouve pwen aksè HTTP lokal sa a anvan ou sove oswa konekte.",
@@ -4338,7 +4341,15 @@
       "download": "Telechaje modèl sou aparèy la",
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",
-      "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
+      "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò.",
+      "cannotUse": "Pa ka egzekite: {{items}}.",
+      "cannotUseOptions": "Pa ka ranpli: kèk opsyon zouti.",
+      "limitations": "Limitasyon",
+      "tools": {
+        "time": "Lè",
+        "settingsList": "Montre paramèt",
+        "settingsSet": "Chanje paramèt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modèl sa a sipòte efò refleksyon"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Pa t kapab sovgade enstriksyon an",
     "instructionDeleteFailed": "Pa t kapab efase enstriksyon an",
     "instructionToggleFailed": "Pa t kapab mete enstriksyon an ajou",
+    "instructionViewTitle": "Fichye enstriksyon",
     "instructionLimitReached": "Yon pwofil ka kenbe jiska {{max}} enstriksyon. Efase youn pou ajoute yon lòt.",
     "mcp": {
       "title": "MCP serveurs",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Pa t ka chaje aktivite kredi.",
       "appStoreReceipt": "Resi ki nan App Store",
+      "deduction": {
+        "adminCancel": "Administratè fèmen balans lan",
+        "adminDebit": "Administratè retire kredi yo",
+        "codingPlan": "Plan kodaj: {{plan}}",
+        "correction": "Koreksyon balans",
+        "dispute": "Diskisyon peman",
+        "refundAppStore": "Ranbousman pake kredi nan App Store",
+        "refundGooglePlay": "Ranbousman pake kredi nan Google Play"
+      },
       "deductionFallback": "Dediksyon kredi",
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
       "expiredGrant": "Ekspire: {{description}}",
+      "expiredStatus": "Ekspire",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
       "retentionLimit": "Sa yo se istorik kredi ki pi resan an.",
-      "voidedGrant": "Anile: {{description}}"
+      "voidedGrant": "Anile: {{description}}",
+      "voidedStatus": "Anile"
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Ogmante limit depans la pou pèmèt rezime sa a.",
     "saved": "Paramèt rapò anrejistre",
     "selectedSessions": "Sesyon yo chwazi",
-    "snapshotPullRequests": "PR nan sesyon yo chwazi yo",
-    "snapshotBlockers": "Blokaj nan sesyon yo chwazi yo",
+    "snapshotPullRequests": "PR",
+    "snapshotBlockers": "Blokaj",
     "capturedAt": "Anrejistre {{time}}",
     "snapshotHint": "Apèsi fiks ki montre, nan mezi sa posib, dènye eta sesyon ki disponib yo, jan yo te anrejistre nan lè maten ki pwograme a. Kantite yo konsène sesyon yo chwazi yo, pa tout aktivite pandan lannuit la.",
     "snapshotTruncated": "Gen kèk sesyon oswa prèv yo pa mete pou apèsi sa a rete nan limit li yo.",

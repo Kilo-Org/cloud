@@ -2,6 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "skipMiddlewareRequestBody": true,
   "schedules": {
+    "cleanup-environment-setup-runs": {
+      "schedule": "30 4 * * *",
+      "path": "/api/cron/cleanup-environment-setup-runs",
+      "requestMethod": "GET"
+    },
     "sync-model-stats": {
       "schedule": "0 */6 * * *",
       "path": "/api/cron/sync-model-stats",

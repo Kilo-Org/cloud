@@ -6,6 +6,7 @@ import {
   SENSITIVE_REASON,
   UNSERVED_BROWSER_TOOL_NAMES,
   createStepTokenStore,
+  dropTargetSchema,
   hashBrowserToolArguments,
 } from '../browser-agent-checks';
 import type { StepTokenIssue, StepTokenStore } from '../browser-agent-checks';
@@ -178,7 +179,7 @@ const approvalOutcome =
   (input: BrowserToolRunInput): BrowserToolRunOutcome => {
     const [presented] = input.agent?.sensitive ?? [];
 
-    if (presented !== undefined && tokens.consume(presented, binding)) {
+    if (presented !== undefined && tokens.take(presented, [binding]).ok) {
       return {
         kind: 'result',
         result: { ok: true, value: 'report.txt: The file was downloaded.' },
@@ -527,7 +528,7 @@ describe('local agent browser bridge', () => {
       content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
     });
     // The token was redeemed by the repeat: the same token cannot approve a second call.
-    expect(tokens.consume(token, binding)).toBe(false);
+    expect(tokens.take(token, [binding]).ok).toBe(false);
     expect(tokens.size()).toBe(0);
   });
 
@@ -1020,6 +1021,57 @@ describe('local agent browser bridge', () => {
     expect(list['tools']).toContainEqual(
       expect.objectContaining({ name: 'browser_snapshot', readOnly: true })
     );
+  });
+
+  it('lists browser_drop with the non-empty path and target rules its handler enforces', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const listed = z
+      .object({
+        contractSha: z.string(),
+        tools: z.array(z.object({ inputSchema: z.unknown(), name: z.string() })),
+      })
+      .parse(await bridge.listTools());
+    const drop = listed.tools.find(tool => tool.name === 'browser_drop');
+    const publishedProperties = z
+      .object({ properties: z.record(z.string(), z.unknown()) })
+      .parse(drop?.inputSchema).properties;
+    const publishedPaths = z
+      .object({
+        description: z.string(),
+        items: z.record(z.string(), z.unknown()),
+      })
+      .parse(publishedProperties['paths']);
+    const vendoredTarget = z
+      .record(z.string(), z.unknown())
+      .parse(
+        z
+          .object({ properties: z.record(z.string(), z.unknown()) })
+          .parse(BROWSER_TOOL_CONTRACT.find(entry => entry.name === 'browser_drop')?.inputSchema)
+          .properties['target']
+      );
+    // The rule the drop handlers apply, read from the schema they parse rather than copied from the producer.
+    const targetRule = z
+      .object({ minLength: z.number(), type: z.string() })
+      .parse(z.toJSONSchema(dropTargetSchema, { io: 'input' }));
+
+    // The listing a model reads states the rule the tool applies.
+    expect(publishedPaths.items).toStrictEqual({ minLength: 1, type: 'string' });
+    expect(publishedPaths.description).toContain('empty entry is not allowed');
+    expect(publishedProperties['target']).toStrictEqual({ ...vendoredTarget, ...targetRule });
+    // The vendored `target` wording is published unchanged beside the rule.
+    expect(
+      z.object({ description: z.string() }).parse(publishedProperties['target']).description
+    ).toBe(vendoredTarget['description']);
+    expect(targetRule).toStrictEqual({ minLength: 1, type: 'string' });
+    // The contract itself stays verbatim, which is what keeps the handshake SHA valid.
+    expect(
+      z
+        .object({ properties: z.record(z.string(), z.unknown()) })
+        .parse(BROWSER_TOOL_CONTRACT.find(entry => entry.name === 'browser_drop')?.inputSchema)
+        .properties['paths']
+    ).toMatchObject({ items: { type: 'string' } });
+    expect(listed.contractSha).toBe(BROWSER_TOOL_CONTRACT_SHA);
   });
 
   it('does not offer the one pinned tool no backend here can run', async () => {

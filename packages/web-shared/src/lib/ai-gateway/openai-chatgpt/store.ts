@@ -82,7 +82,6 @@ function ownerRowWhere(...conditions: [SQL, SQL, ...SQL[]]): SQL {
  * through the wrong partial index while reads still match the old row.
  */
 type OpenAiChatGptOwnerShape = {
-  /** Matches the owner's row for reads, updates and deletes. */
   row: SQL;
   /** The identity columns a save writes for this shape. */
   identity: (createdBy: string) => {
@@ -392,6 +391,16 @@ export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): P
  * The owner's recorded plan limit, when one is still current. An expired record
  * stays in the row and is filtered here instead of being cleared, so this read
  * never writes; a reconnect resets the columns.
+ *
+ * This read takes the primary, not the replica, for the same reason
+ * `getOpenAiChatGptStoredConnectionFromPrimary` does: the status query reports
+ * the connection to a person. It already reads the connection payload on the
+ * primary through `getOpenAiChatGptConnection`, so the payload and the limit
+ * come from one database and one status response stays consistent. It also
+ * means a limit a request recorded moments ago must be visible at once rather
+ * than after the replica lag. No gateway path reads this value: a gateway
+ * request records the limit only after the upstream response, so the gateway's
+ * pre-inference replica rule does not apply here.
  */
 export async function readOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,

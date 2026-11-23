@@ -1,5 +1,5 @@
 {
-  "id": "a41d76ac-3413-4b2d-91d4-15a5da112a63",
+  "id": "38f99b16-bf3f-44c4-8911-71ac23ca2338",
   "prevId": "27bb4c8e-8a57-45e9-b05f-4b99dfe0e718",
   "version": "7",
   "dialect": "postgresql",
@@ -3282,12 +3282,6 @@
         },
         "attempt_started_at": {
           "name": "attempt_started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "charge_refused_at": {
-          "name": "charge_refused_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -6716,6 +6710,303 @@
       },
       "isRLSEnabled": false
     },
+    "public.cloud_agent_environment_setup_runs": {
+      "name": "cloud_agent_environment_setup_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draft_environment_id": {
+          "name": "draft_environment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_environment_id": {
+          "name": "target_environment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'starting'"
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verification_count": {
+          "name": "verification_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "verification_limit": {
+          "name": "verification_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 6
+        },
+        "published_environment_id": {
+          "name": "published_environment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "IDX_env_setup_runs_user_id": {
+          "name": "IDX_env_setup_runs_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_env_setup_runs_org_id": {
+          "name": "IDX_env_setup_runs_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_env_setup_runs_target": {
+          "name": "IDX_env_setup_runs_target",
+          "columns": [
+            {
+              "expression": "target_environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_env_setup_runs_published": {
+          "name": "IDX_env_setup_runs_published",
+          "columns": [
+            {
+              "expression": "published_environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_env_setup_runs_session": {
+          "name": "UQ_env_setup_runs_session",
+          "columns": [
+            {
+              "expression": "cloud_agent_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environment_setup_runs\".\"cloud_agent_session_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_env_setup_runs_draft": {
+          "name": "UQ_env_setup_runs_draft",
+          "columns": [
+            {
+              "expression": "draft_environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environment_setup_runs\".\"draft_environment_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_env_setup_runs_open_target": {
+          "name": "UQ_env_setup_runs_open_target",
+          "columns": [
+            {
+              "expression": "target_environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environment_setup_runs\".\"target_environment_id\" IS NOT NULL AND \"cloud_agent_environment_setup_runs\".\"status\" NOT IN ('published', 'reverted', 'cancelled')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_environment_setup_runs_owned_by_organization_id_organizations_id_fk": {
+          "name": "cloud_agent_environment_setup_runs_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "cloud_agent_environment_setup_runs",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_environment_setup_runs_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_environment_setup_runs_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_environment_setup_runs",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_environment_setup_runs_draft_environment_id_cloud_agent_environments_id_fk": {
+          "name": "cloud_agent_environment_setup_runs_draft_environment_id_cloud_agent_environments_id_fk",
+          "tableFrom": "cloud_agent_environment_setup_runs",
+          "tableTo": "cloud_agent_environments",
+          "columnsFrom": [
+            "draft_environment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_environment_setup_runs_target_environment_id_cloud_agent_environments_id_fk": {
+          "name": "cloud_agent_environment_setup_runs_target_environment_id_cloud_agent_environments_id_fk",
+          "tableFrom": "cloud_agent_environment_setup_runs",
+          "tableTo": "cloud_agent_environments",
+          "columnsFrom": [
+            "target_environment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_environment_setup_runs_published_environment_id_cloud_agent_environments_id_fk": {
+          "name": "cloud_agent_environment_setup_runs_published_environment_id_cloud_agent_environments_id_fk",
+          "tableFrom": "cloud_agent_environment_setup_runs",
+          "tableTo": "cloud_agent_environments",
+          "columnsFrom": [
+            "published_environment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "env_setup_runs_owner_check": {
+          "name": "env_setup_runs_owner_check",
+          "value": "(\n        (\"cloud_agent_environment_setup_runs\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_environment_setup_runs\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_environment_setup_runs\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_environment_setup_runs\".\"owned_by_organization_id\" IS NOT NULL))"
+        },
+        "env_setup_runs_status_check": {
+          "name": "env_setup_runs_status_check",
+          "value": "\"cloud_agent_environment_setup_runs\".\"status\" IN ('starting', 'running', 'needs_input', 'verifying', 'publish_conflict', 'failed', 'published', 'reverted', 'cancelled')"
+        },
+        "env_setup_runs_verification_check": {
+          "name": "env_setup_runs_verification_check",
+          "value": "\"cloud_agent_environment_setup_runs\".\"verification_count\" >= 0 AND \"cloud_agent_environment_setup_runs\".\"verification_limit\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.cloud_agent_environment_vars": {
       "name": "cloud_agent_environment_vars",
       "schema": "",
@@ -6943,6 +7234,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_draft": {
+          "name": "is_draft",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "draft_for_environment_id": {
+          "name": "draft_for_environment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "egress_required_hosts": {
+          "name": "egress_required_hosts",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7133,6 +7443,21 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_cloud_agent_environments_draft_for": {
+          "name": "IDX_cloud_agent_environments_draft_for",
+          "columns": [
+            {
+              "expression": "draft_for_environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_cloud_agent_environments_repositories": {
           "name": "IDX_cloud_agent_environments_repositories",
           "columns": [
@@ -7176,6 +7501,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "cloud_agent_environments_draft_for_environment_id_cloud_agent_environments_id_fk": {
+          "name": "cloud_agent_environments_draft_for_environment_id_cloud_agent_environments_id_fk",
+          "tableFrom": "cloud_agent_environments",
+          "tableTo": "cloud_agent_environments",
+          "columnsFrom": [
+            "draft_for_environment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7193,6 +7531,10 @@
         "cloud_agent_environments_egress_policy_check": {
           "name": "cloud_agent_environments_egress_policy_check",
           "value": "(\n        (\n          (\"cloud_agent_environments\".\"egress_mode\" IS NULL AND \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) OR\n          (\"cloud_agent_environments\".\"egress_mode\" IS NOT NULL AND \"cloud_agent_environments\".\"egress_mode\" IN ('unrestricted', 'allowlist'))\n        ) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'unrestricted' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'allowlist' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NOT NULL)\n      )"
+        },
+        "cloud_agent_environments_draft_target_check": {
+          "name": "cloud_agent_environments_draft_target_check",
+          "value": "\"cloud_agent_environments\".\"draft_for_environment_id\" IS NULL OR \"cloud_agent_environments\".\"is_draft\""
         }
       },
       "isRLSEnabled": false

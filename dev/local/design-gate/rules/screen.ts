@@ -187,9 +187,15 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
 
 export function checkOverlap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
+  // A box the platform says the user cannot see collides with nothing: an
+  // accessibility snapshot carries no style, so a copy the app hides from sight
+  // arrives here as an ordinary sibling and reads as a collision over the
+  // visible box beside it. The probe marks the same node `opacity: 0` or
+  // `position: absolute` and never pairs it.
+  const unseen = (node: LayoutNode) => node.probe.invisible === true;
   for (const node of tree.nodes) {
     const siblings = node.children.filter(
-      child => !child.absolute && (child.hasText || child.pressable)
+      child => !child.absolute && !unseen(child) && (child.hasText || child.pressable)
     );
     for (let i = 0; i < siblings.length; i++) {
       for (let j = i + 1; j < siblings.length; j++) {

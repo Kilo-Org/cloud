@@ -91,6 +91,7 @@
     "draft": "Qoralama",
     "enabled": "Yoqilgan",
     "github": "GitHub",
+    "image": "Rasm",
     "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
     "loading": "Yuklanmoqda…",
     "loadMore": "Yana yuklash",
@@ -122,10 +123,10 @@
     "connectProvider": "Provayderni ulash",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
+    "couldNotLoad": "Yuklab bo‘lmadi.",
+    "couldNotLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
     "couldNotLoadSessions": "Seanslarni yuklab bo‘lmadi.",
-    "couldnTLoad": "Yuklab bo‘lmadi.",
-    "couldnTLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "deviceSessions": "Qurilma seanslari",
     "disabled": "O‘chirilgan",
     "email": "Elektron pochta",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
+      "imageUnavailableRetryWithAlt": "Rasm yuklanmadi, {{alt}}, qayta yuklash",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",
@@ -2811,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Ichma-ich sessiyalar soni ruxsat etilgan chegaraga yetdi.",
+      "maxNestingDepth": "Ichma-ich sessiyalarning maksimal chuqurligiga yetdi.",
       "modelAccessibility": "Model nomi: {{modelLabel}}",
       "openHint": "Yordamchi agent sessiyasini ochish",
       "subagent": "Yordamchi agent",
@@ -3690,7 +3692,7 @@
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
-      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
+      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hisob-fakturalar har bir hisob-kitob davrida avtomatik yaratiladi. Tashkilotingizga to'lov hisobi chiqarilgach, ular shu yerda ko'rinadi.",
       "emptyTitle": "Hisob-fakturalar yo'q",
       "invoiceFallback": "Hisob-faktura",
@@ -3770,7 +3772,6 @@
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
-      "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
       "ssoAndDomain": "SSO va domen",
       "dataCollection": "Ma'lumotlar yig'ish",
@@ -3890,7 +3891,7 @@
     "signupStepUpApple": "Hisob yaratishni yakunlash uchun '$t(login.signInWithApple)' dan foydalaning.",
     "signupStepUpGoogle": "Hisob yaratishni yakunlash uchun '$t(login.signInWithGoogle)' dan foydalaning.",
     "signupStepUpBack": "Hisob yaratishni yakunlash uchun orqaga qayting va '$t(login.moreSignInOptions)' dan foydalaning.",
-    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Qayta urinib ko‘ring yoki '$t(login.resendCode)' dan foydalaning.",
+    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Yoki '$t(login.resendCode)' dan, yoki '$t(login.moreSignInOptions)' dan foydalaning.",
     "codeInProgress": "Kodingiz tekshirilmoqda. Biroz kuting va qayta urinib ko'ring.",
     "tooManyAttempts": "Juda ko'p urinish bo'ldi. Yangi kod so'rang.",
     "invalidToken": "Hisobga kirib bo‘lmadi. Qayta urinib ko‘ring.",
@@ -4204,6 +4205,8 @@
       "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
       "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",
+      "invalidApiKey": "API kaliti yuborib boʻlmaydigan belgini oʻz ichiga oladi. Faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
+      "invalidHeaders": "Maxsus sarlavhani yuborib boʻlmaydi. Uning nomini tekshirib, faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
       "invalidUrl": "Kirish maʼlumotlari, soʻrov parametrlari yoki fragmentsiz HTTP yoki HTTPS API asosiy manzilini kiriting.",
       "publicHttp": "Ommaviy HTTP ulanish manzillariga ruxsat berilmaydi. HTTPS yoki xususiy mahalliy ulanish manzilidan foydalaning.",
       "httpApprovalRequired": "Saqlash yoki ulanishdan oldin bu mahalliy HTTP ulanish manzilini tasdiqlang.",
@@ -4338,7 +4341,15 @@
       "download": "Qurilmadagi modelni yuklab olish",
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
-      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
+      "cannotUse": "Ishga tushirib bo'lmaydi: {{items}}.",
+      "cannotUseOptions": "To'ldirib bo'lmaydi: ba'zi vosita variantlari.",
+      "limitations": "Cheklovlar",
+      "tools": {
+        "time": "Vaqt",
+        "settingsList": "Sozlamalarni ko‘rsatish",
+        "settingsSet": "Sozlamalarni o‘zgartirish"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
@@ -4517,6 +4528,7 @@
     "instructionSaveFailed": "Ko'rsatmani saqlab bo'lmadi",
     "instructionDeleteFailed": "Ko'rsatmani o'chirib bo'lmadi",
     "instructionToggleFailed": "Ko'rsatmani yangilab bo'lmadi",
+    "instructionViewTitle": "Ko'rsatma fayli",
     "instructionLimitReached": "Profilga {{max}} tagacha ko'rsatma sig'adi. Boshqasini qo'shish uchun bittasini o'chiring.",
     "mcp": {
       "title": "MCP serverlari",
@@ -4687,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
+      "deduction": {
+        "adminCancel": "Balans administrator tomonidan yopilgan",
+        "adminDebit": "Kreditlar administrator tomonidan olib tashlangan",
+        "codingPlan": "Kodlash tarifi: {{plan}}",
+        "correction": "Balansni tuzatish",
+        "dispute": "To‘lov bo‘yicha nizo",
+        "refundAppStore": "App Store’dan kredit paketi qaytarilishi",
+        "refundGooglePlay": "Google Play’dan kredit paketi qaytarilishi"
+      },
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
       "expiredGrant": "Muddati tugagan: {{description}}",
+      "expiredStatus": "Muddati tugagan",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
@@ -4717,7 +4739,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
       "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
-      "voidedGrant": "Bekor qilingan: {{description}}"
+      "voidedGrant": "Bekor qilingan: {{description}}",
+      "voidedStatus": "Bekor qilingan"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -4906,8 +4929,8 @@
     "estimateSpendLimitTooLow": "Bu xulosani yaratishga imkon berish uchun xarajat cheklovini oshiring.",
     "saved": "Brifing sozlamalari saqlandi",
     "selectedSessions": "Tanlangan seanslar",
-    "snapshotPullRequests": "Tanlangan seanslardagi PRlar",
-    "snapshotBlockers": "Tanlangan seanslardagi to‘siqlar",
+    "snapshotPullRequests": "PRlar",
+    "snapshotBlockers": "To‘siqlar",
     "capturedAt": "{{time}} da qayd etilgan",
     "snapshotHint": "Rejalashtirilgan tonggi vaqtda mavjud bo‘lgan eng so‘nggi seans holatining imkon qadar to‘liq qayd etilgan nusxasi. Sonlar tun davomidagi barcha faoliyatni emas, tanlangan seanslarni aks ettiradi.",
     "snapshotTruncated": "Bu holat nusxasi hajmini cheklash uchun ayrim seanslar yoki dalillar kiritilmadi.",

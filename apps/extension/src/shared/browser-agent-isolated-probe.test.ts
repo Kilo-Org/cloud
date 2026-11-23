@@ -338,7 +338,7 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { target: '#pay' },
         authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -376,7 +376,7 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { function: '(element) => element.ownerDocument.cookie', target: '#pay' },
         authorized,
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -421,7 +421,7 @@ describe('isolated frame list', () => {
       preflightAgentCall({
         args: { target: '#pay' },
         authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session: { ...sessionWith(probe), takeDownloads: () => [] },
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -517,7 +517,7 @@ describe('isolated refs inside a child frame', () => {
     preflightAgentCall({
       args: { target: 'e3' },
       authorized,
-      consumeStepToken: () => false,
+      consumeStepToken: () => ({ ok: false }),
       session: framedSession(targets),
       sessionHandle: 'session-1',
       stepTokens: [],
@@ -567,7 +567,7 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'read', origin: PAY }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session,
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -601,7 +601,7 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'read', origin: SHOP }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session,
         sessionHandle: 'session-1',
         stepTokens: [],
@@ -647,7 +647,7 @@ describe('isolated refs inside a child frame', () => {
       preflightAgentCall({
         args: { target: 'e3' },
         authorized: [{ class: 'act', origin: GITHUB }],
-        consumeStepToken: () => false,
+        consumeStepToken: () => ({ ok: false }),
         session,
         sessionHandle: 'session-1',
         stepTokens: [],

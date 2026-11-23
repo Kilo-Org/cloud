@@ -1,9 +1,15 @@
 import { captureException } from '@sentry/nextjs';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import {
+  formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
   resolveGitHubRepositoryForOwner,
+  type GitHubRepositoryChoice,
 } from './github-repository-context';
+import {
+  REPOSITORY_PROMPT_MAX_CHARACTERS,
+  REPOSITORY_PROMPT_MAX_REPOSITORIES,
+} from './repository-prompt-budget';
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getAllIntegrationsForOwner: jest.fn(),
@@ -321,4 +327,90 @@ test('keeps the same canonical repository associated to each Kilo owner separate
   await expect(
     resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-b' }, repository.full_name, 'agent')
   ).resolves.toMatchObject({ githubIntegrationId: 'association-owner-b' });
+});
+
+function bulkRepositories(count: number): GitHubRepositoryChoice[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    name: `repo-${index}`,
+    full_name: `acme/repo-${index}`,
+    private: false,
+    githubIntegrationId: 'bulk',
+    githubAppType: 'standard' as const,
+  }));
+}
+
+test('bounds the prompt block to the listed cap and one overflow line', () => {
+  const repositories = bulkRepositories(REPOSITORY_PROMPT_MAX_REPOSITORIES + 10);
+
+  const result = formatGitHubRepositoriesForPrompt({ repositories });
+  const resultLines = result.split('\n');
+  const entryLines = resultLines.filter(line => /^- .*\[id: /.test(line));
+  const overflowLine = resultLines.find(line => line.startsWith('- Repositories not listed here:'));
+
+  expect(entryLines).toHaveLength(REPOSITORY_PROMPT_MAX_REPOSITORIES);
+  expect(overflowLine).toBe(
+    '- Repositories not listed here: 10. Ask the user for the exact owner/name of the repository they want to use.'
+  );
+  expect(result).toContain('Available repositories:');
+  expect(result).toContain('infer the correct repository');
+});
+
+test('resolves a repository that falls outside the rendered subset', async () => {
+  const repositories = bulkRepositories(REPOSITORY_PROMPT_MAX_REPOSITORIES + 10);
+  const lastRepository = repositories[repositories.length - 1];
+  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
+    {
+      id: 'bulk',
+      platform: 'github',
+      github_connection_role: 'workflow',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories,
+    },
+  ] as never);
+
+  const owner = { type: 'org', id: 'organization-1' } as const;
+  const context = await getGitHubRepositoryContext(owner);
+  expect(context.repositories).toHaveLength(REPOSITORY_PROMPT_MAX_REPOSITORIES + 10);
+
+  const prompt = formatGitHubRepositoriesForPrompt(context);
+  expect(prompt).not.toContain(`${lastRepository.full_name} `);
+  expect(prompt).toContain('Repositories not listed here: 10.');
+
+  await expect(
+    resolveGitHubRepositoryForOwner(owner, lastRepository.full_name)
+  ).resolves.toMatchObject({
+    full_name: lastRepository.full_name,
+    githubIntegrationId: 'bulk',
+  });
+});
+
+test('keeps the rendered prompt block within the character cap for long names', () => {
+  const repositories: GitHubRepositoryChoice[] = Array.from({ length: 60 }, (_, index) => ({
+    id: index + 1,
+    name: `repo-${index}`,
+    full_name: `acme/${'segment'.repeat(12)}/repo-${index}`,
+    private: true,
+    githubIntegrationId: 'bulk',
+    githubAppType: 'standard' as const,
+  }));
+
+  const result = formatGitHubRepositoriesForPrompt({ repositories });
+  const list = result.split('Available repositories:\n')[1].split('\n\nWhen the user asks')[0];
+  const listLines = list.split('\n');
+  const listed = listLines.length - 1;
+  const omitted = Number(/^- Repositories not listed here: (\d+)\./.exec(listLines[listed])?.[1]);
+
+  expect(list.length).toBeLessThanOrEqual(REPOSITORY_PROMPT_MAX_CHARACTERS);
+  expect(listed).toBeLessThan(REPOSITORY_PROMPT_MAX_REPOSITORIES);
+  expect(listed).toBeGreaterThan(0);
+  expect(listed + omitted).toBe(repositories.length);
+  expect(listLines[listed - 1]).toContain('[id: ');
+  expect(result).toContain(
+    'When the user asks you to work on code without specifying a repository'
+  );
 });

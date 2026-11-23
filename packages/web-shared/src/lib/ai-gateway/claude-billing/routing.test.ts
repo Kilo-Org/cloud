@@ -1,4 +1,7 @@
-jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
+jest.mock('./store', () => ({
+  ...jest.requireActual('./store'),
+  getGrantedClaudeBillingConnection: jest.fn(),
+}));
 jest.mock('./operator', () => ({
   getClaudeOperatorToken: jest.fn(),
   isClaudeOperatorConfigured: jest.fn(),
@@ -14,7 +17,7 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { getGrantedClaudeBillingConnection } from './store';
+import { getGrantedClaudeBillingConnection, type ClaudeBillingGrantedConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import {
   buildClaudeBillingProvider,
@@ -51,8 +54,24 @@ const ORGANIZATION_ROW: ClaudeBillingConnectionRow = {
   created_by: 'connector',
 };
 
+/** A stored row whose grant gives it to the same scope, so both views agree. */
+function granted(
+  connectionRow: ClaudeBillingConnectionRow | null
+): ClaudeBillingGrantedConnection | null {
+  return connectionRow
+    ? {
+        connection: connectionRow,
+        grant: {
+          kilo_user_id: connectionRow.kilo_user_id,
+          organization_id: connectionRow.organization_id,
+          created_by: connectionRow.created_by,
+        },
+      }
+    : null;
+}
+
 beforeEach(() => {
-  jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(row);
+  jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(granted(row));
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
   jest
@@ -89,7 +108,9 @@ function organizationOwner() {
 function organizationOnly() {
   jest
     .mocked(getGrantedClaudeBillingConnection)
-    .mockImplementation(async owner => (owner.kind === 'organization' ? ORGANIZATION_ROW : null));
+    .mockImplementation(async owner =>
+      owner.kind === 'organization' ? granted(ORGANIZATION_ROW) : null
+    );
 }
 
 describe('Claude customer-billed routing', () => {
@@ -208,7 +229,7 @@ describe('Claude customer-billed routing', () => {
   it('does not serve an organization request from a personal connection', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
-      .mockImplementation(async owner => (owner.kind === 'personal' ? row : null));
+      .mockImplementation(async owner => (owner.kind === 'personal' ? granted(row) : null));
     expect(await checkClaudeBilling({ ...input(), organizationId: ORGANIZATION_ID })).toBeNull();
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledWith(
@@ -287,7 +308,9 @@ describe('Claude customer-billed routing', () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
-        owner.kind === 'organization' ? { ...ORGANIZATION_ROW, created_by: null as never } : null
+        owner.kind === 'organization'
+          ? granted({ ...ORGANIZATION_ROW, created_by: null as never })
+          : null
       );
 
     expect(await checkClaudeBilling({ ...input(), organizationId: ORGANIZATION_ID })).toMatchObject(
@@ -301,7 +324,7 @@ describe('Claude customer-billed routing', () => {
       id: 'connector',
       blocked_reason: 'soft-deleted at 2026-01-01',
     } as never);
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(row);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted(row));
 
     const result = await checkClaudeBilling(input());
 
@@ -313,7 +336,9 @@ describe('Claude customer-billed routing', () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
-        owner.kind === 'organization' ? { ...ORGANIZATION_ROW, status: 'billing_unavailable' } : row
+        owner.kind === 'organization'
+          ? granted({ ...ORGANIZATION_ROW, status: 'billing_unavailable' })
+          : granted(row)
       );
     const result = await checkClaudeBilling({
       ...input(),
@@ -342,7 +367,7 @@ describe('Claude customer-billed routing', () => {
   });
 
   it.each(['pending', 'removed'] as const)('keeps normal routing for %s owners', async status => {
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue({ ...row, status });
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted({ ...row, status }));
     expect(await checkClaudeBilling(input())).toBeNull();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -367,7 +392,7 @@ describe('Claude customer-billed routing', () => {
     jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
     jest
       .mocked(getGrantedClaudeBillingConnection)
-      .mockResolvedValue({ ...row, status: 'billing_unavailable' });
+      .mockResolvedValue(granted({ ...row, status: 'billing_unavailable' }));
     const connectionResult = await checkClaudeBilling(input());
     if (operatorResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
     if (connectionResult?.kind !== 'unavailable') throw new Error('Expected unavailable');
@@ -421,7 +446,7 @@ describe('Claude customer-billed routing', () => {
   it('fails locally without fetching an operator token after a terminal refusal', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
-      .mockResolvedValue({ ...row, status: 'billing_unavailable' });
+      .mockResolvedValue(granted({ ...row, status: 'billing_unavailable' }));
     expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });

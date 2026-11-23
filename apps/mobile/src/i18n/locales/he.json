@@ -14,7 +14,7 @@
     "creationUnknown": "תוצאת היצירה אינה ידועה. יש לרענן את רשימת הסשנים לפני ניסיון נוסף.",
     "commandFailed": "הפקודה לתהליך ההרצה נכשלה",
     "invalidReply": "תגובה לא תקינה מתהליך ההרצה",
-    "unsafeCommand": "יש להשתמש בפקודות /compact, /new, /skill, /models, /agents או /clear (מקומית בלבד).",
+    "unsafeCommand": "יש להשתמש בפקודות ⁦/compact⁩, ⁦/new⁩, ⁦/skill⁩, ⁦/models⁩, ⁦/agents⁩ או ⁦/clear⁩ (מקומית בלבד).",
     "status": "חיבור: {{connection}} · תהליך הרצה: {{runner}}",
     "presenceStatus": "מארחים: {{connection}}",
     "commandStatus": "מסירת הפקודה: {{status}}",
@@ -92,6 +92,7 @@
     "draft": "טיוטה",
     "enabled": "מופעל",
     "github": "GitHub",
+    "image": "תמונה",
     "imageUnavailable": "התמונה לא זמינה.",
     "loading": "בטעינה…",
     "loadMore": "טעינת פריטים נוספים",
@@ -123,10 +124,10 @@
     "connectProvider": "חיבור ספק",
     "contentTruncated": "התוכן קוצר",
     "copyLink": "העתקת קישור",
+    "couldNotLoad": "לא הצלחנו לטעון.",
+    "couldNotLoadMore": "לא הצלחנו לטעון פריטים נוספים.",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",
     "couldNotLoadSessions": "לא הצלחנו לטעון את הסשנים.",
-    "couldnTLoad": "לא הצלחנו לטעון.",
-    "couldnTLoadMore": "לא הצלחנו לטעון פריטים נוספים.",
     "deviceSessions": "סשנים במכשירים",
     "disabled": "מושבת",
     "email": "דוא״ל",
@@ -2125,6 +2126,7 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
+      "imageUnavailableRetryWithAlt": "התמונה אינה זמינה, {{alt}}, ניסיון טעינה נוסף",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
       "viewImageWithAlt": "הצגת התמונה: {{alt}}",
@@ -2276,7 +2278,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "לא ניתן לפתוח סשנים נוספים ברמת קינון עמוקה יותר.",
+      "maxNestingDepth": "עומק הקינון המרבי הושג.",
       "modelAccessibility": "מודל: {{modelLabel}}",
       "openHint": "פתיחת הסשן של תת-הסוכן",
       "subagent": "תת-סוכן",
@@ -2441,7 +2443,7 @@
       "exitSession": "יציאה מהסשן",
       "clearSession": "סיום הסשן הזה והתחלת סשן חדש",
       "compactDescription": "כווץ את הקשר הסשן הנוכחי",
-      "goalDescription": "המשך לעבוד לקראת מטרת סשן. /goal <objective> או pause, resume, clear",
+      "goalDescription": "המשך לעבוד לקראת מטרת סשן. ⁦/goal <objective>⁩ או pause, resume, clear",
       "initDescription": "הגדרת AGENTS.md מודרכת",
       "resumeClaudeDescription": "ייבא תמלול של סשן Claude Code",
       "resumeCodexDescription": "ייבא תמלול של סשן OpenAI Codex",
@@ -3762,7 +3764,7 @@
       "noSeatsAvailable": "כל המושבים בשימוש. יש לבקש מאחד מבעלי הארגון להוסיף מושבים לפני הזמנת חברים נוספים."
     },
     "invoices": {
-      "downloadA11y": "הורדת חשבונית {{number}}",
+      "downloadA11y": "הורדת חשבונית {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "חשבוניות נוצרות אוטומטית בכל מחזור חיוב ויופיעו כאן לאחר שהארגון שלך יחויב.",
       "emptyTitle": "אין חשבוניות",
       "invoiceFallback": "חשבונית",
@@ -3842,7 +3844,6 @@
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
-      "guardrails": "מעקות בטיחות",
       "byok": "שימוש במפתח משלך",
       "ssoAndDomain": "SSO ודומיין",
       "dataCollection": "איסוף נתונים",
@@ -3960,7 +3961,7 @@
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
-    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. השתמש ב-'$t(login.resendCode)' או ב-'$t(login.moreSignInOptions)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -4283,6 +4284,8 @@
       "discoveryNoModels": "נקודת הקצה לא הציגה מודלים. הזינו מודלים באופן ידני.",
       "connectionIncomplete": "המודל השיב אך לא סיים. נסו שוב, או בדקו את מזהה המודל ואת הפרוטוקול.",
       "invalidInput": "הזינו שם שרת, כותרות תקינות ולפחות מודל אחד עם מזהה ושם ייחודיים. מגבלות האסימונים חייבות להיות מספרים שלמים חיוביים.",
+      "invalidApiKey": "מפתח ה-API מכיל תו שלא ניתן לשלוח. השתמשו באותיות, בספרות ובסימנים סטנדרטיים בלבד, ללא מעברי שורה.",
+      "invalidHeaders": "לא ניתן לשלוח כותרת מותאמת אישית. בדקו את שמה והשתמשו באותיות, בספרות ובסימנים סטנדרטיים בלבד, ללא מעברי שורה.",
       "invalidUrl": "הזינו כתובת בסיס של API המשתמשת ב-HTTP או ב-HTTPS, ללא פרטי הזדהות, שאילתה או מקטע.",
       "publicHttp": "נקודות קצה ציבוריות המשתמשות ב-HTTP אינן מותרות. השתמשו ב-HTTPS או בנקודת קצה מקומית פרטית.",
       "httpApprovalRequired": "אשרו את נקודת הקצה המקומית הזו המשתמשת ב-HTTP לפני שמירה או התחברות.",
@@ -4417,7 +4420,15 @@
       "download": "הורדת המודל למכשיר",
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
-      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב.",
+      "cannotUse": "לא ניתן להריץ: {{items}}.",
+      "cannotUseOptions": "לא ניתן למלא: כמה אפשרויות של כלי.",
+      "limitations": "מגבלות",
+      "tools": {
+        "time": "שעה",
+        "settingsList": "הצג הגדרות",
+        "settingsSet": "שנה הגדרות"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
@@ -4601,6 +4612,7 @@
     "instructionSaveFailed": "לא ניתן היה לשמור את ההוראה",
     "instructionDeleteFailed": "לא ניתן היה למחוק את ההוראה",
     "instructionToggleFailed": "לא ניתן היה לעדכן את ההוראה",
+    "instructionViewTitle": "קובץ הוראה",
     "instructionLimitReached": "פרופיל יכול להכיל עד {{max}} הוראות. מחקו אחת כדי להוסיף אחרת.",
     "mcp": {
       "title": "שרתי MCP",
@@ -4772,10 +4784,20 @@
     "history": {
       "activityUnavailable": "לא ניתן לטעון פעילות קרדיט.",
       "appStoreReceipt": "קבלה מ-App Store",
+      "deduction": {
+        "adminCancel": "היתרה נסגרה על ידי מנהל",
+        "adminDebit": "קרדיטים הוסרו על ידי מנהל",
+        "codingPlan": "תוכנית קידוד: {{plan}}",
+        "correction": "תיקון יתרה",
+        "dispute": "מחלוקת תשלום",
+        "refundAppStore": "החזר על חבילת קרדיטים מ-App Store",
+        "refundGooglePlay": "החזר על חבילת קרדיטים מ-Google Play"
+      },
       "deductionFallback": "ניכוי קרדיטים",
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",
       "expiredGrant": "פג התוקף: {{description}}",
+      "expiredStatus": "פג התוקף",
       "googlePlayReceipt": "קבלה מ-Google Play",
       "kind": {
         "adjustment": "התאמה",
@@ -4802,7 +4824,8 @@
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
       "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר.",
-      "voidedGrant": "בוטל: {{description}}"
+      "voidedGrant": "בוטל: {{description}}",
+      "voidedStatus": "בוטל"
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
@@ -4996,8 +5019,8 @@
     "estimateSpendLimitTooLow": "העלה את מגבלת ההוצאות כדי לאפשר סיכום זה.",
     "saved": "הגדרות דוח נשמרו",
     "selectedSessions": "סשנים שנבחרו",
-    "snapshotPullRequests": "PRs בסשנים שנבחרו",
-    "snapshotBlockers": "חסמים בסשנים שנבחרו",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "חסמים",
     "capturedAt": "נלכד ב־{{time}}",
     "snapshotHint": "תמונת מצב שנלכדה כמיטב האפשר בשעת הבוקר המתוזמנת, על סמך מצב הסשנים העדכני ביותר הזמין. המספרים מתייחסים לסשנים שנבחרו, ולא לכל הפעילות במהלך הלילה.",
     "snapshotTruncated": "חלק מהסשנים או הראיות הושמטו כדי להגביל את היקף תמונת המצב.",

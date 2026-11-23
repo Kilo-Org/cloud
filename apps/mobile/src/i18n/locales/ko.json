@@ -20,7 +20,6 @@
     "commandStatus": "명령 전달: {{status}}",
     "delivered": "전달됨",
     "expired": "만료됨",
-    "recoveryGaps_one": "이 대화 기록의 {{displayCount}}개 부분이 누락되었습니다.",
     "recoveryGaps_other": "이 대화 기록의 {{displayCount}}개 부분이 누락되었습니다."
   },
   "common": {
@@ -91,6 +90,7 @@
     "draft": "초안",
     "enabled": "활성화됨",
     "github": "GitHub",
+    "image": "이미지",
     "imageUnavailable": "이미지를 표시할 수 없습니다.",
     "loading": "불러오는 중…",
     "loadMore": "더 보기",
@@ -122,10 +122,10 @@
     "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
+    "couldNotLoad": "불러오지 못했습니다.",
+    "couldNotLoadMore": "추가 항목을 불러오지 못했습니다.",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
     "couldNotLoadSessions": "세션을 불러오지 못했습니다.",
-    "couldnTLoad": "불러오지 못했습니다.",
-    "couldnTLoadMore": "추가 항목을 불러오지 못했습니다.",
     "deviceSessions": "기기 세션",
     "disabled": "비활성화됨",
     "email": "이메일",
@@ -664,7 +664,6 @@
       "emptyTitle": "아직 알림이 없습니다",
       "emptyCategoryTitle": "이 카테고리에 알림이 없습니다",
       "emptyBody": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
-      "emptyBody_one": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
       "emptyBody_other": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
       "capped": "최근 알림을 표시합니다.",
       "loadError": "알림 기록을 불러오지 못했습니다.",
@@ -954,7 +953,6 @@
     "overview": {
       "allAreas": "모든 영역",
       "nSelected": "{{displayCount}}개 선택됨",
-      "nSelected_one": "{{displayCount}}개 선택됨",
       "nSelected_other": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "set": "설정됨",
@@ -1033,7 +1031,6 @@
       "couldNotLoad": "분석을 불러오지 못했습니다",
       "trackedReviewsCaption": "이 기간 동안 분석이 켜진 상태에서 완료된 리뷰입니다. 실행 중이거나 실패한 리뷰는 계산에 포함되지 않습니다.",
       "trackedReviewsUncounted": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
-      "trackedReviewsUncounted_one": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
       "trackedReviewsUncounted_other": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다."
     },
     "council": {
@@ -1125,7 +1122,6 @@
       "triageReasoning": "분류 근거",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
-      "whereFound_one": "발견 위치({{displayCount}})",
       "whereFound_other": "발견 위치({{displayCount}})",
       "yes": "예",
       "action": {
@@ -1154,7 +1150,6 @@
       "eventReason": "사유: {{reason}}",
       "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
       "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
-      "eventsCount_one": "{{displayCount}}개 이벤트",
       "eventsCount_other": "{{displayCount}}개 이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",
       "noActivity": "기록된 활동 없음",
@@ -1163,7 +1158,6 @@
       "repositoryNotRecorded": "저장소가 기록되지 않음",
       "reasonUnknown": "알 수 없는 사유",
       "severityCount": "{{displayCount}} {{label}}",
-      "severityCount_one": "{{displayCount}} {{label}}",
       "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "보고서 요약",
       "title": "감사 보고서",
@@ -1214,14 +1208,14 @@
       "minimumSeverity": "최소 심각도",
       "queued": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "queued_other": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
-      "queued_one": "기존 문제 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "requireApproval": "자동 수정 전 승인 필요",
       "requireApprovalSubtitle": "자동 수정 시 승인을 받은 후 PR을 생성합니다.",
       "severityAll": "전체",
       "severityCriticalOnly": "치명적만 포함",
       "severityHighAndAbove": "높음 이상",
       "severityMediumAndAbove": "중간 이상",
-      "title": "자동화"
+      "title": "자동화",
+      "queued_one": "기존 문제 {{displayCount}}건을 분석 대기열에 추가했습니다."
     },
     "dashboard": {
       "actFirst": "우선 조치 항목",
@@ -1249,13 +1243,10 @@
       "refreshFailed": "새로고침하지 못했습니다. 마지막으로 동기화된 데이터를 표시합니다.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "미해결 {{displayCount}}건",
-      "repoSummaryOpen_one": "미해결 {{displayCount}}건",
       "repoSummaryOpen_other": "미해결 {{displayCount}}건",
       "repoSummaryCritical": "치명적 {{displayCount}}건",
-      "repoSummaryCritical_one": "치명적 {{displayCount}}건",
       "repoSummaryCritical_other": "치명적 {{displayCount}}건",
       "repoSummaryHigh": "높음 {{displayCount}}건",
-      "repoSummaryHigh_one": "높음 {{displayCount}}건",
       "repoSummaryHigh_other": "높음 {{displayCount}}건",
       "repositoryActionPlan": "저장소 조치 계획",
       "settings": "설정",
@@ -1263,9 +1254,7 @@
       "syncNow": "지금 동기화",
       "syncQueued": "동기화를 대기열에 추가했습니다.",
       "syncStatusUnavailable": "동기화 상태를 확인할 수 없습니다.",
-      "daysOverdue_one": "기한 {{displayCount}}일 초과",
       "daysOverdue_other": "기한 {{displayCount}}일 초과",
-      "findingsCount_one": "발견된 문제 {{displayCount}}건",
       "findingsCount_other": "발견된 문제 {{displayCount}}건"
     },
     "dashboardMetrics": {
@@ -1280,17 +1269,13 @@
       "deadlinePassedDetail": "{{critical}}, {{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
       "breakdownCritical": "치명적 {{displayCount}}건",
-      "breakdownCritical_one": "치명적 {{displayCount}}건",
       "breakdownCritical_other": "치명적 {{displayCount}}건",
       "breakdownHigh": "높음 {{displayCount}}건",
-      "breakdownHigh_one": "높음 {{displayCount}}건",
       "breakdownHigh_other": "높음 {{displayCount}}건",
       "breakdownMediumLow": "중간·낮음 {{displayCount}}건",
-      "breakdownMediumLow_one": "중간·낮음 {{displayCount}}건",
       "breakdownMediumLow_other": "중간·낮음 {{displayCount}}건",
       "dueThisWeek": "이번 주 마감",
       "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
-      "dueThisWeekDetail_one": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "dueThisWeekDetail_other": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",
       "reviewSlaAssignment": "SLA 지정 내역 검토",
@@ -1432,8 +1417,7 @@
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨"
+      "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨"
     },
     "settingsSave": {
       "saveChanges": "변경 사항 저장",
@@ -1529,9 +1513,7 @@
       "dueTomorrow": "내일 마감",
       "dueInDays_other": "{{count}}일 후 마감",
       "overdue": "기한 {{count}}일 초과",
-      "overdue_one": "기한 {{count}}일 초과",
-      "dueInDays": "{{count}}일 후 마감",
-      "dueInDays_one": "{{count}}일 후 마감"
+      "dueInDays": "{{count}}일 후 마감"
     },
     "remediationStatus": {
       "notStarted": "시작 안 함",
@@ -1613,7 +1595,6 @@
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
       "pastSessions": "지난 세션",
-      "sectionAccessibility_one": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
@@ -1633,10 +1614,8 @@
       "sessionDeleted": "세션이 삭제되었습니다.",
       "needsInput": "입력 필요",
       "fromPlatform": "{{platform}}에서",
-      "cent_one": "센트",
       "cent": "센트",
       "cent_other": "센트",
-      "dollar_one": "달러",
       "dollar": "달러",
       "dollar_other": "달러",
       "costSpoken": "비용 {{cost}}",
@@ -1926,7 +1905,6 @@
       "snapshotCaptured": "작업 공간 스냅샷 {{when}} 캡처됨"
     },
     "partRenderer": {
-      "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
       "updatedFileCount": "파일 {{displayCount}}개를 업데이트했습니다.",
       "updatedFileCount_other": "파일 {{displayCount}}개를 업데이트했습니다."
     },
@@ -1965,11 +1943,8 @@
       "linesBadge": "{{displayCount}}줄",
       "filesBadge": "파일 {{displayCount}}개",
       "matchesBadge": "{{displayCount}}건 일치",
-      "filesBadge_one": "파일 {{displayCount}}개",
       "filesBadge_other": "파일 {{displayCount}}개",
-      "linesBadge_one": "{{displayCount}}줄",
       "linesBadge_other": "{{displayCount}}줄",
-      "matchesBadge_one": "{{displayCount}}건 일치",
       "matchesBadge_other": "{{displayCount}}건 일치",
       "noOutput": "출력이 없습니다.",
       "translationFailed": "번역 실패"
@@ -2098,6 +2073,7 @@
     "filePart": {
       "loadingImage": "이미지 불러오는 중",
       "imageUnavailableRetry": "이미지를 불러올 수 없습니다. 불러오기 다시 시도",
+      "imageUnavailableRetryWithAlt": "이미지를 불러올 수 없습니다. {{alt}}. 불러오기 다시 시도",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
       "viewImageWithAlt": "{{alt}} 이미지 보기",
@@ -2284,12 +2260,12 @@
     "olderMessages": {
       "arrived": "이전 메시지를 불러왔습니다",
       "retryHint": "이 세션의 이전 메시지를 다시 불러옵니다.",
-      "omitted_one": "이 세션의 이전 항목 일부를 표시하지 못했습니다.",
       "omitted": "이 세션의 이전 항목 {{displayCount}}개를 표시하지 못했습니다.",
       "omitted_other": "이 세션의 이전 항목 {{displayCount}}개를 표시하지 못했습니다.",
       "couldNotLoad": "이전 메시지를 불러오지 못했습니다.",
       "unavailable": "이전 메시지를 확인할 수 없습니다.",
-      "tooLarge": "이전 메시지의 용량이 너무 커서 불러올 수 없습니다."
+      "tooLarge": "이전 메시지의 용량이 너무 커서 불러올 수 없습니다.",
+      "omitted_one": "이 세션의 이전 항목 일부를 표시하지 못했습니다."
     },
     "sessionFilter": {
       "title": "세션 필터링",
@@ -2347,9 +2323,7 @@
       "couldNotOpenPhotoPicker": "사진 선택 화면을 열지 못했습니다. Kilo를 다시 시작한 후 다시 시도하세요.",
       "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "onlyAddingFiles": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
-      "maxFilesAllowed_one": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "maxFilesAllowed_other": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
-      "onlyAddingFiles_one": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
       "onlyAddingFiles_other": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)"
     },
     "composer": {
@@ -2374,7 +2348,6 @@
       "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
       "charactersRemaining": "{{count}}자 남음",
       "insertNewline": "줄바꿈 삽입",
-      "charactersRemaining_one": "{{count}}자 남음",
       "charactersRemaining_other": "{{count}}자 남음"
     },
     "chatLink": {
@@ -2450,13 +2423,10 @@
       "ofWindowTokens": "{{window}} 토큰 중",
       "tokens": "토큰",
       "tokens_other": "토큰",
-      "tokens_one": "토큰",
       "tokensWithPercentage": "토큰 ({{percentage}})",
-      "stepsCount_one": "{{steps}}단계",
       "stepsCount": "{{steps}}단계",
       "stepsCount_other": "{{steps}}단계",
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "모델 ({{displayCount}})",
       "modelsCount_other": "모델 ({{displayCount}})"
     },
     "sessionChanges": {
@@ -2530,7 +2500,6 @@
     "toolRun": {
       "sheetTitle": "도구 호출",
       "condensedLabel": "{{itemCount}}개 항목; {{last}}",
-      "condensedLabel_one": "{{itemCount}}개 항목; {{last}}",
       "condensedLabel_other": "{{itemCount}}개 항목; {{last}}"
     }
   },
@@ -2669,7 +2638,6 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "최근 세션 검색",
     "connectedCli": "연결된 CLI",
-    "connectedCliAccessibility_one": "{{title}}: CLI {{displayCount}}개",
     "connectedCliAccessibility_other": "{{title}}: CLI {{displayCount}}개",
     "connectedCliAccessibility": "{{title}}: CLI {{displayCount}}개",
     "newSessionOn": "{{name}}의 새 세션",
@@ -2685,7 +2653,6 @@
     "cliCantReceiveFilesMessage": "이 세션을 실행하는 Kilo CLI가 파일을 받을 수 없습니다. 해당 컴퓨터에서 CLI를 업데이트하거나 새 세션으로 공유하세요.",
     "contentlessMessage": "텍스트나 파일이 없어 공유할 내용이 없습니다.",
     "couldNotReadContent": "공유된 내용을 읽지 못했습니다.",
-    "onlyFirstFilesAttached_one": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
     "onlyFirstFilesAttached_other": "처음 {{displayCount}}개의 파일만 첨부됩니다."
   },
   "kiloPass": {
@@ -2850,23 +2817,19 @@
     "checkConnection": "연결 확인",
     "checks": {
       "checksCount": "검사 {{displayCount}}개",
-      "checksCount_one": "검사 {{displayCount}}개",
       "checksCount_other": "검사 {{displayCount}}개",
       "couldNotLoad": "검사 결과를 불러오지 못했습니다.",
       "failed": "{{displayCount}}개 실패",
-      "failed_one": "{{displayCount}}개 실패",
       "failed_other": "{{displayCount}}개 실패",
       "noAccess": "이 저장소의 검사 결과를 볼 권한이 없습니다.",
       "noChecksReported": "보고된 검사 결과 없음",
       "notAvailable": "아직 검사 결과를 확인할 수 없습니다. 최신 커밋이 처리되지 않았거나 해당 커밋의 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
       "openDetails": "{{name}} 세부 정보 열기",
       "passed": "{{displayCount}}개 통과",
-      "passed_one": "{{displayCount}}개 통과",
       "passed_other": "{{displayCount}}개 통과",
       "pending": "{{displayCount}}개 대기 중",
       "retryChecks": "검사 다시 시도",
       "skipped": "{{displayCount}}개 건너뜀",
-      "skipped_one": "{{displayCount}}개 건너뜀",
       "skipped_other": "{{displayCount}}개 건너뜀",
       "title": "검사",
       "checkDetails": "검사 세부 정보"
@@ -2932,7 +2895,6 @@
       "comment_other": "댓글 {{displayCount}}개",
       "conversationTruncated": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "conversationTruncated_other": "처음 {{displayCount}}개의 댓글만 표시합니다.",
-      "conversationTruncated_one": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "loadMoreComments": "댓글 더 불러오기",
@@ -2960,13 +2922,11 @@
       "mutedUser": "{{login}} 님을 숨겼습니다.",
       "noDiscussion": "아직 토론 없음",
       "noDiscussionDescription": "이 풀 리퀘스트에는 아직 리뷰 스레드나 댓글이 없습니다.",
-      "comment_one": "댓글 1개",
       "outdated": "이전 버전",
       "quotedDiffSnippet": "인용된 변경 내용 일부",
       "reactionPill": "{{emoji}} {{countLabel}} {{displayCount}}개",
       "reaction": "반응",
       "reaction_other": "반응",
-      "reaction_one": "반응",
       "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
       "replyBody": "답글 내용",
       "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
@@ -3025,7 +2985,6 @@
       },
       "deletedUser": "삭제된 사용자",
       "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
-      "moreLinesAbove_one": "… 위에 {{displayCount}}줄이 더 있습니다.",
       "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다.",
       "deleteComment": "댓글 삭제",
       "deleteCommentTitle": "댓글을 삭제할까요?",
@@ -3033,7 +2992,8 @@
       "commentEditFailed": "댓글을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "commentEditUnavailable": "이 댓글은 수정할 수 없습니다. 삭제되었을 수 있습니다.",
       "commentDeleteFailed": "댓글을 삭제하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다."
+      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다.",
+      "comment_one": "댓글 1개"
     },
     "entry": {
       "noRecentPrs": "최근 리뷰 없음",
@@ -3077,10 +3037,8 @@
       "retryLoadingMoreFiles": "파일 더 불러오기 다시 시도",
       "title": "파일",
       "viewedCount": "{{total}}개 중 {{viewed}}개 확인함",
-      "viewedCount_one": "{{total}}개 중 {{viewed}}개 확인함",
       "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
     },
     "fileRows": {
@@ -3113,8 +3071,6 @@
       "expandMoreLines": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
       "failedToLoadContext": "주변 코드 불러오기 실패 · 탭하여 다시 시도",
       "failedToLoadMoreFiles": "파일 더 불러오기 실패 · 탭하여 다시 시도",
-      "fileLoadedCount_one": "파일 {{displayCount}}개 불러옴",
-      "fileLoadedOfTotalCount_one": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
       "fileLoadedCount": "파일 {{displayCount}}개 불러옴",
       "fileLoadedCount_other": "파일 {{displayCount}}개 불러옴",
       "fileLoadedOfTotalCount": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
@@ -3133,15 +3089,10 @@
       "loadingMoreFiles": "파일 더 불러오는 중…",
       "retryLoadingContext": "주변 코드 불러오기 다시 시도",
       "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도",
-      "expandAllLines_one": "{{displayCount}}줄 모두 펼치기",
       "expandAllLines_other": "{{displayCount}}줄 모두 펼치기",
-      "expandLines_one": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
       "expandLines_other": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "주변 코드 {{displayCount}}줄 펼치기",
       "expandLinesOfContext_other": "주변 코드 {{displayCount}}줄 펼치기",
-      "expandMoreLines_one": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "파일 {{total}}개 중 {{loaded}}개 불러옴",
       "loadedOfTotalFiles_other": "파일 {{total}}개 중 {{loaded}}개 불러옴"
     },
     "inbox": {
@@ -3225,7 +3176,6 @@
       },
       "restrictions": {
         "title": "병합 제한",
-        "approvalsRequired_one": "{{displayCount}}개의 승인 필요",
         "approvalsRequired_other": "{{displayCount}}개의 승인 필요",
         "pipelineMustSucceed": "병합하기 전에 파이프라인이 성공해야 합니다."
       },
@@ -3252,10 +3202,8 @@
     "overview": {
       "commit": "커밋",
       "commit_other": "커밋",
-      "commit_one": "커밋",
       "file": "파일",
       "file_other": "파일",
-      "file_one": "파일",
       "stateMerged": "병합됨",
       "stateOpen": "오픈",
       "stateOpenApproved": "열림 · 승인됨",
@@ -3318,16 +3266,12 @@
       "loadFailedTitle": "리뷰 제출 화면을 불러오지 못했습니다.",
       "pendingComment": "제출 대기 중인 댓글",
       "pendingComment_other": "제출 대기 중인 댓글",
-      "pendingComment_one": "제출 대기 중인 댓글",
       "summaryOptional": "요약(선택 사항)",
       "partialPostedFresh": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
-      "partialPostedFresh_one": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedFresh_other": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedStale": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
-      "partialPostedStale_one": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "partialPostedStale_other": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
-      "submitCountOfTotal_one": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitCountOfTotal_other": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitReview": "리뷰 제출",
       "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
@@ -3343,9 +3287,9 @@
       "discussion": "토론",
       "discussionAccessibility": "{{title}}: 댓글 {{displayCount}}개",
       "discussionAccessibility_other": "{{title}}: 댓글 {{displayCount}}개",
-      "discussionAccessibility_one": "{{title}}: 댓글 1개",
       "files": "파일",
-      "overview": "개요"
+      "overview": "개요",
+      "discussionAccessibility_one": "{{title}}: 댓글 1개"
     },
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
@@ -3355,7 +3299,6 @@
       "lineLabel": "{{status}}, {{line}}번 줄: {{text}}",
       "lineLabelNoNumber": "{{status}}, {{text}}",
       "emptyLine": "(비어 있음)",
-      "truncationBanner_one": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다.",
       "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
@@ -3493,10 +3436,8 @@
         "groupIdentity": "그룹 \"{{name}}\"",
         "groupMembers": "그룹 \"{{name}}\": {{members}}",
         "groupMemberGroups": "그룹 {{displayCount}}개",
-        "groupMemberGroups_one": "그룹 {{displayCount}}개",
         "groupMemberGroups_other": "그룹 {{displayCount}}개",
         "groupMemberGroupsOf": "{{email}}: 그룹 {{displayCount}}개",
-        "groupMemberGroupsOf_one": "{{email}}: 그룹 {{displayCount}}개",
         "groupMemberGroupsOf_other": "{{email}}: 그룹 {{displayCount}}개",
         "groupPolicySet": "그룹 \"{{name}}\": {{policy}} 정책 설정함",
         "groupPolicyRemoved": "그룹 \"{{name}}\": {{policy}} 정책 제거함",
@@ -3518,17 +3459,14 @@
         "fundsPurchased": "{{method}}(으)로 {{amount}}",
         "fundsGranted": "{{amount}}",
         "fundsDistributed": "하위 조직 {{displayCount}}곳에 {{amount}}",
-        "fundsDistributed_one": "하위 조직 {{displayCount}}곳에 {{amount}}",
         "fundsDistributed_other": "하위 조직 {{displayCount}}곳에 {{amount}}",
         "fundsReceived": "상위 조직 {{parent}}에서 {{amount}}",
         "reviewAgentPlatform": "{{platform}}",
         "reviewAgentConfig": "{{platform}} 구성",
         "reviewAgentConfigStyle": "{{platform}}: 스타일 {{style}}",
         "reviewAgentSecretsUpdated": "{{displayCount}}개 업데이트됨",
-        "reviewAgentSecretsUpdated_one": "{{displayCount}}개 업데이트됨",
         "reviewAgentSecretsUpdated_other": "{{displayCount}}개 업데이트됨",
         "reviewAgentSecretsFailed": "{{displayCount}}개 오류",
-        "reviewAgentSecretsFailed_one": "{{displayCount}}개 오류",
         "reviewAgentSecretsFailed_other": "{{displayCount}}개 오류",
         "reviewAgentSecretRotated": "{{values}}",
         "settingAdvancedPolicies": "{{values}}",
@@ -3694,7 +3632,7 @@
       "noSeatsAvailable": "모든 시트가 사용 중입니다. 멤버를 더 초대하려면 먼저 조직 소유자에게 시트 추가를 요청하세요."
     },
     "invoices": {
-      "downloadA11y": "청구서 {{number}} 다운로드",
+      "downloadA11y": "청구서 {{number}}, {{amount}}, {{date}}, {{status}} 다운로드",
       "emptyDescription": "청구서는 청구 주기마다 자동으로 생성되며, 조직에 요금이 청구되면 여기에 표시됩니다.",
       "emptyTitle": "청구서 없음",
       "invoiceFallback": "청구서",
@@ -3774,7 +3712,6 @@
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
-      "guardrails": "가드레일",
       "byok": "자체 키 사용(BYOK)",
       "ssoAndDomain": "SSO 및 도메인",
       "dataCollection": "데이터 수집",
@@ -3841,7 +3778,6 @@
       "emptyTitle": "그룹이 아직 없습니다",
       "enterpriseOnly": "그룹은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
       "memberCount": "멤버 {{displayCount}}명",
-      "memberCount_one": "멤버 {{displayCount}}명",
       "memberCount_other": "멤버 {{displayCount}}명",
       "memberViewEmpty": "이 조직의 어떤 그룹에도 속해 있지 않습니다.",
       "memberViewTitle": "내 그룹",
@@ -3863,14 +3799,14 @@
       "ended": "종료됨",
       "notSubscribed": "구독하지 않음",
       "overallocated": "Kilo Pass 배정 수가 유료 라이선스 수를 초과함",
-      "paidSeat_one": "유료 라이선스 {{displayCount}}개",
       "paidSeat": "유료 좌석 {{displayCount}}개",
       "paidSeat_other": "유료 좌석 {{displayCount}}개",
       "paymentNeedsAttention": "결제 확인 필요",
       "paymentPending": "결제 대기 중",
       "processingBlocked": "처리 차단됨",
       "processingNeedsReview": "처리 검토 필요",
-      "retryHint": "Kilo Pass 상태를 다시 불러옵니다."
+      "retryHint": "Kilo Pass 상태를 다시 불러옵니다.",
+      "paidSeat_one": "유료 라이선스 {{displayCount}}개"
     }
   },
   "feedback": {
@@ -3890,7 +3826,7 @@
     "signupStepUpApple": "계정 생성을 완료하려면 '$t(login.signInWithApple)' 항목을 선택하세요.",
     "signupStepUpGoogle": "계정 생성을 완료하려면 '$t(login.signInWithGoogle)' 항목을 선택하세요.",
     "signupStepUpBack": "계정 생성을 완료하려면 뒤로 돌아가서 '$t(login.moreSignInOptions)' 항목을 선택하세요.",
-    "invalidCode": "코드가 올바르지 않거나 만료되었습니다. 다시 시도하거나 '$t(login.resendCode)' 버튼을 누르세요.",
+    "invalidCode": "코드가 올바르지 않거나 만료되었습니다. '$t(login.resendCode)' 버튼을 누르거나 '$t(login.moreSignInOptions)' 버튼을 선택하세요.",
     "codeInProgress": "코드를 처리 중입니다. 잠시 기다린 후 다시 시도하세요.",
     "tooManyAttempts": "시도 횟수가 너무 많습니다. 새 코드를 요청하세요.",
     "invalidToken": "로그인에 실패했습니다. 다시 시도하세요.",
@@ -3972,23 +3908,15 @@
     "answerNeeded": "답변 필요",
     "waitingToRetry": "재시도 대기",
     "countNoun": {
-      "needsInput_one": "입력 필요",
       "needsInput_other": "입력 필요",
-      "running_one": "작업 중",
       "running_other": "작업 중",
-      "scheduled_one": "예약됨",
       "scheduled_other": "예약됨",
-      "idle_one": "대기 중",
       "idle_other": "대기 중"
     },
     "count": {
-      "needsInput_one": "{{displayCount}} 입력 필요",
       "needsInput_other": "{{displayCount}} 입력 필요",
-      "running_one": "{{displayCount}} 작업 중",
       "running_other": "{{displayCount}} 작업 중",
-      "scheduled_one": "{{displayCount}} 예약됨",
       "scheduled_other": "{{displayCount}} 예약됨",
-      "idle_one": "{{displayCount}} 대기 중",
       "idle_other": "{{displayCount}} 대기 중"
     },
     "footer": {
@@ -4129,7 +4057,6 @@
       "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
       "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
       "serverChecking": "이 서버를 확인하는 중…",
-      "serverToolCount_one": "도구 {{count}}개",
       "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다",
@@ -4204,6 +4131,8 @@
       "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
       "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",
+      "invalidApiKey": "API 키에 전송할 수 없는 문자가 포함되어 있습니다. 줄바꿈 없이 문자, 숫자 및 표준 기호만 사용하세요.",
+      "invalidHeaders": "사용자 지정 헤더를 전송할 수 없습니다. 이름을 확인하고 줄바꿈 없이 문자, 숫자 및 표준 기호만 사용하세요.",
       "invalidUrl": "인증 정보, 쿼리 또는 프래그먼트가 없는 HTTP 또는 HTTPS API 루트를 입력하세요.",
       "publicHttp": "공개 HTTP 엔드포인트는 허용되지 않습니다. HTTPS 또는 비공개 로컬 엔드포인트를 사용하세요.",
       "httpApprovalRequired": "저장하거나 연결하기 전에 이 로컬 HTTP 엔드포인트를 승인하세요.",
@@ -4338,7 +4267,15 @@
       "download": "기기 내 모델 다운로드",
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
-      "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
+      "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요.",
+      "cannotUse": "실행할 수 없습니다: {{items}}.",
+      "cannotUseOptions": "채울 수 없습니다: 일부 도구 옵션.",
+      "limitations": "제한 사항",
+      "tools": {
+        "time": "시간",
+        "settingsList": "설정 보기",
+        "settingsSet": "설정 변경"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
@@ -4405,16 +4342,11 @@
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
     "counts": {
-      "vars_one": "{{count}} 변수",
       "vars_other": "{{count}} 변수",
       "mcp": "{{count}} MCP",
-      "skills_one": "{{count}} 스킬",
       "skills_other": "{{count}} 스킬",
-      "commands_one": "{{count}} 명령",
       "commands_other": "{{count}} 명령",
-      "setupCommands_one": "{{count}} 설정 명령",
       "setupCommands_other": "{{count}} 설정 명령",
-      "agents_one": "{{count}} 에이전트",
       "agents_other": "{{count}} 에이전트"
     },
     "nameLabel": "프로필 이름",
@@ -4517,6 +4449,7 @@
     "instructionSaveFailed": "지침을 저장하지 못했습니다",
     "instructionDeleteFailed": "지침을 삭제하지 못했습니다",
     "instructionToggleFailed": "지침을 업데이트하지 못했습니다",
+    "instructionViewTitle": "지침 파일",
     "instructionLimitReached": "프로필당 지침은 최대 {{max}}개까지 가능합니다. 하나를 삭제하고 추가하세요.",
     "mcp": {
       "title": "MCP 서버",
@@ -4531,7 +4464,6 @@
       "environment": "환경(JSON)",
       "headers": "헤더(JSON)",
       "timeout": "제한시간",
-      "secretCount_one": "{{count}} 비밀",
       "secretCount_other": "{{count}} 비밀",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
@@ -4687,10 +4619,20 @@
     "history": {
       "activityUnavailable": "크레딧 활동을 불러오지 못했습니다.",
       "appStoreReceipt": "App Store 영수증",
+      "deduction": {
+        "adminCancel": "관리자가 잔액을 마감함",
+        "adminDebit": "관리자가 크레딧을 회수함",
+        "codingPlan": "코딩 플랜: {{plan}}",
+        "correction": "잔액 정정",
+        "dispute": "결제 분쟁",
+        "refundAppStore": "App Store 크레딧 팩 환불",
+        "refundGooglePlay": "Google Play 크레딧 팩 환불"
+      },
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",
       "expiredGrant": "만료됨: {{description}}",
+      "expiredStatus": "만료됨",
       "googlePlayReceipt": "Google Play 영수증",
       "kind": {
         "adjustment": "조정",
@@ -4717,7 +4659,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} 영수증 열기",
       "receiptUnavailable": "이 구매에 대한 영수증이 없습니다.",
       "retentionLimit": "최근 크레딧 기록을 표시합니다.",
-      "voidedGrant": "무효 처리됨: {{description}}"
+      "voidedGrant": "무효 처리됨: {{description}}",
+      "voidedStatus": "무효 처리됨"
     },
     "title": "크레딧 구매",
     "description": "크레딧은 Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 추가되는 일회성 구매입니다. 스토어가 계정에 요금을 청구하고 스토어가 결제를 확인한 후 크레딧이 추가됩니다.",
@@ -4761,9 +4704,7 @@
       "couldNotLoad": "목록을 불러올 수 없습니다",
       "noRepository": "저장소 없음",
       "rowA11y": "{{name}} — {{openCount}}",
-      "openCount_one": "{{count}}개 열림",
       "openCount_other": "{{count}}개 열림",
-      "archived_one": "보관됨 ({{count}})",
       "archived_other": "보관됨 ({{count}})",
       "archive": "보관",
       "unarchive": "보관 해제",
@@ -4786,7 +4727,6 @@
       "addFailed": "할 일을 추가할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
       "empty": "아직 할 일이 없습니다",
       "setDefaults": "저장소, 모드 및 모델 설정",
-      "completed_one": "완료 ({{count}})",
       "completed_other": "완료 ({{count}})"
     },
     "item": {
@@ -4795,7 +4735,6 @@
       "markDonePrompt": "완료로 표시할까요?",
       "deleted": "할 일이 삭제되었습니다",
       "undo": "실행 취소",
-      "runCount_one": "실행 {{count}}회",
       "runCount_other": "실행 {{count}}회",
       "startNow": "리뷰 없이 시작",
       "startNowHint": "길게 눌러 리뷰 없이 시작",
@@ -4893,7 +4832,6 @@
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
-    "paidDisclosure_one": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "paidDisclosure_other": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
@@ -4906,8 +4844,8 @@
     "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요.",
     "saved": "브리핑 설정이 저장되었습니다",
     "selectedSessions": "선택된 세션",
-    "snapshotPullRequests": "선택된 세션의 PRs",
-    "snapshotBlockers": "선택된 세션의 차단 요소",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "차단 요소",
     "capturedAt": "{{time}} 캡처",
     "snapshotHint": "예약된 아침 시각에 확인 가능한 최신 세션 상태를 가능한 범위에서 캡처한 스냅샷입니다. 수치는 선택된 세션에 대한 것으로, 밤사이 전체 활동을 나타내지 않습니다.",
     "snapshotTruncated": "스냅샷 크기를 제한하기 위해 일부 세션이나 근거 자료가 제외되었습니다.",
@@ -4935,11 +4873,7 @@
     "metadataFailureProvider": "프로바이더 오류",
     "metadataFailureTool": "도구 오류",
     "metadataStopped": "지난 턴 중단됨",
-    "metadataFailureOther": "기타 오류",
-    "metadataPlan_one": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
-    "metadataFiles_one": "{{displayCount}}개 파일 변경됨",
-    "metadataLinesAdded_one": "{{displayCount}}줄 추가됨",
-    "metadataLinesRemoved_one": "{{displayCount}}줄 삭제됨"
+    "metadataFailureOther": "기타 오류"
   },
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"

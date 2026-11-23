@@ -93,6 +93,7 @@
     "draft": "Osnutek",
     "enabled": "Omogočeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika ni na voljo.",
     "loading": "Nalaganje…",
     "loadMore": "Naloži več",
@@ -124,10 +125,10 @@
     "connectProvider": "Poveži ponudnika",
     "contentTruncated": "Vsebina skrajšana",
     "copyLink": "Kopiraj povezavo",
+    "couldNotLoad": "Podatkov ni bilo mogoče naložiti.",
+    "couldNotLoadMore": "Dodatnih podatkov ni bilo mogoče naložiti.",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
-    "couldnTLoad": "Podatkov ni bilo mogoče naložiti.",
-    "couldnTLoadMore": "Dodatnih podatkov ni bilo mogoče naložiti.",
     "deviceSessions": "Seje v napravah",
     "disabled": "Onemogočeno",
     "email": "E-poštni naslov",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",
@@ -3826,7 +3828,7 @@
       "noSeatsAvailable": "Vsa mesta so zasedena. Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov."
     },
     "invoices": {
-      "downloadA11y": "Prenesi račun {{number}}",
+      "downloadA11y": "Prenesi račun {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Računi se samodejno ustvarijo za vsako obračunsko obdobje. Tukaj se prikažejo po obračunu za tvojo organizacijo.",
       "emptyTitle": "Ni računov",
       "invoiceFallback": "Račun",
@@ -3906,7 +3908,6 @@
       "usageDetails": "Podrobnosti porabe",
       "providersAndModels": "Ponudniki in modeli",
       "groups": "Skupine",
-      "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
       "ssoAndDomain": "SSO in domena",
       "dataCollection": "Zbiranje podatkov",
@@ -4030,7 +4031,7 @@
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
     "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
-    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Uporabi »$t(login.resendCode)« ali »$t(login.moreSignInOptions)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4362,6 +4363,8 @@
       "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
       "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
+      "invalidApiKey": "Ključ API vsebuje znak, ki ga ni mogoče poslati. Uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
+      "invalidHeaders": "Glave po meri ni mogoče poslati. Preveri njeno ime in uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
       "httpApprovalRequired": "Pred shranjevanjem ali povezovanjem odobri to lokalno končno točko HTTP.",
@@ -4496,7 +4499,15 @@
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
-      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
+      "cannotUse": "Ni mogoče zagnati: {{items}}.",
+      "cannotUseOptions": "Ni mogoče izpolniti: nekatere možnosti orodja.",
+      "limitations": "Omejitve",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Prikaži nastavitve",
+        "settingsSet": "Spremeni nastavitve"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
@@ -4685,6 +4696,7 @@
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",
     "instructionToggleFailed": "Navodila ni bilo mogoče posodobiti",
+    "instructionViewTitle": "Datoteka z navodili",
     "instructionLimitReached": "Profil lahko vsebuje največ {{max}} navodil. Izbrišite eno, da dodate drugo.",
     "mcp": {
       "title": "MCP strežniki",
@@ -4857,10 +4869,20 @@
     "history": {
       "activityUnavailable": "Kreditne aktivnosti ni bilo mogoče naložiti.",
       "appStoreReceipt": "Potrdilo iz trgovine App Store",
+      "deduction": {
+        "adminCancel": "Stanje je zaprl skrbnik",
+        "adminDebit": "Kredite je odstranil skrbnik",
+        "codingPlan": "Načrt kodiranja: {{plan}}",
+        "correction": "Prilagoditev stanja",
+        "dispute": "Spor o plačilu",
+        "refundAppStore": "Vračilo denarja za paket kreditov iz trgovine App Store",
+        "refundGooglePlay": "Vračilo denarja za paket kreditov iz trgovine Google Play"
+      },
       "deductionFallback": "Odbitek kreditov",
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
       "expiredGrant": "Poteklo: {{description}}",
+      "expiredStatus": "Poteklo",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
@@ -4887,7 +4909,8 @@
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
       "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
-      "voidedGrant": "Razveljavljeno: {{description}}"
+      "voidedGrant": "Razveljavljeno: {{description}}",
+      "voidedStatus": "Razveljavljeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
@@ -5086,8 +5109,8 @@
     "estimateSpendLimitTooLow": "Povečajte varovalko porabe, da omogočite ta povzetek.",
     "saved": "Nastavitve poročila so shranjene",
     "selectedSessions": "Izbrane seje",
-    "snapshotPullRequests": "PR-ji v izbranih sejah",
-    "snapshotBlockers": "Ovire v izbranih sejah",
+    "snapshotPullRequests": "PR-ji",
+    "snapshotBlockers": "Ovire",
     "capturedAt": "Zajeto {{time}}",
     "snapshotHint": "Posnetek zadnjega razpoložljivega stanja sej, zajet ob načrtovanem jutranjem času. Popolnost ni zagotovljena. Števila se nanašajo na izbrane seje, ne na celotno nočno dejavnost.",
     "snapshotTruncated": "Nekatere seje ali dokazno gradivo so izpuščeni, da posnetek ostane v omejenem obsegu.",

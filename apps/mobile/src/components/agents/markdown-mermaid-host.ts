@@ -43,8 +43,8 @@ function paint() {
   document.documentElement.style.background = background;
   document.body.style.background = background;
   // The theme alone picks mermaid's own colors; a theme that needs its own
-  // measured values (the dark theme's pie fills) sends them alongside, and
-  // mermaid re-applies them over the ones the theme derives.
+  // measured values (both themes' pie fills) sends them alongside, and mermaid
+  // re-applies them over the ones the theme derives.
   const overrides =
     themeVariables !== null && typeof themeVariables === 'object' ? themeVariables : null;
   let rendered;

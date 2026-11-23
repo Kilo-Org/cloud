@@ -3,12 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 import {
-  isTerminalSessionHistoryFailure,
   SESSION_HISTORY_FAILURES,
+  sessionHistoryFailureCopy,
   sessionHistoryFailureCopyKey,
   SessionHistoryFailureError,
   type SessionHistoryFailureKind,
-  TERMINAL_SESSION_HISTORY_FAILURE_KINDS,
 } from './session-history-failures';
 
 function declaredTelemetry(error: Error): unknown {
@@ -64,13 +63,6 @@ describe('SessionHistoryFailureError', () => {
       fingerprint: ['session-history-page', kind],
       tags: { 'error.subsystem': 'session-history', 'error.operation': 'read-page' },
     });
-    expect(TERMINAL_SESSION_HISTORY_FAILURE_KINDS).toContain(kind);
-  });
-
-  it('classifies the terminal kinds and leaves the retryable one retryable', () => {
-    expect(isTerminalSessionHistoryFailure('too_large')).toBe(true);
-    expect(isTerminalSessionHistoryFailure('invalid_data')).toBe(true);
-    expect(isTerminalSessionHistoryFailure('retryable_failure')).toBe(false);
   });
 
   it.each([
@@ -96,5 +88,17 @@ describe('SessionHistoryFailureError', () => {
         ])
       )
     ).toEqual(expected);
+  });
+});
+
+describe('sessionHistoryFailureCopy', () => {
+  it.each([
+    ['retryable_failure', 'agentChat.session.historyTemporarilyUnavailable', true],
+    ['too_large', 'agentChat.session.historyTooLarge', false],
+    ['invalid_data', 'agentChat.session.historyUnavailable', false],
+  ] as const)('gives the %s kind its copy key and retryability', (kind, copyKey, retryable) => {
+    // The kind decides both: a retryable read keeps its Retry, and a terminal
+    // read states a page a retry re-reads unchanged.
+    expect(sessionHistoryFailureCopy(kind)).toEqual({ copyKey, retryable });
   });
 });

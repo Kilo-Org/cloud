@@ -36,38 +36,13 @@ export const SESSION_HISTORY_FAILURES = {
 export type SessionHistoryFailureKind = keyof typeof SESSION_HISTORY_FAILURES;
 
 /**
- * The failures a retry cannot recover: the stored page is oversize or
- * unreadable, so the same read answers the same way every time. A retryable
- * failure is absent by design — offering Retry for it is correct.
- */
-export const TERMINAL_SESSION_HISTORY_FAILURE_KINDS: readonly SessionHistoryFailureKind[] = [
-  'too_large',
-  'invalid_data',
-];
-
-/** A kind a retry cannot recover. */
-export type TerminalSessionHistoryFailureKind =
-  (typeof TERMINAL_SESSION_HISTORY_FAILURE_KINDS)[number];
-
-/**
- * True when the failure kind is one a retry cannot recover. A missing kind
- * (`null`/`undefined`) is not one: the read never answered with a typed kind,
- * so the transport store classifies its sentence instead.
- */
-export function isTerminalSessionHistoryFailure(
-  kind: SessionHistoryFailureKind | null | undefined
-): kind is TerminalSessionHistoryFailureKind {
-  return kind != null && TERMINAL_SESSION_HISTORY_FAILURE_KINDS.includes(kind);
-}
-
-/**
  * The reader copy key for a failure kind, so the terminal state names the
  * failure from its type instead of matching the wire's English message. Only
  * a terminal kind has one; a retryable failure never resolves through it.
  * The English `message` stays the wire identity of the row itself.
  */
 export function sessionHistoryFailureCopyKey(
-  kind: TerminalSessionHistoryFailureKind
+  kind: SessionHistoryFailureKind
 ): 'agentChat.session.historyTooLarge' | 'agentChat.session.historyUnavailable' {
   return kind === 'too_large'
     ? 'agentChat.session.historyTooLarge'

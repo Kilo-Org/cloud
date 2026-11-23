@@ -125,6 +125,16 @@ describe('backend form boundary', () => {
     );
   });
 
+  it('normalizes the key edges and refuses a hidden character at a header edge', () => {
+    expect(backendDraftFromFields({ ...fields, apiKey: ' secret\u00A0' }, false).apiKey).toBe(
+      'secret'
+    );
+    const hidden = '{"Authorization":"Bearer secret\u00A0"}';
+    expect(() => backendDraftFromFields({ ...fields, apiKey: '', headers: hidden }, false)).toThrow(
+      'invalidHeaders'
+    );
+  });
+
   it('requires approval before saving an otherwise valid local HTTP profile', () => {
     expect(() =>
       backendDraftFromFields({ ...fields, baseUrl: 'http://localhost:8080/v1' }, false)

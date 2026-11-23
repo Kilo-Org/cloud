@@ -36,6 +36,13 @@ const backendModelSchema = z
  * The no-break space (U+00A0) and the soft hyphen (U+00AD) are excluded because they
  * are invisible and are outside the letters, digits and standard symbols the refusal
  * copy promises.
+ *
+ * Only the key is trimmed, and that difference is deliberate. Surrounding whitespace
+ * is never part of a credential, so a pasted key loses its edges and keeps its body
+ * instead of failing on a character the person cannot see. A header value is a
+ * literal the person typed for one server, so it is compared exactly as written and
+ * a hidden character at its edge is named rather than stripped out of it. Both rules
+ * answer the same question: the value must be printable text before it is sent.
  */
 const SENDABLE_TEXT = /^[\u0020-\u007E\u00A1-\u00AC\u00AE-\u00FF]*$/;
 

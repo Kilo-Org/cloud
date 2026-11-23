@@ -2491,7 +2491,7 @@
       "snapshotCaptured": "వర్క్‌స్పేస్ స్నాప్‌షాట్ {{when}} క్యాప్చర్ చేయబడింది"
     },
     "partRenderer": {
-      "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించారు.",
+      "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించారు",
       "updatedFileCount": "{{displayCount}} ఫైళ్లను నవీకరించారు",
       "updatedFileCount_other": "{{displayCount}} ఫైళ్లను నవీకరించారు"
     },

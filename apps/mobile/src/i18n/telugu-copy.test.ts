@@ -99,7 +99,7 @@ describe('Telugu new-session branch and profile copy', () => {
 describe('Telugu updated-file count', () => {
   it('selects the one-file value for a single file', () => {
     expect(i18n.t('agentChat.partRenderer.updatedFileCount', { count: 1, displayCount: '1' })).toBe(
-      '1 ఫైల్‌ను నవీకరించారు.'
+      '1 ఫైల్‌ను నవీకరించారు'
     );
   });
 

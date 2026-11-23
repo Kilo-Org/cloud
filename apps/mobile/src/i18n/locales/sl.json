@@ -5157,6 +5157,7 @@
   },
   "usage": {
     "title": "Poraba",
+    "personalTitle": "Poraba osebnega računa",
     "orgTitle": "Poraba organizacije",
     "entrySubtitle": "Stroški, zahteve in žetoni",
     "rangePicker": "Časovno obdobje",

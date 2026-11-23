@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "کارونه",
+    "personalTitle": "شخصي کارونه",
     "orgTitle": "د سازمان کارونه",
     "entrySubtitle": "لګښت، غوښتنې او ټوکنونه",
     "rangePicker": "د وخت موده",

@@ -5063,6 +5063,7 @@
   },
   "usage": {
     "title": "שימוש",
+    "personalTitle": "שימוש בחשבון אישי",
     "orgTitle": "שימוש בארגון",
     "entrySubtitle": "הוצאות, בקשות וטוקנים",
     "rangePicker": "טווח זמן",

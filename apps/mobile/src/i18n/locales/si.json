@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "භාවිතය",
+    "personalTitle": "පුද්ගලික ගිණුම් භාවිතය",
     "orgTitle": "සංවිධාන භාවිතය",
     "entrySubtitle": "වියදම, ඉල්ලීම් සහ ටෝකන",
     "rangePicker": "කාල පරාසය",

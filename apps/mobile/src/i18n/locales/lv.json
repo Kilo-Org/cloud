@@ -5063,6 +5063,7 @@
   },
   "usage": {
     "title": "Lietojums",
+    "personalTitle": "Personīgā konta lietojums",
     "orgTitle": "Organizācijas lietojums",
     "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
     "rangePicker": "Laika periods",

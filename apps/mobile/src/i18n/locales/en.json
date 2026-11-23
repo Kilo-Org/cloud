@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "Usage",
+    "personalTitle": "Personal usage",
     "orgTitle": "Organization usage",
     "entrySubtitle": "Spend, requests, and tokens",
     "rangePicker": "Time range",

@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "استعمال",
+    "personalTitle": "ذاتی اکاؤنٹ کا استعمال",
     "orgTitle": "تنظیم کا استعمال",
     "entrySubtitle": "خرچ، درخواستیں اور ٹوکن",
     "rangePicker": "وقت کی مدت",

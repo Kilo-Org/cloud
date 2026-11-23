@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "用量",
+    "personalTitle": "個人用量",
     "orgTitle": "組織用量",
     "entrySubtitle": "費用、請求與詞元",
     "rangePicker": "時間範圍",

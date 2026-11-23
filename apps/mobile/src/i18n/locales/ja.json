@@ -4969,6 +4969,7 @@
   },
   "usage": {
     "title": "使用状況",
+    "personalTitle": "個人の使用状況",
     "orgTitle": "組織の使用状況",
     "entrySubtitle": "コスト、リクエスト、トークン",
     "rangePicker": "期間",

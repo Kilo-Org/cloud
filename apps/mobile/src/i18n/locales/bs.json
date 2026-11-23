@@ -5063,6 +5063,7 @@
   },
   "usage": {
     "title": "Potrošnja",
+    "personalTitle": "Potrošnja ličnog računa",
     "orgTitle": "Potrošnja organizacije",
     "entrySubtitle": "Troškovi, zahtjevi i tokeni",
     "rangePicker": "Vremenski period",

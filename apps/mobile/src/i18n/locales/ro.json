@@ -5063,6 +5063,7 @@
   },
   "usage": {
     "title": "Utilizare",
+    "personalTitle": "Utilizarea contului personal",
     "orgTitle": "Utilizarea organizației",
     "entrySubtitle": "Cheltuieli, cereri și tokenuri",
     "rangePicker": "Interval de timp",

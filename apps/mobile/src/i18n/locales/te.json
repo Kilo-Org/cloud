@@ -4971,6 +4971,7 @@
   },
   "usage": {
     "title": "వినియోగం",
+    "personalTitle": "వ్యక్తిగత వినియోగం",
     "orgTitle": "సంస్థ వినియోగం",
     "entrySubtitle": "ఖర్చు, అభ్యర్థనలు, టోకెన్లు",
     "rangePicker": "కాల వ్యవధి",

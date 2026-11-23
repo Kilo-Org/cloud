@@ -5,6 +5,7 @@ import {
   MESSAGE_ID_PATTERN,
 } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from './kilo-token-version';
 import {
   ENVIRONMENT_SETUP_PROCEDURE_PREFIX,
   environmentSetupAgentOperations,
@@ -72,7 +73,7 @@ export type CloudAgentAuthority = z.infer<typeof CloudAgentAuthoritySchema>;
 const numericDate = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const scopedTokenClaimsSchema = z
   .object({
-    version: z.literal(3),
+    version: z.literal(KILO_TOKEN_VERSION),
     kiloUserId: z.string().min(1),
     apiTokenPepper: z.string().nullable(),
     env: z.string().optional(),

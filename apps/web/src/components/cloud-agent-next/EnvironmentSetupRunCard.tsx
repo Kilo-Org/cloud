@@ -265,6 +265,7 @@ export function EnvironmentSetupRunCard({
                             });
                             return 'keep-open';
                           }
+                          return undefined;
                         },
                       })
                     }

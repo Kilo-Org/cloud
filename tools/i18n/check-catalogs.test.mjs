@@ -3964,14 +3964,13 @@ for (const [name, keywords, reason] of [
 }
 
 test('holds a non-English catalog to the same keyword lists', () => {
-  const found = runKeywords({ translatedKeywords: withoutKeyword('language') });
-  const text = found.join('\n');
-  assert.deepEqual(
-    found.filter(problem => problem === 'mobile/ru: "settingsSearch.keywords.language" is missing'),
-    ['mobile/ru: "settingsSearch.keywords.language" is missing'],
-    text
+  const translatedKeywords = Object.fromEntries(
+    Object.entries(SETTINGS_KEYWORDS_TRANSLATED).filter(([id]) => id !== 'language')
   );
-  assert.doesNotMatch(text, /^mobile\/en: "settingsSearch\.keywords/m);
+  const found = runKeywords({ translatedKeywords });
+  // One defect, one line: the keyword rule names the missing id and the key-parity
+  // rule does not restate it, on the locale side as well as the English side.
+  assert.deepEqual(found, ['mobile/ru: "settingsSearch.keywords.language" is missing']);
 });
 
 test('reports only the parse problem of a catalog the keyword rule cannot read', () => {

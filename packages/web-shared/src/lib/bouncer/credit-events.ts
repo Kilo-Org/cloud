@@ -72,12 +72,13 @@ export const CREDIT_EVENT_CLIENT_FIELDS = [
  * cannot be reduced to a single statement by accident. A personal event locks that row `FOR UPDATE`
  * and is skipped when the account is gone/deleting; an organization event locks it `FOR SHARE` and
  * is still enqueued, with the attributed client's fields withheld. Either lock serializes the
- * enqueue insert against a concurrent `softDeleteUser` (which updates the same row) at the database
- * boundary, so an in-flight late webhook cannot insert after the deletion commits; it does not undo
- * a delivery that already happened, and the drainer rechecks the owner before sending a personal
- * event. Passing the caller's transaction also makes the insert atomic with the primary write. A DB
- * error propagates, so the caller can let the payment or webhook provider retry instead of losing
- * the report. The insert is idempotent on `(eventId, event_type)`.
+ * enqueue against a concurrent `softDeleteUser` (which updates the same row) at the database
+ * boundary, so a late webhook that waits for the cleanup reads the committed state: a personal
+ * event is skipped, and an organization event that is still enqueued carries no client-derived
+ * fields. It does not undo a delivery that already happened, and the drainer rechecks the owner
+ * before sending a personal event. Passing the caller's transaction also makes the insert atomic
+ * with the primary write. A DB error propagates, so the caller can let the payment or webhook
+ * provider retry instead of losing the report. The insert is idempotent on `(eventId, event_type)`.
  *
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,

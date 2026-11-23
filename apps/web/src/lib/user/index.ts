@@ -1308,9 +1308,9 @@ export async function anonymizeCloudUserData(
   // Bouncer credit-event payloads carry the user id, client ip, and card
   // fingerprint, so every row for the user is deleted rather than retained.
   // `enqueueCreditEvent` locks this user row for every event, so an in-flight
-  // enqueue cannot insert after this cleanup commits: a personal event is
-  // skipped for a soft-deleted account, and an organization event is still
-  // enqueued without the client-derived fields.
+  // enqueue runs before or after this cleanup, never across it: a personal
+  // event is skipped for a soft-deleted account, and an organization event
+  // that is still enqueued carries no client-derived fields.
   await tx
     .delete(bouncer_credit_event_outbox)
     .where(eq(bouncer_credit_event_outbox.user_id, userId));

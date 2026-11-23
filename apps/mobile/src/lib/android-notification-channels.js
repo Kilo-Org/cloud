@@ -21,7 +21,7 @@ const ANDROID_NOTIFICATION_CHANNELS_CREATED = Object.freeze([
 /** The Android notification channels the app creates silent: no sound and no
  *  vibration. The channel writer (src/lib/notifications.ts) reads this list,
  *  and scripts/assert-expo-config.mjs reads the same list to keep the FCM
- *  fallback channel off it. Derived from the table above, in its order.
+ *  fallback channel off it.
  *  @type {ReadonlyArray<import('@kilocode/notifications').AndroidNotificationChannelId>} */
 export const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = Object.freeze(
   ANDROID_NOTIFICATION_CHANNELS_CREATED.filter(channel => channel.silent).map(channel => channel.id)
@@ -29,8 +29,7 @@ export const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = Object.freeze(
 
 /** The Android notification channels this app creates: one entry per channel
  *  its writer (src/lib/notifications.ts) sets up at startup and on a headless
- *  start, so a push addressed to any of these reaches the system list. Derived
- *  from the table above, in its order.
+ *  start, so a push addressed to any of these reaches the system list.
  *  @type {ReadonlyArray<import('@kilocode/notifications').AndroidNotificationChannelId>} */
 export const CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS = Object.freeze(
   ANDROID_NOTIFICATION_CHANNELS_CREATED.map(channel => channel.id)

@@ -229,9 +229,33 @@ describe('balanceCodeFences', () => {
     expect(balanceCodeFences('plain')).toBe('plain');
   });
 
-  it('counts indented fences', () => {
+  it('counts indented fences and keeps the indent on the closer', () => {
     const text = '  ```\ncode';
-    expect(balanceCodeFences(text)).toBe('  ```\ncode\n```');
+    expect(balanceCodeFences(text)).toBe('  ```\ncode\n  ```');
+  });
+
+  it('closes an unterminated tilde fence', () => {
+    expect(balanceCodeFences('~~~\ncode')).toBe('~~~\ncode\n~~~');
+  });
+
+  it('leaves a closed tilde fence unchanged', () => {
+    const text = '~~~\ncode\n~~~';
+    expect(balanceCodeFences(text)).toBe(text);
+  });
+
+  it('closes an unterminated fence with the opener\u2019s own run length', () => {
+    const text = '````\ncode';
+    expect(balanceCodeFences(text)).toBe('````\ncode\n````');
+  });
+
+  it('closes a fence with a longer run than its opener', () => {
+    const text = '````\ncode\n`````';
+    expect(balanceCodeFences(text)).toBe(text);
+  });
+
+  it('treats a shorter run inside a longer fence as content', () => {
+    const text = '````\ncode\n```\nmore';
+    expect(balanceCodeFences(text)).toBe('````\ncode\n```\nmore\n````');
   });
 });
 

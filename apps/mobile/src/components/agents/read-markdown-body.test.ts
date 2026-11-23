@@ -68,6 +68,7 @@ describe('ReadMarkdownBody', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ReadMarkdownBody({
       body: { text: longText, footer: undefined },
+      sourceKey: 'part-1',
     }) as unknown as React.ReactElement;
     const markdown = findByType(root, 'ChatMarkdownText');
     expect(markdown).toHaveLength(1);
@@ -85,6 +86,7 @@ describe('ReadMarkdownBody', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ReadMarkdownBody({
       body: { text: '# Title', footer },
+      sourceKey: 'part-2',
     }) as unknown as React.ReactElement;
     const texts = findByType(root, 'Text');
     expect(texts.some(el => (el.props as { children?: unknown }).children === footer)).toBe(true);
@@ -94,6 +96,7 @@ describe('ReadMarkdownBody', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ReadMarkdownBody({
       body: { text: '', footer: undefined },
+      sourceKey: 'part-3',
     }) as unknown as React.ReactElement;
     const texts = findByType(root, 'Text');
     expect(

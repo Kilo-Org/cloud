@@ -262,6 +262,13 @@ export function publishConversion(
 
 export type MarkdownTextProps = {
   value: string;
+  /**
+   * Identity of the element this text belongs to. Each HTML segment passes it
+   * down, so a different element rendered where the previous one was (a
+   * recycled row, a new part in the same sheet) resets the segments' own state
+   * instead of inheriting it.
+   */
+  sourceKey?: string;
   variant?: MarkdownVariant;
   /**
    * Base direction of the document body, when it has one of its own: a legal
@@ -293,6 +300,7 @@ export type MarkdownTextProps = {
 
 export function MarkdownText({
   value,
+  sourceKey,
   variant = 'assistant',
   documentDirection,
   selectable = true,
@@ -377,6 +385,7 @@ export function MarkdownText({
             key={`md-html-${index}`}
             html={segment.raw}
             palette={palette}
+            resetKey={`${sourceKey ?? ''}:${index}`}
             documentDirection={documentDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}

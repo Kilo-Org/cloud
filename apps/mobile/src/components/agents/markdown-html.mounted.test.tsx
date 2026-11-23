@@ -126,12 +126,15 @@ function flattenStyle(style: unknown): Record<string, unknown>[] {
   return [style as Record<string, unknown>];
 }
 
-async function mountHtml(html: string): Promise<TestRenderer.ReactTestRenderer> {
+async function mountHtml(
+  html: string,
+  resetKey = 'default'
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
     ref.current = TestRenderer.create(
-      createElement(MarkdownHtml, { html, palette, selectable: true })
+      createElement(MarkdownHtml, { html, palette, resetKey, selectable: true })
     );
   });
   if (!ref.current) {
@@ -309,9 +312,13 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
 
 describe('MarkdownHtml details', () => {
   /** Republishes one HTML source through the mounted renderer, settled. */
-  async function republish(renderer: TestRenderer.ReactTestRenderer, html: string): Promise<void> {
+  async function republish(
+    renderer: TestRenderer.ReactTestRenderer,
+    html: string,
+    resetKey = 'default'
+  ): Promise<void> {
     await act(async () => {
-      renderer.update(createElement(MarkdownHtml, { html, palette, selectable: true }));
+      renderer.update(createElement(MarkdownHtml, { html, palette, resetKey, selectable: true }));
       await Promise.resolve();
     });
   }
@@ -385,6 +392,54 @@ describe('MarkdownHtml details', () => {
       expanded: true,
     });
     expect(allText(renderer)).toContain('Hidden body');
+  });
+
+  it('resets a reader expansion when a different element reuses the instance', async () => {
+    const renderer = await mountHtml(
+      '<details><summary>First</summary><p>First body</p></details>'
+    );
+    const row = renderer.root.findByType('Pressable' as never);
+    await act(async () => {
+      (row.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+
+    // The engine keys its children by structural path, so a different document
+    // rendered at the same path reuses this instance; its new identity is what
+    // resets the state to the incoming element's own `open` presence.
+    await republish(
+      renderer,
+      '<details><summary>Second</summary><p>Second body</p></details>',
+      'second-part'
+    );
+
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: false,
+    });
+    expect(allText(renderer)).toContain('Second');
+    expect(allText(renderer)).not.toContain('Second body');
+  });
+
+  it('opens an incoming element that carries the open attribute', async () => {
+    const renderer = await mountHtml(
+      '<details><summary>First</summary><p>First body</p></details>'
+    );
+
+    expect(allText(renderer)).not.toContain('Third body');
+
+    await republish(
+      renderer,
+      '<details open><summary>Third</summary><p>Third body</p></details>',
+      'third-part'
+    );
+
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(allText(renderer)).toContain('Third body');
   });
 });
 

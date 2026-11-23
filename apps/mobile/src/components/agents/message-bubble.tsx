@@ -410,7 +410,12 @@ function MessageBubbleImpl({
                 <Bubble side="user">
                   <InMessageBubbleContext.Provider value>
                     {userTextContent ? (
-                      <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                      <ChatMarkdownText
+                        value={userTextContent}
+                        sourceKey={message.info.id}
+                        variant="user"
+                        selectable={false}
+                      />
                     ) : null}
                     {fileParts.map(part => (
                       <FilePartRenderer

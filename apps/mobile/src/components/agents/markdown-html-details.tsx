@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { type ComponentType, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
-  type CustomBlockRenderer,
+  type CustomRendererProps,
+  type TBlock,
   TChildrenRenderer,
   TNodeChildrenRenderer,
 } from '@native-html/render';
@@ -12,22 +13,38 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
+type HtmlDetailsProps = CustomRendererProps<TBlock> & { resetKey: string };
+
 /**
  * `<details>` as a collapsible block, collapsed unless it carries `open`. The
  * summary is a pressable row with a chevron; a details element without one
  * gets the browser's "Details" label.
  */
-export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, style }) {
+export const HtmlDetails: ComponentType<HtmlDetailsProps> = function HtmlDetails({
+  tnode,
+  style,
+  resetKey,
+}) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(tnode.attributes.open !== undefined);
-  const [expandedOpen, setExpandedOpen] = useState(tnode.attributes.open !== undefined);
-  // A streaming publish can swap the node while this component instance stays
-  // mounted, and the `open` attribute can arrive in that later publish. The
-  // state re-reads the attribute only when its presence changes: a reader's
-  // own expansion of a details element without the attribute survives every
-  // publish of the same segment, because an absent `open` never resets state.
   const open = tnode.attributes.open !== undefined;
-  if (expandedOpen !== open) {
+  const [expanded, setExpanded] = useState(open);
+  const [expandedOpen, setExpandedOpen] = useState(open);
+  // The engine keys children by their structural path, so a different
+  // `<details>` element rendered at the same path (a recycled row, a new part
+  // in the same sheet) reuses this instance. Reset to the incoming element's
+  // own `open` presence during render, before anything from the last one
+  // shows.
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setExpanded(open);
+    setExpandedOpen(open);
+  } else if (expandedOpen !== open) {
+    // A streaming publish can swap the node while this component instance stays
+    // mounted, and the `open` attribute can arrive in that later publish. The
+    // state re-reads the attribute only when its presence changes: a reader's
+    // own expansion of a details element without the attribute survives every
+    // publish of the same segment, because an absent `open` never resets state.
     setExpandedOpen(open);
     setExpanded(open);
   }

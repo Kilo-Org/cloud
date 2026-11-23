@@ -53,7 +53,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
-        <TextPartRenderer text={part.text} />
+        <TextPartRenderer text={part.text} sourceKey={part.id} />
       </MessageErrorBoundary>
     );
   }

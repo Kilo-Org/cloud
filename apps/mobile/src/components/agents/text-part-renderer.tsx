@@ -1,12 +1,17 @@
 import { hasNonWhitespaceText } from './part-types';
 import { ChatMarkdownText } from './chat-markdown-text';
 
-export function TextPartRenderer({ text }: Readonly<{ text: string }>) {
+export function TextPartRenderer({
+  text,
+  sourceKey,
+}: Readonly<{ text: string; sourceKey: string }>) {
   if (!hasNonWhitespaceText(text)) {
     return null;
   }
 
   // selectable={false}: the message Pressable's long-press copy sheet and iOS
   // native text selection would both trigger on the same gesture otherwise.
-  return <ChatMarkdownText value={text} variant="assistant" selectable={false} />;
+  return (
+    <ChatMarkdownText value={text} sourceKey={sourceKey} variant="assistant" selectable={false} />
+  );
 }

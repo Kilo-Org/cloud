@@ -615,6 +615,13 @@ const LTR_BASE_DIRECTION = { direction: 'ltr' } as const;
 type MarkdownHtmlProps = {
   html: string;
   palette: MarkdownPalette;
+  /**
+   * Identity of the element this HTML renders. The engine keys its children by
+   * structural path, so a different document rendered at the same path reuses
+   * a `<details>` component instance; this key lets it reset to the new
+   * element instead of inheriting the previous one's expansion.
+   */
+  resetKey: string;
   /** Base direction of the document body; see `MarkdownTextProps`. */
   documentDirection?: 'ltr';
   selectable: boolean;
@@ -625,6 +632,7 @@ type MarkdownHtmlProps = {
 export function MarkdownHtml({
   html,
   palette,
+  resetKey,
   documentDirection,
   selectable,
   onLongPressLink,
@@ -765,12 +773,17 @@ export function MarkdownHtml({
         />
       );
     };
+    // The engine registers one renderer per tag for the whole document, so the
+    // element identity reaches a details instance through this closure.
+    const HtmlDetailsRenderer: CustomBlockRenderer = props => (
+      <HtmlDetails {...props} resetKey={resetKey} />
+    );
     return {
       a: HtmlAnchor,
       img: HtmlImage,
-      details: HtmlDetails,
+      details: HtmlDetailsRenderer,
     };
-  }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
+  }, [baseStyle, documentDirection, onLongPressLink, onPressLink, resetKey, selectable]);
 
   return (
     <View onLayout={handleLayout}>

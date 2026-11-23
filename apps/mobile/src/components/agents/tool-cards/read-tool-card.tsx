@@ -94,7 +94,7 @@ export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
   return (
     <View className="gap-2">
-      {markdownBody ? <ReadMarkdownBody body={markdownBody} /> : null}
+      {markdownBody ? <ReadMarkdownBody body={markdownBody} sourceKey={part.id} /> : null}
       {/* An image read's output is only "Image read successfully" — the image itself
           is the content, so the code body would be noise. */}
       {markdownBody === undefined && !hasImages

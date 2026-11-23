@@ -706,7 +706,7 @@ function FilePreviewModal({
       );
     }
     if (mode === 'markdown') {
-      return <ChatMarkdownText value={text} />;
+      return <ChatMarkdownText value={text} sourceKey={part.id} />;
     }
     return <Text className="text-sm text-foreground">{text}</Text>;
   }

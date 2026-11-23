@@ -12,7 +12,10 @@ import { type MarkdownBody } from './read-tool-markdown';
  * The sheet scrolls, so the complete file renders here — no inline cap, no nested
  * full-screen reader.
  */
-export function ReadMarkdownBody({ body }: Readonly<{ body: MarkdownBody }>) {
+export function ReadMarkdownBody({
+  body,
+  sourceKey,
+}: Readonly<{ body: MarkdownBody; sourceKey: string }>) {
   const textSelectable = useTranscriptTextSelectable();
   const { t } = useTranslation();
 
@@ -24,7 +27,7 @@ export function ReadMarkdownBody({ body }: Readonly<{ body: MarkdownBody }>) {
 
   return (
     <View className="gap-1">
-      <ChatMarkdownText value={body.text} selectable={textSelectable} />
+      <ChatMarkdownText value={body.text} sourceKey={sourceKey} selectable={textSelectable} />
       {body.footer ? <Text className="text-xs text-muted-foreground">{body.footer}</Text> : null}
     </View>
   );

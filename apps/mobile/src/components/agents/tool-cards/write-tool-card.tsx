@@ -40,7 +40,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     // Pending or running: the write has not finished, so the file is not yet
     // known to be empty. `ToolPartDetailBody` already shows the status line.
   } else if (isMarkdownPath(filePath)) {
-    body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
+    body = <ReadMarkdownBody body={{ text: content, footer: undefined }} sourceKey={part.id} />;
   } else if (content === '') {
     body = (
       <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>

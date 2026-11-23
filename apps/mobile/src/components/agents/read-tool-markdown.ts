@@ -172,12 +172,54 @@ export function parseReadOutputFallback(output: string): ReadFileDisplay | undef
   };
 }
 
-export function balanceCodeFences(text: string): string {
-  const fenceCount = text.split('\n').filter(line => /^\s*```/.test(line)).length;
-  if (fenceCount % 2 === 1) {
-    return `${text}\n\`\`\``;
+// A fence run: its leading indentation, marker, and length. An info string may
+// follow an opener; only whitespace may follow a closer.
+const FENCE_RUN = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
+
+type FenceLine = { marker: '`' | '~'; length: number; indent: string; rest: string };
+
+type OpenFence = Omit<FenceLine, 'rest'>;
+
+function parseFence(line: string): FenceLine | undefined {
+  const match = FENCE_RUN.exec(line);
+  const indent = match?.[1];
+  const run = match?.[2];
+  if (indent === undefined || run === undefined) {
+    return undefined;
   }
-  return text;
+  return {
+    marker: run.startsWith('~') ? '~' : '`',
+    length: run.length,
+    indent,
+    rest: match?.[3] ?? '',
+  };
+}
+
+/** The fence still open after `fence`, given the one open before it. */
+function nextOpenFence(open: OpenFence | null, fence: FenceLine): OpenFence | null {
+  if (open === null) {
+    return fence;
+  }
+  const closes =
+    fence.marker === open.marker && fence.length >= open.length && fence.rest.trim() === '';
+  return closes ? null : open;
+}
+
+/**
+ * Closes an unterminated fenced code block, so a truncated read body cannot
+ * swallow the document after it. The appended closer matches the open fence's
+ * marker, run length, and indentation; a longer run of the same marker opens a
+ * fence that a shorter run or the other marker does not close.
+ */
+export function balanceCodeFences(text: string): string {
+  let open: OpenFence | null = null;
+  for (const line of text.split('\n')) {
+    const fence = parseFence(line);
+    if (fence !== undefined) {
+      open = nextOpenFence(open, fence);
+    }
+  }
+  return open === null ? text : `${text}\n${open.indent}${open.marker.repeat(open.length)}`;
 }
 
 function formatGroupedNumber(n: number): string {

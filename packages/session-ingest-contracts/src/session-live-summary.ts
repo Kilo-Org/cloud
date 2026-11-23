@@ -56,7 +56,9 @@ export type SessionLiveTodoStatus = (typeof SESSION_LIVE_TODO_STATUSES)[number];
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
+/** The longest plan step text (`plan.current`). */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
+/** The longest permission command the session card shows (`permissionCommand`), one line. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({

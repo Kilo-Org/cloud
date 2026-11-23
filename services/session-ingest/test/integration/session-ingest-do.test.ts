@@ -2494,6 +2494,43 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
+    it('serves a stored native display part instead of failing the page as invalid_data', async () => {
+      const sessionId = 'ses_sdk_page_native_part_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const info = {
+        id: 'msg_native',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      // Persistence stores a part under `id` + `messageID` only, and the native
+      // v2 display projection keeps its own id family: the message id plus the
+      // display suffix. Neither family may turn the whole page into invalid_data.
+      const part = {
+        id: 'msg_native_000001',
+        messageID: info.id,
+        type: 'text',
+        text: 'native display',
+      };
+      await stub.ingest([{ type: 'message', data: info }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+          `part/${info.id}/${part.id}`,
+          'part',
+          JSON.stringify(part)
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info, parts: [part] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+    });
+
     it('returns invalid_data for a persisted slash-bearing part body identity', async () => {
       const sessionId = 'ses_sdk_page_part_slash_body_001';
       const stub = getStub(kiloUserId, sessionId);

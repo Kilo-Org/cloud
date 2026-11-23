@@ -9,7 +9,7 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
   messageIdSchema,
-  partIdSchema,
+  sdkPartIdSchema,
   sessionDiffFileSchema,
   type KiloSdkMessagesCursor,
   type SessionDiffFile,
@@ -524,7 +524,9 @@ function parsePersistedKiloSdkPartStorageIdentity(
 ): PersistedKiloSdkPartStorageIdentity | null {
   const identity = parsePartItemIdentity(itemId);
   if (identity === null) return null;
-  const parsed = z.object({ messageId: messageIdSchema, partId: partIdSchema }).safeParse(identity);
+  const parsed = z
+    .object({ messageId: messageIdSchema, partId: sdkPartIdSchema })
+    .safeParse(identity);
   return parsed.success && parsed.data.messageId === expectedMessageId ? parsed.data : null;
 }
 
@@ -932,7 +934,7 @@ function readPartIdentity(
   part: Record<string, unknown>
 ): PersistedKiloSdkPartStorageIdentity | null {
   const parsed = z
-    .object({ id: partIdSchema, messageID: messageIdSchema })
+    .object({ id: sdkPartIdSchema, messageID: messageIdSchema })
     .transform(value => ({ partId: value.id, messageId: value.messageID }))
     .safeParse(part);
   return parsed.success ? parsed.data : null;

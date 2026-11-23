@@ -26,9 +26,14 @@ export const backgroundJobSchema = z.discriminatedUnion('kind', [
     description: z.string(),
   }),
 ]);
+/**
+ * The cap for each inventory collection (jobs, sessions, waits); producers slice to it.
+ */
+export const BACKGROUND_ACTIVITY_INVENTORY_LIMIT = 256;
+
 export const backgroundActivityInventorySchema = z.object({
   sessionID: storedSessionIdSchema,
-  jobs: z.array(backgroundJobSchema).max(256),
+  jobs: z.array(backgroundJobSchema).max(BACKGROUND_ACTIVITY_INVENTORY_LIMIT),
   sessions: z
     .array(
       z.object({
@@ -37,10 +42,10 @@ export const backgroundActivityInventorySchema = z.object({
         title: z.string().optional(),
       })
     )
-    .max(256),
+    .max(BACKGROUND_ACTIVITY_INVENTORY_LIMIT),
   waits: z
     .array(z.object({ sessionID: storedSessionIdSchema, kind: z.enum(['question', 'permission']) }))
-    .max(256),
+    .max(BACKGROUND_ACTIVITY_INVENTORY_LIMIT),
 });
 export type BackgroundJob = z.infer<typeof backgroundJobSchema>;
 export type BackgroundActivityInventory = z.infer<typeof backgroundActivityInventorySchema>;

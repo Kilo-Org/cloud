@@ -37,6 +37,21 @@ type SettingsTargetContextValue = {
 
 const SettingsTargetContext = createContext<SettingsTargetContextValue | null>(null);
 
+/**
+ * Which interaction owns the body on screen. A caller's `resetKey` bump replaces
+ * the body, and only a selection — a change of `settingsTarget`/`revealKey` —
+ * may reveal a row in the body that replaces it.
+ */
+type BodySwap = {
+  readonly settingsTarget: string | undefined;
+  readonly revealKey: number;
+  readonly resetKey: number;
+  /** This swap replaced the body without a selection, so no row may reveal. */
+  readonly suppressed: boolean;
+  /** This swap moved `resetKey` itself, so it also owns the instant reset. */
+  readonly resetPending: boolean;
+};
+
 type SettingsSearchTargetScopeProps = {
   settingsTarget?: string;
   /** The scrolling ancestor a target is measured and revealed inside. */
@@ -61,6 +76,13 @@ type SettingsSearchTargetScopeProps = {
    * is repeated against the settled one.
    */
   frameHeight?: number;
+  /**
+   * A body swap counter, as the caller's `SettingsSearchScrollView` receives
+   * it. This scope owns the swap: it drops the reveal the replaced body armed,
+   * suppresses layout-driven reveals for the body the caller just replaced, and
+   * returns the scroller to its first row.
+   */
+  resetKey?: number;
   children: ReactNode;
 };
 
@@ -76,14 +98,66 @@ export function SettingsSearchTargetScope({
   revealKey = 0,
   contentHeight,
   frameHeight,
+  resetKey = 0,
   children,
 }: Readonly<SettingsSearchTargetScopeProps>) {
+  // One owner per body swap. The scroller is one native view for whichever body
+  // the caller renders, so a `resetKey` bump says the caller replaced the whole
+  // body and the offset belongs to a body that is gone. The reveal the outgoing
+  // body armed belongs to the interaction that just ended too: left armed, the
+  // replacement's row lays out in the same commit, re-arms, and animates the
+  // scroller that the swap had just returned to its first row. Measured on the
+  // Profile tab, that parked the credits card 328 px above the viewport with
+  // `Add credits` unreachable.
+  //
+  // The swap is decided here, during render, rather than in an effect: the
+  // replacement must render the stale row inactive in its very first commit, so
+  // its `onLayout` never reaches `reveal` and the geometry pass has nothing
+  // armed to re-fire. Ordering alone settles it — no timer, no debounce and no
+  // second scroll path behind the reset. A selection is the one reveal the
+  // person asked for: a change of `settingsTarget`/`revealKey` clears the
+  // suppression before the row it selects lays out, so that swap still
+  // highlights and animates.
+  const [bodySwap, setBodySwap] = useState<BodySwap>(() => ({
+    settingsTarget,
+    revealKey,
+    resetKey,
+    suppressed: false,
+    resetPending: false,
+  }));
+  let swap = bodySwap;
+  if (
+    swap.settingsTarget !== settingsTarget ||
+    swap.revealKey !== revealKey ||
+    swap.resetKey !== resetKey
+  ) {
+    // Only a target the person chose is a selection: a dropped target (the
+    // search ended without one) removes the highlight, it never reveals a row.
+    const selection =
+      settingsTarget !== undefined &&
+      (swap.settingsTarget !== settingsTarget || swap.revealKey !== revealKey);
+    swap = {
+      settingsTarget,
+      revealKey,
+      resetKey,
+      suppressed: !selection,
+      // A caller that moves `resetKey` replaced the whole body; only that, and
+      // only when no selection owns the transition, resets the offset.
+      resetPending: !selection && swap.resetKey !== resetKey,
+    };
+    // React's own way to adjust state from props: this render restarts with the
+    // decided swap, so nothing reaches layout from the superseded pass.
+    setBodySwap(swap);
+  }
+  // The target the rows render against: a body the caller replaced shows no
+  // highlight until a selection asks for one.
+  const effectiveTarget = swap.suppressed ? undefined : settingsTarget;
   // The latest target and mounted state, read when an asynchronous measurement
   // lands: an old measurement must never scroll after a target change or after
   // the screen is gone. StrictMode runs the effect twice, so the body re-arms
   // the flag its simulated cleanup cleared.
-  const targetRef = useRef(settingsTarget);
-  targetRef.current = settingsTarget;
+  const targetRef = useRef(effectiveTarget);
+  targetRef.current = effectiveTarget;
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -189,6 +263,27 @@ export function SettingsSearchTargetScope({
     [revealArmed]
   );
 
+  // One effect decides a swap: it drops the row the outgoing body armed (so the
+  // geometry triggers below have nothing to re-fire), leaves the replacement's
+  // layout inactive — `effectiveTarget` already rendered it so — and returns the
+  // scroller to its first row. A selection's swap is exempt: its reveal is the
+  // destination the person asked for.
+  const appliedSwapRef = useRef(swap);
+  useEffect(() => {
+    if (appliedSwapRef.current === swap) {
+      return;
+    }
+    appliedSwapRef.current = swap;
+    if (!swap.suppressed) {
+      return;
+    }
+    armedRef.current = null;
+    attemptRef.current += 1;
+    if (swap.resetPending) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [swap, scrollRef]);
+
   // `onContentSizeChange` is the scroller's post-layout report: the taller body
   // that contains the row exists by the time it fires, so re-measuring here is
   // what turns the Android clamp into the intended offset. The viewport frame
@@ -204,20 +299,22 @@ export function SettingsSearchTargetScope({
   }, [contentHeight, frameHeight, revealArmed]);
 
   // A repeated selection of the same result keeps the target id, so the row
-  // never re-lays out; the bumped key asks the scope to reveal it again.
-  const selectionRef = useRef({ target: settingsTarget, revealKey });
+  // never re-lays out; the bumped key asks the scope to reveal it again. Only a
+  // target the rows actually render against is a selection: a suppressed swap
+  // leaves nothing armed and nothing to reveal.
+  const selectionRef = useRef({ target: effectiveTarget, revealKey });
   useEffect(() => {
     const previous = selectionRef.current;
-    if (previous.target === settingsTarget && previous.revealKey === revealKey) {
+    if (previous.target === effectiveTarget && previous.revealKey === revealKey) {
       return;
     }
-    selectionRef.current = { target: settingsTarget, revealKey };
+    selectionRef.current = { target: effectiveTarget, revealKey };
     revealArmed(true);
-  }, [settingsTarget, revealKey, revealArmed]);
+  }, [effectiveTarget, revealKey, revealArmed]);
 
   const value = useMemo<SettingsTargetContextValue>(
-    () => ({ target: settingsTarget, reveal }),
-    [settingsTarget, reveal]
+    () => ({ target: effectiveTarget, reveal }),
+    [effectiveTarget, reveal]
   );
 
   return <SettingsTargetContext.Provider value={value}>{children}</SettingsTargetContext.Provider>;
@@ -226,18 +323,33 @@ export function SettingsSearchTargetScope({
 type SettingsSearchScrollViewProps = ComponentProps<typeof TabScreenScrollView> & {
   settingsTarget?: string;
   revealKey?: number;
+  /**
+   * A body swap counter. The scroller is one native view for whichever body the
+   * caller renders, so its scroll offset survives a body the person scrolled
+   * while a different body was in place. A caller that replaces the whole body
+   * (Profile swaps its settings list for the search results and back) bumps this
+   * when the replacing body is not the destination of a reveal; the scope then
+   * returns the scroller to its start, so the new body never opens scrolled past
+   * its own first row, and the replaced body's stale row renders inactive so its
+   * layout cannot animate the scroller back. A reveal owns its transition
+   * instead: it bumps `revealKey`, so a selection neither moves the scroller nor
+   * is moved by it.
+   */
+  resetKey?: number;
   ref?: Ref<ScrollViewInstance>;
 };
 
 /**
  * A settings screen's scrolling body that can reveal one routed target row.
  * Every `TabScreenScrollView` prop — including its IME reveal callback — and the
- * forwarded scroll ref pass through; the additions are `settingsTarget` and the
- * `revealKey` that repeats a reveal for the same target.
+ * forwarded scroll ref pass through; the additions are `settingsTarget`, the
+ * `revealKey` that repeats a reveal for the same target, and the `resetKey` that
+ * returns a replaced body to its first row.
  */
 export function SettingsSearchScrollView({
   settingsTarget,
   revealKey,
+  resetKey,
   ref,
   children,
   onContentSizeChange,
@@ -276,6 +388,7 @@ export function SettingsSearchScrollView({
     <SettingsSearchTargetScope
       settingsTarget={settingsTarget}
       revealKey={revealKey}
+      resetKey={resetKey}
       scrollRef={scrollRef}
       contentHeight={contentHeight}
       frameHeight={frameHeight}

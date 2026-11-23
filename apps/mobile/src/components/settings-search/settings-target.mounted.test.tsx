@@ -8,7 +8,9 @@ import {
   SettingsTarget,
 } from './settings-target';
 import {
+  contentSize,
   createHarness,
+  frame,
   layout,
   overlays,
   resetScroll,
@@ -79,6 +81,7 @@ vi.mock('@/components/tab-screen', () => ({
 
 const system = defineSetting('appearance.system', 'preferences.appearanceSystem');
 const dark = defineSetting('appearance.dark', 'preferences.appearanceDark');
+const signOut = defineSetting('profile.signOut', 'common.signOut', 'signOut');
 
 const harness = createHarness();
 
@@ -185,5 +188,100 @@ describe('SettingsSearchScrollView', () => {
 
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();
     expect(overlays(root)).toEqual([]);
+  });
+
+  it('returns a replaced body to its first row when the reset key moves', () => {
+    // The scroller is one native view for whichever body the caller renders, so
+    // an offset scrolled on the body that is replaced outlives it: measured on
+    // the Profile tab, a search-results list scrolled deep left the settings
+    // body parked with its credits card above the viewport once the query
+    // cleared. A `resetKey` bump is the caller saying the body was replaced.
+    const body = (resetKey: number) => (
+      <SettingsSearchScrollView resetKey={resetKey}>{row('body')}</SettingsSearchScrollView>
+    );
+    harness.mount(body(0));
+    fake.state.contentHeight = 2000;
+    fake.state.frameHeight = 800;
+    fake.state.offset = 700;
+
+    // A re-render that does not move the key leaves the person's scroll alone.
+    harness.update(body(0));
+    expect(fake.scroll.scrollTo).not.toHaveBeenCalled();
+    expect(fake.state.offset).toBe(700);
+
+    harness.update(body(1));
+    expect(fake.scroll.scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+    expect(fake.state.offset).toBe(0);
+  });
+
+  it('owns the swap a reset makes, so the replaced body cannot reveal a stale row', () => {
+    // Measured on the Profile tab: with a highlight left by an earlier selection,
+    // a second search and then a clear returned the body to its first row
+    // (Credits at offset 0) and then animated it 328 px back (y -125 dp) with Add
+    // credits unreachable. The replaced body's row laid out in the same commit,
+    // re-armed the stale target, and the reset could not stop it.
+    type Body = { search: boolean; resetKey: number; revealKey?: number };
+    const body = ({ search, resetKey, revealKey }: Body) => (
+      <SettingsSearchScrollView
+        settingsTarget="profile.signOut"
+        revealKey={revealKey}
+        resetKey={resetKey}
+      >
+        {search ? (
+          row('results')
+        ) : (
+          <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+        )}
+      </SettingsSearchScrollView>
+    );
+    type ScrollOptions = { y: number; animated?: boolean };
+    const animated = () =>
+      fake.scroll.scrollTo.mock.calls.filter(
+        ([options]) => (options as ScrollOptions).animated === true
+      );
+    const resets = () =>
+      fake.scroll.scrollTo.mock.calls.filter(([options]) => {
+        const call = options as ScrollOptions;
+        return call.y === 0 && call.animated === false;
+      });
+
+    fake.state.top = 900;
+    const root = harness.mount(body({ search: false, resetKey: 0 }));
+    contentSize(root, fake.state, 2000);
+    frame(root, fake.state, 800);
+    layout(wrapper(root));
+    // The selection's own reveal animates to its row.
+    expect(animated()).toHaveLength(1);
+    expect(fake.state.offset).toBe(888);
+    expect(overlays(root)).toHaveLength(1);
+
+    // The caller replaces the body with the results, then replaces those with
+    // the settings body again. Neither swap is a selection, so each one owns its
+    // reset and neither may reveal the highlight left by the earlier selection.
+    harness.update(body({ search: true, resetKey: 1 }));
+    contentSize(root, fake.state, 200);
+    expect(resets()).toHaveLength(1);
+
+    harness.update(body({ search: false, resetKey: 2 }));
+    contentSize(root, fake.state, 2000);
+    expect(resets()).toHaveLength(2);
+    expect(fake.state.offset).toBe(0);
+
+    // The replaced body's row reports its layout late; nothing is armed for it,
+    // so only the instant reset reached the scroller.
+    layout(wrapper(root));
+    expect(animated()).toHaveLength(1);
+    expect(fake.state.offset).toBe(0);
+    expect(overlays(root)).toEqual([]);
+    expect(wrapper(root)).toBeUndefined();
+
+    // A selection still owns its swap: the row the person chose renders active
+    // and its layout reveals it.
+    harness.update(body({ search: false, resetKey: 2, revealKey: 1 }));
+    expect(animated()).toHaveLength(1);
+    layout(wrapper(root));
+    expect(animated()).toHaveLength(2);
+    expect(fake.scroll.scrollTo).toHaveBeenLastCalledWith({ y: 888, animated: true });
+    expect(fake.state.offset).toBe(888);
   });
 });

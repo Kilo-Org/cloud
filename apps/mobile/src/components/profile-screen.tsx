@@ -375,6 +375,9 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   const [settingsTarget, setSettingsTarget] = useState(
     routeTarget === undefined ? undefined : { id: routeTarget, attempt: 0 }
   );
+  // Whether the body swap in flight belongs to the root result selected in this
+  // same interaction. Only that swap defers to the highlight's reveal.
+  const selectedTargetRef = useRef(false);
 
   const selectSetting = useCallback(
     (entry: SettingsSearchResult['entry']) => {
@@ -382,6 +385,9 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       // before the row is revealed or the destination opens, so neither lands
       // behind the IME. The results list keeps the first tap (`handled` taps).
       Keyboard.dismiss();
+      if (!entry.path) {
+        selectedTargetRef.current = true;
+      }
       settingsSearch.clear();
       if (entry.path) {
         // Expo Router's per-route Href union cannot associate this union of
@@ -398,6 +404,41 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
     },
     [router, settingsSearch]
   );
+
+  // The scroller is one native view for both bodies, so the offset the person
+  // scrolled the search results to would otherwise stay on the settings body
+  // that replaces them: measured on the device, a results list scrolled deep
+  // left the credits card and every section above APP out of the viewport, with
+  // Add credits unreachable. Each body swap away from the results returns the
+  // replaced body to its first row.
+  //
+  // One owner per swap. Only the swap a selection makes in this same interaction
+  // defers to the highlight's reveal, which is the destination the person asked
+  // for. Every other end of the search would otherwise land on a highlight set
+  // by an earlier selection — a stale row far below the top, which is the
+  // reported state again — so that highlight is dropped and the body starts at
+  // its first row.
+  const searchActive = settingsSearch.active;
+  const [bodySwap, setBodySwap] = useState(0);
+  const bodyWasSearch = useRef(searchActive);
+  useEffect(() => {
+    if (bodyWasSearch.current === searchActive) {
+      return;
+    }
+    bodyWasSearch.current = searchActive;
+    if (searchActive) {
+      // Entering the search: the results body is new, so it starts at its own
+      // first row whatever the settings body was scrolled to.
+      setBodySwap(current => current + 1);
+      return;
+    }
+    if (selectedTargetRef.current) {
+      selectedTargetRef.current = false;
+      return;
+    }
+    setSettingsTarget(undefined);
+    setBodySwap(current => current + 1);
+  }, [searchActive]);
 
   // Personal context has no selected organization to label, so its row opens
   // the account picker; otherwise the row names the destination for the active
@@ -519,6 +560,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
         ref={deleteScrollRef}
         settingsTarget={settingsTarget?.id}
         revealKey={settingsTarget?.attempt}
+        resetKey={bodySwap}
         className="flex-1"
         contentContainerClassName={settingsSearch.active ? undefined : SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}

@@ -8,6 +8,7 @@ import {
   mountProfile,
   providersQueryFn,
   routerPush,
+  scrollToFn,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
 import { SettingsTarget } from '@/components/settings-search/settings-target';
@@ -80,6 +81,7 @@ describe('ProfileScreen settings search', () => {
     confirmFn.mockClear();
     keyboardDismissFn.mockClear();
     routerPush.mockClear();
+    scrollToFn.mockClear();
     signOutFn.mockClear();
     // Linked providers are account data, not settings: the section stays hidden
     // so the coverage assertion can speak about permanent rows alone.
@@ -221,6 +223,57 @@ describe('ProfileScreen settings search', () => {
       pathname: '/(app)/(tabs)/(3_profile)/preferences',
       params: { settingsTarget: 'appearance.dark' },
     });
+  });
+
+  it('returns the settings body to its first row when the search ends', async () => {
+    // The settings body and the results body share one scroller. A results list
+    // scrolled deep used to leave its offset on the settings body that replaced
+    // it, which parked the credits card and every section above APP above the
+    // viewport with Add credits unreachable.
+    const { renderer } = await mountProfile();
+    const root = renderer.root;
+    const resets = () =>
+      scrollToFn.mock.calls.filter(([options]) => {
+        const call = options as { y?: number; animated?: boolean } | undefined;
+        // Only the body reset scrolls instantly; a reveal animates to its row.
+        return call?.y === 0 && call.animated === false;
+      });
+
+    expect(resets()).toHaveLength(0);
+
+    query(root, 'logout');
+    // Entering the search swaps the body, so the results start at their own
+    // first row.
+    expect(resets()).toHaveLength(1);
+    expect(scrollToFn).toHaveBeenLastCalledWith({ y: 0, animated: false });
+
+    // Clearing the query with no highlight set ends the search, so the settings
+    // body that replaces the results starts at its first row. This is the
+    // reported collapse: without it the replaced body keeps the results' offset.
+    query(root, '');
+    expect(resets()).toHaveLength(2);
+
+    // A root result selection owns the swap it makes: its reveal is the
+    // destination, so that swap is not also reset.
+    query(root, 'logout');
+    const entry = results(root).find(result => result.entry.path === undefined);
+    if (!entry) {
+      throw new Error('the search renders no root result');
+    }
+    const resetsBeforeSelection = resets().length;
+    selectResult(root, entry);
+    // The selection's own body swap must not also reset the replaced body: its reveal owns that transition.
+    expect(resets()).toHaveLength(resetsBeforeSelection);
+    expect(targetHighlights(root)).toHaveLength(1);
+
+    // That highlight stays set. A later search and clear must still start the
+    // settings body at its first row, and must drop the highlight rather than
+    // return the body to a stale row far below the top.
+    query(root, 'logout');
+    const beforeClear = resets().length;
+    query(root, '');
+    expect(resets()).toHaveLength(beforeClear + 1);
+    expect(targetHighlights(root)).toEqual([]);
   });
 
   it('opens the privacy analytics setting on the consent review screen', async () => {

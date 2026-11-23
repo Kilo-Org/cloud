@@ -453,12 +453,16 @@ test('still rejects a template-literal key', () => {
   );
 });
 
-test('does not call a key unused when a source file could not be read', () => {
+test('does not call a key unused when a source file could not be read', context => {
   // A refused read leaves that file's keys out of the scan, so the dead-key rule
   // would name every key it never saw. The unreadable file here is the one that
   // used `agents.retired`: calling it dead would ask someone to delete copy a
   // screen still renders. The read failure is reported instead, and the key the
   // readable source calls but English does not define is still named.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
   const file = 'apps/mobile/src/unreadable.ts';
   const found = run({
     english: { agents: { title: 'Agents', retired: 'Retired agents' } },

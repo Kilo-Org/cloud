@@ -329,19 +329,25 @@ export async function scheduleRunChunks(
     ])
   );
   const statements: D1PreparedStatement[] = [];
-  // A block is `(run, model, variant, rep, case set)`. Its chunk id is its position in the
-  // lane, and a user lane's cases come from a paid-request plan that can reorder between
-  // passes, so the same block would otherwise land in a brand-new row with its attempt
-  // counters back at 0. One run-scoped read of the materialized blocks keeps the budget a
-  // property of the block: an existing block is never written again, whatever position its
-  // case now occupies, so its counters and its terminal status survive.
-  const blocks = await db
+  // The manager's block is `(model, effort, rep, case)`. A chunk's id is its position in the
+  // lane and a user lane's cases come from a paid-request plan that can reorder between
+  // passes, so position is not a block identity: the same case would otherwise land in a
+  // brand-new row with its attempt counters back at 0, and a chunk holding several cases
+  // would lose its budget when a re-plan regroups them. One run-scoped read of the
+  // materialized cases keeps the budget a property of the case: a case that any existing
+  // chunk of this lane already schedules is never written again, so its counters and its
+  // terminal status survive wherever the plan puts it.
+  const materializedRows = await db
     .prepare('SELECT model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
     .bind(run.runId)
     .all<{ model: string; variant: string; rep: number; case_ids: string }>();
-  const materialized = new Set(
-    blocks.results.map(row => JSON.stringify([row.model, row.variant, row.rep, row.case_ids]))
-  );
+  const materialized = new Map<string, Set<string>>();
+  for (const row of materializedRows.results) {
+    const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
+    const cases = materialized.get(laneKey) ?? new Set<string>();
+    for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
+    materialized.set(laneKey, cases);
+  }
   const writeBatch = async (final: boolean): Promise<boolean> => {
     const status = await db
       .prepare('SELECT status FROM benchmark_runs WHERE id = ?')
@@ -371,9 +377,12 @@ export async function scheduleRunChunks(
       const start = resumeAt.get(laneKey) ?? 0;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;
-        const caseIds = JSON.stringify(laneCaseIds.slice(offset, offset + run.chunkSize));
-        const blockKey = JSON.stringify([entry.model, variant, rep, caseIds]);
-        if (materialized.has(blockKey)) continue;
+        const laneCases = laneCaseIds.slice(offset, offset + run.chunkSize);
+        const scheduled = materialized.get(laneKey);
+        // Every case in this chunk must be new. A partly-scheduled chunk is skipped whole:
+        // re-emitting it would put a case that already has a row into a second one.
+        if (scheduled && laneCases.some(caseId => scheduled.has(caseId))) continue;
+        const caseIds = JSON.stringify(laneCases);
         statements.push(
           db
             .prepare(SCHEDULER_INSERT_CHUNK_SQL)

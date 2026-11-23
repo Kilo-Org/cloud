@@ -1974,6 +1974,56 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     ).toEqual([JSON.stringify(['case-a'])]);
   });
 
+  it('keeps each case’s cap when a re-plan regroups cases into different chunks', async () => {
+    // Production chunks hold one case (`DECIDER_CHUNK_SIZE = 1`, src/run.ts:298), but the
+    // initializer takes a chunk size, so the guard must be case-level rather than
+    // case-set-level: a re-plan that regroups a multi-case chunk would otherwise hand every
+    // case in it a fresh counter. Blocks are `(run, model, variant, rep, case)`.
+    insertRun(sqlite, 'regrouped', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: 'low' };
+    const laneKey = JSON.stringify([block.model, block.variant, 0]);
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-a', 'case-b', 'case-c']]]),
+    });
+    // Two chunks: [a,b] and [c]. Fail the [c] chunk after spending its attempt.
+    const chunkC = storedChunks(sqlite).find(row => row.case_ids === JSON.stringify(['case-c']));
+    if (!chunkC) throw new Error('Expected the case-c chunk');
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'failed', attempts = 1 WHERE id = ?")
+      .run(chunkC.id);
+    expect(storedChunks(sqlite)).toHaveLength(2);
+
+    // The plan now regroups: [b,c] and [a]. case-b was in [a,b] and case-c was failed on its
+    // own, so both new groupings contain a scheduled case and neither may be written. Only a
+    // case with no row at all would be.
+    await scheduleRunChunks(db, {
+      runId: 'regrouped',
+      entries: [block],
+      repetitions: 1,
+      caseIds: ['case-b', 'case-c', 'case-a'],
+      chunkSize: 2,
+      laneCaseIds: new Map([[laneKey, ['case-b', 'case-c', 'case-a']]]),
+    });
+
+    // Nothing was re-created and no case inherited a second row: the [a,b] chunk still holds
+    // only case-a and case-b, and case-c keeps its failed row and its spent attempt.
+    expect(storedChunks(sqlite).map(row => [row.case_ids, row.status, row.attempts])).toEqual([
+      [JSON.stringify(['case-a', 'case-b']), 'pending', 0],
+      [JSON.stringify(['case-c']), 'failed', 1],
+    ]);
+    // A regrouped case never becomes claimable again: case-c has no second row to claim.
+    expect(
+      (await claimMany(db, schedulerConfig('{"slots":3}'), 3, 'after-regroup', NOW + 10)).map(
+        claim => claim.case_ids
+      )
+    ).toEqual([JSON.stringify(['case-a', 'case-b'])]);
+  });
+
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {
     insertRun(sqlite, 'resize');
     const id = await exhaustOneBlock('resize', 'case-a');

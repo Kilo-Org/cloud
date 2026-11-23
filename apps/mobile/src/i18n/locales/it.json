@@ -92,6 +92,7 @@
     "draft": "Bozza",
     "enabled": "Attivo",
     "github": "GitHub",
+    "image": "Immagine",
     "imageUnavailable": "L'immagine non è disponibile.",
     "loading": "Caricamento…",
     "loadMore": "Carica altro",
@@ -999,7 +1000,7 @@
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
-      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e responsabili della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche",
       "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
       "trackedReviewsUncounted": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
@@ -2092,6 +2093,7 @@
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",
       "imageUnavailableRetry": "Immagine non disponibile, riprova a caricarla",
+      "imageUnavailableRetryWithAlt": "Immagine non disponibile, {{alt}}, riprova a caricarla",
       "imagePreviewUnavailableInSession": "L'anteprima dell'immagine non è disponibile in questa sessione.",
       "viewImage": "Visualizza l'immagine",
       "viewImageWithAlt": "Visualizza l'immagine {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Per completare la creazione del tuo account, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Per completare la creazione del tuo account, usa \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "Per completare la creazione del tuo account, torna indietro e usa \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "Il codice non è corretto o è scaduto. Riprova o usa \"$t(login.resendCode)\".",
+    "invalidCode": "Il codice non è corretto o è scaduto. Usa \"$t(login.resendCode)\" o \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "Il tuo codice è in fase di elaborazione. Attendi un momento e riprova.",
     "tooManyAttempts": "Troppi tentativi. Richiedi un nuovo codice.",
     "invalidToken": "Accesso non riuscito. Riprova.",
@@ -4417,7 +4419,15 @@
       "download": "Scarica il modello sul dispositivo",
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
-      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
+      "cannotUse": "Impossibile eseguire: {{items}}.",
+      "cannotUseOptions": "Impossibile compilare: alcune opzioni dello strumento.",
+      "limitations": "Limitazioni",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Mostra impostazioni",
+        "settingsSet": "Modifica impostazioni"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Impossibile salvare l'istruzione",
     "instructionDeleteFailed": "Impossibile eliminare l'istruzione",
     "instructionToggleFailed": "Impossibile aggiornare l'istruzione",
+    "instructionViewTitle": "File dell'istruzione",
     "instructionLimitReached": "Un profilo può contenere fino a {{max}} istruzioni. Eliminane una per aggiungerne un'altra.",
     "mcp": {
       "title": "server MCP",

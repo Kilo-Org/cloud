@@ -94,6 +94,7 @@
     "draft": "Dréacht",
     "enabled": "Cumasaithe",
     "github": "GitHub",
+    "image": "Íomhá",
     "imageUnavailable": "Níl an íomhá ar fáil.",
     "loading": "Ag lódáil…",
     "loadMore": "Lódáil tuilleadh",
@@ -1678,7 +1679,7 @@
       "empty": "Níl aon athbhreithniú le hanailísíocht fós",
       "emptyDescription": "Taifeadann an anailísíocht athbhreithnithe críochnaithe fad atá sí cumasaithe don eagraíocht.",
       "offTitle": "Tá an anailísíocht múchta do {{platform}}",
-      "offDescription": "Is féidir le huinéirí, riarthóirí agus bainisteoirí billíochta — róil billíochta na heagraíochta — an anailísíocht a chumasú i socruithe na heagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
+      "offDescription": "Is féidir le húinéirí, riarthóirí agus bainisteoirí billeála — róil billeála na heagraíochta — an anailísíocht a chumasú i socruithe na heagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
       "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil",
       "trackedReviewsCaption": "Athbhreithnithe críochnaithe a tháinig chun deiridh sa tréimhse seo leis an anailísíocht chumasaithe. Ní áirítear ariamh athbhreithnithe atá ar siúl ná cinn a theip orthu.",
       "trackedReviewsUncounted": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
@@ -2819,6 +2820,7 @@
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",
       "imageUnavailableRetry": "Níl an íomhá ar fáil, bain triail eile as í a lódáil",
+      "imageUnavailableRetryWithAlt": "Níl an íomhá ar fáil, {{alt}}, bain triail eile as í a lódáil",
       "imagePreviewUnavailableInSession": "Níl réamhamharc na híomhá ar fáil sa seisiún seo.",
       "viewImage": "Féach ar an íomhá",
       "viewImageWithAlt": "Féach ar an íomhá {{alt}}",
@@ -4100,7 +4102,7 @@
     "signupStepUpApple": "Chun cruthú do chuntais a chríochnú, úsáid '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Chun cruthú do chuntais a chríochnú, úsáid '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Chun cruthú do chuntais a chríochnú, téigh ar ais agus úsáid '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Tá an cód sin mícheart nó imithe in éag. Bain triail as arís nó úsáid '$t(login.resendCode)'.",
+    "invalidCode": "Tá an cód sin mícheart nó imithe in éag. Úsáid '$t(login.resendCode)' nó '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Tá do chód á phróiseáil. Fan nóiméad agus bain triail as arís.",
     "tooManyAttempts": "An iomarca iarrachtaí. Iarr cód nua le do thoil.",
     "invalidToken": "Theip ar an síniú isteach. Bain triail eile as.",
@@ -4575,7 +4577,15 @@
       "download": "Íoslódáil an tsamhail ar an ngléas",
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
-      "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+      "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as.",
+      "cannotUse": "Ní féidir {{items}} a rith.",
+      "cannotUseOptions": "Ní féidir roinnt roghanna uirlise a líonadh isteach.",
+      "limitations": "Teorainneacha",
+      "tools": {
+        "time": "Am",
+        "settingsList": "Taispeáin socruithe",
+        "settingsSet": "Athraigh socruithe"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
@@ -4769,6 +4779,7 @@
     "instructionSaveFailed": "Níorbh fhéidir an treoir a shábháil",
     "instructionDeleteFailed": "Níorbh fhéidir an treoir a scriosadh",
     "instructionToggleFailed": "Níorbh fhéidir an treoir a nuashonrú",
+    "instructionViewTitle": "Comhad treorach",
     "instructionLimitReached": "Is féidir le próifíl suas le {{max}} treoir a choinneáil. Scrios ceann chun ceann eile a chur leis.",
     "mcp": {
       "title": "Freastalaithe MCP",

@@ -91,6 +91,7 @@
     "draft": "ಕರಡು",
     "enabled": "ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
     "github": "GitHub",
+    "image": "ಚಿತ್ರ",
     "imageUnavailable": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ.",
     "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
     "loadMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಿ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ಚಿತ್ರ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
       "imageUnavailableRetry": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ, ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "imageUnavailableRetryWithAlt": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ, {{alt}}, ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "imagePreviewUnavailableInSession": "ಈ ಸೆಶನ್‌ನಲ್ಲಿ ಚಿತ್ರದ ಮುನ್ನೋಟ ಲಭ್ಯವಿಲ್ಲ.",
       "viewImage": "ಚಿತ್ರ ನೋಡಿ",
       "viewImageWithAlt": "{{alt}} ಚಿತ್ರ ನೋಡಿ",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithApple)' ಬಳಸಿ.",
     "signupStepUpGoogle": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು '$t(login.signInWithGoogle)' ಬಳಸಿ.",
     "signupStepUpBack": "ನಿಮ್ಮ ಖಾತೆ ರಚನೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಹಿಂದಕ್ಕೆ ಹೋಗಿ '$t(login.moreSignInOptions)' ಬಳಸಿ.",
-    "invalidCode": "ಆ ಕೋಡ್ ತಪ್ಪಾಗಿದೆ ಅಥವಾ ಅದರ ಅವಧಿ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ '$t(login.resendCode)' ಬಳಸಿ.",
+    "invalidCode": "ಆ ಕೋಡ್ ತಪ್ಪಾಗಿದೆ ಅಥವಾ ಅದರ ಅವಧಿ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು '$t(login.resendCode)' ಬಳಸಿ ಅಥವಾ '$t(login.moreSignInOptions)' ಬಳಸಿ.",
     "codeInProgress": "ನಿಮ್ಮ ಕೋಡ್ ಅನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ. ಸ್ವಲ್ಪ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "tooManyAttempts": "ಅತಿಯಾಗಿ ಪ್ರಯತ್ನಿಸಿದ್ದೀರಿ. ಹೊಸ ಕೋಡ್‌ಗಾಗಿ ವಿನಂತಿಸಿ.",
     "invalidToken": "ಸೈನ್-ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -4338,7 +4340,15 @@
       "download": "ಸಾಧನದಲ್ಲಿನ ಮಾದರಿಯನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
       "downloading": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "downloadProgress": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {{percent}}%",
-      "downloadFailed": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕ ಮತ್ತು ಖಾಲಿ ಸಂಗ್ರಹಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "downloadFailed": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕ ಮತ್ತು ಖಾಲಿ ಸಂಗ್ರಹಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "cannotUse": "ಚಲಾಯಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ: {{items}}.",
+      "cannotUseOptions": "ಭರ್ತಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ: ಕೆಲವು ಟೂಲ್ ಆಯ್ಕೆಗಳು.",
+      "limitations": "ಮಿತಿಗಳು",
+      "tools": {
+        "time": "ಸಮಯ",
+        "settingsList": "ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೋರಿಸಿ",
+        "settingsSet": "ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "ಸೂಚನೆ ಉಳಿಸಲಾಗಲಿಲ್ಲ",
     "instructionDeleteFailed": "ಸೂಚನೆ ಅಳಿಸಲಾಗಲಿಲ್ಲ",
     "instructionToggleFailed": "ಸೂಚನೆ ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ",
+    "instructionViewTitle": "ಸೂಚನೆ ಫೈಲ್",
     "instructionLimitReached": "ಒಂದು ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಗರಿಷ್ಠ {{max}} ಸೂಚನೆಗಳು ಇರಬಹುದು. ಇನ್ನೊಂದು ಸೇರಿಸಲು ಒಂದನ್ನು ಅಳಿಸಿ.",
     "mcp": {
       "title": "MCP ಸರ್ವರ್‌ಗಳು",

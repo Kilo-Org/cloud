@@ -91,6 +91,7 @@
     "draft": "Utkast",
     "enabled": "Aktivert",
     "github": "GitHub",
+    "image": "Bilde",
     "imageUnavailable": "Bildet er ikke tilgjengelig.",
     "loading": "Laster inn…",
     "loadMore": "Last inn flere",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Laster inn bilde",
       "imageUnavailableRetry": "Bildet er ikke tilgjengelig. Prøv å laste det inn på nytt",
+      "imageUnavailableRetryWithAlt": "Bildet er ikke tilgjengelig. {{alt}}. Prøv å laste det inn på nytt",
       "imagePreviewUnavailableInSession": "Bildet kan ikke forhåndsvises i denne økten.",
       "viewImage": "Vis bilde",
       "viewImageWithAlt": "Vis bilde: {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Bruk «$t(login.signInWithApple)» for å fullføre opprettelsen av kontoen din.",
     "signupStepUpGoogle": "Bruk «$t(login.signInWithGoogle)» for å fullføre opprettelsen av kontoen din.",
     "signupStepUpBack": "For å fullføre opprettelsen av kontoen din, gå tilbake og bruk «$t(login.moreSignInOptions)».",
-    "invalidCode": "Koden er feil eller utløpt. Prøv igjen, eller bruk «$t(login.resendCode)».",
+    "invalidCode": "Koden er feil eller utløpt. Bruk «$t(login.resendCode)» eller «$t(login.moreSignInOptions)».",
     "codeInProgress": "Koden din behandles. Vent et øyeblikk og prøv igjen.",
     "tooManyAttempts": "For mange forsøk. Be om en ny kode.",
     "invalidToken": "Påloggingen mislyktes. Prøv igjen.",
@@ -4338,7 +4340,15 @@
       "download": "Last ned modell på enheten",
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
-      "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen."
+      "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen.",
+      "cannotUse": "Kan ikke kjøre: {{items}}.",
+      "cannotUseOptions": "Kan ikke fylle ut: enkelte verktøyalternativer.",
+      "limitations": "Begrensninger",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Vis innstillinger",
+        "settingsSet": "Endre innstillinger"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Kunne ikke lagre instruksjonen",
     "instructionDeleteFailed": "Kunne ikke slette instruksjonen",
     "instructionToggleFailed": "Kunne ikke oppdatere instruksjonen",
+    "instructionViewTitle": "Instruksjonsfil",
     "instructionLimitReached": "En profil kan ha opptil {{max}} instruksjoner. Slett én for å legge til flere.",
     "mcp": {
       "title": "MCP-servere",

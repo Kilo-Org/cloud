@@ -81,9 +81,7 @@ describe('groupAgentSessionsByDate', () => {
     expect(groups.map(g => g.label)).toEqual(['Today', 'Yesterday', expect.any(String), 'Older']);
   });
 
-  it('places weekend-stale created_at in the correct weekday bucket under created_at sort', () => {
-    // updated_at is "today" but created_at is ancient — by created_at sort it
-    // belongs in Older, not Today.
+  it('places a stale created_at in Older under created_at sort even though updated_at is today', () => {
     const input: FakeSession[] = [
       { session_id: 'ancient-created', created_at: iso(60), updated_at: iso(0) },
     ];
@@ -120,10 +118,6 @@ describe('groupAgentSessionsByDate', () => {
   });
 
   it('reads each selected timestamp once per session, whatever the list size', () => {
-    // The selected timestamp is the input to the sort, the section boundary
-    // checks and the in-section order, so it has to be read (and parsed) once
-    // per row. Reading it inside a comparator makes the work grow with the
-    // comparison count instead.
     const rowCount = 40;
     let reads = 0;
     const input = Array.from({ length: rowCount }, (_, index) => {
@@ -176,8 +170,7 @@ describe('groupAgentSessionsByDate across a day boundary and a zone move', () =>
 
   it('moves a session from Yesterday to Today when the zone moves east', () => {
     // Two hours apart, on different UTC dates but the same local date at
-    // UTC+14: the row changes section only because the zone moved. The zone is
-    // an input, so the process date cache cannot pin the list to the old one.
+    // UTC+14: the row changes section only because the zone moved.
     const input: FakeSession[] = [
       {
         session_id: 'late',

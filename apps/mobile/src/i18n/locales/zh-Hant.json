@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已啟用",
     "github": "GitHub",
+    "image": "圖片",
     "imageUnavailable": "無法顯示圖片。",
     "loading": "載入中…",
     "loadMore": "載入更多",
@@ -1029,7 +1030,7 @@
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
       "offTitle": "已關閉 {{platform}} 的分析",
-      "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
+      "offDescription": "組織的帳單角色（擁有者、管理員與帳單管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料",
       "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
       "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
+      "imageUnavailableRetryWithAlt": "無法顯示圖片，{{alt}}，重新載入",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片：{{alt}}",
@@ -3690,7 +3692,7 @@
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
       "seatsFull": "所有席位皆已使用（{{used}}/{{total}}）。請先請組織擁有者增加席位，再邀請更多成員。",
-      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳務管理員，他們不會佔用席位。",
+      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳單管理員，他們不會佔用席位。",
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "如要完成帳戶建立，請選擇「$t(login.signInWithApple)」。",
     "signupStepUpGoogle": "如要完成帳戶建立，請選擇「$t(login.signInWithGoogle)」。",
     "signupStepUpBack": "如要完成帳戶建立，請返回上一步並選擇「$t(login.moreSignInOptions)」。",
-    "invalidCode": "該驗證碼不正確或已過期。請再試一次，或使用「$t(login.resendCode)」。",
+    "invalidCode": "該驗證碼不正確或已過期。使用「$t(login.resendCode)」或「$t(login.moreSignInOptions)」。",
     "codeInProgress": "正在處理你的驗證碼。請稍候再試一次。",
     "tooManyAttempts": "嘗試次數過多。請重新索取驗證碼。",
     "invalidToken": "登入失敗。請再試一次。",
@@ -4338,7 +4340,15 @@
       "download": "下載裝置端模型",
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
-      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。",
+      "cannotUse": "無法執行：{{items}}。",
+      "cannotUseOptions": "無法填寫：部分工具選項。",
+      "limitations": "限制",
+      "tools": {
+        "time": "時間",
+        "settingsList": "顯示設定",
+        "settingsSet": "變更設定"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "無法儲存指示",
     "instructionDeleteFailed": "無法刪除指示",
     "instructionToggleFailed": "無法更新指示",
+    "instructionViewTitle": "指示檔案",
     "instructionLimitReached": "每個設定檔最多可有 {{max}} 個指示。請刪除一個以新增其他指示。",
     "mcp": {
       "title": "MCP伺服器",

@@ -7,9 +7,14 @@ import { expect, it, vi } from 'vitest';
 import { unstable_readConfig, unstable_startWorker } from 'wrangler';
 import { usage } from './usage.test-fixture';
 
+// The worker consumes messages in parallel, so compare recorded writes as a set keyed by usage id.
+const sortById = (list: { core: { id: string } }[]) =>
+  list.toSorted((a, b) => a.core.id.localeCompare(b.core.id));
+
 async function testQueueRetryDelay(randomValue: number) {
-  const calls: unknown[] = [];
+  const calls: (typeof usage)[] = [];
   let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
+  let statusById: Map<string, number | 'recorded' | 'duplicate' | 'admission'> | undefined;
   let mixedStatus: number | 'admission' | undefined;
   let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
   let heldSecond: ReturnType<typeof Promise.withResolvers<void>> | undefined;
@@ -24,7 +29,7 @@ async function testQueueRetryDelay(randomValue: number) {
     response.once('finish', () => active--);
     const status =
       mixedStatus === undefined
-        ? statuses.shift()
+        ? (statusById?.get(event.core.id) ?? statuses.shift())
         : event.core.id.endsWith('3300')
           ? 'recorded'
           : mixedStatus;
@@ -140,7 +145,7 @@ async function testQueueRetryDelay(randomValue: number) {
       'queue-5',
     ]);
     expect(successfulResult.retryMessages).toEqual([]);
-    expect(calls).toEqual(events);
+    expect(sortById(calls)).toEqual(sortById(events));
     expect(peak).toBe(2);
     expect(statuses).toEqual([]);
     for (const status of [400, 429, 503, 'admission'] as const) {
@@ -165,11 +170,13 @@ async function testQueueRetryDelay(randomValue: number) {
       const delay = result.retryMessages[0].delaySeconds;
       expect(delay).toBeGreaterThanOrEqual(status === 'admission' ? 2 : 60);
       expect(delay).toBeLessThanOrEqual(status === 'admission' ? 4 : 120);
-      expect(calls.slice(-2)).toEqual(events.slice(0, 2));
+      expect(sortById(calls.slice(-2))).toEqual(sortById(events.slice(0, 2)));
     }
     mixedStatus = undefined;
     for (const status of [429, 503, 'admission'] as const) {
-      statuses = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'];
+      // Outcomes are fixed per message id: parallel consumption makes arrival order unstable.
+      const outcomes = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'] as const;
+      statusById = new Map(events.map((event, index) => [event.core.id, outcomes[index]]));
       heldFirst = Promise.withResolvers<void>();
       const priorCalls = calls.length;
       let finished = false;
@@ -187,9 +194,9 @@ async function testQueueRetryDelay(randomValue: number) {
       expect(result.ackAll).toBe(false);
       expect(result.explicitAcks.toSorted()).toEqual(['queue-0', 'queue-3', 'queue-4', 'queue-5']);
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
-      expect(calls.slice(-6)).toEqual(events);
-      expect(statuses).toEqual([]);
+      expect(sortById(calls.slice(-6))).toEqual(sortById(events));
       // A later delivery retains the usage identity and can settle as a duplicate.
+      statusById = undefined;
       statuses = ['duplicate'];
       const replay = await entrypoint.queue('local-usage', [{ ...messages[1], attempts: 3 }]);
       expect(replay.outcome).toBe('ok');

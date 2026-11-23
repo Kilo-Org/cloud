@@ -91,6 +91,7 @@
     "draft": "Mustand",
     "enabled": "Sisse lülitatud",
     "github": "GitHub",
+    "image": "Pilt",
     "imageUnavailable": "Pilt pole saadaval.",
     "loading": "Laadimine…",
     "loadMore": "Laadi veel",
@@ -399,7 +400,7 @@
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "orgDescription": "Neid võtmeid jagatakse kõigi organisatsiooni liikmetega ja kulud arveldatakse organisatsiooni teenusepakkuja kontodelt.",
-      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arvelduse haldur.",
+      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arveldushaldur.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
+      "imageUnavailableRetryWithAlt": "Pilt pole saadaval, {{alt}}, proovi laadimist uuesti",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditilogi",
-      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Auditisündmusi pole",
       "emptyDescription": "Siin kuvatakse selles organisatsioonis tehtud toimingud.",
       "truncated": "Kuvatakse viimased sündmused.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Arveldus",
-      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tellimus",
       "state": "Olek",
       "stateNone": "Tellimus puudub",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Kasuta nuppu „Varasem tund”, et näha varasemaid päringuid.",
       "emptyBoundDescription": "Päringulogid ei ulatu sellest kaugemale tagasi.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
-      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisse · {{output}} välja",
       "byok": "BYOK"
     },
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Konto loomise lõpetamiseks mine tagasi ja kasuta valikut „$t(login.moreSignInOptions)“.",
-    "invalidCode": "See kood on vale või aegunud. Proovi uuesti või kasuta valikut „$t(login.resendCode)“.",
+    "invalidCode": "See kood on vale või aegunud. Kasuta valikut „$t(login.resendCode)“ või „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
     "invalidToken": "Sisselogimine ebaõnnestus. Proovi uuesti.",
@@ -4338,7 +4340,15 @@
       "download": "Laadi seadmesisene mudel alla",
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
-      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
+      "cannotUse": "Ei saa käivitada: {{items}}.",
+      "cannotUseOptions": "Ei saa täita: mõned tööriista valikud.",
+      "limitations": "Piirangud",
+      "tools": {
+        "time": "Aeg",
+        "settingsList": "Näita seadeid",
+        "settingsSet": "Muuda seadeid"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",
     "instructionToggleFailed": "Juhise uuendamine ebaõnnestus",
+    "instructionViewTitle": "Juhise fail",
     "instructionLimitReached": "Profiil mahutab kuni {{max}} juhist. Kustuta üks, et lisada veel.",
     "mcp": {
       "title": "MCP-serverid",

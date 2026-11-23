@@ -92,6 +92,7 @@
     "draft": "Melnraksts",
     "enabled": "Iespējots",
     "github": "GitHub",
+    "image": "Attēls",
     "imageUnavailable": "Attēls nav pieejams.",
     "loading": "Ielādē…",
     "loadMore": "Ielādēt vairāk",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
+      "imageUnavailableRetryWithAlt": "Attēls nav pieejams, {{alt}}, mēģināt ielādēt vēlreiz",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
-    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Izmanto “$t(login.resendCode)” vai “$t(login.moreSignInOptions)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",
@@ -4417,7 +4419,15 @@
       "download": "Lejupielādēt ierīces modeli",
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
-      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
+      "cannotUse": "Nevar palaist: {{items}}.",
+      "cannotUseOptions": "Nevar aizpildīt: dažas rīka opcijas.",
+      "limitations": "Ierobežojumi",
+      "tools": {
+        "time": "Laiks",
+        "settingsList": "Rādīt iestatījumus",
+        "settingsSet": "Mainīt iestatījumus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Instrukciju neizdevās saglabāt",
     "instructionDeleteFailed": "Instrukciju neizdevās dzēst",
     "instructionToggleFailed": "Instrukciju neizdevās atjaunināt",
+    "instructionViewTitle": "Instrukcijas fails",
     "instructionLimitReached": "Profils var ietvert līdz {{max}} instrukcijām. Dzēsiet vienu, lai pievienotu citu.",
     "mcp": {
       "title": "MCP serveri",

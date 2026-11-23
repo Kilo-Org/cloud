@@ -40,6 +40,28 @@ function sharedCreatedDate(createdAt: string | null | undefined): Date | null {
 }
 
 /**
+ * The day a shared session started, as the header subtitle prints it.
+ *
+ * A share can stay live for years, so a month and a day alone would date an
+ * older session as this year's. The year joins the line whenever the session
+ * did not start in the reader's current year. The comparison uses the years
+ * the locale itself prints, not the Gregorian year: a Persian, Pashto or Thai
+ * reader counts in another calendar, and the line must compare that reader's
+ * own year. Every locale, non-Gregorian ones included, therefore keeps its
+ * pattern from `formatDate`. A same-year session keeps the short form, where
+ * the year carries nothing.
+ */
+function sharedStartDateLabel(date: Date): string {
+  const currentYear = formatDate(new Date(), i18n.language, { year: 'numeric' });
+  const sessionYear = formatDate(date, i18n.language, { year: 'numeric' });
+  return formatDate(date, i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    ...(sessionYear === currentYear ? {} : { year: 'numeric' }),
+  });
+}
+
+/**
  * Read-only view of a publicly shared session, opened from an `/s/<token>`
  * link.
  *
@@ -72,9 +94,7 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   const ownerName = metadata?.ownerName ?? t('sharedSession.someone');
   const repoLabel = metadata?.gitUrl ? formatGitUrlProject(metadata.gitUrl) : null;
   const createdDate = sharedCreatedDate(metadata?.createdAt);
-  const dateLabel = createdDate
-    ? formatDate(createdDate, i18n.language, { month: 'short', day: 'numeric' })
-    : null;
+  const dateLabel = createdDate ? sharedStartDateLabel(createdDate) : null;
   // The share time is not part of the public read: the payload carries the
   // session's own `createdAt`, and the link's `shared_at` stays inside the
   // token the server resolves. So the line names the session start, and the

@@ -65,14 +65,11 @@ export function useConsentCardState(mode: ConsentMode) {
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
   // The Retry affordance's own state: the failed card re-runs the same read
-  // when the person asks for it. The first settle of one attempt — bound or
-  // read — takes ownership and publishes; the loser's write is dropped.
+  // when the person asks for it.
   const [storedLoadRetryKey, setStoredLoadRetryKey] = useState(0);
 
   useEffect(() => {
     if (!userId) {
-      // Nothing to load: the switch renders as before and its toggle path
-      // shows the account error.
       setStoredLoad({ status: 'idle' });
       return undefined;
     }

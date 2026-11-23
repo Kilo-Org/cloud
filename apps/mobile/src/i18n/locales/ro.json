@@ -92,6 +92,7 @@
     "draft": "Ciornă",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imagine",
     "imageUnavailable": "Imaginea nu este disponibilă.",
     "loading": "Se încarcă…",
     "loadMore": "Încarcă mai multe",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -3754,7 +3756,7 @@
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
       "seatsFull": "Toate locurile sunt ocupate ({{used}}/{{total}}). Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri.",
-      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare administratori de facturare, care nu ocupă un loc.",
+      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare manageri de facturare, care nu ocupă un loc.",
       "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Pentru a finaliza crearea contului, revino la ecranul anterior și folosește „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Codul este incorect sau a expirat. Încearcă din nou sau folosește „$t(login.resendCode)”.",
+    "invalidCode": "Codul este incorect sau a expirat. Folosește „$t(login.resendCode)” sau „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Codul tău este procesat. Așteaptă puțin și încearcă din nou.",
     "tooManyAttempts": "Prea multe încercări. Solicită un cod nou.",
     "invalidToken": "Autentificarea a eșuat. Încearcă din nou.",
@@ -4417,7 +4419,15 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Nu se poate rula: {{items}}.",
+      "cannotUseOptions": "Nu se pot completa: unele opțiuni ale instrumentului.",
+      "limitations": "Limitări",
+      "tools": {
+        "time": "Timp",
+        "settingsList": "Arată setările",
+        "settingsSet": "Modifică setările"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",
     "instructionToggleFailed": "Instrucțiunea nu a putut fi actualizată",
+    "instructionViewTitle": "Fișier de instrucțiuni",
     "instructionLimitReached": "Un profil poate avea până la {{max}} instrucțiuni. Șterge una pentru a adăuga alta.",
     "mcp": {
       "title": "servere MCP",

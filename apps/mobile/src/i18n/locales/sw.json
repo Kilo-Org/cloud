@@ -91,6 +91,7 @@
     "draft": "Rasimu",
     "enabled": "Imewashwa",
     "github": "GitHub",
+    "image": "Picha",
     "imageUnavailable": "Picha haipatikani.",
     "loading": "Inapakia…",
     "loadMore": "Pakia zaidi",
@@ -1591,7 +1592,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
+      "imageUnavailableRetryWithAlt": "Picha haipatikani, {{alt}}, jaribu tena kupakia",
       "imagePreviewUnavailableInSession": "Onyesho la awali la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",
@@ -3686,7 +3688,7 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Ili kukamilisha kuunda akaunti yako, rudi nyuma kisha utumie '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tafadhali jaribu tena au tumia '$t(login.resendCode)'.",
+    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tumia '$t(login.resendCode)' au '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Msimbo wako unachakatwa. Subiri kidogo kisha ujaribu tena.",
     "tooManyAttempts": "Majaribio mengi mno. Tafadhali omba msimbo mpya.",
     "invalidToken": "Kuingia kumeshindikana. Tafadhali jaribu tena.",
@@ -4338,7 +4340,15 @@
       "download": "Pakua modeli ya kwenye kifaa",
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
-      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
+      "cannotUse": "Haiwezi kuendeshwa: {{items}}.",
+      "cannotUseOptions": "Haiwezi kujazwa: baadhi ya chaguo za kifaa.",
+      "limitations": "Vikwazo",
+      "tools": {
+        "time": "Muda",
+        "settingsList": "Onyesha mipangilio",
+        "settingsSet": "Badilisha mipangilio"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Imeshindwa kuhifadhi elekezo",
     "instructionDeleteFailed": "Imeshindwa kufuta elekezo",
     "instructionToggleFailed": "Imeshindwa kusasisha elekezo",
+    "instructionViewTitle": "Faili ya elekezo",
     "instructionLimitReached": "Wasifu unaweza kubeba elekezo {{max}} kwa juu. Futa moja ili kuongeza nyingine.",
     "mcp": {
       "title": "seva za MCP",

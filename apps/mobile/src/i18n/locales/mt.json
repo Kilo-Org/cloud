@@ -94,6 +94,7 @@
     "draft": "Abbozz",
     "enabled": "Attivat",
     "github": "GitHub",
+    "image": "Immaġni",
     "imageUnavailable": "L-immaġni mhix disponibbli.",
     "loading": "Qed jgħabbi…",
     "loadMore": "Għabbi aktar",
@@ -1678,7 +1679,7 @@
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
       "offTitle": "L-istatistika hija mitfija għal {{platform}}",
-      "offDescription": "Ir-rwoli tal-fatturazzjoni tal-organizzazzjoni jistgħu jixgħlu l-istatistika fil-settings tal-organizzazzjoni fuq il-web biex jirrekordjaw reviżjonijiet kompluti.",
+      "offDescription": "Ir-rwoli tal-ħlasijiet tal-organizzazzjoni jistgħu jixgħlu l-istatistika fil-settings tal-organizzazzjoni fuq il-web biex jirrekordjaw reviżjonijiet kompluti.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija",
       "trackedReviewsCaption": "Reviżjonijiet kompluti li spiċċaw f'dan il-perjodu meta l-istatistika kienet mixgħula. Reviżjonijiet li għadhom għaddejjin u dawk li tfallu qatt ma jingħaddu.",
       "trackedReviewsUncounted": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
@@ -2819,6 +2820,7 @@
     "filePart": {
       "loadingImage": "Qed titgħabba l-immaġni",
       "imageUnavailableRetry": "L-immaġni mhix disponibbli, erġa' pprova tgħabbiha",
+      "imageUnavailableRetryWithAlt": "L-immaġni mhix disponibbli, {{alt}}, erġa' pprova tgħabbiha",
       "imagePreviewUnavailableInSession": "Il-previżjoni tal-immaġni mhix disponibbli f'din is-sessjoni.",
       "viewImage": "Ara l-immaġni",
       "viewImageWithAlt": "Ara l-immaġni {{alt}}",
@@ -3607,7 +3609,7 @@
   "organization": {
     "auditLog": {
       "title": "Reġistru tal-awditjar",
-      "permissionDenied": "Il-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni fuq il-pjan Enterprise. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Ir-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni fuq il-pjan Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "L-ebda avveniment tal-awditjar",
       "emptyDescription": "L-azzjonijiet meħuda f'din l-organizzazzjoni jidhru hawn.",
       "truncated": "Qed jintwerew l-aktar avvenimenti riċenti.",
@@ -3890,7 +3892,7 @@
       "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
       "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni.",
       "seatsFull": "Il-postijiet kollha qed jintużaw ({{used}}/{{total}}). Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri.",
-      "seatsFullCanInviteBilling": "Il-postijiet kollha qed jintużaw ({{used}}/{{total}}). Xorta tista' tistieden maniġers tal-fatturazzjoni, li ma jokkupawx post.",
+      "seatsFullCanInviteBilling": "Il-postijiet kollha qed jintużaw ({{used}}/{{total}}). Xorta tista' tistieden maniġers tal-ħlasijiet, li ma jokkupawx post.",
       "noSeatsAvailable": "Il-postijiet kollha qed jintużaw. Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri."
     },
     "invoices": {
@@ -4100,7 +4102,7 @@
     "signupStepUpApple": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Biex tlesti l-ħolqien tal-kont tiegħek, mur lura u uża '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Erġa' pprova jew uża '$t(login.resendCode)'.",
+    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Uża '$t(login.resendCode)' jew '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Il-kodiċi tiegħek qed jiġi pproċessat. Stenna mument u erġa' pprova.",
     "tooManyAttempts": "Wisq tentattivi. Jekk jogħġbok itlob kodiċi ġdid.",
     "invalidToken": "Ma stajtx tidħol. Erġa' pprova.",
@@ -4575,7 +4577,15 @@
       "download": "Niżżel il-mudell fuq l-apparat",
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
-      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova.",
+      "cannotUse": "Ma jistax jiġi eżegwit: {{items}}.",
+      "cannotUseOptions": "Ma jistgħux jimtlew: xi għażliet tal-għodda.",
+      "limitations": "Limitazzjonijiet",
+      "tools": {
+        "time": "Ħin",
+        "settingsList": "Uri l-impostazzjonijiet",
+        "settingsSet": "Biddel l-impostazzjonijiet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
@@ -4769,6 +4779,7 @@
     "instructionSaveFailed": "Ma setgħetx tiġi salvata l-istruzzjoni",
     "instructionDeleteFailed": "Ma setgħetx tiġi mħassra l-istruzzjoni",
     "instructionToggleFailed": "Ma setgħetx tiġi aġġornata l-istruzzjoni",
+    "instructionViewTitle": "Fajl tal-istruzzjoni",
     "instructionLimitReached": "Profil jista' jżomm sa {{max}} struzzjonijiet. Ħassar waħda biex iżżid oħra.",
     "mcp": {
       "title": "servers MCP",

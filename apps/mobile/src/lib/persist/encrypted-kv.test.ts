@@ -46,8 +46,8 @@ let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
 // `PRAGMA journal_mode = WAL` returns the mode the connection switched to.
-// node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
-// this seam and the test can force a rejected switch.
+// The fake's `getFirstSync` answers this pragma itself, so a test can force a
+// rejected switch or a non-WAL answer.
 let journalMode = 'wal';
 // Simulates an engine that rejects the pragma outright instead of answering
 // with the mode it kept.
@@ -1005,10 +1005,6 @@ describe('migration failure keeps the database', () => {
   });
 
   it('a_corrupt_page_that_fails_inside_the_migration_resets_like_a_probe_failure', async () => {
-    // Damage past the first page passes the `sqlite_master` count and fails
-    // inside `migrate()` instead. The engine message routes it into the same
-    // recovery: an unrecoverable file must not leave the store broken for
-    // every later launch.
     failNextMigration = true;
     nextMigrationMessage = 'database disk image is malformed';
     await setItem('s', 'a', 'x');

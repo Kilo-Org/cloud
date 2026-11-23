@@ -324,9 +324,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function publishCommands(commands: SlashCommandInfo[]): void {
-      // Deep copy the array, every command object, and every hints array
-      // so the event payload, the internal cache, and every subsequent
-      // state callback each hold an independent snapshot.
       const snapshotted = deepCopyCommands(commands);
       lastValidCommands = snapshotted;
       sink.onServiceEvent({
@@ -446,9 +443,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             // publishing an empty `idle` catalog that would stick.
             const hasModel = parsed.data.providers.some(provider => provider.models.length > 0);
             if (!hasModel) {
-              // The CLI may still be warming up its provider registry.
-              // Surface it as an error and self-heal under the budget instead
-              // of publishing an empty `idle` catalog that would stick.
               publishRemoteModelState({
                 ownerConnectionId: expectedOwnerConnectionId,
                 protocol: 'v1',
@@ -797,9 +791,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         let snapshotReplayGeneration = 0;
         // The read that currently gates live delivery, if any.
         let snapshotRead: SnapshotRead | null = null;
-        // One page per attach seeds the manager. Whichever page applies first
-        // wins — the connect() read, a reconnect catch-up, or a delayed resync
-        // — so a slower read cannot reset an already-recorded cursor.
         let initialPageRecorded = false;
 
         // Mark one attempt settled and clear its deadline. Returns false when

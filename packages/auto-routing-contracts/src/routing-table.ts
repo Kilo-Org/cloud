@@ -379,7 +379,6 @@ export function rankCandidates(
         competes,
         free,
         value: rankValue({
-          // ADR 0005: a $0 candidate takes no cost term.
           avgCostUsd: free ? undefined : estimatedRequestCostUsd,
           accuracy: c.accuracy,
           cases: c.cases,

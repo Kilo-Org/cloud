@@ -211,7 +211,6 @@ export type AdminAccessEvent =
       target: string | null;
     });
 
-/** The `kind` discriminant of {@link AdminAccessEvent}. */
 export type AdminAccessKind = AdminAccessEvent['kind'];
 
 export type AdminAccessSink = (event: AdminAccessEvent) => void;

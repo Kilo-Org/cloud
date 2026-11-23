@@ -58,10 +58,7 @@ export async function findCustomRouter(
   return row ? toCustomRouterDefinition(row) : null;
 }
 
-/**
- * Custom routers usable in a request context (ADR 0005): the user's personal routers, plus the
- * organization's routers in an organization context.
- */
+/** The custom routers a request context can use (ADR 0005). */
 export async function listUsableCustomRouters(params: {
   userId: string;
   organizationId: string | null;

@@ -56,6 +56,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  // The font-scale module falls back to the window's scale outside its provider.
+  useWindowDimensions: () => ({ fontScale: 1 }),
   View: 'View',
   Pressable: 'Pressable',
   Switch: 'Switch',
@@ -79,7 +81,6 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
-  Pencil: 'Pencil',
   Plus: 'Plus',
   Trash2: 'Trash2',
 }));
@@ -103,6 +104,9 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView' }));
 vi.mock('@/components/profiles/profile-section-header', () => ({
   ProfileSectionHeader: 'ProfileSectionHeader',
+}));
+vi.mock('@/components/profiles/instruction-view-sheet', () => ({
+  InstructionViewSheet: 'InstructionViewSheet',
 }));
 vi.mock('@/components/profiles/instruction-form-sheet', async () => {
   // vi.mock factories are hoisted above this module's imports, so the React,
@@ -142,6 +146,10 @@ vi.mock('@/components/profiles/instruction-form-sheet', async () => {
 
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
 const INSTRUCTION_NAME = 'zalgo-2026';
+
+/** The longest file name the server stores, i.e. `INSTRUCTION_NAME_MAX_LENGTH`. */
+const LONG_INSTRUCTION_NAME =
+  'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every-quarter-close-safety-revi';
 
 type TestInstruction = { id: string; name: string; content: string; enabled: boolean };
 
@@ -238,6 +246,15 @@ async function confirmRequestAndSettle(request: ConfirmRequest): Promise<void> {
 
 function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
+}
+
+/** The instruction the mocked detail sheet was handed, or `null` while it is closed. */
+function sheetInstruction(root: ReactTestInstance): { name: string; content: string } | null {
+  const sheet = findAll(root, 'InstructionViewSheet')[0];
+  if (!sheet) {
+    throw new TypeError('the detail sheet was not rendered');
+  }
+  return (sheet.props.instruction ?? null) as { name: string; content: string } | null;
 }
 
 /** Press the add control a loaded list renders in its footer. */
@@ -473,6 +490,28 @@ describe('ProfileInstructionsScreen row controls', () => {
       )
     ).toBe(false);
 
+    // The press opens the form that shows the whole name, so this row clamps
+    // the name to the title's one line at the default font scale and cuts it in
+    // the middle, where two names that share a long prefix still differ.
+    const nameLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === INSTRUCTION_NAME
+    );
+    expect(nameLine?.props.numberOfLines).toBe(1);
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
+    expect(nameLine?.props.children).toBe(INSTRUCTION_NAME);
+
+    // The editable row's switch stays its own accessible stop with its own
+    // checked state, so its content press carries no value of its own.
+    expect(
+      findRowControl(
+        renderer.root,
+        [
+          i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME }),
+          `.kilocode/rules/${INSTRUCTION_NAME}.md`,
+        ].join(', ')
+      ).props.accessibilityValue
+    ).toBeUndefined();
+
     unmount();
   });
 });
@@ -482,24 +521,117 @@ describe('ProfileInstructionsScreen read-only row', () => {
     permission.value = 'read-only';
   });
 
-  it('drops the edit control and keeps the file name and its path readable', async () => {
+  it('drops the edit control and names the file on the row it presses', async () => {
     const { renderer, unmount } = await mountScreen();
 
-    // The content is the edit action, so a read-only profile renders no row
-    // control at all — and, because there is no press to name the row, the
-    // painted file name stays a text stop that carries the path itself.
+    // The content is the edit action, so a read-only profile renders no edit
+    // control. The row itself is the press, and it carries the name and path
+    // the painted line used to speak.
     expect(rowControls(renderer.root)).not.toContain(
       i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
     );
+    const rowLabel = [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ');
+    expect(rowControls(renderer.root)).toContain(rowLabel);
+
+    // The painted name is out of the accessibility tree because the row above
+    // it now speaks the same name, and it clamps to the row's one line: the
+    // press opens the detail sheet that paints it in full.
     const nameLine = findAll(renderer.root, 'Text').find(
-      node => node.props.children === INSTRUCTION_NAME
+      node => node.props.children === isolateLtrBidiText(INSTRUCTION_NAME)
     );
-    expect(nameLine?.props.accessibilityLabel).toBe(
+    expect(nameLine?.props.accessibilityLabel).toBeUndefined();
+    expect(nameLine?.props.accessible).toBe(false);
+    expect(nameLine?.props.importantForAccessibility).toBe('no');
+    expect(nameLine?.props.numberOfLines).toBe(1);
+    // The cut sits in the middle of the name, so two files that share a long
+    // prefix still read differently on the row itself.
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
+    expect(nameLine?.props.children).toBe(isolateLtrBidiText(INSTRUCTION_NAME));
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
+  });
+
+  // The row's one accessible press swallows the switch on iOS, so the state the
+  // switch carries has to ride the row's spoken value or a reader loses it.
+  it('speaks the row state in its value, on the press that hides the switch', async () => {
+    const rowLabel = [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ');
+
+    const enabled = await mountScreen();
+    expect(findRowControl(enabled.renderer.root, rowLabel).props.accessibilityValue).toEqual({
+      text: i18n.t('common.enabled'),
+    });
+    enabled.unmount();
+
+    h.query.data = [testInstruction({ enabled: false })];
+    const disabled = await mountScreen();
+    expect(findRowControl(disabled.renderer.root, rowLabel).props.accessibilityValue).toEqual({
+      text: i18n.t('common.disabled'),
+    });
+    disabled.unmount();
+  });
+
+  // A disclosure mark beside the switch used to take the width the title
+  // needed, and the whole row is already one press: nothing else trails it.
+  it('leaves the trailing cell to the switch its state belongs to', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the frame's spec is the screen's own.
+    const trailingCells = renderer.root
+      .findAll(node => node.props.trailing !== undefined)
+      .map(node => node.props.trailing as { kind: string; nodes?: readonly unknown[] });
+    expect(trailingCells).toHaveLength(1);
+    expect(trailingCells[0]?.kind).toBe('nodes');
+    expect(trailingCells[0]?.nodes).toHaveLength(1);
+    expect(findAll(renderer.root, 'Switch')).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('opens the detail sheet with the whole instruction on a row press', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    expect(sheetInstruction(renderer.root)).toBeNull();
+
+    pressRowControl(
+      renderer.root,
       [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ')
     );
-    expect(nameLine?.props.accessible).toBeUndefined();
-    expect(nameLine?.props.importantForAccessibility).toBeUndefined();
-    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    expect(sheetInstruction(renderer.root)).toMatchObject({
+      name: INSTRUCTION_NAME,
+      content: '# Rules',
+    });
+
+    unmount();
+  });
+
+  // The row clamps the name to one line, so the longest file the server stores
+  // reaches the sheet unchanged and the sheet is what makes it readable.
+  it('hands a 100-character file name to the sheet unchanged', async () => {
+    h.query.data = [testInstruction({ name: LONG_INSTRUCTION_NAME })];
+    const { renderer, unmount } = await mountScreen();
+
+    expect(LONG_INSTRUCTION_NAME).toHaveLength(100);
+
+    // The row's own spoken name finds the press on either arm; the row no
+    // longer wraps, so the cut and the untouched sheet value are what differ.
+    const nameLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === isolateLtrBidiText(LONG_INSTRUCTION_NAME)
+    );
+    expect(nameLine).toBeDefined();
+    expect(nameLine?.props.numberOfLines).toBe(1);
+    // A 100-character name that shares its prefix with a sibling stays
+    // distinguishable on the row: the middle cut keeps its own ending.
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
+
+    pressRowControl(
+      renderer.root,
+      [LONG_INSTRUCTION_NAME, `.kilocode/rules/${LONG_INSTRUCTION_NAME}.md`].join(', ')
+    );
+
+    const shown = sheetInstruction(renderer.root);
+    expect(shown?.name).toBe(LONG_INSTRUCTION_NAME);
 
     unmount();
   });

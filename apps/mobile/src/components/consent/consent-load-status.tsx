@@ -51,12 +51,6 @@ export function ConsentLoadStatusLine({ load, error, onRetry, t }: ConsentLoadSt
     );
   }
   if (load.status === 'failed') {
-    // The load failure lives in the union; the action-error slot is a
-    // separate channel. The newest failure wins the copy: `error` carries a
-    // later action's failure (a failed sign-out, a failed optional-save)
-    // and hides the load copy while it is live, but Retry — the affordance
-    // that re-runs the read that blocks the primary — stays rendered for
-    // the whole `failed` phase, so the card can always reach `ready` again.
     return (
       <View className="flex-row items-center justify-center gap-1">
         <AccessibleStatus message={t(error ?? load.message)} className="text-sm" />

@@ -91,6 +91,7 @@
     "draft": "ડ્રાફ્ટ",
     "enabled": "ચાલુ",
     "github": "GitHub",
+    "image": "છબી",
     "imageUnavailable": "છબી ઉપલબ્ધ નથી.",
     "loading": "લોડ થઈ રહ્યું છે…",
     "loadMore": "વધુ લોડ કરો",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "છબી લોડ થઈ રહી છે",
       "imageUnavailableRetry": "છબી ઉપલબ્ધ નથી, લોડ કરવા ફરી પ્રયાસ કરો",
+      "imageUnavailableRetryWithAlt": "છબી ઉપલબ્ધ નથી, {{alt}}, લોડ કરવા ફરી પ્રયાસ કરો",
       "imagePreviewUnavailableInSession": "આ સત્રમાં છબીનું પૂર્વાવલોકન ઉપલબ્ધ નથી.",
       "viewImage": "છબી જુઓ",
       "viewImageWithAlt": "છબી જુઓ: {{alt}}",
@@ -3434,7 +3436,7 @@
         "promoCreditGranted": "પ્રોમોશનલ ક્રેડિટ આપી",
         "memberRemove": "સભ્યને દૂર કર્યો",
         "memberChangeRole": "સભ્યની ભૂમિકા બદલી",
-        "memberAdminAdd": "એડમિનિસ્ટ્રેટર ઉમેર્યો",
+        "memberAdminAdd": "એડમિન ઉમેર્યો",
         "memberAutoJoin": "સભ્ય આપમેળે જોડાયો",
         "ssoAutoProvision": "SSO દ્વારા વપરાશકર્તા ફાળવ્યો",
         "ssoSetDomain": "SSO ડોમેન ઉમેર્યું",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithApple)' વાપરો.",
     "signupStepUpGoogle": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithGoogle)' વાપરો.",
     "signupStepUpBack": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે પાછા જાઓ અને '$t(login.moreSignInOptions)' વાપરો.",
-    "invalidCode": "આ કોડ ખોટો છે અથવા તેની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો અથવા '$t(login.resendCode)' વાપરો.",
+    "invalidCode": "આ કોડ ખોટો છે અથવા તેની સમયમર્યાદા પૂરી થઈ ગઈ છે. '$t(login.resendCode)' વાપરો અથવા '$t(login.moreSignInOptions)' વાપરો.",
     "codeInProgress": "તમારા કોડ પર પ્રક્રિયા ચાલી રહી છે. થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો.",
     "tooManyAttempts": "ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને નવો કોડ માંગો.",
     "invalidToken": "સાઇન ઇન કરી શકાયું નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
@@ -4338,7 +4340,15 @@
       "download": "ઉપકરણ પરનું મોડેલ ડાઉનલોડ કરો",
       "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
       "downloadProgress": "ડાઉનલોડ થઈ રહ્યું છે… {{percent}}%",
-      "downloadFailed": "ડાઉનલોડ પૂરું થયું નથી. તમારું કનેક્શન અને ખાલી સ્ટોરેજ તપાસો, પછી ફરી પ્રયાસ કરો."
+      "downloadFailed": "ડાઉનલોડ પૂરું થયું નથી. તમારું કનેક્શન અને ખાલી સ્ટોરેજ તપાસો, પછી ફરી પ્રયાસ કરો.",
+      "cannotUse": "ચલાવી શકાતું નથી: {{items}}.",
+      "cannotUseOptions": "ભરી શકાતા નથી: ટૂલના કેટલાક વિકલ્પો.",
+      "limitations": "મર્યાદાઓ",
+      "tools": {
+        "time": "સમય",
+        "settingsList": "સેટિંગ્સ બતાવો",
+        "settingsSet": "સેટિંગ્સ બદલો"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "સૂચના સેવ કરી શકાઈ નહીં",
     "instructionDeleteFailed": "સૂચના કાઢી શકાઈ નહીં",
     "instructionToggleFailed": "સૂચના અપડેટ કરી શકાઈ નહીં",
+    "instructionViewTitle": "સૂચના ફાઇલ",
     "instructionLimitReached": "એક પ્રોફાઇલમાં વધુમાં વધુ {{max}} સૂચનાઓ રાખી શકાય. બીજી ઉમેરવા એક કાઢી નાખો.",
     "mcp": {
       "title": "MCP સર્વર્સ",

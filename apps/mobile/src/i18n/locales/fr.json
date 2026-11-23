@@ -92,6 +92,7 @@
     "draft": "Brouillon",
     "enabled": "Activé",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Cette image est indisponible",
     "loading": "Chargement…",
     "loadMore": "Afficher la suite",
@@ -2020,6 +2021,7 @@
     "filePart": {
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
+      "imageUnavailableRetryWithAlt": "Image indisponible, {{alt}}, réessayer le chargement",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
       "viewImageWithAlt": "Voir l'image {{alt}}",
@@ -3758,7 +3760,7 @@
       "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "alreadyMember": "Cette personne est déjà membre de cette organisation.",
       "seatsFull": "Toutes les places sont occupées ({{used}}/{{total}}). Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres.",
-      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des gestionnaires de facturation, qui n'occupent pas de place.",
+      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des responsables de la facturation, qui n'occupent pas de place.",
       "noSeatsAvailable": "Toutes les places sont occupées. Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres."
     },
     "invoices": {
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithApple) ».",
     "signupStepUpGoogle": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithGoogle) ».",
     "signupStepUpBack": "Pour finaliser la création de votre compte, revenez en arrière et utilisez « $t(login.moreSignInOptions) ».",
-    "invalidCode": "Ce code est incorrect ou a expiré. Réessayez ou utilisez « $t(login.resendCode) ».",
+    "invalidCode": "Ce code est incorrect ou a expiré. Utilisez « $t(login.resendCode) » ou « $t(login.moreSignInOptions) ».",
     "codeInProgress": "Votre code est en cours de traitement. Attendez un instant et réessayez.",
     "tooManyAttempts": "Trop de tentatives. Veuillez demander un nouveau code.",
     "invalidToken": "Échec de la connexion. Réessayez.",
@@ -4417,7 +4419,15 @@
       "download": "Télécharger le modèle sur l'appareil",
       "downloading": "Téléchargement…",
       "downloadProgress": "Téléchargement… {{percent}} %",
-      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
+      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez.",
+      "cannotUse": "Impossible d'exécuter : {{items}}.",
+      "cannotUseOptions": "Impossible de renseigner : certaines options d'outil.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Heure",
+        "settingsList": "Afficher les paramètres",
+        "settingsSet": "Modifier les paramètres"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Impossible d'enregistrer l'instruction",
     "instructionDeleteFailed": "Impossible de supprimer l'instruction",
     "instructionToggleFailed": "Impossible de mettre à jour l'instruction",
+    "instructionViewTitle": "Fichier d'instruction",
     "instructionLimitReached": "Un profil peut contenir jusqu'à {{max}} instructions. Supprimez-en une pour en ajouter une autre.",
     "mcp": {
       "title": "Serveurs MCP",

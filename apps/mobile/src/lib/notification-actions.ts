@@ -316,7 +316,6 @@ async function dispatchNeedsInputResponse(
     }
   }
 
-  // Any other identifier keeps the existing tap behaviour.
   if (data === null) {
     return false;
   }
@@ -691,10 +690,6 @@ function resultIdentities(
  *
  * Resolves to whether the result post landed, so the caller records a reply
  * result only for a notification that exists.
- *
- * `interruptionLevel` is outcome-derived: the retryable failure keeps the
- * raise's time-sensitive break-through because it still needs the user; the
- * `ok` / `unavailable` confirmations and the `empty` body are quiet.
  *
  * The result is posted with `sound: false`. Android replays the attention
  * channel's sound on every notify of a notification that already exists, and a

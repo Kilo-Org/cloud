@@ -98,8 +98,6 @@ async function sendToKms(
   const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
-    // A retry only gets the time that is left, so the whole sequence stays inside the budget,
-    // and a slice too short to answer is not spent: the earlier error is the specific one.
     const remainingMs = deadline - Date.now();
     if (attempt > 1 && remainingMs < KMS_MIN_ATTEMPT_BUDGET_MS) throw failure;
     const timeoutMs = Math.min(KMS_REQUEST_TIMEOUT_MS, remainingMs);

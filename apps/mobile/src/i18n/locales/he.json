@@ -92,6 +92,7 @@
     "draft": "טיוטה",
     "enabled": "מופעל",
     "github": "GitHub",
+    "image": "תמונה",
     "imageUnavailable": "התמונה לא זמינה.",
     "loading": "בטעינה…",
     "loadMore": "טעינת פריטים נוספים",
@@ -400,7 +401,7 @@
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "orgDescription": "מפתחות אלה משותפים לכל חברי הארגון, והחיוב מתבצע בחשבונות הספקים של הארגון.",
-      "viewOnly": "רק בעלים של הארגון, אדמין או מנהל חיובים יכולים לשנות את המפתחות שלו.",
+      "viewOnly": "רק בעלים של הארגון, מנהל או מנהל חיובים יכולים לשנות את המפתחות שלו.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
@@ -2125,6 +2126,7 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
+      "imageUnavailableRetryWithAlt": "התמונה אינה זמינה, {{alt}}, ניסיון טעינה נוסף",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
       "viewImageWithAlt": "הצגת התמונה: {{alt}}",
@@ -3473,7 +3475,7 @@
   "organization": {
     "auditLog": {
       "title": "יומן ביקורת",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "אין אירועי ביקורת",
       "emptyDescription": "פעולות שמתבצעות בארגון הזה יופיעו כאן.",
       "truncated": "מוצגים האירועים האחרונים.",
@@ -3489,7 +3491,7 @@
         "promoCreditGranted": "ניתנו קרדיטים לקידום",
         "memberRemove": "החבר הוסר",
         "memberChangeRole": "תפקיד החבר שונה",
-        "memberAdminAdd": "אדמין נוסף",
+        "memberAdminAdd": "מנהל נוסף",
         "memberAutoJoin": "החבר הצטרף אוטומטית",
         "ssoAutoProvision": "המשתמש הוקצה על ידי SSO",
         "ssoSetDomain": "דומיין SSO נוסף",
@@ -3857,7 +3859,7 @@
       "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
       "emptyBoundDescription": "יומני הבקשות לא מגיעים אחורה יותר מכך.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "קלט {{input}} · פלט {{output}}",
       "byok": "BYOK"
     },
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
-    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. השתמש ב-'$t(login.resendCode)' או ב-'$t(login.moreSignInOptions)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -4417,7 +4419,15 @@
       "download": "הורדת המודל למכשיר",
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
-      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+      "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב.",
+      "cannotUse": "לא ניתן להריץ: {{items}}.",
+      "cannotUseOptions": "לא ניתן למלא: כמה אפשרויות של כלי.",
+      "limitations": "מגבלות",
+      "tools": {
+        "time": "שעה",
+        "settingsList": "הצג הגדרות",
+        "settingsSet": "שנה הגדרות"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "לא ניתן היה לשמור את ההוראה",
     "instructionDeleteFailed": "לא ניתן היה למחוק את ההוראה",
     "instructionToggleFailed": "לא ניתן היה לעדכן את ההוראה",
+    "instructionViewTitle": "קובץ הוראה",
     "instructionLimitReached": "פרופיל יכול להכיל עד {{max}} הוראות. מחקו אחת כדי להוסיף אחרת.",
     "mcp": {
       "title": "שרתי MCP",

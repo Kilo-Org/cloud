@@ -91,6 +91,7 @@
     "draft": "Volavola",
     "enabled": "Mandeha",
     "github": "GitHub",
+    "image": "Sary",
     "imageUnavailable": "Tsy azo aseho ny sary.",
     "loading": "Mampiditra…",
     "loadMore": "Ampidiro ny manaraka",
@@ -399,7 +400,7 @@
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
       "orgDescription": "Iombonan'ny olona rehetra ao amin'ny fikambanana ireo lakile ireo ary aloa amin'ny kaontin'ny fikambanana ao amin'ny mpamatsy.",
-      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka manova ny lakileny.",
+      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana faktiora ihany no afaka manova ny lakileny.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "managedByPlan": "Tantanin'ny drafitra fandaharana anananao",
       "enableKey": "Alefaso ny lakilen'ny {{provider}}",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Maka sary",
       "imageUnavailableRetry": "Tsy azo aseho ny sary, andramo alaina indray",
+      "imageUnavailableRetryWithAlt": "Tsy azo aseho ny sary, {{alt}}, andramo alaina indray",
       "imagePreviewUnavailableInSession": "Tsy azo jerena mialoha ny sary amin'ity fotoam-piasana ity.",
       "viewImage": "Jereo ny sary",
       "viewImageWithAlt": "Jereo ny sary {{alt}}",
@@ -3686,7 +3688,7 @@
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
       "seatsFull": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny.",
-      "seatsFullCanInviteBilling": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Mbola afaka manasa mpitantana ny fandoavam-bola ianao, izay tsy mibodo toerana.",
+      "seatsFullCanInviteBilling": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Mbola afaka manasa mpitantana faktiora ianao, izay tsy mibodo toerana.",
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
@@ -3847,7 +3849,7 @@
       "nameRequired": "Ampidiro ny anaran'ny vondrona.",
       "nameTooLong": "Aza mihoatra ny 80 litera ny anarana.",
       "notFound": "Tsy misy intsony ity vondrona ity.",
-      "permissionDenied": "Ny tompon'ny fikambanana na ny mpitantany ihany no afaka manova ny vondrona ao aminy.",
+      "permissionDenied": "Ny tompon'ny fikambanana na ny mpitantana ihany no afaka manova ny vondrona ao aminy.",
       "searchMembers": "Karohy ny mpikambana",
       "selectAllVisible": "Safidio izay rehetra aseho"
     },
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Ampiasao ny '$t(login.resendCode)' na ny '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -4338,7 +4340,15 @@
       "download": "Sintony ny modely ao amin'ny fitaovana",
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
-      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray.",
+      "cannotUse": "Tsy afaka mampandeha: {{items}}.",
+      "cannotUseOptions": "Tsy afaka mameno: safidy fitaovana sasany.",
+      "limitations": "Fetra",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Asehoy ny fikirana",
+        "settingsSet": "Ovao ny fikirana"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Tsy afaka nitahiry ny torolalana",
     "instructionDeleteFailed": "Tsy afaka namafa ny torolalana",
     "instructionToggleFailed": "Tsy afaka nanavao ny torolalana",
+    "instructionViewTitle": "Rakitra torolalana",
     "instructionLimitReached": "Ny profil iray dia mahazaka torolalana hatramin'ny {{max}}. Fafao ny iray hanampiana ny hafa.",
     "mcp": {
       "title": "Mpizara MCP",

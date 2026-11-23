@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   clearTrustedImageHosts,
   revokeImageHost,
@@ -73,19 +74,21 @@ function slotCount(root: TestRenderer.ReactTestInstance, aspectRatio: number): n
   ).length;
 }
 
-function loadLabel(uri: string): string {
-  return `Load ${new URL(uri).hostname.toLowerCase()}`;
+function loadLabel(uri: string, alt = ''): string {
+  const withHost = `Load ${new URL(uri).hostname.toLowerCase()}`;
+  return alt ? `${alt} and ${withHost}` : withHost;
 }
 
 function findLoadButtons(
   root: TestRenderer.ReactTestInstance,
-  uri: string
+  uri: string,
+  alt = ''
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
-      node.props.accessibilityLabel === loadLabel(uri)
+      node.props.accessibilityLabel === loadLabel(uri, alt)
   );
 }
 
@@ -108,11 +111,11 @@ function chooseAlertAction(action: string): void {
 async function pressLoad(
   root: TestRenderer.ReactTestInstance,
   uri: string,
-  action = 'Load once'
+  { action = 'Load once', alt = '' }: { action?: string; alt?: string } = {}
 ): Promise<void> {
   await act(async () => {
     await Promise.resolve();
-    const loadButton = findLoadButtons(root, uri)[0];
+    const loadButton = findLoadButtons(root, uri, alt)[0];
     if (!loadButton) {
       throw new Error('load button not found');
     }
@@ -223,7 +226,7 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('renderer was not created');
     }
 
-    await pressLoad(renderer.root, uri);
+    await pressLoad(renderer.root, uri, { alt: 'first' });
 
     expect(ofType(renderer.root, 'Image')).toHaveLength(2);
     await unmount(renderer);
@@ -232,15 +235,18 @@ describe('MarkdownImage inert-until-load', () => {
   it('renders http and data URIs as static chips without fetching', async () => {
     const httpRenderer = await mount('http://insecure.com/a.png');
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
+    // Nothing to press without a link: the chip is plain content, never a button.
     expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
-    expect(texts(httpRenderer.root)).toContain('insecure.com · HTTPS images only');
+    expect(texts(httpRenderer.root)).toContain(
+      '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
     expect(slotCount(httpRenderer.root, 4 / 3)).toBe(0);
     await unmount(httpRenderer);
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
-    expect(texts(dataRenderer.root)).toContain('HTTPS images only');
+    expect(texts(dataRenderer.root)).toContain('\u2068HTTPS images only\u2069');
     expect(slotCount(dataRenderer.root, 4 / 3)).toBe(0);
     await unmount(dataRenderer);
   });
@@ -266,7 +272,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Image unavailable, retry loading'
+        node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     expect(retryButtons).toHaveLength(1);
     const retryButton = retryButtons[0];
@@ -311,7 +317,7 @@ describe('MarkdownImage inert-until-load', () => {
     let renderer = await mount(uri, 'shot');
 
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
-    await pressLoad(renderer.root, uri);
+    await pressLoad(renderer.root, uri, { alt: 'shot' });
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
@@ -334,7 +340,7 @@ describe('MarkdownImage inert-until-load', () => {
     expect(slotCount(renderer.root, 0.75)).toBe(1);
 
     const retry = renderer.root.find(
-      node => node.props.accessibilityLabel === 'Image unavailable, retry loading'
+      node => node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     await act(async () => {
       await Promise.resolve();
@@ -508,8 +514,8 @@ describe('MarkdownImage inert-until-load', () => {
     const chip = renderer.root.find(
       node =>
         typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        node.props.accessibilityLabel === 'insecure.com · HTTPS images only'
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
     );
     expect(chip.props.accessibilityActions).toEqual([
       { name: 'showLinkActions', label: 'Show link actions' },
@@ -545,7 +551,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Image unavailable, retry loading'
+        node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     expect(retryButtons).toHaveLength(1);
     const retryButton = retryButtons[0];
@@ -617,14 +623,14 @@ describe('MarkdownImage inert-until-load', () => {
   });
 
   it('Load control is at least 44pt and announces host plus action', async () => {
-    const renderer = await mount('https://example.com/a.png');
-    const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    const renderer = await mount('https://example.com/a.png', 'A chart');
+    const load = findLoadButtons(renderer.root, 'https://example.com/a.png', 'A chart')[0];
     if (!load) {
       throw new Error('load button not found');
     }
     expect(load.props.className).toContain('min-h-11');
     expect(load.props.className).toContain('min-w-11');
-    expect(load.props.accessibilityLabel).toBe('Load example.com');
+    expect(load.props.accessibilityLabel).toBe('A chart and Load example.com');
 
     await unmount(renderer);
   });
@@ -643,7 +649,7 @@ describe('MarkdownImage inert-until-load', () => {
 describe('MarkdownImage trusted-host policy', () => {
   it('auto-loads a later image from a trusted host without another prompt', async () => {
     const first = await mount('https://example.com/a.png');
-    await pressLoad(first.root, 'https://example.com/a.png', 'Trust this host');
+    await pressLoad(first.root, 'https://example.com/a.png', { action: 'Trust this host' });
     expect(ofType(first.root, 'Image')).toHaveLength(1);
     await unmount(first);
 
@@ -679,5 +685,255 @@ describe('MarkdownImage trusted-host policy', () => {
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
     await unmount(dataRenderer);
+  });
+});
+
+/**
+ * The chips stand in for an image the reader cannot see, so each one carries
+ * the alt text the markdown gave it, and each one offers the message's link
+ * actions on long press exactly as the loaded image does.
+ */
+describe('MarkdownImage chip descriptions and long press', () => {
+  it('puts the alt text in front of an http chip reason', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart');
+    expect(texts(renderer.root)).toContain(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
+    const chip = ofType(renderer.root, 'View')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.accessibilityRole).toBe('text');
+    expect(chip.props.accessibilityLabel).toBe(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
+    expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('puts the alt text in front of a data URI chip reason', async () => {
+    const renderer = await mount('data:image/png;base64,abc', 'A chart');
+    expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068HTTPS images only\u2069');
+    expect(ofType(renderer.root, 'View')[0]?.props.accessibilityLabel).toBe(
+      '\u2068A chart\u2069 · \u2068HTTPS images only\u2069'
+    );
+    expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('follows the enclosing link when the blocked chip is tapped', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      accessibilityLabel: 'Example',
+      onPress,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.accessibilityRole).toBe('link');
+    expect(String(chip.props.className)).toContain('active:opacity-80');
+
+    await act(async () => {
+      await Promise.resolve();
+      (chip.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('keeps the blocked chip inert without a link or link actions', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart');
+    // Nothing to press, nothing to grow: no pressable host at all.
+    expect(ofType(renderer.root, 'Pressable')).toHaveLength(0);
+    const chip = ofType(renderer.root, 'View')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.accessibilityRole).toBe('text');
+    expect(String(chip.props.className)).not.toContain(TOUCH_TARGET_CLASS);
+    expect(String(chip.props.className)).not.toContain('active:opacity-80');
+
+    await unmount(renderer);
+  });
+
+  it('sizes the blocked chip as a touch target once it answers a press', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      onShowLinkActions: () => undefined,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.onLongPress).toBeTypeOf('function');
+    expect(String(chip.props.className)).toContain(TOUCH_TARGET_CLASS);
+
+    await unmount(renderer);
+  });
+
+  it('names a linked blocked chip for the link while drawing only the description', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      accessibilityLabel: 'Example',
+      onPress: () => undefined,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    // The link's name reaches the reader...
+    expect(chip.props.accessibilityLabel).toBe(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069 and Example'
+    );
+    // ...and never lands in the drawn line.
+    expect(texts(renderer.root)).toContain(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
+
+    await unmount(renderer);
+  });
+
+  it('names the unconfirmed chip row and its Load button with the alt text', async () => {
+    const uri = 'https://example.com/a.png';
+    const renderer = await mount(uri, 'A chart');
+    expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068example.com\u2069');
+
+    const load = findLoadButtons(renderer.root, uri, 'A chart')[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    expect(load.props.accessibilityLabel).toBe('A chart and Load example.com');
+
+    await unmount(renderer);
+  });
+
+  it('long-presses the blocked chip into the link actions', async () => {
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount('http://insecure.com/a.png', '', {
+      onShowLinkActions: onShow,
+    });
+    const chip = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
+    expect(chip.props.onLongPress).toBe(onShow);
+    await act(async () => {
+      await Promise.resolve();
+      (chip.props.onLongPress as () => void)();
+    });
+    expect(onShow).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('long-presses the unconfirmed Load button into the link actions', async () => {
+    const uri = 'https://example.com/a.png';
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount(uri, '', { onShowLinkActions: onShow });
+    const load = findLoadButtons(renderer.root, uri)[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    expect(load.props.onLongPress).toBe(onShow);
+    await act(async () => {
+      await Promise.resolve();
+      (load.props.onLongPress as () => void)();
+    });
+    expect(onShow).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('retries a failed image on tap instead of following its link', async () => {
+    const uri = 'https://example.com/a.png';
+    confirmMarkdownImage(uri);
+    const onPress = vi.fn<() => void>();
+    const renderer = await mount(uri, 'shot', { accessibilityLabel: 'Example', onPress });
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    const retry = ofType(renderer.root, 'Pressable')[0];
+    if (!retry) {
+      throw new Error('retry chip not found');
+    }
+    expect(texts(renderer.root)).toContain('Image unavailable\nshot');
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+    expect(onPress).not.toHaveBeenCalled();
+    expect(ofType(renderer.root, 'Image')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('names the retry chip with the alt text and keeps the plain copy without it', async () => {
+    const uri = 'https://example.com/a.png';
+    confirmMarkdownImage(uri);
+    const renderer = await mount(uri, 'shot');
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+    expect(ofType(renderer.root, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Image unavailable, shot, retry loading'
+    );
+    await unmount(renderer);
+
+    const plainUri = 'https://example.com/b.png';
+    confirmMarkdownImage(plainUri);
+    const plainRenderer = await mount(plainUri);
+    const plainImage = ofType(plainRenderer.root, 'Image')[0];
+    if (!plainImage) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (plainImage.props.onError as () => void)();
+    });
+    expect(ofType(plainRenderer.root, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Image unavailable, retry loading'
+    );
+    await unmount(plainRenderer);
+  });
+
+  it('falls back to the translated image name for an empty alt and src', async () => {
+    const renderer = await mount('', '');
+    expect(texts(renderer.root)).toContain('Image');
+    await unmount(renderer);
+  });
+
+  it('names the viewer of an alt-less HTTPS image with the translated image name', async () => {
+    const uri = 'https://example.com/';
+    confirmMarkdownImage(uri);
+    const renderer = await mount(uri, '');
+
+    const imageButton = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === 'View image'
+    );
+    await act(async () => {
+      await Promise.resolve();
+      (imageButton.props.onPress as () => void)();
+    });
+    expect(ofType(renderer.root, 'ImageViewer')[0]?.props.filename).toBe('Image');
+
+    await unmount(renderer);
   });
 });

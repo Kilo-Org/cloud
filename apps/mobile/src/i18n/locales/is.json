@@ -91,6 +91,7 @@
     "draft": "Drög",
     "enabled": "Virkt",
     "github": "GitHub",
+    "image": "Mynd",
     "imageUnavailable": "Myndin er ekki tiltæk.",
     "loading": "Hleðsla í gangi…",
     "loadMore": "Sækja meira",
@@ -1591,7 +1592,7 @@
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
-      "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
+      "offDescription": "Eigendur, stjórnendur og innheimtustjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina",
       "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
       "trackedReviewsUncounted": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Hleður myndinni",
       "imageUnavailableRetry": "Myndin er ekki tiltæk, reyna að hlaða henni aftur",
+      "imageUnavailableRetryWithAlt": "Myndin er ekki tiltæk, {{alt}}, reyna að hlaða henni aftur",
       "imagePreviewUnavailableInSession": "Ekki er hægt að forskoða myndir í þessari lotu.",
       "viewImage": "Skoða mynd",
       "viewImageWithAlt": "Skoða mynd {{alt}}",
@@ -3686,7 +3688,7 @@
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
       "seatsFull": "Öll sæti eru í notkun ({{used}}/{{total}}). Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum.",
-      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið greiðslustjórum, sem nota ekki sæti.",
+      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið innheimtustjórum, sem nota ekki sæti.",
       "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Notaðu „$t(login.resendCode)“ eða „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",
@@ -4338,7 +4340,15 @@
       "download": "Sækja líkan í tækið",
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
-      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur."
+      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur.",
+      "cannotUse": "Ekki hægt að keyra: {{items}}.",
+      "cannotUseOptions": "Ekki hægt að fylla út: suma valkosti tóls.",
+      "limitations": "Takmarkanir",
+      "tools": {
+        "time": "Tími",
+        "settingsList": "Sýna stillingar",
+        "settingsSet": "Breyta stillingum"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Gat ekki vistað leiðbeininguna",
     "instructionDeleteFailed": "Gat ekki eytt leiðbeiningunni",
     "instructionToggleFailed": "Gat ekki uppfært leiðbeininguna",
+    "instructionViewTitle": "Leiðbeiningarskrá",
     "instructionLimitReached": "Snið getur haft allt að {{max}} leiðbeiningar. Eyða einni til að bæta við annarri.",
     "mcp": {
       "title": "MCP netþjóna",

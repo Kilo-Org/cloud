@@ -2999,6 +2999,39 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  it('never grades a killed-before-events attempt whose retry the block refused', async () => {
+    // The block is on its last claim, so the retry is refused. A first attempt killed before
+    // any event is not a measurement: grading it would write a zero for a case that never ran,
+    // so it is deferred through normal admission instead (the retry===null rule).
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: -1,
+      costUsd: 0,
+      eventCount: 0,
+      lastEventTypes: [],
+    });
+    schedulerRun.mockImplementation(async (sql?: string) => ({
+      meta: { changes: typeof sql === 'string' && sql.includes('attempts = attempts + 1') ? 0 : 1 },
+    }));
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    // Nothing is measured or written for the case.
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(savePendingDeciderOutput).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    // It is released as unbilled and the chunk defers through normal admission.
+    expect(restartPaidCase).not.toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
+  });
+
   it('spends the block’s retry attempt before the in-process empty-output retry', async () => {
     vi.mocked(runDeciderCaseViaCli)
       .mockResolvedValueOnce({ ...successfulCliResult, text: '', costUsd: 0.01 })

@@ -1396,6 +1396,37 @@ export function refundRetryAttemptStatement(
     .bind(id, token);
 }
 
+/**
+ * Undo a retry that provably never reached the model: the attempt it spent and the ledger
+ * start it moved. Both writes name this claim's own token, and the chunk is addressed by the
+ * claim's id — a chunk id is the JSON of the block's position, never the run id. Best effort
+ * by design: the block is already deferring, and a failed refund must not turn a wait into a
+ * lane death.
+ */
+export async function refundRetryAttempt(
+  db: D1Database,
+  input: {
+    /** The claim the retry ran under. */
+    claim: { id: string; token: string };
+    /** The case whose ledger start the retry moved. */
+    execution: PaidExecutionKey & { attemptStartedAt: number };
+    /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
+    startedAt: number;
+    onError?: (error: unknown) => void;
+  }
+): Promise<void> {
+  await db
+    .batch([
+      refundRetryAttemptStatement(db, input.claim.id, input.claim.token),
+      restartPaidCaseStatement(
+        db,
+        { ...input.execution, attemptStartedAt: input.startedAt },
+        input.execution.attemptStartedAt
+      ),
+    ])
+    .catch((error: unknown) => input.onError?.(error));
+}
+
 export async function restartPaidCase(
   db: D1Database,
   key: PaidExecutionKey,

@@ -187,7 +187,7 @@ import {
   acquireInitializationLease,
   restartPaidCaseStatement,
   consumeRetryAttemptStatement,
-  refundRetryAttemptStatement,
+  refundRetryAttempt,
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
@@ -3230,39 +3230,6 @@ async function caseInferenceProxy(
  *   the deletes match in the same transaction.
  * A crash cannot split them: either the whole batch commits or none of it does.
  */
-/**
- * Undo a retry that provably never reached the model: the attempt it spent and the ledger
- * start it moved. Both writes name this claim's own token, so a concurrent pass that owns the
- * case is untouched. Best effort by design — the block is already deferring, and a failed
- * refund must not turn a wait into a lane death.
- */
-async function refundRetryAttempt(
-  env: Env,
-  input: {
-    execution: PaidExecutionKey & { attemptStartedAt: number };
-    /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
-    startedAt: number;
-  }
-): Promise<void> {
-  await env.BENCH_DB.batch([
-    refundRetryAttemptStatement(env.BENCH_DB, input.execution.runId, input.execution.token),
-    restartPaidCaseStatement(
-      env.BENCH_DB,
-      { ...input.execution, attemptStartedAt: input.startedAt },
-      input.execution.attemptStartedAt
-    ),
-  ]).catch((error: unknown) => {
-    console.warn(
-      JSON.stringify({
-        event: 'benchmark_retry_attempt_refund_failed',
-        runId: input.execution.runId,
-        caseId: input.execution.caseId,
-        errorCategory: benchmarkErrorCategory(error),
-      })
-    );
-  });
-}
-
 async function releaseUnbilledPaidGeneration(
   env: Env,
   input: {
@@ -3855,10 +3822,32 @@ async function processDeciderJob(
         if ((consumed.meta.changes ?? 0) === 0) {
           // The block already spent its automatic attempts: the ledger restart above is
           // undone so the retry leaves no trace of a start that never happened.
-          await refundRetryAttempt(env, {
+          await refundRetryAttempt(env.BENCH_DB, {
+            claim: { id: claim.id, token: claim.token },
             execution: { ...execution, attemptStartedAt },
             startedAt,
+            onError: error =>
+              console.warn(
+                JSON.stringify({
+                  event: 'benchmark_retry_attempt_refund_failed',
+                  runId: message.runId,
+                  caseId: benchCase.id,
+                  errorCategory: benchmarkErrorCategory(error),
+                })
+              ),
           });
+          // A killed-before-events first attempt is not a measurement: grading it would
+          // record a zero for a case that never ran, exactly what the retry===null path
+          // refuses. It is deferred through normal admission instead.
+          if (isKilledBeforeEventsResult(first)) {
+            const cleared = await releaseUnbilledPaidGeneration(env, {
+              key: caseKey,
+              execution: { ...execution, attemptStartedAt: startedAt },
+              generation: canonicalGeneration,
+            }).catch(() => 'quarantined' as const);
+            if (cleared === 'quarantined') return null;
+            throw new ChunkClaimLostError();
+          }
           return { result: first, retried: false, promptRevision };
         }
         // The retry is a further paid call of the same generation: its capability must name
@@ -3938,9 +3927,19 @@ async function processDeciderJob(
           // The retry never reached the provider, so its spend is returned before anything
           // else: a container-capacity refusal is a wait, and the block must not lose an
           // attempt to it.
-          await refundRetryAttempt(env, {
+          await refundRetryAttempt(env.BENCH_DB, {
+            claim: { id: claim.id, token: claim.token },
             execution: { ...execution, attemptStartedAt },
             startedAt,
+            onError: error =>
+              console.warn(
+                JSON.stringify({
+                  event: 'benchmark_retry_attempt_refund_failed',
+                  runId: message.runId,
+                  caseId: benchCase.id,
+                  errorCategory: benchmarkErrorCategory(error),
+                })
+              ),
           });
           // The first attempt was killed before any event and no retry measured the case, so
           // there is nothing to grade: returning `first` would record a zero for a case that
@@ -3959,9 +3958,8 @@ async function processDeciderJob(
             if (retryNotReached !== null) throw retryNotReached;
             throw new ChunkClaimLostError();
           }
-          // Any other refusal still leaves the case unmeasured when the first attempt never
-          // emitted an event, so it is deferred through normal admission rather than graded.
-          if (isKilledBeforeEventsResult(first)) throw retryNotReached ?? new ChunkClaimLostError();
+          // Only a case the model actually answered reaches grading here: the
+          // killed-before-events result was handled above.
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         addPriorAttempt(retry, first);

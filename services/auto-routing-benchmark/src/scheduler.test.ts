@@ -33,6 +33,8 @@ import {
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_USER_ATTEMPTS,
   SCHEDULER_MATERIALIZED_PAGE_SIZE,
+  refundRetryAttempt,
+  restartPaidCaseStatement,
   SCHEDULER_MAX_USER_LEASE_RECLAIMS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
@@ -1010,6 +1012,62 @@ describe('scheduler (production migrations and real SQLite)', () => {
       attempts: SCHEDULER_MAX_USER_ATTEMPTS,
     });
     expect(await claimMany(db, config, 2, 'after-user-defer', NOW + 10)).toEqual([]);
+  });
+
+  it("refunds a refused retry's attempt and ledger start against a real database", async () => {
+    // The refund addresses the chunk by the CLAIM's id: a chunk id is the JSON of the block's
+    // position, so binding the run id there matched nothing and silently left the block at its
+    // cap. This runs the production helper against real migrations, not mocks.
+    insertRun(sqlite, 'refund');
+    await scheduleRunChunks(db, {
+      runId: 'refund',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refund-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    // The retry spent its attempt and moved the ledger start, then was refused.
+    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
+    const ledgerKey = {
+      runId: 'refund',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    const retriedAt = NOW + 1;
+    await restartPaidCaseStatement(
+      db,
+      {
+        runId: 'refund',
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        caseId: 'case',
+        token: claim.token,
+        attemptStartedAt: NOW,
+      },
+      retriedAt
+    ).run();
+
+    await refundRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      // `execution` carries the attempt's ORIGINAL start; `startedAt` is what the retry
+      // wrote. Reverting restores the original, which is what the WHERE clause matches.
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+    expect(
+      sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
+    ).toEqual({ started_at: NOW });
   });
 
   it('does not spend a platform attempt on a wait that never reached the model', async () => {

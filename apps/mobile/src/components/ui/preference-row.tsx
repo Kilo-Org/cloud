@@ -1,5 +1,5 @@
 import { type ComponentType, type ReactNode } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { type LucideProps } from '@/components/ui/icons';
@@ -78,27 +78,8 @@ export function PreferenceRow({
   testID,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
-  const isDark = useColorScheme() === 'dark';
-  // The shared `Switch` already paints the dark scheme: a light grip on the
-  // muted ink, which reads as a knob in a dark row. What it cannot know is this
-  // row's light surface: its off track is `mutedSoft`, 2.1:1 over the row's
-  // `#F0EEE6` card, and Android's own default before it was 1.02:1, so the off
-  // control read as two barely-visible grey marks. The light scheme therefore
-  // overrides both halves with the muted ink `#6F6A61` (4.6:1 on the row) under
-  // the white grip (5.2:1 over that track). The dark scheme passes nothing and
-  // takes the shared pair.
-  // An unavailable row must not read as both dimmed and on: a full-strength
-  // accent track beside the muted title says the control is live. While the row
-  // is disabled the light override yields, so the shared `Switch` paints its
-  // own muted pair there (`mutedSoft` track, `primaryDisabled` fill); iOS fades
-  // the control itself.
-  const switchColors =
-    isDark || disabled
-      ? undefined
-      : {
-          thumbColor: colors.primaryForeground,
-          trackColor: { false: colors.mutedForeground, true: colors.primary },
-        };
+  // The row takes the shared switch pair, which clears the 3:1 non-text floor
+  // on every surface this row paints.
   // Both ways of moving the switch flip the same value: a tap on the row and a
   // tap on the thumb can arrive in either order, and a burst must not build one
   // flip from the rendered value and the next from the native thumb state.
@@ -191,8 +172,6 @@ export function PreferenceRow({
         value,
         onValueChange: flip,
         disabled,
-        thumbColor: switchColors?.thumbColor,
-        trackColor: switchColors?.trackColor,
         accessibilityLabel: spokenLabel,
         accessibilityHint: subtitle,
         accessibilityState: { disabled, busy, checked: value },

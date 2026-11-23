@@ -26,12 +26,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * olive the palette keeps for the same theme (`selection` — the light primary's
  * hue, lifted for the dark page) rather than the accent.
  *
- * The off pair follows the scheme as well, because a grip that always takes
- * `primaryForeground` is near-black in dark mode and vanishes into the off
- * track. Off draws a light grip on a lighter track, so the control still reads
- * as a control while it says off: `mutedSoft` with a white grip in light,
- * `mutedForeground` with a `foreground` grip in dark. A caller that wants
- * another pair still wins: its own props are applied last.
+ * The off pair is one pair in both themes: the mid neutral `mutedForeground`
+ * track under the scheme ink `foreground` grip. That pair clears the 3:1
+ * non-text floor against itself and against `background`, `card` and
+ * `secondary` in light and dark alike, so the control reads as a control while
+ * it says off. The earlier light pair, a white grip on the `mutedSoft` track,
+ * measured about 2.5:1 on its own track and about 1.1:1 on the cream row that
+ * Android's wider thumb overhangs onto. A caller that wants another pair still
+ * wins: its own props are applied last.
  *
  * A disabled switch paints one muted pair, at the position it still shows.
  * Android folds the colours into the track and thumb drawables and only sets
@@ -41,15 +43,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  *
  * The pair is the same for on and off and has one shape in light and dark: a
  * soft grip on the translucent ink track `ringTrack`, `muted` in light and
- * `mutedForeground` in dark. Each half is quieter than its enabled twin (the
- * white or `foreground` grip, the `mutedSoft` or `mutedForeground` off track,
- * the olive on track), so disabled reads quieter than enabled in both schemes,
- * while the thumb's position still says which way it points. The earlier
- * `mutedSoft` track under the ink `foreground` grip painted a near-black grip
- * in light, the darkest mark in its card, and a light one in dark, so one
- * state read two ways across themes (Android critic, 2026-11-19). An olive
- * `primaryDisabled` track read as active (`app-notifications` gate,
- * 2026-11-18).
+ * `mutedForeground` in dark. Each half is quieter than its enabled twin — the
+ * enabled grips, the mid neutral off track, the olive on track — so disabled
+ * reads quieter than enabled in both schemes, while the thumb's position still
+ * says which way it points. The earlier `mutedSoft` track under the ink
+ * `foreground` grip painted a near-black grip in light, the darkest mark in its
+ * card, and a light one in dark, so one state read two ways across themes
+ * (Android critic, 2026-11-19). An olive `primaryDisabled` track read as active
+ * (`app-notifications` gate, 2026-11-18).
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that
@@ -105,8 +106,10 @@ export function Switch({
   // fills with `primary`, dark with the muted olive `selection`.
   const enabledOnTrack = dark ? colors.selection : colors.primary;
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
-  const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
-  const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
+  // The off pair is the same in both themes: the mid neutral track under the
+  // scheme ink grip, which clears the 3:1 non-text floor on every row surface.
+  const enabledOffGrip = colors.foreground;
+  const enabledOffTrack = colors.mutedForeground;
   // The off grip sits on the off track. A control that cannot change paints
   // one quiet pair at the position it still shows: a soft grip on the
   // translucent ink track, quieter than every enabled half in both schemes.

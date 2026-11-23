@@ -469,6 +469,49 @@ describe('disabled switch pair contrast (non-text)', () => {
   });
 });
 
+// The off control is what tells a reader a settings-row switch is off: the
+// light grip on the `mutedSoft` track it used to paint measured about 2.5:1 on
+// its own track, and about 1.1:1 where Android's wider thumb overhangs onto
+// the cream row, both under WCAG 1.4.11's 3:1 non-text floor. The pair is now
+// the mid neutral track under the scheme ink, the same in light and dark.
+describe('enabled off switch pair contrast (non-text)', () => {
+  it('every theme: the off grip reads on its own track and the row surfaces', () => {
+    for (const [themeName, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      expect(
+        contrastRatio(colors.foreground, colors.mutedForeground),
+        `off grip vs its track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      const surfaces = [
+        ['background', colors.background],
+        ['card', colors.card],
+        ['secondary', colors.secondary],
+      ] as const;
+      for (const [surfaceName, surface] of surfaces) {
+        expect(
+          contrastRatio(colors.mutedForeground, surface),
+          `off track vs ${surfaceName} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+        expect(
+          contrastRatio(colors.foreground, surface),
+          `off grip vs ${surfaceName} (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+      }
+    }
+  });
+
+  // Regression: the replaced light pair was the white `primaryForeground` grip
+  // on the `mutedSoft` track. It sat at about 2.5:1, so it never cleared the
+  // floor even against its own track.
+  it('light theme: the old white grip on the muted-soft track stays under the floor', () => {
+    expect(contrastRatio(lightColors.primaryForeground, lightColors.mutedSoft)).toBeLessThan(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+});
+
 // The `secondary` button variant paints `--secondary-fill`. It used to paint
 // `--secondary`, which is also the dark card an `outline` control paints, so in
 // the dark scheme a filled action and the outlined control beside it (the

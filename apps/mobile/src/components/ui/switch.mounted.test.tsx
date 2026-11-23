@@ -108,15 +108,21 @@ describe('Switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({}).root);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedForeground,
+      true: lightColors.primary,
+    });
+    expect(props.thumbColor).toBe(lightColors.foreground);
   });
 
   it('paints the light grip on the on track', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ value: true }).root);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedForeground,
+      true: lightColors.primary,
+    });
     expect(props.thumbColor).toBe(lightColors.primaryForeground);
   });
 
@@ -279,7 +285,10 @@ describe('Switch', () => {
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.disabled).toBe(true);
     expect(props.accessibilityState?.disabled).toBe(true);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedForeground,
+      true: lightColors.primary,
+    });
     expect(props.thumbColor).toBe(lightColors.primaryForeground);
   });
 

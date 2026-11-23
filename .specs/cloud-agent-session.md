@@ -83,6 +83,8 @@ repository.
 
 1. Environment and profile editors MUST list **Network secrets** separately from environment variables.
    Commands can read environment values, including values hidden after save.
+   In the profile editor, network secrets MUST use the same row add, edit and delete controls as
+   profile environment variables, and each action MUST save at once.
 2. A network secret MUST have a variable name, a write-only value, and one to ten exact allowed domains.
    An environment or profile MUST hold at most twenty network secrets.
    One name MUST NOT be both an environment variable and a network secret in the same source.
@@ -109,6 +111,8 @@ repository.
 8. The editor MUST explain domain reachability, token scope, response echo risk, and client token-format checks.
    Network secrets restrict where Kilo sends a value, not which actions the agent can perform there.
    Kilo MUST NOT promise response redaction or protection for raw TCP, SSH, or database protocols.
+   The profile editor MUST show the flow from the sandbox placeholder through the Kilo network proxy to
+   a replaced or a blocked request. Its explanations MAY be in a collapsed section.
 
 ### Start
 
@@ -921,6 +925,10 @@ The following use SHOULD and are not enforced today:
    under Start rule 9.)
 
 ## Changelog
+
+### 2026-11-23 -- Profile network secrets editor
+
+- The profile editor saves network secret changes per row, shows the proxy flow, and puts warnings under Limits.
 
 ### 2026-11-13 -- Multi-repository environments on Vercel
 

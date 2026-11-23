@@ -1,6 +1,8 @@
 import {
+  NETWORK_SECRET_LIMITS,
   networkSecretInputSchema,
   type NetworkSecretChange,
+  type NetworkSecretInput,
   type NetworkSecretPolicy,
 } from '@kilocode/worker-utils/network-secrets';
 
@@ -36,44 +38,29 @@ export function buildNetworkSecretChanges(
   ];
 }
 
-export type NetworkSecretSaveFailure = { key: string; message: string };
+export function parseNetworkSecretForm({
+  key,
+  secret,
+  domains,
+}: Pick<NetworkSecretFormState, 'key' | 'secret' | 'domains'>): NetworkSecretInput | string {
+  const parsed = networkSecretInputSchema.safeParse({
+    key,
+    value: secret,
+    allowedHosts: domains.split(/[\s,]+/).filter(Boolean),
+    locations: ['header'],
+  });
+  return parsed.success
+    ? parsed.data
+    : (parsed.error.issues[0]?.message ?? 'Check the network secret.');
+}
 
-/** Applies every change in order and returns the changes that failed, so earlier changes are not hidden. */
-export async function saveNetworkSecretChanges(
-  changes: readonly NetworkSecretChange[],
-  apply: (change: NetworkSecretChange) => Promise<unknown>
-): Promise<NetworkSecretSaveFailure[]> {
-  const failures: NetworkSecretSaveFailure[] = [];
-  for (const change of changes) {
-    try {
-      await apply(change);
-    } catch (error) {
-      failures.push({
-        key: change.key,
-        message: error instanceof Error ? error.message : 'Could not save this network secret.',
-      });
-    }
+export function networkSecretAddError(
+  rows: readonly { key: string; delivery?: 'env' | 'network' }[],
+  key: string
+): string | null {
+  if (rows.some(row => row.key === key)) return 'This variable name already exists.';
+  if (rows.filter(row => row.delivery === 'network').length >= NETWORK_SECRET_LIMITS.MAX_SECRETS) {
+    return `Maximum ${NETWORK_SECRET_LIMITS.MAX_SECRETS} network secrets allowed.`;
   }
-  return failures;
-}
-
-/** Keeps only the values of failed changes, so a retry sends only what did not land. */
-export function draftAfterFailedSave(
-  draft: readonly NetworkSecretDraft[],
-  failures: readonly NetworkSecretSaveFailure[]
-): NetworkSecretDraft[] {
-  const failed = new Set(failures.map(failure => failure.key));
-  return draft.map(({ value, ...row }) =>
-    value !== undefined && failed.has(row.key) ? { ...row, value } : row
-  );
-}
-
-export function networkSecretSaveFailureMessage(
-  failures: readonly NetworkSecretSaveFailure[],
-  changeCount: number
-): string {
-  const keys = [...new Set(failures.map(failure => failure.key))].join(', ');
-  const reason = (failures[0]?.message ?? '').replace(/[.!?]?$/, '.');
-  const saved = changeCount > failures.length ? ' Your other changes were saved.' : '';
-  return `Could not save ${keys}: ${reason}${saved}`;
+  return null;
 }

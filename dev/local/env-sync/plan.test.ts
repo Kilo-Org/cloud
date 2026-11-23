@@ -899,6 +899,48 @@ test('points the local auto routing worker at the local gateway and seeds its se
   }
 });
 
+test('seeds the cloud-agent-next BYOC Secrets Store binding from the local env file', () => {
+  const readRepoFile = (relPath: string) =>
+    fs.readFileSync(new URL(`../../../${relPath}`, import.meta.url), 'utf-8');
+  const repo = createRepo({
+    '.env.local': 'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=\n',
+    [`${workerDir}/package.json`]: readRepoFile(`${workerDir}/package.json`),
+    [`${workerDir}/wrangler.jsonc`]: readRepoFile(`${workerDir}/wrangler.jsonc`),
+    [`${workerDir}/.dev.vars.example`]: 'R2_ATTACHMENTS_BUCKET=""\n',
+  });
+  try {
+    withFakePnpm('', () => {
+      // An empty value cannot seed the store, so the binding stays a reported gap.
+      const emptyPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
+      assert.equal(
+        emptyPlan.secretStoreAutoCreates.some(
+          create => create.binding.secret_name === 'BYOC_INTERNAL_API_SECRET_PROD'
+        ),
+        false
+      );
+
+      // The generated value reaches the store entry through the base-key fallback.
+      writeFile(
+        repo.root,
+        '.env.local',
+        'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=synthetic-byoc-key\n'
+      );
+      const seededPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
+      const seeded = seededPlan.secretStoreAutoCreates.find(
+        create =>
+          create.workerDir === workerDir &&
+          create.binding.secret_name === 'BYOC_INTERNAL_API_SECRET_PROD'
+      );
+      assert.ok(seeded);
+      assert.equal(seeded.sourceKey, 'BYOC_INTERNAL_API_SECRET');
+      assert.equal(seeded.value, 'synthetic-byoc-key');
+      assert.equal(seeded.binding.binding, 'BYOC_INTERNAL_API_SECRET_PROD');
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev vars', () => {
   const repo = createRepo({
     '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',

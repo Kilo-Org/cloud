@@ -18,10 +18,14 @@ type PreferenceRowProps = Readonly<{
   /** The line under the title. Omit it for a one-line switch row. */
   subtitle?: string;
   /**
-   * The line cap for the subtitle. Omit it and the subtitle paints every line;
-   * a caller that shares this row's copy with another row passes its cap so
-   * both reserve the same height. `'all'` states the same uncapped intent when
-   * the sibling row's own default is capped.
+   * The line cap for the subtitle, and the one place this row departs from
+   * `ConfigureRow`. That row's subtitle is often a value, an identifier or a
+   * hint that reads best on one line, so it caps the line by default. This
+   * row's subtitle explains the switch beside it, and the reader has to be able
+   * to finish it, so an omitted cap paints every line. A caller that pairs this
+   * copy with a capped sibling passes that sibling's cap so both reserve the
+   * same height, and `'all'` states the same uncapped intent when only the
+   * sibling has a default.
    */
   subtitleNumberOfLines?: number | 'all';
   /**

@@ -72,11 +72,15 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
               />
             </SettingsTarget>
             <SettingsTarget item={PREFERENCES_HUB_SETTINGS.toolSummaryTranslation}>
+              {/* This subtitle is a sentence whose tail names the failure
+                  behaviour, and the English copy already fills three lines at
+                  the compact column: a two-line cap cuts that tail off, so no
+                  fixed count bounds the copy. */}
               <ConfigureRow
                 icon={WandSparkles}
                 title={t(PREFERENCES_HUB_SETTINGS.toolSummaryTranslation.label)}
                 subtitle={t('preferences.toolSummaryTranslationSubtitle')}
-                subtitleNumberOfLines={2}
+                subtitleNumberOfLines="all"
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
                 }}

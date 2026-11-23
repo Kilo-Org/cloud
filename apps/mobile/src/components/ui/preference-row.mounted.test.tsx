@@ -65,6 +65,7 @@ function renderRow(props: {
   resolveValue?: () => boolean;
   title?: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number | 'all';
   note?: string;
   accessibilityLabel?: string;
   inactiveSubtitle?: string;
@@ -288,6 +289,42 @@ describe('PreferenceRow', () => {
     // so the row is as tall as the taller copy instead of the sum.
     expect(copies[0]?.props.className).toContain('w-full');
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
+  });
+
+  it('pins one line cap on every subtitle copy, capped or uncapped', () => {
+    // The reserved pair and the visible overlay must carry the same cap: a
+    // mismatched pair changes the row's height the moment the state flips.
+    const subtitleCaps = (props: { subtitleNumberOfLines?: number | 'all' }) => {
+      const root = renderRow({
+        value: false,
+        subtitle: 'Applies now',
+        inactiveSubtitle: 'Has no effect right now',
+        onValueChange: () => undefined,
+        ...props,
+      });
+      // The title is `text-sm`; the subtitle copies are the `text-xs` ones.
+      const subtitles = root.findAll(
+        node => Object.is(node.type, 'Text') && String(node.props.className).includes('text-xs')
+      );
+
+      // Three subtitle copies plus the title, so a dropped branch fails here.
+      expect(root.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(4);
+      expect(subtitles).toHaveLength(3);
+      return subtitles.map(node => node.props.numberOfLines);
+    };
+
+    // An omitted cap paints every line.
+    expect(subtitleCaps({})).toEqual([undefined, undefined, undefined]);
+
+    // A number clamps the reserved and the visible copy alike.
+    expect(subtitleCaps({ subtitleNumberOfLines: 2 })).toEqual([2, 2, 2]);
+
+    // `'all'` states the same uncapped intent as the omitted prop.
+    expect(subtitleCaps({ subtitleNumberOfLines: 'all' })).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
 
   it('paints the note as a third, smaller muted line under the subtitle', () => {

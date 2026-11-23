@@ -999,7 +999,10 @@ describe('the recorded state', () => {
     const crossFrame = { ...step, boundOrigin: 'https://pay.example' };
 
     firstHold.tab({ ...agentTab(), step: crossFrame });
-    firstHold.arm({ ...armedNeed({ url: 'https://app.example/reports/q4.pdf' }), step: crossFrame });
+    firstHold.arm({
+      ...armedNeed({ url: 'https://app.example/reports/q4.pdf' }),
+      step: crossFrame,
+    });
     await vi.advanceTimersByTimeAsync(0);
 
     const second = makeDownloads();

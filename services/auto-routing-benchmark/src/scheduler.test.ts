@@ -1819,4 +1819,163 @@ describe('scheduler (production migrations and real SQLite)', () => {
       .run();
     expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(false);
   });
+
+/**
+ * The automatic-attempt cap is keyed on the chunk row, so the proof that a platform block
+ * cannot exceed two calls reduces to: a block (run, model, variant, rep, case) always lands
+ * in the same chunk id, in a run that is never re-opened, and the row is never pruned and
+ * re-created. These tests replay every path that could break that.
+ */
+describe('platform attempt cap — a block can never be re-chunked with a fresh counter', () => {
+  let directory: string;
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    directory = mkdtempSync(join(tmpdir(), 'benchmark-retry-cap-'));
+    sqlite = new DatabaseSync(join(directory, 'scheduler.sqlite'));
+    applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
+    db = sqliteD1(sqlite);
+  });
+
+  afterEach(() => {
+    sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+    vi.useRealTimers();
+  });
+
+  /** Drives one platform block to its failed terminal state and returns its chunk id. */
+  async function exhaustOneBlock(runId: string, caseId: string): Promise<string> {
+    await scheduleRunChunks(db, {
+      runId,
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: [caseId],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    for (let attempt = 1; attempt <= SCHEDULER_MAX_PLATFORM_ATTEMPTS; attempt++) {
+      const [claim] = await claimMany(db, config, 1, `${runId}-${caseId}-${attempt}`, NOW + attempt);
+      if (!claim) throw new Error(`Expected claim ${attempt} for ${caseId}`);
+      expect(claim.case_ids).toBe(JSON.stringify([caseId]));
+      await deferChunk(db, claim.id, claim.token, NOW + attempt);
+    }
+    const row = storedChunks(sqlite).find(chunk => chunk.run_id === runId);
+    if (!row) throw new Error('Expected the exhausted chunk');
+    expect(row).toMatchObject({ status: 'failed', attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS });
+    return row.id;
+  }
+
+  it('keeps the same chunk id and counter when initialization is replayed after a failure', async () => {
+    insertRun(sqlite, 'replay');
+    const id = await exhaustOneBlock('replay', 'case-a');
+
+    // Dead-letter's legacy branch and every dispatch retry call initializeScheduledRun again.
+    // The chunk id is derived from the run and the block's position, and the insert is
+    // ON CONFLICT (id) DO NOTHING, so the replay neither recreates the row nor resets it.
+    await scheduleRunChunks(db, {
+      runId: 'replay',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 1,
+    });
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(storedChunks(sqlite)).toHaveLength(1);
+    expect(await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'replay-after', NOW + 10)).toEqual(
+      []
+    );
+  });
+
+  it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {
+    insertRun(sqlite, 'resize');
+    const id = await exhaustOneBlock('resize', 'case-a');
+    // chunkSize is a constant 1 for every decider run, but even a different size lands the
+    // only case at chunk 0; the id must not move and the counter must not restart.
+    await scheduleRunChunks(db, {
+      runId: 'resize',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 3,
+    });
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+    expect(await claimMany(db, schedulerConfig('{"slots":1}'), 2, 'resize-after', NOW + 10))
+      .toEqual([]);
+  });
+
+  it('assigns every block the same chunk id and counter on every replay', async () => {
+    insertRun(sqlite, 'narrowed');
+    // `laneCaseIds` can shift case offsets, but the initializer builds it only for a user run
+    // (`if (run.purpose === 'user')`, src/run.ts:1658); a platform run always measures the
+    // whole ordered catalog list, so each block keeps its own chunk index across replays.
+    const caseIds = ['case-a', 'case-b', 'case-c'];
+    await scheduleRunChunks(db, {
+      runId: 'narrowed',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    const before = storedChunks(sqlite).map(row => [row.id, row.case_ids]);
+    expect(before).toEqual(
+      caseIds.map((caseId, index) => [
+        JSON.stringify(['narrowed', 'cap/model', 'high', 0, index]),
+        JSON.stringify([caseId]),
+      ])
+    );
+    // Replaying the same initialization, which is what every retry path does, is a no-op.
+    await scheduleRunChunks(db, {
+      runId: 'narrowed',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds,
+      chunkSize: 1,
+    });
+    expect(storedChunks(sqlite).map(row => [row.id, row.case_ids])).toEqual(before);
+  });
+
+  it('prunes a failed chunk only with its stale run, and a terminal run is never re-opened', async () => {
+    insertRun(sqlite, 'pruned');
+    const id = await exhaustOneBlock('pruned', 'case-a');
+
+    // A running run's failed chunk is retained through the whole 24-hour window.
+    await recoverChunks(db, NOW + 23 * 3600_000);
+    expect(storedChunks(sqlite).find(row => row.id === id)).toMatchObject({
+      status: 'failed',
+      attempts: SCHEDULER_MAX_PLATFORM_ATTEMPTS,
+    });
+
+    // Only a run that already left `running` is pruned, and nothing in production writes a
+    // run back to `running` (no UPDATE benchmark_runs ... 'running' exists; a requeue starts
+    // a brand-new run id). So there is no later initialization that could recreate the row.
+    // The run's initialization marker names it for the prune, exactly as a real completed
+    // run's does.
+    sqlite.prepare("INSERT INTO scheduler_runs (run_id) VALUES ('pruned')").run();
+    sqlite
+      .prepare("UPDATE benchmark_runs SET status = 'failed', completed_at = ? WHERE id = 'pruned'")
+      .run(new Date(NOW).toISOString());
+    await recoverChunks(db, NOW + 25 * 3600_000);
+    expect(storedChunks(sqlite).find(row => row.id === id)).toBeUndefined();
+    await scheduleRunChunks(db, {
+      runId: 'pruned',
+      entries: [{ model: 'cap/model', variant: 'high' }],
+      repetitions: 1,
+      caseIds: ['case-a'],
+      chunkSize: 1,
+    });
+    // A terminal run's initialization is refused, so the pruned block is never recreated.
+    expect(storedChunks(sqlite)).toEqual([]);
+  });
 });

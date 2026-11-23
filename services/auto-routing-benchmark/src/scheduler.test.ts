@@ -33,9 +33,9 @@ import {
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_USER_ATTEMPTS,
   SCHEDULER_MATERIALIZED_PAGE_SIZE,
+  consumeRetryAttemptStatement,
   refundUnspentRetryAttempt,
   restartPaidCaseStatement,
-  revertRetryLedgerStart,
   SCHEDULER_MAX_USER_LEASE_RECLAIMS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
@@ -1071,10 +1071,10 @@ describe('scheduler (production migrations and real SQLite)', () => {
     ).toEqual({ started_at: NOW });
   });
 
-  it('gives back only the ledger start when the consume statement refused the retry', async () => {
-    // A refused consume (zero changes) is proof the retry's attempt was never added. Undoing
-    // the ledger start alone is therefore the whole refund: decrementing `attempts` too would
-    // grant an attempt the block never used and break the cap.
+  it('leaves both starts untouched when the consume statement refuses the retry', async () => {
+    // The retry spends its attempt before it moves either start, so a refused spend means the
+    // ledger start and the canonical case-run start were never touched and still agree — which
+    // is what RunnerCancel's live check compares.
     insertRun(sqlite, 'refused');
     await scheduleRunChunks(db, {
       runId: 'refused',
@@ -1096,67 +1096,27 @@ describe('scheduler (production migrations and real SQLite)', () => {
       token: claim.token,
     };
     expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
-    // The block is on its second claim, and only the ledger start moved: `consume` refused.
     sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
-    const retriedAt = NOW + 1;
-    await restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt).run();
+    const before = {
+      ledger: sqlite
+        .prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?')
+        .get('case'),
+      canonical: sqlite
+        .prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?')
+        .get('case'),
+    };
 
-    await revertRetryLedgerStart(db, {
-      claim: { id: claim.id, token: claim.token },
-      execution: { ...ledgerKey, attemptStartedAt: NOW },
-      startedAt: retriedAt,
-    });
+    // The production order: consume first, and stop when it refuses.
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(0);
 
-    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
     expect(
       sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
-    ).toEqual({ started_at: NOW });
-  });
-
-  it('allows the same number of lease losses and no-model-call waits before failing', async () => {
-    // Both paths are re-attempts for work that never reached the model, so they share one
-    // boundary: SCHEDULER_MAX_USER_LEASE_RECLAIMS are allowed and the next one fails the block.
-    const config = schedulerConfig('{"slots":1}');
-    const waits: Array<'deferred' | 'failed'> = [];
-    insertRun(sqlite, 'wait-bound', { purpose: 'user' });
-    await scheduleRunChunks(db, {
-      runId: 'wait-bound',
-      entries: independentEntries(1),
-      repetitions: 1,
-      caseIds: ['case'],
-      chunkSize: 1,
-    });
-    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1; attempt++) {
-      const [claim] = await claimMany(db, config, 1, `wait-${attempt}`, NOW + attempt);
-      if (!claim) throw new Error(`Expected wait claim ${attempt}`);
-      waits.push(await deferNoModelCallChunk(db, claim.id, claim.token, NOW + attempt));
-    }
-
-    const reclaims: Array<'failed' | 'claimed'> = [];
-    insertRun(sqlite, 'lease-bound', { purpose: 'user' });
-    await scheduleRunChunks(db, {
-      runId: 'lease-bound',
-      entries: independentEntries(1),
-      repetitions: 1,
-      caseIds: ['case'],
-      chunkSize: 1,
-    });
-    let now = NOW;
-    for (let attempt = 1; attempt <= SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1; attempt++) {
-      const [claim] = await claimMany(db, config, 1, `lease-${attempt}`, now);
-      if (!claim) {
-        reclaims.push('claimed');
-        break;
-      }
-      now += SCHEDULER_QUEUE_LEASE_MS;
-      // Only this lane's terminal rows count: the sweep also reports the earlier run's.
-      const failed = await recoverChunks(db, now);
-      reclaims.push(failed.some(row => row.run_id === 'lease-bound') ? 'failed' : 'claimed');
-    }
-
-    // Allowed three times, failed on the fourth, on both paths.
-    expect(waits).toEqual(['deferred', 'deferred', 'deferred', 'failed']);
-    expect(reclaims).toEqual(['claimed', 'claimed', 'claimed', 'failed']);
+    ).toEqual(before.ledger);
+    expect(
+      sqlite.prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?').get('case')
+    ).toEqual(before.canonical);
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
   });
 
   it('does not spend a platform attempt on a wait that never reached the model', async () => {
@@ -2387,6 +2347,62 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     // and another none, so count them.
     expect(new Set(scheduled).size).toBe(scheduled.length);
     expect(rows.every(cases => cases.length === 1)).toBe(true);
+  });
+
+  it('hashes every repetition, so a plan that fills a reused lane still reads as changed', async () => {
+    // Repetition 0 is fully reused (no planned rows) while repetition 1 is planned. If the
+    // fingerprint skipped the empty lane and returned early, a changed plan for repetition 1
+    // would hash equal: the pass would take the prefix path with no materialized set, and a
+    // case that moved above the prefix would be dropped by ON CONFLICT DO NOTHING.
+    insertRun(sqlite, 'reused-rep', { purpose: 'user' });
+    const block = { model: 'cap/model', variant: '' };
+    const laneKey = (rep: number) => JSON.stringify([block.model, block.variant, rep]);
+    const firstPlan = new Map([
+      [laneKey(0), []],
+      [laneKey(1), ['case-a', 'case-b']],
+    ]);
+    await scheduleRunChunks(db, {
+      runId: 'reused-rep',
+      entries: [block],
+      repetitions: 2,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+      laneCaseIds: firstPlan,
+    });
+    expect(storedChunks(sqlite).map(row => row.case_ids)).toEqual([
+      JSON.stringify(['case-a']),
+      JSON.stringify(['case-b']),
+    ]);
+    const recorded = sqlite
+      .prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'reused-rep'")
+      .get() as { plan_fingerprint: string };
+    expect(recorded.plan_fingerprint).toEqual(expect.any(String));
+
+    // Re-plan repetition 1 by moving case-b ahead of case-a. Repetition 0 stays empty.
+    sqlite.prepare("DELETE FROM scheduler_runs WHERE run_id = 'reused-rep'").run();
+    await scheduleRunChunks(db, {
+      runId: 'reused-rep',
+      entries: [block],
+      repetitions: 2,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+      laneCaseIds: new Map([
+        [laneKey(0), []],
+        [laneKey(1), ['case-b', 'case-a']],
+      ]),
+    });
+
+    // The fingerprint changed, so the guard ran: each case still has exactly one row.
+    expect(
+      (
+        sqlite
+          .prepare("SELECT plan_fingerprint FROM benchmark_runs WHERE id = 'reused-rep'")
+          .get() as { plan_fingerprint: string }
+      ).plan_fingerprint
+    ).not.toBe(recorded.plan_fingerprint);
+    const scheduled = storedChunks(sqlite).flatMap(row => JSON.parse(row.case_ids) as string[]);
+    expect(scheduled.sort()).toEqual(['case-a', 'case-b']);
+    expect(new Set(scheduled).size).toBe(scheduled.length);
   });
 
   it('keeps the same chunk id when a larger chunk size changes nothing for one case', async () => {

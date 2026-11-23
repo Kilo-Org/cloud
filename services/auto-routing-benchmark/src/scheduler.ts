@@ -364,17 +364,18 @@ export async function scheduleRunChunks(
   const planFingerprint = run.laneCaseIds
     ? await sha256Hex(
         JSON.stringify(
+          // Every (entry, rep, case list) in order, with an empty lane as its own marker: a
+          // lane the plan left out must hash differently from one it later fills. Returning
+          // early for an empty lane would drop the later repetitions of the same entry from
+          // the hash, so a changed plan for those repetitions would look unchanged.
           run.entries.flatMap(entry => {
             const variant = entry.variant ?? '';
-            const lanes: Array<[string, string, number, readonly string[]]> = [];
-            for (let rep = 0; rep < run.repetitions; rep++) {
-              const laneCaseIds = run.laneCaseIds?.get(JSON.stringify([entry.model, variant, rep]));
-              // Missing lanes are skipped by the loop below, so they hash as empty rather
-              // than borrowing the catalog list the loop would never use.
-              if (!laneCaseIds || laneCaseIds.length === 0) return lanes;
-              lanes.push([entry.model, variant, rep, laneCaseIds]);
-            }
-            return lanes;
+            return Array.from({ length: run.repetitions }, (_, rep) => [
+              entry.model,
+              variant,
+              rep,
+              run.laneCaseIds?.get(JSON.stringify([entry.model, variant, rep])) ?? [],
+            ]);
           })
         )
       )
@@ -1406,8 +1407,7 @@ export function refundRetryAttemptStatement(
 
 /**
  * Undo a retry that provably never reached the model, after the retry's ledger start was moved
- * and its attempt was spent: both are given back. Two separate calls exist because the two
- * facts are independent — see {@link revertRetryLedgerStart}.
+ * and its attempt was spent: both are given back.
  *
  * Every write names this claim's own token, and the chunk is addressed by the claim's id: a
  * chunk id is the JSON of the block's position, never the run id. Best effort by design — the
@@ -1420,27 +1420,6 @@ export async function refundUnspentRetryAttempt(
   await db
     .batch([
       refundRetryAttemptStatement(db, input.claim.id, input.claim.token),
-      restartPaidCaseStatement(
-        db,
-        { ...input.execution, attemptStartedAt: input.startedAt },
-        input.execution.attemptStartedAt
-      ),
-    ])
-    .catch((error: unknown) => input.onError?.(error));
-}
-
-/**
- * Undo only the ledger start a retry moved. The attempt is NOT given back here, because the
- * caller knows it never spent one: a refused `consumeRetryAttemptStatement` (zero changes) is
- * exactly that proof, and decrementing anyway would hand the block an attempt it never used —
- * an extra automatic attempt, which would break the cap.
- */
-export async function revertRetryLedgerStart(
-  db: D1Database,
-  input: RetryRefundInput
-): Promise<void> {
-  await db
-    .batch([
       restartPaidCaseStatement(
         db,
         { ...input.execution, attemptStartedAt: input.startedAt },

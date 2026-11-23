@@ -188,7 +188,6 @@ import {
   restartPaidCaseStatement,
   consumeRetryAttemptStatement,
   refundUnspentRetryAttempt,
-  revertRetryLedgerStart,
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
@@ -3794,26 +3793,11 @@ async function processDeciderJob(
           return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         startedAt = Math.max(Date.now(), startedAt + 1);
-        // The retry spends the block's last automatic attempt, but only once it is sure to
-        // happen: the spend is the last guard before the call and is refunded whenever the
-        // retry provably never reached the model. `attempts` is the same counter the scheduler
-        // spends on every claim and deferral, so a claim plus this retry can never exceed the
-        // platform cap.
-        //
-        // The retry's start must move in the ledger and on the canonical fence in the same
-        // transaction: RunnerCancel's live check compares `benchmark_case_runs.started_at`
-        // to ISO(attemptStartedAt), so a ledger-only move would refuse every retry.
-        const restarted = await env.BENCH_DB.batch([
-          restartPaidCaseStatement(env.BENCH_DB, { ...execution, attemptStartedAt }, startedAt),
-          restartPaidCaseRunStatement(env.BENCH_DB, {
-            key: caseKey,
-            executor: { runId: execution.runId, token: execution.token },
-            startedAt,
-          }),
-        ]);
-        if ((restarted[0]?.meta.changes ?? 0) === 0) {
-          return { result: first, retried: false, promptRevision };
-        }
+        // The retry spends the block's last automatic attempt first. `attempts` is the same
+        // counter the scheduler spends on every claim and deferral, so a claim plus this retry
+        // can never exceed the platform cap — and spending it before touching any other row is
+        // what keeps the ledger and the canonical fence in step: a refused spend leaves both
+        // exactly as they were, with nothing to unwind.
         const consumed = await consumeRetryAttemptStatement(
           env.BENCH_DB,
           claim.id,
@@ -3821,23 +3805,6 @@ async function processDeciderJob(
           Date.now()
         ).run();
         if ((consumed.meta.changes ?? 0) === 0) {
-          // The block already spent its automatic attempts — `consume` changed nothing, so no
-          // attempt was added either. Only the ledger restart above is undone: refunding an
-          // attempt here would hand the block one it never used and break the cap.
-          await revertRetryLedgerStart(env.BENCH_DB, {
-            claim: { id: claim.id, token: claim.token },
-            execution: { ...execution, attemptStartedAt },
-            startedAt,
-            onError: error =>
-              console.warn(
-                JSON.stringify({
-                  event: 'benchmark_retry_attempt_refund_failed',
-                  runId: message.runId,
-                  caseId: benchCase.id,
-                  errorCategory: benchmarkErrorCategory(error),
-                })
-              ),
-          });
           // A killed-before-events first attempt is not a measurement: grading it would
           // record a zero for a case that never ran, exactly what the retry===null path
           // refuses. It is deferred through normal admission instead.
@@ -3852,6 +3819,36 @@ async function processDeciderJob(
           }
           return { result: first, retried: false, promptRevision };
         }
+        // The retry's start must move in the ledger and on the canonical fence in the same
+        // transaction: RunnerCancel's live check compares `benchmark_case_runs.started_at`
+        // to ISO(attemptStartedAt), so a ledger-only move would refuse every retry. The spend
+        // succeeded, so a refusal here refunds it and leaves both rows as they were.
+        const restarted = await env.BENCH_DB.batch([
+          restartPaidCaseStatement(env.BENCH_DB, { ...execution, attemptStartedAt }, startedAt),
+          restartPaidCaseRunStatement(env.BENCH_DB, {
+            key: caseKey,
+            executor: { runId: execution.runId, token: execution.token },
+            startedAt,
+          }),
+        ]);
+        if ((restarted[0]?.meta.changes ?? 0) === 0) {
+          await refundUnspentRetryAttempt(env.BENCH_DB, {
+            claim: { id: claim.id, token: claim.token },
+            execution: { ...execution, attemptStartedAt },
+            startedAt,
+            onError: error =>
+              console.warn(
+                JSON.stringify({
+                  event: 'benchmark_retry_attempt_refund_failed',
+                  runId: message.runId,
+                  caseId: benchCase.id,
+                  errorCategory: benchmarkErrorCategory(error),
+                })
+              ),
+          });
+          return { result: first, retried: false, promptRevision };
+        }
+
         // The retry is a further paid call of the same generation: its capability must name
         // the new signed start or the gateway rejects it as expired.
         inference = await caseInferenceProxy(env, {

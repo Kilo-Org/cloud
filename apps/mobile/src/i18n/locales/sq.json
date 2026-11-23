@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Të gjitha vendet janë në përdorim. Kërkoji një pronari të organizatës të shtojë vende para se të ftosh më shumë anëtarë."
     },
     "invoices": {
-      "downloadA11y": "Shkarko faturën {{number}}",
+      "downloadA11y": "Shkarko faturën {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faturat krijohen automatikisht në çdo cikël faturimi dhe do të shfaqen këtu sapo të faturohet organizata jote.",
       "emptyTitle": "Nuk ka fatura",
       "invoiceFallback": "Fatura",

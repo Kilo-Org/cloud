@@ -3964,7 +3964,7 @@
       "noSeatsAvailable": "Mae'r holl seddi'n cael eu defnyddio. Gofynnwch i berchennog sefydliad ychwanegu seddi cyn gwahodd rhagor o aelodau."
     },
     "invoices": {
-      "downloadA11y": "Lawrlwytho anfoneb {{number}}",
+      "downloadA11y": "Lawrlwytho anfoneb {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Cynhyrchir anfonebau'n awtomatig bob cylch bilio a byddant yn ymddangos yma unwaith y bydd eich sefydliad yn cael ei filio.",
       "emptyTitle": "Dim anfonebau",
       "invoiceFallback": "Anfoneb",

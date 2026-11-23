@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Alle plasser er i bruk. Be en organisasjonseier om å legge til plasser før du inviterer flere medlemmer."
     },
     "invoices": {
-      "downloadA11y": "Last ned faktura {{number}}",
+      "downloadA11y": "Last ned faktura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturaer opprettes automatisk for hver faktureringsperiode. De vises her når organisasjonen din faktureres.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",

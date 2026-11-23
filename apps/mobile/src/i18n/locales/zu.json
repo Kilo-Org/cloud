@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Zonke izihlalo ziyasetshenziswa. Cela umnikazi wenhlangano ukuthi engeze izihlalo ngaphambi kokumema amanye amalungu."
     },
     "invoices": {
-      "downloadA11y": "Landa i-invoyisi {{number}}",
+      "downloadA11y": "Landa i-invoyisi {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ama-invoyisi akhiqizwa ngokuzenzakalelayo ngomjikelezo ngamunye wokukhokha futhi azovela lapha uma inhlangano yakho isikhokhiswa.",
       "emptyTitle": "Awekho ama-invoyisi",
       "invoiceFallback": "I-invoyisi",

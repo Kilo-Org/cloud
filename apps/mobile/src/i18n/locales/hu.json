@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Az összes hely foglalt. Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg."
     },
     "invoices": {
-      "downloadA11y": "A(z) {{number}} számú számla letöltése",
+      "downloadA11y": "A(z) {{number}} számú számla letöltése, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "A számlák minden számlázási ciklusban automatikusan elkészülnek, és a szervezetednek kiállított számlák itt jelennek meg.",
       "emptyTitle": "Nincs számla",
       "invoiceFallback": "Számla",

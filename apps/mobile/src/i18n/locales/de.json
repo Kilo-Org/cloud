@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Alle Plätze sind belegt. Bitte einen Organisationsinhaber, Plätze hinzuzufügen, bevor du weitere Mitglieder einlädst."
     },
     "invoices": {
-      "downloadA11y": "Rechnung {{number}} herunterladen",
+      "downloadA11y": "Rechnung {{number}}, {{amount}}, {{date}}, {{status}} herunterladen",
       "emptyDescription": "Rechnungen werden für jeden Abrechnungszeitraum automatisch erstellt. Sie erscheinen hier, sobald deine Organisation eine Rechnung erhält.",
       "emptyTitle": "Keine Rechnungen",
       "invoiceFallback": "Rechnung",

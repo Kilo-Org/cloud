@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
-      "downloadA11y": "I-download ang talaan ng singil {{number}}",
+      "downloadA11y": "I-download ang talaan ng singil {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Awtomatikong ginagawa ang mga talaan ng singil sa bawat siklo ng pagsingil. Lalabas ang mga ito rito kapag nasingil na ang iyong organisasyon.",
       "emptyTitle": "Walang talaan ng singil",
       "invoiceFallback": "Talaan ng singil",

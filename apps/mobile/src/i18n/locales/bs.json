@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Sva mjesta su zauzeta. Zamoli vlasnika organizacije da doda mjesta prije nego što pozoveš još članova."
     },
     "invoices": {
-      "downloadA11y": "Preuzmi fakturu {{number}}",
+      "downloadA11y": "Preuzmi fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakture se automatski generišu u svakom obračunskom periodu i prikazuju ovdje nakon naplate tvojoj organizaciji.",
       "emptyTitle": "Nema faktura",
       "invoiceFallback": "Faktura",

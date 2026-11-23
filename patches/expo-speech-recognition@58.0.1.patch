@@ -637,7 +637,7 @@ index 9dc90826634fe3424c0c143eb7cfd72efe90498a..f783f7e49f54cfea04114db741b818a6
    }
  }
 diff --git a/ios/ExpoSpeechRecognizer.swift b/ios/ExpoSpeechRecognizer.swift
-index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620c2c4c5fb 100644
+index b27842501f72e1a5a9382636397cbef30d5a2b30..ee00547b95b03b205a21e5e6cb966d2651a081fb 100644
 --- a/ios/ExpoSpeechRecognizer.swift
 +++ b/ios/ExpoSpeechRecognizer.swift
 @@ -42,16 +42,18 @@ actor ExpoSpeechRecognizer: ObservableObject {
@@ -677,7 +677,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      options: SpeechRecognitionOptions,
      resultHandler: @escaping (SFSpeechRecognitionResult) -> Void,
      errorHandler: @escaping (Error) -> Void,
-@@ -135,45 +132,50 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -135,45 +132,48 @@ actor ExpoSpeechRecognizer: ObservableObject {
      audioEndHandler: @escaping (String?, Double) -> Void,
      volumeChangeHandler: @escaping (Float) -> Void
    ) {
@@ -725,8 +725,6 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
 +    let hasEndHandler = endHandler != nil
 +    cancelled = true
 +    let taskState = task?.state
-+    // Check if the recognizer is running
-+    // If it is, then just run the stopListening function
 +    if taskState == .running || taskState == .starting {
 +      stopListening()
 +    } else {
@@ -753,7 +751,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
    }
  
    ///
-@@ -207,8 +209,6 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -207,8 +207,6 @@ actor ExpoSpeechRecognizer: ObservableObject {
      speechStartHandler: @escaping () -> Void,
      audioStartHandler: @escaping (String?, Double) -> Void
    ) {
@@ -762,7 +760,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
  
      self.options = options
      self.request = nil
-@@ -267,23 +267,23 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -267,23 +265,23 @@ actor ExpoSpeechRecognizer: ObservableObject {
      canEmitInterimResults: Bool,
      isSourcedFromFile: Bool
    ) {
@@ -798,7 +796,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
        }
      )
    }
-@@ -386,6 +386,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -386,6 +384,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
        )
      }
  
@@ -806,7 +804,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      try Self.prepareEngine(
        audioEngine: audioEngine,
        mixerNode: mixerNode,
-@@ -394,7 +395,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -394,7 +393,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
        audioFileRef: self.audioFileRef,
        volumeChangeHandler: { volume in
          Task { @MainActor in
@@ -815,7 +813,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
          }
        }
      )
-@@ -491,12 +492,13 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -491,12 +490,13 @@ actor ExpoSpeechRecognizer: ObservableObject {
      let filePath = self.outputFileUrl?.absoluteString
      let timestamp = audioEndTimestampMillis ?? Date().timeIntervalSince1970 * 1000
      outputFileUrl = nil
@@ -835,7 +833,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      }
    }
  
-@@ -565,11 +567,14 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -565,11 +565,14 @@ actor ExpoSpeechRecognizer: ObservableObject {
      // Unless we really need to emit the end event
      // (e.g. in the case of a setup error)
      print("SpeechRecognizer: end")
@@ -853,7 +851,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      }
      audioEndTimestampMillis = nil
    }
-@@ -812,6 +817,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -812,6 +815,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
      newEngine.attach(mixerNode)
      newEngine.connect(inputNode, to: mixerNode, format: audioFormat)
  
@@ -861,7 +859,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      do {
        try Self.prepareEngine(
          audioEngine: newEngine,
-@@ -821,7 +827,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -821,7 +825,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
          audioFileRef: self.audioFileRef,
          volumeChangeHandler: { volume in
            Task { @MainActor in
@@ -870,7 +868,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
            }
          }
        )
-@@ -833,9 +839,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -833,9 +837,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
    }
  
    private func emitError(_ error: RecognizerError) {
@@ -881,7 +879,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
    }
  
    private static func calculatePower(buffer: AVAudioPCMBuffer) -> Float? {
-@@ -920,8 +924,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -920,8 +922,7 @@ actor ExpoSpeechRecognizer: ObservableObject {
      ExtAudioFileWrite(audioFileRef, convertedBuffer.frameLength, convertedBuffer.audioBufferList)
    }
  
@@ -891,7 +889,7 @@ index b27842501f72e1a5a9382636397cbef30d5a2b30..5f1ca4b62eba4cd59e760f8dffbd2620
      result: SFSpeechRecognitionResult?,
      error: Error?,
      resultHandler: @escaping (SFSpeechRecognitionResult) -> Void,
-@@ -945,32 +948,22 @@ actor ExpoSpeechRecognizer: ObservableObject {
+@@ -945,32 +946,22 @@ actor ExpoSpeechRecognizer: ObservableObject {
  
      let shouldEmitResult = receivedFinalResult || canEmitInterimResults || receivedFinalLikeResult
  

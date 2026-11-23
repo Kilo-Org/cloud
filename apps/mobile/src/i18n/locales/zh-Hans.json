@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "所有席位均已占用。请先联系组织所有者增加席位，再邀请更多成员。"
     },
     "invoices": {
-      "downloadA11y": "下载发票 {{number}}",
+      "downloadA11y": "下载发票 {{number}}，{{amount}}，{{date}}，{{status}}",
       "emptyDescription": "每个账单周期都会自动生成发票，组织完成计费后即可在此查看。",
       "emptyTitle": "暂无发票",
       "invoiceFallback": "发票",

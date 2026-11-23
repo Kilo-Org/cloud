@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Semua tempat duduk sedang digunakan. Minta pemilik organisasi menambah tempat duduk sebelum menjemput lebih ramai ahli."
     },
     "invoices": {
-      "downloadA11y": "Muat turun invois {{number}}",
+      "downloadA11y": "Muat turun invois {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Invois dijana secara automatik setiap kitaran pengebilan dan akan muncul di sini setelah organisasi anda dibilkan.",
       "emptyTitle": "Tiada invois",
       "invoiceFallback": "Invois",

@@ -3896,7 +3896,7 @@
       "noSeatsAvailable": "Tá gach suíochán in úsáid. Iarr ar úinéir eagraíochta suíocháin a chur leis sula dtabharfaidh tú cuireadh do thuilleadh ball."
     },
     "invoices": {
-      "downloadA11y": "Íoslódáil sonrasc {{number}}",
+      "downloadA11y": "Íoslódáil sonrasc {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Gintear sonraisc go huathoibríoch gach timthriall billeála agus taispeánfar iad anseo nuair a bheidh d'eagraíocht billeáilte.",
       "emptyTitle": "Níl aon sonrasc ann",
       "invoiceFallback": "Sonrasc",

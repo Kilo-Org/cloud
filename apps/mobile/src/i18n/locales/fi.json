@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
-      "downloadA11y": "Lataa lasku {{number}}",
+      "downloadA11y": "Lataa lasku {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Laskut luodaan automaattisesti joka laskutusjaksolla. Ne näkyvät tässä, kun organisaatiotasi on laskutettu.",
       "emptyTitle": "Ei laskuja",
       "invoiceFallback": "Lasku",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Teessoowwan hundi fayyadamarra jiru. Miseensoota dabalataa afeeruu kee dura, abbaa dhaabbataa teessoowwan akka dabalu gaafadhu."
     },
     "invoices": {
-      "downloadA11y": "Gaaffii kaffaltii {{number}} buufadhu",
+      "downloadA11y": "Gaaffii kaffaltii {{number}}, {{amount}}, {{date}}, {{status}} buufadhu",
       "emptyDescription": "Gaaffiiwwan kaffaltii marsaa kaffaltii hundatti ofumaan uumamu. Yeroo dhaabbanni kee akka kaffalu gaafatamu asitti mul'atu.",
       "emptyTitle": "Gaaffiin kaffaltii hin jiru",
       "invoiceFallback": "Gaaffii kaffaltii",

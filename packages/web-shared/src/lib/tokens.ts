@@ -458,7 +458,13 @@ export function generateCloudAgentWorkflowToken(
     authorizationUser?: User;
   }
 ): string {
+  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow control token expiry must be positive');
+  }
   if (!isResourceTokenIssuanceEnabled('cloud-agent-next')) {
+    // The audience-less payload keeps its compatibility shape. The one-hour
+    // bound and the positive-lifetime refusal apply to both payloads.
     return generateApiToken(
       user,
       {
@@ -467,17 +473,13 @@ export function generateCloudAgentWorkflowToken(
         botId: options.botId,
         createdOnPlatform: options.createdOnPlatform,
       },
-      { expiresIn: options.expiresIn }
+      { expiresIn }
     );
   }
   assertMintablePepper(
     user.api_token_pepper,
     'Workflow control tokens require a current user pepper'
   );
-  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
-  if (expiresIn <= 0) {
-    throw new Error('Workflow control token expiry must be positive');
-  }
   const authorizationUser = options.authorizationUser ?? user;
   return signWorkflowKiloToken({
     user,

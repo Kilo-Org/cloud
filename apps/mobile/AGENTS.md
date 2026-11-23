@@ -338,6 +338,12 @@ what a translator has to work from.
   merges: `check:i18n` fails on a key one of them lacks, so a change that adds
   copy either waits for the translation slice or lands the catalog values
   itself and says so.
+- A command run inside right-to-left prose carries a left-to-right isolate in the
+  catalog value: U+2066 before the command and U+2069 after it. The neutral `/`
+  then keeps the command's own order. Separators and sentence punctuation stay
+  outside the isolate. `nativeRemote.prompt`, `nativeRemote.unsafeCommand` and
+  `agentChat.slashCommands.goalDescription` follow this rule. Wrap the whole run,
+  so a command keeps its argument inside the isolate.
 
 ## Design
 

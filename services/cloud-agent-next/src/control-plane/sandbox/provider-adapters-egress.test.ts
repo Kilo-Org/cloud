@@ -18,6 +18,7 @@ const deps: ProviderAdapterDeps = {
   getSandboxContainer: () => {
     throw new Error('not used at construction');
   },
+  operationStorage: { get: unused, transaction: unused, list: unused, delete: unused },
 };
 
 const vercelPin = {

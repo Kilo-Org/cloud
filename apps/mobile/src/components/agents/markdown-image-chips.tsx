@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, Download } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { isolateBidiText } from '@/lib/bidi';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
@@ -17,6 +18,14 @@ import { getLinkAccessibilityActions } from './markdown-link';
  * picture is gone, and both answer the message's link long press exactly as the
  * loaded image does.
  */
+
+/** Each segment becomes its own bidi run, so a right-to-left line keeps the reading order. */
+function chipLine(segments: readonly (string | null)[]): string {
+  return segments
+    .filter((segment): segment is string => segment !== null && segment !== '')
+    .map(segment => isolateBidiText(segment))
+    .join(' · ');
+}
 
 /** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
 export function BlockedImageChip({
@@ -35,11 +44,8 @@ export function BlockedImageChip({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
-  const reason = host
-    ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
-    : t('agentChat.markdownImage.httpsOnly');
   const description = alt.trim();
-  const label = description ? `${description} · ${reason}` : reason;
+  const label = chipLine([description, host, t('agentChat.markdownImage.httpsOnly')]);
   return (
     <Pressable
       onPress={onPress}
@@ -83,7 +89,7 @@ export function UnconfirmedImageChip({
   const host = formatTrustedImageHost(uri);
   const reason = host ?? t('agentChat.markdownImage.httpsOnly');
   const description = alt.trim();
-  const label = description ? `${description} · ${reason}` : reason;
+  const label = chipLine([description, reason]);
   const loadLabel = host
     ? t('agentChat.markdownImage.loadWithHost', { host })
     : t('agentChat.markdownImage.load');

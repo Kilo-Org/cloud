@@ -236,14 +236,16 @@ describe('MarkdownImage inert-until-load', () => {
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
     // The chip itself is the one long-pressable element; it never loads.
     expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(1);
-    expect(texts(httpRenderer.root)).toContain('insecure.com · HTTPS images only');
+    expect(texts(httpRenderer.root)).toContain(
+      '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
     expect(slotCount(httpRenderer.root, 4 / 3)).toBe(0);
     await unmount(httpRenderer);
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(1);
-    expect(texts(dataRenderer.root)).toContain('HTTPS images only');
+    expect(texts(dataRenderer.root)).toContain('\u2068HTTPS images only\u2069');
     expect(slotCount(dataRenderer.root, 4 / 3)).toBe(0);
     await unmount(dataRenderer);
   });
@@ -516,7 +518,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'insecure.com · HTTPS images only'
+        node.props.accessibilityLabel === '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
     );
     expect(chip.props.accessibilityActions).toEqual([
       { name: 'showLinkActions', label: 'Show link actions' },
@@ -697,13 +699,17 @@ describe('MarkdownImage trusted-host policy', () => {
 describe('MarkdownImage chip descriptions and long press', () => {
   it('puts the alt text in front of an http chip reason', async () => {
     const renderer = await mount('http://insecure.com/a.png', 'A chart');
-    expect(texts(renderer.root)).toContain('A chart · insecure.com · HTTPS images only');
+    expect(texts(renderer.root)).toContain(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
     const chip = ofType(renderer.root, 'Pressable')[0];
     if (!chip) {
       throw new Error('blocked chip not found');
     }
     expect(chip.props.accessibilityRole).toBe('text');
-    expect(chip.props.accessibilityLabel).toBe('A chart · insecure.com · HTTPS images only');
+    expect(chip.props.accessibilityLabel).toBe(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
     await unmount(renderer);
@@ -711,9 +717,9 @@ describe('MarkdownImage chip descriptions and long press', () => {
 
   it('puts the alt text in front of a data URI chip reason', async () => {
     const renderer = await mount('data:image/png;base64,abc', 'A chart');
-    expect(texts(renderer.root)).toContain('A chart · HTTPS images only');
+    expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068HTTPS images only\u2069');
     expect(ofType(renderer.root, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'A chart · HTTPS images only'
+      '\u2068A chart\u2069 · \u2068HTTPS images only\u2069'
     );
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
@@ -758,7 +764,7 @@ describe('MarkdownImage chip descriptions and long press', () => {
   it('names the unconfirmed chip row and its Load button with the alt text', async () => {
     const uri = 'https://example.com/a.png';
     const renderer = await mount(uri, 'A chart');
-    expect(texts(renderer.root)).toContain('A chart · example.com');
+    expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068example.com\u2069');
 
     const load = findLoadButtons(renderer.root, uri, 'A chart')[0];
     if (!load) {
@@ -778,7 +784,7 @@ describe('MarkdownImage chip descriptions and long press', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'insecure.com · HTTPS images only'
+        node.props.accessibilityLabel === '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
     );
     expect(chip.props.onLongPress).toBe(onShow);
     await act(async () => {

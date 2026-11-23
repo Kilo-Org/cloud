@@ -2531,6 +2531,101 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
+    it('counts a native display part when later-shell rows are counted instead of hydrated', async () => {
+      const sessionId = 'ses_sdk_page_native_count_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+      const older = message('msg_100_older_parts', 100);
+      const newest = message('msg_200_newest_parts', 200);
+      // Enough part bytes on the newest message to exhaust the aggregate budget, so the older
+      // message's parts are only counted (the `partHydrationStopped` branch) and never hydrated.
+      const newestParts = [
+        'prt_200_first',
+        'prt_300_second',
+        'prt_400_third',
+        'prt_500_fourth',
+        'prt_600_fifth',
+        'prt_700_sixth',
+      ].map(id => ({
+        id,
+        sessionID: sessionId,
+        messageID: newest.id,
+        type: 'text' as const,
+        text: 'x'.repeat(1536 * 1024),
+      }));
+      const olderPart = {
+        id: 'msg_100_older_parts_000001',
+        messageID: older.id,
+        type: 'text' as const,
+        text: 'native display child of the counted shell',
+      };
+      await stub.ingest(
+        [
+          { type: 'message', data: older },
+          { type: 'part' as const, data: olderPart },
+          { type: 'message', data: newest },
+          ...newestParts.map(data => ({ type: 'part' as const, data })),
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const page = await stub.readKiloSdkMessages({ limit: 2 });
+      expect(page.messages.map(entry => entry.info.id)).toEqual([older.id, newest.id]);
+      expect(page.messages[0].parts).toEqual([]);
+      expect(page.messages[1].parts.map(part => part.id)).toEqual([
+        'prt_200_first',
+        'prt_300_second',
+        'prt_400_third',
+        'prt_500_fourth',
+        'prt_600_fifth',
+      ]);
+      expect(page.omittedItemCount).toBe(2);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('returns invalid_data for a native display part id that names another message', async () => {
+      const sessionId = 'ses_sdk_page_native_foreign_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const info = {
+        id: 'msg_native',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      // The stored item id puts the part under this message, but the native display id names
+      // another one. The client contract rejects that pair, so the DO must not serve it.
+      const part = {
+        id: 'msg_other_000001',
+        messageID: info.id,
+        type: 'text',
+        text: 'native display naming another message',
+      };
+      await stub.ingest([{ type: 'message', data: info }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+          `part/${info.id}/${part.id}`,
+          'part',
+          JSON.stringify(part)
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        kind: 'invalid_data',
+      });
+    });
+
     it('returns invalid_data for a persisted slash-bearing part body identity', async () => {
       const sessionId = 'ses_sdk_page_part_slash_body_001';
       const stub = getStub(kiloUserId, sessionId);

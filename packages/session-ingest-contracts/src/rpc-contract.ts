@@ -269,10 +269,17 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
 /** The boundary name for the stored message-id rule; see `storedMessageIdSchema`. */
 export const messageIdSchema = storedMessageIdSchema;
 
+/**
+ * The stem every SDK part id starts with, declared once so the schema, the
+ * message-membership rule and the Durable Object's part-row reader cannot drift
+ * apart.
+ */
+export const PART_ID_PREFIX = 'prt';
+
 // Part ids become storage and item identities, so they refuse `/` and U+0000.
 export const partIdSchema = z
   .string()
-  .startsWith('prt')
+  .startsWith(PART_ID_PREFIX)
   .refine(id => !id.includes('/') && !id.includes('\u0000'), {
     message: 'part IDs must not contain / or U+0000',
   });
@@ -999,8 +1006,8 @@ const sdkPartBaseShape = {
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
 
-function sdkPartIdMatchesMessage(part: Pick<KiloSdkPartBase, 'id' | 'messageID'>): boolean {
-  if (part.id.startsWith('prt')) return true;
+export function sdkPartIdMatchesMessage(part: Pick<KiloSdkPartBase, 'id' | 'messageID'>): boolean {
+  if (part.id.startsWith(PART_ID_PREFIX)) return true;
   const prefix = `${part.messageID}_`;
   return (
     part.messageID.startsWith('msg_') &&

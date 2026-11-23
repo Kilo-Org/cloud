@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dropPathsSchema } from './browser-agent-checks';
+import { dropPathsSchema, dropTargetSchema } from './browser-agent-checks';
 import type { BrowserToolContractEntry, BrowserToolInputSchema } from './browser-tool-contract';
 
 /*
@@ -10,11 +10,12 @@ import type { BrowserToolContractEntry, BrowserToolInputSchema } from './browser
  * output — its SHA-256 is the handshake stamp a CLI compares, so a rule written
  * into it would break every client's contract check.
  *
- * `browser_drop` is the entry that is narrowed. Its `paths` entries are
- * non-empty strings, which is the rule `dropPathsSchema` states and every
- * handler applies. The published item rule is derived from `dropPathsSchema`
- * itself, so what a model reads and what the handler applies stay the same
- * rule.
+ * `browser_drop` is the entry that is narrowed, in two properties, each of them
+ * the rule every handler applies. Its `paths` entries are non-empty strings,
+ * which is the rule `dropPathsSchema` states. Its `target` is a non-empty
+ * string, which is the rule `dropTargetSchema` states. The `paths` item rule
+ * and the `target` rule are derived from those schemas themselves, so what a
+ * model reads and what the handler applies stay the same rule.
  */
 
 const DROP_TOOL_NAME = 'browser_drop';
@@ -24,23 +25,36 @@ const DROP_PATHS_DESCRIPTION =
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
-/** The one item rule `dropPathsSchema` may publish: anything else means zod changed, and the rule below must be re-read. */
-const dropPathItemRuleSchema = z.strictObject({
+/** The one rule a narrowed non-empty-string property may publish: anything else means zod changed, and the rules below must be re-read. */
+const nonEmptyStringRuleSchema = z.strictObject({
   minLength: z.literal(1),
   type: z.literal('string'),
 });
 
-const publishedDropPathItemRule = dropPathItemRuleSchema.parse(
+const publishedDropPathItemRule = nonEmptyStringRuleSchema.parse(
   z.toJSONSchema(dropPathsSchema, { io: 'input' }).items
 );
 
-const narrowDropPaths = (schema: BrowserToolInputSchema): BrowserToolInputSchema => {
-  const paths = jsonObjectSchema.safeParse(schema.properties['paths']);
+/*
+ * `target` is published as a property, so its rule comes from an object form: a
+ * lone zod schema is a document root and would carry the draft stamp beside it.
+ */
+const dropTargetDocument = z.toJSONSchema(z.object({ target: dropTargetSchema }), {
+  io: 'input',
+});
 
-  if (!paths.success) {
+const publishedDropTargetRule = nonEmptyStringRuleSchema.parse(
+  z.object({ properties: jsonObjectSchema }).parse(dropTargetDocument).properties['target']
+);
+
+const narrowDropSchema = (schema: BrowserToolInputSchema): BrowserToolInputSchema => {
+  const paths = jsonObjectSchema.safeParse(schema.properties['paths']);
+  const target = jsonObjectSchema.safeParse(schema.properties['target']);
+
+  if (!paths.success || !target.success) {
     throw new Error(
-      'browser_drop has no object `paths` property in the vendored contract; re-read the pinned ' +
-        'tools/list before publishing a narrowed schema.'
+      'browser_drop has no object `paths` and `target` properties in the vendored contract; ' +
+        're-read the pinned tools/list before publishing a narrowed schema.'
     );
   }
 
@@ -53,6 +67,7 @@ const narrowDropPaths = (schema: BrowserToolInputSchema): BrowserToolInputSchema
         description: DROP_PATHS_DESCRIPTION,
         items: publishedDropPathItemRule,
       },
+      target: { ...target.data, ...publishedDropTargetRule },
     },
   };
 };
@@ -61,4 +76,4 @@ const narrowDropPaths = (schema: BrowserToolInputSchema): BrowserToolInputSchema
 export const publishedBrowserToolInputSchema = (
   entry: BrowserToolContractEntry
 ): BrowserToolInputSchema =>
-  entry.name === DROP_TOOL_NAME ? narrowDropPaths(entry.inputSchema) : entry.inputSchema;
+  entry.name === DROP_TOOL_NAME ? narrowDropSchema(entry.inputSchema) : entry.inputSchema;

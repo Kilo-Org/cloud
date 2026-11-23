@@ -4,6 +4,7 @@ import { buildWorkflowPageCode } from './agent-workflow-runner';
 import {
   ambiguousSelectorError,
   dropPathsSchema,
+  dropTargetSchema,
   FRESH_SNAPSHOT_HINT,
   looksLikeBrowserRef,
   STALE_REF_ERROR,
@@ -1077,7 +1078,7 @@ const dropArgsSchema = z.object({
   element: z.string().optional(),
   /** An empty entry is refused here because it names no file. */
   paths: dropPathsSchema.optional(),
-  target: z.string().min(1),
+  target: dropTargetSchema,
 });
 
 /** Upstream rule, verbatim: neither a file list nor a MIME payload makes a drop. */

@@ -12,6 +12,9 @@ export type BrowserGrantClass = 'read' | 'act' | 'navigate';
 /** One entry of a `browser_drop`'s `paths`: a local file the page may read, so never an empty string. */
 export const dropPathsSchema = z.array(z.string().min(1));
 
+/** A `browser_drop`'s `target`: the ref or selector the files are dropped onto, never an empty string. */
+export const dropTargetSchema = z.string().min(1);
+
 /**
  * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
  * does `browser_drop` when its `paths` lists at least one local file. A drop that carries

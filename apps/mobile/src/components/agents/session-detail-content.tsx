@@ -1598,16 +1598,6 @@ export function SessionDetailContent({
     deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
       ? deliveredFailedPrompt.text
       : null;
-  // The manager publishes the delivery of a send whose answer was lost but whose
-  // row is confirmed. The composer asks this before restoring that send, so the
-  // text cannot come back beside the message it already sent.
-  const deliveredPrompt = useRef(deliveredFailedPrompt);
-  deliveredPrompt.current = deliveredFailedPrompt;
-  const isPromptDelivered = useCallback((text: string) => {
-    const record = deliveredPrompt.current;
-    return record !== null && composerPromptText(record.text) === composerPromptText(text);
-  }, []);
-
   const consumeDeliveredDraft = useCallback(() => {
     if (deliveredFailedPrompt !== null) {
       setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
@@ -3499,7 +3489,6 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 deliveredDraft={consumableDeliveredDraft}
-                isPromptDelivered={isPromptDelivered}
                 onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}

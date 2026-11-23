@@ -4380,18 +4380,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (stillOnSendingChat) {
           store.set(failedPromptAtom, null);
           store.set(billingFailureAtom, null);
-          // The row is confirmed and only the answer was lost, so the text the
-          // caller would restore on its own rejection is the message that
-          // arrived. The delivery is published before that rejection reaches the
-          // composer, which asks about it (see the mobile composer's
-          // `isPromptDelivered`) and skips the restore instead of leaving a
-          // duplicate beside the delivered row.
-          deliveredFailedPromptSequence += 1;
-          store.set(deliveredFailedPromptAtom, {
-            messageId,
-            text: messageText,
-            sequence: deliveredFailedPromptSequence,
-          });
         }
         return true;
       }

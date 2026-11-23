@@ -1502,7 +1502,9 @@
       "githubError": "Opsætningen af GitHub kunne ikke åbnes. Prøv igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Opsætningen af GitLab kunne ikke åbnes. Prøv igen.",
-      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests."
+      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests.",
+      "notConnectedTitle": "{{platform}} er ikke tilsluttet",
+      "githubAdminOnlyDescription": "Kun organisationsejere og administratorer kan oprette forbindelsen."
     },
     "overview": {
       "allAreas": "Alle områder",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "Revisionslog",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ingen revisionshændelser",
       "emptyDescription": "Handlinger, der udføres i denne organisation, vises her.",
       "truncated": "Viser de seneste hændelser.",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Intet abonnement",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "Brug Forrige time for at se tidligere anmodninger.",
       "emptyBoundDescription": "Anmodningsloggen går ikke længere tilbage.",
       "loadError": "Anmodningslogs kunne ikke indlæses.",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ind · {{output}} ud",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Brug Kilos standardmodel",
     "duration": "Tidsgrænse (minutter)",
     "spendLimit": "Forbrugsgrænse (USD)",
-    "invalidSafeguards": "Angiv positive, endelige tids- og forbrugsgrænser.",
+    "invalidSafeguards": "Angiv et positivt tal inden for det tilladte interval.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Et betalt resumé er ikke tilgængeligt med disse indstillinger. Skift model eller grænser, eller prøv igen senere.",
     "estimatePricingUnavailable": "Prissætning for denne model er ikke tilgængelig. Vælg en anden model.",
@@ -5045,6 +5047,8 @@
       "autoCommit": "Registrér ændringerne, når kørslen slutter",
       "condenseOnComplete": "Komprimér konteksten, når kørslen slutter",
       "activeTitle": "Udløser aktiv",
+      "activeSwitchA11y": "Udløser aktiv: {{name}}",
+      "copyLinkA11y": "Kopiér link til {{name}}",
       "activeDescription": "Pausede webhooks svarer med 404.",
       "runAsCreator": "Kør som mig",
       "runAsCreatorDescription": "Hver kørsel bruger din konto, så det hemmelige headerfelt er påkrævet.",

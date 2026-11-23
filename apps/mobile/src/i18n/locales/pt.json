@@ -1558,7 +1558,9 @@
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
       "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
-      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
+      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente.",
+      "notConnectedTitle": "O {{platform}} não está ligado",
+      "githubAdminOnlyDescription": "Apenas os proprietários da organização e os administradores o podem ligar."
     },
     "overview": {
       "allAreas": "Todas as áreas",
@@ -3537,7 +3539,7 @@
   "organization": {
     "auditLog": {
       "title": "Registo de auditoria",
-      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Sem eventos de auditoria",
       "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
       "truncated": "São apresentados os eventos mais recentes.",
@@ -3737,7 +3739,7 @@
     },
     "billing": {
       "title": "Faturação",
-      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação.",
+      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscrição",
       "state": "Estado",
       "stateNone": "Sem subscrição",
@@ -3914,7 +3916,7 @@
       "emptyDescription": "Utilize Hora anterior para ver pedidos anteriores.",
       "emptyBoundDescription": "Os registos de pedidos não recuam mais do que isto.",
       "loadError": "Não foi possível carregar os registos de pedidos.",
-      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },
@@ -5057,7 +5059,7 @@
     "defaultModel": "Usar o modelo predefinido da Kilo",
     "duration": "Limite de tempo (minutos)",
     "spendLimit": "Limite de gasto (USD)",
-    "invalidSafeguards": "Introduza limites de tempo e gasto positivos e finitos.",
+    "invalidSafeguards": "Introduza um número positivo dentro do intervalo permitido.",
     "estimate": "Estimativa {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Não está disponível um resumo pago para estas definições. Altere o modelo ou os limites, ou tente novamente mais tarde.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
@@ -5233,6 +5235,8 @@
       "autoCommit": "Consolidar alterações quando a execução terminar",
       "condenseOnComplete": "Condensar o contexto quando a execução terminar",
       "activeTitle": "Acionador ativo",
+      "activeSwitchA11y": "Acionador ativo: {{name}}",
+      "copyLinkA11y": "Copiar ligação para {{name}}",
       "activeDescription": "Os webhooks em pausa respondem com 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",

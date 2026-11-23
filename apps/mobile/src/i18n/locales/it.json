@@ -786,6 +786,8 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
+      "notConnectedTitle": "{{platform}} non è connesso",
+      "githubAdminOnlyDescription": "Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
       "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",
@@ -3466,7 +3468,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro di controllo",
-      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione con piano Enterprise può consultare il registro di controllo.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione con piano Enterprise può consultare il registro di controllo. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nessun evento di controllo",
       "emptyDescription": "Qui compaiono le azioni eseguite in questa organizzazione.",
       "truncated": "Vengono mostrati gli eventi più recenti.",
@@ -3661,7 +3663,7 @@
     },
     "billing": {
       "title": "Fatturazione",
-      "permissionDenied": "Solo il proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può visualizzarne la fatturazione.",
+      "permissionDenied": "Solo il proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può visualizzarne la fatturazione. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abbonamento",
       "state": "Stato",
       "stateNone": "Nessun abbonamento",
@@ -3850,7 +3852,7 @@
       "emptyDescription": "Usa «Ora precedente» per visualizzare le richieste precedenti.",
       "emptyBoundDescription": "Lo storico delle richieste non va più indietro di così.",
       "loadError": "Impossibile caricare i registri delle richieste.",
-      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -4968,7 +4970,7 @@
     "defaultModel": "Usa il modello predefinito di Kilo",
     "duration": "Limite di tempo (minuti)",
     "spendLimit": "Limite di spesa (USD)",
-    "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
+    "invalidSafeguards": "Inserisci un numero positivo nell'intervallo consentito.",
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
@@ -5139,6 +5141,8 @@
       "autoCommit": "Esegui il commit delle modifiche al termine dell'esecuzione",
       "condenseOnComplete": "Condensa il contesto al termine dell'esecuzione",
       "activeTitle": "Attivatore attivo",
+      "activeSwitchA11y": "Attivatore attivo: {{name}}",
+      "copyLinkA11y": "Copia link per {{name}}",
       "activeDescription": "I webhook in pausa rispondono con 404.",
       "runAsCreator": "Esegui come me",
       "runAsCreatorDescription": "Ogni esecuzione usa il tuo account, quindi l'intestazione segreta è obbligatoria.",

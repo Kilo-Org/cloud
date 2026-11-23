@@ -11,6 +11,7 @@ import {
   storedSessionIdSchema,
 } from './kilo-session-id';
 import { storedMessageIdSchema } from './message-id';
+import { MAX_GIT_BRANCH_LENGTH } from './git-branch';
 import { needsPartTextRepair } from './part-text';
 import { sessionLiveSummarySchema } from './session-live-summary';
 import { tokenUsageSchema } from './token-usage';
@@ -295,7 +296,7 @@ export const createSessionForCloudAgentSchema = z.object({
    * The branch the new working branch starts from. Omitted means the default
    * branch, or the stacked parent's branch when `parentWorktreeId` is set.
    */
-  baseBranch: z.string().min(1).max(256).optional(),
+  baseBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   /** The exact commit the working branch starts from, resolved by the web router. */
   baseSha: z
     .string()
@@ -308,7 +309,7 @@ export const createSessionForCloudAgentSchema = z.object({
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
   /** The workspace working branch, selected before the first registration. */
-  gitBranch: z.string().min(1).max(256).optional(),
+  gitBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   // The profile the session was prepared with, as resolved by the caller
   // (explicit pick, effective default, or repository binding). Optional and
   // nullable so a caller that predates profile recording still creates the

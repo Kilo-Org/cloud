@@ -1502,7 +1502,9 @@
       "githubError": "GitHub ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
+      "notConnectedTitle": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "githubAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।"
     },
     "overview": {
       "allAreas": "ਸਾਰੇ ਖੇਤਰ",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "ਆਡਿਟ ਲੌਗ",
-      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ਕੋਈ ਆਡਿਟ ਇਵੈਂਟ ਨਹੀਂ",
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਕੀਤੀਆਂ ਕਾਰਵਾਈਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ।",
       "truncated": "ਸਭ ਤੋਂ ਹਾਲੀਆ ਇਵੈਂਟ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "ਬਿਲਿੰਗ",
-      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ",
       "state": "ਸਥਿਤੀ",
       "stateNone": "ਕੋਈ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਨਹੀਂ",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "ਪਿਛਲੀਆਂ ਬੇਨਤੀਆਂ ਵੇਖਣ ਲਈ 'ਪਿਛਲਾ ਘੰਟਾ' ਦੀ ਵਰਤੋਂ ਕਰੋ।",
       "emptyBoundDescription": "ਬੇਨਤੀਆਂ ਦਾ ਇਤਿਹਾਸ ਇੱਥੋਂ ਤੱਕ ਹੀ ਉਪਲਬਧ ਹੈ।",
       "loadError": "ਬੇਨਤੀ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ਇਨਪੁੱਟ · {{output}} ਆਉਟਪੁੱਟ",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Kilo ਦਾ ਡਿਫਾਲਟ ਮਾਡਲ ਵਰਤੋ",
     "duration": "ਸਮਾਂ ਸੀਮਾ (ਮਿੰਟ)",
     "spendLimit": "ਖਰਚ ਸੀਮਾ (USD)",
-    "invalidSafeguards": "ਸਕਾਰਾਤਮਕ, ਸੀਮਤ ਸਮਾਂ ਅਤੇ ਖਰਚ ਸੀਮਾਵਾਂ ਦਰਜ ਕਰੋ।",
+    "invalidSafeguards": "ਅਨੁਮਤ ਸੀਮਾ ਅੰਦਰ ਧਨਾਤਮਕ ਸੰਖਿਆ ਦਰਜ ਕਰੋ।",
     "estimate": "ਅਨੁਮਾਨ {{estimate}} · ਵੱਧ ਤੋਂ ਵੱਧ {{maximum}}",
     "estimateUnavailable": "ਇਨ੍ਹਾਂ ਸੈਟਿੰਗਾਂ ਲਈ ਭੁਗਤਾਨ ਵਾਲਾ ਸਾਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਮਾਡਲ ਜਾਂ ਸੀਮਾਵਾਂ ਬਦਲੋ, ਜਾਂ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "confirmPaid": "ਕੀ {{context}} ਲਈ ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਚਾਲੂ ਕਰਨੇ ਹਨ?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਬਦਲਾਅ ਕਮਿਟ ਕਰੋ",
       "condenseOnComplete": "ਰਨ ਮੁਕਣ ਉੱਤੇ ਸੰਦਰਭ ਨੂੰ ਸੰਖੇਪ ਕਰੋ",
       "activeTitle": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ",
+      "activeSwitchA11y": "ਟ੍ਰਿਗਰ ਸਕਿਰਿਆਸ਼ੀਲ: {{name}}",
+      "copyLinkA11y": "{{name}} ਲਈ ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
       "activeDescription": "ਰੋਕੇ ਗਏ ਵੈਬਹੁੱਕ 404 ਨਾਲ ਜਵਾਬ ਦਿੰਦੇ ਹਨ।",
       "runAsCreator": "ਮੇਰੇ ਵਜੋਂ ਚਲਾਓ",
       "runAsCreatorDescription": "ਹਰ ਰਨ ਤੁਹਾਡੇ ਖਾਤੇ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਗੁਪਤ ਹੈਡਰ ਲਾਜ਼ਮੀ ਹੈ।",

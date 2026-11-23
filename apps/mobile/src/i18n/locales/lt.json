@@ -401,7 +401,7 @@
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
       "orgDescription": "Šie raktai bendrinami su visais organizacijos nariais, o užklausos apmokestinamos jos teikėjų paskyrose.",
-      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų vadovas.",
+      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų administratorius.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "managedByPlan": "Valdoma pagal jūsų programavimo planą",
       "enableKey": "Įjungti {{provider}} raktą",
@@ -1558,7 +1558,9 @@
       "githubError": "Nepavyko atidaryti GitHub sąrankos. Bandyk dar kartą.",
       "gitlabAccount": "GitLab paskyra",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandyk dar kartą.",
-      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR."
+      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR.",
+      "notConnectedTitle": "{{platform}} neprijungtas",
+      "githubAdminOnlyDescription": "Ją prijungti gali tik organizacijos savininkai ir administratoriai."
     },
     "overview": {
       "allAreas": "Visos sritys",
@@ -3537,7 +3539,7 @@
   "organization": {
     "auditLog": {
       "title": "Audito žurnalas",
-      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audito įvykių nėra",
       "emptyDescription": "Čia rodomi šioje organizacijoje atlikti veiksmai.",
       "truncated": "Rodomi naujausi įvykiai.",
@@ -3737,7 +3739,7 @@
     },
     "billing": {
       "title": "Atsiskaitymai",
-      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų tvarkytojas.",
+      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Prenumerata",
       "state": "Būsena",
       "stateNone": "Prenumeratos nėra",
@@ -3914,7 +3916,7 @@
       "emptyDescription": "Norėdami pamatyti ankstesnes užklausas, naudokite „Ankstesnė valanda“.",
       "emptyBoundDescription": "Užklausų žurnalai toliau į praeitį nesiekia.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
-      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
       "byok": "BYOK"
     },
@@ -5057,7 +5059,7 @@
     "defaultModel": "Naudoti numatytąjį Kilo modelį",
     "duration": "Laiko apribojimas (minutės)",
     "spendLimit": "Išlaidų apribojimas (USD)",
-    "invalidSafeguards": "Įveskite teigiamas, baigtines laiko ir išlaidų ribas.",
+    "invalidSafeguards": "Įveskite teigiamą skaičių leidžiamame intervale.",
     "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
     "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama. Pakeiskite modelį arba ribas, arba pabandykite vėliau.",
     "confirmPaid": "{{context}}: įjungti mokamas santraukas?",
@@ -5233,6 +5235,8 @@
       "autoCommit": "Įtraukti pakeitimus pasibaigus paleidimui",
       "condenseOnComplete": "Sutrumpinti kontekstą pasibaigus paleidimui",
       "activeTitle": "Trigeris aktyvus",
+      "activeSwitchA11y": "Aktyvus trigeris: {{name}}",
+      "copyLinkA11y": "Kopijuoti nuorodą: {{name}}",
       "activeDescription": "Pristabdyti žiniatinklio kabliukai atsako 404.",
       "runAsCreator": "Paleisti kaip mane",
       "runAsCreatorDescription": "Kiekvienas paleidimas naudoja jūsų paskyrą, todėl slaptoji antraštė yra privaloma.",

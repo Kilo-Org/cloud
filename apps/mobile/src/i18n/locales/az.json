@@ -1502,7 +1502,9 @@
       "githubError": "GitHub quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "gitlabAccount": "GitLab hesabı",
       "gitlabError": "GitLab quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
-      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur."
+      "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur.",
+      "notConnectedTitle": "{{platform}} qoşulmayıb",
+      "githubAdminOnlyDescription": "Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər."
     },
     "overview": {
       "allAreas": "Bütün sahələr",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit jurnalı",
-      "permissionDenied": "Audit jurnalını yalnız Enterprise planındakı təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "permissionDenied": "Audit jurnalını yalnız Enterprise planındakı təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audit hadisəsi yoxdur",
       "emptyDescription": "Bu təşkilatda edilən əməliyyatlar burada görünür.",
       "truncated": "Ən son hadisələr göstərilir.",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "Ödənişlər",
-      "permissionDenied": "Təşkilatın ödəniş məlumatlarını yalnız sahibi, administratoru və ya ödəniş meneceri görə bilər.",
+      "permissionDenied": "Təşkilatın ödəniş məlumatlarını yalnız sahibi, administratoru və ya ödəniş meneceri görə bilər. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abunəlik",
       "state": "Vəziyyət",
       "stateNone": "Abunəlik yoxdur",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "Əvvəlki sorğuları görmək üçün «Əvvəlki saat» düyməsindən istifadə edin.",
       "emptyBoundDescription": "Bundan əvvəlki sorğu jurnalları mövcud deyil.",
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
-      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıxış",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Kilonun standart modelindən istifadə et",
     "duration": "Vaxt limiti (dəqiqə)",
     "spendLimit": "Xərc limiti (USD)",
-    "invalidSafeguards": "Müsbət, sonlu vaxt və xərc limitləri daxil edin.",
+    "invalidSafeguards": "İcazə verilən aralıqda müsbət ədəd daxil edin.",
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu parametrlər üçün ödənişli xülasə mövcud deyil. Modeli və ya limitləri dəyişin, yaxud bir az sonra yenidən cəhd edin.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
       "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",
       "activeTitle": "Tətikləyici aktivdir",
+      "activeSwitchA11y": "Aktiv tətikləyici: {{name}}",
+      "copyLinkA11y": "{{name}} üçün keçidi kopyala",
       "activeDescription": "Dayandırılmış vebhuklar 404 ilə cavab verir.",
       "runAsCreator": "Mənim hesabımla işlə",
       "runAsCreatorDescription": "Hər icra hesabınızdan istifadə edir, buna görə məxfi başlıq tələb olunur.",

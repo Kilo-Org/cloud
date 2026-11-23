@@ -1502,7 +1502,9 @@
       "githubError": "የGitHub ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "gitlabAccount": "የGitLab መለያ",
       "gitlabError": "የGitLab ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።"
+      "description": "የኮድ ውህደት ጥያቄዎችን በራስ-ሰር ለመገምገም የKilo {{label}}ን ያገናኙ።",
+      "notConnectedTitle": "{{platform}} አልተገናኘም",
+      "githubAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "overview": {
       "allAreas": "ሁሉም ዘርፎች",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "የኦዲት መዝገብ",
-      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ምንም የኦዲት ክስተቶች የሉም",
       "emptyDescription": "በዚህ ድርጅት ውስጥ የተወሰዱ እርምጃዎች እዚህ ይታያሉ።",
       "truncated": "የቅርብ ጊዜዎቹ ክስተቶች እየታዩ ነው።",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "ክፍያ",
-      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ ኃላፊ ብቻ ናቸው።",
+      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "subscription": "የደንበኝነት ምዝገባ",
       "state": "ሁኔታ",
       "stateNone": "የደንበኝነት ምዝገባ የለም",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "ያለፉ ጥያቄዎችን ለማየት ቀዳሚ ሰዓት የሚለውን ይጠቀሙ።",
       "emptyBoundDescription": "የጥያቄ መዝገቦች ወደኋላ የሚደርሱት እስከዚህ ድረስ ብቻ ነው።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
-      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "የKiloን ነባሪ ሞዴል ተጠቀም",
     "duration": "የጊዜ ጥበቃ (ደቂቃዎች)",
     "spendLimit": "የወጪ ጥበቃ (USD)",
-    "invalidSafeguards": "አዎንታዊ እና የተወሰኑ የጊዜ እና የወጪ ገደቦችን ያስገቡ።",
+    "invalidSafeguards": "በተፈቀደው ክልል ውስጥ ያለ አዎንታዊ ቁጥር ያስገቡ።",
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
     "estimateUnavailable": "ለእነዚህ ቅንብሮች የክፍያ ማጠቃለያ አይገኝም። ሞዴሉን ወይም ወሰኖችን ይቀይሩ፣ ወይም በኋላ ላይ እንደገና ይሞክሩ።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "ሩጫው ሲጠናቀቅ ለውጦችን ያስመዝግቡ",
       "condenseOnComplete": "ሩጫው ሲጠናቀቅ ዐውዱን ያሳጥሩ",
       "activeTitle": "ቀስቅሴ ንቁ",
+      "activeSwitchA11y": "ቀስቅሴ ንቁ: {{name}}",
+      "copyLinkA11y": "የ{{name}} አገናኝ ቅዳ",
       "activeDescription": "የቆሙ ዌብሁኮች በ404 ምላሽ ይሰጣሉ።",
       "runAsCreator": "በእኔ ስም ያስኪዱ",
       "runAsCreatorDescription": "እያንዳንዱ ሩጫ የእርስዎን መለያ ይጠቀማል፣ ስለዚህ ምስጢራዊው ራስጌ ያስፈልጋል።",

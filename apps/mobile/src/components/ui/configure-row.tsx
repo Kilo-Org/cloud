@@ -132,11 +132,9 @@ export function ConfigureRow({
   // Both cases get the stacked presentation, which hands the title the row's
   // full width.
   const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
-  // A semantic tone outranks the curated destination hue, and a row carrying
-  // neither keeps the shared neutral tile. A settings list is not a list of
-  // agents: hashing each title into the agent hue ramp gave one list (Language
-  // / Trusted hosts / Device sessions) three different accents, and a title
-  // never picks a hue here.
+  // A settings list is not a list of agents: hashing each title into the agent
+  // hue ramp gave one list (Language / Trusted hosts / Device sessions) three
+  // different accents, and a title never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
   if (destructive) {
     tint = toneColor('danger');

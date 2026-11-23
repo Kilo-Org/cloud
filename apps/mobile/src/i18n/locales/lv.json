@@ -1530,7 +1530,9 @@
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģini vēlreiz.",
-      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus."
+      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus.",
+      "notConnectedTitle": "{{platform}} nav pievienots",
+      "githubAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki un administratori."
     },
     "overview": {
       "allAreas": "Visas jomas",
@@ -3474,7 +3476,7 @@
   "organization": {
     "auditLog": {
       "title": "Audita žurnāls",
-      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns.",
+      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nav audita notikumu",
       "emptyDescription": "Šeit tiek rādītas šajā organizācijā veiktās darbības.",
       "truncated": "Tiek rādīti jaunākie notikumi.",
@@ -3669,7 +3671,7 @@
     },
     "billing": {
       "title": "Norēķini",
-      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonements",
       "state": "Statuss",
       "stateNone": "Nav abonementa",
@@ -3846,7 +3848,7 @@
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
       "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
-      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ievade · {{output}} izvade",
       "byok": "BYOK"
     },
@@ -4968,7 +4970,7 @@
     "defaultModel": "Izmantot Kilo noklusējuma modeli",
     "duration": "Laika ierobežojums (minūtes)",
     "spendLimit": "Izdevumu ierobežojums (USD)",
-    "invalidSafeguards": "Ievadiet pozitīvus, galīgus laika un izdevumu ierobežojumus.",
+    "invalidSafeguards": "Ievadiet pozitīvu skaitli atļautajā intervālā.",
     "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
     "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams. Mainiet modeli vai ierobežojumus, vai arī mēģiniet vēlreiz vēlāk.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",
@@ -5139,6 +5141,8 @@
       "autoCommit": "Fiksēt izmaiņas, kad palaišana beidzas",
       "condenseOnComplete": "Saspiest kontekstu, kad palaišana beidzas",
       "activeTitle": "Trigeris aktīvs",
+      "activeSwitchA11y": "Trigeris aktīvs: {{name}}",
+      "copyLinkA11y": "Kopēt trigera saiti: {{name}}",
       "activeDescription": "Apturēti tīmekļa āķi atbild ar 404.",
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",

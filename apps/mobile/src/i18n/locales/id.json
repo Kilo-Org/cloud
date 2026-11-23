@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
+      "notConnectedTitle": "{{platform}} tidak terhubung",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
       "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
       "gitlabAccount": "akun GitLab",
@@ -3403,7 +3405,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tidak ada peristiwa audit",
       "emptyDescription": "Tindakan yang dilakukan di organisasi ini akan muncul di sini.",
       "truncated": "Menampilkan peristiwa terbaru.",
@@ -3593,7 +3595,7 @@
     },
     "billing": {
       "title": "Penagihan",
-      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tidak ada langganan",
@@ -3782,7 +3784,7 @@
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal.",
       "emptyBoundDescription": "Log permintaan hanya tersedia sampai titik ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Gunakan model default Kilo",
     "duration": "Batas waktu (menit)",
     "spendLimit": "Batas biaya (USD)",
-    "invalidSafeguards": "Masukkan batas waktu dan biaya yang positif dan terbatas.",
+    "invalidSafeguards": "Masukkan angka positif dalam rentang yang diizinkan.",
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini. Ubah model atau batasnya, atau coba lagi nanti.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "Komit perubahan saat eksekusi selesai",
       "condenseOnComplete": "Ringkas konteks saat eksekusi selesai",
       "activeTitle": "Pemicu aktif",
+      "activeSwitchA11y": "Pemicu aktif: {{name}}",
+      "copyLinkA11y": "Salin tautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda akan menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap eksekusi menggunakan akun Anda, sehingga header rahasia wajib diisi.",

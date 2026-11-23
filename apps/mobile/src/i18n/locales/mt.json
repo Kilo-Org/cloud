@@ -402,7 +402,7 @@
       "title": "Ċwievet tal-fornitur",
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
       "orgDescription": "Dawn iċ-ċwievet huma kondiviżi ma' kulħadd fl-organizzazzjoni u jiġu ffatturati lill-kontijiet tal-fornitur tagħha.",
-      "viewOnly": "Is-sid, l-amministraturi jew il-maniġers tal-fatturazzjoni tal-organizzazzjoni biss jistgħu jibdlu ċ-ċwievet tagħha.",
+      "viewOnly": "Is-sid, l-amministraturi jew il-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jibdlu ċ-ċwievet tagħha.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
       "managedByPlan": "Immaniġġjata mill-pjan tal-ikkowdjar tiegħek",
       "enableKey": "Attiva ċ-ċavetta ta' {{provider}}",
@@ -1586,7 +1586,9 @@
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
       "gitlabAccount": "il-kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
-      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament."
+      "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament.",
+      "notConnectedTitle": "{{platform}} mhux konness",
+      "githubAdminOnlyDescription": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jikkonnettjawh."
     },
     "overview": {
       "allAreas": "L-oqsma kollha",
@@ -3600,7 +3602,7 @@
   "organization": {
     "auditLog": {
       "title": "Reġistru tal-awditjar",
-      "permissionDenied": "Il-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni fuq il-pjan Enterprise.",
+      "permissionDenied": "Il-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni fuq il-pjan Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "L-ebda avveniment tal-awditjar",
       "emptyDescription": "L-azzjonijiet meħuda f'din l-organizzazzjoni jidhru hawn.",
       "truncated": "Qed jintwerew l-aktar avvenimenti riċenti.",
@@ -3805,7 +3807,7 @@
     },
     "billing": {
       "title": "Ħlasijiet",
-      "permissionDenied": "Is-sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni biss jistgħu jaraw il-ħlasijiet tagħha.",
+      "permissionDenied": "Is-sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni biss jistgħu jaraw il-ħlasijiet tagħha. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abbonament",
       "state": "Stat",
       "stateNone": "L-ebda abbonament",
@@ -3982,7 +3984,7 @@
       "emptyDescription": "Uża “Siegħa qabel” biex tara talbiet ta' qabel.",
       "emptyBoundDescription": "Ir-reġistri tat-talbiet ma jmorrux iktar lura minn hekk.",
       "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
-      "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
+      "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} dħul · {{output}} ħruġ",
       "byok": "BYOK"
     },
@@ -5146,7 +5148,7 @@
     "defaultModel": "Uża l-mudell default ta' Kilo",
     "duration": "Salvagwardja tal-ħin (minuti)",
     "spendLimit": "Salvagwardja tal-infiq (USD)",
-    "invalidSafeguards": "Daħħal limiti ta' ħin u nfiq pożittivi u finiti.",
+    "invalidSafeguards": "Daħħal numru pożittiv fil-firxa permessa.",
     "estimate": "Stima {{estimate}} · massimu {{maximum}}",
     "estimateUnavailable": "Sommarju li jitħallas mhuwiex disponibbli għal dawn is-settings. Biddel il-mudell jew il-limiti, jew erġa' pprova aktar tard.",
     "confirmPaid": "Tixgħel sommarji bi ħlas għal {{context}}?",
@@ -5327,6 +5329,8 @@
       "autoCommit": "Ikkommetti l-bidliet meta tintemm l-eżekuzzjoni",
       "condenseOnComplete": "Ikkondensa l-kuntest meta tintemm l-eżekuzzjoni",
       "activeTitle": "Skattatur attiv",
+      "activeSwitchA11y": "Skattatur attiv: {{name}}",
+      "copyLinkA11y": "Ikkopja l-ħolqa għal {{name}}",
       "activeDescription": "Il-webhooks ippawżati jwieġbu b'404.",
       "runAsCreator": "Eżegwi bħali",
       "runAsCreatorDescription": "Kull eżekuzzjoni tuża l-kont tiegħek, għalhekk l-intestatura sigrieta hija meħtieġa.",

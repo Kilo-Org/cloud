@@ -1558,7 +1558,9 @@
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
+      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky.",
+      "notConnectedTitle": "{{platform}} není připojen",
+      "githubAdminOnlyDescription": "Připojit ji mohou pouze vlastníci organizace a správci."
     },
     "overview": {
       "allAreas": "Všechny oblasti",
@@ -3537,7 +3539,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3737,7 +3739,7 @@
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3914,7 +3916,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -5057,7 +5059,7 @@
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
-    "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
+    "invalidSafeguards": "Zadejte kladné číslo v povoleném rozsahu.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
@@ -5233,6 +5235,8 @@
       "autoCommit": "Zapsat změny po dokončení spuštění",
       "condenseOnComplete": "Zhuštit kontext po dokončení spuštění",
       "activeTitle": "Spouštěč aktivní",
+      "activeSwitchA11y": "Spouštěč aktivní: {{name}}",
+      "copyLinkA11y": "Kopírovat odkaz: {{name}}",
       "activeDescription": "Pozastavené webhooky odpovídají 404.",
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",

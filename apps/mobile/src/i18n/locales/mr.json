@@ -1502,7 +1502,9 @@
       "githubError": "GitHub सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "gitlabAccount": "GitLab खाते",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा."
+      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा.",
+      "notConnectedTitle": "{{platform}} जोडलेले नाही",
+      "githubAdminOnlyDescription": "केवळ संस्थेचे मालक आणि प्रशासक ते जोडू शकतात."
     },
     "overview": {
       "allAreas": "सर्व क्षेत्रे",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "ऑडिट लॉग",
-      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो.",
+      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "कोणत्याही ऑडिट घटना नाहीत",
       "emptyDescription": "या संस्थेत केलेल्या कृती येथे दिसतात.",
       "truncated": "सर्वात अलीकडील घटना दाखवत आहे.",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "बिलिंग",
-      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात.",
+      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "सदस्यता",
       "state": "स्थिती",
       "stateNone": "सदस्यता नाही",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "आधीच्या विनंत्या पाहण्यासाठी 'मागील तास' वापरा.",
       "emptyBoundDescription": "विनंत्यांच्या नोंदी इथपर्यंतच मागे उपलब्ध आहेत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
-      "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
+      "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Kilo चे डीफॉल्ट मॉडेल वापरा",
     "duration": "वेळ मर्यादा (मिनिटे)",
     "spendLimit": "खर्च मर्यादा (USD)",
-    "invalidSafeguards": "धनात्मक, मर्यादित वेळ आणि खर्च मर्यादा प्रविष्ट करा.",
+    "invalidSafeguards": "अनुमत श्रेणीत धन संख्या प्रविष्ट करा.",
     "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
     "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही. मॉडेल किंवा मर्यादा बदला, किंवा नंतर पुन्हा प्रयत्न करा.",
     "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "रन पूर्ण झाल्यावर बदल कमिट करा",
       "condenseOnComplete": "रन पूर्ण झाल्यावर संदर्भ संक्षिप्त करा",
       "activeTitle": "ट्रिगर सक्रिय",
+      "activeSwitchA11y": "ट्रिगर सक्रिय: {{name}}",
+      "copyLinkA11y": "{{name}} साठी लिंक कॉपी करा",
       "activeDescription": "थांबवलेले वेबहूक 404 ने उत्तर देतात.",
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",

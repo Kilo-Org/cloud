@@ -1502,7 +1502,9 @@
       "githubError": "GitHub سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "gitlabAccount": "GitLab اکاؤنٹ",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
+      "notConnectedTitle": "{{platform}} منسلک نہیں ہے",
+      "githubAdminOnlyDescription": "صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔"
     },
     "overview": {
       "allAreas": "تمام شعبے",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "آڈٹ لاگ",
-      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔",
+      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "کوئی آڈٹ ایونٹ نہیں",
       "emptyDescription": "اس تنظیم میں کیے گئے اقدامات یہاں ظاہر ہوتے ہیں۔",
       "truncated": "حالیہ ترین ایونٹس دکھائے جا رہے ہیں۔",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "بلنگ",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "سبسکرپشن",
       "state": "حالت",
       "stateNone": "کوئی سبسکرپشن نہیں",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "پہلے کی درخواستیں دیکھنے کے لیے پچھلا گھنٹہ استعمال کریں۔",
       "emptyBoundDescription": "درخواستوں کا ریکارڈ بس یہیں تک دستیاب ہے۔",
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
     "duration": "وقت کی حد (منٹ)",
     "spendLimit": "خرچ کی حد (USD)",
-    "invalidSafeguards": "مثبت اور محدود وقت اور خرچ کی حدیں درج کریں۔",
+    "invalidSafeguards": "اجازت شدہ حد کے اندر مثبت عدد درج کریں۔",
     "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
     "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔ ماڈل یا حدود تبدیل کریں، یا بعد میں دوبارہ کوشش کریں۔",
     "confirmPaid": "{{context}} کے لیے ادائیگی والے خلاصے فعال کریں؟",
@@ -5045,6 +5047,8 @@
       "autoCommit": "رن مکمل ہونے پر تبدیلیاں کمٹ کریں",
       "condenseOnComplete": "رن مکمل ہونے پر سیاق و سباق مختصر کریں",
       "activeTitle": "ٹرگر فعال ہے",
+      "activeSwitchA11y": "فعال ٹرگر: {{name}}",
+      "copyLinkA11y": "{{name}} کے لیے لنک کاپی کریں",
       "activeDescription": "موقوف ویب ہکس 404 کے ساتھ جواب دیتے ہیں۔",
       "runAsCreator": "میرے طور پر چلائیں",
       "runAsCreatorDescription": "ہر رن آپ کے اکاؤنٹ سے ہوتا ہے، اس لیے سیکرٹ ہیڈر لازمی ہے۔",

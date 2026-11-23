@@ -141,9 +141,6 @@ describe('readStoredValueWithRetry', () => {
 
   beforeEach(async () => {
     mockConfig(0);
-    // `mockReset` instead of `clearAllMocks`: one-time implementations queued
-    // by a previous test (`mockRejectedValueOnce`) must not leak into this
-    // suite's defaults.
     getItemAsync.mockReset();
     vi.useFakeTimers();
     events = [];

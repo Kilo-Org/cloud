@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
+      "notConnectedTitle": "{{platform}} chưa được kết nối",
+      "githubAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
       "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "tài khoản GitLab",
@@ -3403,7 +3405,7 @@
   "organization": {
     "auditLog": {
       "title": "Nhật ký kiểm tra",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Không có sự kiện kiểm tra",
       "emptyDescription": "Các hành động được thực hiện trong tổ chức này sẽ hiển thị tại đây.",
       "truncated": "Đang hiển thị các sự kiện gần đây nhất.",
@@ -3593,7 +3595,7 @@
     },
     "billing": {
       "title": "Thanh toán",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Gói đăng ký",
       "state": "Trạng thái",
       "stateNone": "Không có gói đăng ký",
@@ -3782,7 +3784,7 @@
       "emptyDescription": "Dùng Giờ cũ hơn để xem các yêu cầu trước đó.",
       "emptyBoundDescription": "Nhật ký yêu cầu không lưu xa hơn mốc này.",
       "loadError": "Không thể tải nhật ký yêu cầu.",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vào · {{output}} ra",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Dùng mô hình mặc định của Kilo",
     "duration": "Giới hạn thời gian (phút)",
     "spendLimit": "Giới hạn chi phí (USD)",
-    "invalidSafeguards": "Nhập giới hạn thời gian và chi phí dương, hữu hạn.",
+    "invalidSafeguards": "Nhập một số dương trong phạm vi cho phép.",
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này. Hãy đổi mô hình hoặc giới hạn, hoặc thử lại sau.",
     "confirmPaid": "Bật tóm tắt trả phí cho {{context}}?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "Commit thay đổi khi lần chạy kết thúc",
       "condenseOnComplete": "Cô đọng ngữ cảnh khi lần chạy kết thúc",
       "activeTitle": "Trình kích hoạt đang hoạt động",
+      "activeSwitchA11y": "Trình kích hoạt đang hoạt động: {{name}}",
+      "copyLinkA11y": "Sao chép liên kết cho {{name}}",
       "activeDescription": "Webhook bị tạm dừng sẽ trả về 404.",
       "runAsCreator": "Chạy dưới danh nghĩa tôi",
       "runAsCreatorDescription": "Mỗi lần chạy đều dùng tài khoản của bạn, nên bắt buộc phải có tiêu đề bí mật.",

@@ -74,11 +74,8 @@ export function ActivityIndicator({
       accessibilityElementsHidden={hiddenFromA11y}
       importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
       className="items-center justify-center"
-      // The static glyph stands in for the native indicator, so the wrapper
-      // owns the indicator's box: pinned to the same dimension the native
-      // branch renders at, the drawn marker keeps a visible size wherever it
-      // mounts - inside Button's reserved busy slot included - instead of
-      // shrinking to whatever the glyph's own measurement reports.
+      // A static glyph would otherwise shrink to its own measured size, so the
+      // wrapper keeps the box the native branch pins.
       // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
       style={[style, { width: dimension, height: dimension }]}
     >

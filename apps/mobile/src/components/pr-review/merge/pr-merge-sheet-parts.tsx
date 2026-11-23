@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the parts module holds the skeleton and the settled form in one place, so the placeholder and the form it stands in for cannot drift apart. */
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type TextInput, View } from 'react-native';
@@ -217,6 +218,8 @@ export function MergeSheetFormBody(props: {
   onDeleteBranchChange: (next: boolean) => void;
   inlineError: string | null;
   inlineErrorKind: 'retryable' | 'non-retryable' | 'reconnect' | null;
+  /** Clears the sheet's latch once the notice's check confirms the provider. */
+  onConnectionRestored: () => void;
   submitLabel: string;
   onConfirm: () => void;
   onDismiss: () => void;
@@ -239,6 +242,7 @@ export function MergeSheetFormBody(props: {
     onDeleteBranchChange,
     inlineError,
     inlineErrorKind,
+    onConnectionRestored,
     submitLabel,
     onConfirm,
     onDismiss,
@@ -297,7 +301,7 @@ export function MergeSheetFormBody(props: {
           {inlineErrorKind === 'reconnect' ? (
             <>
               <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
-              <PrReviewReconnectNotice />
+              <PrReviewReconnectNotice onConnectionRestored={onConnectionRestored} />
             </>
           ) : null}
         </View>

@@ -1,9 +1,8 @@
-// iOS only: the native sheet there reports a dimmed-area tap instead of
-// dismissing on its own (repo-local `BottomSheet.ios`), and the wrapper answers
-// it the way Android Back is answered. This suite pins that answer: the report
-// closes the sheet, a caller that wants to confirm first can refuse it, a sheet
-// with the gestures off never gets the report, and one tap answers the caller
-// exactly once.
+// iOS only: the repo-local `BottomSheet.ios` patch reports a dimmed-area tap
+// instead of dismissing on its own. This suite pins the wrapper's answer: the
+// report closes the sheet, a caller that wants to confirm first can refuse it, a
+// sheet with the gestures off never gets the report, and one tap answers the
+// caller exactly once.
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {

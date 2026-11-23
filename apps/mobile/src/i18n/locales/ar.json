@@ -825,6 +825,8 @@
     },
     "providerConnect": {
       "description": "اربط {{label}} الخاص بـ Kilo لمراجعة طلبات السحب تلقائيًا.",
+      "notConnectedTitle": "{{platform}} غير متصل",
+      "githubAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين فقط ربطه.",
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح صفحة إعداد GitHub. حاول مرة أخرى.",
       "gitlabAccount": "حساب GitLab",
@@ -3655,7 +3657,7 @@
   "organization": {
     "auditLog": {
       "title": "سجل التدقيق",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "لا توجد أحداث تدقيق",
       "emptyDescription": "تظهر هنا الإجراءات المتخذة في هذه المؤسسة.",
       "truncated": "يتم عرض أحدث الأحداث.",
@@ -3865,7 +3867,7 @@
     },
     "billing": {
       "title": "الفوترة",
-      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها.",
+      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "الاشتراك",
       "state": "الحالة",
       "stateNone": "لا يوجد اشتراك",
@@ -4054,7 +4056,7 @@
       "emptyDescription": "استخدم «الساعة الأقدم» لعرض الطلبات السابقة.",
       "emptyBoundDescription": "هذا أقدم ما تصل إليه سجلات الطلبات.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
       "byok": "BYOK"
     },
@@ -5235,7 +5237,7 @@
     "defaultModel": "استخدام نموذج Kilo الافتراضي",
     "duration": "حد الوقت (بالدقائق)",
     "spendLimit": "حد الإنفاق (USD)",
-    "invalidSafeguards": "أدخل حدودًا موجبة ومحددة للوقت والإنفاق.",
+    "invalidSafeguards": "أدخل رقمًا موجبًا ضمن النطاق المسموح.",
     "estimate": "التقدير {{estimate}} · الحد الأقصى {{maximum}}",
     "estimateUnavailable": "الملخص المدفوع غير متاح لهذه الإعدادات. غيّر النموذج أو الحدود، أو أعد المحاولة لاحقًا.",
     "confirmPaid": "تفعيل الملخصات المدفوعة لـ {{context}}؟",
@@ -5421,6 +5423,8 @@
       "autoCommit": "تثبيت التغييرات عند انتهاء التشغيل",
       "condenseOnComplete": "تكثيف السياق عند انتهاء التشغيل",
       "activeTitle": "المشغل نشط",
+      "activeSwitchA11y": "المشغل نشط: {{name}}",
+      "copyLinkA11y": "نسخ الرابط للمشغل {{name}}",
       "activeDescription": "ترد الويب هوكات الموقوفة بالرمز 404.",
       "runAsCreator": "التشغيل باسمي",
       "runAsCreatorDescription": "يستخدم كل تشغيل حسابك، لذا تكون ترويسة السر مطلوبة.",

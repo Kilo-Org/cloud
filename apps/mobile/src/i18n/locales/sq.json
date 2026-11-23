@@ -1502,7 +1502,9 @@
       "githubError": "Nuk u hap konfigurimi i GitHub. Provo përsëri.",
       "gitlabAccount": "llogaria GitLab",
       "gitlabError": "Nuk u hap konfigurimi i GitLab. Provo përsëri.",
-      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR."
+      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR.",
+      "notConnectedTitle": "{{platform}} nuk është i lidhur",
+      "githubAdminOnlyDescription": "Vetëm pronarët e organizatës dhe administratorët mund ta lidhin."
     },
     "overview": {
       "allAreas": "Të gjitha fushat",
@@ -3411,7 +3413,7 @@
   "organization": {
     "auditLog": {
       "title": "Regjistri i auditimit",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nuk ka ngjarje auditimi",
       "emptyDescription": "Veprimet e kryera në këtë organizatë shfaqen këtu.",
       "truncated": "Po shfaqen ngjarjet më të fundit.",
@@ -3601,7 +3603,7 @@
     },
     "billing": {
       "title": "Faturimi",
-      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit.",
+      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonimi",
       "state": "Statusi",
       "stateNone": "Pa abonim",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
       "emptyBoundDescription": "Regjistrat e kërkesave nuk shkojnë më mbrapa se kaq.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
       "byok": "BYOK"
     },
@@ -4879,7 +4881,7 @@
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
     "duration": "Kufiri i kohës (minuta)",
     "spendLimit": "Kufiri i shpenzimit (USD)",
-    "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
+    "invalidSafeguards": "Fut një numër pozitiv brenda intervalit të lejuar.",
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime. Ndrysho modelin ose kufijtë, ose provo përsëri më vonë.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
@@ -5045,6 +5047,8 @@
       "autoCommit": "Regjistro ndryshimet kur përfundon ekzekutimi",
       "condenseOnComplete": "Përmblidh kontekstin kur përfundon ekzekutimi",
       "activeTitle": "Shkaktari aktiv",
+      "activeSwitchA11y": "Shkaktari aktiv: {{name}}",
+      "copyLinkA11y": "Kopjo lidhjen për {{name}}",
       "activeDescription": "Webhook-et e pezulluara përgjigjen me 404.",
       "runAsCreator": "Ekzekuto si unë",
       "runAsCreatorDescription": "Çdo ekzekutim përdor llogarinë tënde, prandaj kërkohet koka sekrete.",

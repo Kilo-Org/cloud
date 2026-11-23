@@ -191,10 +191,11 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
 }
 
 /**
- * A placeholder line sized by the copy it stands in for. The hidden copy is the
- * same text the loaded field paints, so the bar is exactly as tall as that line
- * in every locale and at every text size; wrapping and font scaling therefore
- * cannot make the loaded form taller than the placeholder.
+ * A placeholder line sized by the copy it stands in for. The hidden copy carries
+ * the loaded line's own style — `text-sm font-medium`, which both the field's
+ * label and the `Text` inside its reserved slot paint — so the bar is exactly as
+ * tall as that line in every locale and at every text size; a different weight
+ * would change the glyph advances and could wrap where the loaded line does not.
  */
 function PlaceholderLine({ text, barClassName }: Readonly<{ text: string; barClassName: string }>) {
   return (
@@ -205,7 +206,7 @@ function PlaceholderLine({ text, barClassName }: Readonly<{ text: string; barCla
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <Text className="w-full shrink-0 text-sm">{text}</Text>
+        <Text className="w-full shrink-0 text-sm font-medium">{text}</Text>
       </View>
       <View className="absolute inset-0">
         <Skeleton className={cn('h-full', barClassName)} />

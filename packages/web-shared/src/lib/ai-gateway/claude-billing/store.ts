@@ -586,7 +586,8 @@ function isAboveHeldLockKeys(lockKey: string, heldLockKeys: ReadonlySet<string>)
  * so the next attempt would fail the same way: that is a genuine cycle. The
  * safety cap, `CLAUDE_BILLING_LOCK_ATTEMPT_CAP`, exists for the same reason. Both
  * surface as `ClaudeBillingLockBusyError` after one `console.warn`, so the
- * restart signal never leaves this function.
+ * restart signal never leaves this function. That log names only the key
+ * namespace, because a key embeds a user or connection id.
  */
 async function withClaudeBillingLockRetry<T>(
   attempt: (extraLockKeys: ReadonlySet<string>) => Promise<T>

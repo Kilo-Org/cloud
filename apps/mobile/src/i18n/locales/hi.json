@@ -5140,7 +5140,7 @@
     "revokeTitle": "लिंक वापस लें?",
     "revokeMessage": "मौजूदा लिंक तुरंत काम करना बंद कर देगा।",
     "revokeFailed": "लिंक वापस नहीं लिया जा सका।",
-    "expiresIn": "{{duration}} में समाप्त होगा",
+    "expiresIn": "{{duration}} बाद समाप्त होगा",
     "neverExpires": "कभी समाप्त नहीं होगा",
     "includesNewMessages": "नए संदेश शामिल हैं।",
     "excludesNewMessages": "नए संदेश शामिल नहीं हैं।",

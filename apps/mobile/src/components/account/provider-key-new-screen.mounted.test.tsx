@@ -686,6 +686,20 @@ describe('ProviderKeyNewScreen', () => {
     expect(root.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThan(0);
   });
 
+  it('holds the header subtitle line while the stored method is still being read', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethodPending = true;
+    const root = await mount();
+
+    // The provider list already answered, so only the stored-method read keeps
+    // this body: the header must still hold the line the form will fill, or the
+    // form moves the body down when it appears.
+    const [header] = root.findAll(node => Object.is(node.type, 'ScreenHeader'));
+    expect(header?.props.reserveSubtitle).toBe(true);
+    expect(root.findAll(node => Object.is(node.type, CREDENTIAL_FORM))).toHaveLength(0);
+  });
+
   it('offers a retry when the stored method could not be read', async () => {
     state.params = { provider: 'bedrock', id: KEY_ID };
     state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];

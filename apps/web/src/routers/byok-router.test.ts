@@ -107,7 +107,9 @@ const BEDROCK_API_KEY_CREDENTIALS = {
 };
 
 describe('BYOK Router', () => {
-  useFakeByokKms();
+  // The fake clears its log before each test, so this reference sees only the
+  // calls the current test made.
+  const kms = useFakeByokKms();
 
   let ownerUser: User;
   let memberUser: User;
@@ -1472,6 +1474,20 @@ describe('BYOK Router', () => {
       const caller = await createCallerForUser(ownerUser.id);
 
       await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({ method: null });
+    });
+
+    test('does not decrypt a row whose provider carries no Bedrock method', async () => {
+      const id = await insertKey({
+        provider_id: 'anthropic',
+        envelope: testByokEnvelope('stored-api-key'),
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({ method: null });
+      // Only a Bedrock row has a method to read, so another provider's key must
+      // never reach the KMS at all.
+      expect(kms.requests).toEqual([]);
     });
 
     test('answers null without throwing when the stored credential is missing or unreadable', async () => {

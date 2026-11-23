@@ -144,10 +144,10 @@ export function ProviderKeyNewScreen() {
       <View className="flex-1 bg-background">
         {/* The loaded header names the provider on its subtitle line, so the
             pending header holds that line and the form does not move when the
-            provider list answers. */}
+            provider list, or the stored method a Bedrock replace reads, answers. */}
         <ScreenHeader
           title={title}
-          reserveSubtitle={providers.isPending}
+          reserveSubtitle={providers.isPending || waiting}
           backFallback={PROFILE_TAB_HREF}
         />
         {stalled.isError ? (

@@ -4,6 +4,14 @@ import { getStructuredCredentialKind } from '@kilocode/app-shared/byok-credentia
 export type StoredBedrockMethod = 'apiKey' | 'accessKeys';
 
 /**
+ * Whether a stored key of this provider may carry a Bedrock method at all. A
+ * row of another provider needs no decrypt to answer that it has none.
+ */
+export function carriesBedrockMethod(providerId: string): boolean {
+  return getStructuredCredentialKind(providerId) === 'bedrock';
+}
+
+/**
  * The method a stored Bedrock credential was saved with, or null for another
  * provider, an unparseable credential, or neither shape. Reads only the field
  * names, so the credential value never leaves the server.

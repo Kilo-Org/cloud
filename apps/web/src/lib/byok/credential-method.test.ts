@@ -1,5 +1,17 @@
 import { describe, test, expect } from '@jest/globals';
-import { storedBedrockMethod } from './credential-method';
+import { carriesBedrockMethod, storedBedrockMethod } from './credential-method';
+
+describe('carriesBedrockMethod', () => {
+  test('accepts a Bedrock provider', () => {
+    expect(carriesBedrockMethod('bedrock')).toBe(true);
+    expect(carriesBedrockMethod('bedrock-byok')).toBe(true);
+  });
+
+  test('rejects a provider without a structured credential', () => {
+    expect(carriesBedrockMethod('anthropic')).toBe(false);
+    expect(carriesBedrockMethod('azure')).toBe(false);
+  });
+});
 
 describe('storedBedrockMethod', () => {
   test('reads the IAM key pair shape as access keys', () => {

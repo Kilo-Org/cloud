@@ -40,7 +40,7 @@ import {
   type BYOKKeyTestResult,
   type CredentialMethodResponse,
 } from '@/lib/byok/types';
-import { storedBedrockMethod } from '@/lib/byok/credential-method';
+import { carriesBedrockMethod, storedBedrockMethod } from '@/lib/byok/credential-method';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
@@ -514,6 +514,12 @@ export const byokRouter = createTRPCRouter({
         if (existingKey.kilo_user_id !== ctx.user.id) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
         }
+      }
+
+      // Only a Bedrock row can carry a method, so another provider's key costs
+      // no KMS decrypt and logs no warning it could never answer.
+      if (!carriesBedrockMethod(existingKey.provider_id)) {
+        return { method: null };
       }
 
       try {

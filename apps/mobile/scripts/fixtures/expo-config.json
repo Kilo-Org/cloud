@@ -2,17 +2,12 @@
   "ios": {
     "bundleIdentifier": "com.kilocode.kiloapp",
     "requireFullScreen": false,
-    "associatedDomains": [
-      "applinks:app.kilo.ai",
-      "webcredentials:app.kilo.ai"
-    ],
+    "associatedDomains": ["applinks:app.kilo.ai", "webcredentials:app.kilo.ai"],
     "entitlements": {
       "com.apple.developer.usernotifications.time-sensitive": true
     },
     "infoPlist": {
-      "CFBundleLocalizations": [
-        "en"
-      ]
+      "CFBundleLocalizations": ["en"]
     }
   },
   "android": {
@@ -22,16 +17,11 @@
       "android.permission.READ_MEDIA_VIDEO",
       "android.permission.READ_MEDIA_AUDIO"
     ],
-    "permissions": [
-      "android.permission.ACCESS_NOTIFICATION_POLICY"
-    ]
+    "permissions": ["android.permission.ACCESS_NOTIFICATION_POLICY"]
   },
   "scheme": "kiloapp",
   "orientation": "default",
-  "platforms": [
-    "ios",
-    "android"
-  ],
+  "platforms": ["ios", "android"],
   "locales": {
     "en": {
       "ios": {

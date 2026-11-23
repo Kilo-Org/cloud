@@ -4190,9 +4190,9 @@
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?",
     "guarded": {
-      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
-      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn dein Guthaben knapp wird.",
-      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
+      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Du würdest keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Du würdest keine Benachrichtigungen mehr erhalten, wenn dein Guthaben knapp wird.",
+      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Du würdest keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
       "hideBalanceOn": "Guthaben ausblenden? Deine Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
     }
   },

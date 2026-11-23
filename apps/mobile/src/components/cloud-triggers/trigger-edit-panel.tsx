@@ -121,9 +121,9 @@ export function TriggerEditPanel({
         organizationId={organizationId}
         draft={draft}
         problems={problems}
-        onDraftChange={next => {
+        onDraftChange={update => {
           clearWhere(candidate => candidate.kind === 'rejected');
-          setDraft(next);
+          setDraft(current => update(current));
         }}
         authConfigured={authConfigured}
         secretResetKey={secretResetKey}

@@ -151,10 +151,10 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
           organizationId={organizationId}
           draft={draft}
           problems={problems}
-          onDraftChange={next => {
+          onDraftChange={update => {
             clearWhere(candidate => candidate.kind === 'rejected');
             setSubmittedDraft(null);
-            setDraft(next);
+            setDraft(current => update(current));
           }}
           authConfigured={false}
           submitting={submitting}

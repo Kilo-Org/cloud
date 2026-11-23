@@ -115,7 +115,9 @@ function CreateFormHarness() {
       mode: 'create',
       draft,
       problems: {},
-      onDraftChange: setDraft,
+      onDraftChange: update => {
+        setDraft(update);
+      },
       repositoryPickerOpen: false,
       onRepositoryPickerOpenChange: () => {
         // no picker in this harness
@@ -127,7 +129,9 @@ function CreateFormHarness() {
       problems: {},
       authConfigured: false,
       secretResetKey: 0,
-      onDraftChange: setDraft,
+      onDraftChange: update => {
+        setDraft(update);
+      },
     })
   );
 }

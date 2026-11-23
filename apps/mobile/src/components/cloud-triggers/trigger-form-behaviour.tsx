@@ -17,6 +17,7 @@ import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
   type TriggerDraft,
+  type TriggerDraftChange,
   type TriggerDraftProblems,
   withRunAsCreator,
 } from '@/lib/cloud-triggers/trigger-draft';
@@ -33,7 +34,7 @@ type TriggerFormBehaviourProps = Readonly<{
   authConfigured: boolean;
   /** Changes after a save so the uncontrolled secret field remounts empty. */
   secretResetKey: number;
-  onDraftChange: (next: TriggerDraft) => void;
+  onDraftChange: TriggerDraftChange;
 }>;
 
 /**
@@ -81,13 +82,16 @@ export function TriggerFormBehaviour({
         multiline
         defaultValue={draft.prompt}
         onChangeText={prompt => {
-          onDraftChange({ ...draft, prompt });
+          onDraftChange(current => ({ ...current, prompt }));
         }}
         error={triggerProblemText(shownProblem('prompt'))}
         onBlur={() => {
           markTouched('prompt');
         }}
-        className="min-h-32"
+        // The box stops at this height and scrolls its own text: a box that
+        // grew with the prompt pushed every row below it down while the person
+        // typed, so a tap aimed at the run options landed on another row.
+        className="min-h-32 max-h-52 leading-[1.25rem]"
         textAlignVertical="top"
       />
 
@@ -98,7 +102,7 @@ export function TriggerFormBehaviour({
             multiline
             defaultValue={draft.bodySchemaJson}
             onChangeText={bodySchemaJson => {
-              onDraftChange({ ...draft, bodySchemaJson });
+              onDraftChange(current => ({ ...current, bodySchemaJson }));
             }}
             error={triggerProblemText(shownProblem('bodySchema'))}
             onBlur={() => {
@@ -108,7 +112,7 @@ export function TriggerFormBehaviour({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-32 font-mono text-xs"
+            className="min-h-32 max-h-52 font-mono text-xs leading-[1.25rem]"
             textAlignVertical="top"
           />
           <Text variant="caption">{t('cloudAgent.triggers.bodySchemaHelp')}</Text>
@@ -119,12 +123,12 @@ export function TriggerFormBehaviour({
               description={t('cloudAgent.triggers.authDescription')}
               value={draft.authEnabled}
               onValueChange={authEnabled => {
-                onDraftChange({
-                  ...draft,
+                onDraftChange(current => ({
+                  ...current,
                   authEnabled,
-                  authSecret: authEnabled ? draft.authSecret : '',
-                  runAsCreator: authEnabled ? draft.runAsCreator : false,
-                });
+                  authSecret: authEnabled ? current.authSecret : '',
+                  runAsCreator: authEnabled ? current.runAsCreator : false,
+                }));
               }}
               disabled={draft.runAsCreator}
             />
@@ -135,7 +139,7 @@ export function TriggerFormBehaviour({
                   required
                   defaultValue={draft.authHeader}
                   onChangeText={authHeader => {
-                    onDraftChange({ ...draft, authHeader });
+                    onDraftChange(current => ({ ...current, authHeader }));
                   }}
                   error={triggerProblemText(shownProblem('authHeader'))}
                   onBlur={() => {
@@ -152,7 +156,7 @@ export function TriggerFormBehaviour({
                   required={!authConfigured}
                   defaultValue={draft.authSecret}
                   onChangeText={authSecret => {
-                    onDraftChange({ ...draft, authSecret });
+                    onDraftChange(current => ({ ...current, authSecret }));
                   }}
                   error={triggerProblemText(shownProblem('authSecret'))}
                   onBlur={() => {
@@ -180,14 +184,14 @@ export function TriggerFormBehaviour({
           title={t('cloudAgent.triggers.autoCommit')}
           value={draft.autoCommit}
           onValueChange={autoCommit => {
-            onDraftChange({ ...draft, autoCommit });
+            onDraftChange(current => ({ ...current, autoCommit }));
           }}
         />
         <TriggerSwitchRow
           title={t('cloudAgent.triggers.condenseOnComplete')}
           value={draft.condenseOnComplete}
           onValueChange={condenseOnComplete => {
-            onDraftChange({ ...draft, condenseOnComplete });
+            onDraftChange(current => ({ ...current, condenseOnComplete }));
           }}
         />
         {mode === 'edit' && (
@@ -196,7 +200,7 @@ export function TriggerFormBehaviour({
             description={draft.active ? undefined : t('cloudAgent.triggers.activeDescription')}
             value={draft.active}
             onValueChange={active => {
-              onDraftChange({ ...draft, active });
+              onDraftChange(current => ({ ...current, active }));
             }}
           />
         )}
@@ -206,7 +210,7 @@ export function TriggerFormBehaviour({
             description={t('cloudAgent.triggers.runAsCreatorDescription')}
             value={draft.runAsCreator}
             onValueChange={runAsCreator => {
-              onDraftChange(withRunAsCreator(draft, runAsCreator));
+              onDraftChange(current => withRunAsCreator(current, runAsCreator));
             }}
           />
         )}

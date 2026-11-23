@@ -245,10 +245,10 @@ describe('TriggerCreateScreen hand-off through the detail route', () => {
   /** Hand the form the draft change a field edit produces. */
   function editDraft(renderer: TestRenderer.ReactTestRenderer): void {
     const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
-      onDraftChange: (next: Record<string, unknown>) => void;
+      onDraftChange: (update: (current: Record<string, unknown>) => unknown) => void;
     };
     act(() => {
-      formProps.onDraftChange({
+      formProps.onDraftChange(() => ({
         activation: 'webhook',
         cron: '',
         timezone: 'UTC',
@@ -268,7 +268,7 @@ describe('TriggerCreateScreen hand-off through the detail route', () => {
         authSecret: '',
         runAsCreator: false,
         name: 'trigger-new',
-      });
+      }));
     });
   }
 

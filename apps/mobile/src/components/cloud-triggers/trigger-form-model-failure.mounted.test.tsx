@@ -102,7 +102,9 @@ describe('trigger form model list failure', () => {
     renderWithProviders(
       createElement(TriggerFormAgent, {
         problems: {},
-        onDraftChange: () => undefined,
+        onDraftChange: () => {
+          // no edit is reported by this suite
+        },
         openSheet: null,
         onOpenSheetChange: () => undefined,
         draft: createTriggerDraft('UTC'),

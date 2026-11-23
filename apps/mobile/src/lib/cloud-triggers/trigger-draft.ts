@@ -76,6 +76,17 @@ export type TriggerDraft = Readonly<{
   runAsCreator: boolean;
 }>;
 
+/**
+ * One draft edit the form reports. The screen applies it to the draft it holds
+ * when the update runs, so two edits that land in one commit — a queued text
+ * change and a switch the reader just tapped — each rewrite only their own
+ * fields instead of overwriting each other with a render's snapshot.
+ */
+export type TriggerDraftChange = (
+  /** Applied to the draft the screen holds when the edit lands. */
+  update: (current: TriggerDraft) => TriggerDraft
+) => void;
+
 /** The fields a problem can be attached to, so the form can place its copy. */
 export type TriggerDraftField =
   | 'name'

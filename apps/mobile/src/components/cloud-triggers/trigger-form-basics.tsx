@@ -22,6 +22,7 @@ import {
   defaultPrompt,
   type TriggerActivation,
   type TriggerDraft,
+  type TriggerDraftChange,
   type TriggerDraftProblems,
 } from '@/lib/cloud-triggers/trigger-draft';
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
@@ -39,7 +40,7 @@ type TriggerFormBasicsProps = Readonly<{
   organizationId?: string;
   draft: TriggerDraft;
   problems: TriggerDraftProblems;
-  onDraftChange: (next: TriggerDraft) => void;
+  onDraftChange: TriggerDraftChange;
   repositoryPickerOpen: boolean;
   onRepositoryPickerOpenChange: (open: boolean) => void;
 }>;
@@ -63,12 +64,14 @@ export function TriggerFormBasics({
   const activate = (activation: TriggerActivation) => {
     // A prompt still on the other activation's default follows the choice, so a
     // scheduled trigger does not start out describing a webhook body.
-    onDraftChange({
-      ...draft,
+    onDraftChange(current => ({
+      ...current,
       activation,
       prompt:
-        draft.prompt === defaultPrompt(draft.activation) ? defaultPrompt(activation) : draft.prompt,
-    });
+        current.prompt === defaultPrompt(current.activation)
+          ? defaultPrompt(activation)
+          : current.prompt,
+    }));
   };
   return (
     <View className="gap-4">
@@ -78,7 +81,7 @@ export function TriggerFormBasics({
           required
           defaultValue={draft.name}
           onChangeText={name => {
-            onDraftChange({ ...draft, name });
+            onDraftChange(current => ({ ...current, name }));
           }}
           error={triggerProblemText(shownProblem('name'))}
           onBlur={() => {
@@ -129,7 +132,7 @@ export function TriggerFormBasics({
             required
             defaultValue={draft.cron}
             onChangeText={cron => {
-              onDraftChange({ ...draft, cron });
+              onDraftChange(current => ({ ...current, cron }));
             }}
             error={triggerProblemText(shownProblem('cron'))}
             onBlur={() => {
@@ -146,7 +149,7 @@ export function TriggerFormBasics({
             label={t('cloudAgent.triggers.fieldTimezone')}
             defaultValue={draft.timezone}
             onChangeText={timezone => {
-              onDraftChange({ ...draft, timezone });
+              onDraftChange(current => ({ ...current, timezone }));
             }}
             autoCapitalize="none"
             autoCorrect={false}
@@ -190,11 +193,11 @@ export function TriggerFormBasics({
           selectedKey={draft.repository.length === 0 ? null : `github:${draft.repository}`}
           onSelect={repository => {
             onRepositoryPickerOpenChange(false);
-            onDraftChange({
-              ...draft,
+            onDraftChange(current => ({
+              ...current,
               repository: repository.fullName,
               environmentId: null,
-            });
+            }));
           }}
           onClose={() => {
             onRepositoryPickerOpenChange(false);

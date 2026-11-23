@@ -243,10 +243,10 @@ function editDraft(
   overrides: Partial<Record<string, unknown>> = {}
 ): void {
   const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
-    onDraftChange: (next: Record<string, unknown>) => void;
+    onDraftChange: (update: (current: Record<string, unknown>) => unknown) => void;
   };
   act(() => {
-    formProps.onDraftChange(editedDraft(overrides));
+    formProps.onDraftChange(() => editedDraft(overrides));
   });
 }
 

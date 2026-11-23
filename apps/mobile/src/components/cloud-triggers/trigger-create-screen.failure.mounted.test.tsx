@@ -109,10 +109,10 @@ function editName(root: ReactTestInstance): void {
   const basics = root.findByType('TriggerFormBasics');
   const props = basics.props as {
     draft: Record<string, unknown>;
-    onDraftChange: (next: Record<string, unknown>) => void;
+    onDraftChange: (update: (current: Record<string, unknown>) => unknown) => void;
   };
   act(() => {
-    props.onDraftChange({ ...props.draft, name: h.draftName });
+    props.onDraftChange(current => ({ ...current, name: h.draftName }));
   });
 }
 

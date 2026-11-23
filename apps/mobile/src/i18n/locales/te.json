@@ -2815,7 +2815,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ఉపసెషన్‌లలో మరిన్ని ఉపసెషన్‌లను సృష్టించే గరిష్ట స్థాయికి చేరుకుంది.",
+      "maxNestingDepth": "ఉపసెషన్‌ల గరిష్ట లోతు చేరుకుంది.",
       "modelAccessibility": "మోడల్: {{modelLabel}}",
       "openHint": "ఉప ఏజెంట్ సెషన్‌ను తెరవండి",
       "subagent": "ఉప ఏజెంట్",

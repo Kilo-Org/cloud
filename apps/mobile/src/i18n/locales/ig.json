@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Erutela oke nnọkọ a pụrụ ịmepụta n'ime nnọkọ ndị ọzọ.",
+      "maxNestingDepth": "Erutela oke omimi nke nnọkọ dị n’ime.",
       "modelAccessibility": "Ihe nlereanya: {{modelLabel}}",
       "openHint": "Mepee nnọkọ onye nnọchi anya inyeaka",
       "subagent": "Onye nnọchi anya inyeaka",

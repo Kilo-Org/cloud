@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Daangaan turtii tokko keessa turtii biraa uumuuf jiru ga'ameera.",
+      "maxNestingDepth": "Daangaan gad fageenya turtii keessaa ga’ameera.",
       "modelAccessibility": "Moodela: {{modelLabel}}",
       "openHint": "Turtii ergamaa gargaaraa bani",
       "subagent": "Ergamaa gargaaraa",

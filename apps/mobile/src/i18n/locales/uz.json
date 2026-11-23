@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Ichma-ich sessiyalar soni ruxsat etilgan chegaraga yetdi.",
+      "maxNestingDepth": "Ichma-ich sessiyalarning maksimal chuqurligiga yetdi.",
       "modelAccessibility": "Model nomi: {{modelLabel}}",
       "openHint": "Yordamchi agent sessiyasini ochish",
       "subagent": "Yordamchi agent",

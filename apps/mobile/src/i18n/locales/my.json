@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}၊ {{taskName}}{{modelLabel}}၊ {{latestActivityLabel}}၊ {{status}}",
-      "maxNestingDepth": "စက်ရှင်အတွင်း စက်ရှင်ခွဲများ ထပ်ဖွင့်နိုင်သည့် အဆင့်ကန့်သတ်ချက်သို့ ရောက်နေပါပြီ။",
+      "maxNestingDepth": "ထပ်နေသော စက်ရှင်များ၏ အမြင့်ဆုံးအဆင့်သို့ ရောက်နေပါပြီ။",
       "modelAccessibility": "မော်ဒယ်: {{modelLabel}}",
       "openHint": "အေးဂျင့်ခွဲ၏ စက်ရှင်ကို ဖွင့်ပါ",
       "subagent": "အေးဂျင့်ခွဲ",

@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "එකක් තුළ තවත් උපසැසියක් සෑදිය හැකි උපරිම මට්ටමට ළඟා වී ඇත.",
+      "maxNestingDepth": "කැදැලි සැසිවල උපරිම ගැඹුරට ළඟා වී ඇත.",
       "modelAccessibility": "මාදිලිය: {{modelLabel}}",
       "openHint": "උපනියෝජිත සැසිය විවෘත කරන්න",
       "subagent": "උපනියෝජිතයා",

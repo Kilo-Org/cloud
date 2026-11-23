@@ -32,27 +32,29 @@ function draft(
 }
 
 describe('assertDraftPublishable', () => {
-  it('rejects a multi-repository draft on an allocation that cannot host it', () => {
+  const repositories: EnvironmentRepositoryEntry[] = [
+    { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+    { platform: 'github', repoFullName: 'Kilo-Org/web' },
+  ];
+
+  it('rejects a multi-repository draft on the shared sandbox', () => {
     const multiRepository = draft({
-      sandboxAllocation: 'vercel-small',
-      repositories: [
-        { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
-        { platform: 'github', repoFullName: 'Kilo-Org/web' },
-      ],
+      sandboxAllocation: 'cloudflare-shared',
+      repositories,
     });
 
     expect(() => assertDraftPublishable(multiRepository)).toThrow(TRPCError);
     expect(() => assertDraftPublishable(multiRepository)).toThrow(
-      'A multi-repository environment needs an isolated Cloudflare sandbox allocation'
+      'A multi-repository environment cannot run on the shared sandbox'
     );
   });
 
-  it('allows a single-repository draft on the same allocation', () => {
-    const singleRepository = draft({
+  it('allows a multi-repository draft on Vercel', () => {
+    const multiRepository = draft({
       sandboxAllocation: 'vercel-small',
-      repositories: [{ platform: 'github', repoFullName: 'Kilo-Org/cloud' }],
+      repositories,
     });
 
-    expect(() => assertDraftPublishable(singleRepository)).not.toThrow();
+    expect(() => assertDraftPublishable(multiRepository)).not.toThrow();
   });
 });

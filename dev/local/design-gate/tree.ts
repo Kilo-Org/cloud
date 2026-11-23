@@ -36,6 +36,15 @@ const ProbeNodeSchema = z.object({
   lines: z.number().optional(),
   screenState: z.number().optional(),
   scrollAxes: z.object({ x: z.boolean(), y: z.boolean() }).optional(),
+  /**
+   * The platform says the user cannot see this node: it is transparent, laid out
+   * outside every pane that draws it, or hidden from the reader. An accessibility
+   * snapshot carries no style, so without this flag a box the app hides from
+   * sight still reads as an ordinary in-flow sibling — the to-do header's
+   * zero-opacity copy of its title did, and the `overlap` rule paired it with the
+   * pressable title for one line of collision no pixel shows.
+   */
+  invisible: z.literal(true).optional(),
   style: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 

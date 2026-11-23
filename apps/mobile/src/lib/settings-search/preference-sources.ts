@@ -45,7 +45,11 @@ const PREFERENCES_HUB_REST_SETTINGS = {
   spendAlerts: defineSetting('spend-alerts', 'notifications.channel.spend', 'notifications'),
 } as const;
 
-/** Every row on the Preferences hub, in screen order. `appearance` labels its section. */
+/**
+ * Every row on the Preferences hub, in screen order. `appearance` labels the
+ * Appearance section; the rows below it sit under the screen's own account
+ * heading, which is a grouping label rather than a setting.
+ */
 const PREFERENCES_HUB_SETTINGS = {
   ...PREFERENCES_HUB_TOP_SETTINGS,
   ...APPEARANCE_OPTION_SETTINGS,

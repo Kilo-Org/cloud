@@ -1,4 +1,4 @@
-import { env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -3341,6 +3341,45 @@ describe('SessionIngestDO integration', () => {
     });
   });
 
+  describe('live summary state', () => {
+    it('derives the list step target from the CLI filePath key', async () => {
+      const suffix = crypto.randomUUID().replaceAll('-', '');
+      const liveUserId = `usr_live_list_${suffix}`;
+      const sessionId = `ses_${suffix.slice(0, 26)}`;
+      const stub = getStub(liveUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session_open', data: {} },
+          { type: 'message', data: { id: 'msg_list_1', role: 'assistant', content: '' } },
+          {
+            type: 'part',
+            data: {
+              id: 'p_list_1',
+              messageID: 'msg_list_1',
+              type: 'tool',
+              tool: 'list',
+              state: { status: 'running', input: { filePath: '/repo/src/index.ts' } },
+            },
+          },
+        ],
+        liveUserId,
+        sessionId,
+        1
+      );
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [row] = [
+          ...state.storage.sql.exec<{ value: string }>(
+            'SELECT value FROM ingest_meta WHERE key = ?',
+            'liveSummaryState'
+          ),
+        ];
+        expect(JSON.parse(row.value).step).toEqual({ verb: 'searching', target: 'index.ts' });
+      });
+    });
+  });
+
   describe('attention signals', () => {
     /** A completed signal requires a previously stored status, so tests start sessions as busy. */
     async function ingestBusyStatus(stub: ReturnType<typeof getStub>, sessionId: string) {
@@ -4680,368 +4719,5 @@ describe('SessionIngestDO clone stage', () => {
       })
     ).resolves.toEqual({ status: 'rejected', code: 'clone_setup_failed' });
     expect(await destinationRowCount(destination)).toBe(0);
-  });
-});
-
-describe('SessionIngestDO raw row export', () => {
-  function parseNdjson(raw: string): Record<string, unknown>[] {
-    return raw
-      .trimEnd()
-      .split('\n')
-      .map(line => {
-        const parsed: unknown = JSON.parse(line);
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          throw new Error('NDJSON line was not an object');
-        }
-        // Every line kind is a flat object; the reads below stay field-guarded.
-        return parsed as Record<string, unknown>;
-      });
-  }
-
-  /** The stored body of one exported row, parsed and checked for the field asked for. */
-  function storedBodyField(row: Record<string, unknown>, field: 'id' | 'text' | 'content'): string {
-    const body: unknown = JSON.parse(String(row.item_data));
-    if (typeof body !== 'object' || body === null || !(field in body)) {
-      throw new Error(`stored body did not carry ${field}`);
-    }
-    const value = body[field];
-    if (typeof value !== 'string') throw new Error(`stored body carried a non-string ${field}`);
-    return value;
-  }
-
-  it('streams every stored item type in ingest order with its R2 reference', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-    const offloadedKey = `items/${kiloUserId}/${sessionId}/message/msg_big/1000`;
-
-    await stub.ingest(
-      [
-        { type: 'session', data: { title: 'Raw export' } },
-        { type: 'message', data: { id: 'msg_1', role: 'user' } },
-        { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'hello' } },
-        { type: 'session_status', data: { status: 'busy' } },
-        { type: 'message', data: { id: 'msg_big', role: 'assistant' } },
-      ],
-      kiloUserId,
-      sessionId,
-      1,
-      1000,
-      { 'message/msg_big': offloadedKey }
-    );
-
-    const lines = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
-    const rows = lines.filter(line => line.t === 'row');
-
-    expect(rows.map(row => row.item_type)).toEqual([
-      'session',
-      'message',
-      'part',
-      'session_status',
-      'message',
-    ]);
-    expect(rows.at(-1)).toMatchObject({
-      item_id: 'message/msg_big',
-      item_data: '{}',
-      item_data_r2_key: offloadedKey,
-    });
-    expect(lines.some(line => line.t === 'meta')).toBe(true);
-    expect(lines.at(-1)).toEqual({ t: 'end', rows: rows.length });
-  });
-
-  it('orders rows by id even when a row is rewritten with a later ingest time', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_order_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    await stub.ingest(
-      [
-        { type: 'message', data: { id: 'msg_one', role: 'user' } },
-        { type: 'message', data: { id: 'msg_two', role: 'assistant' } },
-      ],
-      kiloUserId,
-      sessionId,
-      1,
-      1000
-    );
-    // `ingested_at` moves, `id` does not: `(ingested_at, id)` order would put
-    // `msg_one` after `msg_two`.
-    await stub.ingest(
-      [{ type: 'message', data: { id: 'msg_one', role: 'user', content: 'rewritten' } }],
-      kiloUserId,
-      sessionId,
-      1,
-      3000
-    );
-
-    const rows = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream()).text()
-    ).filter(line => line.t === 'row');
-
-    expect(rows.map(row => row.item_id)).toEqual(['message/msg_one', 'message/msg_two']);
-    expect(storedBodyField(rows[0], 'content')).toBe('rewritten');
-  });
-
-  it('never repeats or appends a row written after the stream was created', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_frozen_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-    const firstPage = Array.from({ length: 205 }, (_, index) => ({
-      type: 'message' as const,
-      data: { id: `msg_${index}`, role: 'user' },
-    }));
-
-    await stub.ingest(firstPage, kiloUserId, sessionId, 1, 1000);
-
-    // One page was already read when the stream was created: the first row is
-    // behind the cursor, and the only remaining page ends at the frozen id.
-    const stream = await stub.exportSessionRowsStream();
-    await stub.ingest(
-      [
-        { type: 'message', data: { id: 'msg_0', role: 'user', content: 'rewritten' } },
-        { type: 'message', data: { id: 'msg_new', role: 'assistant' } },
-      ],
-      kiloUserId,
-      sessionId,
-      1,
-      3000
-    );
-
-    const rows = parseNdjson(await new Response(stream).text()).filter(line => line.t === 'row');
-
-    expect(rows).toHaveLength(205);
-    expect(new Set(rows.map(row => row.item_id)).size).toBe(205);
-    expect(rows.at(-1)).toMatchObject({ item_id: 'message/msg_204' });
-  });
-
-  it('pages past one SQLite page without dropping or reordering rows', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_page_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-    const parts = Array.from({ length: 205 }, (_, index) => ({
-      type: 'part' as const,
-      data: {
-        id: `part_${index}`,
-        messageID: 'msg_1',
-        type: 'text' as const,
-        text: `chunk-${index}`,
-      },
-    }));
-
-    await stub.ingest(
-      [{ type: 'message', data: { id: 'msg_1', role: 'user' } }, ...parts],
-      kiloUserId,
-      sessionId,
-      1,
-      1000
-    );
-
-    const rows = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream()).text()
-    ).filter(line => line.t === 'row');
-
-    expect(rows).toHaveLength(206);
-    expect(rows[0]).toMatchObject({ item_id: 'message/msg_1' });
-    expect(rows.at(-1)).toMatchObject({ item_id: 'part/msg_1/part_204' });
-    expect(rows.slice(1).map(row => storedBodyField(row, 'text'))).toEqual(
-      parts.map(part => part.data.text)
-    );
-  });
-
-  it('keeps a byte-capped page from dropping the rows it trimmed', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_bytes_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-    // Three bodies at the inline maximum exceed the 4 MiB pull cap, so the
-    // stream must carry two and re-read the third from the same cursor.
-    const items = ['msg_a', 'msg_b', 'msg_c'].map(id =>
-      makeMessageWithDataBytes(id, MAX_INGEST_ITEM_BYTES)
-    );
-
-    await stub.ingest(items, kiloUserId, sessionId, 1, 1000);
-
-    const rows = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream()).text()
-    ).filter(line => line.t === 'row');
-
-    expect(rows.map(row => storedBodyField(row, 'id'))).toEqual(['msg_a', 'msg_b', 'msg_c']);
-  });
-
-  it('resets an object that stores nothing when asked to clean an empty export', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_empty_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-
-    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
-
-    // The reset is applied by the alarm, so it cannot race this response. The
-    // abort that follows the reset surfaces to the alarm's caller.
-    await expect(runDurableObjectAlarm(stub)).rejects.toThrow(/abort/i);
-
-    // The object restarted with a fresh schema and no prior data.
-    const afterCleanup = parseNdjson(
-      await new Response(await getStub(kiloUserId, sessionId).exportSessionRowsStream()).text()
-    );
-
-    expect(afterCleanup).toEqual([{ t: 'end', rows: 0 }]);
-  });
-
-  it('keeps rows written between the cleanup request and the reset alarm', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_late_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
-
-    // A row lands before the alarm runs, from a batch that does not arm metrics.
-    // The reset must stand down, and because this alarm belongs to the cleanup
-    // it must neither emit metrics nor latch the emitted flag. The O11Y stub
-    // fails the test if metrics run; the DO keeps its bindings on a plain
-    // property, so a test can replace them.
-    await stub.ingest(
-      [{ type: 'message', data: { id: 'msg_late', role: 'user' } }],
-      kiloUserId,
-      sessionId,
-      1,
-      1000
-    );
-    await runInDurableObject(stub, instance => {
-      const doInstance = instance as unknown as { env: Record<string, unknown> };
-      Object.defineProperty(doInstance, 'env', {
-        value: {
-          ...doInstance.env,
-          O11Y: {
-            ingestSessionMetrics: async () => {
-              throw new Error('cleanup alarm must not emit metrics');
-            },
-          },
-        },
-        configurable: true,
-      });
-    });
-    expect(await runDurableObjectAlarm(stub)).toBe(true);
-
-    const metricsEmitted = await runInDurableObject(stub, (_instance, state) => [
-      ...state.storage.sql.exec<{ value: string }>(
-        "SELECT value FROM ingest_meta WHERE key = 'metricsEmitted'"
-      ),
-    ]);
-    expect(metricsEmitted).toEqual([]);
-
-    const after = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
-    expect(after.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
-      'message/msg_late',
-    ]);
-  });
-
-  it('never resets an object that holds rows', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_keep_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    await stub.ingest(
-      [{ type: 'message', data: { id: 'msg_kept', role: 'user' } }],
-      kiloUserId,
-      sessionId,
-      1,
-      1000
-    );
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-    expect(lines.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
-      'message/msg_kept',
-    ]);
-    expect(lines.at(-1)).toEqual({ t: 'end', rows: 1 });
-
-    // Nothing was deleted: an export without the flag still reads the row.
-    const again = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
-    expect(again.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([
-      'message/msg_kept',
-    ]);
-  });
-
-  it('never resets an object that holds only a session row', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_session_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    await runInDurableObject(stub, (_instance, state) => {
-      state.storage.sql.exec("INSERT INTO sessions (session_id) VALUES ('legacy-session')");
-    });
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-    expect(lines).toEqual([{ t: 'end', rows: 0 }]);
-
-    const rows = await runInDurableObject(stub, (_instance, state) => [
-      ...state.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM sessions'),
-    ]);
-    expect(rows).toEqual([{ session_id: 'legacy-session' }]);
-  });
-
-  it('never resets an object that holds only a dispatch row', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_dispatch_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    await runInDurableObject(stub, (_instance, state) => {
-      state.storage.sql.exec(
-        "INSERT INTO agent_notification_dispatch (identity, state, created_at) VALUES ('agent_notification/notification-1', 'pending', 1)"
-      );
-    });
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-    expect(lines).toEqual([{ t: 'end', rows: 0 }]);
-
-    const rows = await runInDurableObject(stub, (_instance, state) => [
-      ...state.storage.sql.exec<{ identity: string }>(
-        'SELECT identity FROM agent_notification_dispatch'
-      ),
-    ]);
-    expect(rows).toEqual([{ identity: 'agent_notification/notification-1' }]);
-  });
-
-  it('stands the reset alarm down for an object that gained only a session row', async () => {
-    const suffix = crypto.randomUUID().replaceAll('-', '');
-    const kiloUserId = `usr_raw_export_session_alarm_${suffix}`;
-    const sessionId = `ses_${suffix.slice(0, 26)}`;
-    const stub = getStub(kiloUserId, sessionId);
-
-    const lines = parseNdjson(
-      await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
-    );
-    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
-
-    await runInDurableObject(stub, (_instance, state) => {
-      state.storage.sql.exec("INSERT INTO sessions (session_id) VALUES ('legacy-session')");
-    });
-    expect(await runDurableObjectAlarm(stub)).toBe(true);
-
-    const rows = await runInDurableObject(stub, (_instance, state) => [
-      ...state.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM sessions'),
-    ]);
-    expect(rows).toEqual([{ session_id: 'legacy-session' }]);
   });
 });

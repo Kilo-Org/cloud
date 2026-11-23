@@ -1,7 +1,22 @@
-export function getLowerDomainFromEmail(email: string): string | null {
+/**
+ * Splits an address at its last `@` into the local part and the domain. An
+ * address without `@` yields no domain.
+ */
+function splitAtLastAt(email: string): { local: string; domain: string } | null {
   const at = email.lastIndexOf('@');
   if (at === -1) return null;
-  return email.slice(at + 1).toLowerCase() || null;
+  return { local: email.slice(0, at), domain: email.slice(at + 1) };
+}
+
+/**
+ * The domain of an address, lowercased. Unlike `getDeliveredEmailAddress`, it
+ * does not trim the input: the address is passed through as stored, so an
+ * address carrying surrounding whitespace yields a domain with that
+ * whitespace.
+ */
+export function getLowerDomainFromEmail(email: string): string | null {
+  const split = splitAtLastAt(email);
+  return split?.domain.toLowerCase() || null;
 }
 
 /**
@@ -21,12 +36,11 @@ export function getDeliveredEmailAddress(email: string): string {
  * Normalizes an email address for duplicate detection.
  */
 export function normalizeEmail(email: string): string {
-  const trimmed = email.trim().toLowerCase();
-  const atIndex = trimmed.lastIndexOf('@');
-  if (atIndex === -1) return trimmed;
+  const split = splitAtLastAt(email.trim().toLowerCase());
+  if (!split) return email.trim().toLowerCase();
 
-  let local = trimmed.slice(0, atIndex);
-  const domain = trimmed.slice(atIndex + 1);
+  let local = split.local;
+  const domain = split.domain;
 
   const plusIndex = local.indexOf('+');
   if (plusIndex !== -1) {

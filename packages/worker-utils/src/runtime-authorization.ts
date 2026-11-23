@@ -16,6 +16,16 @@ import {
 export { RuntimeAuthorizationSchema };
 export type { RuntimeAuthorization };
 
+/*
+ * The role set for runtime delegation: a direct membership whose role is
+ * owner, admin or member, matching the direct-membership-only lookup in
+ * `getMembership` below. Organization-scoped session creation uses its own
+ * gate: the Cloud Agent Next `assertOrganizationMembership` requires a direct
+ * membership whatever its role, and the Discord bot session surface also
+ * accepts an inherited parent `owner` or `admin`. The read predicate
+ * `activeOrganizationAccessSql` in `./organization-membership.js` accepts
+ * every direct role, and also honours an inherited parent-organization role.
+ */
 const membershipRole = z.enum(['owner', 'admin', 'member']);
 const principalSchema = z.object({
   id: z.string().min(1),
@@ -148,6 +158,9 @@ async function getMembership(
     return membership === null ? null : membershipSchema.parse(membership);
   }
   const db = getWorkerDb(input.connectionString);
+  // The lookup is deliberately the direct membership row only: an inherited
+  // parent-organization role authorizes reads and organization-scoped session
+  // creation on the Discord bot surface, not runtime delegation.
   const [row] = await db
     .select({
       id: organization_memberships.id,

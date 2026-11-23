@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { parseWorkspaceSessionCallbackTarget } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   CHILD_SESSION_CALLBACK_VERSION,
+  formatChildQuestionCallbackPrompt,
   formatChildSessionCallbackPrompt,
   type ChildSessionCallbackPayload,
 } from '@kilocode/worker-utils/cloud-agent-child-callback';
@@ -13,7 +14,7 @@ import { isCanonicalMessageId } from '../session/message-id.js';
 import { preflightAndQueuePromptMessage } from '../session/queue-message.js';
 import type { Env } from '../types.js';
 import { classifyCallbackError, type DeliveryResult } from './delivery.js';
-import type { CallbackJob, ExecutionCallbackPayload } from './types.js';
+import type { CallbackQueueJob, ExecutionCallbackPayload } from './types.js';
 
 const RESULT_MAX_LENGTH = 12_000;
 
@@ -102,17 +103,18 @@ export async function resolveCallbackWorkspace(
  */
 export async function deliverWorkspaceSessionCallback(
   env: Env,
-  job: CallbackJob,
+  job: CallbackQueueJob,
   attempts: number
 ): Promise<DeliveryResult> {
   const source = job.parentSession;
+  const interaction = 'type' in job;
   const targetSessionId = parseWorkspaceSessionCallbackTarget(job.target.url);
   if (
     targetSessionId === null ||
     !source?.userId ||
     !isCanonicalMessageId(source.messageId) ||
     !job.payload.cloudAgentSessionId.startsWith('workspace_') ||
-    job.payload.sessionId !== job.payload.cloudAgentSessionId
+    (!interaction && job.payload.sessionId !== job.payload.cloudAgentSessionId)
   ) {
     return { type: 'failed', error: 'Invalid workspace session callback' };
   }
@@ -127,12 +129,12 @@ export async function deliverWorkspaceSessionCallback(
     const target = await fetchSessionMetadata(env, source.userId, targetSessionId);
     if (
       !target ||
-      workspace.worktreeId === null ||
       target.identity.sessionId !== targetSessionId ||
       target.identity.userId !== source.userId ||
       (target.identity.orgId ?? null) !== workspace.organizationId ||
-      target.parentCloudAgentSessionId !== undefined ||
-      target.workspace?.worktreeId !== workspace.worktreeId
+      (workspace.worktreeId === null
+        ? targetSessionId !== workspace.workspaceSessionId
+        : target.workspace?.worktreeId !== workspace.worktreeId)
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Workspace session callback denied' });
     }
@@ -149,7 +151,9 @@ export async function deliverWorkspaceSessionCallback(
         turn: {
           type: 'prompt',
           id: source.messageId,
-          prompt: parentSessionCallbackPrompt(job.payload, targetSessionId),
+          prompt: interaction
+            ? formatChildQuestionCallbackPrompt(job.payload)
+            : parentSessionCallbackPrompt(job.payload, targetSessionId),
         },
       },
       { env, userId: source.userId },

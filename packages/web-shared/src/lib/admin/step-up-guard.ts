@@ -15,8 +15,11 @@ import {
   stepUpPolicyFor,
 } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import {
+  normalizeStepUpMethod,
   stepUpBindingFromOperation,
+  stepUpOperationSchema,
   type StepUpOperation,
+  type StepUpOperationBinding,
   type StepUpSurface,
 } from '@kilocode/web-shared/lib/admin/step-up-binding';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -53,9 +56,35 @@ export function stepUpErrorCodeForState(state: AdminStepUpState): StepUpErrorCod
 }
 
 /**
+ * The binding a refusal carries, which the admin UI echoes back to mint and
+ * verify the proof. The client parses it with `stepUpOperationSchema` before it
+ * sends it, and the challenge endpoint parses it again, so build it through the
+ * same schema: a refusal whose descriptor the boundary rejects would prompt for
+ * an operation the caller cannot confirm.
+ */
+function refusalBinding(
+  actionClass: PrivilegedActionClass,
+  operation: StepUpOperation
+): StepUpOperationBinding {
+  const parsed = stepUpOperationSchema.safeParse(
+    stepUpBindingFromOperation(actionClass, operation)
+  );
+  if (!parsed.success) {
+    throw new Error('An operation step-up binding must be one the client can submit');
+  }
+  return parsed.data;
+}
+
+/**
  * The operation a guard call authorizes. An operation-class refusal carries
  * this value so the admin UI mints a proof for the same action instead of a
  * generic one.
+ *
+ * An operation-class request whose operation does not yield a submittable
+ * binding is a wiring error, not a refusal: the admin UI echoes the refusal
+ * binding back and the boundary schema bounds it, so no proof could ever be
+ * minted for it and no retried request could ever match one. Throw before
+ * anything is measured, exactly as a missing operation itself does.
  */
 export function stepUpOperationFor(params: {
   actionClass: PrivilegedActionClass;
@@ -64,12 +93,16 @@ export function stepUpOperationFor(params: {
   surface: StepUpSurface;
   target: PrivilegedTarget;
 }): StepUpOperation {
-  return {
+  const operation: StepUpOperation = {
     surface: params.surface,
     route: params.route ?? '',
-    method: (params.method ?? '').toLowerCase(),
+    method: normalizeStepUpMethod(params.method ?? ''),
     target: params.target,
   };
+  if (isOperationStepUpClass(params.actionClass)) {
+    refusalBinding(params.actionClass, operation);
+  }
+  return operation;
 }
 
 /**
@@ -98,7 +131,8 @@ export function stepUpDecisionCovers(
 function deny(params: {
   code: StepUpErrorCode;
   actionClass: PrivilegedActionClass;
-  operation: StepUpOperation;
+  /** The operation a retry must name, when the refusal can name one. */
+  operation: StepUpOperation | null;
   message: string;
 }): never {
   const policy = stepUpPolicyFor(params.actionClass);
@@ -110,9 +144,10 @@ function deny(params: {
       actionClass: params.actionClass,
       purpose: policy.purpose,
       maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
-      binding: isOperationStepUpClass(params.actionClass)
-        ? stepUpBindingFromOperation(params.actionClass, params.operation)
-        : null,
+      binding:
+        params.operation && isOperationStepUpClass(params.actionClass)
+          ? refusalBinding(params.actionClass, params.operation)
+          : null,
     }),
   });
 }
@@ -147,6 +182,18 @@ export function stepUpRefusalPayload(cause: StepUpRequiredError): StepUpRequirem
 export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<AdminStepUpState> {
   if (!params.enabled) return { status: 'absent' };
 
+  // A bearer credential can never complete step-up, whatever operation it
+  // names, so refuse it before the operation is resolved: its reason must not
+  // depend on whether the caller also knows its route and method.
+  if (params.credential !== 'session') {
+    deny({
+      code: 'BEARER_NOT_ALLOWED',
+      actionClass: params.actionClass,
+      operation: null,
+      message: 'MFA requires a browser session',
+    });
+  }
+
   const operation = stepUpOperationFor({
     actionClass: params.actionClass,
     route: params.route,
@@ -154,15 +201,6 @@ export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<Admi
     surface: params.surface,
     target: params.target,
   });
-
-  if (params.credential !== 'session') {
-    deny({
-      code: 'BEARER_NOT_ALLOWED',
-      actionClass: params.actionClass,
-      operation,
-      message: 'MFA requires a browser session',
-    });
-  }
 
   let state: AdminStepUpState;
   try {

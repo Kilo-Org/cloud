@@ -7,8 +7,8 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
-  isScriptTool,
-  isUploadTool,
+  isUploadCall,
+  runsPageCode,
   SENSITIVE_REASON,
   toBrowserOrigin,
   toolGrantClass,
@@ -19,6 +19,8 @@ import type {
   BrowserOriginChanged,
   BrowserPermissionItem,
   StepTokenBinding,
+  StepTokenNeed,
+  StepTokenTake,
 } from './browser-agent-checks';
 import {
   frameWithOwnerNode,
@@ -37,6 +39,7 @@ import {
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserToolDownload, BrowserToolSession } from './browser-tool-session';
+import type { WebMcpToolDescriptor } from './tab-debugger';
 
 /**
  * The agent check module (SPEC "Permission flow", D3, D4, D11): before a CLI
@@ -60,8 +63,22 @@ export type AgentPreflight =
       /** The origin the call was authorized for: the frame's, or the destination's for a navigate. */
       readonly ok: true;
       readonly origin: string;
-      /** The step token this call consumed, when it was a sensitive step. */
-      readonly sensitiveToken?: string | undefined;
+      /**
+       * The approval this call redeemed, when it was a sensitive step: the matched token, the element
+       * the sensitive classification ran on, the origin the approval is bound to (the sensitive
+       * element's or focused field's own frame origin), the one file the approval buys when it names
+       * one, and the reason it was issued for, so the caller can tell a step approval from a download
+       * approval and issues a file approval against the same binding.
+       */
+      readonly sensitiveToken?:
+        | {
+            readonly element?: string | undefined;
+            readonly need?: StepTokenNeed | undefined;
+            readonly origin?: string | undefined;
+            readonly reason?: string | undefined;
+            readonly token: string;
+          }
+        | undefined;
       /** The target lives inside a child frame. */
       readonly targetOriginFrame: boolean;
     }
@@ -461,10 +478,13 @@ export const tabsNewDestinationCheck = (
     : { kind: 'ok' };
 
 /**
- * Classifies one act call as a sensitive step: a file upload, an OAuth consent
+ * Classifies one act call as a sensitive step: a call that hands a local file's
+ * contents to the page (an upload, or a drop of local paths), an OAuth consent
  * page, typing into or submitting a password/one-time-code/payment field, or a
- * script call on a page whose script can reach such a field. A download that the
- * call starts is classified after it ran, by the runtime.
+ * call that runs page code — model-authored code or a page-registered tool — on
+ * a page whose script can reach such a field. A call that runs page code probes
+ * the tab's own origin plus every frame with a `read` grant, one probe per frame.
+ * A download that the call starts is classified after it ran, by the runtime.
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
@@ -477,7 +497,7 @@ const sensitiveStepFor = async (input: {
   readonly session: GateSession;
   readonly toolName: string;
 }): Promise<BrowserSensitiveStep | undefined> => {
-  if (isUploadTool(input.toolName)) {
+  if (isUploadCall(input.toolName, input.args)) {
     return { origin: input.origin, reason: SENSITIVE_REASON.fileUpload };
   }
 
@@ -490,8 +510,8 @@ const sensitiveStepFor = async (input: {
     return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
   }
 
-  if (isScriptTool(input.toolName)) {
-    // Model-authored code reaches every field a page script can reach: the tab's own origin, and any frame the extension may read. One probe per such frame.
+  if (runsPageCode(input.toolName)) {
+    // Model-authored code and page-registered code reach every field a page script can reach: the tab's own origin, and every frame with a `read` grant. One probe per such frame.
     const mainOrigin = mainFrameOf(input.frames)?.origin;
     const reachable = input.frames.filter(
       frame =>
@@ -594,8 +614,14 @@ export interface AgentPreflightInput {
   readonly authorized: readonly BrowserGrant[];
   /** The call's shared frame inventory, so the preflight and the tool read one tree. */
   readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
-  /** Validates a token against this exact call and burns it; provided by the runtime's store. */
-  readonly consumeStepToken: (token: string, binding: StepTokenBinding) => boolean;
+  /**
+   * The WebMCP tools the tab's top-level document registers, or `undefined`
+   * when the page cannot report them. Required so no caller can skip the
+   * origin check by omission; the session's `discoverWebMcpTools` supplies it.
+   */
+  readonly readWebMcpTools: () => Promise<readonly WebMcpToolDescriptor[] | undefined>;
+  /** Takes a token against this exact call and burns it; provided by the runtime's store. */
+  readonly consumeStepToken: (token: string, binding: StepTokenBinding) => StepTokenTake;
   readonly session: GateSession;
   /** The calling agent session's handle: a step token is bound to it, not just to the tab. */
   readonly sessionHandle: string;
@@ -638,6 +664,43 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   }
 
   const destination = grantClass === 'navigate' ? navigationDestinationOf(input.args) : undefined;
+
+  /*
+   * `browser_webmcp_call` runs a tool the page registered, and discovery and
+   * execution both happen in the tab's top-level document. Page script controls
+   * the descriptor, so its `origin` is never a permission target: a descriptor
+   * that names no origin, or an origin other than the tab's own, is a call the
+   * grant cannot describe and is refused — not turned into a prompt. Checked
+   * before the required origins, so a mismatch never becomes `needs_permission`.
+   */
+  if (input.toolName === 'browser_webmcp_call') {
+    const requestedName = argumentString(input.args, 'name');
+
+    if (requestedName !== undefined) {
+      const tools = await input.readWebMcpTools();
+      const descriptor = tools?.find(tool => tool.name === requestedName);
+
+      if (descriptor !== undefined && descriptor.origin === '') {
+        return {
+          failure: {
+            error: `WebMCP tool "${requestedName}" does not name the origin it belongs to, so the call was refused.`,
+            kind: 'blocked',
+          },
+          ok: false,
+        };
+      }
+
+      if (descriptor !== undefined && descriptor.origin !== mainOrigin) {
+        return {
+          failure: {
+            error: `WebMCP tool "${requestedName}" reports origin ${descriptor.origin} but runs in the tab's own document (${mainOrigin}), so the call was refused.`,
+            kind: 'blocked',
+          },
+          ok: false,
+        };
+      }
+    }
+  }
 
   // A destination no grant can name (a data:, view-source: or chrome: URL) is refused before the tab is touched, matching the page path.
   if (destination?.kind === 'unresolvable') {
@@ -775,10 +838,27 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     tabId: input.tabId,
     toolName: input.toolName,
   };
-  const matched = input.stepTokens.find(token => input.consumeStepToken(token, binding));
+  // The first token that names this exact call is the approval it redeems; consumption and single use stay in the
+  // Store, so a token that does not match is burnt by its own take and can never be probed for another binding.
+  for (const token of input.stepTokens) {
+    const take = input.consumeStepToken(token, binding);
 
-  if (matched !== undefined) {
-    return { class: 'act', ok: true, origin, sensitiveToken: matched, targetOriginFrame };
+    if (take.ok) {
+      return {
+        class: 'act',
+        ok: true,
+        origin,
+        sensitiveToken: {
+          element: sensitive.element,
+          need: take.need,
+          // The origin the approval was stored under, which is the sensitive element's own frame when it has one.
+          origin: sensitiveOrigin,
+          reason: take.reason,
+          token,
+        },
+        targetOriginFrame,
+      };
+    }
   }
 
   return {

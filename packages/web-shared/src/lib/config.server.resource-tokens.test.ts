@@ -98,7 +98,7 @@ it.each([
   ) as jwt.JwtPayload;
   expect(cloud.aud).toBe(cloudModern ? 'cloud-agent-next' : undefined);
   expect(cloud.tokenPurpose).toBe(cloudModern ? 'internal-service' : undefined);
-  expect(cloud.exp! - cloud.iat!).toBe(cloudModern ? 3600 : 7200);
+  expect(cloud.exp! - cloud.iat!).toBe(3600);
   expect(gateway.aud).toBe(gatewayModern ? 'kilo-gateway' : undefined);
   expect(gateway.tokenPurpose).toBe(gatewayModern ? 'delegated-workload' : undefined);
   expect(gateway.exp! - gateway.iat!).toBe(3600);
@@ -149,6 +149,53 @@ it.each([false, true])(
       expect(() =>
         generateWorkflowGatewayToken(user, { tokenSource: 'reviewer', expiresIn })
       ).toThrow('Workflow gateway token expiry must be positive');
+    }
+  }
+);
+
+it.each([
+  [false, 300, 300],
+  [false, 7200, 3600],
+  [false, 5 * 365 * 24 * 60 * 60, 3600],
+  [true, 300, 300],
+  [true, 7200, 3600],
+  [true, 5 * 365 * 24 * 60 * 60, 3600],
+] as const)(
+  'bounds the Cloud Agent workflow token lifetime to one hour (modern: %s, %s -> %s)',
+  (modern, requestedExpiresIn, expectedLifetime) => {
+    if (modern) {
+      process.env[master] = 'true';
+      process.env[families['cloud-agent-next']] = 'true';
+    }
+    expect(isResourceTokenIssuanceEnabled('cloud-agent-next')).toBe(modern);
+    const user = { id: 'oauth/cloud-bounded', api_token_pepper: 'cloud-bounded-pepper' } as User;
+    const cloud = jwt.decode(
+      generateCloudAgentWorkflowToken(user, {
+        organizationId: 'organization-id',
+        tokenSource: 'reviewer',
+        expiresIn: requestedExpiresIn,
+      })
+    ) as jwt.JwtPayload;
+    expect(cloud.aud).toBe(modern ? 'cloud-agent-next' : undefined);
+    expect(cloud.tokenPurpose).toBe(modern ? 'internal-service' : undefined);
+    expect(cloud.organizationId).toBe('organization-id');
+    expect(cloud.exp! - cloud.iat!).toBe(expectedLifetime);
+  }
+);
+
+it.each([false, true])(
+  'rejects a nonpositive Cloud Agent workflow lifetime in both issuance modes (modern: %s)',
+  modern => {
+    if (modern) {
+      process.env[master] = 'true';
+      process.env[families['cloud-agent-next']] = 'true';
+    }
+    expect(isResourceTokenIssuanceEnabled('cloud-agent-next')).toBe(modern);
+    const user = { id: 'oauth/cloud-nonpositive', api_token_pepper: 'nonpositive-pepper' } as User;
+    for (const expiresIn of [0, -60]) {
+      expect(() =>
+        generateCloudAgentWorkflowToken(user, { tokenSource: 'reviewer', expiresIn })
+      ).toThrow('Workflow control token expiry must be positive');
     }
   }
 );

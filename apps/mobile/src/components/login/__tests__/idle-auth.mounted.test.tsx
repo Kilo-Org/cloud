@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  FLOOR_BOX_MEASURED_DP,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
@@ -218,9 +219,10 @@ function linkEdge(label: string | undefined): 'start' | 'end' {
  * The per-side slop the legal link at one end of the sentence must render. The
  * facing side points at the connector (4dp) or, vertically, at the line the
  * neighbour can occupy below it (0dp); the outer side reaches over plain prose
- * (12dp) and past the row's own line (16dp). Each axis still adds to the 44pt
- * target from the 28dp audit floor. The sentence is LTR in this suite's native
- * mock.
+ * (12dp) and past the row's own line (18dp). The vertical sides still sum to the
+ * symmetric reach the consent sentence uses, and the box's 27.8dp measured
+ * height plus that 18dp clears the 44pt target where 16dp landed 0.2dp short.
+ * The sentence is LTR in this suite's native mock.
  */
 function expectedLinkSlop(edge: 'start' | 'end'): {
   top: number;
@@ -811,8 +813,14 @@ describe('IdleAuth email continue copy', () => {
         right: number;
       };
       expect(slop).toEqual(expectedLinkSlop(linkEdge(link.props.accessibilityLabel as string)));
+      // Horizontal is the declared 28dp box plus its 4dp/12dp sides; this slice
+      // leaves those slops alone. Vertical is measured: the box lays out at
+      // FLOOR_BOX_MEASURED_DP on Android, and 27.8 + 18 = 45.8dp carries the
+      // target where the old 16dp far side landed at 43.8dp.
       expect(box.width + slop.left + slop.right).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(FLOOR_BOX_MEASURED_DP + slop.top + slop.bottom).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
+      );
     }
 
     // The sentence's copy is unchanged: both links still render, with the
@@ -1233,12 +1241,12 @@ describe('IdleAuth layout repairs', () => {
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // Each legal link keeps its whole 44pt vertical reach on the far side of the
+    // Each legal link keeps its whole vertical reach on the far side of the
     // sentence line (the facing side belongs to the neighbour's line), so a
-    // link's region reaches (28 - 17.5) / 2 + 16 = 21.25dp past that line. The
+    // link's region reaches (28 - 17.5) / 2 + 18 = 23.25dp past that line. The
     // screen's `gap-3` gutter to the Continue button above the row (and the
     // ghost button below) is 10.5dp, so the legal row carries its own margin and
-    // the free space is 10.5 + 11 = 21.5dp each side. Without that clearance the
+    // the free space is 10.5 + 13 = 23.5dp each side. Without that clearance the
     // region covered the Continue button's bottom strip and a tap there opened
     // the link instead of sending the code (the earlier mis-routed-tap finding).
     expect(INLINE_LINK_ROW_CLASS).toBe(
@@ -1277,9 +1285,11 @@ describe('IdleAuth layout repairs', () => {
       expect(Math.min(slop.top, slop.bottom)).toBe(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP);
       expect(Math.max(slop.top, slop.bottom)).toBe(INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP);
       expect(overflowDp + Math.max(slop.top, slop.bottom)).toBeLessThanOrEqual(gutterDp);
-      // The region the gutter bounds is still the full design target.
-      const box = boxDp(link.props.className as string);
-      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      // The region the gutter bounds is still the full design target, measured
+      // from the box's Android height rather than its declared floor.
+      expect(FLOOR_BOX_MEASURED_DP + slop.top + slop.bottom).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
+      );
     }
 
     act(() => {

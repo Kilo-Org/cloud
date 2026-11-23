@@ -110,7 +110,9 @@ function TriggerRow({
         // `TOUCH_TARGET_CLASS` floor, which the icon box's 34 dp contribution
         // plus `pb-3` already meets — so the target is real, the glyph keeps
         // the place it has always had, and the URL stays closer to its own
-        // trigger row than to the next one.
+        // trigger row than to the next one. Sibling triggers in one scope share
+        // the URL except the trailing trigger id, so the tail, not the middle,
+        // is what tells rows apart.
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('cloudAgent.triggers.copyLinkA11y', {
@@ -124,7 +126,12 @@ function TriggerRow({
             TOUCH_TARGET_CLASS
           )}
         >
-          <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+          <Text
+            variant="mono"
+            className="min-w-0 flex-1 text-xs"
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {trigger.inboundUrl}
           </Text>
           <View className={cn(ICON_TARGET_BOX_CLASS, '-my-2 shrink-0')}>

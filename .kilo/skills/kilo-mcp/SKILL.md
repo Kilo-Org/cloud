@@ -39,23 +39,23 @@ Read it for current endpoint details.
 
 ## Parent-scoped child sessions
 
-These connections publish `search_models`, `generate_message_id`, `spawn_session`,
-`list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
-`list_environments`, `list_folders`, and `assign_workspace_to_folder`.
-They do not expose API `search` or `call`.
+Use the published dedicated tools, not API `search` or `call`. A workspace manages
+only its direct children. Each child can manage its own children.
 
-1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
-2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
-3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
-4. Set `callbackTarget` to `{"url":"workspace:new-chat"}` (parent workspace) or `{"url":"workspace:<session-id>"}` (this chat); omit for none. Prefer callbacks.
-5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
-6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
-7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
-8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
-9. Use `list_environments({repository:{platform:"github",fullName:"owner/repo"}})` for scoped summaries. Pass a returned `id` as `spawn_session.requestedEnvironment.id`; never guess IDs.
-
-Callbacks return to the canonical parent workspace. Manage only direct children,
-never the parent. No grandchildren.
+- Find repository and branch choices with `list_repositories` and `list_branches`.
+  Use `list_environments` to find an environment ID for the launch repository.
+- Launch with one repository source, or use `stackOnWorktreeId` alone for your
+  own worktree or a direct child's worktree. Include a complete prompt and a fresh
+  `operationKey`. Use an exact `search_models` result; do not invent model IDs.
+- Prefer callbacks. Use `workspace:<session-id>` with the session ID from
+  `cloud-agent-context` to notify this chat. Use `workspace:new-chat` when the
+  parent has a worktree. Answer pending child questions with `answer_question`.
+- Read history with `get_session_messages` and artifacts with `list_child_artifacts`.
+  `create_child_chat` registers another manageable chat without sending work.
+- Use `generate_message_id` before a new follow-up. Reuse the original IDs when
+  retrying the same request, and check state first if the outcome is unknown.
+- `autoCommit` is per message and does not prevent manual Git actions. Put any
+  publication restrictions in the prompt.
 
 ### Examples
 

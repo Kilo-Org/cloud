@@ -19,6 +19,50 @@ const metadata = {
 } satisfies SessionMetadata;
 
 describe('control-plane callback recent activity', () => {
+  it('persists one question callback at the SDK limits, directed to the launching chat', () => {
+    const stored = new Map<string, PendingCallbackJob>();
+    const launchingSessionId = 'workspace_22345678-1234-4234-8234-123456789abc';
+    const callbacks = createMessageCallbacks({
+      storage: {
+        kv: {
+          get: <T>(key: string) => stored.get(key) as T | undefined,
+          put: (key: string, value: PendingCallbackJob) => stored.set(key, value),
+          delete: (key: string) => stored.delete(key),
+          list: () => stored,
+        } as DurableObjectStorage['kv'],
+      },
+      getMetadata: () => ({
+        ...metadata,
+        parentCloudAgentSessionId: launchingSessionId,
+        callback: { target: { url: 'workspace:new-chat', launchingSessionId } },
+      }),
+      getCallbackQueue: () => undefined,
+      getAssistantAnswerForUserMessage: () => null,
+      getRecentAssistantAnswersForUserMessage: () => [],
+    });
+    const question = {
+      id: 'question-1',
+      questions: Array.from({ length: 32 }, (_, index) => ({
+        question: index === 0 ? 'Q'.repeat(4_097) : 'Continue?',
+        header: 'Continue',
+        options: Array.from({ length: 32 }, (_, option) => ({
+          label: `Option ${option + 1}`,
+          description: 'Answer',
+        })),
+      })),
+    };
+    expect(callbacks.persistQuestionCallback(question)).toBe(true);
+    expect(callbacks.persistQuestionCallback(question)).toBe(false);
+    const pending = parseCallbackOutboxValue(
+      stored.get(`${CALLBACK_OUTBOX_PREFIX}question:question-1`)
+    );
+    expect(pending?.job).toMatchObject({
+      type: 'interaction',
+      target: { url: `workspace:${launchingSessionId}` },
+      payload: { cloudAgentSessionId: metadata.identity.sessionId, question },
+    });
+  });
+
   it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(
     'retains the parent message identity through durable outbox repair and retries for %s',
     async url => {
@@ -118,7 +162,8 @@ describe('control-plane callback recent activity', () => {
       expect(callbacks.persistDrainedBatchCallback([message], new Set([message.messageId]))).toBe(
         true
       );
-      const payload = stored.get(`${CALLBACK_OUTBOX_PREFIX}${message.messageId}`)?.job.payload;
+      const job = stored.get(`${CALLBACK_OUTBOX_PREFIX}${message.messageId}`)?.job;
+      const payload = job && !('type' in job) ? job.payload : undefined;
       expect(payload?.lastAssistantMessageText).toBe(
         finalText && finalText.length < CALLBACK_QUEUE_MAX_SERIALIZED_BYTES ? finalText : undefined
       );

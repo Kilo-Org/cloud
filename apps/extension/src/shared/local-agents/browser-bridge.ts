@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, typescript-eslint/consistent-type-definitions -- One bridge owns session, call and content translation; AGENTS.md prefers type over interface. */
+/* eslint-disable import/max-dependencies, max-lines, typescript-eslint/consistent-type-definitions -- One bridge owns session, call and content translation; AGENTS.md prefers type over interface. */
 import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
@@ -15,6 +15,7 @@ import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import { navigateDestinationCheck, tabsNewDestinationCheck } from '../browser-agent-gate';
 import type { BrowserRuntime } from '../browser-runtime';
 import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
+import { publishedBrowserToolInputSchema } from '../browser-tool-published-schema';
 import { boundBrowserToolText } from '../browser-tool-snapshot';
 import type { EvalTabResult } from '../tab-debugger';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
@@ -591,11 +592,13 @@ export const createRuntimeBrowserBridge = ({
       Promise.resolve({
         contractSha: BROWSER_TOOL_CONTRACT_SHA,
         // The contract stays verbatim — its SHA is of the pinned upstream `tools/list` and the handshake compares it —
-        // But a tool no backend here can run is not offered: an offer costs a turn the call can only refuse.
+        // But the offer is narrowed: a tool no backend here can run is not offered (an offer costs a turn the call
+        // Can only refuse), and an entry is published through the project rule builder, so a model is told the rule
+        // The call applies.
         tools: BROWSER_TOOL_CONTRACT.filter(
           tool => !UNSERVED_BROWSER_TOOL_NAMES.has(tool.name)
         ).map(tool => ({
-          inputSchema: tool.inputSchema,
+          inputSchema: publishedBrowserToolInputSchema(tool),
           name: tool.name,
           readOnly: tool.readOnly,
         })),

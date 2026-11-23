@@ -87,12 +87,29 @@ describe('draft round trip', () => {
 
   it('identifies a configuration by content, not by key order', () => {
     const a = config();
-    const b: OrgGuardrailsConfig = structuredClone(a);
-    expect(configKey(a, true)).toBe(configKey(b, true));
-    b.output.enabled = true;
-    expect(configKey(a, true)).not.toBe(configKey(b, true));
+    // jsonb reorders the keys it stores, so a refetch arrives in another order.
+    const reordered: OrgGuardrailsConfig = {
+      ...a,
+      detectors: {
+        sponge_attack: a.detectors.sponge_attack,
+        bias: a.detectors.bias,
+        nsfw: a.detectors.nsfw,
+        toxicity: a.detectors.toxicity,
+        policy_violation: a.detectors.policy_violation,
+        topic_detector: a.detectors.topic_detector,
+        keyword_detector: a.detectors.keyword_detector,
+        pii: a.detectors.pii,
+        injection_attack: a.detectors.injection_attack,
+      },
+    };
+    expect(configKey(a, true)).toBe(configKey(reordered, true));
+    const changed: OrgGuardrailsConfig = {
+      ...reordered,
+      output: { ...reordered.output, enabled: true },
+    };
+    expect(configKey(a, true)).not.toBe(configKey(changed, true));
     // Output guardrails are left out where they are unavailable.
-    expect(configKey(a, false)).toBe(configKey(b, false));
+    expect(configKey(a, false)).toBe(configKey(changed, false));
   });
 
   it('reports a dirty draft only while it differs from the baseline', () => {
@@ -130,8 +147,10 @@ describe('detector choices', () => {
   });
 
   it('saves an input detector off at Block, the action it resumes with', () => {
-    const detectors = withInputDetectorChoice(config().detectors, 'injection_attack', 'off');
-    expect(detectors.injection_attack).toEqual({ enabled: false, action: 'block' });
+    const on = withInputDetectorChoice(config().detectors, 'injection_attack', 'log');
+    expect(on.injection_attack).toEqual({ enabled: true, action: 'log' });
+    const off = withInputDetectorChoice(on, 'injection_attack', 'off');
+    expect(off.injection_attack).toEqual({ enabled: false, action: 'block' });
   });
 
   it('keeps an output detector’s action while it is off', () => {
@@ -171,6 +190,13 @@ describe('guardrailsIssues', () => {
     expect(guardrailsIssues(toDraft(config({ enabled: true })), true)).toEqual([
       'inputDetectorRequired',
     ]);
+    // Only the two gateway-enforced input detectors satisfy the rule.
+    const piiOnly = config({ enabled: true });
+    piiOnly.detectors.pii = { enabled: true, action: 'block', entities: ['secrets'] };
+    expect(guardrailsIssues(toDraft(piiOnly), true)).toEqual(['inputDetectorRequired']);
+    const injection = config({ enabled: true });
+    injection.detectors.injection_attack = { enabled: true, action: 'log' };
+    expect(guardrailsIssues(toDraft(injection), true)).toEqual([]);
   });
 
   it('requires an output detector while the output guardrail is on', () => {
@@ -213,21 +239,19 @@ describe('guardrailsIssues', () => {
     expect(guardrailsIssues(toDraft(saved), true)).toContain('keywordTooLong');
   });
 
-  it('accepts a maximal keyword list whose newlines take it past the old text cap', () => {
+  it('accepts a maximal keyword list of distinct entries at both caps', () => {
     const saved = config();
     saved.output.detectors.keyword_detector = {
       enabled: true,
       action: 'block',
-      banned_keywords: Array.from({ length: GUARDRAILS_LIMITS.keywords }, () => 'x'.repeat(100)),
+      banned_keywords: Array.from(
+        { length: GUARDRAILS_LIMITS.keywords },
+        (_unused, index) =>
+          String(index).padStart(3, '0') + 'x'.repeat(GUARDRAILS_LIMITS.keywordLength - 3)
+      ),
     };
     const draft = toDraft(saved);
-    // 200 entries of 100 characters plus their 199 newlines: the product of the
-    // two caps is 20,000, so a whole-text cap would cut the last keyword short.
-    expect(draft.outputDetectors.keyword_detector.banned_keywords.length).toBeGreaterThan(
-      GUARDRAILS_LIMITS.keywords * GUARDRAILS_LIMITS.keywordLength
-    );
-    expect(guardrailsIssues(draft, true)).not.toContain('keywordsTooMany');
-    expect(guardrailsIssues(draft, true)).not.toContain('keywordTooLong');
+    expect(guardrailsIssues(draft, true)).toEqual([]);
   });
 
   it('rejects a detector list past its cap, a duplicate rule id, and an empty entity list', () => {
@@ -295,6 +319,7 @@ describe('createPolicyRule', () => {
   it('picks an unused numeric id', () => {
     expect(createPolicyRule([rule({ id: 'rule-1' })]).id).toBe('rule-2');
     expect(createPolicyRule([rule({ id: 'rule-1' }), rule({ id: 'rule-2' })]).id).toBe('rule-3');
+    expect(createPolicyRule([rule({ id: 'rule-2' })]).id).toBe('rule-3');
   });
 });
 
@@ -323,7 +348,7 @@ describe('isGuardrailsFormDraft', () => {
     expect(isGuardrailsFormDraft(toDraft(saved))).toBe(true);
   });
 
-  it('rejects a foreign shape, a missing detector, and a line list left as an array', () => {
+  it('rejects a foreign shape, a missing detector, an unknown action, and a line list left as an array', () => {
     const draft = toDraft(config());
     expect(isGuardrailsFormDraft('draft')).toBe(false);
     expect(isGuardrailsFormDraft(null)).toBe(false);
@@ -339,6 +364,18 @@ describe('isGuardrailsFormDraft', () => {
           ...draft.outputDetectors,
           keyword_detector: { enabled: true, action: 'block', banned_keywords: ['alpha'] },
         },
+      })
+    ).toBe(false);
+    expect(
+      isGuardrailsFormDraft({
+        ...draft,
+        detectors: { ...draft.detectors, injection_attack: { enabled: true, action: 'warn' } },
+      })
+    ).toBe(false);
+    expect(
+      isGuardrailsFormDraft({
+        ...draft,
+        outputDetectors: { ...draft.outputDetectors, toxicity: { enabled: true, action: 'warn' } },
       })
     ).toBe(false);
   });

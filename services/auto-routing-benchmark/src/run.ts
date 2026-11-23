@@ -1100,6 +1100,17 @@ export class QueueRunNotAdmittedError extends Error {
   }
 }
 
+/**
+ * Thrown when a live operator pause on the dispatch lock refuses a run start. Nothing was
+ * claimed and nothing was enqueued; the admin route answers like a held drain.
+ */
+export class RunOperatorHoldError extends Error {
+  constructor() {
+    super('an operator pause holds the benchmark dispatch lock');
+    this.name = 'RunOperatorHoldError';
+  }
+}
+
 // Thrown when the saved benchmark config would exceed a hard runtime limit.
 // The admin route maps it to HTTP 400 so operators can fix config instead of
 // starting a run that will immediately hit platform capacity.
@@ -1322,7 +1333,10 @@ export async function startRun(
       runModelRows,
       carriedSummaries
     );
-    if (!admission.admitted) throw new QueueRunNotAdmittedError(admission.occupancy);
+    if (!admission.admitted) {
+      if ('operatorHold' in admission) throw new RunOperatorHoldError();
+      throw new QueueRunNotAdmittedError(admission.occupancy);
+    }
   } catch (error) {
     // The claim is already made, so hand the rows back to the queue — otherwise
     // they sit `running` under a run that was never written and nothing can

@@ -78,6 +78,7 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
+import { isGatewayBackend } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 
 /**
  * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
@@ -284,13 +285,16 @@ export async function applyProviderSpecificLogic({
   // the two raw inputs.
   const payer: RequestPayer =
     userByok === null ? 'kilo' : usesUserGatewayKey ? 'user_gateway' : 'user_byok';
+  // The model the gateway serves and bills is a `~` alias's target, so the free class and the
+  // request rewrite read that id.
+  const servedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   removeModelsFallback(requestedModel, requestToMutate);
   // Kilo's paid server features are removed for a free model, and for a user BYOK
   // key that is not a gateway key. A user gateway key keeps them: the gateway
   // runs them on that account's key.
-  if (isFreeModel(requestedModel) || payer === 'user_byok') {
-    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
+  if (isFreeModel(servedModel) || payer === 'user_byok') {
+    removePaidServerFeatures(provider, servedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
@@ -353,7 +357,7 @@ export async function applyProviderSpecificLogic({
   if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
     // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
     // the newest model it would pick.
-    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
+    requestToMutate.body.model = servedModel;
   }
 
   if (isClaudeModel(requestedModel)) {
@@ -365,7 +369,7 @@ export async function applyProviderSpecificLogic({
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
-  if (payer === 'kilo' && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+  if (payer === 'kilo' && isGatewayBackend(provider.type)) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,

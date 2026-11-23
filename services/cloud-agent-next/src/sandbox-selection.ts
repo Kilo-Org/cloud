@@ -1,4 +1,6 @@
 import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
+import { enrolledByocOwner } from './byoc/owner.js';
+import { fetchAwsByocConnection } from './byoc/aws-credential-resolver.js';
 import {
   fetchByocVercelEnrollment,
   fetchByocVercelEnrollmentForUser,
@@ -105,6 +107,10 @@ export function sandboxAllocationUnavailableReason(
   if (capabilityReason) return capabilityReason;
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
+    case 'aws':
+      return enrolledByocOwner(env.BYOC_AWS_IDS, owner) === undefined
+        ? 'Configure AWS BYOC in Cloud Agent settings to use AWS compute'
+        : undefined;
     case 'cloudflare':
       return undefined;
     case 'vercel':
@@ -133,13 +139,18 @@ export async function getSandboxSelectionCapabilities(
   const selectionAllowed =
     isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) ||
     isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId) ||
-    enrolledByocVercelOwner(env, owner) !== undefined;
+    enrolledByocVercelOwner(env, owner) !== undefined ||
+    enrolledByocOwner(env.BYOC_AWS_IDS, owner) !== undefined;
 
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
   const candidates = await Promise.all(
-    SELECTABLE_SANDBOX_ALLOCATIONS.map(async allocation => {
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation =>
+        getSandboxAllocationProvider(allocation) !== 'aws' ||
+        enrolledByocOwner(env.BYOC_AWS_IDS, owner) !== undefined
+    ).map(async allocation => {
       let unavailableReason = sandboxAllocationUnavailableReason(
         env,
         owner,
@@ -147,6 +158,18 @@ export async function getSandboxSelectionCapabilities(
         capability,
         options?.vercelUnavailableReason
       );
+      if (getSandboxAllocationProvider(allocation) === 'aws' && unavailableReason === undefined) {
+        try {
+          const connection = await fetchAwsByocConnection(
+            env,
+            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId }
+          );
+          if (connection.setupStatus !== 'ready')
+            unavailableReason = 'AWS compute setup is not ready';
+        } catch {
+          unavailableReason = 'AWS compute setup is not ready';
+        }
+      }
       const instance = getSandboxAllocationInstance(allocation);
       // Billing enrollment is service-scoped; use the same identity as usage recording.
       if (

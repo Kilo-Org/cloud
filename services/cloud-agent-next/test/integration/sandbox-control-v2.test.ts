@@ -510,6 +510,104 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   });
 
+  it('retries transient provider admission on the same allocation and credential', async () => {
+    const provider = createFakeProvider();
+    let validations = 0;
+    provider.adapter.validateWrapperAdmission = async () => {
+      if (++validations === 1) throw new Error('temporary provider read failure');
+    };
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    const identity = launchIdentity(provider);
+    const first = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: identity.credential,
+    });
+    expect(
+      await first.hello({ wrapperId: 'wr_first', allocationId: identity.allocationId })
+    ).toBeNull();
+    expect(provider.stopCalls).toHaveLength(0);
+    expect(await readState(stub)).toMatchObject({
+      kind: 'starting',
+      allocationId: before.allocationId,
+      providerRef: before.providerRef,
+      firstConnectDeadlineAt: before.firstConnectDeadlineAt,
+    });
+    const { wrapper } = await connectAndHello(provider, stub, 'wr_reconnected');
+    expect(validations).toBe(2);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toHaveLength(0);
+    wrapper.close();
+  });
+
+  it.each([
+    { code: 'invalid_configuration', reason: 'invalid_configuration' },
+    { code: 'cleanup_required', reason: 'provider_cleanup_required' },
+  ] as const)(
+    'stops a permanent provider $code before welcoming its wrapper',
+    async ({ code, reason }) => {
+      const provider = createFakeProvider();
+      provider.adapter.validateWrapperAdmission = async () => {
+        throw new ProviderCreationError(code);
+      };
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await awaitStarting(provider, stub);
+      const identity = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({
+        sandboxId: SANDBOX_ID,
+        credential: identity.credential,
+      });
+      expect(
+        await wrapper.hello({ wrapperId: 'wr_mismatch', allocationId: identity.allocationId })
+      ).toBeNull();
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason,
+      });
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it('fails a resumed launch that requires repair without confirming its stop', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await awaitStarting(provider, stub);
+    provider.adapter.reconcileLaunch = async () => {
+      throw new ProviderCreationError('cleanup_required');
+    };
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'provider_cleanup_required',
+    });
+    expect(await readState(stub)).toMatchObject({
+      kind: 'stopping',
+      providerRef: provider.refs[0],
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('arms an absolute provider lifetime and reports its specific failure before cleanup', async () => {
+    const provider = createFakeProvider();
+    let deadline = Date.now() + 5_000;
+    provider.adapter.lifetimeDeadlineAt = async () => deadline;
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await awaitStarting(provider, stub);
+    const { wrapper } = await connectAndHello(provider, stub);
+    expect(await readAlarm(stub)).toBe(deadline);
+    deadline = Date.now() - 1;
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'provider_lifetime_exhausted',
+    });
+    wrapper.close();
+  });
+
   it.each([
     { stage: 'create', failure: { failFirstCreate: true } },
     { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
@@ -3097,7 +3195,14 @@ describe('SandboxControlV2 allocation egress policy', () => {
         { egressMode: 'allowlist' as const },
         { egressAudit: true },
         { egressMode: 'unrestricted' as const, egressAudit: true },
-      ].map(policy => ({ ...placement, policy }))
+      ]
+        // An isolated Vercel sandbox enforces an allowlist, but cannot audit without one.
+        .filter(
+          policy =>
+            placement.provider !== 'vercel' ||
+            !('egressMode' in policy && policy.egressMode === 'allowlist')
+        )
+        .map(policy => ({ ...placement, policy }))
     )
   )(
     'rejects unsupported ensure policy placement before creating an allocation: %j',

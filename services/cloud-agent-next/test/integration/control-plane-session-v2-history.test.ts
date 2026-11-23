@@ -1517,10 +1517,10 @@ describe('workspace DO history and mutation cursors', () => {
       'msg_ingest',
     ]);
 
-    // The history page carries the imported transcript, but nothing was admitted
+    // The history page carries the imported transcript, but nothing was settled
     // through this session, so the count states "never ran" rather than a gap.
     const pageBeforeSend = await stub.getSessionMessagesPage();
-    expect(pageBeforeSend).toMatchObject({ admittedMessages: 0 });
+    expect(pageBeforeSend).toMatchObject({ settledTurns: 0 });
 
     const peer = new FakeSandboxPeer();
     peer.prepareView = peer.view('preparing');
@@ -1535,25 +1535,25 @@ describe('workspace DO history and mutation cursors', () => {
       })
     ).resolves.toEqual({ type: 'ok' });
 
-    // A queued turn still counts as admitted, so the page that shows its row and
-    // the count agree; after settlement the row stays durable while the queued
-    // snapshot drops it, and only this count still reports the admitted turn.
-    const pageAfterSend = await stub.getSessionMessagesPage();
-    expect(pageAfterSend).toMatchObject({
-      admittedMessages: 1,
+    // A cold start admits its first turn and the page lands before the run has
+    // reported anything: the queued row is there while no turn has settled, so
+    // the count says the transcript is not a gap yet.
+    const pageWhileQueued = await stub.getSessionMessagesPage();
+    expect(pageWhileQueued).toMatchObject({
+      settledTurns: 0,
       queuedMessages: [expect.objectContaining({ messageId: 'msg_admitted' })],
     });
 
     // Settle the turn and re-read from storage: a completed non-command turn
     // leaves `queuedMessages`, so the count is the only page field through which
-    // this page still states that the session admitted a turn.
+    // this page still states that the session finished a turn.
     peer.prepareView = peer.view('ready');
     await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
     await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'msg_admitted' });
     await evictAllDurableObjects();
 
     const settled = await stub.getSessionMessagesPage();
-    expect(settled).toMatchObject({ admittedMessages: 1, queuedMessages: [] });
+    expect(settled).toMatchObject({ settledTurns: 1, queuedMessages: [] });
   });
 
   it('hydrates only v1 sessions from session-ingest', async () => {

@@ -3015,7 +3015,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       ...page,
       preparationAttempts: snapshotRows.preparationAttempts,
       queuedMessages: snapshotRows.queuedMessages,
-      admittedMessages: snapshotRows.admittedMessages,
+      settledTurns: snapshotRows.settledTurns,
     };
   }
 
@@ -4949,12 +4949,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * own budget is reduced by that size so the response stays inside
    * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
    * always keeps the question row it is answering; preparation attempts give way.
-   * The admitted count is a page field rather than a row, so it is not trimmed.
+   * The settled-turn count is a page field rather than a row, so it is not
+   * trimmed.
    */
   private readSnapshotRows(): {
     preparationAttempts: PreparationAttempt[];
     queuedMessages: QueuedMessageSnapshot[];
-    admittedMessages: number;
+    settledTurns: number;
     bytes: number;
   } {
     const encoder = new TextEncoder();
@@ -4977,10 +4978,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       preparationAttempts,
       queuedMessages,
-      // Every admitted turn keeps its durable row through settlement and a
-      // refused send never writes one, so the stored count is the admission
-      // count rather than the queue depth the rows above are trimmed to.
-      admittedMessages: this.messages.length,
+      // Counts only the turns that reached a terminal state. A queued or
+      // accepted turn is in flight, so it is not counted: the page states a
+      // finished turn, not a starting one. Settlement keeps the row, so the
+      // count survives eviction, and a refused send never writes a row at all.
+      settledTurns: this.messages.filter(message => isTerminalMessage(message.state)).length,
       bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
     };
   }

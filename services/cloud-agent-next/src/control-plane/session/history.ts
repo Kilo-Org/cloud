@@ -118,13 +118,14 @@ export type SessionSnapshotRows = {
   preparationAttempts?: PreparationAttempt[];
   queuedMessages?: QueuedMessageSnapshot[];
   /**
-   * How many turns this session ever admitted, counted from its durable
-   * `control_plane_messages` rows. Settlement rewrites a row and a refused send
-   * writes none, so a settled run keeps its count while `queuedMessages` drops
-   * the completed non-command turn. A page with no transcript beside a positive
+   * How many turns this session settled, counted from its durable
+   * `control_plane_messages` rows. Only a turn that reached a terminal state is
+   * counted; a queued or accepted turn is still in flight. A refused send writes
+   * no row, and a settled turn keeps its row while `queuedMessages` drops the
+   * completed non-command turn, so a page with no transcript beside a positive
    * count is an import or hydration gap, not a session that never ran.
    */
-  admittedMessages?: number;
+  settledTurns?: number;
 };
 
 type V1SessionMessagesPage = {

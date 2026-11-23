@@ -407,8 +407,8 @@ export type SessionSnapshotPage = {
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[] | undefined;
   queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
-  /** The turns the session ever admitted; a positive count with no transcript is a gap. */
-  admittedMessages?: number | undefined;
+  /** The turns the session settled; a positive count with no transcript is a gap. */
+  settledTurns?: number | undefined;
 };
 
 export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;

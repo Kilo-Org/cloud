@@ -246,32 +246,27 @@ describe('cloudSessionMessagesPageSchema', () => {
       ...page,
       preparationAttempts: [attempt],
       queuedMessages: [queued],
-      admittedMessages: 2,
+      settledTurns: 2,
     });
 
     expect(parsed?.preparationAttempts).toEqual([attempt]);
     expect(parsed?.queuedMessages).toEqual([queued]);
-    expect(parsed?.admittedMessages).toBe(2);
+    expect(parsed?.settledTurns).toBe(2);
   });
 
   it.each([
     ['absent', {}, undefined],
-    ['present', { admittedMessages: 0 }, 0],
-  ])('carries an %s admitted-message count without inventing one', (_name, fields, expected) => {
+    ['present', { settledTurns: 0 }, 0],
+  ])('carries an %s settled-turn count without inventing one', (_name, fields, expected) => {
     const parsed = cloudSessionMessagesPageSchema.parse({ ...page, ...fields });
 
-    expect(parsed?.admittedMessages).toBe(expected);
-    if (expected === undefined) expect(parsed).not.toHaveProperty('admittedMessages');
+    expect(parsed?.settledTurns).toBe(expected);
+    if (expected === undefined) expect(parsed).not.toHaveProperty('settledTurns');
   });
 
-  it.each([-1, 0.5, '2', null])(
-    'refuses an invalid admitted-message count %p',
-    admittedMessages => {
-      expect(cloudSessionMessagesPageSchema.safeParse({ ...page, admittedMessages }).success).toBe(
-        false
-      );
-    }
-  );
+  it.each([-1, 0.5, '2', null])('refuses an invalid settled-turn count %p', settledTurns => {
+    expect(cloudSessionMessagesPageSchema.safeParse({ ...page, settledTurns }).success).toBe(false);
+  });
 
   it('states the v1 page version explicitly instead of keeping the wire source', () => {
     const parsed = cloudSessionMessagesPageSchema.parse({
@@ -315,13 +310,13 @@ describe('cloudSessionMessagesPageSchema', () => {
       totalCostMicrodollars: 0,
       preparationAttempts: [attempt],
       queuedMessages: [queued],
-      admittedMessages: 3,
+      settledTurns: 3,
     });
 
     expect(parsed?.sourceVersion).toBe('v2');
     expect(parsed?.preparationAttempts).toEqual([attempt]);
     expect(parsed?.queuedMessages).toEqual([queued]);
-    expect(parsed?.admittedMessages).toBe(3);
+    expect(parsed?.settledTurns).toBe(3);
   });
 
   it('adapts known slim native fields and accounts for malformed or cross-session rows', () => {

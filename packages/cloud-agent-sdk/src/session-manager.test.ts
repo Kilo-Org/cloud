@@ -10885,7 +10885,7 @@ function makePage(
     messages?: SessionSnapshotPage['messages'];
     nextCursor?: string | null;
     omittedItemCount?: number;
-    admittedMessages?: number;
+    settledTurns?: number;
   } = {}
 ): SessionSnapshotPageOutcome {
   return {
@@ -10894,9 +10894,7 @@ function makePage(
     messages: options.messages ?? [],
     nextCursor: options.nextCursor ?? null,
     omittedItemCount: options.omittedItemCount ?? 0,
-    ...(options.admittedMessages === undefined
-      ? {}
-      : { admittedMessages: options.admittedMessages }),
+    ...(options.settledTurns === undefined ? {} : { settledTurns: options.settledTurns }),
   };
 }
 
@@ -11674,7 +11672,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     });
 
     it('stays pending until the metadata can judge a zero-row page that carries no count', async () => {
-      // A page read before `admittedMessages` existed cannot judge itself: the
+      // A page read before `settledTurns` existed cannot judge itself: the
       // session metadata's `initialMessageId` is the fallback. The page read
       // resolves first (the eager cloud read starts before the metadata await),
       // so the verdict can only be derived once the metadata lands.
@@ -11701,7 +11699,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       const opening = mgr.switchSession(kiloId('ses-1'));
       await settlePage();
 
-      // The page produced no row, omitted nothing and carries no admitted-turn
+      // The page produced no row, omitted nothing and carries no settled-turn
       // count: not judgeable yet.
       expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
         kind: 'pending',
@@ -11720,10 +11718,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       });
     });
 
-    it('settles as empty only once the metadata rules out an admitted turn', async () => {
+    it('settles as empty only once the metadata rules out a settled turn', async () => {
       // Same ordering as the test above, with the other discriminator: a page
       // without the count cannot claim the session is empty until the metadata
-      // rules out an admitted turn.
+      // rules out a settled turn.
       const workspaceSessionId = cloudAgentId('workspace_22222222-2222-4222-8222-222222222222');
       const metadataRead = deferred<CloudSessionMetadata>();
       const config = createMockConfig({
@@ -11763,8 +11761,8 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       });
     });
 
-    it('stays pending as streaming while an admitted run is streaming its first turn', async () => {
-      // Zero rows with an admitted turn is also what a working run looks like
+    it('stays pending as streaming while a settled run is streaming its first turn', async () => {
+      // Zero rows with a settled turn is also what a working run looks like
       // before its first turn lands. The surface must keep the skeleton rather
       // than state a failure over a run that is still producing rows, and the
       // reason is what lets it keep the composer available.
@@ -11791,10 +11789,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       mgr.destroy();
     });
 
-    it('reads the page own admitted-turn count before any metadata arrives', async () => {
+    it('reads the page own settled-turn count before any metadata arrives', async () => {
       // The count is the page's own fact, so the verdict needs no second read:
-      // an empty page from a session that admitted turns is a gap as soon as it
-      // applies, and one that admitted none is genuinely empty.
+      // an empty page from a session that settled turns is a gap as soon as it
+      // applies, and one that settled none is genuinely empty.
       const metadataRead = deferred<CloudSessionMetadata>();
       const config = createMockConfig({
         resolveSession: jest.fn().mockResolvedValue({
@@ -11809,7 +11807,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           nextCursor: null,
           omittedItemCount: 0,
           updateCursor: 1,
-          admittedMessages: 2,
+          settledTurns: 2,
         }),
         fetchCloudSession: jest.fn(() => metadataRead.promise),
       });
@@ -11831,10 +11829,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await opening;
     });
 
-    it('settles a page whose count says no turn was ever admitted', async () => {
+    it('settles a page whose count says no turn was ever settled', async () => {
       const config = createMockConfig({
         fetchSnapshotPage: createPageFetchMock(async () =>
-          makePage({ kiloSessionId: 'ses-1', messages: [], admittedMessages: 0 })
+          makePage({ kiloSessionId: 'ses-1', messages: [], settledTurns: 0 })
         ),
         // Metadata that would say otherwise must not outrank the page's count.
         fetchSession: jest.fn().mockResolvedValue({
@@ -11854,10 +11852,62 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       mgr.destroy();
     });
 
+    it('settles a cold start whose queued first turn has not settled yet', async () => {
+      // A cold start writes a message row the moment the turn is queued, so a
+      // page read before the run reports anything has zero settled turns. The
+      // transcript is empty because the run is starting: it must settle, not
+      // claim the history cannot be read.
+      const workspaceSessionId = cloudAgentId('workspace_44444444-4444-4444-8444-444444444444');
+      const metadataRead = deferred<CloudSessionMetadata>();
+      const config = createMockConfig({
+        resolveSession: jest.fn().mockResolvedValue({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: workspaceSessionId,
+        }),
+        fetchCloudSnapshotPage: jest.fn().mockResolvedValue({
+          kind: 'success',
+          info: { id: 'ses-1' },
+          messages: [],
+          nextCursor: null,
+          omittedItemCount: 0,
+          updateCursor: 1,
+          settledTurns: 0,
+        }),
+        fetchCloudSession: jest.fn(() => metadataRead.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      const opening = mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+
+      // The page's own count already settles it: no turn has settled, so the
+      // empty transcript is the session's real state.
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
+
+      // The metadata then names the admitted turn, which is exactly what the
+      // old admission count read as a gap over a healthy starting session.
+      metadataRead.resolve({
+        sessionId: workspaceSessionId,
+        kiloSessionId: kiloId('ses-1'),
+        initialMessageId: 'msg_0123456789abcdefghijklmnop',
+      });
+      await opening;
+
+      expect(config.store.get(mgr.atoms.isStreaming)).toBe(false);
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'settled',
+      });
+
+      mgr.destroy();
+    });
+
     it('is streaming, not a gap, while a counted run still produces its first rows', async () => {
       const config = createMockConfig({
         fetchSnapshotPage: createPageFetchMock(async () =>
-          makePage({ kiloSessionId: 'ses-1', messages: [], admittedMessages: 1 })
+          makePage({ kiloSessionId: 'ses-1', messages: [], settledTurns: 1 })
         ),
       });
       const mgr = createSessionManager(config);
@@ -11892,9 +11942,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       const config = createMockConfig({
         readCachedSnapshotPage,
         fetchSnapshotPage: createPageFetchMock(async () =>
-          makePage({ kiloSessionId: 'ses-1', messages: [], admittedMessages: 4 })
+          makePage({ kiloSessionId: 'ses-1', messages: [], settledTurns: 4 })
         ),
-        // Initial metadata that cannot judge the page either: no admitted turn
+        // Initial metadata that cannot judge the page either: no settled turn
         // recorded, which would settle a page that carries no count.
         fetchSession: jest
           .fn()

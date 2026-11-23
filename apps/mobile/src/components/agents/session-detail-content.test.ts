@@ -972,7 +972,7 @@ function page(
   options: {
     goal?: SessionGoal;
     nextCursor?: string | null;
-    admittedMessages?: number;
+    settledTurns?: number;
   } = {}
 ): SessionSnapshotPageOutcome {
   return {
@@ -981,18 +981,16 @@ function page(
     messages,
     nextCursor: options.nextCursor ?? null,
     omittedItemCount: 0,
-    ...(options.admittedMessages === undefined
-      ? {}
-      : { admittedMessages: options.admittedMessages }),
+    ...(options.settledTurns === undefined ? {} : { settledTurns: options.settledTurns }),
   };
 }
 
 /**
- * The admitted-turn count the root page reports, set by a test before
+ * The settled-turn count the root page reports, set by a test before
  * `mountDetails`. `undefined` keeps the page the way a server older than the
  * field answers it, which is the fixture every other test relies on.
  */
-let rootPageAdmittedMessages: number | undefined = undefined;
+let rootPageSettledTurns: number | undefined = undefined;
 
 // Set before `mountDetails` by the zero-render guard tests; the root page
 // resolves with this cursor instead of the default `null`.
@@ -1067,7 +1065,7 @@ beforeEach(() => {
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
-  rootPageAdmittedMessages = undefined;
+  rootPageSettledTurns = undefined;
   sessionTitleOverride = null;
   pendingSend = null;
   condensePreference.value = false;
@@ -1170,9 +1168,7 @@ async function mountDetails(
           page(id, messages, {
             goal: goalMountOptions.goal,
             nextCursor: rootPageNextCursor,
-            ...(rootPageAdmittedMessages === undefined
-              ? {}
-              : { admittedMessages: rootPageAdmittedMessages }),
+            ...(rootPageSettledTurns === undefined ? {} : { settledTurns: rootPageSettledTurns }),
           })
         );
       }
@@ -3313,9 +3309,9 @@ describe('session detail first-page history state', () => {
 
   it('states a first page that settled unreadable as a terminal card with no Retry', async () => {
     goalMountOptions = { resolvedType: 'remote' };
-    // A page the reader matched no row of, from a session whose run admitted
+    // A page the reader matched no row of, from a session whose run settled
     // turns: the page's own count is what tells this apart from an empty one.
-    rootPageAdmittedMessages = 3;
+    rootPageSettledTurns = 3;
     const view = await mountDetails([]);
 
     expect(view.store.get(view.manager.atoms.transcriptHistory)).toEqual({ kind: 'unreadable' });
@@ -3335,6 +3331,24 @@ describe('session detail first-page history state', () => {
         node => Object.is(node.type, 'StateAction') && node.props.label === i18n.t('common.retry')
       )
     ).toHaveLength(0);
+  });
+
+  it('shows the empty state for a cold start whose first turn has not settled', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // The first turn of a cold start is queued, not settled, so the page
+    // reports no settled turn beside its empty transcript. That is an empty
+    // session to write into, never the terminal "cannot be read" card.
+    rootPageSettledTurns = 0;
+    const view = await mountDetails([]);
+
+    expect(view.store.get(view.manager.atoms.transcriptHistory)).toEqual({ kind: 'settled' });
+    expect(
+      view.renderer.root.findAllByProps({ testID: 'session-history-unreadable' })
+    ).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
   });
 
   it('keeps the skeleton and withdraws the session chrome while the first page has not landed', async () => {
@@ -3357,9 +3371,9 @@ describe('session detail first-page history state', () => {
 
   it('keeps the composer available for a run that is streaming its first turn', async () => {
     goalMountOptions = { resolvedType: 'remote' };
-    // The page landed with no row while the run admitted a turn: that is
+    // The page landed with no row while the run settled a turn: that is
     // progress, not a history that cannot be read.
-    rootPageAdmittedMessages = 1;
+    rootPageSettledTurns = 1;
     const view = await mountDetails([]);
     act(() => {
       view.store.set(view.manager.atoms.isStreaming, true);

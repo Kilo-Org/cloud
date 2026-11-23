@@ -1389,17 +1389,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   /**
    * The first applied page's own evidence, kept as facts: whether it stored any
    * row, how many items the reader omitted, and how many turns the session
-   * admitted. It is a dependency of `transcriptHistoryAtom`, not a verdict:
+   * settled. It is a dependency of `transcriptHistoryAtom`, not a verdict:
    * whether the facts mean `settled`, `pending` or `unreadable` also needs the
    * run's live streaming state, so the verdict is derived on read.
    *
-   * `admittedMessages` is absent on a page read before the field existed, and
-   * the verdict then falls back to the session metadata's `initialMessageId`.
+   * `settledTurns` is absent on a page read before the field existed, and the
+   * verdict then falls back to the session metadata's `initialMessageId`.
    */
   const firstPageEvidenceAtom = atom<{
     storedRowCount: number;
     omittedItemCount: number;
-    admittedMessages?: number | undefined;
+    settledTurns?: number | undefined;
   } | null>(null);
   /**
    * First-page lifecycle for the active session: `pending` until that page's
@@ -1409,11 +1409,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * gets a terminal failure instead of the empty state.
    *
    * The verdict is derived rather than latched at the page apply, because the
-   * live run decides the last step: an admitted turn with no rows yet is
+   * live run decides the last step: a settled turn with no rows yet is
    * `pending` while the session streams and `unreadable` once it stopped. The
-   * page's own count of admitted turns settles that without waiting for the
+   * page's own count of settled turns settles that without waiting for the
    * metadata, whose `initialMessageId` is only the fallback for a page that
-   * predates it.
+   * predates it. An in-flight turn is not counted, so a session that just
+   * started its first turn stays `pending` or `settled` rather than
+   * `unreadable`.
    */
   const transcriptHistoryAtom = atom<TranscriptHistoryState>(get => {
     // `/clear` empties the view on purpose: that is an empty session, not a
@@ -1438,9 +1440,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (evidence.storedRowCount > 0) return { kind: 'settled' };
     if (evidence.omittedItemCount > 0) return { kind: 'unreadable' };
     const streaming = (): TranscriptHistoryState => ({ kind: 'pending', reason: 'streaming' });
-    if (evidence.admittedMessages === undefined) {
+    if (evidence.settledTurns === undefined) {
       // An older page carries no count, so the session's own metadata decides
-      // whether a turn was ever admitted. Until it lands the answer is still
+      // whether a turn was ever settled. Until it lands the answer is still
       // pending, and it usually lands after this page.
       const metadata = get(fetchedSessionDataAtom);
       if (metadata === null) return { kind: 'pending', reason: 'first-page' };
@@ -1452,10 +1454,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // at all, and that state must state itself instead of loading forever.
       return get(isStreamingAtom) ? streaming() : { kind: 'unreadable' };
     }
-    // The page's own count: a run that admitted a turn and has no row yet is
+    // The page's own count: a run that settled a turn and has no row yet is
     // streaming while it is live, and a gap once it stopped. A session that
-    // never admitted a turn is genuinely empty.
-    if (evidence.admittedMessages === 0) return { kind: 'settled' };
+    // never settled a turn is genuinely empty; an in-flight turn is not
+    // counted, so a starting run is progress rather than a gap.
+    if (evidence.settledTurns === 0) return { kind: 'settled' };
     return get(isStreamingAtom) ? streaming() : { kind: 'unreadable' };
   });
 
@@ -2755,7 +2758,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // The first applied page owns the evidence. A later re-apply of the same
       // page (the live read after the cached replay) must not overwrite it, and
       // the `settled`/`pending`/`unreadable` verdict is derived from it plus the
-      // live run. The one fact a re-apply may add is the admitted-turn count a
+      // live run. The one fact a re-apply may add is the settled-turn count a
       // cached page read before the field existed never carried: it is fresh
       // when it arrives, and only ever travels from absent to a number.
       const evidence = store.get(firstPageEvidenceAtom);
@@ -2763,15 +2766,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         store.set(firstPageEvidenceAtom, {
           storedRowCount: storedMessageIds.length,
           omittedItemCount: outcome.omittedItemCount,
-          admittedMessages: outcome.admittedMessages,
+          settledTurns: outcome.settledTurns,
         });
-      } else if (
-        evidence.admittedMessages === undefined &&
-        outcome.admittedMessages !== undefined
-      ) {
+      } else if (evidence.settledTurns === undefined && outcome.settledTurns !== undefined) {
         store.set(firstPageEvidenceAtom, {
           ...evidence,
-          admittedMessages: outcome.admittedMessages,
+          settledTurns: outcome.settledTurns,
         });
       }
     }

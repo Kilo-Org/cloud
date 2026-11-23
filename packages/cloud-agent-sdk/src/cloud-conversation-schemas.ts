@@ -299,8 +299,8 @@ const cloudV1MessagesPageWireSchema = z.object({
   /** The rows the stream replays on connect; only the first page carries them. */
   preparationAttempts: z.array(preparationAttemptPageSchema).optional(),
   queuedMessages: z.array(queuedMessageSnapshotSchema).optional(),
-  /** Turns the session admitted, so an empty page can tell "never ran" from a gap. */
-  admittedMessages: z.number().int().nonnegative().optional(),
+  /** Settled turns, so an empty page can tell "never ran" from a gap. */
+  settledTurns: z.number().int().nonnegative().optional(),
 });
 
 /** Native v2 pages carry a conversation source and `{ message, parentID }` rows. */

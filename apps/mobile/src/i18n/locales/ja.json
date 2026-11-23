@@ -89,6 +89,7 @@
     "details": "詳細",
     "draft": "下書き",
     "enabled": "有効",
+    "fileUnavailable": "このファイルはダウンロードできなくなりました",
     "github": "GitHub",
     "image": "画像",
     "imageUnavailable": "画像を表示できません。",

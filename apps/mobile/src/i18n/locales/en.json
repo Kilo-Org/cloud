@@ -192,6 +192,7 @@
     "details": "Details",
     "draft": "Draft",
     "enabled": "Enabled",
+    "fileUnavailable": "This file is no longer available to download",
     "github": "GitHub",
     "image": "Image",
     "imageUnavailable": "Image unavailable",

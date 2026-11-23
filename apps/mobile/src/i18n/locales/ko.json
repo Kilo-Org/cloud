@@ -89,6 +89,7 @@
     "details": "세부 정보",
     "draft": "초안",
     "enabled": "활성화됨",
+    "fileUnavailable": "이 파일은 더 이상 다운로드할 수 없습니다",
     "github": "GitHub",
     "image": "이미지",
     "imageUnavailable": "이미지를 표시할 수 없습니다.",

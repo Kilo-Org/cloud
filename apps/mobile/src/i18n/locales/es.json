@@ -91,6 +91,7 @@
     "details": "Detalles",
     "draft": "Borrador",
     "enabled": "Activado",
+    "fileUnavailable": "Este archivo ya no está disponible para descargar",
     "github": "GitHub",
     "image": "Imagen",
     "imageUnavailable": "La imagen no está disponible.",

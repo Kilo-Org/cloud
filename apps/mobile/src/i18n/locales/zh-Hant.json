@@ -89,6 +89,7 @@
     "details": "詳細資料",
     "draft": "草稿",
     "enabled": "已啟用",
+    "fileUnavailable": "此檔案已無法下載",
     "github": "GitHub",
     "image": "圖片",
     "imageUnavailable": "無法顯示圖片。",

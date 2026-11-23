@@ -89,6 +89,7 @@
     "details": "รายละเอียด",
     "draft": "ฉบับร่าง",
     "enabled": "เปิดใช้งานแล้ว",
+    "fileUnavailable": "ไฟล์นี้ไม่สามารถดาวน์โหลดได้อีกต่อไป",
     "github": "GitHub",
     "image": "รูปภาพ",
     "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",

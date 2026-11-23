@@ -90,6 +90,7 @@
     "details": "Detaljer",
     "draft": "Utkast",
     "enabled": "Aktivert",
+    "fileUnavailable": "Denne filen er ikke lenger tilgjengelig for nedlasting",
     "github": "GitHub",
     "image": "Bilde",
     "imageUnavailable": "Bildet er ikke tilgjengelig.",

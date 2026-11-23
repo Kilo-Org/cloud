@@ -90,6 +90,7 @@
     "details": "Detaljer",
     "draft": "Kladde",
     "enabled": "Aktiveret",
+    "fileUnavailable": "Denne fil kan ikke længere downloades",
     "github": "GitHub",
     "image": "Billede",
     "imageUnavailable": "Billedet er ikke tilgængeligt.",

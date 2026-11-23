@@ -50,9 +50,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#666' }),
 }));
 vi.mock('@/lib/share-remote-file', () => ({
-  getShareRemoteFileReason: vi.fn(),
+  getShareFailureKind: vi.fn(() => 'general'),
   shareLocalFile: vi.fn(),
-  ShareRemoteFileError: Error,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('./mono-scroll-block', () => ({

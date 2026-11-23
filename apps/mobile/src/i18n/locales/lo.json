@@ -89,6 +89,7 @@
     "details": "ລາຍລະອຽດ",
     "draft": "ສະບັບຮ່າງ",
     "enabled": "ເປີດໃຊ້ແລ້ວ",
+    "fileUnavailable": "ໄຟລ໌ນີ້ບໍ່ສາມາດດາວໂຫຼດໄດ້ແລ້ວ",
     "github": "GitHub",
     "image": "ຮູບພາບ",
     "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",

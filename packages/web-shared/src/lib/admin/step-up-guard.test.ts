@@ -208,6 +208,29 @@ describe('runStepUpGuard', () => {
     });
   });
 
+  it('refuses a bearer credential before it resolves the operation', async () => {
+    // A bearer credential cannot complete step-up whatever it names, so its
+    // refusal must not turn into a different failure just because the caller
+    // also does not know its route and method.
+    const cause = await refusal(
+      runStepUpGuard(
+        params({
+          credential: 'human_bearer',
+          actionClass: 'support_write',
+          route: null,
+          method: null,
+        })
+      )
+    );
+
+    expect(cause).toMatchObject({
+      code: 'BEARER_NOT_ALLOWED',
+      purpose: 'operation',
+      binding: null,
+    });
+    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['route', { route: null }],
     ['method', { method: null }],

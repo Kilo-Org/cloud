@@ -131,7 +131,8 @@ export function stepUpDecisionCovers(
 function deny(params: {
   code: StepUpErrorCode;
   actionClass: PrivilegedActionClass;
-  operation: StepUpOperation;
+  /** The operation a retry must name, when the refusal can name one. */
+  operation: StepUpOperation | null;
   message: string;
 }): never {
   const policy = stepUpPolicyFor(params.actionClass);
@@ -143,9 +144,10 @@ function deny(params: {
       actionClass: params.actionClass,
       purpose: policy.purpose,
       maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
-      binding: isOperationStepUpClass(params.actionClass)
-        ? refusalBinding(params.actionClass, params.operation)
-        : null,
+      binding:
+        params.operation && isOperationStepUpClass(params.actionClass)
+          ? refusalBinding(params.actionClass, params.operation)
+          : null,
     }),
   });
 }
@@ -180,6 +182,18 @@ export function stepUpRefusalPayload(cause: StepUpRequiredError): StepUpRequirem
 export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<AdminStepUpState> {
   if (!params.enabled) return { status: 'absent' };
 
+  // A bearer credential can never complete step-up, whatever operation it
+  // names, so refuse it before the operation is resolved: its reason must not
+  // depend on whether the caller also knows its route and method.
+  if (params.credential !== 'session') {
+    deny({
+      code: 'BEARER_NOT_ALLOWED',
+      actionClass: params.actionClass,
+      operation: null,
+      message: 'MFA requires a browser session',
+    });
+  }
+
   const operation = stepUpOperationFor({
     actionClass: params.actionClass,
     route: params.route,
@@ -187,15 +201,6 @@ export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<Admi
     surface: params.surface,
     target: params.target,
   });
-
-  if (params.credential !== 'session') {
-    deny({
-      code: 'BEARER_NOT_ALLOWED',
-      actionClass: params.actionClass,
-      operation,
-      message: 'MFA requires a browser session',
-    });
-  }
 
   let state: AdminStepUpState;
   try {

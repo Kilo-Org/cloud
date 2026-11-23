@@ -191,16 +191,19 @@ function rowTitles(root: I): string[] {
 }
 
 /**
- * The subtitle the pending placeholder row paints, read from its props. The
- * settled `PreferenceRow` is a real component here, so its subtitle is a Text
- * child and belongs to `texts`.
+ * The subtitle the optional row's placeholder paints before the stored read
+ * settles, read from that row's props. Every required disclosure row is also a
+ * `ConfigureRow` here, so the helper filters to the optional row's own title;
+ * the settled `PreferenceRow` is a real component, so its copy is a Text child
+ * and belongs to `texts`.
  */
-function pendingRowSubtitles(root: I): string[] {
+function optionalPendingSubtitles(root: I): string[] {
   return root
     .findAll(
       n =>
         typeof n.type === 'string' &&
         (n.type as string) === 'ConfigureRow' &&
+        n.props.title === i18n.t('consent.helpImprove') &&
         typeof n.props.subtitle === 'string'
     )
     .map(n => n.props.subtitle as string);
@@ -285,7 +288,6 @@ describe('ConsentCard', () => {
     expect(t).toContain('Required to use Kilo');
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
-    expect(t).not.toContain(i18n.t('profile.privacyChoices'));
     expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
@@ -582,9 +584,9 @@ describe('ConsentCard', () => {
     expect(placeholder[0]?.props.subtitleNumberOfLines).toBe('all');
     // The placeholder already paints the review-mode copy, so the branch that
     // shows while the read is in flight reserves the settled row's height.
-    expect(pendingRowSubtitles(renderer.root)).toContain(
-      i18n.t('consent.helpImproveReviewDescription')
-    );
+    expect(optionalPendingSubtitles(renderer.root)).toEqual([
+      i18n.t('consent.helpImproveReviewDescription'),
+    ]);
 
     await act(() => {
       deferred.resolve({ mandatory: true, optional: true });

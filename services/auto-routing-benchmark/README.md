@@ -1197,10 +1197,23 @@ pool, then forwards its immutable context to `POST /admin/custom-router-benchmar
 | `progress` | Continues staging, activates a fully staged request, settles a finished one, and returns one page of cases with a cursor. Never creates a request. |
 | `pause` | Detaches this request's payers, cancels only the case runs it was alone paying, and makes dispatch stop now. |
 
+Staging is paged, and the browser is not required to finish it: while a request is `preparing`,
+the one-minute tick stages a hard-capped budget of 4,400 slots (50 batches of 88, split as
+`floor(4,400 / requests that still need slots)` and served stalest-first) across its live
+requests, which activates the widest observed pool in about 28 minutes with the tab closed, and a
+`progress` read stages 400 more. A request that is fully staged takes no slot budget — it only
+needs to activate, which the same tick does — so it never dilutes another request's share. A request stays
+alive while its staging keeps adding slots (`last_staged_at`) and is closed as "Benchmark request
+was never activated." — retryably, freeing its pool's only live-request slot — once it was offered
+budget and staged no slot for an hour. Row age, a tick that never reached it for budget, and passes
+that write nothing never extend that window. `scheduled-tick-budget.test.ts` measures the whole
+tick at about 680 of D1's 1,000 queries per invocation.
+
 The web exposes the same four actions through the pool-owner authorization: an organization needs
 the existing billing authority to start or pause, and any member with pool access may read the
 quote, progress and table. A save, an alias scan, a subscription sync, an admin retry, or a deploy
-cannot start a request.
+cannot start a request. A failed request can simply be restarted: it is outside the one-live-
+request-per-pool unique index, so the retry quotes and starts a fresh request.
 
 Admission of registry rows still uses `POST /admin/profiles/register`: stale history admits free,
 a never-seen model consumes the 20-per-base-router-per-24-hours window, and the batch records its

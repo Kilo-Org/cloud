@@ -118,7 +118,7 @@ describe('notificationHistoryCopy', () => {
     expect(copy).toEqual({ headline: 'A security check has an update', detail: null });
   });
 
-  it('matches the app name of the row language, not the English one', () => {
+  it('resolves the row title from its catalog key, not the stored copy', () => {
     const copy = notificationHistoryCopy(
       {
         i18nKey: 'internal.securityLifecycle',

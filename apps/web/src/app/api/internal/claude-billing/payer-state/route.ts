@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { getGrantedClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  claudeBillingEffectiveConnection,
+  getGrantedClaudeBillingConnection,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   ClaudeBillingOwnerSchema,
   claudeBillingPayerState,
@@ -13,9 +16,13 @@ export async function POST(request: Request) {
   if (unauthorized) return unauthorized;
   const owner = ClaudeBillingOwnerSchema.safeParse(await request.json().catch(() => null));
   if (!owner.success) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
-  const row = await getGrantedClaudeBillingConnection(owner.data, db);
+  const granted = await getGrantedClaudeBillingConnection(owner.data, db);
   return NextResponse.json(
-    { connection: claudeBillingPayerState(row) },
+    {
+      connection: claudeBillingPayerState(
+        granted ? claudeBillingEffectiveConnection(granted) : null
+      ),
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

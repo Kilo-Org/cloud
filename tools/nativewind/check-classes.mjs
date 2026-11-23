@@ -38,9 +38,11 @@
  * may never exceed its baseline count, and an entry the file is now below is
  * reported with the line to lower or delete, so the baseline only shrinks and
  * at the end of the migration it is empty. Regenerate it with
- * `--write-layout-baseline` only after the violations themselves are gone, and
- * the rewrite refuses a run that could not read the theme or could not read or
- * parse a walked file: those counts are short by what the run never saw.
+ * `--write-layout-baseline` only after the violations themselves are gone. The
+ * rewrite refuses a run that could not read or parse a walked file, because
+ * those counts are short by what the run never saw; a theme read failure does
+ * not withhold the rewrite, because the theme tokens feed only the `/opacity`
+ * ban rule, and an ordinary run reports it.
  *
  * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
@@ -53,8 +55,6 @@ import { propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
-// Resolve from the app: react-native-css is the app's dependency, not the repo root's.
-const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * The app's base, repo-relative, and its source root built from it. The walk
@@ -63,9 +63,13 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * reaches all three together instead of leaving one of them reading a path the
  * walk no longer parses. The layout allowlist and exempt trees are written
  * under the same base, so the prefix the layout rules test and the slice they
- * take are one path, not two spellings of it.
+ * take are one path, not two spellings of it. The compiler pins resolve
+ * `react-native-css/compiler` from the app's `package.json` under this base too:
+ * the compiler is the app's dependency, not the repo root's, so that resolution
+ * moves with the rest.
  */
 const APP_RELATIVE = 'apps/mobile';
+const require = createRequire(join(ROOT, APP_RELATIVE, 'package.json'));
 const APP_SRC_RELATIVE = `${APP_RELATIVE}/src`;
 const APP_SRC = join(ROOT, APP_SRC_RELATIVE);
 const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
@@ -1206,21 +1210,23 @@ function detectInlineStyles({ program, text, lineOf }) {
 /**
  * A chevron placed straight from the icon modules instead of through
  * `RowChevron`, which is what mirrors it in RTL and keeps it to the row's
- * trailing size. The row primitives and `RowChevron` own that placement.
+ * trailing size. The row primitives and `RowChevron` own that placement. The
+ * declarations are the ones `fileFacts` already collected, in its source-order
+ * walk, so the rule reads them instead of walking the tree again.
  */
 const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
 const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
 
-function detectRowChevrons({ program, lineOf }) {
+function detectRowChevrons({ imports, lineOf }) {
   const problems = [];
-  walk(program, node => {
-    for (const specifier of valueImportSpecifiers(node, ROW_CHEVRON_MODULES)) {
+  for (const declaration of imports) {
+    for (const specifier of valueImportSpecifiers(declaration, ROW_CHEVRON_MODULES)) {
       const name = importedName(specifier.imported);
       if (ROW_CHEVRON_NAMES.has(name)) {
         problems.push({ line: lineOf(specifier.start), offending: name });
       }
     }
-  });
+  }
   return problems;
 }
 
@@ -1254,7 +1260,10 @@ function detectTitleContent({ relative, program, lineOf }) {
  * A sheet opened imperatively renders its own body, so nothing outside it adds
  * the title row: without `SheetHeader` it starts under the drag handle with no
  * title and no close control. The files below are the ones that own their first
- * row instead. `SHEET_MODULES` is the module set the sheet rule reads.
+ * row instead. `SHEET_MODULES` is the module set the sheet rule reads, and the
+ * declarations it reads are the ones `fileFacts` already collected, so the rule
+ * does not walk the tree to find the sheet's local name; the walk that finds
+ * the sheet's JSX stays, because that reads elements, not imports.
  */
 const SHEET_MODULES = new Set(['@/components/ui/sheet']);
 const SHEET_ALLOWLIST = new Set([
@@ -1316,19 +1325,19 @@ function localComponentDrawsHeader(name, text, components, visited) {
   );
 }
 
-function detectSheetHeader({ relative, program, text, lineOf }) {
+function detectSheetHeader({ relative, imports, program, text, lineOf }) {
   if (SHEET_ALLOWLIST.has(relative)) {
     return [];
   }
   const sheetNames = new Set();
-  walk(program, node => {
-    for (const specifier of valueImportSpecifiers(node, SHEET_MODULES)) {
+  for (const declaration of imports) {
+    for (const specifier of valueImportSpecifiers(declaration, SHEET_MODULES)) {
       if (importedName(specifier.imported) !== 'Sheet') {
         continue;
       }
       sheetNames.add(specifier.local?.name ?? importedName(specifier.imported));
     }
-  });
+  }
   if (sheetNames.size === 0) {
     return [];
   }
@@ -1445,8 +1454,10 @@ function layoutExempt(path) {
 /**
  * Every layout finding one file has, from the table's rules, as records. The
  * printable line is built from a record only where the report is printed.
+ * `imports` is the collection `fileFacts` gathered, handed to the rules that
+ * read import declarations so they do not walk the tree for them again.
  */
-export function checkLayout(relative, program, chunks, text, lineOf) {
+export function checkLayout(relative, program, chunks, imports, text, lineOf) {
   if (layoutExempt(relative)) {
     return [];
   }
@@ -1472,14 +1483,18 @@ export function checkLayout(relative, program, chunks, text, lineOf) {
       if (rule.detectSurface === undefined) {
         continue;
       }
-      problems.push(...records(rule, rule.detectSurface({ relative, text, lineOf, group })));
+      problems.push(
+        ...records(rule, rule.detectSurface({ relative, imports, text, lineOf, group }))
+      );
     }
   }
   for (const rule of LAYOUT_RULES) {
     if (rule.detect === undefined) {
       continue;
     }
-    problems.push(...records(rule, rule.detect({ relative, program, chunks, text, lineOf })));
+    problems.push(
+      ...records(rule, rule.detect({ relative, program, chunks, imports, text, lineOf }))
+    );
   }
   return problems;
 }
@@ -1791,9 +1806,9 @@ function destructuredTextSource(pattern, init) {
  * for lines once. A file the parser refused is reported here, once: its tree is
  * empty, so leaving it out would report the file as clean.
  *
- * The four syntax rules read the facts one traversal gathered; the layout rules
- * walk the tree for their surfaces and select each surface's chunks from that
- * same collection.
+ * The four syntax rules read the facts one traversal gathered, and so do the two
+ * layout rules that read imports; the other layout rules walk the tree for their
+ * surfaces and select each surface's chunks from that same collection.
  */
 export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
   const { chunks, elements, imports, calls, memberUses } = fileFacts(program, text);
@@ -1805,7 +1820,7 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
       ...checkDirectIntl(path, file, calls, lineOf),
       ...checkRules(path, chunks, lineOf),
     ],
-    layout: checkLayout(path, program, chunks, text, lineOf),
+    layout: checkLayout(path, program, chunks, imports, text, lineOf),
   };
 }
 
@@ -1931,16 +1946,20 @@ function writeLayoutBaseline(findings) {
  * the baseline shrinking instead of outliving the migration.
  */
 function compareLayoutBaseline(findings, baseline) {
-  const exceeded = new Set();
-  const stale = [];
+  const reported = [];
+  const overCount = [];
   for (const [path, byRule] of findings) {
     for (const [id, problems] of byRule) {
       const admitted = baseline[path]?.[id] ?? 0;
       if (problems.length > admitted) {
-        exceeded.add(`${path} ${id}`);
+        reported.push(...problems.map(layoutFindingText));
+        overCount.push(
+          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${admitted}; remove the new one(s)`
+        );
       }
     }
   }
+  const stale = [];
   for (const [path, rules] of Object.entries(baseline)) {
     for (const [id, admitted] of Object.entries(rules)) {
       const actual = findings.get(path)?.get(id)?.length ?? 0;
@@ -1950,19 +1969,6 @@ function compareLayoutBaseline(findings, baseline) {
       if (actual < admitted) {
         stale.push(
           `${LAYOUT_BASELINE_PATH}: ${path} ${id} baseline is ${admitted} but the file now has ${actual}; ${actual === 0 ? 'delete the entry' : `lower it to ${actual}`}`
-        );
-      }
-    }
-  }
-
-  const reported = [];
-  const overCount = [];
-  for (const [path, byRule] of findings) {
-    for (const [id, problems] of byRule) {
-      if (exceeded.has(`${path} ${id}`)) {
-        reported.push(...problems.map(layoutFindingText));
-        overCount.push(
-          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${baseline[path]?.[id] ?? 0}; remove the new one(s)`
         );
       }
     }
@@ -2012,7 +2018,6 @@ function auditRun({
   // from the rules' findings: no rule can report what it never read, so a run
   // holding one of these has not audited the tree it walked.
   const unaudited = [];
-  const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
     for (const entry of parseSourceTree(dir, ROOT, isTestArtifact, read)) {
       unaudited.push(...entry.problems);
@@ -2024,19 +2029,17 @@ function auditRun({
   const findings = layoutFindings(layout);
 
   if (writeBaseline) {
-    // A run that could not read the theme, or a walked file it could not read
-    // or parse, has not audited the tree: rewriting the baseline from it would
-    // record counts short by every file the run never saw, and the migration's
-    // floor would rise instead of shrink.
-    if (themeFailure !== null || unaudited.length > 0) {
-      if (themeFailure !== null) {
-        console.error(themeFailure);
-      }
+    // Only a walked file the run could not read or parse leaves the tree
+    // unaudited and makes the counts short: rewriting the baseline from such a
+    // run would record every file it never saw as clean, and the migration's
+    // floor would rise instead of shrink. A theme read failure is an instrument
+    // problem of the ban rule and changes no layout count, so it neither aborts
+    // nor shortens the rewrite.
+    if (unaudited.length > 0) {
       for (const problem of unaudited) {
         console.error(problem);
       }
-      const count = unaudited.length + (themeFailure === null ? 0 : 1);
-      console.error(`\ncheck-classes: ${count} problem(s)`);
+      console.error(`\ncheck-classes: ${unaudited.length} problem(s)`);
       process.exitCode = 1;
       return;
     }
@@ -2047,6 +2050,9 @@ function auditRun({
   // The theme and baseline problems belong with the instrument problems: the
   // file problems print first, then what the audit could not check, then the
   // summary.
+  // The theme was already read during the walk, by the opacity rule, so this is
+  // the memo and not a second read.
+  const { failure: themeFailure } = themeTokens();
   const { baseline, failure: baselineFailure } = readBaseline();
   if (themeFailure !== null) {
     problems.push(themeFailure);

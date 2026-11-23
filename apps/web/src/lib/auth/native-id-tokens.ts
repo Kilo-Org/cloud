@@ -361,10 +361,6 @@ export async function exchangeNativeGoogleAuthCode(
     throw new NativeIdTokenError('Google token response missing id_token');
   }
 
-  // Verify the returned ID token against the web client audience through the
-  // shared helper, so both Google paths apply the same payload checks, reusing
-  // the certificate set fetched before the exchange. Cert/network failures
-  // already surfaced above as 5xx; invalid tokens surface as 401.
   return verifyGoogleIdTokenWith(
     client,
     idToken,

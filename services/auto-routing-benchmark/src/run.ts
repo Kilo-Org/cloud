@@ -2769,14 +2769,17 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     } else if (
       error instanceof PaidCaseAttachedError ||
       error instanceof BenchmarkInfraUnavailableError ||
-      error instanceof BenchmarkCaseNotStartedError
+      error instanceof BenchmarkCaseNotStartedError ||
+      isRetryableContainerAvailabilityError(error)
     ) {
       // Nothing reached the model: another funded generation owns the case, the gateway is
-      // unreachable, or the launch fence refused the start. The block re-enters normal
-      // admission on a short backoff without spending an attempt — bounded, because a
-      // generation attached to a lost executor or a permanently unreachable gateway would
-      // otherwise re-queue forever. At the bound the block fails like any other, so its run
-      // and any paid request on it can finish.
+      // unreachable, the launch fence refused the start, or the container could not be reached
+      // (a transient observation, not a measurement). The block re-enters normal admission on
+      // a short backoff
+      // without spending an attempt — bounded, because a generation attached to a lost
+      // executor or a permanently unreachable gateway would otherwise re-queue forever. At
+      // the bound the block fails like any other, so its run and any paid request on it can
+      // finish.
       const delaySeconds = schedulerBackoffSeconds(1);
       const outcome = await deferNoModelCallChunk(
         env.BENCH_DB,
@@ -3979,7 +3982,9 @@ async function processDeciderJob(
       let output: StoredDeciderOutput | null = null;
       try {
         const pending = await getPendingDeciderOutput(env.BENCH_DB, pendingKey).catch(() => {
-          throw new DeciderGraderRetryError('Pending decider output could not be read');
+          // A read failure BEFORE any inference: infrastructure, never a grading outcome, so it
+          // is deferred without spending the block's billed attempt.
+          throw new BenchmarkInfraUnavailableError('Pending decider output could not be read');
         });
         output = pending;
         if (!output) {

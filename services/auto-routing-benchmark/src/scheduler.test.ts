@@ -36,7 +36,7 @@ import {
   consumeRetryAttemptStatement,
   refundUnspentRetryAttempt,
   restartPaidCaseStatement,
-  SCHEDULER_MAX_USER_LEASE_RECLAIMS,
+  SCHEDULER_MAX_NO_MODEL_REATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
   SCHEDULER_PRUNE_EXECUTIONS_SQL,
@@ -937,7 +937,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     // A lease loss leaves no invocation to report what it spent, so the block returns to the
     // queue and its single BILLED attempt is refunded; the paid ledger fence on the next claim
     // is what prevents a second billed call.
-    for (let reclaim = 1; reclaim <= SCHEDULER_MAX_USER_LEASE_RECLAIMS; reclaim++) {
+    for (let reclaim = 1; reclaim <= SCHEDULER_MAX_NO_MODEL_REATTEMPTS; reclaim++) {
       const [claim] = await claimMany(db, config, 1, `user-reclaim-${reclaim}`, now);
       if (!claim) throw new Error(`Expected user claim ${reclaim}`);
       expect(claim.attempts).toBe(1);
@@ -958,7 +958,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
       attempts: 0,
-      lease_reclaims: SCHEDULER_MAX_USER_LEASE_RECLAIMS + 1,
+      lease_reclaims: SCHEDULER_MAX_NO_MODEL_REATTEMPTS + 1,
     });
     expect(await claimMany(db, config, 2, 'after-user-lease', now)).toEqual([]);
   });
@@ -1645,7 +1645,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(insertPlan).not.toContain('scheduler_chunks');
     const lanesPlan = explainPlan(sqlite, SCHEDULER_MATERIALIZED_LANES_SQL);
     expect(lanesPlan).toContain(
-      'SEARCH scheduler_chunks USING INDEX IX_scheduler_chunks_run (run_id=?)'
+      'SEARCH scheduler_chunks USING INDEX IX_scheduler_chunks_run_id (run_id=?)'
     );
     expect(lanesPlan).not.toContain('SCAN scheduler_chunks');
   });
@@ -2021,7 +2021,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     }
     const chunksPlan = explainPlan(sqlite, SCHEDULER_PRUNE_CHUNKS_SQL);
     expect(chunksPlan).toContain(
-      'SEARCH c USING COVERING INDEX IX_scheduler_chunks_run (run_id>?)'
+      'SEARCH c USING COVERING INDEX IX_scheduler_chunks_run_id (run_id>?)'
     );
     expect(chunksPlan).toContain('SEARCH run USING INDEX sqlite_autoindex_benchmark_runs_1 (id=?)');
     expect(chunksPlan).not.toMatch(/^SCAN run$/m);

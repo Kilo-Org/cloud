@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a6f50835-5653-49b1-9a70-4b1a9ba57235",
+  "id": "07536ddb-aa77-418d-aa79-c1b16e821fe6",
   "prevId": "9f77d4f9-c3b7-44d4-8bb5-5c4604701435",
   "tables": {
     "benchmark_case_payers": {
@@ -4076,13 +4076,6 @@
           "columns": [
             "status",
             "available_at"
-          ],
-          "isUnique": false
-        },
-        "IX_scheduler_chunks_run": {
-          "name": "IX_scheduler_chunks_run",
-          "columns": [
-            "run_id"
           ],
           "isUnique": false
         },

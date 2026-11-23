@@ -145,16 +145,17 @@ export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
  */
 export const SCHEDULER_MAX_USER_ATTEMPTS = 1;
 /**
- * Automatic lease-loss re-attempts one block of a USER pool may use.
+ * Automatic re-attempts one block may use when nothing reached the model — a lease loss, a
+ * crash, an attached generation, an unreachable gateway, a refused launch, or a container that
+ * could not be reached. Both purposes share it, and it is deliberately separate from the
+ * attempt cap: none of these spends a billed attempt.
  *
- * A lease loss means no invocation is left to say what it spent, so this counter is the bound
- * that keeps a block from looping: the paid ledger fence (`getPaidCaseStartedAt` raising
- * `AmbiguousBenchmarkExecutionError`) is what stops a second billed call, and an expired lease
- * whose invocation never opened a generation is retried without touching the user's single
- * billed attempt. Three rides out a deploy or a container restart; a fourth fails the block
- * into the manual requeue. A wait that made no model call shares this exact boundary.
+ * A lease loss leaves no invocation to say what it spent, so this counter is the bound that
+ * keeps a block from looping; the paid ledger fence (`getPaidCaseStartedAt` raising
+ * `AmbiguousBenchmarkExecutionError`) is what stops a second billed call. Three rides out a
+ * deploy or a container restart; a fourth fails the block into the manual requeue.
  */
-export const SCHEDULER_MAX_USER_LEASE_RECLAIMS = 3;
+export const SCHEDULER_MAX_NO_MODEL_REATTEMPTS = 3;
 /**
  * Automatic attempts one block of a PLATFORM pool may use: the first run plus one
  * automatic retry, counted on the chunk's own `attempts` across every automatic path
@@ -380,10 +381,14 @@ export async function scheduleRunChunks(
         )
       )
     : null;
-  const recordedFingerprint = await db
-    .prepare('SELECT plan_fingerprint FROM benchmark_runs WHERE id = ?')
-    .bind(run.runId)
-    .first<{ plan_fingerprint: string | null }>();
+  // Only a plan-driven run has a fingerprint to compare (the column is written only for one),
+  // so a platform pass skips this round-trip entirely.
+  const recordedFingerprint = planFingerprint
+    ? await db
+        .prepare('SELECT plan_fingerprint FROM benchmark_runs WHERE id = ?')
+        .bind(run.runId)
+        .first<{ plan_fingerprint: string | null }>()
+    : undefined;
   const planChanged =
     planFingerprint !== null && recordedFingerprint?.plan_fingerprint !== planFingerprint;
   const materialized = new Map<string, Set<string>>();
@@ -885,13 +890,13 @@ export async function deferNoModelCallChunk(
 ): Promise<'deferred' | 'failed'> {
   // The wait is counted on `lease_reclaims`, the counter that already bounds automatic
   // re-attempts for a block's lease losses. A wait that made no model call is exactly as
-  // retryable as a lease loss, so it uses the same boundary: `SCHEDULER_MAX_USER_LEASE_RECLAIMS`
+  // retryable as a lease loss, so it uses the same boundary: `SCHEDULER_MAX_NO_MODEL_REATTEMPTS`
   // re-attempts are allowed and the next one fails the block. Without the bound, a generation
   // attached to a lost executor or a permanently unreachable gateway would re-queue the block
   // forever at the constant backoff.
   const row = await db
     .prepare(`UPDATE scheduler_chunks SET
-    status = CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_USER_LEASE_RECLAIMS}
+    status = CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_NO_MODEL_REATTEMPTS}
       THEN 'failed' ELSE 'pending' END,
     attempts = MAX(attempts - 1, 0),
     lease_reclaims = lease_reclaims + 1,
@@ -1115,7 +1120,7 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
           AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep
       ) THEN 'failed' WHEN EXISTS (
         SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status != 'running'
-      ) THEN 'completed' WHEN ${chunkIsUserSql('scheduler_chunks')} THEN CASE WHEN lease_reclaims >= ${SCHEDULER_MAX_USER_LEASE_RECLAIMS} THEN 'failed' ELSE 'pending' END
+      ) THEN 'completed' WHEN ${chunkIsUserSql('scheduler_chunks')} THEN CASE WHEN lease_reclaims + 1 > ${SCHEDULER_MAX_NO_MODEL_REATTEMPTS} THEN 'failed' ELSE 'pending' END
       WHEN attempts >= ${chunkAttemptCapSql('scheduler_chunks')} THEN 'failed' ELSE 'pending' END,
       attempts = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN MAX(attempts - 1, 0) ELSE attempts END,
       lease_reclaims = CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN lease_reclaims + 1 ELSE lease_reclaims END,

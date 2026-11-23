@@ -296,9 +296,8 @@ export const schedulerChunks = sqliteTable(
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
-    index('IX_scheduler_chunks_run').on(table.run_id),
-    // The keyset page the initializer reads after a re-plan walks one run in id order, so
-    // `(run_id, id)` serves each page as an index range instead of a scan plus sort.
+    // Serves both the run-scoped reads and the initializer's keyset page: `(run_id, id)` has
+    // `run_id` as its leftmost prefix, so it replaces the old single-column index.
     index('IX_scheduler_chunks_run_id').on(table.run_id, table.id),
     // Lane-head dispatch: a lane is one (run, model, variant, rep) chunk chain, and
     // `(available_at, chunk)` orders its runnable head. This prefix lets a claim

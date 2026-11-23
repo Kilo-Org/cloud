@@ -2276,7 +2276,15 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(runDeciderCaseViaCli).mockRejectedValueOnce(new Error(message));
     await processJob(env, deciderMessage());
     expect(releasedUnbilledGeneration()).toBe(true);
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // A container that could not be reached made no model call, so the block waits under the
+    // no-model-call bound instead of spending a billed attempt.
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
+    expect(deferChunk).not.toHaveBeenCalled();
     expect(queueSend).toHaveBeenCalledWith(
       { runId, kind: 'decider', model, schedulerWake: true },
       { delaySeconds: 15 }
@@ -2296,7 +2304,8 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalled();
+    expect(deferNoModelCallChunk).toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
   });
 
   function schedulerWaitEvent(calls: unknown[][]): unknown {
@@ -2317,7 +2326,12 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(releasedUnbilledGeneration()).toBe(true);
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
     expect(failChunk).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
@@ -2448,6 +2462,48 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     });
   });
 
+  it('defers a user-pool block whose container cannot be reached, failing only at the bound', async () => {
+    // A container that was never reached made no model call, so a user block must not lose its
+    // single billed attempt to one transient observation. It waits under the no-model-call
+    // bound and fails only when that bound is reached.
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, purpose: 'user', admission_marker: '2026-06-16T00:00:00.000Z' },
+    });
+    const claim = mockClaim();
+    const unreachable = new Error(
+      'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container just exited'
+    );
+    vi.mocked(runDeciderCaseViaCli).mockRejectedValue(unreachable);
+    vi.mocked(deferNoModelCallChunk).mockResolvedValueOnce('deferred');
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    // A wait, not a measurement: no deferral that spends the attempt, no lane death, no grade.
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+
+    // The same observation at the bound ends the block, so the run can finish.
+    vi.mocked(deferNoModelCallChunk).mockResolvedValueOnce('failed');
+    await processJob(env, deciderMessage());
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ failureClass: 'container_capacity' })
+    );
+  });
+
   it('defers a killed-before-events case whose retry never reaches the container', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(runDeciderCaseViaCli)
@@ -2473,7 +2529,13 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(failChunk).not.toHaveBeenCalled();
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();
-    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    // The refused retry is a no-model-call wait, so the block is released without spending.
+    expect(deferNoModelCallChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'chunk-1',
+      'token-1',
+      expect.any(Number)
+    );
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
     expect(schedulerWaitEvent(warn.mock.calls)).toMatchObject({
       reason: 'container_capacity',

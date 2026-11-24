@@ -379,8 +379,9 @@ needed.
   high-volume call sites (the gateway and session-ingest) at a fixed rate
   recorded in the line, so queries can weight by it.
 - Every verifier Worker must have `observability.enabled` and `logpush: true`
-  in its `wrangler.jsonc`, as `services/latency-ingest` does. Phase 0 checks
-  each verifier in the verifier table and enables Logpush where it is missing.
+  in its `wrangler.jsonc`, as `services/latency-ingest` does. Of the verifier
+  Workers, `services/notifications` and `services/git-token-service` have no
+  `logpush: true` today; Phase 0 enables it there and confirms the rest.
 - The ai-gateway session-fallback counter uses the same line, with call site
   `gateway.session-fallback` and the route.
 

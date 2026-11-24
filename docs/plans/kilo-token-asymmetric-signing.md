@@ -3,14 +3,14 @@
 ## Goal
 
 `NEXTAUTH_SECRET` is one HS256 secret shared by apps/web, apps/ai-gateway and
-about fifteen Workers. Any deployable that verifies a Kilo token can also mint
+13 Workers in this repository. Any deployable that verifies a Kilo token can also mint
 any Kilo token for any user and any audience. This plan splits the secret by
 purpose:
 
 1. **NextAuth session cookie**: unchanged in apps/web. `NEXTAUTH_SECRET` stays,
    used only by NextAuth in apps/web. apps/ai-gateway stops reading browser
    sessions (see [ai-gateway: no browser sessions](#ai-gateway-no-browser-sessions)),
-   so after cutover it holds no symmetric secret at all. A later rotation of
+   so after cutover it holds no secret that can mint Kilo tokens. A later rotation of
    `NEXTAUTH_SECRET` logs everyone out and is out of scope.
 2. **Same-service tokens** (minted and verified by one deployable): a dedicated
    symmetric secret per deployable.
@@ -33,9 +33,10 @@ cookie, so it authenticates callers by bearer token alone.
 - Changing the NextAuth session cookie or the secrets that are already
   dedicated: `SESSION_SYNC_SECRET`, `SESSION_SHARE_JWT_SECRET_PROD`,
   `CALLBACK_TOKEN_SECRET`, `BOT_TOKEN_MINT_SECRET`, `MCP_CATALOG_TOKEN_SECRET`,
-  `PAGES_AUTH_SECRET`, `GATEWAY_TOKEN_SECRET`, `INTERNAL_API_SECRET`.
-- A central token-minting service. The signer interface in this plan
-  (Workstream A) is the seam where one could be added later.
+  `PAGES_AUTH_SECRET`, `PAGES_DEV_AUTH_SECRET`, `GATEWAY_TOKEN_SECRET`,
+  `INTERNAL_API_SECRET`.
+- A central token-minting service. The `KiloTokenSigner` interface in this plan
+  is the seam where one could be added later.
 
 ## Inventory
 
@@ -46,11 +47,15 @@ prefix, and one ES256 key pair per environment.
 
 | Issuer ID | Deployable | Allowed audiences | Audience-less allowed? |
 |---|---|---|---|
-| `kilo-web` | apps/web | `kilo-api`, `kilo-gateway`, `cloud-agent-next`, `session-ingest`, `session-ingest:user-deletion`, `user-data-export`, `ai-attribution`, `kiloclaw`, `kilo-chat`, `event-service`, `notifications`, `deploy-builder:html-deploy`, `pages`, `pages-dev`, every `git-token-service:*` operation audience, `cloud-agent-stream`, `cloud-agent-terminal`, `cloud-agent-preview`, `session-sync:transcript` | Yes. User API tokens, organization tokens and chat tokens are audience-less today. |
+| `kilo-web` | apps/web | `kilo-api`, `kilo-gateway`, `cloud-agent-next`, `session-ingest`, `session-ingest:user-deletion`, `user-data-export`, `ai-attribution`, `kiloclaw`, `kilo-chat`, `event-service`, `notifications`, `deploy-builder:html-deploy`, `pages`, `pages-dev`, every `git-token-service:*` operation audience, `cloud-agent-stream`, `cloud-agent-terminal`, `cloud-agent-preview`, `session-sync:transcript` | Yes. User API tokens, organization tokens, chat tokens, web-minted kiloclaw machine keys and control tokens, and the flag-off legacy branches of workflow and internal-service tokens are audience-less today. |
 | `cloud-agent-next` | services/cloud-agent-next | `kilo-api`, `kilo-gateway`, `session-ingest` (runtime token array, runtime-proxy attestation, workspace MCP grant) | No |
 | `security-auto-analysis` | services/security-auto-analysis | `cloud-agent-next`, `kilo-gateway`, `session-ingest` | No |
 | `webhook-agent-ingest` | services/webhook-agent-ingest | `cloud-agent-next` | No |
-| `kiloclaw` | services/kiloclaw | `kilo-gateway` for the 30-day machine key; add `kilo-api` only if the open question below confirms it | No |
+| `kiloclaw` | services/kiloclaw | `kilo-gateway`, `kilo-api`, `session-ingest` for the 30-day machine key | No |
+
+`kilo-chat`, `event-service`, `notifications` and `kiloclaw` are allowed for
+`kilo-web` ahead of use. apps/web does not mint those audiences yet; those
+verifiers accept audience-less tokens (`allow-legacy`) today.
 
 apps/ai-gateway is deliberately absent. Today it only verifies Kilo tokens. Its
 one ES256 signer is the Anthropic federation JWT (`CLAUDE_FEDERATION_PRIVATE_KEY`),
@@ -62,30 +67,42 @@ Under these rules, the following existing behaviour changes with ES256:
   token shape becomes mandatory for security-auto-analysis and
   webhook-agent-ingest when they switch to ES256; their legacy-shape flag-off
   branch stays HS256-only.
-- The kiloclaw machine key gains `aud: kilo-gateway`. The machine also presents
-  the key to the kiloclaw controller routes, but those compare it as an opaque
-  string against Durable Object state, so the audience change does not affect
-  them.
+- The kiloclaw machine key gains the audience array
+  `['kilo-gateway', 'kilo-api', 'session-ingest']`. The machine presents it to
+  the gateway, to apps/web's Exa route
+  (`services/kiloclaw/plugins/kiloclaw-customizer/src/kilo-exa-web-search-provider.ts`,
+  which apps/web checks for `kilo-gateway`), and, when `KILOCLAW_KILO_CLI=true`,
+  to the Kilo CLI inside the instance as `KILO_API_KEY`
+  (`controller/src/bootstrap.ts`). Narrow the array if that CLI flag is
+  retired. apps/web also mints machine keys (`apps/web/src/routers/kiloclaw-router.ts`,
+  `generateApiToken`); it must mint them with the same audience array so an
+  instance's key has the same scope whichever side minted it last. The kiloclaw
+  controller routes compare the key as an opaque string against Durable Object
+  state, so the audience change does not affect them.
 
 ### Verifiers of cross-service tokens
 
 Each verifier needs the public key set (JWKS) and the shared issuer policy.
+The policy maps issuers to audiences only, so the last column is derived from
+it: a verifier accepts every issuer whose allow-list contains an audience that
+verifier checks. Per-verifier issuer allow-lists would narrow this further; see
+open question 8.
 
-| Verifier | Audiences accepted today | Issuers it will accept |
+| Verifier | Audiences accepted today | Issuers accepted (derived from the issuer policy) |
 |---|---|---|
-| apps/web | `kilo-api`, `kilo-gateway` (Exa), `cloud-agent-next` (balance), `pages`, `pages-dev`, plus runtime attestations | `kilo-web`, `cloud-agent-next`, `security-auto-analysis` (only if it ever targets `kilo-api`; today it does not), `kiloclaw` (if `kilo-api` is confirmed) |
-| apps/ai-gateway | `kilo-gateway`, plus runtime attestations | `kilo-web`, `cloud-agent-next`, `security-auto-analysis`, `kiloclaw` |
-| services/session-ingest | `session-ingest`, `session-ingest:user-deletion`, plus runtime attestations | `kilo-web`, `cloud-agent-next`, `security-auto-analysis` |
-| services/cloud-agent-next | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, stream, terminal and preview tickets | `kilo-web`, `security-auto-analysis`, `webhook-agent-ingest`, and `cloud-agent-next` itself for the workspace MCP grant |
+| apps/web | `kilo-api`, `kilo-gateway` (Exa), `cloud-agent-next` (balance), `pages`, `pages-dev`, plus runtime attestations | `kilo-web`, `cloud-agent-next`, `kiloclaw` (`kilo-api`, `kilo-gateway`); `security-auto-analysis` (`kilo-gateway` on Exa, `cloud-agent-next` on balance); `webhook-agent-ingest` (`cloud-agent-next` on balance) |
+| apps/ai-gateway | `kilo-gateway`; `kilo-api` on the organization model routes (tRPC `getUserFromAuth` default audience); plus runtime attestations | `kilo-web`, `cloud-agent-next`, `security-auto-analysis`, `kiloclaw` |
+| services/session-ingest | `session-ingest`, `session-ingest:user-deletion`, plus runtime attestations | `kilo-web`, `cloud-agent-next`, `security-auto-analysis`, `kiloclaw` |
+| services/cloud-agent-next | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, stream, terminal and preview tickets | `kilo-web`, `security-auto-analysis`, `webhook-agent-ingest`, `kiloclaw`, and `cloud-agent-next` itself for its own runtime tokens (balance and model validation, workspace MCP grant issuance) |
 | services/kiloclaw | `kiloclaw` | `kilo-web` |
 | services/kilo-chat | `kilo-chat` | `kilo-web` |
 | services/event-service | `event-service` | `kilo-web` |
 | services/notifications | `notifications` | `kilo-web` |
 | services/ai-attribution | `ai-attribution` | `kilo-web` |
-| services/auto-routing | `kilo-gateway` | `kilo-web`, `security-auto-analysis`, `kiloclaw` (`cloud-agent-next` runtime tokens are already refused there) |
+| services/auto-routing | `kilo-gateway` | `kilo-web`, `security-auto-analysis`, `kiloclaw`; `cloud-agent-next` by policy, but its runtime tokens are already refused there |
 | services/git-token-service | the `git-token-service:*` operation audiences | `kilo-web` |
 | services/user-data-export | `user-data-export` | `kilo-web` |
-| services/session-sync | `kilo-api` at credential exchange, `session-sync:transcript` | `kilo-web` |
+| services/session-sync | `kilo-api` at credential exchange, `session-sync:transcript` | `kilo-web`; other `kilo-api` issuers pass the signature check but fail the exchange claim allowlist, which accepts `iss` only as `kilo-web` |
 | External: deploy-builder (not in this repo) | `deploy-builder:html-deploy` | `kilo-web` |
 | Test: cloud-agent-next fake-llm Worker | as the gateway | as the gateway |
 
@@ -94,6 +111,7 @@ no key changes:
 
 - code-review-infra stores the web-minted token and forwards it to
   cloud-agent-next.
+- services/kilo-mcp relays the cloud-agent-next workspace MCP grant to apps/web.
 - auto-routing-benchmark presents bot tokens.
 - kiloclaw machines and the controller treat the machine key as an opaque string.
 - Cloud Agent sandboxes and the wrapper.
@@ -145,11 +163,12 @@ Store binding with `_PROD` and `_DEV` secret names.
 | Preview session cookie | `auth.ts`, `preview/route.ts` | 1h | Open previews |
 | Runtime-authorization seal | `packages/worker-utils/src/runtime-authorization.ts` (`sealRuntimeAuthorization`) | 5m | Negligible |
 | Runtime-proxy origin proof | `runtime-credential-proxy-origin.ts`; set by `sandbox-containers/containers-outbound.ts` and `sandbox-control/vercel-network-policy.ts` | Deterministic | **Embedded in the Vercel network policy**. Not verified yet. |
-| Wrapper dispatch ticket | `auth.ts` (`mintWrapperDispatchTicket`) | 4h | Dead code. Delete it rather than migrate it. |
+| Wrapper dispatch ticket | `auth.ts` (`mintWrapperDispatchTicket`, `validateWrapperDispatchTicket`) | 4h | Dead code: neither has a production caller. Delete both rather than migrate them. |
 
 Today `createRuntimeAuthorization` and `renewRuntimeAuthorization` take one
-`secret` that is used both to seal the record (same-service) and to mint the
-runtime Kilo token (cross-service). Split that into a `sealSecret` and a `signer`.
+`secret` that is used to verify the caller's token (cross-service), to seal the
+record (same-service) and to mint the runtime Kilo token (cross-service). Split
+it into a `verifier`, a `sealSecret` and a `signer`.
 
 **services/kiloclaw** gets `KILOCLAW_COOKIE_SECRET`, a Worker secret like the
 other kiloclaw secrets.
@@ -185,10 +204,16 @@ ES256 tokens carry:
   user, organization and chat tokens stay audience-less until a separate
   audience migration.
 
-All other claims are unchanged. The runtime-proxy attestation keeps its
-distinguishing `iss: 'kilocode-runtime-proxy'`, so its issuer is resolved from
-`kid` rather than `iss`. The verifier always resolves the issuer from `kid`
-and, where `iss` is present, checks that the two agree.
+All other claims are unchanged. The verifier always resolves the issuer from
+`kid`. If a Kilo token carries `iss`, it must equal that issuer. The one
+exception is the runtime-proxy attestation: it keeps
+`iss: 'kilocode-runtime-proxy'` (`runtime-proxy-attestation.ts`) and is accepted
+only when `kid` resolves to `cloud-agent-next`. The session-sync transcript
+token already carries `iss: 'kilo-web'`, which matches its issuer ID.
+
+The ES256 signer itself refuses to sign an audience-less payload for any issuer
+other than `kilo-web`, so a non-web issuer cannot produce one even while its
+legacy-shape rollout flag is off.
 
 ### Issuer policy
 
@@ -251,34 +276,49 @@ The other HS256 verifiers move onto the same dispatcher:
 - kiloclaw `src/auth/jwt.ts`
 - runtime-proxy attestation verification
 
-apps/web's verification is synchronous (`jsonwebtoken`). It keeps that by
-importing the JWKS once into `KeyObject`s with `crypto.createPublicKey({ format: 'jwk' })`.
-Workers use `jose` with `createLocalJWKSet`.
+apps/web verifies on two paths: synchronously with `jsonwebtoken`
+(`tryJwtVerify`), and asynchronously through the worker-utils `jose` helpers
+(`verifyKiloTokenForPolicy`, `verifyRuntimeProxyAttestation`). The synchronous
+path imports the JWKS once into `KeyObject`s with
+`crypto.createPublicKey({ key, format: 'jwk' })`. The `jose` path uses
+`createLocalJWKSet`, as Workers do. `verifyKiloTokenSignature` and every helper
+built on it (`verifyKiloToken*`, `verifyKiloBearerAgainstCurrentPepper`) take a
+key-material object (legacy secret plus JWKS) instead of `secret: string`.
 
 Each verifier logs a sanitized counter per verification, with the algorithm,
-the issuer, the expected audience and a coarse lifetime bucket. It never logs
-user IDs or token content. These counters drive the cutover decision.
+the issuer, the expected audience, a coarse lifetime bucket, and whether
+`botId`, `internalApiUse` and `tokenPurpose` are present. The booleans separate
+five-year automation tokens from five-year user tokens, which lifetime alone
+cannot. It never logs user IDs or token content. These counters drive the
+cutover decision.
 
 ### Signing
 
 - **Workers.** `packages/worker-utils` exposes a `KiloTokenSigner`:
   `{ issuer, sign(payload) }`. It is built from `KILO_TOKEN_SIGNING_KEY`.
-  `signKiloToken`, `signModernKiloToken`, `issueRuntimeToken`,
-  `issueRuntimeProxyAttestation` and `signWorkspaceMcpGrant` take a signer
-  instead of a secret. During the transition, the signer chooses HS256 with the
-  old secret or ES256 with the private key based on a per-issuer flag, so each
-  issuer can switch, and roll back, on its own.
+  `signKiloToken`, `signModernKiloToken`, `issueRuntimeProxyAttestation` and the
+  public runtime-authorization entry points (`createRuntimeAuthorization`,
+  `renewRuntimeAuthorization`, which call the private `issueRuntimeToken`) in
+  worker-utils take a signer instead of a secret, as does `signWorkspaceMcpGrant`
+  in `services/cloud-agent-next/src/cloud-agent-authority.ts`. During the
+  transition, the signer chooses HS256 with the old secret or ES256 with the
+  private key based on a per-issuer flag (for `kilo-web`, one flag per token
+  family: short-lived cross-service tokens, then user and automation tokens),
+  so each issuer can switch, and roll back, on its own.
 - **apps/web.** The signing half of `packages/web-shared/src/lib/tokens.ts`
   moves into apps/web. That covers `generateApiToken`,
   `generateOrganizationApiToken`, `generateInternalServiceToken`,
   `generateBoundedInternalServiceToken`, `signWorkflowKiloToken`,
   `generateCloudAgentWorkflowToken` and `generateWorkflowGatewayToken`. The
   verifying half (`validateAuthorizationHeader` and related) stays in
-  web-shared. Because nothing else in web-shared calls a signer, the gateway
+  web-shared. Because nothing else in web-shared calls a Kilo token signer (the
+  Anthropic federation JWT signer is unrelated), the gateway
   bundle then contains no signing code and never reads the private key. Signing
   stays synchronous: `jsonwebtoken` signs ES256 with a `KeyObject` from
-  `crypto.createPrivateKey({ format: 'jwk' })`. The other web signers use the
-  same web signer module:
+  `crypto.createPrivateKey({ key, format: 'jwk' })`. The other web signers use
+  the same web signer module (the `jose` call sites, such as
+  `signModernKiloToken` in `native-remote/token`, use the async worker-utils
+  signer with the same key):
   - `lib/auth/resource-delegation.ts`
   - `app/api/internal/bot-token/route.ts`
   - `app/api/native-remote/token/route.ts`
@@ -290,17 +330,27 @@ user IDs or token content. These counters drive the cutover decision.
 
 ### Schema updates that must reach readers first
 
-Strict claim parsers reject unknown claims, so `iss` must be accepted before any
-issuer emits it:
+Several checks compare a token's raw claim names against a fixed set, or
+strict-parse its claims, so `iss` must be accepted before any issuer emits it:
 
-- `kiloTokenPayload` (`packages/worker-utils/src/kilo-token.ts`).
-- The credential-exchange claim-name allowlist (`docs/token-issuance-policy.md`,
-  `kilo-token-policy.ts`). Add `iss`, but only with the value `kilo-web`. An
-  exchange token signed by any other issuer stays ineligible.
+- Every claim-name allowlist: `KILO_EXCHANGE_SAFE_CLAIM_NAMES` and
+  `legacyExchangeSafeClaimNames` (`kilo-token-policy.ts`, documented in
+  `docs/token-issuance-policy.md`), `accountBearerClaimNames`
+  (`packages/web-shared/src/lib/user/server.ts`), `hasUnsafeLegacyClaims` and
+  `hasRestrictedPrincipalClaims` (`apps/web/src/lib/auth/resource-delegation.ts`),
+  `PAGES_TOKEN_CLAIM_NAMES` (`app/api/pages-auth/exchange/route.ts`) and
+  session-sync's `LEGACY_CLAIMS` and `MODERN_CLAIMS`
+  (`services/session-sync/src/auth.ts`). Each accepts `iss` only with the value
+  `kilo-web`, so a credential-exchange, account or Pages token signed by any
+  other issuer stays ineligible.
 - `validateCloudAgentAuthorityClaims` (`packages/worker-utils/src/cloud-agent-authority.ts`),
   which strict-parses claims.
-- `buildModernKiloTokenPayload`, whose reserved-claims list needs `iss` as a
-  signer-owned claim.
+- `kiloTokenPayload` (`packages/worker-utils/src/kilo-token.ts`) gains an
+  optional `iss`. It is not strict, so it was not refusing `iss`; this is for
+  typing.
+- The signing-side strict schemas, `signKiloTokenPayload` (`kilo-token.ts`) and
+  `modernTokenExtra` (the strict `extra` schema of `buildModernKiloTokenPayload`,
+  `kilo-token-policy.ts`), must omit `iss`, so only the signer sets it.
 
 ## ai-gateway: no browser sessions
 
@@ -328,7 +378,7 @@ callers with the public catalog instead of the personal one:
 
 | Route (via rewrite) | Browser callers in apps/web | Today with a cookie | After |
 |---|---|---|---|
-| `/api/openrouter/models` | `useOpenRouterModels` in `lib/hooks/use-openrouter-models.ts`, used by the organization providers-and-models configuration (`useOrganizationConfiguration`) and admin alerting model search (`app/admin/alerting/use-add-model-search.ts`) | Personal catalog: the caller's BYOK models, custom routers and BYOK availability tags | Public catalog for the request country |
+| `/api/openrouter/models` | `useOpenRouterModels` in `lib/hooks/use-openrouter-models.ts`, used by the organization providers-and-models configuration (`useOrganizationConfiguration`); admin alerting model search (`app/admin/alerting/use-add-model-search.ts`) fetches the same route directly | Personal catalog: the caller's BYOK models, custom routers and BYOK availability tags | Public catalog for the request country |
 | `/api/openrouter/models-by-provider` | `useOpenRouterModelsAndProviders` | Public snapshot (filtering needs `organizationId`, which only bearer tokens carry) | Unchanged |
 | `/api/openrouter/providers` | `useOpenRouterProviders` | Unauthenticated | Unchanged |
 
@@ -344,32 +394,35 @@ Other gateway routes (inference, FIM, edit, embeddings, transcription,
 organization model lists and validation) are called only with bearer tokens:
 by the CLI, the extensions, the mobile app and server-side apps/web code. A
 browser request to them with only a cookie becomes anonymous and is refused,
-where today it is accepted. Verify this by checking the gateway logs for
-cookie-authenticated requests before shipping.
+where today it is accepted. Nothing records cookie-authenticated gateway
+requests today, so first ship a counter on the session fallback in
+`resolveUserFromAuth` (per route, no user data), and confirm only the catalog
+routes above use it before shipping the change.
 
 **Side effect.** The gateway no longer needs the primary-database
 `web_session_pepper` read that `resolveUserFromSession` does from `sfo1`. Remove
 that exception from `packages/web-shared/AGENTS.md`.
 
-This change does not depend on the token work. Ship it in Phase 0.
+This change does not depend on the token work and runs as its own track,
+alongside Phase 0. It must ship before the Phase 5 cutover.
 
 ## Rollout
 
 Phases 1 and 2 are independent. Phase 3 depends on Phase 1 being deployed
-everywhere.
+everywhere. The ai-gateway session change
+([ai-gateway: no browser sessions](#ai-gateway-no-browser-sessions)) is a
+separate track that must finish before Phase 5.
 
 ### Phase 0: preparation (code only, no behaviour change)
 
 1. Add the issuer registry, the `KiloTokenSigner` interface, the dispatcher with
    only the HS256 branch active, and `deriveServiceKey`.
 2. Move web signing into apps/web and add the ai-gateway guard.
-3. Split the runtime-authorization `secret` into a seal secret and a signer.
-4. Delete the dead `mintWrapperDispatchTicket`.
+3. Split the runtime-authorization `secret` into a verifier, a seal secret and
+   a signer.
+4. Delete the dead `mintWrapperDispatchTicket` and
+   `validateWrapperDispatchTicket`.
 5. Add the verification counters.
-6. Stop the gateway reading browser sessions (see
-   [ai-gateway: no browser sessions](#ai-gateway-no-browser-sessions)). This is
-   the one Phase 0 item that changes behaviour, and it is independent of the
-   rest.
 
 ### Phase 1: readers accept ES256
 
@@ -429,10 +482,13 @@ verified.
    tokens, bounded internal-service tokens and git, export and deletion
    assertions.
 3. `cloud-agent-next`: runtime tokens, runtime-proxy attestations and the
-   workspace MCP grant. Runtime tokens and attestations must flip together per
-   session, because verifiers already check both.
-4. `kiloclaw` machine key, with `aud: kilo-gateway`. Re-mint the keys of
-   running instances so no 30-day HS256 keys remain at cutover.
+   workspace MCP grant. With dual verification any mix of HS256 and ES256
+   tokens and attestations verifies; the prerequisite is that cloud-agent-next's
+   own verifiers (balance and model validation, workspace) have the JWKS from
+   Phase 1.
+4. `kiloclaw` machine key, with the audience array above, together with the
+   web-side machine-key mint. Re-mint the keys of running instances so no
+   30-day HS256 keys remain at cutover.
 5. `kilo-web` user and automation tokens: `generateApiToken` (five-year
    editor, CLI and device tokens), device-session access tokens, organization
    tokens, chat tokens, bot tokens, workflow tokens and delegated resource
@@ -444,8 +500,8 @@ Watch the HS256 counters. Short-lived HS256 tokens disappear on their own. What
 remains is five-year user tokens and five-year automation tokens minted by web
 (`bot/agent-runner.ts`, `discord/auth.ts`, `code-reviews/review-memory/llm.ts`).
 Automation tokens are minted fresh per run, so after Phase 3 they are already
-ES256. Confirm this from the counters, broken down by verifier and lifetime
-bucket.
+ES256. Confirm this from the counters, broken down by verifier, lifetime bucket
+and the automation-marker booleans.
 
 Before cutover, also:
 
@@ -457,9 +513,13 @@ Before cutover, also:
 
 1. Turn off `KILO_TOKEN_LEGACY_HS256` everywhere, through a coordinated deploy
    of all verifiers.
-2. From then on, an HS256 token is refused with reason `token_version_outdated`
-   ("please re-authenticate"), which clients already handle, rather than
-   `invalid_token`.
+2. From then on, apps/web and the gateway refuse an HS256 token with a new
+   internal reason, `token_algorithm_retired`, which keeps the counters
+   distinct, and the same 401 body as the version refusal ("Token version
+   outdated, please re-authenticate"). `isRejectedCredentialReason` fails
+   closed, so the new reason never falls back to anonymous. Workers return their
+   usual 401. Whether clients send users back to sign-in on these responses is
+   open question 2.
 3. Remove the `NEXTAUTH_SECRET` fallbacks from Phase 2.
 4. Remove `NEXTAUTH_SECRET` and `NEXTAUTH_SECRET_PROD` and `_DEV` from every
    Worker, and remove `NEXTAUTH_SECRET` from the `kilocode-ai-gateway` Vercel
@@ -468,13 +528,17 @@ Before cutover, also:
    follow-up.
 
 After cutover, `NEXTAUTH_SECRET` exists only in `kilocode-app`, used only for
-NextAuth. Rotating it is then the separate
-log-everyone-out operation mentioned in the Goal.
+NextAuth. Rotating it is then the separate log-everyone-out operation mentioned
+in the Goal.
 
 **Effect on users:** at cutover, every holder of a pre-Phase-3 HS256 user token
-is refused and has to sign in again. Anyone who received a token after their
-issuer flipped in Phase 3 is unaffected. No token is refused before the
-cutover.
+is refused. Clients that hold a native or device-session refresh token can
+refresh on the 401 and receive an ES256 access token
+(`app/api/auth/native/refresh/route.ts`, `app/api/device-auth/token/route.ts`),
+so refresh-on-401 is the main client fix to confirm. Holders of five-year
+tokens, which have no refresh path, sign in again. Anyone who received a token
+after their issuer flipped in Phase 3 is unaffected. No token is refused before
+the cutover.
 
 ## Configuration and tooling changes
 
@@ -494,9 +558,10 @@ cutover.
     option, or an operator sets these by hand.
 - **Local dev.**
   - `pnpm dev:env` generates a key pair per issuer and the JWKS, and writes
-    them to `.env.local` and the Workers' `.dev.vars`. Check whether the
-    existing `pkcs8` directive in `dev/local/env-sync/parse.ts` already covers
-    key generation.
+    them to `.env.local` and the Workers' `.dev.vars`. The existing `pkcs8`
+    directive in `dev/local/env-sync/parse.ts` only converts an RSA PEM already
+    in `.env.local`, so add a generator directive for EC JWKs and the derived
+    JWKS.
   - Add the new symmetric secrets to `GENERATED_LOCAL_SECRET_KEYS`
     (`dev/local/env-sync/plan.ts`), the `.dev.vars.example` files,
     `.env.local.example` and `dev/local/setup-env.ts`.
@@ -504,9 +569,9 @@ cutover.
     in `dev/local/services.ts`.
 - **Tests and seeds.**
   - Add fixed test JWKs in a worker-utils test helper.
-  - Update `dev/seed/lib/api-token.ts`, the cloud-agent-next e2e auth helpers,
+  - Update `dev/seed/app/api-token.ts`, the cloud-agent-next e2e auth helpers,
     the kiloclaw `e2e/*.mjs` scripts, the session-sync scripts and the roughly
-    30 apps/web tests that mock `config.server` with `NEXTAUTH_SECRET`.
+    40 apps/web tests that mock `config.server` with `NEXTAUTH_SECRET`.
 - **Docs.**
   - Update `ENVIRONMENT.md`, `docs/token-issuance-policy.md` (issuer table and
     `iss` in the exchange allowlist), kiloclaw `DEVELOPMENT.md` and `AGENTS.md`,
@@ -524,9 +589,14 @@ cutover.
   token whose HMAC key is the issuer's public key, and an ES256 token signed by
   an unregistered key are all refused.
 - When the flag is on, HS256 tokens keep today's behaviour. When it is off,
-  they are refused with `token_version_outdated`.
-- The `iss` claim passes `kiloTokenPayload`, the cloud-agent authority strict
-  parser and the exchange allowlist (only for `kilo-web`).
+  they are refused with `token_algorithm_retired`.
+- The `iss` claim passes the cloud-agent authority strict parser and every
+  claim-name allowlist listed above (only for `kilo-web`), and the signing-side
+  strict schemas refuse a caller-supplied `iss`.
+- A runtime-proxy attestation with `iss: 'kilocode-runtime-proxy'` is accepted
+  only when `kid` resolves to `cloud-agent-next`.
+- A kiloclaw machine key is accepted by the gateway, apps/web's Exa route and a
+  `kilo-api` route.
 
 Other tests:
 
@@ -540,9 +610,9 @@ Other tests:
 - Dual-key verification and hash matching for each Phase 2 use. Specifically,
   stored sign-in and download codes created under `NEXTAUTH_SECRET` still
   redeem.
-- cloud-agent-next: a runtime token and attestation from the same session flip
-  together, and handles embedded in the Vercel network policy keep working
-  through the switch.
+- cloud-agent-next: mixed HS256 and ES256 runtime tokens and attestations
+  verify during the transition, and handles embedded in the Vercel network
+  policy keep working through the switch.
 - An end-to-end run on the local dev stack: CLI login, a gateway request, a
   Cloud Agent session (runtime token, attestation, session-ingest), kiloclaw
   access, and chat and notifications, each once with HS256 issuers and once
@@ -551,11 +621,13 @@ Other tests:
 ## Open questions
 
 1. **kiloclaw.** `docs/token-issuance-policy.md` mentions an October end of
-   life. If kiloclaw is already retired, drop it from scope. If not, does the
-   machine key only go to the gateway, or also to `kilo-api` routes?
+   life. If kiloclaw is already retired, drop it from scope. If not, is the
+   `KILOCLAW_KILO_CLI` flag still used? If it is retired, the machine key's
+   audiences can narrow to `kilo-gateway`.
 2. **Clients.** Do the CLI, the VS Code and JetBrains extensions and the mobile
-   app send users back to sign-in on `token_version_outdated` and on
-   `invalid_token`? The kilocode repository and apps/mobile need checking.
+   app refresh on a 401 where they hold a refresh token, and otherwise send
+   users back to sign-in on the "please re-authenticate" 401 and on other
+   401s? The kilocode repository and apps/mobile need checking.
 3. **deploy-builder.** Who owns the external `deploy-builder:html-deploy`
    verifier, and how will it receive the JWKS?
 4. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
@@ -565,9 +637,21 @@ Other tests:
    attestations? Both keys would live in the same Worker, so the benefit is
    limited.
 6. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
-   cloud-agent-next, kiloclaw and user-data-export? None is declared in their
-   checked-in `wrangler.jsonc`.
+   cloud-agent-next and user-data-export? Neither declares it in its checked-in
+   `wrangler.jsonc`. kiloclaw sets its secrets with `wrangler secret put`
+   (`services/kiloclaw/wrangler.jsonc` comment).
 7. **Five-year lifetime.** Should new user tokens keep a five-year lifetime?
    With per-issuer keys, a shorter lifetime plus refresh would make future
    rotation of the `kilo-web` key possible without forcing everyone to sign in
    again.
+8. **Narrower verifier acceptance.** The issuer policy limits audiences only. A
+   leaked non-web key can still sign tokens of any purpose (including
+   `human-api` or the legacy shape) for its allowed audiences, which reach
+   resource delegation, account APIs and session-sync grants unless a claim
+   allowlist stops them. Options: add `allowedPurposes` per issuer (non-web
+   issuers sign only `delegated-workload` or `internal-service`, and kiloclaw
+   moves to the modern token shape), and add per-verifier issuer allow-lists.
+9. **Drop `iss`.** `kid` is in the signed header and is already authoritative.
+   Not emitting `iss` would remove the claim-allowlist changes, the
+   signing-side schema changes and the attestation exception. The cost is that
+   the issuer is only visible in the header.

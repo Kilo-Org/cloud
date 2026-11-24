@@ -5,9 +5,12 @@
 
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
+import {
+  scrubSentryEvent,
+  scrubSentryLog,
+} from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
-export { sanitizeSentryRequestData };
+export { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 
 type DrizzleQueryError = Error & {
   query: string;
@@ -165,12 +168,9 @@ export function initServerSentry(): void {
         }
       }
 
-      // Automatic request data can retain credentials in headers, the GitHub
-      // OAuth `state` token, the app-flow `installState` bearer, or a `/s/{jwt}`
-      // share token; strip them while keeping the rest.
-      sanitizeSentryRequestData(event);
-
-      return event;
+      return scrubSentryEvent(event);
     },
+
+    beforeSendLog: scrubSentryLog,
   });
 }

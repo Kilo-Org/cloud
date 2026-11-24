@@ -8,6 +8,7 @@ import {
   SENSITIVE_QUERY_PARAMS,
   sanitizeAnalyticsPathname,
 } from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import { FILTERED_VALUE } from '@kilocode/web-shared/lib/observability/sentry-secret-patterns';
 
 // Query keys covered by the shared URL policy, plus the handoff key that only
 // this request carries. The rest of the request is kept.
@@ -62,7 +63,6 @@ const ALLOWED_HEADERS = new Set([
   'x-forwarded-proto',
   'traceparent',
 ]);
-const FILTERED_HEADER_VALUE = '[Filtered]';
 
 function sanitizeStringQuery(queryString: string): string {
   return queryString
@@ -128,7 +128,7 @@ function sanitizeHeaders(headers: SentryHeaders): void {
   for (const name of Object.keys(headers)) {
     const lowerName = name.toLowerCase();
     if (!ALLOWED_HEADERS.has(lowerName)) {
-      headers[name] = FILTERED_HEADER_VALUE;
+      headers[name] = FILTERED_VALUE;
     } else if (lowerName === REFERER_HEADER) {
       headers[name] = sanitizeRequestUrl(headers[name]);
     }

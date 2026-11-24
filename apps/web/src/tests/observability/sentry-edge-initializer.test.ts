@@ -1,12 +1,18 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { Event } from '@sentry/nextjs';
+import type { Event, Log } from '@sentry/nextjs';
+import {
+  expectScrubbedServerEvent,
+  leakyServerEvent,
+} from '@kilocode/web-shared/tests/helpers/sentry-event.helper';
 
 type BeforeSend = (event: Event) => Event | null;
+type BeforeSendLog = (log: Log) => Log | null;
+type EdgeOptions = { beforeSend: BeforeSend; beforeSendLog: BeforeSendLog };
 
 // The edge initializer calls `init` at module scope, so each test loads a fresh
 // copy of the real config module against a stubbed SDK and reads the options it
 // registered.
-async function loadEdgeBeforeSend(): Promise<BeforeSend> {
+async function loadEdgeOptions(): Promise<EdgeOptions> {
   const initMock = jest.fn();
   await jest.isolateModulesAsync(async () => {
     jest.doMock('@sentry/nextjs', () => ({
@@ -18,9 +24,14 @@ async function loadEdgeBeforeSend(): Promise<BeforeSend> {
   });
 
   expect(initMock).toHaveBeenCalledTimes(1);
-  const options = initMock.mock.calls[0]?.[0] as { beforeSend?: unknown };
+  const options = initMock.mock.calls[0]?.[0] as Partial<EdgeOptions>;
   expect(typeof options.beforeSend).toBe('function');
-  return options.beforeSend as BeforeSend;
+  expect(typeof options.beforeSendLog).toBe('function');
+  return options as EdgeOptions;
+}
+
+async function loadEdgeBeforeSend(): Promise<BeforeSend> {
+  return (await loadEdgeOptions()).beforeSend;
 }
 
 describe('edge Sentry initializer request data', () => {
@@ -122,5 +133,29 @@ describe('edge Sentry initializer request data', () => {
       'https://app.kilo.sh/github-app?organizationId=org_123&fromApp=1'
     );
     expect(result?.request?.query_string).toBe('organizationId=org_123&fromApp=1');
+  });
+
+  test('removes every credential from a realistic server event', async () => {
+    const beforeSend = await loadEdgeBeforeSend();
+
+    expectScrubbedServerEvent(beforeSend(leakyServerEvent()));
+  });
+});
+
+describe('edge Sentry initializer logs', () => {
+  test('redacts the log message and scrubs its attributes', async () => {
+    const { beforeSendLog } = await loadEdgeOptions();
+
+    const result = beforeSendLog({
+      level: 'warn',
+      message: 'middleware rejected Bearer fake_edge_token_0123456789',
+      attributes: { 'sentry.message.parameter.0': { cookie: 'a=b', path: '/profile' } },
+    });
+
+    expect(result).toEqual({
+      level: 'warn',
+      message: 'middleware rejected Bearer [Filtered]',
+      attributes: { 'sentry.message.parameter.0': { cookie: '[Filtered]', path: '/profile' } },
+    });
   });
 });

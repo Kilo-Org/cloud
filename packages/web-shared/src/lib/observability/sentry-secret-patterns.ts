@@ -2,7 +2,7 @@
 // code that puts upstream text into Sentry data. Keep this module edge-safe: no
 // SDK runtime values and no Node builtins.
 
-const FILTERED = '[Filtered]';
+export const FILTERED_VALUE = '[Filtered]';
 const CIRCULAR = '[Circular]';
 const MAX_DEPTH = 12;
 const MAX_ENTRIES = 1000;
@@ -39,9 +39,9 @@ const SENSITIVE_KEY_WORDS = new Set([
 const SENSITIVE_KEY_PAIRS = new Set(['access key', 'api key', 'private key']);
 
 export function redactSecretValues(text: string): string {
-  let redacted = text.replace(BEARER_PATTERN, `$1 ${FILTERED}`);
+  let redacted = text.replace(BEARER_PATTERN, `$1 ${FILTERED_VALUE}`);
   for (const pattern of SECRET_VALUE_PATTERNS) {
-    redacted = redacted.replace(pattern, FILTERED);
+    redacted = redacted.replace(pattern, FILTERED_VALUE);
   }
   return redacted;
 }
@@ -56,7 +56,7 @@ function keyWords(key: string): string[] {
 
 // Only the last word decides, so `sessionId` and `inputTokens` stay readable
 // while `accessToken` and `x-api-key` are filtered.
-function isSensitiveKey(key: string): boolean {
+export function isSensitiveKey(key: string): boolean {
   const words = keyWords(key);
   const last = words.at(-1);
   if (last === undefined) {
@@ -72,7 +72,7 @@ function scrubObject(
 ): Record<string, unknown> {
   const scrubbed: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value).slice(0, MAX_ENTRIES)) {
-    scrubbed[key] = isSensitiveKey(key) ? FILTERED : scrubValue(entry, depth + 1, ancestors);
+    scrubbed[key] = isSensitiveKey(key) ? FILTERED_VALUE : scrubValue(entry, depth + 1, ancestors);
   }
   return scrubbed;
 }
@@ -85,7 +85,7 @@ function scrubValue(value: unknown, depth: number, ancestors: WeakSet<object>): 
     return value;
   }
   if (depth >= MAX_DEPTH) {
-    return FILTERED;
+    return FILTERED_VALUE;
   }
   if (ancestors.has(value)) {
     return CIRCULAR;

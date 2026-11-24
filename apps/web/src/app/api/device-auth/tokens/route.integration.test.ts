@@ -23,7 +23,7 @@ jest.mock('@/lib/device-auth/device-auth', () => {
 
 import { POST } from './route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 function createRequest(headers: Record<string, string> = {}) {
@@ -61,7 +61,10 @@ describe('POST /api/device-auth/tokens integration', () => {
     'never approves with %s and a cookie',
     async kind => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
-      const authorization = kind === 'valid bearer' ? `Bearer ${generateApiToken(user)}` : '';
+      const authorization =
+        kind === 'valid bearer'
+          ? `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`
+          : '';
       mockHeaders.mockResolvedValue(
         new Headers({
           Authorization: authorization,

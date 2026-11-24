@@ -36,12 +36,14 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 /**
- * Lifetimes a device-bound credential may carry: the one-hour access lifetime
- * and the fixed long-term lifetime. Both require an active session.
+ * Lifetimes a device-bound credential may carry: the one-hour access lifetime,
+ * the 30-day long-term lifetime, and the five-year lifetime minted before the
+ * 30-day cap. All require an active session.
  */
 const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
   ONE_HOUR_SECONDS,
-  TOKEN_EXPIRY.default,
+  TOKEN_EXPIRY.thirtyDays,
+  157_680_000,
 ];
 
 export type DelegableResource =
@@ -484,7 +486,7 @@ export async function createControlTokenForRequest(
         'Shared resource token migration is unavailable'
       );
     }
-    const expiresIn = options?.legacyExpiresIn ?? TOKEN_EXPIRY.default;
+    const expiresIn = options?.legacyExpiresIn ?? TOKEN_EXPIRY.thirtyDays;
     const token = generateApiToken(
       authority.user,
       {

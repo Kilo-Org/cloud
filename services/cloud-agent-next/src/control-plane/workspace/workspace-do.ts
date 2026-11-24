@@ -142,10 +142,11 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
       throw error;
     }
     const secret = await this.secret();
-    const verified = await verifyKiloTokenForPolicy(live.token, secret, {
-      audience: 'kilo-api',
-      mode: 'required',
-    });
+    const verified = await verifyKiloTokenForPolicy(
+      live.token,
+      { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web', 'cloud-agent-next'] },
+      { audience: 'kilo-api', mode: 'required' }
+    );
     return signWorkspaceMcpGrant({
       record: live.record,
       pepper: verified.claims.apiTokenPepper ?? null,

@@ -147,7 +147,25 @@ export {
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
 export {
+  KILO_TOKEN_ISSUER_IDS,
+  KILO_TOKEN_ISSUERS,
   KILO_TOKEN_PURPOSES,
+} from './kilo-token-issuers.js';
+export type {
+  KiloTokenAcceptedIssuers,
+  KiloTokenIssuerId,
+  KiloTokenIssuerPolicy,
+  KiloTokenPurpose,
+} from './kilo-token-issuers.js';
+export { createLegacyHs256KiloTokenSigner } from './kilo-token-signer.js';
+export type { KiloTokenSigner } from './kilo-token-signer.js';
+export { verifyKiloTokenSignature } from './kilo-token-verification.js';
+export type {
+  KiloTokenKeyMaterial,
+  KiloTokenVerificationEvent,
+  KiloTokenVerifier,
+} from './kilo-token-verification.js';
+export {
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   buildModernKiloTokenPayload,
   signModernKiloToken,

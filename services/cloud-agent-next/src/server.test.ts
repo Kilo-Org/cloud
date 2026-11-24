@@ -1080,7 +1080,8 @@ describe('server runtime credential proxy', () => {
       await expect(
         verifyRuntimeProxyAttestation({
           value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-          secret,
+          keys: { legacyHs256Secret: secret },
+          acceptedIssuers: ['cloud-agent-next'],
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
@@ -1389,7 +1390,8 @@ describe('server runtime credential proxy', () => {
         await expect(
           verifyRuntimeProxyAttestation({
             value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-            secret,
+            keys: { legacyHs256Secret: secret },
+            acceptedIssuers: ['cloud-agent-next'],
             audience: 'kilo-api',
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',
@@ -1438,7 +1440,8 @@ describe('server runtime credential proxy', () => {
       await expect(
         verifyRuntimeProxyAttestation({
           value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-          secret,
+          keys: { legacyHs256Secret: secret },
+          acceptedIssuers: ['cloud-agent-next'],
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
@@ -1514,7 +1517,8 @@ describe('server runtime credential proxy', () => {
         expect(
           await verifyRuntimeProxyAttestation({
             value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-            secret,
+            keys: { legacyHs256Secret: secret },
+            acceptedIssuers: ['cloud-agent-next'],
             audience: 'session-ingest',
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',

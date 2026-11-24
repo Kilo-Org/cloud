@@ -66,10 +66,11 @@ export async function validateBalanceOnly(
     try {
       const secret = await resolveSecret(env.NEXTAUTH_SECRET);
       if (!secret) throw new Error();
-      const verified = await verifyKiloTokenForPolicy(token, secret, {
-        audience: 'kilo-api',
-        mode: 'required',
-      });
+      const verified = await verifyKiloTokenForPolicy(
+        token,
+        { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web', 'cloud-agent-next'] },
+        { audience: 'kilo-api', mode: 'required' }
+      );
       const authorization = verified.claims.runtimeAuthorization;
       if (
         !authorization ||

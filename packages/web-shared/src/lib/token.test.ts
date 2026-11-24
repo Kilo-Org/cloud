@@ -26,6 +26,11 @@ import {
   type JWTTokenPayload,
 } from './tokens';
 
+const kiloWebVerifier = {
+  keys: { legacyHs256Secret: NEXTAUTH_SECRET },
+  acceptedIssuers: ['kilo-web'] as const,
+};
+
 // Test fixtures
 const mockUser: User = {
   id: 'test-user-123',
@@ -140,12 +145,12 @@ describe('Token Functions', () => {
       expect(claims.apiTokenPepper).toBeUndefined();
       expect(claims.env).toBeUndefined();
       await expect(
-        verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+        verifyKiloTokenForResource(token, kiloWebVerifier, {
           audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
           mode: 'required',
         })
       ).resolves.toMatchObject({ kiloUserId: mockUser.id });
-      const auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+      const auth = await verifyKiloTokenForPolicy(token, kiloWebVerifier, {
         audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
         mode: 'required',
       });

@@ -19,7 +19,8 @@ export async function authenticateToken(
 ): Promise<AuthResult | null> {
   return verifyKiloBearerAgainstCurrentPepper({
     token,
-    nextAuthSecret: env.NEXTAUTH_SECRET,
+    keys: { legacyHs256Secret: env.NEXTAUTH_SECRET },
+    acceptedIssuers: ['kilo-web'],
     workerEnv: env.WORKER_ENV,
     connectionString: env.HYPERDRIVE.connectionString,
     resourceAudience: { audience: EVENT_SERVICE_AUDIENCE, mode: 'allow-legacy' },

@@ -8,8 +8,14 @@ import {
   verifyKiloToken,
   type SignKiloTokenExtra,
 } from './kilo-token.js';
+import type { KiloTokenVerifier } from './kilo-token-verification.js';
 
 const SECRET = 'test-secret-at-least-32-characters-long';
+
+const verifier: KiloTokenVerifier = {
+  keys: { legacyHs256Secret: SECRET },
+  acceptedIssuers: ['kilo-web'],
+};
 
 function encode(secret: string) {
   return new TextEncoder().encode(secret);
@@ -41,7 +47,7 @@ describe('signKiloToken', () => {
       },
     });
 
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
 
     expect(payload).toMatchObject({
       kiloUserId: 'user-123',
@@ -115,8 +121,8 @@ describe('signKiloToken', () => {
       expiresInSeconds: 60,
     });
 
-    const payloadWithEnv = await verifyKiloToken(withEnv.token, SECRET);
-    const payloadWithoutEnv = await verifyKiloToken(withoutEnv.token, SECRET);
+    const payloadWithEnv = await verifyKiloToken(withEnv.token, verifier);
+    const payloadWithoutEnv = await verifyKiloToken(withoutEnv.token, verifier);
 
     expect(payloadWithEnv.env).toBe('production');
     expect(payloadWithoutEnv.env).toBeUndefined();
@@ -129,7 +135,7 @@ describe('signKiloToken', () => {
       expiresInSeconds: 60,
     });
 
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
 
     expect('apiTokenPepper' in payload).toBe(false);
   });
@@ -160,7 +166,7 @@ describe('signKiloToken', () => {
       },
     });
 
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
 
     expect(kiloTokenPayload.parse(payload)).toEqual(payload);
   });
@@ -181,7 +187,7 @@ describe('signKiloToken', () => {
       },
     });
 
-    await expect(verifyKiloToken(token, SECRET)).resolves.toMatchObject({
+    await expect(verifyKiloToken(token, verifier)).resolves.toMatchObject({
       organizationRole: 'admin',
       runtimeAdmission: { source: 'user' },
     });
@@ -201,7 +207,7 @@ describe('signKiloToken', () => {
       expiresInSeconds: 60,
       extra: { runtimeAuthorization: claim },
     });
-    await expect(verifyKiloToken(token, SECRET)).resolves.toMatchObject({
+    await expect(verifyKiloToken(token, verifier)).resolves.toMatchObject({
       runtimeAuthorization: claim,
     });
 
@@ -222,7 +228,7 @@ describe('signKiloToken', () => {
       kiloUserId: 'user-runtime-claim',
       runtimeAuthorization: { ...claim, extraKey: true },
     });
-    await expect(verifyKiloToken(widened, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(widened, verifier)).rejects.toThrow();
   });
 
   it.each(ORGANIZATION_ROLES)('round-trips the %s organization role', async role => {
@@ -238,7 +244,7 @@ describe('signKiloToken', () => {
       },
     });
 
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
 
     expect(payload.organizationRole).toBe(role);
     expect(payload.orgMemberships?.[0]?.role).toBe(role);
@@ -248,7 +254,7 @@ describe('signKiloToken', () => {
 describe('verifyKiloToken', () => {
   it('accepts a valid version-3 token', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' });
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
     expect(payload.kiloUserId).toBe('user-123');
     expect(payload.version).toBe(KILO_TOKEN_VERSION);
   });
@@ -260,7 +266,7 @@ describe('verifyKiloToken', () => {
       apiTokenPepper: 'pepper-abc',
       organizationId: 'org-1',
     });
-    const payload = await verifyKiloToken(token, SECRET);
+    const payload = await verifyKiloToken(token, verifier);
     expect(payload.kiloUserId).toBe('user-456');
     // Extra claims survive the parse
     expect((payload as Record<string, unknown>).apiTokenPepper).toBe('pepper-abc');
@@ -269,17 +275,17 @@ describe('verifyKiloToken', () => {
 
   it('rejects wrong version', async () => {
     const token = await sign({ version: 2, kiloUserId: 'user-123' });
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
   });
 
   it('rejects token missing kiloUserId', async () => {
     const token = await sign({ version: 3 });
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
   });
 
   it('rejects empty kiloUserId', async () => {
     const token = await sign({ version: 3, kiloUserId: '' });
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
   });
 
   it('requires the expected audience when one is specified', async () => {
@@ -291,12 +297,14 @@ describe('verifyKiloToken', () => {
       .sign(encode(SECRET));
 
     await expect(
-      verifyKiloToken(token, SECRET, {
+      verifyKiloToken(token, verifier, {
         audience: 'git-token-service:bitbucket-repositories',
       })
     ).resolves.toMatchObject({ kiloUserId: 'user-123' });
-    await expect(verifyKiloToken(token, SECRET, { audience: 'another-service' })).rejects.toThrow();
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+    await expect(
+      verifyKiloToken(token, verifier, { audience: 'another-service' })
+    ).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
   });
 
   it('retains jose audience-array handling for the strict reader', async () => {
@@ -311,25 +319,28 @@ describe('verifyKiloToken', () => {
       .sign(encode(SECRET));
 
     await expect(
-      verifyKiloToken(token, SECRET, { audience: 'git-token-service:bitbucket-repositories' })
+      verifyKiloToken(token, verifier, { audience: 'git-token-service:bitbucket-repositories' })
     ).resolves.toMatchObject({ kiloUserId: 'user-123' });
-    await expect(verifyKiloToken(token, SECRET, { audience: 'other-service' })).rejects.toThrow();
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow('Unexpected token audience');
+    await expect(verifyKiloToken(token, verifier, { audience: 'other-service' })).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow('Unexpected token audience');
   });
 
   it('rejects wrong secret', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' });
     await expect(
-      verifyKiloToken(token, 'wrong-secret-that-is-at-least-32-chars')
+      verifyKiloToken(token, {
+        keys: { legacyHs256Secret: 'wrong-secret-that-is-at-least-32-chars' },
+        acceptedIssuers: ['kilo-web'],
+      })
     ).rejects.toThrow();
   });
 
   it('rejects expired token', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' }, SECRET, '0s');
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
   });
 
   it('rejects a non-JWT string', async () => {
-    await expect(verifyKiloToken('not.a.token', SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken('not.a.token', verifier)).rejects.toThrow();
   });
 });

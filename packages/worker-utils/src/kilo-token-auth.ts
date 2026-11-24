@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getCachedSecret } from './cached-secret';
 import { verifyKiloToken } from './kilo-token';
 import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
+import type { KiloTokenKeyMaterial, KiloTokenVerifier } from './kilo-token-verification';
 
 export type KiloBearerAuthResult = {
   userId: string;
@@ -13,6 +14,11 @@ export type KiloBearerAuthResult = {
 
 export type KiloSecretBinding = {
   get(): Promise<string | null>;
+};
+
+/** Key material whose legacy secret may still be an unresolved Secrets Store binding. */
+export type KiloTokenKeyMaterialSource = Omit<KiloTokenKeyMaterial, 'legacyHs256Secret'> & {
+  legacyHs256Secret: KiloSecretBinding | string;
 };
 
 /** Account availability: a block recorded in either column makes the account blocked. */
@@ -66,7 +72,9 @@ export async function findKiloUserPepper(
 export async function verifyKiloBearerAgainstCurrentPepper(
   params: {
     token: string | null;
-    nextAuthSecret: KiloSecretBinding | string;
+    keys: KiloTokenKeyMaterialSource;
+    acceptedIssuers: KiloTokenVerifier['acceptedIssuers'];
+    onVerification?: KiloTokenVerifier['onVerification'];
     workerEnv?: string;
     connectionString: string;
     getUserPepper?: GetKiloUserPepper;
@@ -80,10 +88,18 @@ export async function verifyKiloBearerAgainstCurrentPepper(
 
   const getUserPepper = params.getUserPepper ?? findKiloUserPepper;
 
-  const secret =
-    typeof params.nextAuthSecret === 'string'
-      ? params.nextAuthSecret
-      : await getCachedSecret(params.nextAuthSecret, 'NEXTAUTH_SECRET');
+  const { legacyHs256Secret, ...keys } = params.keys;
+  const verifier: KiloTokenVerifier = {
+    keys: {
+      ...keys,
+      legacyHs256Secret:
+        typeof legacyHs256Secret === 'string'
+          ? legacyHs256Secret
+          : await getCachedSecret(legacyHs256Secret, 'NEXTAUTH_SECRET'),
+    },
+    acceptedIssuers: params.acceptedIssuers,
+    onVerification: params.onVerification,
+  };
 
   let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
   try {
@@ -91,10 +107,10 @@ export async function verifyKiloBearerAgainstCurrentPepper(
       params.resourceAudience === undefined
         ? await verifyKiloToken(
             params.token,
-            secret,
+            verifier,
             params.audience ? { audience: params.audience } : undefined
           )
-        : await verifyKiloTokenForResource(params.token, secret, params.resourceAudience);
+        : await verifyKiloTokenForResource(params.token, verifier, params.resourceAudience);
   } catch {
     return null;
   }

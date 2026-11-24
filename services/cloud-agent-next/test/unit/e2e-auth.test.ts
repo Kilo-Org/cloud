@@ -69,7 +69,8 @@ describe('E2E API token', () => {
 
       const auth = {
         token,
-        nextAuthSecret: secret,
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['kilo-web'] as const,
         workerEnv: 'development',
         connectionString: 'unused',
         audience: 'cloud-agent-next',

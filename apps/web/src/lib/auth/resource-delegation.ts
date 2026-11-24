@@ -173,10 +173,11 @@ type VerifiedBearer = Extract<VerifiedKiloAuthContext, { type: 'bearer' }>;
  * failure policy: some return false, some throw unauthorized(), some rethrow.
  */
 async function verifyApiBearer(bearer: string): Promise<VerifiedBearer> {
-  return await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-    audience: KILO_API_AUDIENCE,
-    mode: 'allow-legacy',
-  });
+  return await verifyKiloTokenForPolicy(
+    bearer,
+    { keys: { legacyHs256Secret: NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+    { audience: KILO_API_AUDIENCE, mode: 'allow-legacy' }
+  );
 }
 
 /**

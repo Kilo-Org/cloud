@@ -18,6 +18,8 @@ const secret = 'runtime-proxy-attestation-secret';
 const now = new Date('2026-01-01T00:00:00.000Z');
 const input = {
   secret,
+  keys: { legacyHs256Secret: secret },
+  acceptedIssuers: ['cloud-agent-next'] as const,
   audience: 'kilo-api' as const,
   userId: 'usr_123',
   authorizationId: '11111111-1111-4111-8111-111111111111',

@@ -62,10 +62,11 @@ function parseExchange(body: unknown): Exchange | null {
 /** The user a Pages token names, or null when it is not a valid, unexpired token for `audience`. */
 async function userIdFromPagesToken(token: string, audience: string): Promise<string | null> {
   try {
-    const verified = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
-      audience,
-      mode: 'required',
-    });
+    const verified = await verifyKiloTokenForPolicy(
+      token,
+      { keys: { legacyHs256Secret: NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+      { audience, mode: 'required' }
+    );
     const { claims } = verified;
     if (
       claims.aud !== audience ||

@@ -478,10 +478,11 @@ async function verifyKiloApiBearer(requestHeaders: Headers) {
   if (!token) return null;
 
   try {
-    return await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
-      audience: KILO_API_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    return await verifyKiloTokenForPolicy(
+      token,
+      { keys: { legacyHs256Secret: NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+      { audience: KILO_API_AUDIENCE, mode: 'allow-legacy' }
+    );
   } catch {
     return null;
   }
@@ -613,7 +614,8 @@ async function resolveUserFromAuth(
       typeof decodedPayload?.kiloUserId === 'string'
         ? await verifyRuntimeProxyAttestation({
             value: headersList.get('X-Kilo-Runtime-Proxy-Attestation'),
-            secret: NEXTAUTH_SECRET,
+            keys: { legacyHs256Secret: NEXTAUTH_SECRET },
+            acceptedIssuers: ['cloud-agent-next'],
             audience: attestationAudience.data,
             userId: decodedPayload.kiloUserId,
             authorizationId: runtimeAuthorization.data.id,

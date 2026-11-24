@@ -56,10 +56,17 @@ it('issues a scoped short-lived development credential for the authenticated use
   const body = z
     .object({ token: z.string(), expiresAt: z.iso.datetime() })
     .parse(await response.json());
-  const credential = await verifyKiloTokenForPolicy(body.token, 'synthetic-preview-test-secret', {
-    audience: KILO_API_AUDIENCE,
-    mode: 'allow-legacy',
-  });
+  const credential = await verifyKiloTokenForPolicy(
+    body.token,
+    {
+      keys: { legacyHs256Secret: 'synthetic-preview-test-secret' },
+      acceptedIssuers: ['kilo-web'],
+    },
+    {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    }
+  );
 
   expect(credential.userId).toBe(user.id);
   expect(credential.claims).toMatchObject({

@@ -6,6 +6,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { KiloTokenVerifier } from '@kilocode/worker-utils/kilo-token-verification';
 
 export async function validateKiloToken(
   authHeader: string | null,
@@ -35,9 +36,14 @@ export async function validateKiloToken(
     return { success: false, error: 'Missing or malformed Authorization header' };
   }
 
+  const verifier: KiloTokenVerifier = {
+    keys: { legacyHs256Secret: secret },
+    acceptedIssuers: ['kilo-web', 'security-auto-analysis', 'webhook-agent-ingest'],
+  };
+
   const auth = await verifyKiloBearerAgainstCurrentPepper({
     token,
-    nextAuthSecret: secret,
+    ...verifier,
     connectionString,
     resourceAudience: { audience: CLOUD_AGENT_NEXT_AUDIENCE, mode: 'allow-legacy' },
     ...(workerEnv ? { workerEnv } : {}),
@@ -48,7 +54,7 @@ export async function validateKiloToken(
   }
 
   try {
-    const verified = await verifyKiloTokenForResource(token, secret, {
+    const verified = await verifyKiloTokenForResource(token, verifier, {
       audience: CLOUD_AGENT_NEXT_AUDIENCE,
       mode: 'allow-legacy',
     });

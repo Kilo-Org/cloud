@@ -1074,10 +1074,14 @@ describe('webhook trigger variant inputs', () => {
         expiresIn: tokens.TOKEN_EXPIRY.oneHour,
       });
       await expect(
-        verifyForResource(token, secret, {
-          audience: CLOUD_AGENT_NEXT_AUDIENCE,
-          mode: 'allow-legacy',
-        })
+        verifyForResource(
+          token,
+          { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web'] },
+          {
+            audience: CLOUD_AGENT_NEXT_AUDIENCE,
+            mode: 'allow-legacy',
+          }
+        )
       ).resolves.toMatchObject({
         kiloUserId: user.id,
         tokenSource: 'webhook-trigger',

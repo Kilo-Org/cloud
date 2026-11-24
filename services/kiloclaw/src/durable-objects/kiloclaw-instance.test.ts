@@ -2704,10 +2704,10 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(storage._store.get('kilocodeApiKey')).toBe(options.kilocodeApiKey);
     expect(storage._store.get('kilocodeApiKeyExpiresAt')).toBeTypeOf('string');
 
-    const payload = await verifyKiloToken(
-      options.kilocodeApiKey!,
-      'test-nextauth-secret-at-least-32-chars'
-    );
+    const payload = await verifyKiloToken(options.kilocodeApiKey!, {
+      keys: { legacyHs256Secret: 'test-nextauth-secret-at-least-32-chars' },
+      acceptedIssuers: ['kilo-web'],
+    });
     expect(payload.kiloUserId).toBe('user-1');
     expect(payload.apiTokenPepper).toBe('pepper-1');
     expect(payload.env).toBe('development');

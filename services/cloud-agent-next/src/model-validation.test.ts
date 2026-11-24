@@ -371,7 +371,8 @@ describe('modern model validation trust boundary', () => {
       expect(init?.redirect).toBe('manual');
       expect(
         await verifyRuntimeProxyAttestation({
-          secret,
+          keys: { legacyHs256Secret: secret },
+          acceptedIssuers: ['cloud-agent-next'],
           audience: organizationId ? 'kilo-api' : 'kilo-gateway',
           userId: 'oauth/test',
           authorizationId,

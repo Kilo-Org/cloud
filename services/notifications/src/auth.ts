@@ -28,7 +28,8 @@ export const authMiddleware = createMiddleware<{
   try {
     const auth = await verifyKiloBearerAgainstCurrentPepper({
       token,
-      nextAuthSecret: c.env.NEXTAUTH_SECRET,
+      keys: { legacyHs256Secret: c.env.NEXTAUTH_SECRET },
+      acceptedIssuers: ['kilo-web'],
       workerEnv: c.env.WORKER_ENV,
       connectionString: c.env.HYPERDRIVE.connectionString,
       resourceAudience: { audience: NOTIFICATIONS_AUDIENCE, mode: 'allow-legacy' },

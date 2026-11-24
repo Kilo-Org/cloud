@@ -9,6 +9,7 @@ import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
+  type KiloTokenVerifier,
 } from './kilo-token-verification';
 
 export { KILO_TOKEN_VERSION };
@@ -134,10 +135,10 @@ export async function signKiloToken(params: {
  */
 export async function verifyKiloToken(
   token: string,
-  secret: string,
+  verifier: KiloTokenVerifier,
   options?: { audience?: string }
 ): Promise<KiloTokenPayload> {
-  const { payload } = await verifyKiloTokenSignature(token, secret, {
+  const { payload } = await verifyKiloTokenSignature(token, verifier, {
     audience: options?.audience,
   });
   if (options?.audience === undefined && payload.aud !== undefined) {

@@ -5,6 +5,7 @@ import {
   KILO_API_AUDIENCE,
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   isKiloCredentialExchangeEligible,
+  type KiloTokenVerifier,
   signKiloToken,
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils';
@@ -13,6 +14,11 @@ import { apiTokenSigningParams, DEFAULT_EXPIRES_DAYS } from '../app/api-token';
 import { seedTokenSigningParams } from './token-signing';
 
 const TEST_SECRET = 'api-token-shape-test-secret';
+
+const verifier: KiloTokenVerifier = {
+  keys: { legacyHs256Secret: TEST_SECRET },
+  acceptedIssuers: ['kilo-web'],
+};
 
 // The auth policy (getResourceDelegationAuthority in apps/web) verifies a
 // legacy bearer token with `claims.env === process.env.NODE_ENV` and
@@ -36,7 +42,7 @@ test('the default seed token carries the shape the policy accepts', async () => 
     secret: TEST_SECRET,
     ...params,
   });
-  const auth = await verifyKiloTokenForPolicy(token, TEST_SECRET, {
+  const auth = await verifyKiloTokenForPolicy(token, verifier, {
     audience: KILO_API_AUDIENCE,
     mode: 'allow-legacy',
   });
@@ -63,7 +69,7 @@ test('a short-lived dev token is exchange-ineligible (the broken pre-fix shape)'
     secret: TEST_SECRET,
     ...params,
   });
-  const auth = await verifyKiloTokenForPolicy(token, TEST_SECRET, {
+  const auth = await verifyKiloTokenForPolicy(token, verifier, {
     audience: KILO_API_AUDIENCE,
     mode: 'allow-legacy',
   });
@@ -85,7 +91,7 @@ test('seed signing params supply the local development env', async () => {
       secret: TEST_SECRET,
       ...params,
     });
-    const auth = await verifyKiloTokenForPolicy(token, TEST_SECRET, {
+    const auth = await verifyKiloTokenForPolicy(token, verifier, {
       audience: KILO_API_AUDIENCE,
       mode: 'allow-legacy',
     });

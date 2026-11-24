@@ -244,7 +244,8 @@ describe('null-pepper personal webhook compatibility', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: secret,
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['kilo-web'],
         connectionString: 'unused',
         resourceAudience: { audience: 'cloud-agent-next', mode: 'allow-legacy' },
         getUserPepper: async () => ({ pepper: null, blocked: false }),

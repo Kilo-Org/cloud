@@ -34,9 +34,11 @@ async function authenticatedUserId(request: Request, env: ExportEnv): Promise<st
   const token = extractBearerToken(request.headers.get('authorization'));
   if (!token) return null;
   try {
-    const payload = await verifyKiloToken(token, env.NEXTAUTH_SECRET, {
-      audience: USER_DATA_EXPORT_AUDIENCE,
-    });
+    const payload = await verifyKiloToken(
+      token,
+      { keys: { legacyHs256Secret: env.NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+      { audience: USER_DATA_EXPORT_AUDIENCE }
+    );
     const now = Math.floor(Date.now() / 1000);
     if (
       payload.iat === undefined ||

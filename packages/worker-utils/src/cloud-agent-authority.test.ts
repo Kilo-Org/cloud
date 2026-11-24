@@ -22,9 +22,14 @@ import {
   verifyKiloTokenForResource,
 } from './kilo-token-policy';
 import { verifyKiloToken } from './kilo-token';
+import type { KiloTokenVerifier } from './kilo-token-verification';
 
 const now = 1_900_000_000;
 const secret = 'fixture-only-cloud-agent-authority-secret';
+const verifier: KiloTokenVerifier = {
+  keys: { legacyHs256Secret: secret },
+  acceptedIssuers: ['kilo-web'],
+};
 const organizationId = '11111111-1111-4111-8111-111111111111';
 const scope: CloudAgentAuthority = {
   version: 1,
@@ -932,7 +937,7 @@ describe('environment setup authority', () => {
 
 describe('scoped JWT policy', () => {
   it('retains verified scope and cannot exchange for a human credential', async () => {
-    const auth = await verifyKiloTokenForPolicy(await sign(claims()), secret, {
+    const auth = await verifyKiloTokenForPolicy(await sign(claims()), verifier, {
       audience: 'kilo-api',
       mode: 'required',
     });
@@ -972,30 +977,30 @@ describe('scoped JWT policy', () => {
   ])('all verification paths reject widened claims %j', async overrides => {
     const token = await sign(claims(overrides));
     await expect(
-      verifyKiloTokenForPolicy(token, secret, { audience: 'kilo-api', mode: 'allow-legacy' })
+      verifyKiloTokenForPolicy(token, verifier, { audience: 'kilo-api', mode: 'allow-legacy' })
     ).rejects.toThrow();
     await expect(
-      verifyKiloTokenForResource(token, secret, { audience: 'kilo-api', mode: 'allow-legacy' })
+      verifyKiloTokenForResource(token, verifier, { audience: 'kilo-api', mode: 'allow-legacy' })
     ).rejects.toThrow();
-    await expect(verifyKiloToken(token, secret, { audience: 'kilo-api' })).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier, { audience: 'kilo-api' })).rejects.toThrow();
   });
   it('keeps a session-length credential valid after fifteen minutes', async () => {
     const token = await sign(claims({ iat: now - 1 }));
     vi.setSystemTime(new Date((now + 3600) * 1000));
     await expect(
-      verifyKiloTokenForPolicy(token, secret, { audience: 'kilo-api', mode: 'required' })
+      verifyKiloTokenForPolicy(token, verifier, { audience: 'kilo-api', mode: 'required' })
     ).resolves.toMatchObject({ claims: { cloudAgentAuthority: scope } });
   });
   it('rejects forged and expired credentials without downgrade', async () => {
     await expect(
-      verifyKiloTokenForPolicy(await sign(claims(), 'forged-fixture-secret'), secret, {
+      verifyKiloTokenForPolicy(await sign(claims(), 'forged-fixture-secret'), verifier, {
         audience: 'kilo-api',
         mode: 'allow-legacy',
       })
     ).rejects.toThrow();
     vi.setSystemTime(new Date(scope.expiresAt * 1000));
     await expect(
-      verifyKiloTokenForPolicy(await sign(claims()), secret, {
+      verifyKiloTokenForPolicy(await sign(claims()), verifier, {
         audience: 'kilo-api',
         mode: 'allow-legacy',
       })

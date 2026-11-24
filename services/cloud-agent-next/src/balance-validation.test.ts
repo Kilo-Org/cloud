@@ -68,7 +68,8 @@ describe('balance-validation', () => {
         const headers = new Headers(init.headers);
         expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
         const result = await verifyRuntimeProxyAttestation({
-          secret: 'test-secret',
+          keys: { legacyHs256Secret: 'test-secret' },
+          acceptedIssuers: ['cloud-agent-next'],
           audience: 'kilo-api',
           userId: 'user_123',
           bearer: token,
@@ -131,12 +132,16 @@ describe('balance-validation', () => {
           const headers = new Headers(init.headers);
           const bearer = headers.get('Authorization')?.slice('Bearer '.length) ?? '';
           try {
-            await verifyKiloTokenForPolicy(bearer, 'test-secret', {
-              audience: url.endsWith('/api/cloud-agent-next/balance')
-                ? 'cloud-agent-next'
-                : 'kilo-api',
-              mode: 'required',
-            });
+            await verifyKiloTokenForPolicy(
+              bearer,
+              { keys: { legacyHs256Secret: 'test-secret' }, acceptedIssuers: ['kilo-web'] },
+              {
+                audience: url.endsWith('/api/cloud-agent-next/balance')
+                  ? 'cloud-agent-next'
+                  : 'kilo-api',
+                mode: 'required',
+              }
+            );
             return Response.json({ balance: 10, isDepleted: false });
           } catch {
             return new Response('Unauthorized', { status: 401 });

@@ -1,6 +1,6 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
-import { verifyKiloTokenSignature } from './kilo-token-verification';
+import { verifyKiloTokenSignature, type KiloTokenVerifier } from './kilo-token-verification';
 import { Sha256HexDigestSchema } from './runtime-authorization-contract';
 import { sha256Hex } from './sha256';
 
@@ -62,7 +62,6 @@ function signingKey(secret: string): Uint8Array {
 }
 
 export type RuntimeProxyAttestationSubject = {
-  secret: string;
   audience: RuntimeProxyAttestationAudience;
   userId: string;
   authorizationId: string;
@@ -72,7 +71,7 @@ export type RuntimeProxyAttestationSubject = {
 };
 
 export async function issueRuntimeProxyAttestation(
-  input: RuntimeProxyAttestationSubject
+  input: RuntimeProxyAttestationSubject & { secret: string }
 ): Promise<string> {
   const now = input.now ?? new Date();
   const issuedAt = Math.floor(now.getTime() / 1000);
@@ -100,11 +99,11 @@ export async function issueRuntimeProxyAttestation(
 }
 
 export async function verifyRuntimeProxyAttestation(
-  input: RuntimeProxyAttestationSubject & { value: string | null | undefined }
+  input: RuntimeProxyAttestationSubject & KiloTokenVerifier & { value: string | null | undefined }
 ): Promise<boolean> {
   if (!input.value || input.value.length > RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH) return false;
   try {
-    const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {
+    const { payload } = await verifyKiloTokenSignature(input.value, input, {
       issuer: RUNTIME_PROXY_ATTESTATION_ISSUER,
       audience: input.audience,
       currentDate: input.now,

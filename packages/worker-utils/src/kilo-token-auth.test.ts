@@ -33,7 +33,8 @@ async function signToken(params: {
 function verifyToken(token: string | null) {
   return verifyKiloBearerAgainstCurrentPepper({
     token,
-    nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+    keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+    acceptedIssuers: ['kilo-web'],
     workerEnv: 'production',
     connectionString: 'postgres://test',
     getUserPepper,
@@ -65,7 +66,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'production',
         connectionString: 'postgres://test',
         getUserPepper: async () => {
@@ -81,11 +83,14 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: {
-          get: async () => {
-            throw new Error('secrets store unavailable');
+        keys: {
+          legacyHs256Secret: {
+            get: async () => {
+              throw new Error('secrets store unavailable');
+            },
           },
         },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'production',
         connectionString: 'postgres://test',
         getUserPepper,
@@ -108,7 +113,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
         token: await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' }).then(
           ({ token }) => token
         ),
-        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'production',
         connectionString: 'postgres://test',
         getUserPepper: async () => null,
@@ -163,7 +169,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+        acceptedIssuers: ['kilo-web'],
         connectionString: 'postgres://test',
         getUserPepper,
       })
@@ -176,7 +183,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+        keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'staging',
         connectionString: 'postgres://test',
         getUserPepper,
@@ -198,7 +206,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: TEST_JWT_SECRET,
+        keys: { legacyHs256Secret: TEST_JWT_SECRET },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'production',
         connectionString: 'postgres://test',
         getUserPepper: async (...args) => {
@@ -241,7 +250,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
       audience: 'other-resource',
     });
     const params = {
-      nextAuthSecret: TEST_JWT_SECRET,
+      keys: { legacyHs256Secret: TEST_JWT_SECRET },
+      acceptedIssuers: ['kilo-web'],
       workerEnv: 'production',
       connectionString: 'postgres://test',
       audience: 'resource-audience',
@@ -278,7 +288,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     });
     const params = {
       token,
-      nextAuthSecret: TEST_JWT_SECRET,
+      keys: { legacyHs256Secret: TEST_JWT_SECRET },
+      acceptedIssuers: ['kilo-web'] as const,
       workerEnv: 'production',
       connectionString: 'postgres://test',
     };
@@ -339,7 +350,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
       }),
     ]);
     const params = {
-      nextAuthSecret: TEST_JWT_SECRET,
+      keys: { legacyHs256Secret: TEST_JWT_SECRET },
+      acceptedIssuers: ['kilo-web'] as const,
       workerEnv: 'production',
       connectionString: 'postgres://test',
       getUserPepper,
@@ -369,7 +381,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     });
     const params = {
       token,
-      nextAuthSecret: TEST_JWT_SECRET,
+      keys: { legacyHs256Secret: TEST_JWT_SECRET },
+      acceptedIssuers: ['kilo-web'] as const,
       workerEnv: 'production',
       connectionString: 'postgres://test',
       resourceAudience: { audience: 'resource-audience', mode: 'required' } as const,
@@ -413,7 +426,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
       await expect(
         verifyKiloBearerAgainstCurrentPepper({
           token,
-          nextAuthSecret: TEST_JWT_SECRET,
+          keys: { legacyHs256Secret: TEST_JWT_SECRET },
+          acceptedIssuers: ['kilo-web'],
           workerEnv: 'production',
           connectionString: 'postgres://test',
           getUserPepper,
@@ -437,7 +451,12 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: { get: async () => Promise.reject(new Error('secrets store unavailable')) },
+        keys: {
+          legacyHs256Secret: {
+            get: async () => Promise.reject(new Error('secrets store unavailable')),
+          },
+        },
+        acceptedIssuers: ['kilo-web'],
         workerEnv: 'production',
         connectionString: 'postgres://test',
         getUserPepper: async (...args) => {
@@ -462,7 +481,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: TEST_JWT_SECRET,
+        keys: { legacyHs256Secret: TEST_JWT_SECRET },
+        acceptedIssuers: ['kilo-web'],
         connectionString: 'postgres://test',
         getUserPepper: async () => Promise.reject(new Error('connection refused')),
         resourceAudience: { audience: 'resource-audience', mode: 'required' },
@@ -474,7 +494,8 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     await expect(
       verifyKiloBearerAgainstCurrentPepper({
         token: null,
-        nextAuthSecret: TEST_JWT_SECRET,
+        keys: { legacyHs256Secret: TEST_JWT_SECRET },
+        acceptedIssuers: ['kilo-web'],
         connectionString: 'postgres://test',
         audience: 'legacy-audience',
         resourceAudience: { audience: 'resource-audience', mode: 'required' },
@@ -505,7 +526,8 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
   function verifyInternalToken(token: string, workerEnv?: string) {
     return verifyKiloBearerAgainstCurrentPepper({
       token,
-      nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+      keys: { legacyHs256Secret: { get: async () => TEST_JWT_SECRET } },
+      acceptedIssuers: ['kilo-web'],
       ...(workerEnv ? { workerEnv } : {}),
       connectionString: 'postgres://test',
       getUserPepper,

@@ -52,10 +52,11 @@ export async function validateKiloToken(
   }
 
   try {
-    const raw = await verifyKiloTokenForResource(token, secret, {
-      audience: AI_ATTRIBUTION_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    const raw = await verifyKiloTokenForResource(
+      token,
+      { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web'] },
+      { audience: AI_ATTRIBUTION_AUDIENCE, mode: 'allow-legacy' }
+    );
     const payload = OrganizationJWTPayload.parse(raw);
 
     return {

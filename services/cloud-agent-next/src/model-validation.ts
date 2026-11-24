@@ -299,7 +299,11 @@ async function attestCatalogContext(
   if (!secret) throw deny();
   try {
     const audience = context.organizationId ? 'kilo-api' : 'kilo-gateway';
-    const verified = await verifyKiloTokenForPolicy(token, secret, { audience, mode: 'required' });
+    const verified = await verifyKiloTokenForPolicy(
+      token,
+      { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web', 'cloud-agent-next'] },
+      { audience, mode: 'required' }
+    );
     if (verified.claims.organizationId !== context.organizationId) throw deny();
     const authorization = verified.claims.runtimeAuthorization;
     if (!authorization || authorization.resourceKind !== 'cloud-agent-next') throw deny();

@@ -60,6 +60,10 @@ import {
 
 const boundedTokenFlag = 'BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED';
 const originalBoundedTokenFlag = process.env[boundedTokenFlag];
+const kiloWebVerifier = {
+  keys: { legacyHs256Secret: NEXTAUTH_SECRET },
+  acceptedIssuers: ['kilo-web'] as const,
+};
 const userId = 'bounded-assertion-user';
 const organizationId = '11111111-1111-4111-8111-111111111111';
 const integrationId = '22222222-2222-4222-8222-222222222222';
@@ -375,19 +379,19 @@ describe('bounded Worker assertions', () => {
             credentialExchange: false,
           });
           await expect(
-            verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+            verifyKiloTokenForResource(token, kiloWebVerifier, {
               audience: operation.audience,
               mode: 'required',
             })
           ).resolves.toMatchObject({ kiloUserId: userId });
-          const auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+          const auth = await verifyKiloTokenForPolicy(token, kiloWebVerifier, {
             audience: operation.audience,
             mode: 'required',
           });
           expect(isKiloCredentialExchangeEligible(auth, { legacy: 'five-year-api' })).toBe(false);
           for (const otherAudience of ['kilo-api', 'kilo-gateway']) {
             await expect(
-              verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+              verifyKiloTokenForResource(token, kiloWebVerifier, {
                 audience: otherAudience,
                 mode: 'allow-legacy',
               })
@@ -399,12 +403,12 @@ describe('bounded Worker assertions', () => {
           if (operation.legacyAudience) {
             expect(claims.aud).toBe(operation.audience);
             await expect(
-              verifyKiloToken(token, NEXTAUTH_SECRET, { audience: operation.audience })
+              verifyKiloToken(token, kiloWebVerifier, { audience: operation.audience })
             ).resolves.toMatchObject({ kiloUserId: userId });
           } else {
             expect(claims.aud).toBeUndefined();
             await expect(
-              verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+              verifyKiloTokenForResource(token, kiloWebVerifier, {
                 audience: operation.audience,
                 mode: 'allow-legacy',
               })

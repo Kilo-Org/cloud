@@ -12,6 +12,7 @@ import {
   type VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 import { verifyKiloToken } from './kilo-token.js';
+import type { KiloTokenVerifier } from './kilo-token-verification.js';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
@@ -26,6 +27,10 @@ import {
 } from './internal-service-token-audiences.js';
 
 const SECRET = 'synthetic-policy-test-secret-at-least-32-chars';
+const verifier: KiloTokenVerifier = {
+  keys: { legacyHs256Secret: SECRET },
+  acceptedIssuers: ['kilo-web'],
+};
 const NOW = new Date('2030-01-02T03:04:05.000Z');
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
 const HISTORICAL_FIVE_YEAR_LIFETIMES = [157_680_000, 157_788_000] as const;
@@ -98,7 +103,7 @@ describe('verifyKiloTokenForPolicy', () => {
       legacyClaims({ aud: ['kilo-api', 'kilo-gateway'], deviceSessionId: 'device-session' })
     );
 
-    const context = await verifyKiloTokenForPolicy(token, SECRET, API_POLICY);
+    const context = await verifyKiloTokenForPolicy(token, verifier, API_POLICY);
 
     expect(context).toMatchObject({ type: 'bearer', userId: 'synthetic-user' });
     expect(context.claims).toMatchObject({
@@ -117,7 +122,7 @@ describe('verifyKiloTokenForPolicy', () => {
       vi.setSystemTime(NOW);
       const context = await verifyKiloTokenForPolicy(
         await sign(legacyClaims({ futureAutomation: value })),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       );
 
@@ -139,7 +144,7 @@ describe('verifyKiloTokenForPolicy', () => {
           futureCredentialRestriction: true,
         })
       ),
-      SECRET,
+      verifier,
       API_POLICY
     );
 
@@ -152,7 +157,7 @@ describe('verifyKiloTokenForPolicy', () => {
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ orgMemberships: [{ orgId: 'synthetic-org', role: 'member' }] })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
 
@@ -174,7 +179,7 @@ describe('verifyKiloTokenForPolicy', () => {
     const token = await sign(legacyClaims({ aud: 'kilo-gateway' }));
 
     await expect(
-      verifyKiloTokenForPolicy(token, SECRET, { audience: 'kilo-gateway', mode: 'required' })
+      verifyKiloTokenForPolicy(token, verifier, { audience: 'kilo-gateway', mode: 'required' })
     ).resolves.toMatchObject({ type: 'bearer' });
   });
 
@@ -201,22 +206,22 @@ describe('verifyKiloTokenForPolicy', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const token = await sign(legacyClaims({ aud: audience }));
-    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
-    await expect(verifyKiloToken(token, SECRET, { audience })).resolves.toMatchObject({
+    await expect(verifyKiloToken(token, verifier)).rejects.toThrow();
+    await expect(verifyKiloToken(token, verifier, { audience })).resolves.toMatchObject({
       kiloUserId: 'synthetic-user',
     });
     await expect(
-      verifyKiloToken(await sign(legacyClaims()), SECRET, { audience })
+      verifyKiloToken(await sign(legacyClaims()), verifier, { audience })
     ).rejects.toThrow();
     await expect(
-      verifyKiloTokenForPolicy(token, SECRET, { audience, mode: 'required' })
+      verifyKiloTokenForPolicy(token, verifier, { audience, mode: 'required' })
     ).resolves.toMatchObject({ type: 'bearer' });
-    await expect(verifyKiloTokenForPolicy(token, SECRET, API_POLICY)).rejects.toThrow();
+    await expect(verifyKiloTokenForPolicy(token, verifier, API_POLICY)).rejects.toThrow();
     await expect(
-      verifyKiloTokenForPolicy(await sign(legacyClaims()), SECRET, { audience, mode: 'required' })
+      verifyKiloTokenForPolicy(await sign(legacyClaims()), verifier, { audience, mode: 'required' })
     ).rejects.toThrow();
     await expect(
-      verifyKiloTokenForPolicy(await sign(legacyClaims()), SECRET, {
+      verifyKiloTokenForPolicy(await sign(legacyClaims()), verifier, {
         audience,
         mode: 'allow-legacy',
       })
@@ -286,7 +291,7 @@ describe('verifyKiloTokenForPolicy', () => {
             'string expiration',
           ].includes(_name),
         }),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       )
     ).rejects.toThrow();
@@ -298,28 +303,28 @@ describe('verifyKiloTokenForPolicy', () => {
     await expect(
       verifyKiloTokenForPolicy(
         await sign(legacyClaims({ exp: NOW_SECONDS - 1 })),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForPolicy(
         await sign(legacyClaims(), { nbf: NOW_SECONDS + 1 }),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForPolicy(
         await sign(legacyClaims(), { secret: 'another-synthetic-test-secret-at-least-32' }),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForPolicy(
         await sign(legacyClaims(), { algorithm: 'HS384' }),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       )
     ).rejects.toThrow();
@@ -358,7 +363,7 @@ describe('verifyKiloTokenForResource', () => {
   ])('handles %s', async (_name, claims, policy, allowed) => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    const verification = verifyKiloTokenForResource(await sign(claims), SECRET, policy);
+    const verification = verifyKiloTokenForResource(await sign(claims), verifier, policy);
     if (allowed) {
       await expect(verification).resolves.toMatchObject({ kiloUserId: 'synthetic-user' });
     } else {
@@ -372,7 +377,7 @@ describe('verifyKiloTokenForResource', () => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW);
       await expect(
-        verifyKiloTokenForResource(await sign(legacyClaims({ aud: 'kilo-api' })), SECRET, {
+        verifyKiloTokenForResource(await sign(legacyClaims({ aud: 'kilo-api' })), verifier, {
           audience,
           mode: 'required',
         })
@@ -395,7 +400,7 @@ describe('verifyKiloTokenForResource', () => {
           ignoredFutureResourceClaim: true,
         })
       ),
-      SECRET,
+      verifier,
       API_POLICY
     );
 
@@ -415,7 +420,7 @@ describe('verifyKiloTokenForResource', () => {
     vi.setSystemTime(NOW);
     const undated = await verifyKiloTokenForResource(
       await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' }, { dates: false }),
-      SECRET,
+      verifier,
       API_POLICY
     );
     expect(undated).not.toHaveProperty('iat');
@@ -423,14 +428,14 @@ describe('verifyKiloTokenForResource', () => {
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api', iat: NOW_SECONDS + 1, exp: NOW_SECONDS + 10 })),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).resolves.toMatchObject({ iat: NOW_SECONDS + 1 });
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api', exp: NOW_SECONDS + 1.5 })),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).resolves.toMatchObject({ exp: NOW_SECONDS + 1.5 });
@@ -439,37 +444,37 @@ describe('verifyKiloTokenForResource', () => {
   it('rejects malformed, expired, not-before, signature, version, and user failures', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    await expect(verifyKiloTokenForResource('not.a.token', SECRET, API_POLICY)).rejects.toThrow();
+    await expect(verifyKiloTokenForResource('not.a.token', verifier, API_POLICY)).rejects.toThrow();
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api', exp: NOW_SECONDS - 1 })),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api' }), { nbf: NOW_SECONDS + 1 }),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api' }), { secret: 'another-secret' }),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).rejects.toThrow();
     await expect(
       verifyKiloTokenForResource(
         await sign({ version: 2, kiloUserId: 'synthetic-user', aud: 'kilo-api' }),
-        SECRET,
+        verifier,
         API_POLICY
       )
     ).rejects.toThrow();
     await expect(
-      verifyKiloTokenForResource(await sign({ version: 3, aud: 'kilo-api' }), SECRET, API_POLICY)
+      verifyKiloTokenForResource(await sign({ version: 3, aud: 'kilo-api' }), verifier, API_POLICY)
     ).rejects.toThrow();
   });
 });
@@ -504,7 +509,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.setSystemTime(NOW);
     const bearer = await verifyKiloTokenForPolicy(
       await sign(legacyClaims()),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(bearer, { legacy: 'five-year-api' })).toBe(true);
@@ -547,7 +552,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       expect(LEGACY_API_TOKEN_LIFETIMES_SECONDS).toContain(lifetime);
       const valid = await verifyKiloTokenForPolicy(
         await sign(legacyClaims({ exp: NOW_SECONDS + lifetime })),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       );
       const nearExpiry = await verifyKiloTokenForPolicy(
@@ -557,7 +562,7 @@ describe('isKiloCredentialExchangeEligible', () => {
             exp: NOW_SECONDS + 1,
           })
         ),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       );
       expect(isKiloCredentialExchangeEligible(valid, { legacy: 'five-year-api' })).toBe(true);
@@ -577,7 +582,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ exp: NOW_SECONDS + lifetime })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
@@ -598,7 +603,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       vi.setSystemTime(NOW);
       const context = await verifyKiloTokenForPolicy(
         await sign(legacyClaims({ [marker]: value })),
-        SECRET,
+        verifier,
         LEGACY_POLICY
       );
       expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
@@ -610,7 +615,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ iat: NOW_SECONDS - 1, exp: NOW_SECONDS + 157_680_000 })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(context.claims.exp - context.claims.iat).toBe(157_680_001);
@@ -639,7 +644,7 @@ describe('isKiloCredentialExchangeEligible', () => {
             : 'present';
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ [marker]: value })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
@@ -650,7 +655,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ deviceSessionId: '11111111-1111-4111-8111-111111111111' })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(true);
@@ -667,7 +672,7 @@ describe('isKiloCredentialExchangeEligible', () => {
           tokenSource: 'cloud-agent',
         })
       ),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
@@ -678,12 +683,12 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.setSystemTime(NOW);
     const pepperless = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ apiTokenPepper: undefined })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     const deviceCode = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ deviceAuthRequestCode: 'request-code' })),
-      SECRET,
+      verifier,
       LEGACY_POLICY
     );
     expect(isKiloCredentialExchangeEligible(pepperless, { legacy: 'five-year-api' })).toBe(false);
@@ -702,7 +707,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       tokenPurpose: 'human-api',
       credentialExchange: true,
     });
-    const context = await verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY);
+    const context = await verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY);
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(true);
     vi.setSystemTime(new Date((NOW_SECONDS + 1) * 1000));
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(false);
@@ -720,23 +725,23 @@ describe('isKiloCredentialExchangeEligible', () => {
       tokenPurpose: 'human-api',
       credentialExchange: true,
     });
-    const context = await verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY);
+    const context = await verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY);
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(true);
     const multipleAudiences = await verifyKiloTokenForPolicy(
       await sign({ ...claims, aud: ['kilo-api', 'kilo-gateway'] }),
-      SECRET,
+      verifier,
       API_POLICY
     );
     expect(isKiloCredentialExchangeEligible(multipleAudiences, { legacy: 'deny' })).toBe(false);
     const singletonArray = await verifyKiloTokenForPolicy(
       await sign({ ...claims, aud: ['kilo-api'] }),
-      SECRET,
+      verifier,
       API_POLICY
     );
     expect(isKiloCredentialExchangeEligible(singletonArray, { legacy: 'deny' })).toBe(true);
     const wrongAudience = await verifyKiloTokenForPolicy(
       await sign({ ...claims, aud: 'kilo-gateway' }),
-      SECRET,
+      verifier,
       { audience: 'kilo-gateway', mode: 'required' }
     );
     expect(isKiloCredentialExchangeEligible(wrongAudience, { legacy: 'deny' })).toBe(false);
@@ -785,7 +790,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       credentialExchange: true,
       extra: { deviceAuthRequestCode: 'synthetic-request-code' },
     });
-    const context = await verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY);
+    const context = await verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY);
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(true);
   });
 
@@ -807,7 +812,7 @@ describe('isKiloCredentialExchangeEligible', () => {
         orgMemberships: undefined,
       },
     });
-    const context = await verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY);
+    const context = await verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY);
     expect(context.claimNames).not.toContain('tokenSource');
     expect(context.claimNames).not.toContain('botId');
     expect(context.claimNames).not.toContain('internalApiUse');
@@ -830,7 +835,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     });
 
     await expect(
-      verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY)
+      verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY)
     ).resolves.toMatchObject({
       userId: 'synthetic-user',
       claims: { botId: 'synthetic-bot', tokenSource: 'automation' },
@@ -844,7 +849,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       vi.setSystemTime(NOW);
       const context = await verifyKiloTokenForPolicy(
         await sign(legacyClaims({ aud: 'kilo-api', tokenPurpose, credentialExchange: false })),
-        SECRET,
+        verifier,
         API_POLICY
       );
       expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
@@ -867,7 +872,7 @@ describe('isKiloCredentialExchangeEligible', () => {
       tokenSource: '',
     });
     for (const claims of [human, audienceOnly, marked]) {
-      const context = await verifyKiloTokenForPolicy(await sign(claims), SECRET, API_POLICY);
+      const context = await verifyKiloTokenForPolicy(await sign(claims), verifier, API_POLICY);
       expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
     }
   });
@@ -888,7 +893,7 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     });
     expect(payload).toMatchObject({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' });
     await expect(
-      verifyKiloTokenForPolicy(await sign(payload), SECRET, API_POLICY)
+      verifyKiloTokenForPolicy(await sign(payload), verifier, API_POLICY)
     ).resolves.toMatchObject({ userId: 'synthetic-user' });
   });
 
@@ -977,12 +982,12 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const audienceToken = await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' });
-    await expect(verifyKiloToken(audienceToken, SECRET)).rejects.toThrow();
+    await expect(verifyKiloToken(audienceToken, verifier)).rejects.toThrow();
     await expect(
-      verifyKiloToken(audienceToken, SECRET, { audience: 'kilo-api' })
+      verifyKiloToken(audienceToken, verifier, { audience: 'kilo-api' })
     ).resolves.toMatchObject({ kiloUserId: 'synthetic-user' });
     await expect(
-      verifyKiloTokenForPolicy(audienceToken, SECRET, API_POLICY)
+      verifyKiloTokenForPolicy(audienceToken, verifier, API_POLICY)
     ).resolves.toMatchObject({ userId: 'synthetic-user' });
     const noDates = await new SignJWT({
       version: 3,
@@ -991,11 +996,11 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .sign(key());
-    await expect(verifyKiloToken(noDates, SECRET)).resolves.toEqual({
+    await expect(verifyKiloToken(noDates, verifier)).resolves.toEqual({
       version: 3,
       kiloUserId: 'synthetic-user',
     });
-    await expect(verifyKiloTokenForPolicy(noDates, SECRET, LEGACY_POLICY)).rejects.toThrow();
+    await expect(verifyKiloTokenForPolicy(noDates, verifier, LEGACY_POLICY)).rejects.toThrow();
   });
 });
 
@@ -1068,7 +1073,7 @@ describe('signModernKiloToken', () => {
       credentialExchange: false,
       extra: { tokenSource: 'git-token-service' },
     });
-    const context = await verifyKiloTokenForPolicy(token, SECRET, {
+    const context = await verifyKiloTokenForPolicy(token, verifier, {
       audience: 'git-token-service:internal',
       mode: 'required',
     });

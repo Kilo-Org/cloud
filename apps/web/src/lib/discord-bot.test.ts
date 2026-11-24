@@ -392,10 +392,14 @@ describe('processDiscordBotMessage session start authorization', () => {
       jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
         const bearer = new Headers(init?.headers).get('authorization')?.replace(/^Bearer /, '');
         if (!bearer) throw new Error('Session credential required');
-        const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-          audience: 'cloud-agent-next',
-          mode: 'required',
-        });
+        const verified = await verifyKiloTokenForPolicy(
+          bearer,
+          { keys: { legacyHs256Secret: NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+          {
+            audience: 'cloud-agent-next',
+            mode: 'required',
+          }
+        );
         const [actingUser] = await db
           .select()
           .from(kilocode_users)

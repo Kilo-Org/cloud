@@ -222,10 +222,14 @@ describe('startSecurityAnalysis token source', () => {
         organizationId,
       });
       expect(cloudAgentToken).not.toBe(triageInput.authToken);
-      const tokenPolicy = await verifyKiloTokenForPolicy(triageInput.authToken, tokenSecret, {
-        audience: 'kilo-gateway',
-        mode: 'required',
-      });
+      const tokenPolicy = await verifyKiloTokenForPolicy(
+        triageInput.authToken,
+        { keys: { legacyHs256Secret: tokenSecret }, acceptedIssuers: ['kilo-web'] },
+        {
+          audience: 'kilo-gateway',
+          mode: 'required',
+        }
+      );
       expect(isKiloCredentialExchangeEligible(tokenPolicy, { legacy: 'five-year-api' })).toBe(
         false
       );

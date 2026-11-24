@@ -21,10 +21,11 @@ export async function validateKiloToken(
 ): Promise<ValidateResult> {
   let payload: Awaited<ReturnType<typeof verifyKiloTokenForResource>>;
   try {
-    payload = await verifyKiloTokenForResource(token, secret, {
-      audience: KILOCLAW_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    payload = await verifyKiloTokenForResource(
+      token,
+      { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web'] },
+      { audience: KILOCLAW_AUDIENCE, mode: 'allow-legacy' }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'JWT verification failed';
     return { success: false, error: message };

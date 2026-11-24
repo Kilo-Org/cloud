@@ -299,10 +299,14 @@ export async function createRuntimeAuthorization(
     .max(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
     .default(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
     .parse(input.lifetimeMs);
-  const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
-    audience: resourceKind,
-    mode: 'allow-legacy',
-  });
+  const auth = await verifyKiloTokenForPolicy(
+    input.token,
+    {
+      keys: { legacyHs256Secret: input.secret },
+      acceptedIssuers: ['kilo-web', 'security-auto-analysis', 'webhook-agent-ingest'],
+    },
+    { audience: resourceKind, mode: 'allow-legacy' }
+  );
   const claims = auth.claims;
   const admission = claims.runtimeAdmission;
   const soleAudience =

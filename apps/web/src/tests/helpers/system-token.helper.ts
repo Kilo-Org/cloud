@@ -47,11 +47,15 @@ export async function expectNonExchangeableSystemToken(
     tokenSource,
   });
 
-  await expect(verifyKiloToken(token, NEXTAUTH_SECRET)).resolves.toMatchObject({
+  const verifier = {
+    keys: { legacyHs256Secret: NEXTAUTH_SECRET },
+    acceptedIssuers: ['kilo-web'] as const,
+  };
+  await expect(verifyKiloToken(token, verifier)).resolves.toMatchObject({
     kiloUserId: user.id,
     tokenSource,
   });
-  const context = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+  const context = await verifyKiloTokenForPolicy(token, verifier, {
     audience: KILO_API_AUDIENCE,
     mode: 'allow-legacy',
   });

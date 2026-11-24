@@ -20,6 +20,10 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://session-ingest.test.invalid',
 }));
 
+const kiloWebVerifier = {
+  keys: { legacyHs256Secret: NEXTAUTH_SECRET },
+  acceptedIssuers: ['kilo-web'] as const,
+};
 const mockFetch = jest.fn();
 const originalFetch = global.fetch;
 beforeEach(() => {
@@ -150,13 +154,13 @@ describe('session-ingest client token issuance', () => {
       expect(claims.organizationId).toBeUndefined();
 
       await expect(
-        verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+        verifyKiloTokenForResource(token, kiloWebVerifier, {
           audience: SESSION_INGEST_AUDIENCE,
           mode: 'allow-legacy',
         })
       ).resolves.toMatchObject({ kiloUserId: userId });
 
-      const policyAuth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+      const policyAuth = await verifyKiloTokenForPolicy(token, kiloWebVerifier, {
         audience: SESSION_INGEST_AUDIENCE,
         mode: 'allow-legacy',
       });
@@ -169,7 +173,7 @@ describe('session-ingest client token issuance', () => {
           credentialExchange: false,
         });
         await expect(
-          verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+          verifyKiloTokenForResource(token, kiloWebVerifier, {
             audience: 'session-ingest:user-deletion',
             mode: 'required',
           })

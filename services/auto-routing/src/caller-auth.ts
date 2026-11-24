@@ -86,10 +86,14 @@ async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTok
   let payload: KiloTokenPayload;
   try {
     // The CLI presents its gateway token, so accept exactly the audiences the gateway accepts.
-    payload = await verifyKiloTokenForResource(token, secret, {
-      audience: KILO_GATEWAY_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    payload = await verifyKiloTokenForResource(
+      token,
+      {
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['kilo-web', 'security-auto-analysis', 'kiloclaw'],
+      },
+      { audience: KILO_GATEWAY_AUDIENCE, mode: 'allow-legacy' }
+    );
   } catch {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }

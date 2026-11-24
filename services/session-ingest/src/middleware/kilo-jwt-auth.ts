@@ -64,7 +64,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   try {
     const deletionAuth = await verifyKiloBearerAgainstCurrentPepper({
       token,
-      nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+      keys: { legacyHs256Secret: c.env.NEXTAUTH_SECRET_PROD },
+      acceptedIssuers: ['kilo-web'],
       connectionString: c.env.HYPERDRIVE.connectionString,
       audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
       allowBlocked: true,
@@ -81,7 +82,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     } else {
       auth = await verifyKiloBearerAgainstCurrentPepper({
         token,
-        nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+        keys: { legacyHs256Secret: c.env.NEXTAUTH_SECRET_PROD },
+        acceptedIssuers: ['kilo-web', 'cloud-agent-next', 'security-auto-analysis', 'kiloclaw'],
         connectionString: c.env.HYPERDRIVE.connectionString,
         resourceAudience: { audience: SESSION_INGEST_AUDIENCE, mode: 'allow-legacy' },
       });
@@ -110,7 +112,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
       const secret = await getCachedSecret(c.env.NEXTAUTH_SECRET_PROD, 'NEXTAUTH_SECRET');
       attested = await verifyRuntimeProxyAttestation({
         value: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER),
-        secret,
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['cloud-agent-next'],
         audience: SESSION_INGEST_AUDIENCE,
         userId: auth.userId,
         authorizationId: runtimeAuthorization.data.id,

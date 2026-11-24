@@ -305,10 +305,14 @@ for (const enabled of [false, true]) {
       const token = signedClaims(extras[kind]);
       if (kind !== 'exchange-only') {
         await expect(
-          verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
-            audience: 'kilo-api',
-            mode: 'allow-legacy',
-          })
+          verifyKiloTokenForPolicy(
+            token,
+            { keys: { legacyHs256Secret: NEXTAUTH_SECRET }, acceptedIssuers: ['kilo-web'] },
+            {
+              audience: 'kilo-api',
+              mode: 'allow-legacy',
+            }
+          )
         ).resolves.toMatchObject({ userId: user.id });
       }
       const headers = bearer(token);

@@ -28,7 +28,12 @@
  * semantics.
  */
 
-import { extractBearerToken, verifyKiloToken, type KiloTokenPayload } from '@kilocode/worker-utils';
+import {
+  extractBearerToken,
+  verifyKiloToken,
+  type KiloTokenPayload,
+  type KiloTokenVerifier,
+} from '@kilocode/worker-utils';
 
 /**
  * Organization claims stay rejected: the deployed e2e suite runs as one
@@ -76,11 +81,14 @@ export type ModelRouteAuthResult =
   | { ok: true; payload: KiloTokenPayload }
   | { ok: false; status: number; message: string };
 
-async function verifyModernAudience(token: string, secret: string): Promise<KiloTokenPayload> {
+async function verifyModernAudience(
+  token: string,
+  verifier: KiloTokenVerifier
+): Promise<KiloTokenPayload> {
   let lastError: unknown;
   for (const audience of MODEL_TOKEN_AUDIENCES) {
     try {
-      return await verifyKiloToken(token, secret, { audience });
+      return await verifyKiloToken(token, verifier, { audience });
     } catch (error) {
       lastError = error;
     }
@@ -133,12 +141,17 @@ export async function verifyModelRouteBearer(
     return { ok: false, status: 401, message: 'invalid model token' };
   }
 
+  // The issuers the gateway accepts, since this Worker stands in for it.
+  const verifier: KiloTokenVerifier = {
+    keys: { legacyHs256Secret: secret },
+    acceptedIssuers: ['kilo-web', 'cloud-agent-next', 'security-auto-analysis', 'kiloclaw'],
+  };
   let payload: KiloTokenPayload;
   try {
     payload =
       decoded.aud === undefined
-        ? await verifyKiloToken(token, secret)
-        : await verifyModernAudience(token, secret);
+        ? await verifyKiloToken(token, verifier)
+        : await verifyModernAudience(token, verifier);
   } catch {
     return { ok: false, status: 401, message: 'invalid model token' };
   }

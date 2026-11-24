@@ -634,10 +634,14 @@ async function requiresRuntimeAuthorization(ctx: TRPCContext): Promise<boolean> 
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   }
   try {
-    const verified = await verifyKiloTokenForPolicy(ctx.authToken, secret, {
-      audience: 'cloud-agent-next',
-      mode: 'allow-legacy',
-    });
+    const verified = await verifyKiloTokenForPolicy(
+      ctx.authToken,
+      {
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['kilo-web', 'security-auto-analysis', 'webhook-agent-ingest'],
+      },
+      { audience: 'cloud-agent-next', mode: 'allow-legacy' }
+    );
     const modern =
       verified.claims.tokenPurpose !== undefined ||
       verified.claims.credentialExchange !== undefined ||

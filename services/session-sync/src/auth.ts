@@ -184,10 +184,11 @@ async function verifyCredential(
   secret: string,
   environment: string
 ): Promise<Credential | Response> {
-  const auth = await verifyKiloTokenForPolicy(token, secret, {
-    audience: KILO_API_AUDIENCE,
-    mode: 'allow-legacy',
-  }).catch(() => undefined);
+  const auth = await verifyKiloTokenForPolicy(
+    token,
+    { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web'] },
+    { audience: KILO_API_AUDIENCE, mode: 'allow-legacy' }
+  ).catch(() => undefined);
   if (!auth) return invalidCredential();
   const { claims, claimNames } = auth;
   if (claims.env !== environment) return invalidCredential();

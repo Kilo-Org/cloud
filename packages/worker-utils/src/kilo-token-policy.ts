@@ -4,10 +4,12 @@ import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
+import { KILO_TOKEN_PURPOSES } from './kilo-token-issuers';
 import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
+  type KiloTokenVerifier,
 } from './kilo-token-verification';
 
 const audienceName = z
@@ -22,12 +24,6 @@ const audienceClaim = z.union([
     .refine(values => new Set(values).size === values.length),
 ]);
 const numericDate = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-export const KILO_TOKEN_PURPOSES = [
-  'human-api',
-  'device-access',
-  'delegated-workload',
-  'internal-service',
-] as const;
 const purposeClaim = z.enum(KILO_TOKEN_PURPOSES);
 
 const policyClaims = kiloTokenPayload
@@ -131,10 +127,12 @@ function assertKiloTokenAudience(
 
 export async function verifyKiloTokenForResource(
   token: string,
-  secret: string,
+  verifier: KiloTokenVerifier,
   audiencePolicy: KiloResourceAudiencePolicy
 ): Promise<KiloTokenPayload> {
-  const { payload } = await verifyKiloTokenSignature(token, secret);
+  const { payload } = await verifyKiloTokenSignature(token, verifier, {
+    expectedAudience: audiencePolicy.audience,
+  });
   assertKiloTokenAudience(payload.aud, audiencePolicy);
   if (checkKiloTokenAuthorityClaims(payload)) {
     policyClaims.parse(payload);
@@ -175,11 +173,14 @@ const verifiedContexts = new WeakSet<VerifiedKiloAuthContext>();
 
 export async function verifyKiloTokenForPolicy(
   token: string,
-  secret: string,
+  verifier: KiloTokenVerifier,
   audiencePolicy: KiloResourceAudiencePolicy
 ): Promise<VerifiedKiloBearerContext> {
   const currentDate = new Date();
-  const { payload } = await verifyKiloTokenSignature(token, secret, { currentDate });
+  const { payload } = await verifyKiloTokenSignature(token, verifier, {
+    currentDate,
+    expectedAudience: audiencePolicy.audience,
+  });
   const claims = policyClaims.parse(payload);
   checkKiloTokenAuthorityClaims(payload);
   assertKiloTokenIssuedAt(claims.iat, Math.floor(currentDate.getTime() / 1000));

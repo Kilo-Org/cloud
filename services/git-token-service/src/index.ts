@@ -23,6 +23,7 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { KiloTokenVerifier } from '@kilocode/worker-utils/kilo-token-verification';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import type {
   GitHubBrokerRejectionProvenance,
@@ -1463,13 +1464,17 @@ export default {
               : url.pathname === USER_ACCESS_TOKEN_PATH
                 ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
                 : codeReviewAudience;
+      const verifier: KiloTokenVerifier = {
+        keys: { legacyHs256Secret: secret },
+        acceptedIssuers: ['kilo-web'],
+      };
       authorization =
         url.pathname === DISCONNECT_PATH
-          ? await verifyKiloTokenForResource(token, secret, {
+          ? await verifyKiloTokenForResource(token, verifier, {
               audience: GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
               mode: 'allow-legacy',
             })
-          : await verifyKiloToken(token, secret, audience ? { audience } : undefined);
+          : await verifyKiloToken(token, verifier, audience ? { audience } : undefined);
     } catch {
       return Response.json(
         { error: 'unauthorized' },

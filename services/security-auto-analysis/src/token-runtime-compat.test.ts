@@ -11,6 +11,7 @@ import { generateControlToken, generateTriageToken, generateInternalServiceToken
 
 const secret = 'automation-compat-test-secret';
 const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const verifier = { keys: { legacyHs256Secret: secret }, acceptedIssuers: ['kilo-web'] as const };
 
 describe('automation issuer to runtime compatibility', () => {
   it.each([null, 'current-pepper'])(
@@ -51,7 +52,8 @@ describe('automation issuer to runtime compatibility', () => {
       const authenticate = (token: string, audience: string) =>
         verifyKiloBearerAgainstCurrentPepper({
           token,
-          nextAuthSecret: secret,
+          keys: { legacyHs256Secret: secret },
+          acceptedIssuers: ['kilo-web'],
           connectionString: 'unused',
           resourceAudience: { audience, mode: 'allow-legacy' },
           getUserPepper: async () => ({ pepper: principal.apiTokenPepper, blocked: false }),
@@ -59,7 +61,7 @@ describe('automation issuer to runtime compatibility', () => {
       await expect(authenticate(legacy.token, 'kilo-api')).resolves.toEqual({ userId: user.id });
       await expect(authenticate(control, 'cloud-agent-next')).resolves.toEqual({ userId: user.id });
       for (const audience of ['kilo-api', 'kilo-gateway', 'session-ingest']) {
-        const auth = await verifyKiloTokenForPolicy(runtime.token, secret, {
+        const auth = await verifyKiloTokenForPolicy(runtime.token, verifier, {
           audience,
           mode: 'required',
         });
@@ -72,7 +74,7 @@ describe('automation issuer to runtime compatibility', () => {
         await expect(authenticate(control, audience)).resolves.toBeNull();
       }
       await expect(
-        verifyKiloTokenForPolicy(runtime.token, secret, {
+        verifyKiloTokenForPolicy(runtime.token, verifier, {
           audience: 'cloud-agent-next',
           mode: 'required',
         })
@@ -108,13 +110,13 @@ describe('automation issuer to runtime compatibility', () => {
         [await generateInternalServiceToken(user.id, secret, flag), 'session-ingest'],
       ];
       for (const [token, audience] of tokens) {
-        const auth = await verifyKiloTokenForPolicy(token, secret, {
+        const auth = await verifyKiloTokenForPolicy(token, verifier, {
           audience,
           mode: 'allow-legacy',
         });
         expect(auth.claims.exp - auth.claims.iat).toBe(3600);
         if (flag === true || flag === 'true') {
-          await expect(verifyKiloToken(token, secret)).rejects.toThrow('audience');
+          await expect(verifyKiloToken(token, verifier)).rejects.toThrow('audience');
           for (const other of [
             'cloud-agent-next',
             'kilo-gateway',
@@ -122,11 +124,11 @@ describe('automation issuer to runtime compatibility', () => {
             'kilo-api',
           ].filter(value => value !== audience)) {
             await expect(
-              verifyKiloTokenForPolicy(token, secret, { audience: other, mode: 'allow-legacy' })
+              verifyKiloTokenForPolicy(token, verifier, { audience: other, mode: 'allow-legacy' })
             ).rejects.toThrow('audience');
           }
         } else {
-          await expect(verifyKiloToken(token, secret)).resolves.toHaveProperty(
+          await expect(verifyKiloToken(token, verifier)).resolves.toHaveProperty(
             'kiloUserId',
             user.id
           );

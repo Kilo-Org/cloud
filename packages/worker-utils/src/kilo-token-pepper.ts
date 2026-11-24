@@ -13,10 +13,11 @@ export type KiloTokenPepperClaims = {
 };
 
 const INTERNAL_ASSERTION_MAX_LIFETIME_SECONDS = 60 * 60;
+const ISSUED_AT_CLOCK_SKEW_SECONDS = 60;
 
 /**
- * For verifiers that accept only user credentials, such as the web gateway. No internal assertion
- * is addressed to them, so an absent claim is refused.
+ * For verifiers that accept only user credentials: the web gateway and every Worker that no
+ * internal assertion is addressed to. An absent claim is refused.
  */
 export function isKiloUserCredentialPepperCurrent(
   claims: Pick<KiloTokenPepperClaims, 'apiTokenPepper'>,
@@ -26,24 +27,25 @@ export function isKiloUserCredentialPepperCurrent(
 }
 
 /**
- * For Worker verifiers that also receive internal assertions minted by the web and other Workers.
+ * Only for receivers that internal assertions minted by the web and other Workers are addressed
+ * to, such as Session Ingest.
  */
 export function isKiloTokenPepperCurrent(
   claims: KiloTokenPepperClaims,
-  accountPepper: string | null | undefined
+  accountPepper: string | null | undefined,
+  nowSeconds: number
 ): boolean {
   if (claims.apiTokenPepper !== undefined) {
     return isKiloUserCredentialPepperCurrent(claims, accountPepper);
   }
-  return isShortLivedInternalAssertion(claims) || isLegacyShortLivedInternalAssertion(claims);
+  return (
+    hasShortValidity(claims, nowSeconds) &&
+    (isInternalServiceAssertion(claims) || isLegacyInternalAssertion(claims))
+  );
 }
 
-function isShortLivedInternalAssertion(claims: KiloTokenPepperClaims): boolean {
-  return (
-    claims.tokenPurpose === 'internal-service' &&
-    hasAudience(claims.aud) &&
-    hasShortLifetime(claims)
-  );
+function isInternalServiceAssertion(claims: KiloTokenPepperClaims): boolean {
+  return claims.tokenPurpose === 'internal-service' && hasAudience(claims.aud);
 }
 
 /**
@@ -53,8 +55,8 @@ function isShortLivedInternalAssertion(claims: KiloTokenPepperClaims): boolean {
  * on in production (or that fallback is removed), `generateInternalServiceToken` has no callers,
  * and one hour has passed since the last legacy mint.
  */
-function isLegacyShortLivedInternalAssertion(claims: KiloTokenPepperClaims): boolean {
-  return claims.tokenPurpose === undefined && hasShortLifetime(claims);
+function isLegacyInternalAssertion(claims: KiloTokenPepperClaims): boolean {
+  return claims.tokenPurpose === undefined;
 }
 
 function hasAudience(aud: unknown): boolean {
@@ -62,8 +64,14 @@ function hasAudience(aud: unknown): boolean {
   return Array.isArray(aud) && aud.length > 0;
 }
 
-function hasShortLifetime({ iat, exp }: KiloTokenPepperClaims): boolean {
+// A future `iat` must not stretch the remaining validity past the lifetime bound.
+function hasShortValidity({ iat, exp }: KiloTokenPepperClaims, nowSeconds: number): boolean {
   if (typeof iat !== 'number' || typeof exp !== 'number') return false;
   const lifetime = exp - iat;
-  return lifetime > 0 && lifetime <= INTERNAL_ASSERTION_MAX_LIFETIME_SECONDS;
+  return (
+    lifetime > 0 &&
+    lifetime <= INTERNAL_ASSERTION_MAX_LIFETIME_SECONDS &&
+    iat <= nowSeconds + ISSUED_AT_CLOCK_SKEW_SECONDS &&
+    exp - nowSeconds <= INTERNAL_ASSERTION_MAX_LIFETIME_SECONDS
+  );
 }

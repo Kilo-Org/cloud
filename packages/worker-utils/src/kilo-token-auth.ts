@@ -5,7 +5,11 @@ import { decodeJwt } from 'jose';
 
 import { getCachedSecret } from './cached-secret';
 import { verifyKiloToken } from './kilo-token';
-import { isKiloTokenPepperCurrent } from './kilo-token-pepper';
+import {
+  isKiloTokenPepperCurrent,
+  isKiloUserCredentialPepperCurrent,
+  type KiloTokenPepperClaims,
+} from './kilo-token-pepper';
 import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
 
 export type KiloBearerAuthResult = {
@@ -57,24 +61,50 @@ export async function findKiloUserPepper(
   };
 }
 
+type KiloBearerVerificationParams = {
+  token: string | null;
+  nextAuthSecret: KiloSecretBinding | string;
+  workerEnv?: string;
+  connectionString: string;
+  getUserPepper?: GetKiloUserPepper;
+  allowBlocked?: boolean;
+} & KiloBearerAudienceOptions;
+
+type PepperRule = (
+  claims: KiloTokenPepperClaims,
+  accountPepper: string | null,
+  nowSeconds: number
+) => boolean;
+
 /**
- * Verify a Kilo bearer against the account's current pepper and active state.
+ * Verify a Kilo user credential against the account's current pepper and active state. The token
+ * must carry a current `apiTokenPepper` claim (`isKiloUserCredentialPepperCurrent`).
  *
  * Returns null only for a credential the caller must not retry: malformed,
- * expired, wrong env, unknown user, blocked user, or a stale pepper
- * (`isKiloTokenPepperCurrent`).
+ * expired, wrong env, unknown user, blocked user, or a missing or stale pepper.
  * A dependency failure (secret store, database) throws, so a caller can map an
  * outage to a retryable 503 instead of reporting it as an invalid token.
  */
-export async function verifyKiloBearerAgainstCurrentPepper(
-  params: {
-    token: string | null;
-    nextAuthSecret: KiloSecretBinding | string;
-    workerEnv?: string;
-    connectionString: string;
-    getUserPepper?: GetKiloUserPepper;
-    allowBlocked?: boolean;
-  } & KiloBearerAudienceOptions
+export function verifyKiloBearerAgainstCurrentPepper(
+  params: KiloBearerVerificationParams
+): Promise<KiloBearerAuthResult | null> {
+  return verifyKiloBearer(params, isKiloUserCredentialPepperCurrent);
+}
+
+/**
+ * Like `verifyKiloBearerAgainstCurrentPepper`, but also accepts a short-lived internal assertion
+ * without a pepper claim (`isKiloTokenPepperCurrent`). Use it only on a receiver that the web or
+ * another Worker addresses such assertions to.
+ */
+export function verifyKiloBearerOrInternalAssertionAgainstCurrentPepper(
+  params: KiloBearerVerificationParams
+): Promise<KiloBearerAuthResult | null> {
+  return verifyKiloBearer(params, isKiloTokenPepperCurrent);
+}
+
+async function verifyKiloBearer(
+  params: KiloBearerVerificationParams,
+  isPepperCurrent: PepperRule
 ): Promise<KiloBearerAuthResult | null> {
   if (params.audience !== undefined && params.resourceAudience !== undefined) {
     throw new Error('Bearer audience and resource audience policies are mutually exclusive');
@@ -118,7 +148,8 @@ export async function verifyKiloBearerAgainstCurrentPepper(
   }
 
   // The projected payload drops `tokenPurpose` and `aud`; the signature is already verified.
-  if (!isKiloTokenPepperCurrent({ ...decodeJwt(params.token), ...payload }, result.pepper)) {
+  const claims = { ...decodeJwt(params.token), ...payload };
+  if (!isPepperCurrent(claims, result.pepper, Math.floor(Date.now() / 1000))) {
     return null;
   }
 

@@ -22,11 +22,34 @@ describe('isKiloUserCredentialPepperCurrent', () => {
 });
 
 describe('isKiloTokenPepperCurrent', () => {
+  it('rejects an absent claim issued more than a minute ahead', () => {
+    expect(isKiloTokenPepperCurrent({ iat: iat + 61, exp: iat + 361 }, 'current', iat)).toBe(false);
+    expect(
+      isKiloTokenPepperCurrent(
+        {
+          tokenPurpose: 'internal-service',
+          aud: 'session-ingest',
+          iat: iat + 3000,
+          exp: iat + 6600,
+        },
+        'current',
+        iat
+      )
+    ).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat: iat + 60, exp: iat + 360 }, 'current', iat)).toBe(true);
+  });
+
+  it('rejects an absent claim that stays valid for more than one hour from now', () => {
+    expect(isKiloTokenPepperCurrent({ iat: iat + 60, exp: iat + 3660 }, 'current', iat)).toBe(
+      false
+    );
+  });
+
   it('compares a present claim with the account pepper', () => {
-    expect(isKiloTokenPepperCurrent({ apiTokenPepper: 'current' }, 'current')).toBe(true);
-    expect(isKiloTokenPepperCurrent({ apiTokenPepper: 'stale' }, 'current')).toBe(false);
-    expect(isKiloTokenPepperCurrent({ apiTokenPepper: null }, null)).toBe(true);
-    expect(isKiloTokenPepperCurrent({ apiTokenPepper: null }, 'rotated')).toBe(false);
+    expect(isKiloTokenPepperCurrent({ apiTokenPepper: 'current' }, 'current', iat)).toBe(true);
+    expect(isKiloTokenPepperCurrent({ apiTokenPepper: 'stale' }, 'current', iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ apiTokenPepper: null }, null, iat)).toBe(true);
+    expect(isKiloTokenPepperCurrent({ apiTokenPepper: null }, 'rotated', iat)).toBe(false);
   });
 
   it('compares a present claim even on a short-lived internal assertion', () => {
@@ -39,17 +62,22 @@ describe('isKiloTokenPepperCurrent', () => {
           iat,
           exp: iat + 3600,
         },
-        'current'
+        'current',
+        iat
       )
     ).toBe(false);
   });
 
   it('accepts an absent claim on a short-lived audience-bound internal-service assertion', () => {
     const claims = { tokenPurpose: 'internal-service', aud: 'session-ingest', iat };
-    expect(isKiloTokenPepperCurrent({ ...claims, exp: iat + 3600 }, 'current')).toBe(true);
-    expect(isKiloTokenPepperCurrent({ ...claims, exp: iat + 300 }, null)).toBe(true);
+    expect(isKiloTokenPepperCurrent({ ...claims, exp: iat + 3600 }, 'current', iat)).toBe(true);
+    expect(isKiloTokenPepperCurrent({ ...claims, exp: iat + 300 }, null, iat)).toBe(true);
     expect(
-      isKiloTokenPepperCurrent({ ...claims, aud: ['session-ingest'], exp: iat + 300 }, 'current')
+      isKiloTokenPepperCurrent(
+        { ...claims, aud: ['session-ingest'], exp: iat + 300 },
+        'current',
+        iat
+      )
     ).toBe(true);
   });
 
@@ -57,56 +85,65 @@ describe('isKiloTokenPepperCurrent', () => {
     expect(
       isKiloTokenPepperCurrent(
         { tokenPurpose: 'internal-service', iat, exp: iat + 300 },
-        'current'
+        'current',
+        iat
       )
     ).toBe(false);
     expect(
       isKiloTokenPepperCurrent(
         { tokenPurpose: 'internal-service', aud: '', iat, exp: iat + 300 },
-        'current'
+        'current',
+        iat
       )
     ).toBe(false);
     expect(
       isKiloTokenPepperCurrent(
         { tokenPurpose: 'internal-service', aud: [], iat, exp: iat + 300 },
-        'current'
+        'current',
+        iat
       )
     ).toBe(false);
   });
 
   it('accepts an absent claim on a short-lived legacy internal assertion', () => {
-    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 3600 }, 'current')).toBe(true);
+    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 3600 }, 'current', iat)).toBe(true);
     expect(
       isKiloTokenPepperCurrent(
         { aud: 'git-token-service:bitbucket-repositories', iat, exp: iat + 300 },
-        'current'
+        'current',
+        iat
       )
     ).toBe(true);
   });
 
   it('rejects an absent claim on a token that lives longer than one hour', () => {
-    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 3601 }, 'current')).toBe(false);
-    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 157_680_000 }, null)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 3601 }, 'current', iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat, exp: iat + 157_680_000 }, null, iat)).toBe(false);
     expect(
       isKiloTokenPepperCurrent(
         { tokenPurpose: 'internal-service', aud: 'session-ingest', iat, exp: iat + 3601 },
-        'current'
+        'current',
+        iat
       )
     ).toBe(false);
   });
 
   it('rejects an absent claim when iat or exp is missing or not a positive lifetime', () => {
-    expect(isKiloTokenPepperCurrent({ exp: iat + 300 }, 'current')).toBe(false);
-    expect(isKiloTokenPepperCurrent({ iat }, 'current')).toBe(false);
-    expect(isKiloTokenPepperCurrent({}, null)).toBe(false);
-    expect(isKiloTokenPepperCurrent({ iat, exp: iat }, 'current')).toBe(false);
-    expect(isKiloTokenPepperCurrent({ iat: '1', exp: iat + 300 }, 'current')).toBe(false);
+    expect(isKiloTokenPepperCurrent({ exp: iat + 300 }, 'current', iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat }, 'current', iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({}, null, iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat, exp: iat }, 'current', iat)).toBe(false);
+    expect(isKiloTokenPepperCurrent({ iat: '1', exp: iat + 300 }, 'current', iat)).toBe(false);
   });
 
   it('rejects an absent claim on a token with any other purpose', () => {
     for (const tokenPurpose of ['human-api', 'device-access', 'delegated-workload', 'unknown']) {
       expect(
-        isKiloTokenPepperCurrent({ tokenPurpose, aud: 'kilo-api', iat, exp: iat + 300 }, 'current')
+        isKiloTokenPepperCurrent(
+          { tokenPurpose, aud: 'kilo-api', iat, exp: iat + 300 },
+          'current',
+          iat
+        )
       ).toBe(false);
     }
   });

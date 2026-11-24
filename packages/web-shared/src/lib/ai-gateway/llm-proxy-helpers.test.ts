@@ -2351,6 +2351,30 @@ describe('captureProxyError', () => {
     expect(data.first4kOfResponse).toBe('[Truncated]');
   });
 
+  it('reads only a bounded prefix of a large error body', async () => {
+    const chunk = new TextEncoder().encode(`${'x '.repeat(32 * 1024)}`);
+    let pulledChunks = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulledChunks += 1;
+        if (pulledChunks > 1024) controller.close();
+        else controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const response = new Response(body, { status: 502 });
+
+    const data = await captureResponsesError({}, response);
+    await response.body?.cancel();
+
+    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2048)}[Truncated]`);
+    expect(pulledChunks).toBeLessThan(8);
+    expect(cancelled).toBe(true);
+  });
+
   it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
     const response = Response.json(
       { padding: 'x'.repeat(16 * 1024), error: { param: 'input', code: 'unknown_parameter' } },

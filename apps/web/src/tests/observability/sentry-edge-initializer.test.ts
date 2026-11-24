@@ -102,7 +102,7 @@ describe('edge Sentry initializer request data', () => {
     expect(result?.request?.url).toBe('https://app.kilo.sh/s/:share_token?utm_source=copy');
   });
 
-  test('applies the query policy to the forwarded search header', async () => {
+  test('filters the forwarded search header', async () => {
     const beforeSend = await loadEdgeBeforeSend();
 
     const result = beforeSend({
@@ -114,7 +114,7 @@ describe('edge Sentry initializer request data', () => {
       },
     });
 
-    expect(result?.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
+    expect(result?.request?.headers?.['x-search']).toBe('[Filtered]');
     expect(result?.request?.headers?.['x-pathname']).toBe('/s/:share_token');
   });
 

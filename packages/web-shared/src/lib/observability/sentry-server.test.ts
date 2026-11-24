@@ -326,12 +326,12 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.url).toBe('/s/:share_token#open');
   });
 
-  test('applies the query policy to the forwarded search header', () => {
+  test('filters the forwarded search header', () => {
     const event: Event = {
       request: {
         url: 'https://app.kilo.sh/github-app',
         headers: {
-          'x-search': '?organizationId=org_123&installState=abc-token-123&fromApp=1',
+          'X-Search': '?organizationId=org_123&fromApp=1',
           accept: '*/*',
         },
       },
@@ -339,8 +339,7 @@ describe('sanitizeSentryRequestData', () => {
 
     const result = sanitizeSentryRequestData(event);
 
-    expect(result.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
-    expect(result.request?.headers?.accept).toBe('*/*');
+    expect(result.request?.headers).toEqual({ 'X-Search': '[Filtered]', accept: '*/*' });
   });
 
   test('redacts a session share path in the forwarded pathname header', () => {
@@ -359,30 +358,58 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.headers?.accept).toBe('*/*');
   });
 
-  test('matches the search header name case-insensitively', () => {
-    const event: Event = {
-      request: { headers: { 'X-Search': 'state=raw-state-token&tab=usage' } },
-    };
-
-    const result = sanitizeSentryRequestData(event);
-
-    expect(result.request?.headers?.['X-Search']).toBe('tab=usage');
-  });
-
-  test('clears the forwarded search header for a policy path', () => {
+  test('drops a query value that holds a nested query in every request URL form', () => {
+    const callbackPath = '/pages-auth?audience=pages&state=fake-link-state-0000';
+    const query = new URLSearchParams({ callbackPath, plan: 'pro' }).toString();
     const event: Event = {
       request: {
-        headers: {
-          'x-pathname': '/auth/verify-magic-link',
-          'x-search': '?email=person%40example.com&next=%2Fhome',
-        },
+        url: `https://app.kilo.sh/users/sign_in?${query}`,
+        query_string: query,
+        headers: { referer: `https://app.kilo.sh/users/sign_in?${query}` },
       },
     };
 
     const result = sanitizeSentryRequestData(event);
 
-    expect(result.request?.headers?.['x-pathname']).toBe('/auth/verify-magic-link');
-    expect(result.request?.headers?.['x-search']).toBe('');
+    expect(result.request).toEqual({
+      url: 'https://app.kilo.sh/users/sign_in?plan=pro',
+      query_string: 'plan=pro',
+      headers: { referer: 'https://app.kilo.sh/users/sign_in?plan=pro' },
+    });
+  });
+
+  test('drops a nested query value from relative URLs and array and object query strings', () => {
+    const nested = '/cloud-agent-fork/review-md?platform=github&repo=a%2Fb';
+    const event: Event = {
+      request: {
+        url: `/users/sign_in?callbackPath=${encodeURIComponent(nested)}&plan=pro#top`,
+      },
+    };
+    const arrayForm: Event = {
+      request: {
+        query_string: [
+          ['callbackPath', nested],
+          ['plan', 'pro'],
+        ],
+      },
+    };
+    const objectForm: Event = {
+      request: { query_string: { callbackPath: nested, plan: 'pro' } },
+    };
+
+    expect(sanitizeSentryRequestData(event).request?.url).toBe('/users/sign_in?plan=pro#top');
+    expect(sanitizeSentryRequestData(arrayForm).request?.query_string).toEqual([['plan', 'pro']]);
+    expect(sanitizeSentryRequestData(objectForm).request?.query_string).toEqual({ plan: 'pro' });
+  });
+
+  test('keeps a nested path value without its own query', () => {
+    const event: Event = {
+      request: { query_string: 'callbackPath=%2Fcloud%2Fchat&plan=pro' },
+    };
+
+    expect(sanitizeSentryRequestData(event).request?.query_string).toBe(
+      'callbackPath=%2Fcloud%2Fchat&plan=pro'
+    );
   });
 
   test('filters every request header that is not on the allowlist', () => {

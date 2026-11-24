@@ -73,8 +73,7 @@ async function errorCode(result: unknown): Promise<{ status: number; code: unkno
 async function legacyApiToken(
   options: { lifetime?: number; env?: string; extra?: SignKiloTokenExtra } = {}
 ): Promise<string> {
-  // Signed directly: the default is the five-year lifetime that `signKiloToken`
-  // no longer mints and the exchange must keep accepting.
+  // Signed directly so a test can ask for a lifetime `signKiloToken` refuses to mint.
   return new SignJWT({
     version: 3,
     kiloUserId: USER,
@@ -82,7 +81,7 @@ async function legacyApiToken(
     env: options.env ?? 'development',
     ...(options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' }),
     iat: nowSeconds(),
-    exp: nowSeconds() + (options.lifetime ?? FIVE_YEARS),
+    exp: nowSeconds() + (options.lifetime ?? THIRTY_DAYS),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
@@ -325,6 +324,28 @@ describe('exchange', () => {
       'unsupported_credential',
     ],
     [
+      'a five-year API credential',
+      () => legacyApiToken({ lifetime: FIVE_YEARS }),
+      401,
+      'invalid_credential',
+    ],
+    [
+      'a five-year device credential',
+      () =>
+        legacyApiToken({
+          lifetime: FIVE_YEARS,
+          extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' },
+        }),
+      401,
+      'invalid_credential',
+    ],
+    [
+      'an API credential one second above the 30-day cap',
+      () => legacyApiToken({ lifetime: THIRTY_DAYS + 1 }),
+      401,
+      'invalid_credential',
+    ],
+    [
       'a short-lived legacy credential without a device session',
       () => legacyApiToken({ lifetime: 3600 }),
       403,
@@ -346,8 +367,7 @@ describe('exchange', () => {
   });
 
   it.each<[string, () => Promise<string>]>([
-    ['a five-year API credential', () => legacyApiToken()],
-    ['a 30-day API credential', () => legacyApiToken({ lifetime: THIRTY_DAYS })],
+    ['a 30-day API credential', () => legacyApiToken()],
     [
       'a 30-day API credential minted by the shared signer',
       async () =>
@@ -363,16 +383,8 @@ describe('exchange', () => {
         ).token,
     ],
     [
-      'a five-year device credential',
-      () => legacyApiToken({ extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' } }),
-    ],
-    [
       'a 30-day device credential',
-      () =>
-        legacyApiToken({
-          lifetime: THIRTY_DAYS,
-          extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' },
-        }),
+      () => legacyApiToken({ extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' } }),
     ],
   ])('admits %s to the account lookup', async (_name, token) => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

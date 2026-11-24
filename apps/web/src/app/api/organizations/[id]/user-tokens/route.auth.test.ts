@@ -139,13 +139,12 @@ for (const enabled of [false, true]) {
   describe(`legacy organization issuance with resource flags ${enabled}`, () => {
     beforeEach(() => setIssuance(enabled));
 
-    test.each(['cookie', 'legacy-1h', 'legacy-30d', 'legacy-5y'] as const)(
+    test.each(['cookie', 'legacy-1h', 'legacy-30d'] as const)(
       'preserves %s for absent, empty, malformed and empty-object bodies',
       async auth => {
         const legacyLifetimes = {
           'legacy-1h': 3600,
           'legacy-30d': TOKEN_EXPIRY.thirtyDays,
-          'legacy-5y': 157_680_000,
         };
         const headers =
           auth === 'cookie'
@@ -325,9 +324,13 @@ for (const enabled of [false, true]) {
       'wrong-user',
       'revoked-pepper',
       'wrong-env',
+      'five-year-lifetime',
       'malformed-header',
     ])('fails closed for %s even with a valid ambient session', async kind => {
       let token = signedClaims({});
+      if (kind === 'five-year-lifetime') {
+        token = signedClaims({ exp: Math.floor(Date.now() / 1000) + 157_680_000 });
+      }
       if (kind === 'invalid-signature') token = signedClaims({}, 'wrong-signing-secret');
       if (kind === 'expired') token = signedClaims({ iat: 1, exp: 2 });
       if (kind === 'wrong-env') token = signedClaims({ env: 'different-environment' });

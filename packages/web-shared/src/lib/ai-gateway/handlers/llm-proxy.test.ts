@@ -519,7 +519,7 @@ function signedToken(audience: string) {
       aud: audience,
     },
     NEXTAUTH_SECRET,
-    { algorithm: 'HS256' }
+    { algorithm: 'HS256', expiresIn: '1h' }
   );
 }
 
@@ -532,7 +532,7 @@ function signedTokenWithVersion(audience: string, version: number) {
       aud: audience,
     },
     NEXTAUTH_SECRET,
-    { algorithm: 'HS256' }
+    { algorithm: 'HS256', expiresIn: '1h' }
   );
 }
 
@@ -722,7 +722,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
         },
       },
       NEXTAUTH_SECRET,
-      { algorithm: 'HS256' }
+      { algorithm: 'HS256', expiresIn: '1h' }
     );
     const user = { id: 'user-123', google_user_email: 'test@example.com' } as User;
 

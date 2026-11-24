@@ -38,3 +38,28 @@ export function assertKiloTokenIssuedAt(iat: unknown, nowSeconds: number): void 
   if (typeof iat !== 'number') throw new Error('Missing or invalid token issued-at');
   if (iat > nowSeconds) throw new Error('Token issued in the future');
 }
+
+/** Longest lifetime (`exp - iat`) a Kilo token may carry. Exactly 30 days is allowed. */
+export const KILO_TOKEN_MAX_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * Whether the token proves a lifetime within the cap. A token without a numeric
+ * `iat` and `exp` cannot prove one, and a token without `exp` never expires, so
+ * both are refused like a token above the cap.
+ */
+export function isKiloTokenLifetimeAllowed(claims: { iat?: unknown; exp?: unknown }): boolean {
+  const { iat, exp } = claims;
+  return (
+    typeof iat === 'number' &&
+    typeof exp === 'number' &&
+    Number.isFinite(iat) &&
+    Number.isFinite(exp) &&
+    exp - iat <= KILO_TOKEN_MAX_LIFETIME_SECONDS
+  );
+}
+
+export function assertKiloTokenLifetime(claims: { iat?: unknown; exp?: unknown }): void {
+  if (!isKiloTokenLifetimeAllowed(claims)) {
+    throw new Error('Token lifetime is missing or exceeds the maximum');
+  }
+}

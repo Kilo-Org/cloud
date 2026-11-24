@@ -255,7 +255,8 @@ describe('cloud-agent model validation through real web authentication', () => {
               scenario === 'foreign' ? foreign.api_token_pepper : owner.api_token_pepper,
             env: process.env.NODE_ENV,
           },
-          NEXTAUTH_SECRET
+          NEXTAUTH_SECRET,
+          { expiresIn: '1h' }
         );
         currentHeaders.set('authorization', `Bearer ${token}`);
       }
@@ -398,7 +399,8 @@ describe('cloud-agent model validation through real web authentication', () => {
         apiTokenPepper: user.api_token_pepper,
         env: process.env.NODE_ENV,
       },
-      NEXTAUTH_SECRET
+      NEXTAUTH_SECRET,
+      { expiresIn: '1h' }
     );
     for (const organizationId of [undefined, org.id]) {
       await expect(

@@ -76,7 +76,7 @@ function signToken(
       ...(audience ? { aud: audience } : {}),
     },
     secret,
-    { algorithm: 'HS256' }
+    { algorithm: 'HS256', expiresIn: '1h' }
   );
 }
 

@@ -1,6 +1,9 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+} from '@kilocode/worker-utils/kilo-token';
 import { validateAuthorizationHeader, isRejectedCredentialReason } from './tokens';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -15,7 +18,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         deviceSessionId: 'device-session-c15-test',
       },
       getEnvVariable('NEXTAUTH_SECRET'),
-      { algorithm: 'HS256', expiresIn: '5y' }
+      { algorithm: 'HS256', expiresIn: '1h' }
     );
 
     const headers = new Headers();
@@ -40,7 +43,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         deviceSessionId,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
-      { algorithm: 'HS256', expiresIn: '5y' }
+      { algorithm: 'HS256', expiresIn: '1h' }
     );
 
     const headers = new Headers();
@@ -61,7 +64,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         version: KILO_TOKEN_VERSION,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
-      { algorithm: 'HS256', expiresIn: '5y' }
+      { algorithm: 'HS256', expiresIn: '1h' }
     );
 
     const headers = new Headers();
@@ -99,6 +102,7 @@ describe('isRejectedCredentialReason', () => {
     ['missing_credentials', false],
     ['invalid_token', true],
     ['token_version_outdated', true],
+    ['token_lifetime_exceeded', true],
     ['runtime_attestation_required', true],
     ['audience_not_allowed', true],
     ['a_reason_added_later', true],
@@ -121,7 +125,7 @@ describe('the verified payload schema', () => {
   const validate = (claims: Record<string, unknown>) => {
     const token = jwt.sign(claims, getEnvVariable('NEXTAUTH_SECRET'), {
       algorithm: 'HS256',
-      expiresIn: '5y',
+      expiresIn: '1h',
     });
     return validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` }));
   };
@@ -168,5 +172,69 @@ describe('the verified payload schema', () => {
     // The audience policy refuses a null audience on its own; the schema only
     // has to let the claim through so that check stays reachable.
     expect(validate({ ...validClaims, aud: null }).reason).toBe('audience_not_allowed');
+  });
+});
+
+describe('the token lifetime cap', () => {
+  const claims = {
+    env: process.env.NODE_ENV,
+    kiloUserId: 'test-user-lifetime',
+    apiTokenPepper: 'test-pepper',
+    version: KILO_TOKEN_VERSION,
+  };
+
+  const validate = (dates: { iat?: number; exp?: number }, extra: Record<string, unknown> = {}) => {
+    const token = jwt.sign({ ...claims, ...extra, ...dates }, getEnvVariable('NEXTAUTH_SECRET'), {
+      algorithm: 'HS256',
+      noTimestamp: dates.iat === undefined,
+    });
+    return validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` }));
+  };
+
+  const now = () => Math.floor(Date.now() / 1000);
+
+  test.each([
+    ['one hour', 60 * 60],
+    ['exactly 30 days', KILO_TOKEN_MAX_LIFETIME_SECONDS],
+  ])('accepts a lifetime of %s', (_name, lifetime) => {
+    const iat = now();
+    const result = validate({ iat, exp: iat + lifetime });
+
+    expect(result.error).toBeUndefined();
+    expect(result.kiloUserId).toBe('test-user-lifetime');
+  });
+
+  test.each([
+    ['one second above 30 days', KILO_TOKEN_MAX_LIFETIME_SECONDS + 1],
+    ['five years', 5 * 365 * 24 * 60 * 60],
+  ])('refuses a lifetime of %s as a rejected credential', (_name, lifetime) => {
+    const iat = now();
+    const result = validate({ iat, exp: iat + lifetime });
+
+    expect(result.reason).toBe('token_lifetime_exceeded');
+    expect(result.error).toMatch(/please re-authenticate/);
+    expect(result.kiloUserId).toBeUndefined();
+    expect(isRejectedCredentialReason(result.reason)).toBe(true);
+  });
+
+  test.each([
+    ['iat', { exp: now() + 60 }],
+    ['exp', { iat: now() }],
+    ['iat and exp', {}],
+  ])('refuses a token without %s, which cannot prove its lifetime', (_name, dates) => {
+    const result = validate(dates);
+
+    expect(result.reason).toBe('token_lifetime_exceeded');
+    expect(isRejectedCredentialReason(result.reason)).toBe(true);
+  });
+
+  test('reports an outdated version before the lifetime', () => {
+    const iat = now();
+    const result = validate(
+      { iat, exp: iat + KILO_TOKEN_MAX_LIFETIME_SECONDS + 1 },
+      { version: KILO_TOKEN_VERSION - 1 }
+    );
+
+    expect(result.reason).toBe('token_version_outdated');
   });
 });

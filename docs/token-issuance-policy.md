@@ -23,15 +23,15 @@ The current shared verifier rejects a token with an audience when no audience is
 
 `generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds.
 
-Five-year tokens are no longer minted. `generateApiToken` has no default lifetime, and it, `signKiloToken`, and `signModernKiloToken` refuse a lifetime above 30 days (`KILO_TOKEN_MAX_LIFETIME_SECONDS`). User-held credentials (device authorization, the profile-page API key, editor sign-in, and the native sign-in without a refresh pair) are minted for exactly 30 days. This is an issuance cap only: verification does not reject tokens issued earlier with a five-year lifetime.
+Five-year tokens are no longer minted. `generateApiToken` has no default lifetime, and it, `signKiloToken`, and `signModernKiloToken` refuse a lifetime above 30 days (`KILO_TOKEN_MAX_LIFETIME_SECONDS`). User-held credentials (device authorization, the profile-page API key, editor sign-in, and the native sign-in without a refresh pair) are minted for exactly 30 days. Verification enforces the same cap: every Kilo token verifier refuses a token whose `exp - iat` is above 30 days, or that lacks a numeric `iat` or `exp` and so cannot prove its lifetime (`assertKiloTokenLifetime` / `isKiloTokenLifetimeAllowed` in `packages/worker-utils/src/kilo-token-verification.ts`). That covers `verifyKiloToken`, `verifyKiloTokenForResource`, `verifyKiloTokenForPolicy`, and the web's `validateAuthorizationHeader`, which reports `token_lifetime_exceeded`; the AI gateway answers it with its rejected-credential `INVALID_TOKEN` response. Exactly 30 days is accepted. Tokens issued earlier with a five-year lifetime are therefore refused everywhere.
 
 | Legacy issuer expression | Exact `exp - iat` | Evidence |
 |---|---:|---|
-| Numeric five-year default (until the 30-day cap) | `157680000` | `packages/web-shared/src/lib/tokens.ts` history |
+| Numeric five-year default (until the 30-day cap; now refused) | `157680000` | `packages/web-shared/src/lib/tokens.ts` history |
 | 30-day user credential | `2592000` | `TOKEN_EXPIRY.thirtyDays` in `packages/web-shared/src/lib/tokens.ts` |
-| Historical `'5y'` default | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
+| Historical `'5y'` default (now refused) | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
 
-The two five-year values are required for the narrow legacy five-year class; the 30-day value is the same class as minted now. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also called the generic five-year issuer, and unmarked 30-day tokens share the shape (see below).
+The two five-year values no longer verify, so the narrow legacy class holds only the 30-day value minted now. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also called the generic five-year issuer, and unmarked 30-day tokens share the shape (see below).
 
 ## Opt-in contract
 
@@ -72,7 +72,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 
 ## Legacy exchange class
 
-`five-year-api` is deliberately narrow. The name is historical: it permits both exact five-year durations (`157680000`, `157788000`) and the exact 30-day duration minted now (`2592000`), and requires all of the following:
+`five-year-api` is deliberately narrow. The name is historical: five-year tokens are refused at verification, so it permits only the exact 30-day duration minted now (`2592000`), and requires all of the following:
 
 - no `aud`;
 - no modern policy fields;
@@ -80,7 +80,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 - only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
 - `deviceAuthRequestCode` is allowed, preserving legacy device authorization output.
 
-Known marked automation and system-style issuers fail this shape. Device-bound legacy credentials (`deviceSessionId`) are checked separately by the web resource delegation and by `session-sync`, which accept one hour, 30 days, and the five-year `157680000`, each with a live device session. KiloClaw's 30-day runtime keys carry no marker, so since the 30-day duration joined this class they match it. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
+Known marked automation and system-style issuers fail this shape. Device-bound legacy credentials (`deviceSessionId`) are checked separately by the web resource delegation and by `session-sync`, which accept one hour and 30 days, each with a live device session. KiloClaw's 30-day runtime keys carry no marker, so since the 30-day duration joined this class they match it. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
 
 Future issuance routes should use `legacy: 'deny'` by default. A route requiring proof of human issuance must use trustworthy server-side issuance provenance or fresh session authentication, not enable the shape fallback as a substitute. Any compatibility exception requires an explicit policy decision accepting the documented residual risk. This concerns permission to exchange credentials, not supported ordinary legacy resource access; Phase 1 does not invalidate tokens.
 

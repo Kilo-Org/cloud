@@ -257,16 +257,37 @@ describe('validateKiloToken', () => {
     ).resolves.toEqual({ success: false, error: 'Invalid or expired token' });
   });
 
-  it('accepts legacy tokens without dates through the resource verifier', async () => {
+  it('refuses a token without dates, which cannot prove its lifetime', async () => {
     userRowByUserId.set('user-1', { pepper: 'pepper-current', blockedReason: null });
     const token = signResourceToken(
       { apiTokenPepper: 'pepper-current', tokenSource: 'cloud-agent' },
       { algorithm: 'HS256', noTimestamp: true }
     );
 
-    await expect(validateKiloToken(`Bearer ${token}`, validParams)).resolves.toMatchObject({
+    await expect(validateKiloToken(`Bearer ${token}`, validParams)).resolves.toEqual({
+      success: false,
+      error: 'Invalid or expired token',
+    });
+  });
+
+  it('refuses a token that outlives the lifetime cap', async () => {
+    userRowByUserId.set('user-1', { pepper: 'pepper-current', blockedReason: null });
+    const withinCap = signResourceToken(
+      { apiTokenPepper: 'pepper-current' },
+      { algorithm: 'HS256', expiresIn: 30 * 24 * 60 * 60 }
+    );
+    const aboveCap = signResourceToken(
+      { apiTokenPepper: 'pepper-current' },
+      { algorithm: 'HS256', expiresIn: 30 * 24 * 60 * 60 + 1 }
+    );
+
+    await expect(validateKiloToken(`Bearer ${withinCap}`, validParams)).resolves.toMatchObject({
       success: true,
       userId: 'user-1',
+    });
+    await expect(validateKiloToken(`Bearer ${aboveCap}`, validParams)).resolves.toEqual({
+      success: false,
+      error: 'Invalid or expired token',
     });
   });
 

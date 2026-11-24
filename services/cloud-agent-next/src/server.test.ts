@@ -216,7 +216,7 @@ function signKiloToken(userId = 'usr_1'): string {
       kiloUserId: userId,
     },
     secret,
-    { algorithm: 'HS256' }
+    { algorithm: 'HS256', expiresIn: 60 }
   );
 }
 
@@ -228,7 +228,7 @@ function signKiloTokenWithAudience(audience: string | string[], userId = 'usr_1'
       aud: audience,
     },
     secret,
-    { algorithm: 'HS256' }
+    { algorithm: 'HS256', expiresIn: 60 }
   );
 }
 

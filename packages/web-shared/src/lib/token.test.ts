@@ -310,7 +310,7 @@ describe('Token Functions', () => {
           ...claims,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
-        { algorithm: 'HS256' }
+        { algorithm: 'HS256', expiresIn: '1h' }
       );
     }
 
@@ -434,7 +434,7 @@ describe('Token Functions', () => {
           version: KILO_TOKEN_VERSION,
         },
         'wrong-secret',
-        { algorithm: 'HS256', expiresIn: '5y' }
+        { algorithm: 'HS256', expiresIn: '1h' }
       );
 
       const headers = new Headers();
@@ -455,7 +455,7 @@ describe('Token Functions', () => {
           version: KILO_TOKEN_VERSION - 1, // Outdated version
         },
         getEnvVariable('NEXTAUTH_SECRET'),
-        { algorithm: 'HS256', expiresIn: '5y' }
+        { algorithm: 'HS256', expiresIn: '1h' }
       );
 
       const headers = new Headers();
@@ -541,19 +541,28 @@ describe('Token Functions', () => {
       );
     });
 
+    it.each<[string, Record<string, unknown>]>([
+      ['future issuance', { iat: Math.floor(Date.now() / 1000) + 3600 }],
+      ['partial modern claim', { tokenPurpose: 'human-api' }],
+    ])('preserves historical JWT behavior for %s', (_name, payloadClaims) => {
+      const result = validationResult(payloadClaims);
+
+      expect(result.error).toBeUndefined();
+      expect(result.kiloUserId).toBe(mockUser.id);
+    });
+
     it.each<[string, Record<string, unknown>, boolean]>([
       ['missing issuance', { exp: Math.floor(Date.now() / 1000) + 3600 }, true],
-      ['future issuance', { iat: Math.floor(Date.now() / 1000) + 3600 }, false],
+      ['missing expiry', {}, false],
       ['no dates', {}, true],
-      ['partial modern claim', { tokenPurpose: 'human-api' }, false],
-    ])('preserves historical JWT behavior for %s', (_name, payloadClaims, noTimestamp) => {
+    ])('refuses a token with %s, which cannot prove its lifetime', (_name, dates, noTimestamp) => {
       const token = jwt.sign(
         {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
           version: KILO_TOKEN_VERSION,
-          ...payloadClaims,
+          ...dates,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
         { algorithm: 'HS256', noTimestamp }
@@ -561,8 +570,8 @@ describe('Token Functions', () => {
 
       const result = validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` }));
 
-      expect(result.error).toBeUndefined();
-      expect(result.kiloUserId).toBe(mockUser.id);
+      expect(result.reason).toBe('token_lifetime_exceeded');
+      expect(result.kiloUserId).toBeUndefined();
     });
 
     describe('generateOrganizationApiToken', () => {

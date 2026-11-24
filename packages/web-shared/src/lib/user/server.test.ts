@@ -70,7 +70,13 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+  signKiloToken,
+} from '@kilocode/worker-utils/kilo-token';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -94,7 +100,10 @@ afterEach(() => {
 });
 
 function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
-  return jwt.sign(claims, secret, { algorithm: 'HS256' });
+  return jwt.sign(claims, secret, {
+    algorithm: 'HS256',
+    ...(claims.exp === undefined ? { expiresIn: '1h' } : {}),
+  });
 }
 
 async function createParentAndChildOrganizations() {
@@ -542,6 +551,57 @@ describe('getUserFromAuth', () => {
     // that was presented and refused, so it must not become anonymous access.
     expect(result.user).toBeNull();
     expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('answers a token above the lifetime cap as a rejected credential, never as anonymous', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'lifetime-cap-pepper' });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: issuedAt,
+      exp: issuedAt + KILO_TOKEN_MAX_LIFETIME_SECONDS + 1,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(true);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+
+    const caller = resolveGatewayCaller(result, { allowAnonymous: true, ipAddress: '192.0.2.1' });
+    expect(caller.kind).toBe('rejected');
+    if (caller.kind !== 'rejected') return;
+    expect(caller.response.status).toBe(401);
+    await expect(caller.response.json()).resolves.toMatchObject({
+      error: { code: INVALID_TOKEN_CODE },
+    });
+  });
+
+  test('authenticates a token of exactly the lifetime cap', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'lifetime-at-cap-pepper' });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: issuedAt,
+      exp: issuedAt + KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
   });
 
   test('enforces the requested audience without falling through to a valid session', async () => {
@@ -1421,7 +1481,31 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  test.each([30 * 24 * 60 * 60, 157_680_000, 157_788_000])(
+  test.each([157_680_000, 157_788_000, 30 * 24 * 60 * 60 + 1])(
+    'refuses a legacy bearer token with a %i second lifetime, above the cap',
+    async expiresInSeconds => {
+      const user = await insertTestUser({ api_token_pepper: `capped-pepper-${expiresInSeconds}` });
+      const now = Math.floor(Date.now() / 1000);
+      const token = signPolicyClaims({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        iat: now,
+        exp: now + expiresInSeconds,
+      });
+
+      const result = await getUserFromBearerForCredentialExchange(
+        new Headers({ authorization: `Bearer ${token}` }),
+        { legacy: 'five-year-api' }
+      );
+
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(result.user).toBeNull();
+    }
+  );
+
+  test.each([30 * 24 * 60 * 60])(
     'authorizes eligible legacy bearer tokens with a %i second lifetime',
     async expiresInSeconds => {
       const user = await insertTestUser({ api_token_pepper: `legacy-pepper-${expiresInSeconds}` });
@@ -1456,7 +1540,7 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  test.each([30 * 24 * 60 * 60, 157_680_000, 157_788_000])(
+  test.each([30 * 24 * 60 * 60])(
     'authorizes a near-expiry legacy bearer token with a %i second lifetime',
     async lifetime => {
       const user = await insertTestUser({ api_token_pepper: `near-expiry-pepper-${lifetime}` });
@@ -1511,7 +1595,7 @@ describe('credential exchange bearer authentication guard', () => {
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
       iat: now,
-      exp: now + 157_680_000,
+      exp: now + 30 * 24 * 60 * 60,
     });
 
     const result = await getUserFromBearerForCredentialExchange(
@@ -1655,7 +1739,7 @@ describe('credential exchange bearer authentication guard', () => {
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
       iat: now,
-      exp: now + 157_680_000,
+      exp: now + 30 * 24 * 60 * 60,
       ...marker,
     });
 
@@ -1667,7 +1751,7 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.authFailedResponse?.status).toBe(401);
   });
 
-  test('exchanges a five-year bearer token bound to its device session', async () => {
+  test('exchanges a 30-day bearer token bound to its device session', async () => {
     const user = await insertTestUser({ api_token_pepper: 'session-exchange-pepper' });
     const [session] = await db
       .insert(device_sessions)
@@ -1680,7 +1764,7 @@ describe('credential exchange bearer authentication guard', () => {
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
       iat: now,
-      exp: now + 157_680_000,
+      exp: now + 30 * 24 * 60 * 60,
       deviceSessionId: session!.id,
     });
 
@@ -1694,7 +1778,7 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.deviceSessionId).toBe(session!.id);
   });
 
-  test('refuses to exchange a five-year bearer token whose device session is revoked', async () => {
+  test('refuses to exchange a 30-day bearer token whose device session is revoked', async () => {
     const user = await insertTestUser({ api_token_pepper: 'revoked-exchange-pepper' });
     const [session] = await db
       .insert(device_sessions)
@@ -1711,7 +1795,7 @@ describe('credential exchange bearer authentication guard', () => {
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
       iat: now,
-      exp: now + 157_680_000,
+      exp: now + 30 * 24 * 60 * 60,
       deviceSessionId: session!.id,
     });
 

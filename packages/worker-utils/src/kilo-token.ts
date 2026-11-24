@@ -6,19 +6,19 @@ import { KILO_TOKEN_VERSION } from './kilo-token-version';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
 import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
   assertKiloTokenIssuedAt,
+  assertKiloTokenLifetime,
   checkKiloTokenAuthorityClaims,
+  isKiloTokenLifetimeAllowed,
   verifyKiloTokenSignature,
 } from './kilo-token-verification';
 
-export { KILO_TOKEN_VERSION };
-
-/** The longest lifetime any Kilo token may be minted with: 30 days. */
-export const KILO_TOKEN_MAX_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+export { KILO_TOKEN_VERSION, KILO_TOKEN_MAX_LIFETIME_SECONDS, isKiloTokenLifetimeAllowed };
 
 /**
- * Refuses to mint a token that would outlive the cap. Verification is not
- * affected: tokens issued with a longer lifetime before the cap stay valid.
+ * Refuses to mint a token that would outlive the cap, which every verifier
+ * refuses as well.
  */
 export function assertKiloTokenLifetimeWithinCap(expiresInSeconds: number): void {
   if (!(expiresInSeconds <= KILO_TOKEN_MAX_LIFETIME_SECONDS)) {
@@ -135,7 +135,8 @@ export async function signKiloToken(params: {
 /**
  * Verify a Kilo user JWT (HS256, version 3).
  *
- * Checks: signature, expiration (built into jose), version === 3, and that
+ * Checks: signature, expiration (built into jose), a lifetime (`exp - iat`) of
+ * at most `KILO_TOKEN_MAX_LIFETIME_SECONDS`, version === 3, and that
  * kiloUserId is a non-empty string. When the token carries
  * `cloudAgentAuthority`, it also checks that `iat` is present and not in the
  * future.
@@ -157,6 +158,7 @@ export async function verifyKiloToken(
   if (options?.audience === undefined && payload.aud !== undefined) {
     throw new Error('Unexpected token audience');
   }
+  assertKiloTokenLifetime(payload);
 
   if (checkKiloTokenAuthorityClaims(payload)) {
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));

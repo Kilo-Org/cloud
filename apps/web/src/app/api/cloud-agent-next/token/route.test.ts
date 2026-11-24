@@ -61,7 +61,7 @@ function sourceToken(claims: Record<string, unknown> = {}, signingSecret = secre
       apiTokenPepper: user.api_token_pepper,
       deviceAuthRequestCode: 'synthetic-cli-pairing-code',
       iat: now,
-      exp: now + 157_680_000,
+      exp: now + 30 * 24 * 60 * 60,
       ...claims,
     },
     signingSecret,
@@ -322,6 +322,13 @@ it.each([
   { name: 'wrong audience', claims: { aud: 'kilo-gateway' } },
 ])('rejects a source with $name', async ({ claims }) => {
   const response = await POST(request(sourceToken(claims)));
+  expect(response.status).toBe(401);
+  expect(await response.json()).not.toHaveProperty('token');
+});
+
+it('rejects a five-year legacy token, which outlives the lifetime cap', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 157_680_000;
+  const response = await POST(request(sourceToken({ exp })));
   expect(response.status).toBe(401);
   expect(await response.json()).not.toHaveProperty('token');
 });

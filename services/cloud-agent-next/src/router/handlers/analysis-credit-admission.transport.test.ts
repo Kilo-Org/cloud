@@ -37,6 +37,7 @@ const ENDPOINT = 'https://worker.test/trpc/getAnalysisCreditAdmission';
 
 const TOKEN = jwt.sign({ version: 3, kiloUserId: 'usr_transport' }, SECRET, {
   algorithm: 'HS256',
+  expiresIn: 60,
 });
 
 const env = {

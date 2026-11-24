@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SignJWT } from 'jose';
 import { validateKiloToken } from './jwt';
-import { KILO_TOKEN_VERSION } from '../config';
+import { KILO_TOKEN_VERSION, KILOCODE_API_KEY_EXPIRY_SECONDS } from '../config';
 import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils';
 
 const TEST_SECRET = 'test-secret-for-jwt-verification';
@@ -71,7 +71,7 @@ describe('validateKiloToken', () => {
     }
   });
 
-  it('preserves legacy tokens without an audience or date claims', async () => {
+  it('refuses a token without date claims, which cannot prove its lifetime', async () => {
     const token = await new SignJWT({
       kiloUserId: 'user_123',
       apiTokenPepper: 'pepper_abc',
@@ -81,10 +81,33 @@ describe('validateKiloToken', () => {
       .sign(new TextEncoder().encode(TEST_SECRET));
 
     await expect(validateKiloToken(token, TEST_SECRET, undefined)).resolves.toEqual({
-      success: true,
-      userId: 'user_123',
-      token,
-      pepper: 'pepper_abc',
+      success: false,
+      error: 'Token lifetime is missing or exceeds the maximum',
+    });
+  });
+
+  it('accepts a 30-day API key and refuses a longer-lived token', async () => {
+    const sign = (lifetimeSeconds: number) => {
+      const iat = Math.floor(Date.now() / 1000);
+      return new SignJWT({
+        kiloUserId: 'user_123',
+        apiTokenPepper: 'pepper_abc',
+        version: KILO_TOKEN_VERSION,
+        iat,
+        exp: iat + lifetimeSeconds,
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .sign(new TextEncoder().encode(TEST_SECRET));
+    };
+
+    await expect(
+      validateKiloToken(await sign(KILOCODE_API_KEY_EXPIRY_SECONDS), TEST_SECRET, undefined)
+    ).resolves.toMatchObject({ success: true, userId: 'user_123' });
+    await expect(
+      validateKiloToken(await sign(KILOCODE_API_KEY_EXPIRY_SECONDS + 1), TEST_SECRET, undefined)
+    ).resolves.toEqual({
+      success: false,
+      error: 'Token lifetime is missing or exceeds the maximum',
     });
   });
 

@@ -16,8 +16,7 @@ export const usage = '<email> [options]';
 // The resource-delegation policy (createControlTokenForRequest →
 // isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in
 // @kilocode/worker-utils) only accepts legacy API tokens with that exact
-// lifetime (or a historical five-year one) for credential exchange, so any
-// other lifetime is rejected by control-token routes such as
+// lifetime for credential exchange, so any other lifetime is rejected by control-token routes such as
 // cloudAgentNext.prepareSession with 403 "Unsupported legacy credential
 // context" — the 2026-09-12 failure of the delegation-protected
 // prepareSession probe.

@@ -30,7 +30,8 @@ const NOW = new Date('2030-01-02T03:04:05.000Z');
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
 const HISTORICAL_FIVE_YEAR_LIFETIMES = [157_680_000, 157_788_000] as const;
 const THIRTY_DAYS = 30 * 24 * 60 * 60;
-const EXCHANGEABLE_LEGACY_LIFETIMES = [...HISTORICAL_FIVE_YEAR_LIFETIMES, THIRTY_DAYS] as const;
+const EXCHANGEABLE_LEGACY_LIFETIMES = [THIRTY_DAYS] as const;
+const LIFETIME_REFUSAL = 'Token lifetime is missing or exceeds the maximum';
 const API_POLICY = { audience: 'kilo-api', mode: 'required' } as const;
 const LEGACY_POLICY = { audience: 'kilo-api', mode: 'allow-legacy' } as const;
 
@@ -412,16 +413,16 @@ describe('verifyKiloTokenForResource', () => {
     expect(payload).not.toHaveProperty('credentialExchange');
   });
 
-  it('preserves optional dates and jose temporal behavior', async () => {
+  it('requires dates and preserves jose temporal behavior', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    const undated = await verifyKiloTokenForResource(
-      await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' }, { dates: false }),
-      SECRET,
-      API_POLICY
-    );
-    expect(undated).not.toHaveProperty('iat');
-    expect(undated).not.toHaveProperty('exp');
+    await expect(
+      verifyKiloTokenForResource(
+        await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' }, { dates: false }),
+        SECRET,
+        API_POLICY
+      )
+    ).rejects.toThrow(LIFETIME_REFUSAL);
     await expect(
       verifyKiloTokenForResource(
         await sign(legacyClaims({ aud: 'kilo-api', iat: NOW_SECONDS + 1, exp: NOW_SECONDS + 10 })),
@@ -436,6 +437,27 @@ describe('verifyKiloTokenForResource', () => {
         API_POLICY
       )
     ).resolves.toMatchObject({ exp: NOW_SECONDS + 1.5 });
+  });
+
+  it('accepts a lifetime of exactly 30 days and refuses a longer one', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ exp: NOW_SECONDS + THIRTY_DAYS })),
+        SECRET,
+        LEGACY_POLICY
+      )
+    ).resolves.toMatchObject({ kiloUserId: 'synthetic-user' });
+    for (const lifetime of [THIRTY_DAYS + 1, ...HISTORICAL_FIVE_YEAR_LIFETIMES]) {
+      await expect(
+        verifyKiloTokenForResource(
+          await sign(legacyClaims({ aud: 'kilo-api', exp: NOW_SECONDS + lifetime })),
+          SECRET,
+          API_POLICY
+        )
+      ).rejects.toThrow(LIFETIME_REFUSAL);
+    }
   });
 
   it('rejects malformed, expired, not-before, signature, version, and user failures', async () => {
@@ -541,7 +563,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     ).rejects.toThrow('synthetic dependency unavailable');
   });
 
-  it('accepts exactly the five-year lifetimes and the 30-day lifetime', () => {
+  it('accepts exactly the 30-day lifetime', () => {
     expect([...LEGACY_API_TOKEN_LIFETIMES_SECONDS]).toEqual([...EXCHANGEABLE_LEGACY_LIFETIMES]);
   });
 
@@ -572,11 +594,25 @@ describe('isKiloCredentialExchangeEligible', () => {
     }
   );
 
+  it.each([THIRTY_DAYS + 1, ...HISTORICAL_FIVE_YEAR_LIFETIMES])(
+    'refuses a %i-second legacy API token before any exchange decision',
+    async lifetime => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      await expect(
+        verifyKiloTokenForPolicy(
+          await sign(legacyClaims({ exp: NOW_SECONDS + lifetime })),
+          SECRET,
+          LEGACY_POLICY
+        )
+      ).rejects.toThrow(LIFETIME_REFUSAL);
+    }
+  );
+
   it.each([
     6 * 60 * 60,
     24 * 60 * 60,
     ...EXCHANGEABLE_LEGACY_LIFETIMES.map(lifetime => lifetime - 1),
-    ...EXCHANGEABLE_LEGACY_LIFETIMES.map(lifetime => lifetime + 1),
   ])('rejects legacy original lifetime %i seconds', async lifetime => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -610,16 +646,16 @@ describe('isKiloCredentialExchangeEligible', () => {
     }
   );
 
-  it('rejects a longer original lifetime even when exactly five years remain', async () => {
+  it('refuses a longer original lifetime even when exactly 30 days remain', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    const context = await verifyKiloTokenForPolicy(
-      await sign(legacyClaims({ iat: NOW_SECONDS - 1, exp: NOW_SECONDS + 157_680_000 })),
-      SECRET,
-      LEGACY_POLICY
-    );
-    expect(context.claims.exp - context.claims.iat).toBe(157_680_001);
-    expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
+    await expect(
+      verifyKiloTokenForPolicy(
+        await sign(legacyClaims({ iat: NOW_SECONDS - 1, exp: NOW_SECONDS + THIRTY_DAYS })),
+        SECRET,
+        LEGACY_POLICY
+      )
+    ).rejects.toThrow(LIFETIME_REFUSAL);
   });
 
   it.each([
@@ -650,7 +686,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
   });
 
-  it('permits a five-year credential that also names its session', async () => {
+  it('permits a 30-day credential that also names its session', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
@@ -662,7 +698,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(false);
   });
 
-  it('still denies a five-year credential with another restricted marker', async () => {
+  it('still denies a 30-day credential with another restricted marker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const context = await verifyKiloTokenForPolicy(
@@ -978,7 +1014,7 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     ).toThrow();
   });
 
-  it('leaves the legacy verifier behavior unchanged for audiences, stripped modern fields, and absent dates', async () => {
+  it('leaves the legacy verifier behavior unchanged for audiences and refuses absent dates', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const audienceToken = await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' });
@@ -996,10 +1032,7 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .sign(key());
-    await expect(verifyKiloToken(noDates, SECRET)).resolves.toEqual({
-      version: 3,
-      kiloUserId: 'synthetic-user',
-    });
+    await expect(verifyKiloToken(noDates, SECRET)).rejects.toThrow(LIFETIME_REFUSAL);
     await expect(verifyKiloTokenForPolicy(noDates, SECRET, LEGACY_POLICY)).rejects.toThrow();
   });
 });

@@ -24,6 +24,12 @@ async function sign(payload: Record<string, unknown>, secret = SECRET, expiresIn
     .sign(encode(secret));
 }
 
+async function signDated(claims: Record<string, unknown>) {
+  return new SignJWT({ version: 3, kiloUserId: 'user-123', ...claims })
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(encode(SECRET));
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -350,6 +356,48 @@ describe('verifyKiloToken', () => {
   it('rejects expired token', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' }, SECRET, '0s');
     await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+  });
+
+  it('accepts a lifetime of exactly the cap', async () => {
+    const iat = Math.floor(Date.now() / 1000);
+    const token = await signDated({ iat, exp: iat + KILO_TOKEN_MAX_LIFETIME_SECONDS });
+    await expect(verifyKiloToken(token, SECRET)).resolves.toMatchObject({
+      kiloUserId: 'user-123',
+    });
+  });
+
+  it.each([
+    ['one second above the cap', KILO_TOKEN_MAX_LIFETIME_SECONDS + 1],
+    ['five years', 157_680_000],
+  ])('rejects a lifetime of %s', async (_name, lifetime) => {
+    const iat = Math.floor(Date.now() / 1000);
+    const token = await signDated({ iat, exp: iat + lifetime });
+    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow(
+      'Token lifetime is missing or exceeds the maximum'
+    );
+  });
+
+  it('rejects a long-lived token on the audience-bound reader too', async () => {
+    const iat = Math.floor(Date.now() / 1000);
+    const token = await signDated({
+      iat,
+      exp: iat + KILO_TOKEN_MAX_LIFETIME_SECONDS + 1,
+      aud: 'user-data-export',
+    });
+    await expect(verifyKiloToken(token, SECRET, { audience: 'user-data-export' })).rejects.toThrow(
+      'Token lifetime is missing or exceeds the maximum'
+    );
+  });
+
+  it.each([
+    ['iat', { exp: Math.floor(Date.now() / 1000) + 60 }],
+    ['exp', { iat: Math.floor(Date.now() / 1000) }],
+    ['iat and exp', {}],
+  ])('rejects a token without %s, which cannot prove its lifetime', async (_name, dates) => {
+    const token = await signDated(dates);
+    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow(
+      'Token lifetime is missing or exceeds the maximum'
+    );
   });
 
   it('rejects a non-JWT string', async () => {

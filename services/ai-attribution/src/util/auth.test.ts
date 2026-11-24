@@ -159,12 +159,24 @@ describe('validateKiloToken', () => {
     });
   });
 
-  it('accepts a legacy token without an audience, issue date, or expiry date', async () => {
-    const token = signPayload(policyPayload({ iat: undefined, exp: undefined }));
+  it('accepts a legacy token without an audience', async () => {
+    const token = signPayload(policyPayload());
 
     await expect(validateKiloToken(`Bearer ${token}`, TEST_SECRET)).resolves.toMatchObject({
       success: true,
       token,
+    });
+  });
+
+  it.each([
+    ['without an issue date or expiry date', { iat: undefined, exp: undefined }],
+    ['that outlives the lifetime cap', { exp: Math.floor(Date.now() / 1000) + 31 * 24 * 60 * 60 }],
+  ])('rejects a token %s', async (_name, dates) => {
+    const token = signPayload(policyPayload(dates));
+
+    await expect(validateKiloToken(`Bearer ${token}`, TEST_SECRET)).resolves.toEqual({
+      success: false,
+      error: 'Invalid or expired token',
     });
   });
 

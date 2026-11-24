@@ -316,7 +316,7 @@ describe('resource delegation authority', () => {
     });
   });
 
-  test('accepts a device credential with the fixed legacy lifetime', async () => {
+  test('refuses a device credential with the five-year lifetime', async () => {
     const current = await user();
     const [session] = await db
       .insert(device_sessions)
@@ -334,13 +334,9 @@ describe('resource delegation authority', () => {
       { algorithm: 'HS256', expiresIn: 5 * 365 * 24 * 60 * 60 }
     );
 
-    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
-
-    expect(authority).toMatchObject({
-      credentialKind: 'device-access',
-      isModern: false,
-      deviceSessionId: session.id,
-    });
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   test('accepts a device credential with the 30-day lifetime', async () => {
@@ -370,7 +366,29 @@ describe('resource delegation authority', () => {
     });
   });
 
-  test.each([30 * 24 * 60 * 60, 157_680_000])(
+  test.each([30 * 24 * 60 * 60 + 1, 157_680_000, 157_788_000])(
+    'refuses a legacy API credential with a %i second lifetime, above the cap',
+    async expiresIn => {
+      const current = await user();
+      const token = jwt.sign(
+        {
+          version: 3,
+          kiloUserId: current.id,
+          apiTokenPepper: current.api_token_pepper,
+          env: process.env.NODE_ENV,
+          deviceAuthRequestCode: 'ABC123',
+        },
+        secret,
+        { algorithm: 'HS256', expiresIn }
+      );
+
+      await expect(
+        getResourceDelegationAuthority(current, { headers: bearer(token) })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+  );
+
+  test.each([30 * 24 * 60 * 60])(
     'accepts a legacy API credential with a %i second lifetime',
     async expiresIn => {
       const current = await user();
@@ -648,7 +666,7 @@ describe('resource delegation authority', () => {
     expect(new Date(result.expiresAt).getTime() / 1000).toBe(claims.exp);
   });
 
-  test('mints a Pages token from the legacy five-year device credential', async () => {
+  test('mints a Pages token from the legacy 30-day device credential', async () => {
     const current = await user();
     const now = Math.floor(Date.now() / 1000);
     const legacy = jwt.sign(
@@ -659,7 +677,7 @@ describe('resource delegation authority', () => {
         version: 3,
         deviceAuthRequestCode: 'ABC123',
         iat: now,
-        exp: now + 157_788_000,
+        exp: now + 30 * 24 * 60 * 60,
       },
       secret,
       { algorithm: 'HS256' }

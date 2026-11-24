@@ -11,6 +11,7 @@ import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
 import {
   assertKiloTokenIssuedAt,
+  assertKiloTokenLifetime,
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
 } from './kilo-token-verification';
@@ -141,6 +142,7 @@ export async function verifyKiloTokenForResource(
 ): Promise<KiloTokenPayload> {
   const { payload } = await verifyKiloTokenSignature(token, secret);
   assertKiloTokenAudience(payload.aud, audiencePolicy);
+  assertKiloTokenLifetime(payload);
   if (checkKiloTokenAuthorityClaims(payload)) {
     policyClaims.parse(payload);
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
@@ -186,6 +188,7 @@ export async function verifyKiloTokenForPolicy(
   const currentDate = new Date();
   const { payload } = await verifyKiloTokenSignature(token, secret, { currentDate });
   const claims = policyClaims.parse(payload);
+  assertKiloTokenLifetime(claims);
   checkKiloTokenAuthorityClaims(payload);
   assertKiloTokenIssuedAt(claims.iat, Math.floor(currentDate.getTime() / 1000));
   assertKiloTokenAudience(claims.aud, audiencePolicy);
@@ -217,14 +220,11 @@ export async function verifyKiloSessionForPolicy(
 }
 
 /**
- * Lifetimes of an audience-less user API credential: the two five-year values
- * minted before the 30-day cap, which stay accepted, and the 30 days minted now.
+ * Lifetime of an audience-less user API credential. The five-year lifetimes
+ * minted before the 30-day cap are refused at verification, so only the 30 days
+ * minted now remains.
  */
-export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [
-  157_680_000,
-  157_788_000,
-  KILO_TOKEN_MAX_LIFETIME_SECONDS,
-] as const;
+export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [KILO_TOKEN_MAX_LIFETIME_SECONDS] as const;
 
 export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';

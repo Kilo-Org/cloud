@@ -18,7 +18,6 @@ import { exchangeResponseSchema } from '../../src/protocol';
 
 const NEXTAUTH_SECRET = 'exchange-postgres-nextauth-secret-0123456789';
 const GRANT_SECRET = 'exchange-postgres-grant-secret-0123456789abc';
-const FIVE_YEARS = 157_680_000;
 const THIRTY_DAYS = 30 * 24 * 60 * 60;
 
 let client: DrizzleClient;
@@ -85,8 +84,6 @@ async function legacy(
   user: { id: string; pepper: string },
   options: { lifetime?: number; extra?: SignKiloTokenExtra } = {}
 ) {
-  // Signed directly: the default is the five-year lifetime that `signKiloToken`
-  // no longer mints and the exchange must keep accepting.
   const issuedAt = Math.floor(Date.now() / 1000);
   return new SignJWT({
     version: 3,
@@ -95,7 +92,7 @@ async function legacy(
     env: 'development',
     ...(options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' }),
     iat: issuedAt,
-    exp: issuedAt + (options.lifetime ?? FIVE_YEARS),
+    exp: issuedAt + (options.lifetime ?? THIRTY_DAYS),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
@@ -136,11 +133,10 @@ describe('credential exchange against the account database', () => {
     });
   });
 
-  it('issues a grant for a 30-day API credential', async () => {
+  it('refuses a five-year API credential of a live account', async () => {
     const user = await account();
-    const response = await exchange(request(await legacy(user, { lifetime: THIRTY_DAYS })), env);
-    expect(response.status).toBe(200);
-    expect(exchangeResponseSchema.parse(await response.json())).toMatchObject({ userID: user.id });
+    const response = await exchange(request(await legacy(user, { lifetime: 157_680_000 })), env);
+    expect(await code(response)).toEqual({ status: 401, code: 'invalid_credential' });
   });
 
   it('issues a grant for a 30-day credential bound to a live device session', async () => {

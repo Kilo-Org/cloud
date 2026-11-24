@@ -17,6 +17,7 @@ import {
   KILO_TOKEN_MAX_LIFETIME_SECONDS,
   KILO_TOKEN_VERSION,
   assertKiloTokenLifetimeWithinCap,
+  isKiloTokenLifetimeAllowed,
   kiloTokenPayload,
 } from '@kilocode/worker-utils/kilo-token';
 import {
@@ -266,11 +267,12 @@ function tryJwtVerify(token: string) {
  *
  * Every other reason means the caller presented a credential that could not be
  * accepted — `invalid_token`, `token_version_outdated`,
- * `runtime_attestation_required`, or a valid token sent to an endpoint it is not
- * scoped for (`audience_not_allowed`). Such a request must not be answered as an
- * anonymous caller. The caller believes it is authenticated, so downgrading it
- * silently drops the account, its organization, its BYOK keys and its credits,
- * and hides the broken credential from the client that sent it.
+ * `token_lifetime_exceeded`, `runtime_attestation_required`, or a valid token
+ * sent to an endpoint it is not scoped for (`audience_not_allowed`). Such a
+ * request must not be answered as an anonymous caller. The caller believes it
+ * is authenticated, so downgrading it silently drops the account, its
+ * organization, its BYOK keys and its credits, and hides the broken credential
+ * from the client that sent it.
  */
 const ANONYMOUS_FALL_THROUGH_REASON = 'missing_credentials';
 
@@ -347,6 +349,19 @@ export function validateAuthorizationHeader(
     return {
       error: `Token version outdated, please re-authenticate (${traceability_logging_id})`,
       reason: 'token_version_outdated',
+    };
+  }
+
+  if (!isKiloTokenLifetimeAllowed(payload)) {
+    const traceability_logging_id = crypto.randomUUID();
+    warnExceptInTest(`Token lifetime exceeds the maximum (${traceability_logging_id}):`, {
+      iat: payload.iat,
+      exp: payload.exp,
+      kiloUserId: payload.kiloUserId,
+    });
+    return {
+      error: `Token lifetime exceeds the maximum, please re-authenticate (${traceability_logging_id})`,
+      reason: 'token_lifetime_exceeded',
     };
   }
 

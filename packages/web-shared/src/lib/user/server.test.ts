@@ -217,7 +217,7 @@ describe('getUserUUID', () => {
   });
 
   test('should generate a UUID for a legacy user id (oauth/google format)', () => {
-    const legacyId = 'oauth/google:114000741928328149731';
+    const legacyId = 'oauth/google:100000000000000000004';
     const user = { id: legacyId } as User;
 
     const result = getUserUUID(user);
@@ -228,7 +228,7 @@ describe('getUserUUID', () => {
   });
 
   test('should always return the SAME UUID for the same legacy user id', () => {
-    const legacyId = 'oauth/google:114000741928328149731';
+    const legacyId = 'oauth/google:100000000000000000004';
     const user = { id: legacyId } as User;
 
     const result1 = getUserUUID(user);
@@ -245,7 +245,7 @@ describe('getUserUUID', () => {
   });
 
   test('should generate different UUIDs for different legacy user ids', () => {
-    const legacyId1 = 'oauth/google:114000741928328149731';
+    const legacyId1 = 'oauth/google:100000000000000000004';
     const legacyId2 = 'oauth/google:987654321098765432109';
 
     const user1 = { id: legacyId1 } as User;
@@ -261,7 +261,7 @@ describe('getUserUUID', () => {
 
   test('should handle various legacy id formats consistently', () => {
     const legacyFormats = [
-      'oauth/google:114000741928328149731',
+      'oauth/google:100000000000000000004',
       'oauth/github:12345678',
       'oauth/gitlab:abcdef123',
       'some-other-legacy-format',
@@ -296,7 +296,7 @@ describe('getUserUUID', () => {
   test('CRITICAL: should always return a UUID string, never undefined or null', () => {
     const testCases = [
       { id: '550e8400-e29b-41d4-a716-446655440000' }, // Valid UUID
-      { id: 'oauth/google:114000741928328149731' }, // Legacy format
+      { id: 'oauth/google:100000000000000000004' }, // Legacy format
       { id: 'some-random-string' }, // Random string
       { id: '' }, // Empty string
     ];
@@ -314,7 +314,7 @@ describe('getUserUUID', () => {
 
   test('should be deterministic - same input always produces same output', () => {
     const testCases = [
-      'oauth/google:114000741928328149731',
+      'oauth/google:100000000000000000004',
       'oauth/github:12345',
       'random-legacy-id',
     ];

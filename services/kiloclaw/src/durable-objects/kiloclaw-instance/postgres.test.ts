@@ -22,8 +22,8 @@ import type { KiloClawEnv } from '../../types';
 
 describe('fallbackAppNameForRestore', () => {
   it('keeps migrated legacy sandboxes on the acct-* naming path', async () => {
-    const legacyUserId = 'oauth/google:117453785559478190551';
-    const migratedUserId = '199e2b19-aa40-488d-9442-9a18a620ba68';
+    const legacyUserId = 'oauth/google:100000000000000000005';
+    const migratedUserId = '22222222-2222-4222-8222-222222222222';
 
     await expect(
       fallbackAppNameForRestore(migratedUserId, sandboxIdFromUserId(legacyUserId))
@@ -35,7 +35,7 @@ describe('fallbackAppNameForRestore', () => {
 
     await expect(
       fallbackAppNameForRestore(
-        '199e2b19-aa40-488d-9442-9a18a620ba68',
+        '22222222-2222-4222-8222-222222222222',
         'ki_11111111111141118111111111111111'
       )
     ).resolves.toBe(await appNameFromInstanceId(instanceId));

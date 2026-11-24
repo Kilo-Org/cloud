@@ -5,7 +5,9 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   backfillBlockBlacklistedDomainsBatch,
+  countUnblockableDomainUsers,
   findBlacklistedEmailDomains,
+  unblockBlacklistedDomainUsersBatch,
 } from './block-blacklisted-domains';
 
 beforeEach(async () => {
@@ -261,5 +263,178 @@ describe('backfillBlockBlacklistedDomainsBatch', () => {
       .where(eq(kilocode_users.id, already.id));
     expect(row.blocked_reason).toBe('prior reason');
     expect(row.api_token_pepper).toBe('prior-pepper');
+  });
+});
+
+describe('countUnblockableDomainUsers', () => {
+  it('splits matching domain-blocked users by positive balance', async () => {
+    await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 40,
+    });
+    await insertTestUser({
+      google_user_email: 'b@evil.mailinator.com',
+      email_domain: 'evil.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 100,
+    });
+    await insertTestUser({
+      google_user_email: 'c@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'manual',
+      total_microdollars_acquired: 100,
+    });
+
+    await expect(
+      countUnblockableDomainUsers({ domain: 'mailinator.com', remainingDomains: [] })
+    ).resolves.toEqual({ unblockable: 1, keptBlocked: 1 });
+  });
+
+  it('excludes users still matched by a remaining blacklist entry', async () => {
+    await insertTestUser({
+      google_user_email: 'a@sub.mailinator.com',
+      email_domain: 'sub.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    await expect(
+      countUnblockableDomainUsers({
+        domain: 'sub.mailinator.com',
+        remainingDomains: ['mailinator.com'],
+      })
+    ).resolves.toEqual({ unblockable: 0, keptBlocked: 0 });
+  });
+});
+
+describe('unblockBlacklistedDomainUsersBatch', () => {
+  it('unblocks only positive-balance domain blocks and keeps rotated peppers', async () => {
+    const target = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      blocked_at: '2026-01-01T00:00:00.000Z',
+      blocked_by_kilo_user_id: 'blocking-admin',
+      api_token_pepper: 'rotated-pepper',
+      total_microdollars_acquired: 100,
+      microdollars_used: 40,
+    });
+    const subdomain = await insertTestUser({
+      google_user_email: 'b@evil.mailinator.com',
+      email_domain: 'evil.mailinator.com',
+      blocked_reason: 'domainblocked',
+      api_token_pepper: 'subdomain-pepper',
+      total_microdollars_acquired: 50,
+    });
+    const zeroBalance = await insertTestUser({
+      google_user_email: 'c@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 100,
+    });
+    const negativeBalance = await insertTestUser({
+      google_user_email: 'd@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 50,
+      microdollars_used: 150,
+    });
+    const manual = await insertTestUser({
+      google_user_email: 'e@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'manual',
+      total_microdollars_acquired: 100,
+    });
+    const admin = await insertTestUser({
+      google_user_email: 'f@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      is_admin: true,
+      total_microdollars_acquired: 100,
+    });
+    const deleted = await insertTestUser({
+      google_user_email: 'g@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'soft-deleted at 2026-01-01T00:00:00.000Z',
+      total_microdollars_acquired: 100,
+    });
+    const other = await insertTestUser({
+      google_user_email: 'h@legit.com',
+      email_domain: 'legit.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    const result = await unblockBlacklistedDomainUsersBatch({
+      domain: 'mailinator.com',
+      remainingDomains: [],
+      positiveBalanceOnly: true,
+    });
+
+    expect(result).toEqual({ processed: 2, remaining: false, keptBlocked: 2 });
+
+    const rows = await db
+      .select({
+        id: kilocode_users.id,
+        blocked_reason: kilocode_users.blocked_reason,
+        blocked_at: kilocode_users.blocked_at,
+        blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(
+        inArray(kilocode_users.id, [
+          target.id,
+          subdomain.id,
+          zeroBalance.id,
+          negativeBalance.id,
+          manual.id,
+          admin.id,
+          deleted.id,
+          other.id,
+        ])
+      );
+    const byId = new Map(rows.map(row => [row.id, row]));
+
+    expect(byId.get(target.id)).toMatchObject({
+      blocked_reason: null,
+      blocked_at: null,
+      blocked_by_kilo_user_id: null,
+      api_token_pepper: 'rotated-pepper',
+    });
+    expect(byId.get(subdomain.id)?.blocked_reason).toBeNull();
+    expect(byId.get(zeroBalance.id)?.blocked_reason).toBe('domainblocked');
+    expect(byId.get(negativeBalance.id)?.blocked_reason).toBe('domainblocked');
+    expect(byId.get(manual.id)?.blocked_reason).toBe('manual');
+    expect(byId.get(admin.id)?.blocked_reason).toBe('domainblocked');
+    expect(byId.get(deleted.id)?.blocked_reason).toBe('soft-deleted at 2026-01-01T00:00:00.000Z');
+    expect(byId.get(other.id)?.blocked_reason).toBe('domainblocked');
+  });
+
+  it('leaves users blocked while a remaining entry still matches them', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'a@sub.mailinator.com',
+      email_domain: 'sub.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    const result = await unblockBlacklistedDomainUsersBatch({
+      domain: 'sub.mailinator.com',
+      remainingDomains: ['mailinator.com'],
+      positiveBalanceOnly: true,
+    });
+
+    expect(result).toEqual({ processed: 0, remaining: false, keptBlocked: 0 });
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBe('domainblocked');
   });
 });

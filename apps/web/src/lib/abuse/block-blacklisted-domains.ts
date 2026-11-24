@@ -153,3 +153,161 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
 
   return { processed: totalProcessed, remaining: !reachedEnd };
 }
+
+export type UnblockBlacklistedDomainResponse = {
+  processed: number;
+  remaining: boolean;
+  keptBlocked: number;
+};
+
+export type UnblockDomainCounts = {
+  unblockable: number;
+  keptBlocked: number;
+};
+
+type UnblockDomainParams = {
+  domain: string;
+  remainingDomains: string[];
+  positiveBalanceOnly: boolean;
+};
+
+function normalizeDomains(domains: string[]): Set<string> {
+  return new Set(domains.map(domain => domain.toLowerCase().trim()).filter(Boolean));
+}
+
+function positiveBalanceCondition(): SQL {
+  return sql`(${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used}) > 0`;
+}
+
+async function findUnblockableEmailDomains({
+  domain,
+  remainingDomains,
+}: Pick<UnblockDomainParams, 'domain' | 'remainingDomains'>): Promise<string[]> {
+  const removed = normalizeDomains([domain]);
+  if (removed.size === 0) return [];
+  const remaining = normalizeDomains(remainingDomains);
+
+  const rows = await db
+    .select({ email_domain: kilocode_users.email_domain })
+    .from(kilocode_users)
+    .where(
+      and(
+        eq(kilocode_users.blocked_reason, BLOCKED_REASON),
+        blockableUserCondition(),
+        isNotNull(kilocode_users.email_domain)
+      )
+    )
+    .groupBy(kilocode_users.email_domain);
+
+  return rows.flatMap(row => {
+    const emailDomain = row.email_domain;
+    if (emailDomain === null) return [];
+    return emailDomainMatchesBlacklist(emailDomain, removed) &&
+      !emailDomainMatchesBlacklist(emailDomain, remaining)
+      ? [emailDomain]
+      : [];
+  });
+}
+
+export async function countUnblockableDomainUsers(
+  params: Pick<UnblockDomainParams, 'domain' | 'remainingDomains'>
+): Promise<UnblockDomainCounts> {
+  const matchingDomains = await findUnblockableEmailDomains(params);
+  if (matchingDomains.length === 0) return { unblockable: 0, keptBlocked: 0 };
+
+  const [row] = await db
+    .select({
+      unblockable: sql<number>`count(*) FILTER (WHERE ${positiveBalanceCondition()})`.mapWith(
+        Number
+      ),
+      keptBlocked: sql<number>`count(*) FILTER (WHERE NOT (${positiveBalanceCondition()}))`.mapWith(
+        Number
+      ),
+    })
+    .from(kilocode_users)
+    .where(
+      and(
+        eq(kilocode_users.blocked_reason, BLOCKED_REASON),
+        blockableUserCondition(),
+        sql`${kilocode_users.email_domain} = ANY(${sql.param(matchingDomains)}::text[])`
+      )
+    );
+  return { unblockable: row?.unblockable ?? 0, keptBlocked: row?.keptBlocked ?? 0 };
+}
+
+export async function unblockBlacklistedDomainUsersBatch(
+  params: UnblockDomainParams
+): Promise<UnblockBlacklistedDomainResponse> {
+  const matchingDomains = await findUnblockableEmailDomains(params);
+  if (matchingDomains.length === 0) {
+    return { processed: 0, remaining: false, keptBlocked: 0 };
+  }
+
+  const domainCondition = sql`${kilocode_users.email_domain} = ANY(${sql.param(matchingDomains)}::text[])`;
+  const balanceCondition = params.positiveBalanceOnly ? positiveBalanceCondition() : undefined;
+  const eligibleCondition = and(
+    eq(kilocode_users.blocked_reason, BLOCKED_REASON),
+    blockableUserCondition(),
+    domainCondition,
+    balanceCondition
+  );
+
+  const [kept] = params.positiveBalanceOnly
+    ? await db
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(kilocode_users)
+        .where(
+          and(
+            eq(kilocode_users.blocked_reason, BLOCKED_REASON),
+            blockableUserCondition(),
+            domainCondition,
+            sql`NOT (${positiveBalanceCondition()})`
+          )
+        )
+    : [{ count: 0 }];
+
+  let totalProcessed = 0;
+  let reachedEnd = false;
+
+  for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eligibleCondition)
+      .limit(BATCH_SIZE);
+
+    if (rows.length === 0) {
+      reachedEnd = true;
+      break;
+    }
+
+    const updated = await db
+      .update(kilocode_users)
+      .set({
+        blocked_reason: null,
+        blocked_at: null,
+        blocked_by_kilo_user_id: null,
+      })
+      .where(
+        and(
+          inArray(
+            kilocode_users.id,
+            rows.map(r => r.id)
+          ),
+          eq(kilocode_users.blocked_reason, BLOCKED_REASON),
+          blockableUserCondition(),
+          balanceCondition
+        )
+      )
+      .returning({ id: kilocode_users.id });
+
+    totalProcessed += updated.length;
+
+    if (rows.length < BATCH_SIZE) {
+      reachedEnd = true;
+      break;
+    }
+  }
+
+  return { processed: totalProcessed, remaining: !reachedEnd, keptBlocked: kept?.count ?? 0 };
+}

@@ -356,6 +356,34 @@ five-year automation tokens from five-year user tokens, which lifetime alone
 cannot. It never logs user IDs or token content. These counters drive the
 cutover decision.
 
+**Counter implementation.** The counter is one structured JSON log line per
+verification, with a fixed event name (`kilo_token_verification`), in every
+deployable. Both log paths already reach Axiom: Vercel through its log drain
+(the `vercel` dataset, as `admin-access-log.ts` uses) and Cloudflare Workers
+through Logpush (`cloudflare-logpush`). The counters are therefore queried in
+one place with APL, and no Analytics Engine dataset or extra binding is
+needed.
+
+- The dispatcher in `packages/worker-utils` takes an optional
+  `onVerification(event)` callback and stays free of logging dependencies. A
+  shared `logKiloTokenVerification` sink in worker-utils writes the line with
+  `console.log(JSON.stringify(...))`; Workers and web-shared both plug it in.
+- Fields: deployable, call site (for example `web.validateAuthorizationHeader`
+  or `session-ingest.kilo-jwt-auth`), `alg`, issuer (from `kid`, or `legacy`),
+  expected audience, audience form (none, single, array), lifetime bucket (≤5m,
+  ≤1h, ≤1d, ≤30d, five-year), `tokenPurpose` value, `botId` and
+  `internalApiUse` presence, outcome (accepted, or the refusal reason:
+  issuer not accepted, audience not allowed, purpose not allowed, unknown
+  `kid`, HS256 retired), and the sample rate.
+- Every refusal is logged. Accepted verifications may be sampled on
+  high-volume call sites (the gateway and session-ingest) at a fixed rate
+  recorded in the line, so queries can weight by it.
+- Every verifier Worker must have `observability.enabled` and `logpush: true`
+  in its `wrangler.jsonc`, as `services/latency-ingest` does. Phase 0 checks
+  each verifier in the verifier table and enables Logpush where it is missing.
+- The ai-gateway session-fallback counter uses the same line, with call site
+  `gateway.session-fallback` and the route.
+
 ### Signing
 
 - **Workers.** `packages/worker-utils` exposes a `KiloTokenSigner`:
@@ -484,7 +512,9 @@ separate track that must finish before Phase 5.
      Deploys (#8317), so apps/web can mint `deploy-builder:html-deploy` tokens
      that nothing accepts. After removal, a request for that resource gets the
      routes' existing `400 Unsupported resource`.
-5. Add the verification counters.
+5. Add the verification counters: the `logKiloTokenVerification` sink wired
+   into every verifier, and Logpush enabled on any verifier Worker that lacks
+   it (see "Counter implementation").
 
 ### Phase 1: readers accept ES256
 

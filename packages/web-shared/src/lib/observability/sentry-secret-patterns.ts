@@ -8,6 +8,7 @@ const MAX_DEPTH = 12;
 const MAX_ENTRIES = 1000;
 
 const BEARER_PATTERN = /\b(Bearer)\s+[A-Za-z0-9._~+/=-]{16,}/gi;
+const BASIC_PATTERN = /\b(Basic)\s+[A-Za-z0-9+/]{16,}={0,2}/gi;
 
 const SECRET_VALUE_PATTERNS = [
   // A JWS has three segments and a JWE has five; a JWE can have an empty key segment.
@@ -31,15 +32,28 @@ const SENSITIVE_KEY_WORDS = new Set([
   'passphrase',
   'passwd',
   'password',
+  'pepper',
   'secret',
   'session',
   'token',
 ]);
 
-const SENSITIVE_KEY_PAIRS = new Set(['access key', 'api key', 'private key']);
+const SENSITIVE_KEY_PAIRS = new Set([
+  'access key',
+  'api key',
+  'auth header',
+  'authorization header',
+  'cookie header',
+  'encryption key',
+  'private key',
+  'secret key',
+  'signing key',
+]);
 
 export function redactSecretValues(text: string): string {
-  let redacted = text.replace(BEARER_PATTERN, `$1 ${FILTERED_VALUE}`);
+  let redacted = text
+    .replace(BEARER_PATTERN, `$1 ${FILTERED_VALUE}`)
+    .replace(BASIC_PATTERN, `$1 ${FILTERED_VALUE}`);
   for (const pattern of SECRET_VALUE_PATTERNS) {
     redacted = redacted.replace(pattern, FILTERED_VALUE);
   }

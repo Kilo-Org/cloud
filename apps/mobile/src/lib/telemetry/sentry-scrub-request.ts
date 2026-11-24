@@ -11,6 +11,11 @@ const REQUEST_HEADER_ALLOWLIST: ReadonlySet<string> = new Set([
   'user-agent',
 ]);
 
+/** True when a request header with this name may leave the device. */
+export function isAllowedRequestHeader(name: string): boolean {
+  return REQUEST_HEADER_ALLOWLIST.has(name.toLowerCase());
+}
+
 /**
  * Scrub a Sentry event's `request` in place: reduce `url` to origin and path,
  * delete `cookies`, `data` and `query_string`, and keep only the
@@ -25,9 +30,7 @@ export function scrubRequest(req: Record<string, unknown>): void {
   delete req.query_string;
   if (req.headers != null && typeof req.headers === 'object') {
     req.headers = Object.fromEntries(
-      Object.entries(req.headers).filter(([name]) =>
-        REQUEST_HEADER_ALLOWLIST.has(name.toLowerCase())
-      )
+      Object.entries(req.headers).filter(([name]) => isAllowedRequestHeader(name))
     );
   }
 }

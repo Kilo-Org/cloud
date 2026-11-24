@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
+const requestHeaders = new Headers({ 'x-forwarded-for': '203.0.113.7' });
 jest.mock('next/headers', () => ({
-  headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.7' }),
+  headers: async () => requestHeaders,
   cookies: async () => ({
     get: (name: string) => cookieStore.get(name),
     set: (name: string, value: string) => cookieStore.set(name, { name, value }),
@@ -50,7 +51,7 @@ import {
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { user_auth_provider } from '@kilocode/db/schema';
+import { user_auth_provider, type User } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
@@ -87,6 +88,11 @@ async function setSessionCookie(userId: string, claims: Partial<JWT> = {}) {
   });
 }
 
+/** Signs in the request as `user` with a session the account has not revoked. */
+async function setCurrentSessionCookie(user: User) {
+  await setSessionCookie(user.id, { webSessionPepper: user.web_session_pepper });
+}
+
 // These suites exercise a request the way a local run serves it: the client
 // address arrives in the forwarded header, and no platform label rewrites it.
 const originalEnv = process.env;
@@ -94,12 +100,20 @@ beforeEach(() => {
   process.env = { ...originalEnv };
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
+  requestHeaders.delete('authorization');
 });
 afterEach(() => {
   process.env = originalEnv;
 });
 
 describe('authOptions.callbacks.signIn auto-link wiring', () => {
+  let linkingUser: User;
+  let otherUser: User;
+  beforeAll(async () => {
+    linkingUser = await insertTestUser({ web_session_pepper: randomUUID() });
+    otherUser = await insertTestUser({ web_session_pepper: randomUUID() });
+  });
+
   beforeEach(() => {
     cookieStore.clear();
     mockCreateOrUpdateUser.mockReset().mockResolvedValue({
@@ -406,14 +420,14 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       sourceOrganizationId: 'sso-org',
     });
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({
       success: true,
-      user: { id: 'existing-user', blocked_reason: null },
+      user: { id: linkingUser.id, blocked_reason: null },
     } as never);
-    await setSessionCookie('existing-user');
+    await setCurrentSessionCookie(linkingUser);
 
     const result = await signIn({
       user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
@@ -436,10 +450,10 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
   it('requires the web session to name the same user as the pending link', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
     } as never);
-    await setSessionCookie('other-user');
+    await setCurrentSessionCookie(otherUser);
 
     const result = await signIn({
       user: { id: 'x', email: 'mismatch-link@example.com', name: 'Mismatch', image: '' },
@@ -463,7 +477,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
   it('requires a web session to complete a pending link', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
     } as never);
 
@@ -485,14 +499,68 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
+  function completeOpenAiLink(email: string) {
+    return signIn({
+      user: { id: 'x', email, name: 'Linking', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: `openai-${randomUUID()}`, email },
+    } as never);
+  }
+
+  // The link is judged against the account's current state.
+  it.each(['revoked', 'blocked'])(
+    'refuses a link when the session that started it is %s',
+    async sessionState => {
+      const owner = await insertTestUser({
+        web_session_pepper: randomUUID(),
+        ...(sessionState === 'blocked' ? { blocked_reason: 'test block' } : {}),
+      });
+      mockGetAccountLinkingSession.mockResolvedValueOnce({
+        existingUserId: owner.id,
+        targetProvider: 'openai',
+      } as never);
+      await setSessionCookie(owner.id, {
+        webSessionPepper: sessionState === 'revoked' ? randomUUID() : owner.web_session_pepper,
+      });
+
+      const result = await completeOpenAiLink(`${sessionState}-link@example.com`);
+
+      expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses a link when the request presents a bearer credential', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: linkingUser.id,
+      targetProvider: 'openai',
+    } as never);
+    await setCurrentSessionCookie(linkingUser);
+    requestHeaders.set('authorization', 'Bearer any-credential');
+
+    const result = await completeOpenAiLink('bearer-link@example.com');
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('sends a refused organization connect back to its BYOK card', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
       organizationId: SHARED_SERVICES_ORGANIZATION_ID,
       chatGptScope: 'shared_services',
     } as never);
-    await setSessionCookie('other-user');
+    await setCurrentSessionCookie(otherUser);
 
     const result = await signIn({
       user: { id: 'x', email: 'org-mismatch@example.com', name: 'Org Mismatch', image: '' },
@@ -517,15 +585,15 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
   it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
       organizationId: '00000000-0000-4000-8000-000000000001',
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({
       success: true,
-      user: { id: 'existing-user', blocked_reason: null },
+      user: { id: linkingUser.id, blocked_reason: null },
     } as never);
-    await setSessionCookie('existing-user');
+    await setCurrentSessionCookie(linkingUser);
 
     const profile: Record<string, unknown> = {
       sub: 'openai-org-sub',
@@ -555,16 +623,16 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
   // connection.
   async function openAiSharedServicesSignIn() {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: linkingUser.id,
       targetProvider: 'openai',
       organizationId: SHARED_SERVICES_ORGANIZATION_ID,
       chatGptScope: 'shared_services',
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({
       success: true,
-      user: { id: 'existing-user', blocked_reason: null },
+      user: { id: linkingUser.id, blocked_reason: null },
     } as never);
-    await setSessionCookie('existing-user');
+    await setCurrentSessionCookie(linkingUser);
 
     return signIn({
       user: { id: 'x', email: 'shared-services@example.com', name: 'Shared', image: '' },

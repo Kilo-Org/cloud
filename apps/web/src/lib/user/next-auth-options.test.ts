@@ -13,7 +13,7 @@ jest.mock('@/lib/user', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
-  getUserFromSession: jest.fn(),
+  getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
   ...jest.requireActual<typeof domainGatesModule>('@kilocode/web-shared/lib/user/domain-gates'),
@@ -744,9 +744,9 @@ describe('WorkOS sign-in callback', () => {
       createdAt: Date.now(),
     });
     jest
-      .mocked(userServer.getUserFromSession)
-      .mockResolvedValue({ id: 'existing-user' } as Awaited<
-        ReturnType<typeof userServer.getUserFromSession>
+      .mocked(userServer.getUserFromSessionForCredentialIssuance)
+      .mockResolvedValue({ user: { id: 'existing-user' } } as Awaited<
+        ReturnType<typeof userServer.getUserFromSessionForCredentialIssuance>
       >);
 
     await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);

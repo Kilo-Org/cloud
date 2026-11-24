@@ -91,6 +91,7 @@ import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -761,6 +762,20 @@ async function runWithPasskeyManagement(
   }
 }
 
+// The OAuth callback completes a link only for the web session of the account
+// being linked, so starting one requires that same session. The session is
+// read from the request, not the context, because the app shell names its
+// caller with its own cookie.
+async function requireLiveWebSession(ctx: Pick<TRPCContext, 'user'>): Promise<void> {
+  const session = await getUserFromSessionForCredentialIssuance();
+  if (session.user?.id !== ctx.user.id) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Sign in to the Kilo web app to add a sign-in method.',
+    });
+  }
+}
+
 // The `uuid` column stores any 8-4-4-4-12 hex value, so the version-strict
 // RFC validator `z.uuid()` refuses ids the database can hold. `z.guid()`
 // matches the column, so the device-session list and revoke agree on the same
@@ -902,6 +917,7 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await requireLiveWebSession(ctx);
       // Account linking requires the web session that started it. A
       // provider whose callback cannot carry that session (Apple) completes
       // through the pending-link bounce instead. Refuse every provider the

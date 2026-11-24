@@ -3,7 +3,11 @@ import 'server-only';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateKiloClawInferenceToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   AgentIdSchema,
@@ -538,11 +542,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       }
 
       const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+        await generateKiloClawInferenceToken(ctx.user, input.organizationId);
 
       const client = new KiloClawInternalClient();
       let result: Awaited<ReturnType<typeof client.provision>>;
@@ -587,11 +588,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
       const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+        await generateKiloClawInferenceToken(ctx.user, input.organizationId);
 
       const [pin] = await db
         .select({ image_tag: kiloclaw_version_pins.image_tag })
@@ -681,11 +679,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+        await generateKiloClawInferenceToken(ctx.user, input.organizationId);
 
       const response = await client.patchKiloCodeConfig(
         ctx.user.id,
@@ -700,11 +695,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+        await generateKiloClawInferenceToken(ctx.user, input.organizationId);
 
       const response = await client.patchKiloCodeConfig(
         ctx.user.id,

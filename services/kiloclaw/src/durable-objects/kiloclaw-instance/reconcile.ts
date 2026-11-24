@@ -44,6 +44,7 @@ import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { syncInstanceTypeToPostgresHelper } from './postgres';
 import { mintFreshApiKey } from './config';
+import { signKiloClawSearchToken } from '@kilocode/worker-utils/kiloclaw-vm-token';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
@@ -283,7 +284,7 @@ async function reconcileApiKeyExpiry(
   let freshKey: { token: string; expiresAt: string } | null = null;
   try {
     freshKey = await Promise.race([
-      mintFreshApiKey(env, userId),
+      mintFreshApiKey(env, userId, state.orgId),
       new Promise<never>((_, reject) => {
         mintTimeoutId = setTimeout(() => reject(new Error('mint timeout')), MINT_TIMEOUT_MS);
       }),
@@ -300,6 +301,18 @@ async function reconcileApiKeyExpiry(
   if (!freshKey) {
     rctx.log('api_key_mint_failed', { user_id: userId });
     return;
+  }
+
+  const patch: Record<string, string> = { KILOCODE_API_KEY: freshKey.token };
+  if (state.kiloExaSearchMode !== 'disabled' && env.NEXTAUTH_SECRET) {
+    patch.KILOCLAW_EXA_SEARCH_KEY = (
+      await signKiloClawSearchToken(freshKey.token, {
+        userId,
+        organizationId: state.orgId,
+        secret: env.NEXTAUTH_SECRET,
+        env: env.WORKER_ENV,
+      })
+    ).token;
   }
 
   // 2. Update Fly machine config with the fresh encrypted key.
@@ -319,7 +332,9 @@ async function reconcileApiKeyExpiry(
       state.flyAppName ??
       undefined;
     const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey, knownFlyAppName);
-    updatedEnv[`${ENCRYPTED_ENV_PREFIX}KILOCODE_API_KEY`] = encryptEnvValue(envKey, freshKey.token);
+    for (const [key, value] of Object.entries(patch)) {
+      updatedEnv[`${ENCRYPTED_ENV_PREFIX}${key}`] = encryptEnvValue(envKey, value);
+    }
 
     await fly.updateMachine(
       flyConfig,
@@ -343,9 +358,7 @@ async function reconcileApiKeyExpiry(
   //    next natural restart.
   let pushed = false;
   try {
-    const result = await gateway.patchEnvOnMachine(state, env, {
-      KILOCODE_API_KEY: freshKey.token,
-    });
+    const result = await gateway.patchEnvOnMachine(state, env, patch);
     pushed = result?.signaled ?? false;
     if (!pushed) {
       rctx.log('api_key_push_not_signaled', {

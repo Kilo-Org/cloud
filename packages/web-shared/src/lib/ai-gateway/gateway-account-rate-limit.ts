@@ -1,6 +1,6 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
@@ -33,7 +33,7 @@ export function gatewayRateLimitKey(headers: Headers, ipAddress: string | undefi
   // verified either way, so those tokens count as their own account here rather
   // than collapsing onto a shared egress address.
   const validated = validateAuthorizationHeader(headers, {
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
+    expectedAudience: KILO_INFERENCE_AUDIENCE,
     runtimeProxyAttestationVerified: true,
   });
 

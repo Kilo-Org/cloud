@@ -156,7 +156,9 @@ import * as regions from './regions';
 import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
 import { lookupCatalogVersion } from '../lib/catalog-registration';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
-import { verifyKiloToken } from '@kilocode/worker-utils';
+import { signKiloToken, verifyKiloToken } from '@kilocode/worker-utils';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { signKiloClawInferenceToken } from '@kilocode/worker-utils/kiloclaw-vm-token';
 import {
   ALARM_INTERVAL_RUNNING_MS,
   ALARM_INTERVAL_STARTING_MS,
@@ -2662,6 +2664,17 @@ describe('status guards', () => {
 });
 
 describe('buildUserEnvVars API key refresh', () => {
+  async function storedInferenceKey() {
+    return (
+      await signKiloClawInferenceToken({
+        userId: 'user-1',
+        organizationId: null,
+        pepper: 'pepper-1',
+        secret: 'test-nextauth-secret-at-least-32-chars',
+        env: 'development',
+      })
+    ).token;
+  }
   async function callBuildUserEnvVars(instance: KiloClawInstance) {
     await (instance as unknown as { loadState: () => Promise<void> }).loadState();
     return await (
@@ -2706,7 +2719,8 @@ describe('buildUserEnvVars API key refresh', () => {
 
     const payload = await verifyKiloToken(
       options.kilocodeApiKey!,
-      'test-nextauth-secret-at-least-32-chars'
+      'test-nextauth-secret-at-least-32-chars',
+      { audience: KILO_INFERENCE_AUDIENCE }
     );
     expect(payload.kiloUserId).toBe('user-1');
     expect(payload.apiTokenPepper).toBe('pepper-1');
@@ -2735,10 +2749,11 @@ describe('buildUserEnvVars API key refresh', () => {
   it('falls back to the stored key when Hyperdrive is unavailable', async () => {
     const env = createFakeEnv();
     env.HYPERDRIVE = { connectionString: '' } as never;
+    const storedKey = await storedInferenceKey();
     const { instance, storage } = createInstance(createFakeStorage(), env);
     await seedProvisioned(storage, {
-      kilocodeApiKey: 'stored-key',
-      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+      kilocodeApiKey: storedKey,
+      kilocodeApiKeyExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
 
     await callBuildUserEnvVars(instance);
@@ -2747,8 +2762,25 @@ describe('buildUserEnvVars API key refresh', () => {
     const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
       kilocodeApiKey?: string;
     };
-    expect(options.kilocodeApiKey).toBe('stored-key');
-    expect(storage._store.get('kilocodeApiKey')).toBe('stored-key');
+    expect(options.kilocodeApiKey).toBe(storedKey);
+    expect(storage._store.get('kilocodeApiKey')).toBe(storedKey);
+  });
+
+  it('refuses a legacy account key when remint is unavailable', async () => {
+    const env = createFakeEnv();
+    env.HYPERDRIVE = { connectionString: '' } as never;
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    const { token } = await signKiloToken({
+      userId: 'user-1',
+      pepper: 'pepper-1',
+      secret: env.NEXTAUTH_SECRET,
+      expiresInSeconds: 3600,
+    });
+    await seedProvisioned(storage, { kilocodeApiKey: token });
+    await expect(callBuildUserEnvVars(instance)).rejects.toThrow(
+      'valid scoped KiloClaw inference credential required'
+    );
+    expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
   });
 
   it('rejects when Hyperdrive is unavailable and the stored key is expired', async () => {
@@ -2771,10 +2803,11 @@ describe('buildUserEnvVars API key refresh', () => {
   });
 
   it('falls back to the stored key and logs when the user is missing', async () => {
+    const storedKey = await storedInferenceKey();
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
-      kilocodeApiKey: 'stored-key',
-      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+      kilocodeApiKey: storedKey,
+      kilocodeApiKeyExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
     (db.findPepperByUserId as Mock).mockResolvedValueOnce(null);
 
@@ -2784,14 +2817,15 @@ describe('buildUserEnvVars API key refresh', () => {
     const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
       kilocodeApiKey?: string;
     };
-    expect(options.kilocodeApiKey).toBe('stored-key');
+    expect(options.kilocodeApiKey).toBe(storedKey);
   });
 
   it('falls back to the stored key and logs when the DB lookup throws', async () => {
+    const storedKey = await storedInferenceKey();
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
-      kilocodeApiKey: 'stored-key',
-      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+      kilocodeApiKey: storedKey,
+      kilocodeApiKeyExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
     const err = new Error('db down');
     (db.findPepperByUserId as Mock).mockRejectedValueOnce(err);
@@ -2808,7 +2842,7 @@ describe('buildUserEnvVars API key refresh', () => {
     const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
       kilocodeApiKey?: string;
     };
-    expect(options.kilocodeApiKey).toBe('stored-key');
+    expect(options.kilocodeApiKey).toBe(storedKey);
   });
 
   it('rejects when minting fails and the stored key is expired', async () => {
@@ -2839,10 +2873,11 @@ describe('buildUserEnvVars API key refresh', () => {
   it('falls back to the stored key and logs when minting times out', async () => {
     vi.useFakeTimers();
 
+    const storedKey = await storedInferenceKey();
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
-      kilocodeApiKey: 'stored-key',
-      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+      kilocodeApiKey: storedKey,
+      kilocodeApiKeyExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
     (db.findPepperByUserId as Mock).mockImplementationOnce(() => new Promise(() => undefined));
 
@@ -2861,7 +2896,7 @@ describe('buildUserEnvVars API key refresh', () => {
     const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
       kilocodeApiKey?: string;
     };
-    expect(options.kilocodeApiKey).toBe('stored-key');
+    expect(options.kilocodeApiKey).toBe(storedKey);
   });
 
   it('rejects env building when NEXTAUTH_SECRET is missing', async () => {
@@ -4363,7 +4398,7 @@ describe('updateKiloCodeConfig memory fields', () => {
             model: 'openai/text-embedding-3-small',
             remote: {
               baseUrl: 'https://api.kilo.ai/api/gateway/',
-              apiKey: 'tok-123',
+              apiKey: '${KILOCODE_API_KEY}',
               headers: {
                 'x-kilocode-feature': 'kiloclaw-embedding',
                 'X-KiloCode-OrganizationId': 'org_abc',

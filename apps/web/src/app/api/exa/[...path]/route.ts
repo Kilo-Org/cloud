@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  KILO_GATEWAY_AUDIENCE,
+  KILO_EXA_SEARCH_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { EXA_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
 import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -104,14 +107,13 @@ async function recordExaUsageWithinDeadline(record: ExaUsageRecord, remainingMs:
 
 export async function POST(request: NextRequest) {
   const invocationStartedAt = performance.now();
+  const exaPath = extractExaPath(new URL(request.url));
   const { user, authFailedResponse, organizationId } = await getUserFromAuth({
     adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
+    expectedAudience: exaPath === '/search' ? KILO_EXA_SEARCH_AUDIENCE : KILO_GATEWAY_AUDIENCE,
   });
   if (authFailedResponse) return authFailedResponse;
 
-  const url = new URL(request.url);
-  const exaPath = extractExaPath(url);
   if (!exaPath) {
     return NextResponse.json(
       { error: `Invalid path. Allowed: ${EXA_ALLOWED_PATHS.join(', ')}` },

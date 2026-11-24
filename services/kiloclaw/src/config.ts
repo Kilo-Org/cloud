@@ -51,9 +51,6 @@ export const KILOCLAW_ACTIVE_INSTANCE_COOKIE = 'kiloclaw-active-instance';
 /** Cookie max age: 24 hours */
 export const KILOCLAW_AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 
-/** API key max age for gateway credentials minted by the worker */
-export const KILOCODE_API_KEY_EXPIRY_SECONDS = 30 * 24 * 60 * 60;
-
 /** Default Fly Machine guest spec (performance-1x, 3GB) */
 export const DEFAULT_MACHINE_GUEST = {
   cpus: 1,

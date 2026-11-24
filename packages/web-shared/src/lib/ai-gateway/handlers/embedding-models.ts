@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 import {
   getEffectiveModelDecision,
@@ -22,7 +22,7 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
   // model access; `gateway-admission.ts` covers the inference admission rule.
   const auth = await getUserFromAuth({
     adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
+    expectedAudience: KILO_INFERENCE_AUDIENCE,
   }).catch(() => null);
   if (auth?.organizationId && auth.user) {
     // Resolve the member's policy once, then evaluate each catalog model

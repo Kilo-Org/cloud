@@ -1,9 +1,13 @@
-import { signKiloToken, withTimeout } from '@kilocode/worker-utils';
+import { withTimeout } from '@kilocode/worker-utils';
+import {
+  signKiloClawInferenceToken,
+  signKiloClawSearchToken,
+  verifyKiloClawInferenceToken,
+} from '@kilocode/worker-utils/kiloclaw-vm-token';
 import type { KiloClawEnv } from '../../types';
 import { buildEnvVars } from '../../gateway/env';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import { findPepperByUserId, getWorkerDb } from '../../db';
-import { KILOCODE_API_KEY_EXPIRY_SECONDS } from '../../config';
 import type { InstanceMutableState } from './types';
 import { getAppKey } from './types';
 import { storageUpdate } from './state';
@@ -90,7 +94,8 @@ export function hasExpiredStoredApiKey(state: InstanceMutableState): boolean {
  */
 export async function mintFreshApiKey(
   env: KiloClawEnv,
-  userId: string
+  userId: string,
+  organizationId: string | null
 ): Promise<{ token: string; expiresAt: string } | null> {
   const connectionString = env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -115,11 +120,11 @@ export async function mintFreshApiKey(
     return null;
   }
 
-  return signKiloToken({
+  return signKiloClawInferenceToken({
     userId: user.id,
     pepper: user.api_token_pepper,
     secret,
-    expiresInSeconds: KILOCODE_API_KEY_EXPIRY_SECONDS,
+    organizationId,
     env: env.WORKER_ENV,
   });
 }
@@ -151,20 +156,20 @@ export async function buildUserEnvVars(
   if (state.userId && env.HYPERDRIVE?.connectionString) {
     try {
       const freshKey = await withTimeout(
-        mintFreshApiKey(env, state.userId),
+        mintFreshApiKey(env, state.userId, state.orgId),
         MINT_TIMEOUT_MS,
         'API key mint timed out'
       );
       if (freshKey) {
-        kilocodeApiKey = freshKey.token;
-        state.kilocodeApiKey = freshKey.token;
-        state.kilocodeApiKeyExpiresAt = freshKey.expiresAt;
         await ctx.storage.put(
           storageUpdate({
             kilocodeApiKey: freshKey.token,
             kilocodeApiKeyExpiresAt: freshKey.expiresAt,
           })
         );
+        kilocodeApiKey = freshKey.token;
+        state.kilocodeApiKey = freshKey.token;
+        state.kilocodeApiKeyExpiresAt = freshKey.expiresAt;
         console.log('[DO] buildUserEnvVars: minted fresh API key, expires:', freshKey.expiresAt);
       }
     } catch (err) {
@@ -178,6 +183,25 @@ export async function buildUserEnvVars(
     throw new Error(
       'Cannot build env vars: stored KiloCode API key expired and fresh mint unavailable'
     );
+  }
+
+  const identity = {
+    userId: state.userId,
+    organizationId: state.orgId,
+    secret: env.NEXTAUTH_SECRET,
+    env: env.WORKER_ENV,
+  };
+  if (!kilocodeApiKey)
+    throw new Error('Cannot build env vars: missing KiloClaw inference credential');
+  let searchKey: string | undefined;
+  try {
+    if (state.kiloExaSearchMode === 'disabled') {
+      await verifyKiloClawInferenceToken(kilocodeApiKey, identity);
+    } else {
+      searchKey = (await signKiloClawSearchToken(kilocodeApiKey, identity)).token;
+    }
+  } catch {
+    throw new Error('Cannot build env vars: valid scoped KiloClaw inference credential required');
   }
 
   const { env: plainEnv, sensitive } = await buildEnvVars(
@@ -208,6 +232,7 @@ export async function buildUserEnvVars(
       dreamingEnabled: state.dreamingEnabled,
     }
   );
+  if (searchKey) sensitive.KILOCLAW_EXA_SEARCH_KEY = searchKey;
 
   if (state.provider === 'docker-local') {
     const dockerLocalBaseUrl = resolveDockerLocalKiloCodeApiBaseUrl(env.BACKEND_API_URL);

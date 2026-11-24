@@ -9,7 +9,7 @@ import {
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -79,7 +79,7 @@ describe('GET /api/v1/embedding-models', () => {
     await expect(response.json()).resolves.toEqual(catalog);
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
     expect(resolveOrganizationMemberModelPolicy).not.toHaveBeenCalled();
   });

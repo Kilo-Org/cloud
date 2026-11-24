@@ -18,11 +18,23 @@ function getTool() {
 describe('kilo-exa web search provider', () => {
   beforeEach(() => {
     webSearchSdkStub.reset();
-    process.env = { ...originalEnv, KILOCODE_API_KEY: 'kilo-key-123' };
+    process.env = {
+      ...originalEnv,
+      KILOCODE_API_KEY: 'not-for-search',
+      KILOCLAW_EXA_SEARCH_KEY: 'kilo-key-123',
+    };
   });
 
   afterEach(() => {
     process.env = originalEnv;
+  });
+
+  it('does not fall back to the model credential when the search key is absent', async () => {
+    delete process.env.KILOCLAW_EXA_SEARCH_KEY;
+    expect(await getTool().execute({ query: 'recent news' })).toMatchObject({
+      error: 'missing_kilocode_api_key',
+    });
+    expect(webSearchSdkStub.getPostCalls()).toHaveLength(0);
   });
 
   it('validates freshness values', async () => {

@@ -7,6 +7,8 @@ import {
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
+  KILO_INFERENCE_AUDIENCE,
+  KILO_EXA_SEARCH_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
@@ -16,8 +18,10 @@ import {
   verifyKiloTokenForResource,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { signKiloClawSearchToken } from '@kilocode/worker-utils/kiloclaw-vm-token';
 import {
   generateApiToken,
+  generateKiloClawInferenceToken,
   generateBoundedInternalServiceToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
@@ -282,6 +286,42 @@ describe('Token Functions', () => {
   });
 
   describe('validateAuthorizationHeader', () => {
+    it('separates VM inference and Exa search from one another and from account APIs', async () => {
+      const organizationId = 'test-org';
+      const inference = await generateKiloClawInferenceToken(mockUser, organizationId);
+      const search = await signKiloClawSearchToken(inference.token, {
+        userId: mockUser.id,
+        organizationId,
+        secret: NEXTAUTH_SECRET,
+        env: process.env.NODE_ENV,
+      });
+      for (const [issued, allowed, other] of [
+        [inference, KILO_INFERENCE_AUDIENCE, KILO_EXA_SEARCH_AUDIENCE],
+        [search, KILO_EXA_SEARCH_AUDIENCE, KILO_INFERENCE_AUDIENCE],
+      ] as const) {
+        const headers = new Headers({ authorization: `Bearer ${issued.token}` });
+        expect(validateAuthorizationHeader(headers, { expectedAudience: allowed })).toMatchObject({
+          kiloUserId: mockUser.id,
+          apiTokenPepper: mockUser.api_token_pepper,
+          organizationId,
+        });
+        for (const expectedAudience of [
+          undefined,
+          KILO_API_AUDIENCE,
+          KILO_GATEWAY_AUDIENCE,
+          other,
+        ]) {
+          expect(validateAuthorizationHeader(headers, { expectedAudience }).reason).toBe(
+            'audience_not_allowed'
+          );
+        }
+        const verified = await verifyKiloTokenForPolicy(issued.token, NEXTAUTH_SECRET, {
+          audience: allowed,
+          mode: 'required',
+        });
+        expect(isKiloCredentialExchangeEligible(verified, { legacy: 'five-year-api' })).toBe(false);
+      }
+    });
     function signedToken(claims: Record<string, unknown>) {
       return jwt.sign(
         {

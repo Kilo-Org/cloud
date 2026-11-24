@@ -4,7 +4,7 @@ import type { User } from '@kilocode/db/schema';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -185,7 +185,10 @@ export async function handleUsageEndpointRequest<Body>(
   }
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const auth = await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE });
+  const auth = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_INFERENCE_AUDIENCE,
+  });
   const caller = endpoint.allowAnonymousFreeModels
     ? resolveGatewayCaller(auth, {
         allowAnonymous: isFreeModel(requestedModelLowerCased),

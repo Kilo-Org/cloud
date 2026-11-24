@@ -71,7 +71,10 @@ import {
   isCloudAgentAuthorityHttpPathAllowed,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  KILO_API_AUDIENCE,
+  gatewayParentAudience,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   KILO_EXCHANGE_SAFE_CLAIM_NAMES,
   isKiloCredentialExchangeEligible,
@@ -604,7 +607,7 @@ async function resolveUserFromAuth(
       decodedRuntimeAuthorization
     );
     const attestationAudience = RuntimeProxyAttestationAudienceSchema.safeParse(
-      opts.expectedAudience ?? KILO_API_AUDIENCE
+      gatewayParentAudience(opts.expectedAudience ?? KILO_API_AUDIENCE)
     );
     const runtimeProxyAttestationVerified =
       bearer !== null &&
@@ -663,18 +666,33 @@ async function resolveUserFromAuth(
       });
     }
     // A token-bound organization is signed; the request header is mutable.
-    // Legacy and personal tokens intentionally continue to use the header.
+    // A personal VM has a fixed personal scope; unbound client tokens can select an org.
     const headerOrganizationId = headersList.get(ORGANIZATION_ID_HEADER);
-    if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
-      return authError(403, 'Scoped organization mismatch', scope.ownerId, {
-        credentialsRejected: true,
-        internalApiUse,
-        tokenSource,
-        cloudAgentAuthority: scope,
-      });
+    const organizationBound = Boolean(
+      scope || authorizationValidationResult.scopedGatewayCredential
+    );
+    const signedOrganizationId = scope
+      ? scope.organizationId
+      : authorizationValidationResult.organizationId;
+    if (
+      organizationBound &&
+      headerOrganizationId !== null &&
+      headerOrganizationId !== signedOrganizationId
+    ) {
+      return authError(
+        403,
+        'Scoped organization mismatch',
+        authorizationValidationResult.kiloUserId,
+        {
+          credentialsRejected: true,
+          internalApiUse,
+          tokenSource,
+          cloudAgentAuthority: scope,
+        }
+      );
     }
-    const organizationId = scope
-      ? (scope.organizationId ?? undefined)
+    const organizationId = organizationBound
+      ? (signedOrganizationId ?? undefined)
       : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
     const botId = authorizationValidationResult.botId;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;

@@ -238,7 +238,8 @@ KiloClaw uses the KiloCode provider only.
 
 | Variable | Description |
 |---|---|
-| `KILOCODE_API_KEY` | Per-instance KiloCode API key (injected by Next.js during provision/patch) |
+| `KILOCODE_API_KEY` | Scoped model inference/catalog bearer (web provision/patch and Worker renewal) |
+| `KILOCLAW_EXA_SEARCH_KEY` | Separate encrypted, search-only bearer for the bundled Kilo Exa plugin |
 
 ### Fly.io
 
@@ -798,3 +799,20 @@ routes return 500.
 **Port 3000 already in use:**
 Free port 3000 before starting. The Next.js app must run on 3000; other
 services depend on it.
+
+## Runtime credential rollout
+
+Deploy the web and AI gateway readers before enabling scoped issuance. Stage the updated
+controller/plugin image and upgrade pinned images: older plugins use the inference key
+for Exa and older controllers cannot live-patch both keys. After the Worker and web
+issuers are deployed, rebuild machine environments via the normal instance lifecycle;
+verify inference, model discovery, optional Exa search, and controller check-in. A live
+patch or config update alone is not confirmation that the running image and all on-disk
+profiles have been replaced. Rebuild non-Fly and stopped instances on their next start.
+
+The Worker will not re-inject an unscoped stored key if remint is unavailable. Restore
+minting or supply a fresh scoped config before retrying. Existing machines/config copies
+can retain legacy credentials until rebuilt. Replacement does not revoke a copied JWT:
+legacy VM keys remain usable until their original expiry (normally 30 days) or a separate
+account pepper rotation. Account-wide rotation affects other credentials and must be
+coordinated separately, not performed as part of a routine rollout.

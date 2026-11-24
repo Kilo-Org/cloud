@@ -984,7 +984,7 @@ export function generateBaseConfig(
     config.agents.defaults.memorySearch.model = model;
     config.agents.defaults.memorySearch.remote = {
       baseUrl,
-      apiKey: env.KILOCODE_API_KEY || '',
+      apiKey: '${KILOCODE_API_KEY}',
       headers: {
         // Feature attribution for embedding calls — mirrors FEATURE_VALUES in
         // packages/web-shared/src/lib/feature-detection.ts. Hardcoded because the controller

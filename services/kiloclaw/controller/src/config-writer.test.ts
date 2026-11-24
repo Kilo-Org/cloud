@@ -1277,7 +1277,7 @@ describe('generateBaseConfig', () => {
     expect(config.agents.defaults.memorySearch.remote.baseUrl).toBe(
       'https://api.kilo.ai/api/gateway/'
     );
-    expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('test-api-key');
+    expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('${KILOCODE_API_KEY}');
     expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
       'x-kilocode-feature': 'kiloclaw-embedding',
     });

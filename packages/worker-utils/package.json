@@ -15,6 +15,7 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
+    "./kiloclaw-vm-token": "./src/kiloclaw-vm-token.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./cloud-agent-attachments": "./src/cloud-agent-attachments.ts",
     "./cloud-agent-child-callback": "./src/cloud-agent-child-callback.ts",

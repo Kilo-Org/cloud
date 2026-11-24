@@ -1,8 +1,8 @@
-// The one scrubbing policy for Sentry events and logs, called by both the
+// The one scrubbing policy for Sentry events, called by both the
 // Node.js and edge initializers. Keep this module edge-safe: SDK imports stay
 // type-only and no Node builtins are imported.
 
-import type { Breadcrumb, Contexts, Event, Log } from '@sentry/nextjs';
+import type { Breadcrumb, Contexts, Event } from '@sentry/nextjs';
 import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 import {
   FILTERED_VALUE,
@@ -71,12 +71,4 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
     event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);
   }
   return event;
-}
-
-export function scrubSentryLog(log: Log): Log {
-  return {
-    ...log,
-    message: redactSecretValues(log.message),
-    ...(log.attributes !== undefined && { attributes: scrubSecretRecord(log.attributes) }),
-  };
 }

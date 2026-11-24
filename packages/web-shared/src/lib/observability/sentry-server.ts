@@ -3,12 +3,9 @@
 // But note tricky corner cases using vercel otel with sentry:
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
-import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
+import { httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import {
-  scrubSentryEvent,
-  scrubSentryLog,
-} from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
+import { scrubSentryEvent } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
 export { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 
@@ -110,12 +107,13 @@ export function initServerSentry(): void {
 
     dataCollection: RESTRICTED_DATA_COLLECTION,
 
+    // No consoleLoggingIntegration: the SDK formats console arguments into the log
+    // body before beforeSendLog runs, so the body keeps any credential passed as an
+    // argument and no hook can scrub it reliably.
     integrations: [
       // Keep Sentry's httpIntegration for correct request isolation. It emits no spans
       // because Sentry tracing is disabled.
       httpIntegration({ spans: false }),
-      // send console.log, console.error, and console.warn calls as logs to Sentry
-      consoleLoggingIntegration({ levels: ['log', 'error', 'warn'] }),
     ],
 
     beforeSend(event, hint) {
@@ -170,7 +168,5 @@ export function initServerSentry(): void {
 
       return scrubSentryEvent(event);
     },
-
-    beforeSendLog: scrubSentryLog,
   });
 }

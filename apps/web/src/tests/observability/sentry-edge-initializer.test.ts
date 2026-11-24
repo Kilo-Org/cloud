@@ -1,13 +1,12 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { Event, Log } from '@sentry/nextjs';
+import type { Event, Integration } from '@sentry/nextjs';
 import {
   expectScrubbedServerEvent,
   leakyServerEvent,
 } from '@kilocode/web-shared/tests/helpers/sentry-event.helper';
 
 type BeforeSend = (event: Event) => Event | null;
-type BeforeSendLog = (log: Log) => Log | null;
-type EdgeOptions = { beforeSend: BeforeSend; beforeSendLog: BeforeSendLog };
+type EdgeOptions = { beforeSend: BeforeSend; integrations?: Integration[] };
 
 // The edge initializer calls `init` at module scope, so each test loads a fresh
 // copy of the real config module against a stubbed SDK and reads the options it
@@ -17,7 +16,7 @@ async function loadEdgeOptions(): Promise<EdgeOptions> {
   await jest.isolateModulesAsync(async () => {
     jest.doMock('@sentry/nextjs', () => ({
       init: initMock,
-      consoleLoggingIntegration: jest.fn(() => ({ name: 'ConsoleLogging' })),
+      consoleLoggingIntegration: jest.fn(() => ({ name: 'ConsoleLogs' })),
       httpIntegration: jest.fn(() => ({ name: 'Http' })),
     }));
     await import('../../../sentry.edge.config');
@@ -26,7 +25,6 @@ async function loadEdgeOptions(): Promise<EdgeOptions> {
   expect(initMock).toHaveBeenCalledTimes(1);
   const options = initMock.mock.calls[0]?.[0] as Partial<EdgeOptions>;
   expect(typeof options.beforeSend).toBe('function');
-  expect(typeof options.beforeSendLog).toBe('function');
   return options as EdgeOptions;
 }
 
@@ -143,19 +141,11 @@ describe('edge Sentry initializer request data', () => {
 });
 
 describe('edge Sentry initializer logs', () => {
-  test('redacts the log message and scrubs its attributes', async () => {
-    const { beforeSendLog } = await loadEdgeOptions();
+  test('sends no console output to Sentry', async () => {
+    const options = await loadEdgeOptions();
 
-    const result = beforeSendLog({
-      level: 'warn',
-      message: 'middleware rejected Bearer fake_edge_token_0123456789',
-      attributes: { 'sentry.message.parameter.0': { cookie: 'a=b', path: '/profile' } },
-    });
-
-    expect(result).toEqual({
-      level: 'warn',
-      message: 'middleware rejected Bearer [Filtered]',
-      attributes: { 'sentry.message.parameter.0': { cookie: '[Filtered]', path: '/profile' } },
-    });
+    expect(options.integrations?.map(integration => integration.name) ?? []).not.toContain(
+      'ConsoleLogs'
+    );
   });
 });

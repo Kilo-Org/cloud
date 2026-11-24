@@ -5,12 +5,9 @@
 // But note tricky corner cases using vercel otel with sentry:
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
-import { consoleLoggingIntegration, init } from '@sentry/nextjs';
+import { init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import {
-  scrubSentryEvent,
-  scrubSentryLog,
-} from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
+import { scrubSentryEvent } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
 if (process.env.NODE_ENV !== 'development') {
   init({
@@ -28,14 +25,10 @@ if (process.env.NODE_ENV !== 'development') {
 
     dataCollection: RESTRICTED_DATA_COLLECTION,
 
-    integrations: [
-      // send console.log, console.error, and console.warn calls as logs to Sentry
-      consoleLoggingIntegration({ levels: ['log', 'error', 'warn'] }),
-    ],
+    // No consoleLoggingIntegration, for the reason given in initServerSentry.
 
-    // The same scrubbing policy as initServerSentry, so an edge event or log
-    // leaves this process with the same data as a server one.
+    // The same scrubbing policy as initServerSentry, so an edge event leaves
+    // this process with the same data as a server one.
     beforeSend: scrubSentryEvent,
-    beforeSendLog: scrubSentryLog,
   });
 }

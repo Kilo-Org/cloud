@@ -27,6 +27,9 @@ export { extractBearerToken } from './extract-bearer-token.js';
 
 export { sha256Hex } from './sha256.js';
 
+export { deriveServiceKey } from './service-key.js';
+export type { ServiceKeyPurpose } from './service-key.js';
+
 export { createErrorHandler } from './error-handler.js';
 
 export { createNotFoundHandler } from './not-found-handler.js';

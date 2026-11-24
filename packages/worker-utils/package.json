@@ -33,6 +33,7 @@
     "./network-secrets": "./src/network-secrets.ts",
     "./scm-capability-contract": "./src/scm-capability-contract.ts",
     "./sha256": "./src/sha256.ts",
+    "./service-key": "./src/service-key.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",

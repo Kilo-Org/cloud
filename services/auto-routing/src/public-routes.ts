@@ -51,9 +51,9 @@ import {
   type CustomRouterOwner,
   type ServingCustomRouter,
 } from './custom-router-store';
+import { checkDecideInputGuardrail } from './input-guardrail';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
-import { checkDecideInputGuardrail } from './input-guardrail';
 import { deniedOrganizationModelIds } from './organization-policy';
 
 function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Handler<HonoEnv> {

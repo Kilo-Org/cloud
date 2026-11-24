@@ -39,7 +39,13 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
+  logExceptInTest: jest.fn(),
+}));
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -2966,6 +2972,18 @@ describe('user router - passkeys', () => {
     other = await insertTestUser({ google_user_email: 'passkey-other@example.com' });
   });
 
+  beforeEach(() => {
+    jest.mocked(logExceptInTest).mockClear();
+  });
+
+  function loggedPasskeyEvents(): unknown[] {
+    return jest
+      .mocked(logExceptInTest)
+      .mock.calls.flatMap(([line]: unknown[]) =>
+        typeof line === 'string' && line.startsWith('{"event":"passkey_') ? [JSON.parse(line)] : []
+      );
+  }
+
   afterEach(async () => {
     await db
       .delete(passkey_credentials)
@@ -3061,6 +3079,14 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(0);
+    expect(loggedPasskeyEvents()).toEqual([
+      {
+        event: 'passkey_deleted',
+        kiloUserId: owner.id,
+        passkeyId: row.id,
+        credential: 'session',
+      },
+    ]);
   });
 
   it('refuses to delete another user passkey and leaves it in place', async () => {
@@ -3070,6 +3096,7 @@ describe('user router - passkeys', () => {
     await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
+    expect(loggedPasskeyEvents()).toEqual([]);
 
     const stored = await db
       .select()
@@ -3300,6 +3327,14 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(0);
+    expect(loggedPasskeyEvents()).toEqual([
+      {
+        event: 'passkey_deleted',
+        kiloUserId: owner.id,
+        passkeyId: row.id,
+        credential: 'human_bearer',
+      },
+    ]);
   });
 
   it('refuses a grant replayed from another session of the same account', async () => {
@@ -3315,6 +3350,7 @@ describe('user router - passkeys', () => {
       code: 'FORBIDDEN',
       message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
     });
+    expect(loggedPasskeyEvents()).toEqual([]);
   });
 
   it('refuses a grant minted for another account', async () => {

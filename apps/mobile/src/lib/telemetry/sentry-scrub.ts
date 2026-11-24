@@ -14,6 +14,7 @@
  * therefore accept and return opaque values. */
 
 import { stripQueryString } from '@/lib/telemetry/request-target';
+import { scrubRequest } from '@/lib/telemetry/sentry-scrub-request';
 
 /** {@link stripQueryString} for the opaque values a Sentry payload carries. */
 function stripQuery(url: unknown): string {
@@ -424,6 +425,8 @@ function scrubExceptions(exception: Record<string, unknown>, contexts: unknown):
  *
  * - Reduces request URL, contexts.response URL, and contexts.network URL to
  *   their origin and path.
+ * - Deletes `request.cookies`, `request.data`, `request.query_string`, and
+ *   every request header outside the {@link scrubRequest} allowlist.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Rebuilds the app's payload context ({@link NETWORK_BODY_CONTEXT}) from its
  *   allow-listed fields alone and token-redacts every string it keeps, so
@@ -446,10 +449,7 @@ export function scrubEvent<T>(event: T): T | null {
     const e = event as Record<string, unknown>;
 
     if (e.request != null && typeof e.request === 'object') {
-      const req = e.request as Record<string, unknown>;
-      if ('url' in req) {
-        req.url = stripQuery(req.url);
-      }
+      scrubRequest(e.request as Record<string, unknown>);
     }
 
     if (e.contexts != null && typeof e.contexts === 'object') {

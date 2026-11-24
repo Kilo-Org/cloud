@@ -53,7 +53,7 @@ values. Only `kilo-web` may sign the legacy shape (no `tokenPurpose`) or omit
 
 | Issuer ID | Deployable | Allowed audiences | Allowed purposes | Legacy shape and audience-less? |
 |---|---|---|---|---|
-| `kilo-web` | apps/web | `kilo-api`, `kilo-gateway`, `cloud-agent-next`, `session-ingest`, `session-ingest:user-deletion`, `user-data-export`, `ai-attribution`, `kiloclaw`, `kilo-chat`, `event-service`, `notifications`, `deploy-builder:html-deploy`, `pages`, `pages-dev`, every `git-token-service:*` operation audience, `cloud-agent-stream`, `cloud-agent-terminal`, `cloud-agent-preview`, `session-sync:transcript` | All: `human-api`, `device-access`, `delegated-workload`, `internal-service` | Yes. User API tokens, organization tokens, chat tokens, kiloclaw control tokens and the flag-off legacy branches of workflow and internal-service tokens use them today. |
+| `kilo-web` | apps/web | `kilo-api`, `kilo-gateway`, `cloud-agent-next`, `session-ingest`, `session-ingest:user-deletion`, `user-data-export`, `ai-attribution`, `kiloclaw`, `kilo-chat`, `event-service`, `notifications`, `pages`, `pages-dev`, every `git-token-service:*` operation audience, `cloud-agent-stream`, `cloud-agent-terminal`, `cloud-agent-preview`, `session-sync:transcript` | All: `human-api`, `device-access`, `delegated-workload`, `internal-service` | Yes. User API tokens, organization tokens, chat tokens, kiloclaw control tokens and the flag-off legacy branches of workflow and internal-service tokens use them today. |
 | `cloud-agent-next` | services/cloud-agent-next | `kilo-api`, `kilo-gateway`, `session-ingest` (runtime token array, runtime-proxy attestation, workspace MCP grant) | `delegated-workload` | No |
 | `security-auto-analysis` | services/security-auto-analysis | `cloud-agent-next`, `kilo-gateway`, `session-ingest` | `internal-service` | No |
 | `webhook-agent-ingest` | services/webhook-agent-ingest | `cloud-agent-next` | `internal-service` | No |
@@ -137,7 +137,6 @@ when that issuer flips in Phase 3, and turning its flag back off rolls it back.
 | services/user-data-export | `user-data-export` | `kilo-web` |
 | services/session-sync | `kilo-api` at credential exchange | `kilo-web` |
 | services/session-sync | `session-sync:transcript` | `kilo-web` |
-| External: deploy-builder (not in this repo) | `deploy-builder:html-deploy` | `kilo-web` |
 | Test: cloud-agent-next fake-llm Worker | as the gateway | as the gateway |
 
 Because credential exchange, account bearers, resource delegation, Pages
@@ -456,8 +455,18 @@ separate track that must finish before Phase 5.
 2. Move web signing into apps/web and add the ai-gateway guard.
 3. Split the runtime-authorization `secret` into a verifier, a seal secret and
    a signer.
-4. Delete the dead `mintWrapperDispatchTicket` and
-   `validateWrapperDispatchTicket`.
+4. Delete dead token code so it is not migrated:
+   - `mintWrapperDispatchTicket` and `validateWrapperDispatchTicket` in
+     cloud-agent-next.
+   - The `html-deploy` delegable resource (`resource-delegation.ts`, the
+     `/api/auth/resource-token` and `/api/organizations/[id]/user-tokens`
+     routes and their tests) and `HTML_DEPLOY_AUDIENCE`
+     (`internal-service-token-audiences.ts`, re-exported from
+     `packages/worker-utils/src/index.ts`). Its only verifier, the Kilo Deploys
+     HTML builder in `services/deploy-infra/builder`, was removed with Kilo
+     Deploys (#8317), so apps/web can mint `deploy-builder:html-deploy` tokens
+     that nothing accepts. After removal, a request for that resource gets the
+     routes' existing `400 Unsupported resource`.
 5. Add the verification counters.
 
 ### Phase 1: readers accept ES256
@@ -466,7 +475,7 @@ separate track that must finish before Phase 5.
    call site's issuer allow-list enforced.
 2. Generate key pairs for all five issuers in dev, staging and production. Set
    `KILO_TOKEN_PUBLIC_JWKS` on every verifier in the table above, including the
-   e2e fake-llm Worker and the external deploy-builder.
+   e2e fake-llm Worker.
 3. Deploy every verifier. Signing is unchanged.
 
 **Exit criteria:** every verifier is deployed with the ES256 branch active, and
@@ -671,23 +680,21 @@ Other tests:
    app refresh on a 401 where they hold a refresh token, and otherwise send
    users back to sign-in on the "please re-authenticate" 401 and on other
    401s? The kilocode repository and apps/mobile need checking.
-3. **deploy-builder.** Who owns the external `deploy-builder:html-deploy`
-   verifier, and how will it receive the JWKS?
-4. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
+3. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
    `WEB_INTERNAL_SECRET`?
-5. **Attestation key.** Should the runtime-proxy attestation get a separate
+4. **Attestation key.** Should the runtime-proxy attestation get a separate
    `cloud-agent-next` key, so a leaked runtime-token key cannot forge
    attestations? Both keys would live in the same Worker, so the benefit is
    limited.
-6. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
+5. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
    cloud-agent-next and user-data-export? Neither declares it in its checked-in
    `wrangler.jsonc`. kiloclaw sets its secrets with `wrangler secret put`
    (`services/kiloclaw/wrangler.jsonc` comment).
-7. **Five-year lifetime.** Should new user tokens keep a five-year lifetime?
+6. **Five-year lifetime.** Should new user tokens keep a five-year lifetime?
    With per-issuer keys, a shorter lifetime plus refresh would make future
    rotation of the `kilo-web` key possible without forcing everyone to sign in
    again.
-8. **Exa route issuers.** The apps/web Exa route (`kilo-gateway`) lists
+7. **Exa route issuers.** The apps/web Exa route (`kilo-gateway`) lists
    `kilo-web`, `cloud-agent-next` and `kiloclaw`. Confirm from the counters
    during Phase 3 that `security-auto-analysis` tokens never reach it; if they
    do, add it.

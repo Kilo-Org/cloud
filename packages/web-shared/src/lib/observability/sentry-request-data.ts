@@ -39,6 +39,26 @@ type SentryHeaders = NonNullable<SentryRequest['headers']>;
 // header values follow the same policy as the URL.
 const PATHNAME_HEADER = 'x-pathname';
 const SEARCH_HEADER = 'x-search';
+const REFERER_HEADER = 'referer';
+
+// An allowlist, because a deny list misses every new header name that carries a
+// credential, such as x-vercel-sc-headers.
+const ALLOWED_HEADERS = new Set([
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'content-type',
+  'content-length',
+  'host',
+  'user-agent',
+  REFERER_HEADER,
+  'origin',
+  PATHNAME_HEADER,
+  SEARCH_HEADER,
+  'x-vercel-id',
+  'x-request-id',
+]);
+const FILTERED_HEADER_VALUE = '[Filtered]';
 
 function sanitizeStringQuery(queryString: string): string {
   return queryString
@@ -100,6 +120,18 @@ function sanitizeRequestUrl(url: string): string {
   }
 }
 
+function sanitizeHeaders(headers: SentryHeaders): void {
+  for (const name of Object.keys(headers)) {
+    const lowerName = name.toLowerCase();
+    if (!ALLOWED_HEADERS.has(lowerName)) {
+      headers[name] = FILTERED_HEADER_VALUE;
+    } else if (lowerName === REFERER_HEADER) {
+      headers[name] = sanitizeRequestUrl(headers[name]);
+    }
+  }
+  sanitizeForwardedHeaders(headers);
+}
+
 function requestPathname(url: string): string {
   try {
     return new URL(url).pathname;
@@ -153,7 +185,9 @@ export function sanitizeSentryRequestData(event: Event): Event {
       : sanitizeQueryString(request.query_string);
   }
   if (request.headers) {
-    sanitizeForwardedHeaders(request.headers);
+    sanitizeHeaders(request.headers);
   }
+  delete request.cookies;
+  delete request.data;
   return event;
 }

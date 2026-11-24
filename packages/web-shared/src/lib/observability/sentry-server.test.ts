@@ -384,4 +384,74 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.headers?.['x-pathname']).toBe('/auth/verify-magic-link');
     expect(result.request?.headers?.['x-search']).toBe('');
   });
+
+  test('filters every request header that is not on the allowlist', () => {
+    const event: Event = {
+      request: {
+        headers: {
+          Authorization: 'Bearer fake-kilo-token',
+          Cookie: 'a=b',
+          'X-Vercel-Sc-Headers': '{"Authorization":"Bearer fake-vercel-token"}',
+          'x-vercel-proxy-signature': 'Bearer fake-proxy-signature',
+          'x-vercel-is-internal-rewrite-signature': 'fake-rewrite-signature',
+          'x-vercel-proxied-for': '192.0.2.1',
+          'x-vercel-ja3-digest': 'fake-ja3-digest',
+          'x-vercel-ja4-digest': 'fake-ja4-digest',
+          'x-device-auth-viewer-token': 'fake-viewer-token',
+          'x-foo': 'bar',
+          'User-Agent': 'jest',
+          'Content-Type': 'application/json',
+          'X-Vercel-Id': 'fra1::abc',
+          'x-pathname': '/s/eyJhbGciOiJIUzI1NiJ9.share.token',
+        },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.headers).toEqual({
+      Authorization: '[Filtered]',
+      Cookie: '[Filtered]',
+      'X-Vercel-Sc-Headers': '[Filtered]',
+      'x-vercel-proxy-signature': '[Filtered]',
+      'x-vercel-is-internal-rewrite-signature': '[Filtered]',
+      'x-vercel-proxied-for': '[Filtered]',
+      'x-vercel-ja3-digest': '[Filtered]',
+      'x-vercel-ja4-digest': '[Filtered]',
+      'x-device-auth-viewer-token': '[Filtered]',
+      'x-foo': '[Filtered]',
+      'User-Agent': 'jest',
+      'Content-Type': 'application/json',
+      'X-Vercel-Id': 'fra1::abc',
+      'x-pathname': '/s/:share_token',
+    });
+  });
+
+  test('applies the URL policy to the referer header', () => {
+    const event: Event = {
+      request: {
+        headers: {
+          Referer: 'https://app.kilo.sh/s/eyJhbGciOiJIUzI1NiJ9.share.token?state=fake&tab=usage',
+        },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.headers?.Referer).toBe('https://app.kilo.sh/s/:share_token?tab=usage');
+  });
+
+  test('removes request cookies and body data', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/api/profile',
+        cookies: { session: 'fake-session' },
+        data: { password: 'fake-password' },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request).toEqual({ url: 'https://app.kilo.sh/api/profile' });
+  });
 });

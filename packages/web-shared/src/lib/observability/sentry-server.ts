@@ -165,9 +165,9 @@ export function initServerSentry(): void {
         }
       }
 
-      // Automatic request data can retain the GitHub OAuth `state` token, the
-      // app-flow `installState` bearer, or a `/s/{jwt}` share token; strip them
-      // while keeping the rest.
+      // Automatic request data can retain credentials in headers, the GitHub
+      // OAuth `state` token, the app-flow `installState` bearer, or a `/s/{jwt}`
+      // share token; strip them while keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

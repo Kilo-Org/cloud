@@ -68,6 +68,57 @@ describe('server Sentry beforeSend', () => {
     expect(JSON.stringify(result)).not.toContain(FAKE_JWT);
   });
 
+  test('removes local variables from stack frames', () => {
+    const result = beforeSend(
+      errorEvent({
+        exception: {
+          values: [
+            {
+              type: 'Error',
+              value: 'request failed',
+              stacktrace: {
+                frames: [
+                  { function: 'handler', lineno: 4, vars: { apiKey: 'fake-key', count: 2 } },
+                  { function: 'route', lineno: 9 },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+      {}
+    );
+
+    expect(result?.exception?.values?.[0]?.stacktrace?.frames).toEqual([
+      { function: 'handler', lineno: 4 },
+      { function: 'route', lineno: 9 },
+    ]);
+  });
+
+  test('removes the request environment', () => {
+    const result = beforeSend(
+      errorEvent({
+        request: { url: 'https://app.kilo.sh/api', env: { REMOTE_ADDR: '192.0.2.44' } },
+      }),
+      {}
+    );
+
+    expect(result?.request).toEqual({ url: 'https://app.kilo.sh/api' });
+  });
+
+  test.each([
+    [
+      'keeps only the user id',
+      { id: 'user-fake-0123', email: 'person@example.com', ip_address: '192.0.2.44' },
+      { user: { id: 'user-fake-0123' } },
+    ],
+    ['removes a user without an id', { email: 'person@example.com' }, {}],
+  ])('%s', (_name, user, expected) => {
+    const result = beforeSend(errorEvent({ user }), {});
+
+    expect(result).toEqual({ type: undefined, ...expected });
+  });
+
   test('still drops tRPC 4xx errors', () => {
     const error = Object.assign(new Error('not allowed'), { code: 'UNAUTHORIZED' });
 

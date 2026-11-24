@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import type * as SentryNextjs from '@sentry/nextjs';
 import type { Envelope, Event, NodeOptions, Transport } from '@sentry/nextjs';
-import { captureException, close, flush, withIsolationScope } from '@sentry/nextjs';
+import { captureException, close, flush, withIsolationScope, withScope } from '@sentry/nextjs';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 const sentEnvelopes: Envelope[] = [];
@@ -27,6 +27,9 @@ jest.mock('@sentry/nextjs', () => {
 });
 
 const FAKE_SECRET = 'fake-secret-value-0000';
+// Kept away from the capture calls, because the SDK sends nearby source lines
+// as stack frame context.
+const FAKE_JWT = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
 
 type SentItem = { type: string; payload: unknown };
 
@@ -97,5 +100,41 @@ describe('initServerSentry through the real SDK pipeline', () => {
       query_string: 'plan=pro',
       headers: { host: 'app.kilo.sh', 'x-search': '[Filtered]' },
     });
+  });
+
+  test('sends only the user id', async () => {
+    withScope(scope => {
+      scope.setUser({
+        id: 'user-fake-0123',
+        email: 'person@example.com',
+        ip_address: '192.0.2.44',
+        username: FAKE_SECRET,
+      });
+      captureException(new Error('lookup failed'));
+    });
+
+    const [event] = await sentEvents();
+
+    expect(event?.user).toEqual({ id: 'user-fake-0123' });
+  });
+
+  test('redacts a secret in the Drizzle error fingerprint', async () => {
+    const query = 'select 1';
+    captureException(
+      Object.assign(new Error(`Failed query: ${query}`), {
+        query,
+        params: [],
+        cause: { code: '22P02', message: `invalid input syntax for type uuid: "${FAKE_JWT}"` },
+      })
+    );
+
+    const [event] = await sentEvents();
+
+    expect(event?.fingerprint).toEqual([
+      'drizzle-query-error',
+      '22P02',
+      'invalid input syntax for type uuid: "[Filtered]"',
+    ]);
+    expect(JSON.stringify(event)).not.toContain(FAKE_JWT);
   });
 });

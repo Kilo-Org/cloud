@@ -42,6 +42,7 @@ function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
 
 export function scrubSentryEvent<T extends Event>(event: T): T {
   sanitizeSentryRequestData(event);
+  delete event.request?.env;
   if (event.message !== undefined) {
     event.message = redactSecretValues(event.message);
   }
@@ -56,6 +57,20 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
   for (const exception of event.exception?.values ?? []) {
     if (exception.value !== undefined) {
       exception.value = redactSecretValues(exception.value);
+    }
+    for (const frame of exception.stacktrace?.frames ?? []) {
+      delete frame.vars;
+    }
+  }
+  if (event.fingerprint) {
+    event.fingerprint = event.fingerprint.map(entry => redactSecretValues(entry));
+  }
+  if (event.user) {
+    const id = event.user.id;
+    if (id === undefined) {
+      delete event.user;
+    } else {
+      event.user = { id };
     }
   }
   if (event.extra) {

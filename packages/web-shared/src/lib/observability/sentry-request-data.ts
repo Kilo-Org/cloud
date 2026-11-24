@@ -57,6 +57,10 @@ const ALLOWED_HEADERS = new Set([
   SEARCH_HEADER,
   'x-vercel-id',
   'x-request-id',
+  'x-matched-path',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'traceparent',
 ]);
 const FILTERED_HEADER_VALUE = '[Filtered]';
 

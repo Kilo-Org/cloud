@@ -403,6 +403,13 @@ describe('sanitizeSentryRequestData', () => {
           'Content-Type': 'application/json',
           'X-Vercel-Id': 'fra1::abc',
           'x-pathname': '/s/eyJhbGciOiJIUzI1NiJ9.share.token',
+          'X-Matched-Path': '/api/trpc/[trpc]',
+          traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+          'X-Forwarded-Host': 'app.kilo.sh',
+          'x-forwarded-proto': 'https',
+          'x-forwarded-for': '192.0.2.1',
+          'x-real-ip': '192.0.2.1',
+          'x-vercel-deployment-url': 'fake-deployment.vercel.app',
         },
       },
     };
@@ -410,6 +417,13 @@ describe('sanitizeSentryRequestData', () => {
     const result = sanitizeSentryRequestData(event);
 
     expect(result.request?.headers).toEqual({
+      'X-Matched-Path': '/api/trpc/[trpc]',
+      traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+      'X-Forwarded-Host': 'app.kilo.sh',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-for': '[Filtered]',
+      'x-real-ip': '[Filtered]',
+      'x-vercel-deployment-url': '[Filtered]',
       Authorization: '[Filtered]',
       Cookie: '[Filtered]',
       'X-Vercel-Sc-Headers': '[Filtered]',

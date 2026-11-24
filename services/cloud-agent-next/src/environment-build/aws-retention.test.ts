@@ -25,7 +25,7 @@ const templateSchema = z.object({
 });
 
 describe('prepared archive retention contract', () => {
-  it.each(['template.json', 'template.ecs.json'])(
+  it.each(['template.ecs.json'])(
     'expires eligibility one day before storage retention in %s',
     filename => {
       const template = templateSchema.parse(

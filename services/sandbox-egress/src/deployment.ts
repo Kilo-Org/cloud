@@ -4,7 +4,7 @@ import {
   awsEgressPublicDeploymentSchema,
   awsEgressSharedIdentitySchema,
 } from '@kilocode/worker-utils/aws-egress';
-import { AWS_MICROVM_MAXIMUM_DURATION_SECONDS } from '@kilocode/worker-utils/aws-byoc';
+import { AWS_PROXY_CERTIFICATE_RESERVE_SECONDS } from '@kilocode/worker-utils/aws-byoc';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { STANDARD_SCM_HOSTS } from '@kilocode/worker-utils/scm-capability-contract';
 import { createScmAuthority, type ScmAuthority } from './certificates.js';
@@ -86,7 +86,7 @@ export async function establishProxyDeployment(input: {
           identity: { ...common, secret: randomBytes(32).toString('hex') },
           tls: { certificate: authority.certificate, privateKey: authority.privateKey },
         },
-        now() + AWS_MICROVM_MAXIMUM_DURATION_SECONDS * 1000
+        now() + AWS_PROXY_CERTIFICATE_RESERVE_SECONDS * 1000
       );
       try {
         raw =

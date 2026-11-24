@@ -154,7 +154,6 @@ export const GRANT_PROVIDERS = [
   'cloudflare',
   'vercel',
   'cloudflare-containers',
-  'aws',
   'aws-ecs',
 ] as const;
 export type GrantProvider = (typeof GRANT_PROVIDERS)[number];

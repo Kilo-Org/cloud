@@ -1,18 +1,17 @@
 import { z } from 'zod';
 import {
-  AWS_BYOC_TEMPLATE_VERSION,
+  AWS_BYOC_ENVELOPE_KEY_ID,
   AWS_BYOC_PROXY_PROTOCOL_VERSION,
-  awsByocConfigurationSchema,
+  awsBucketSchema,
+  awsExternalIdSchema,
+  awsRoleArnSchema,
   isAwsRepositoryPath,
 } from './aws-byoc';
+import { AWS_ECS_BYOC_ENVELOPE_SCHEME, AWS_ECS_BYOC_TEMPLATE_VERSION } from './aws-ecs';
 
-export const awsSetupProviderSchema = z.enum(['aws', 'aws-ecs']);
-export type AwsSetupProvider = z.infer<typeof awsSetupProviderSchema>;
-
-export const AWS_BYOC_SETUP_ENVELOPE_SCHEME = 'byoc-aws-setup-rsa-aes-256-gcm';
+export const AWS_ECS_BYOC_SETUP_ENVELOPE_SCHEME = 'byoc-aws-ecs-setup-rsa-aes-256-gcm';
 const accountId = z.string().regex(/^\d{12}$/);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
-const bucket = awsByocConfigurationSchema.shape.bucket;
 const key = z
   .string()
   .min(1)
@@ -20,14 +19,14 @@ const key = z
   .refine(value =>
     value.split('/').every(part => /^[A-Za-z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')
   );
-const repositoryArn = z.string().regex(/^arn:aws:ecr:us-east-1:\d{12}:repository\/[a-z0-9_./-]+$/);
+const template = z
+  .object({ bucket: awsBucketSchema, key, sha256: digest })
+  .strict()
+  .refine(value => value.key.includes(value.sha256) && value.key.endsWith('.json'));
 const imageUri = z
   .string()
   .regex(/^\d{12}\.dkr\.ecr\.us-east-1\.amazonaws\.com\/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$/);
-const releaseObject = z
-  .object({ bucket, key, sha256: digest })
-  .strict()
-  .refine(value => value.key.includes(value.sha256));
+const repositoryArn = z.string().regex(/^arn:aws:ecr:us-east-1:\d{12}:repository\/[a-z0-9_./-]+$/);
 
 export const awsReleaseImageSchema = z
   .object({ imageUri, repositoryArn })
@@ -38,29 +37,25 @@ export const awsReleaseImageSchema = z
     if (!isAwsRepositoryPath(repository) || value.imageUri.split('@')[0] !== expected)
       ctx.addIssue({ code: 'custom', message: 'Invalid AWS image pins' });
   });
-export const awsReleaseCustomerAccountsSchema = z
-  .array(accountId)
-  .min(1)
-  .max(500)
-  .refine(value => new Set(value).size === value.length);
 
 /** Operator-published assets. Account access must exist before the customer creates its stack. */
-export const awsByocReleaseSchema = z
+export const awsEcsByocReleaseSchema = z
   .object({
     format: z.literal(1),
-    templateVersion: z.literal(AWS_BYOC_TEMPLATE_VERSION),
+    provider: z.literal('aws-ecs'),
+    templateVersion: z.literal(AWS_ECS_BYOC_TEMPLATE_VERSION),
     proxyProtocolVersion: z.literal(AWS_BYOC_PROXY_PROTOCOL_VERSION),
-    template: releaseObject.refine(value => value.key.endsWith('.json')),
-    runtime: releaseObject.safeExtend({ repositoryArn }),
+    template,
+    runtime: awsReleaseImageSchema,
     proxy: awsReleaseImageSchema,
-    customerAccounts: awsReleaseCustomerAccountsSchema,
+    customerAccounts: z
+      .array(accountId)
+      .min(1)
+      .max(500)
+      .refine(value => new Set(value).size === value.length),
   })
-  .strict()
-  .superRefine((release, ctx) => {
-    if (!release.runtime.key.endsWith('.zip'))
-      ctx.addIssue({ code: 'custom', message: 'Invalid AWS release pins' });
-  });
-export type AwsByocRelease = z.infer<typeof awsByocReleaseSchema>;
+  .strict();
+export type AwsEcsByocRelease = z.infer<typeof awsEcsByocReleaseSchema>;
 
 export const awsSetupOwnerSchema = z.union([
   z.object({ organizationId: z.uuid(), userId: z.never().optional() }).strict(),
@@ -75,13 +70,15 @@ export const awsSetupBindingSchema = z
   })
   .strict();
 export type AwsSetupBinding = z.infer<typeof awsSetupBindingSchema>;
-export const awsSetupIntentSchema = z
+
+export const awsEcsSetupIntentSchema = z
   .object({
     format: z.literal(1),
+    provider: z.literal('aws-ecs'),
     accountId,
     stackName: z.string().regex(/^kilo-[a-f0-9]{32}$/),
-    externalId: awsByocConfigurationSchema.shape.externalId,
-    kiloRoleArn: awsByocConfigurationSchema.shape.roleArn,
+    externalId: awsExternalIdSchema,
+    kiloRoleArn: awsRoleArnSchema,
     controlPlaneUrl: z.url().refine(value => {
       const url = new URL(value);
       return (
@@ -94,38 +91,43 @@ export const awsSetupIntentSchema = z
         url.pathname === '/'
       );
     }),
-    release: awsByocReleaseSchema,
+    release: awsEcsByocReleaseSchema,
   })
   .strict()
-  .superRefine(validateAwsSetupAccounts);
+  .superRefine((intent, ctx) => {
+    const account = intent.kiloRoleArn.split(':')[4];
+    if (
+      !intent.release.customerAccounts.includes(intent.accountId) ||
+      intent.release.runtime.repositoryArn.split(':')[4] !== account ||
+      intent.release.proxy.repositoryArn.split(':')[4] !== account
+    )
+      ctx.addIssue({ code: 'custom', message: 'AWS setup account is not enabled' });
+  });
+export type AwsEcsSetupIntent = z.infer<typeof awsEcsSetupIntentSchema>;
 
-export function validateAwsSetupAccounts(
-  intent: {
-    accountId: string;
-    kiloRoleArn: string;
-    release: {
-      customerAccounts: string[];
-      runtime: { repositoryArn: string };
-      proxy: { repositoryArn: string };
-    };
-  },
-  ctx: z.RefinementCtx
-): void {
-  const account = intent.kiloRoleArn.split(':')[4];
-  if (
-    !intent.release.customerAccounts.includes(intent.accountId) ||
-    intent.release.runtime.repositoryArn.split(':')[4] !== account ||
-    intent.release.proxy.repositoryArn.split(':')[4] !== account
-  )
-    ctx.addIssue({ code: 'custom', message: 'AWS setup account is not enabled' });
+function ownerKey(owner: AwsSetupOwner): string {
+  return owner.organizationId ?? `user:${owner.userId}`;
 }
-export type AwsSetupIntent = z.infer<typeof awsSetupIntentSchema>;
 
 /** A separate purpose and generation prevent a draft envelope from becoming runtime authority. */
-export function awsSetupEnvelopeAad(binding: AwsSetupBinding): string {
+export function awsEcsSetupEnvelope(binding: AwsSetupBinding) {
   const value = awsSetupBindingSchema.parse(binding);
-  const owner = value.owner.organizationId ?? `user:${value.owner.userId}`;
-  return `byoc-aws-setup:v1:${owner}:${value.credentialId}:${value.generation}`;
+  return {
+    scheme: AWS_ECS_BYOC_SETUP_ENVELOPE_SCHEME,
+    aad: `byoc-aws-ecs-setup:v1:${ownerKey(value.owner)}:${value.credentialId}:${value.generation}`,
+  };
+}
+export function awsEcsConfigurationEnvelope(owner: AwsSetupOwner, credentialId: string) {
+  const value = awsSetupOwnerSchema.parse(
+    owner.organizationId !== undefined
+      ? { organizationId: owner.organizationId }
+      : { userId: owner.userId }
+  );
+  return {
+    scheme: AWS_ECS_BYOC_ENVELOPE_SCHEME,
+    aad: `byoc-aws-ecs-configuration:v1:${ownerKey(value)}:${z.uuid().parse(credentialId)}`,
+    keyId: AWS_BYOC_ENVELOPE_KEY_ID,
+  };
 }
 
 export const AWS_SETUP_ERRORS = {

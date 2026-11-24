@@ -9,7 +9,7 @@ import { verifyRunnerCredential } from './runner-credential.js';
 export function mintAwsBuildEgressCredential(
   input: {
     runnerCredential: string;
-    provider: 'aws' | 'aws-ecs';
+    provider: 'aws-ecs';
     environmentId: string;
     buildId: string;
     allocationId: string;

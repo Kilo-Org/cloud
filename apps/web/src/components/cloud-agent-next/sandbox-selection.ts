@@ -13,7 +13,6 @@ const providerLabels: Record<SandboxDestination['provider']['id'], string> = {
   cloudflare: 'Cloudflare',
   'cloudflare-containers': 'Cloudflare Containers',
   vercel: 'Vercel',
-  aws: 'AWS',
   'aws-ecs': 'AWS ECS',
 };
 
@@ -36,7 +35,6 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
   small: 'Small',
   large: 'Medium',
   default: 'Provider default',
-  'microvm-8g': '8 GiB',
   'ecs-8g': '8 GiB',
 };
 

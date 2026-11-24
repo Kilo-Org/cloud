@@ -45,8 +45,7 @@
     "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-manual-admission.test.mjs scripts/runtime-publication-need.test.mjs",
     "build:worker": "tsx scripts/build-sentry-worker.ts",
     "sentry:sourcemaps": "tsx scripts/upload-sentry-source-maps.ts",
-    "build:aws-ecs-template": "node deploy/aws/build-ecs-template.mjs",
-    "test:aws-templates": "node --test deploy/aws/build-ecs-template.test.mjs"
+    "test:aws-templates": "node --test deploy/aws/template.ecs.test.mjs"
   },
   "dependencies": {
     "@hono/trpc-server": "0.4.2",

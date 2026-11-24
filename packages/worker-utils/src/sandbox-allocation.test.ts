@@ -18,6 +18,7 @@ import {
   normalizeSandboxAllocation,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
+  sandboxDestinationSchema,
   sandboxSelectionCapabilitiesSchema,
   vercelSandboxResourcesSchema,
 } from './sandbox-allocation.js';
@@ -219,6 +220,16 @@ describe('sandbox allocation contract', () => {
     ).toBe(false);
   });
 
+  it('rejects the removed AWS MicroVM allocation and destination', () => {
+    const allocation = {
+      provider: { id: 'aws', account: 'byoc' },
+      instanceType: 'microvm-8g',
+    };
+    expect(sandboxAllocationInputSchema.safeParse('aws-microvm-8g').success).toBe(false);
+    expect(sandboxAllocationRequestSchema.safeParse(allocation).success).toBe(false);
+    expect(sandboxDestinationSchema.safeParse(allocation).success).toBe(false);
+  });
+
   it.each(['isolated-standard', 'cloudflare-single', 'cloudflare-shared'] as const)(
     'keeps retired %s decodable in persisted fields but out of the selectable set',
     allocation => {
@@ -241,13 +252,12 @@ describe('sandbox allocation contract', () => {
       'cloudflare-containers-standard-4',
       'vercel-small',
       'vercel-large',
-      'aws-microvm-8g',
       'aws-ecs-8g',
     ]);
     for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
       expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
       expect(getSandboxAllocationProvider(allocation)).toMatch(
-        /^(cloudflare-containers|vercel|aws|aws-ecs)$/
+        /^(cloudflare-containers|vercel|aws-ecs)$/
       );
     }
   });

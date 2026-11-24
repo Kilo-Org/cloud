@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
-  awsArchiveBaseImage,
   awsEcsArchiveBaseImage,
   decodeAwsArchiveBase,
   decodeAwsArchiveSnapshot,
@@ -18,15 +16,12 @@ import {
 
 const connectionId = '11111111-1111-4111-8111-111111111111';
 const captureId = '55555555-5555-4555-8555-555555555555';
-function fixtureFor(provider: 'aws' | 'aws-ecs') {
+function fixture() {
   let context: AwsBuildArchiveContext = {
     environmentId: '22222222-2222-4222-8222-222222222222',
     buildId: '33333333-3333-4333-8333-333333333333',
     allocationId: '44444444-4444-4444-8444-444444444444',
-    baseImage:
-      provider === 'aws'
-        ? awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION)
-        : awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG),
+    baseImage: awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG),
     deadlineAt: 100_000,
     state: 'preparing',
   };
@@ -92,8 +87,7 @@ function fixtureFor(provider: 'aws' | 'aws-ecs') {
   };
 }
 
-describe.each(['aws', 'aws-ecs'] as const)('%s immutable prepared archive', provider => {
-  const fixture = () => fixtureFor(provider);
+describe('ECS immutable prepared archive', () => {
   it('reconciles a lost upload reply and returns the same captured descriptor', async () => {
     const f = fixture();
     await f.api.prepareUpload(f.descriptor);
@@ -210,15 +204,14 @@ describe.each(['aws', 'aws-ecs'] as const)('%s immutable prepared archive', prov
 });
 
 describe('AWS archive public identity', () => {
-  const fixture = () => fixtureFor('aws');
   it('contains no role credentials, external ID or proxy identity', () => {
-    const base = awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION);
+    const base = awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG);
     const decoded = decodeAwsArchiveBase(base);
     expect(decoded).not.toHaveProperty('roleArn');
     expect(decoded).not.toHaveProperty('externalId');
     expect(decoded).not.toHaveProperty('proxy');
   });
-  it.each(['connection', 'image', 'version', 'bucket', 'account'])(
+  it.each(['connection', 'runtime', 'task-revision', 'bucket', 'account'])(
     'rejects another %s when restoring',
     change => {
       const f = fixture();
@@ -230,15 +223,17 @@ describe('AWS archive public identity', () => {
         allocationId: f.context().allocationId,
         archive: f.descriptor,
       };
-      const config = { ...AWS_TEST_CONFIGURATION };
-      if (change === 'image') config.imageIdentifier += '-other';
-      if (change === 'version') config.imageVersion = '99.0';
+      const config = { ...ECS_TEST_CONFIG };
+      if (change === 'runtime')
+        config.runtimeImage = config.runtimeImage.replace(/[a-f0-9]{64}$/, 'd'.repeat(64));
+      if (change === 'task-revision')
+        config.taskDefinitionArn = config.taskDefinitionArn.replace(/:\d+$/, ':99');
       if (change === 'bucket') config.bucket += '-other';
       if (change === 'account') {
-        config.imageIdentifier = config.imageIdentifier.replace(/\d{12}/, '999999999999');
+        config.taskDefinitionArn = config.taskDefinitionArn.replace(/\d{12}/, '999999999999');
         config.stackId = config.stackId.replace(/\d{12}/, '999999999999');
       }
-      const current = awsArchiveBaseImage(
+      const current = awsEcsArchiveBaseImage(
         change === 'connection' ? '77777777-7777-4777-8777-777777777777' : connectionId,
         config
       );

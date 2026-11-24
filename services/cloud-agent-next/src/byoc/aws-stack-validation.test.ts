@@ -1,74 +1,88 @@
 import { describe, expect, it } from 'vitest';
-import { awsSetupIntentSchema } from '@kilocode/worker-utils/aws-onboarding';
+import { awsEcsSetupIntentSchema } from '@kilocode/worker-utils/aws-onboarding';
 import type { AwsStack } from '@kilocode/worker-utils/aws-cloudformation';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
+import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
+import { ECS_TEST_CONFIG as config } from '../../test/fixtures/aws-ecs.js';
 import {
-  assertAwsAllocationStack,
+  assertAwsEcsAllocationStack,
   assertAwsStackVersions,
-  awsConfigurationFromSetupStack,
-  awsSetupParameters,
+  awsEcsResourcesFromSetupStack,
+  awsEcsSetupParameters,
 } from './aws-stack-validation.js';
+import { validateAwsEcsStartupStack } from './aws-startup-stack.js';
+
 const hash = 'a'.repeat(64);
-function fixture() {
-  const config = { ...AWS_TEST_CONFIGURATION, templateVersion: 2 };
-  const intent = awsSetupIntentSchema.parse({
+function stack(): AwsStack {
+  return {
+    stackId: config.stackId,
+    stackName: 'customer',
+    status: 'CREATE_COMPLETE',
+    parameters: {},
+    outputs: {
+      Provider: 'aws-ecs',
+      RoleArn: config.roleArn,
+      Bucket: config.bucket,
+      ClusterArn: config.clusterArn,
+      TaskDefinitionArn: config.taskDefinitionArn,
+      CapacityProvider: config.capacityProvider,
+      ExecutionRoleArn: config.executionRoleArn,
+      RuntimeImage: config.runtimeImage,
+      PrivateSubnet: config.subnetId,
+      SandboxSecurityGroup: config.securityGroupId,
+      ProxyHostname: config.proxy.hostname,
+      TemplateVersion: String(config.templateVersion),
+      ProxyProtocolVersion: String(config.proxyProtocolVersion),
+    },
+  };
+}
+function setup() {
+  const intent = awsEcsSetupIntentSchema.parse({
     format: 1,
+    provider: 'aws-ecs',
     accountId: '123456789012',
     stackName: 'kilo-' + 'b'.repeat(32),
     externalId: config.externalId,
-    kiloRoleArn: 'arn:aws:iam::123456789012:role/kilo',
+    kiloRoleArn: 'arn:aws:iam::999999999999:role/kilo',
     controlPlaneUrl: 'https://worker.example.com',
     release: {
       format: 1,
-      templateVersion: 2,
+      provider: 'aws-ecs',
+      templateVersion: 1,
       proxyProtocolVersion: 1,
       template: { bucket: 'kilo-releases', key: `aws/${hash}/template.json`, sha256: hash },
       runtime: {
-        bucket: 'kilo-releases',
-        key: `aws/${hash}/runtime.zip`,
-        sha256: hash,
-        repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/runtime',
+        imageUri: config.runtimeImage,
+        repositoryArn: 'arn:aws:ecr:us-east-1:999999999999:repository/runtime',
       },
       proxy: {
-        imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/proxy@sha256:${hash}`,
-        repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/proxy',
+        imageUri: `999999999999.dkr.ecr.us-east-1.amazonaws.com/proxy@sha256:${hash}`,
+        repositoryArn: 'arn:aws:ecr:us-east-1:999999999999:repository/proxy',
       },
       customerAccounts: ['123456789012'],
     },
   });
-  config.stackId = `arn:aws:cloudformation:us-east-1:123456789012:stack/${intent.stackName}/12345678-abcd`;
-  const stack: AwsStack = {
-    stackId: config.stackId,
-    stackName: intent.stackName,
-    status: 'CREATE_COMPLETE',
-    parameters: awsSetupParameters(intent),
-    outputs: {
-      RoleArn: config.roleArn,
-      Bucket: config.bucket,
-      ImageArn: config.imageIdentifier,
-      ImageVersion: config.imageVersion,
-      ConnectorArn: config.connectorArn,
-      TemplateVersion: '2',
-      ProxyProtocolVersion: '1',
-    },
-  };
-  return { config, intent, stack };
+  const value = stack();
+  value.stackName = intent.stackName;
+  value.stackId = `arn:aws:cloudformation:us-east-1:123456789012:stack/${intent.stackName}/12345678-abcd`;
+  value.parameters = awsEcsSetupParameters(intent);
+  return { intent, roleArn: config.roleArn, stack: value };
 }
+
 describe('AWS stack version and resource contract', () => {
-  it('builds the runtime configuration from an approved owner-bound stack', () => {
-    const f = fixture();
-    expect(awsConfigurationFromSetupStack({ ...f, roleArn: f.config.roleArn })).toEqual(f.config);
-    expect(() => assertAwsAllocationStack(f.stack, f.config)).not.toThrow();
+  it('builds the ECS resources from an approved owner-bound stack', () => {
+    const f = setup();
+    const { proxy: _proxy, ...resources } = config;
+    expect(awsEcsResourcesFromSetupStack(f)).toEqual({ ...resources, stackId: f.stack.stackId });
   });
-  it.each(['version', 'protocol', 'not-ready', 'account', 'role', 'name', 'release'])(
+  it.each(['version', 'protocol', 'not-ready', 'account', 'role', 'name', 'release', 'provider'])(
     'refuses %s before Save',
     change => {
-      const f = fixture();
-      if (change === 'version') f.stack.outputs.TemplateVersion = '1';
+      const f = setup();
+      if (change === 'version') f.stack.outputs.TemplateVersion = '0';
       if (change === 'protocol') f.stack.outputs.ProxyProtocolVersion = '99';
       if (change === 'not-ready') f.stack.status = 'CREATE_IN_PROGRESS';
       if (change === 'account')
-        f.stack.stackId = f.stack.stackId.replace('123456789012', '999999999999');
+        f.stack.stackId = f.stack.stackId.replace('123456789012', '888888888888');
       if (change === 'role') f.stack.outputs.RoleArn += '-other';
       if (change === 'name') f.stack.stackName += '-other';
       if (change === 'release')
@@ -76,40 +90,84 @@ describe('AWS stack version and resource contract', () => {
           hash,
           'c'.repeat(64)
         );
-      expect(() => awsConfigurationFromSetupStack({ ...f, roleArn: f.config.roleArn })).toThrow();
+      if (change === 'provider') f.stack.outputs.Provider = 'aws';
+      expect(() => awsEcsResourcesFromSetupStack(f)).toThrow();
     }
   );
-  it('reports an actual below-minimum version before checking stale resource pins', () => {
-    const f = fixture();
-    f.stack.outputs.TemplateVersion = '1';
-    f.stack.outputs.ImageVersion = '9.0';
-    try {
-      assertAwsAllocationStack(f.stack, f.config);
-      throw new Error('Expected refusal');
-    } catch (error) {
-      expect(error).toMatchObject({ code: 'byoc_aws_stack_outdated' });
-    }
+  it('requires a supported protocol even on a newer template', () => {
+    const value = stack();
+    value.outputs.TemplateVersion = '3';
+    value.outputs.ProxyProtocolVersion = '2';
+    expect(() => assertAwsStackVersions(value, 1)).toThrow('proxy release');
   });
-  it('rejects changed live resources before allocating new compute', () => {
-    const f = fixture();
-    f.stack.outputs.ImageVersion = '9.0';
-    expect(() => assertAwsAllocationStack(f.stack, f.config)).toThrow('does not match');
-    f.stack.outputs.ImageVersion = f.config.imageVersion;
+});
+
+describe('ECS startup stack authority', () => {
+  it('accepts the exact pinned ECS outputs', () => {
+    expect(() => assertAwsEcsAllocationStack(stack(), config)).not.toThrow();
+  });
+  it.each([
+    'Provider',
+    'RoleArn',
+    'Bucket',
+    'ClusterArn',
+    'TaskDefinitionArn',
+    'CapacityProvider',
+    'ExecutionRoleArn',
+    'RuntimeImage',
+    'PrivateSubnet',
+    'SandboxSecurityGroup',
+    'ProxyHostname',
+  ])('rejects a changed %s', field => {
+    const value = stack();
+    value.outputs[field] = 'changed';
+    expect(() => assertAwsEcsAllocationStack(value, config)).toThrow('does not match');
+  });
+  it('refuses old versions, incomplete stacks and another stack identity', () => {
     expect(() =>
-      assertAwsAllocationStack(f.stack, {
-        ...f.config,
-        proxy: {
-          generation: crypto.randomUUID(),
-          hostname: 'expected.proxy.internal',
-          caFingerprint: 'd'.repeat(64),
+      assertAwsEcsAllocationStack({ ...stack(), status: 'UPDATE_IN_PROGRESS' }, config)
+    ).toThrow();
+    const outdated = stack();
+    outdated.outputs.TemplateVersion = '0';
+    expect(() => assertAwsEcsAllocationStack(outdated, config)).toThrow();
+    expect(() =>
+      assertAwsEcsAllocationStack(
+        { ...stack(), stackId: config.stackId.replace('customer', 'foreign') },
+        config
+      )
+    ).toThrow();
+  });
+  it('reports an actual below-minimum version before checking stale resource pins', () => {
+    const value = stack();
+    value.outputs.TemplateVersion = '0';
+    value.outputs.RuntimeImage = 'changed';
+    expect(() => assertAwsEcsAllocationStack(value, config)).toThrow(
+      expect.objectContaining({ code: 'byoc_aws_stack_outdated' })
+    );
+  });
+  it('uses the shared bounded stack read and preserves specific failures', async () => {
+    let calls = 0;
+    await validateAwsEcsStartupStack({
+      configuration: config,
+      pause: async () => {},
+      read: async () => {
+        if (++calls === 1) throw new AwsRequestError(503, 'ServiceUnavailable');
+        return stack();
+      },
+    });
+    expect(calls).toBe(2);
+    await expect(
+      validateAwsEcsStartupStack({
+        configuration: config,
+        read: async () => {
+          throw new AwsRequestError(403, 'AccessDenied');
         },
       })
-    ).toThrow('does not match');
-  });
-  it('requires a supported protocol even on a newer template', () => {
-    const f = fixture();
-    f.stack.outputs.TemplateVersion = '3';
-    f.stack.outputs.ProxyProtocolVersion = '2';
-    expect(() => assertAwsStackVersions(f.stack)).toThrow('proxy release');
+    ).rejects.toMatchObject({ reason: 'byoc_aws_forbidden' });
+    const mismatch = stack();
+    mismatch.outputs.Provider = 'aws';
+    await expect(
+      validateAwsEcsStartupStack({ configuration: config, read: async () => mismatch })
+    ).rejects.toMatchObject({ reason: 'byoc_aws_connection_changed' });
   });
 });

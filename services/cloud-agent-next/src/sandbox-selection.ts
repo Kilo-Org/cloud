@@ -1,6 +1,6 @@
 import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import { enrolledByocOwner } from './byoc/owner.js';
-import { fetchAwsProviderConnection } from './byoc/aws-credential-resolver.js';
+import { fetchAwsByocConnection } from './byoc/aws-credential-resolver.js';
 import {
   fetchByocVercelEnrollment,
   fetchByocVercelEnrollmentForUser,
@@ -38,8 +38,8 @@ export const RETIRED_SANDBOX_ALLOCATION_MESSAGE =
 
 /**
  * Retired allocations a new session cannot choose. `cloudflare-shared` is gone
- * because every sandbox serves one workspace. `cloudflare-single` is not here:
- * it is the compatibility alias for the native containers default.
+ * because every sandbox serves one workspace. `cloudflare-single` is the
+ * compatibility alias for the native containers default.
  */
 export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boolean {
   return allocation === 'cloudflare-shared' || allocation === 'isolated-standard';
@@ -108,7 +108,6 @@ export function sandboxAllocationUnavailableReason(
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
     case 'aws-ecs':
-    case 'aws':
       return enrolledByocOwner(env.BYOC_AWS_IDS, owner) === undefined
         ? 'Configure AWS BYOC in Cloud Agent settings to use AWS compute'
         : undefined;
@@ -126,11 +125,6 @@ export function sandboxAllocationUnavailableReason(
       return `Sandbox allocation provider ${String(exhaustive)} is not supported`;
     }
   }
-}
-
-function awsAllocationProvider(allocation: SandboxAllocation) {
-  const provider = getSandboxAllocationProvider(allocation);
-  return provider === 'aws' || provider === 'aws-ecs' ? provider : undefined;
 }
 
 export async function getSandboxSelectionCapabilities(
@@ -154,7 +148,7 @@ export async function getSandboxSelectionCapabilities(
   const candidates = await Promise.all(
     SELECTABLE_SANDBOX_ALLOCATIONS.filter(
       allocation =>
-        awsAllocationProvider(allocation) === undefined ||
+        getSandboxAllocationProvider(allocation) !== 'aws-ecs' ||
         enrolledByocOwner(env.BYOC_AWS_IDS, owner) !== undefined
     ).map(async allocation => {
       let unavailableReason = sandboxAllocationUnavailableReason(
@@ -164,13 +158,14 @@ export async function getSandboxSelectionCapabilities(
         capability,
         options?.vercelUnavailableReason
       );
-      const awsProvider = awsAllocationProvider(allocation);
-      if (awsProvider !== undefined && unavailableReason === undefined) {
+      if (
+        getSandboxAllocationProvider(allocation) === 'aws-ecs' &&
+        unavailableReason === undefined
+      ) {
         try {
-          const connection = await fetchAwsProviderConnection(
+          const connection = await fetchAwsByocConnection(
             env,
-            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId },
-            awsProvider
+            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId }
           );
           if (connection.setupStatus !== 'ready')
             unavailableReason = 'AWS compute setup is not ready';

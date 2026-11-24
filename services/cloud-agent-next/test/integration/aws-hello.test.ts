@@ -2,8 +2,8 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { awsProviderFixture } from '../fixtures/aws-provider.js';
-import { awsOperationStorage } from '../../src/control-plane/sandbox/aws-operation-storage.js';
+import { ecsProviderFixture } from '../fixtures/aws-ecs.js';
+import { awsEcsOperationStorage } from '../../src/control-plane/sandbox/aws-operation-storage.js';
 import { allocation } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { hashSandboxCredential } from '../../src/sandbox-control/credential.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
@@ -46,9 +46,9 @@ function hello(wrapperId: string) {
 }
 async function setup(instance: SandboxControlV2, state: DurableObjectState, sandboxId: string) {
   await instance.getAllocationState();
-  const fixture = awsProviderFixture(sandboxId);
+  const fixture = ecsProviderFixture(sandboxId);
   fixture.setNow(Date.now());
-  const adapter = fixture.adapter(awsOperationStorage(state.storage));
+  const adapter = fixture.adapter(awsEcsOperationStorage(state.storage));
   const created = await adapter.create({ intentId: allocationId, createdAt: Date.now() });
   if (!('providerRef' in created)) throw new Error('Missing provider reference');
   fixture.loseNextReply();

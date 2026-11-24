@@ -26,15 +26,17 @@ beforeEach(() => {
   });
 });
 
-describe('AWS provider selection', () => {
-  it('keeps the selector reachable when only the other AWS engine is enabled', () => {
+describe('AWS compute settings', () => {
+  it('describes ECS without a provider choice and explains an unenrolled owner', () => {
     const markup = renderToStaticMarkup(createElement(AwsComputeSettings));
-    expect(markup).toContain('AWS provider');
-    expect(markup).toContain('This AWS provider is not enabled.');
+    expect(markup).toContain('isolated ECS tasks');
+    expect(markup).not.toContain('AWS provider');
+    expect(markup).not.toContain('MicroVM');
+    expect(markup).toContain('AWS compute is not enabled. Contact Kilo.');
     expect(markup).not.toContain('This connection remains saved.');
   });
 
-  it('hides the card when neither AWS engine has access or saved configuration', () => {
+  it('hides the card without access or a saved configuration', () => {
     mockAccess.mockReturnValue(false);
     expect(renderToStaticMarkup(createElement(AwsComputeSettings))).toBe('');
   });

@@ -4,12 +4,11 @@ import { environmentBuildArchiveUploadSchema } from '../shared/environment-build
 import type { EnvironmentBuildGit } from '../shared/environment-build-protocol.js';
 import { buildNativeEgressAllowlist } from '../sandbox-control/egress-policy.js';
 import { grantScmEntries } from '../sandbox-control/session-credential-members.js';
-import { encodeAwsProviderRef } from '../sandbox-control/aws-operation.js';
 import { encodeAwsEcsProviderRef } from '../sandbox-control/aws-ecs-operation.js';
 import type { AwsEgressProof } from '../egress/aws-scoped-admission.js';
 import { awsAccountAccess } from '../byoc/aws-account-access.js';
 import { createAwsRoleSessionCache } from '../byoc/aws-runtime-access.js';
-import type { AwsEgressConfiguration } from '../egress/aws-scoped-admission.js';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
 import type { BuilderLifecycleState } from './builder-state.js';
 import type { BuilderLaunch } from './builder-provider.js';
@@ -50,11 +49,7 @@ export function awsBuildEgressContext(
   const operation = state.operation ?? null;
   const scm = state.scm === 'retired' ? undefined : state.scm;
   const scmActive = available && scm !== undefined;
-  const providerRef = operation
-    ? operation.ref.provider === 'aws'
-      ? encodeAwsProviderRef(operation.ref)
-      : encodeAwsEcsProviderRef(operation.ref)
-    : null;
+  const providerRef = operation ? encodeAwsEcsProviderRef(operation.ref) : null;
   return {
     environmentId: allocation.environmentId,
     buildId: build.id,
@@ -97,7 +92,7 @@ export function awsBuildEgressContext(
 export function createAwsEnvironmentBuildServices(deps: AwsBuildContextDeps) {
   const contexts = createAwsBuildContexts(deps);
   const compute = createAwsBuilderLifecycle(deps);
-  const access = createAwsRoleSessionCache((config: AwsEgressConfiguration) =>
+  const access = createAwsRoleSessionCache((config: AwsEcsByocConfiguration) =>
     awsAccountAccess(deps.env, config)
   );
   // This queue covers broker renewals and archive reservations. Lifecycle cancellation uses SQLite directly.
@@ -169,10 +164,10 @@ export function createAwsEnvironmentBuildServices(deps: AwsBuildContextDeps) {
   async function archives(initial: AwsPinnedBuild) {
     const operation = initial.state.operation;
     if (!operation) throw new AwsBuildInactiveError();
-    const selected = await resolveAwsBuildConfiguration(deps.env, initial.allocation);
-    if (JSON.stringify(selected.configuration) !== JSON.stringify(operation.config))
+    const configuration = await resolveAwsBuildConfiguration(deps.env, initial.allocation);
+    if (JSON.stringify(configuration) !== JSON.stringify(operation.config))
       throw new BuilderTargetMismatchError();
-    const { objects } = await access(selected.configuration);
+    const { objects } = await access(configuration);
     return createAwsBuildArchiveStorage({
       now: contexts.now,
       serial,

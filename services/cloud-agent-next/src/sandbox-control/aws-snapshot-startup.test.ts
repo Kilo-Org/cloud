@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { awsProviderFixture, AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import { ecsProviderFixture, ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import {
-  awsArchiveBaseImage,
   awsEcsArchiveBaseImage,
   encodeAwsArchiveSnapshot,
   awsArchiveObjectKey,
@@ -29,15 +27,8 @@ const startup = {
     SANDBOX_CONTROL_CREDENTIAL: 'synthetic-launch-only',
   },
 };
-function fixture(provider: 'aws' | 'aws-ecs') {
-  const target =
-    provider === 'aws'
-      ? { provider, configuration: AWS_TEST_CONFIGURATION }
-      : { provider, configuration: ECS_TEST_CONFIG };
-  const baseImage =
-    provider === 'aws'
-      ? awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION)
-      : awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG);
+function fixture() {
+  const baseImage = awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG);
   const archive = {
     format: 1 as const,
     baseImage,
@@ -48,7 +39,7 @@ function fixture(provider: 'aws' | 'aws-ecs') {
     deletedCount: 0,
   };
   const snapshot = {
-    provider,
+    provider: 'aws-ecs' as 'vercel' | 'aws-ecs',
     baseImage,
     snapshotId: encodeAwsArchiveSnapshot({ ...identity, archive }),
   };
@@ -62,10 +53,10 @@ function fixture(provider: 'aws' | 'aws-ecs') {
     async (key: string, _seconds: number) =>
       `https://customer-artifacts.s3.us-east-1.amazonaws.com/${key}?synthetic-signature`
   );
-  const currentConfiguration = vi.fn(async () => target.configuration);
+  const currentConfiguration = vi.fn(async () => ECS_TEST_CONFIG);
   return {
     input: {
-      ...target,
+      configuration: ECS_TEST_CONFIG,
       connectionId,
       snapshot,
       startup,
@@ -83,9 +74,9 @@ function fixture(provider: 'aws' | 'aws-ecs') {
   };
 }
 
-describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provider => {
+describe('ECS session archive admission', () => {
   it('checks pinned metadata and restores before the fresh runtime with the proxy environment intact', async () => {
-    const f = fixture(provider);
+    const f = fixture();
     const result = await prepareAwsSnapshotStartup(f.input);
     expect(f.inspectArchive).toHaveBeenCalledWith(awsArchiveObjectKey(identity));
     expect(f.downloadUrl).toHaveBeenCalledWith(awsArchiveObjectKey(identity), 30);
@@ -108,8 +99,8 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
     'size',
     'deadline',
   ])('rejects %s before signing a download', async change => {
-    const f = fixture(provider);
-    if (change === 'provider') f.input.snapshot.provider = provider === 'aws' ? 'aws-ecs' : 'aws';
+    const f = fixture();
+    if (change === 'provider') f.input.snapshot.provider = 'vercel';
     if (change === 'connection') f.input.connectionId = '66666666-6666-4666-8666-666666666666';
     if (change === 'base') f.input.snapshot.baseImage = 'other-base';
     if (change === 'current-connection')
@@ -126,7 +117,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
   it.each([true, false])(
     'recovers the persisted snapshot source without preparing twice (lost reply: %s)',
     async lostReply => {
-      const f = provider === 'aws' ? awsProviderFixture() : ecsProviderFixture();
+      const f = ecsProviderFixture();
       const prepare = vi.fn(async (value: ProviderStartup) => ({
         ...value,
         command: { argv: ['/restored-runtime'] },
@@ -135,7 +126,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
       const first = f.adapter();
       const created = await first.create({ intentId: 'allocation-1', createdAt: 10_000 });
       if (!('providerRef' in created)) throw new Error('Missing test reference');
-      const options = { snapshot: fixture(provider).input.snapshot, deadlineAt: 31_000 };
+      const options = { snapshot: fixture().input.snapshot, deadlineAt: 31_000 };
       if (lostReply) f.loseNextReply();
       if (lostReply)
         await expect(first.launch(created.providerRef, startup, options)).rejects.toThrow();
@@ -154,7 +145,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
   );
 
   it('does not issue Run after cancellation during archive preparation', async () => {
-    const f = provider === 'aws' ? awsProviderFixture() : ecsProviderFixture();
+    const f = ecsProviderFixture();
     const first = f.adapter();
     const created = await first.create({ intentId: 'allocation-1', createdAt: 10_000 });
     if (!('providerRef' in created)) throw new Error('Missing test reference');
@@ -163,17 +154,15 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
       return value;
     });
     await expect(
-      f
-        .adapter()
-        .launch(created.providerRef, startup, { snapshot: fixture(provider).input.snapshot })
+      f.adapter().launch(created.providerRef, startup, { snapshot: fixture().input.snapshot })
     ).rejects.toThrow('stopping');
     expect(f.submitted).toHaveLength(0);
     expect(await f.adapter().stop(created.providerRef)).toBe('terminal');
-    expect('objects' in f ? f.objects.size : f.documents.size).toBe(0);
+    expect(f.documents.size).toBe(0);
   });
 
   it('returns a permanent missing-archive result without an image start', async () => {
-    const f = provider === 'aws' ? awsProviderFixture() : ecsProviderFixture();
+    const f = ecsProviderFixture();
     f.setSnapshotPreparation(async () => {
       throw new ProviderSnapshotCreationError('missing');
     });
@@ -182,7 +171,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s session archive admission', provi
     if (!('providerRef' in created)) throw new Error('Missing test reference');
     expect(
       await adapter.launch(created.providerRef, startup, {
-        snapshot: fixture(provider).input.snapshot,
+        snapshot: fixture().input.snapshot,
       })
     ).toEqual({
       startSource: 'repository',

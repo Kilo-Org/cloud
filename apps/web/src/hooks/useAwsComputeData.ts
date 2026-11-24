@@ -1,21 +1,20 @@
 'use client';
-import type { AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 
-export function useAwsComputeData(provider: AwsSetupProvider, organizationId?: string) {
+export function useAwsComputeData(organizationId?: string) {
   const trpc = useTRPC();
   const client = useRawTRPCClient();
   const cache = useQueryClient();
   const statusOptions =
     organizationId !== undefined
-      ? trpc.organizations.awsCompute.getStatus.queryOptions({ organizationId, provider })
-      : trpc.awsCompute.getStatus.queryOptions({ provider });
+      ? trpc.organizations.awsCompute.getStatus.queryOptions({ organizationId })
+      : trpc.awsCompute.getStatus.queryOptions();
   const status = useQuery(statusOptions);
   const enrollment = useQuery(
     organizationId !== undefined
-      ? trpc.organizations.awsCompute.getEnrollment.queryOptions({ organizationId, provider })
-      : trpc.awsCompute.getEnrollment.queryOptions({ provider })
+      ? trpc.organizations.awsCompute.getEnrollment.queryOptions({ organizationId })
+      : trpc.awsCompute.getEnrollment.queryOptions()
   );
   const invalidate = () => cache.invalidateQueries({ queryKey: statusOptions.queryKey });
   const prepare = useMutation({
@@ -23,8 +22,8 @@ export function useAwsComputeData(provider: AwsSetupProvider, organizationId?: s
     gcTime: 0,
     mutationFn: (accountId: string) =>
       organizationId !== undefined
-        ? client.organizations.awsCompute.prepare.mutate({ organizationId, accountId, provider })
-        : client.awsCompute.prepare.mutate({ accountId, provider }),
+        ? client.organizations.awsCompute.prepare.mutate({ organizationId, accountId })
+        : client.awsCompute.prepare.mutate({ accountId }),
     onSuccess: invalidate,
   });
   const instructions = useMutation({
@@ -32,16 +31,16 @@ export function useAwsComputeData(provider: AwsSetupProvider, organizationId?: s
     gcTime: 0,
     mutationFn: () =>
       organizationId !== undefined
-        ? client.organizations.awsCompute.instructions.mutate({ organizationId, provider })
-        : client.awsCompute.instructions.mutate({ provider }),
+        ? client.organizations.awsCompute.instructions.mutate({ organizationId })
+        : client.awsCompute.instructions.mutate(),
   });
   const validate = useMutation({
     mutationKey: [...statusOptions.queryKey, 'validate'],
     gcTime: 0,
     mutationFn: (roleArn: string) =>
       organizationId !== undefined
-        ? client.organizations.awsCompute.validate.mutate({ organizationId, roleArn, provider })
-        : client.awsCompute.validate.mutate({ roleArn, provider }),
+        ? client.organizations.awsCompute.validate.mutate({ organizationId, roleArn })
+        : client.awsCompute.validate.mutate({ roleArn }),
     onSuccess: invalidate,
   });
   const discard = useMutation({
@@ -52,9 +51,8 @@ export function useAwsComputeData(provider: AwsSetupProvider, organizationId?: s
         ? client.organizations.awsCompute.discardDraft.mutate({
             organizationId,
             generation,
-            provider,
           })
-        : client.awsCompute.discardDraft.mutate({ generation, provider }),
+        : client.awsCompute.discardDraft.mutate({ generation }),
     onSuccess: async () => {
       instructions.reset();
       prepare.reset();

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { awsByocConfigurationSchema } from '@kilocode/worker-utils/aws-byoc';
+import { awsBucketSchema, awsStackIdSchema } from '@kilocode/worker-utils/aws-byoc';
 import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
 import { AWS_EGRESS_PORT } from '@kilocode/worker-utils/aws-egress';
 import { readProxyTaskCredentials } from './task-credentials.js';
@@ -14,8 +14,8 @@ async function main() {
   const config = z
     .object({
       AWS_REGION: z.literal('us-east-1'),
-      AWS_STACK_ID: awsByocConfigurationSchema.shape.stackId,
-      AWS_ARTIFACT_BUCKET: awsByocConfigurationSchema.shape.bucket,
+      AWS_STACK_ID: awsStackIdSchema,
+      AWS_ARTIFACT_BUCKET: awsBucketSchema,
       PROXY_HOSTNAME: egressDomainSchema,
       KILO_CONTROL_PLANE_URL: z.url(),
     })

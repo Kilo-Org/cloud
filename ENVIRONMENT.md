@@ -626,8 +626,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `BYOC_AWS_IDS` - User or organization IDs enrolled in the AWS MVP. Empty is off; `*` enrolls all owners. [SERVER]
 - `AWS_BYOC_KILO_ROLE_ARN` - Fixed Kilo role assumed before the customer role. [SERVER]
 - `AWS_BYOC_CREDENTIALS` - Private bootstrap credentials that can only assume the Kilo role. [SERVER]
-- `AWS_BYOC_RELEASE` - Operator JSON manifest for the private, immutable MicroVM template, runtime ZIP, proxy image, and authorized customer accounts. [SERVER]
-- `AWS_ECS_BYOC_RELEASE` - Separate operator JSON manifest for the private ECS template, digest-pinned runtime and proxy images, and authorized customer accounts. Missing manifests disable setup for that provider. [SERVER]
+- `AWS_ECS_BYOC_RELEASE` - Operator JSON manifest for the private ECS template, digest-pinned runtime and proxy images, and authorized customer accounts. A missing manifest disables AWS setup. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Auto Routing Worker

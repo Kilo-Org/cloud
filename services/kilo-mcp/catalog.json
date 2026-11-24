@@ -3932,51 +3932,23 @@
     "path": "awsCompute.getEnrollment",
     "kind": "query",
     "summary": "Check whether the current user is enrolled or eligible for AWS BYOC compute, returning their enrollment details. Use to see if an AWS account must be connected first.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "provider": {
-          "default": "aws",
-          "type": "string",
-          "enum": [
-            "aws",
-            "aws-ecs"
-          ]
-        }
-      }
-    },
+    "inputSchema": {},
     "tags": [
       "awscompute",
-      "getenrollment",
-      "provider"
+      "getenrollment"
     ],
-    "searchBlob": "awsCompute.getEnrollment Check whether the current user is enrolled or eligible for AWS BYOC compute, returning their enrollment details. Use to see if an AWS account must be connected first. awscompute getenrollment provider provider"
+    "searchBlob": "awsCompute.getEnrollment Check whether the current user is enrolled or eligible for AWS BYOC compute, returning their enrollment details. Use to see if an AWS account must be connected first. awscompute getenrollment"
   },
   "awsCompute.getStatus": {
     "path": "awsCompute.getStatus",
     "kind": "query",
     "summary": "Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "provider": {
-          "default": "aws",
-          "type": "string",
-          "enum": [
-            "aws",
-            "aws-ecs"
-          ]
-        }
-      }
-    },
+    "inputSchema": {},
     "tags": [
       "awscompute",
-      "getstatus",
-      "provider"
+      "getstatus"
     ],
-    "searchBlob": "awsCompute.getStatus Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists. awscompute getstatus provider provider"
+    "searchBlob": "awsCompute.getStatus Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists. awscompute getstatus"
   },
   "byok.create": {
     "path": "byok.create",
@@ -7596,38 +7568,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "aws"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "byoc"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "const": "microvm-8g"
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -7699,7 +7639,6 @@
                     "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large",
-                    "aws-microvm-8g",
                     "aws-ecs-8g"
                   ]
                 }
@@ -8418,38 +8357,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "aws"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "byoc"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "const": "microvm-8g"
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -8521,7 +8428,6 @@
                     "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large",
-                    "aws-microvm-8g",
                     "aws-ecs-8g"
                   ]
                 }
@@ -9875,7 +9781,6 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g",
                 "aws-ecs-8g"
               ]
             },
@@ -9976,7 +9881,6 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g",
                 "aws-ecs-8g"
               ]
             },
@@ -10491,7 +10395,6 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g",
                 "aws-ecs-8g"
               ]
             },
@@ -11694,7 +11597,6 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g",
                 "aws-ecs-8g"
               ]
             },
@@ -19232,14 +19134,6 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "provider": {
-          "default": "aws",
-          "type": "string",
-          "enum": [
-            "aws",
-            "aws-ecs"
-          ]
         }
       },
       "required": [
@@ -19250,10 +19144,9 @@
       "organizations",
       "awscompute",
       "getenrollment",
-      "organizationid",
-      "provider"
+      "organizationid"
     ],
-    "searchBlob": "organizations.awsCompute.getEnrollment Check whether the organization is enrolled and eligible for AWS compute onboarding (bring your own AWS account). Use it before starting AWS setup to see if the feature is available. organizations awscompute getenrollment organizationid provider organizationId provider"
+    "searchBlob": "organizations.awsCompute.getEnrollment Check whether the organization is enrolled and eligible for AWS compute onboarding (bring your own AWS account). Use it before starting AWS setup to see if the feature is available. organizations awscompute getenrollment organizationid organizationId"
   },
   "organizations.awsCompute.getStatus": {
     "path": "organizations.awsCompute.getStatus",
@@ -19267,14 +19160,6 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "provider": {
-          "default": "aws",
-          "type": "string",
-          "enum": [
-            "aws",
-            "aws-ecs"
-          ]
         }
       },
       "required": [
@@ -19285,10 +19170,9 @@
       "organizations",
       "awscompute",
       "getstatus",
-      "organizationid",
-      "provider"
+      "organizationid"
     ],
-    "searchBlob": "organizations.awsCompute.getStatus Get the current AWS compute connection status: whether no setup exists, a setup draft is pending, or the AWS account role is ready, including account and verification details. organizations awscompute getstatus organizationid provider organizationId provider"
+    "searchBlob": "organizations.awsCompute.getStatus Get the current AWS compute connection status: whether no setup exists, a setup draft is pending, or the AWS account role is ready, including account and verification details. organizations awscompute getstatus organizationid organizationId"
   },
   "organizations.bitbucket.connect": {
     "path": "organizations.bitbucket.connect",
@@ -21355,38 +21239,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "aws"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "byoc"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "const": "microvm-8g"
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -21458,7 +21310,6 @@
                         "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large",
-                        "aws-microvm-8g",
                         "aws-ecs-8g"
                       ]
                     }
@@ -22183,38 +22034,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "aws"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "byoc"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "const": "microvm-8g"
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -22286,7 +22105,6 @@
                         "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large",
-                        "aws-microvm-8g",
                         "aws-ecs-8g"
                       ]
                     }
@@ -40778,7 +40596,6 @@
             "cloudflare-containers-standard-4",
             "vercel-small",
             "vercel-large",
-            "aws-microvm-8g",
             "aws-ecs-8g"
           ]
         },
@@ -41194,7 +41011,6 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g",
                 "aws-ecs-8g"
               ]
             },

@@ -12,7 +12,7 @@ const member = (repoFullName: string): EnvironmentReferenceRepository => ({
   repoFullName,
   leaf: repoFullName.split('/')[1]!,
 });
-function fixtureFor(provider: 'aws' | 'aws-ecs') {
+function fixture() {
   const issue = vi.fn(async () => ({
     success: true as const,
     capability: 'kgh2.synthetic-build',
@@ -28,7 +28,7 @@ function fixtureFor(provider: 'aws' | 'aws-ecs') {
     issue,
     input: {
       env,
-      provider,
+      provider: 'aws-ecs' as const,
       owner: {
         environmentId: '11111111-1111-4111-8111-111111111111',
         buildId: '22222222-2222-4222-8222-222222222222',
@@ -44,8 +44,7 @@ function fixtureFor(provider: 'aws' | 'aws-ecs') {
   };
 }
 
-describe.each(['aws', 'aws-ecs'] as const)('%s environment builder SCM issuance', provider => {
-  const fixture = () => fixtureFor(provider);
+describe('ECS environment builder SCM issuance', () => {
   it('issues only workflow authority and shares a stable alias across same-provider repositories', async () => {
     const f = fixture();
     const grant = await issueBuildScmGrant(f.input);
@@ -103,10 +102,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s environment builder SCM issuance'
   it('refuses engine substitution in persisted broker authority', async () => {
     const f = fixture();
     const grant = await issueBuildScmGrant(f.input);
-    expect(
-      buildScmGrantSchema.safeParse({ ...grant, provider: provider === 'aws' ? 'aws-ecs' : 'aws' })
-        .success
-    ).toBe(false);
+    expect(buildScmGrantSchema.safeParse({ ...grant, provider: 'aws' }).success).toBe(false);
   });
 
   it('renews the selected member and preserves every alias', async () => {

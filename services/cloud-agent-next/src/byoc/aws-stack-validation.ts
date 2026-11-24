@@ -1,18 +1,14 @@
+import { AWS_BYOC_PROXY_PROTOCOL_VERSION } from '@kilocode/worker-utils/aws-byoc';
 import {
-  AWS_BYOC_TEMPLATE_VERSION,
-  AWS_BYOC_PROXY_PROTOCOL_VERSION,
-  awsByocConfigurationSchema,
-  type AwsByocConfiguration,
-} from '@kilocode/worker-utils/aws-byoc';
-import type {
-  AwsProviderSetupIntent,
-  AwsEcsSetupIntent,
-} from '@kilocode/worker-utils/aws-ecs-onboarding';
+  awsEcsResourceConfigurationSchema,
+  AWS_ECS_BYOC_TEMPLATE_VERSION,
+  type AwsEcsByocConfiguration,
+} from '@kilocode/worker-utils/aws-ecs';
 import type { AwsStack } from '@kilocode/worker-utils/aws-cloudformation';
 import {
   AWS_SETUP_ERRORS,
+  type AwsEcsSetupIntent,
   type AwsSetupErrorCode,
-  type AwsSetupIntent,
 } from '@kilocode/worker-utils/aws-onboarding';
 
 export class AwsSetupError extends Error {
@@ -21,7 +17,7 @@ export class AwsSetupError extends Error {
     this.name = 'AwsSetupError';
   }
 }
-export function assertAwsStackComplete(stack: AwsStack) {
+function assertAwsStackComplete(stack: AwsStack) {
   if (!['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE'].includes(stack.status))
     throw new AwsSetupError('byoc_aws_stack_not_ready');
 }
@@ -30,17 +26,14 @@ function version(value: string | undefined): number | null {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
-export function assertAwsStackVersions(
-  stack: AwsStack,
-  minimumTemplateVersion = AWS_BYOC_TEMPLATE_VERSION
-): void {
+export function assertAwsStackVersions(stack: AwsStack, minimumTemplateVersion: number): void {
   const template = version(stack.outputs.TemplateVersion);
   if (template === null || template < minimumTemplateVersion)
     throw new AwsSetupError('byoc_aws_stack_outdated');
   if (version(stack.outputs.ProxyProtocolVersion) !== AWS_BYOC_PROXY_PROTOCOL_VERSION)
     throw new AwsSetupError('byoc_aws_proxy_protocol_unsupported');
 }
-function sharedSetupParameters(intent: AwsProviderSetupIntent): Record<string, string> {
+export function awsEcsSetupParameters(intent: AwsEcsSetupIntent): Record<string, string> {
   return {
     KiloRoleArn: intent.kiloRoleArn,
     ExternalId: intent.externalId,
@@ -48,20 +41,11 @@ function sharedSetupParameters(intent: AwsProviderSetupIntent): Record<string, s
     ProxyImageUri: intent.release.proxy.imageUri,
     ProxyRepositoryArn: intent.release.proxy.repositoryArn,
     ControlPlaneUrl: new URL(intent.controlPlaneUrl).origin,
+    RuntimeImageUri: intent.release.runtime.imageUri,
   };
 }
-export function awsSetupParameters(intent: AwsSetupIntent): Record<string, string> {
-  return {
-    ...sharedSetupParameters(intent),
-    RuntimeArtifactBucket: intent.release.runtime.bucket,
-    RuntimeArtifactKey: intent.release.runtime.key,
-  };
-}
-export function awsEcsSetupParameters(intent: AwsEcsSetupIntent): Record<string, string> {
-  return { ...sharedSetupParameters(intent), RuntimeImageUri: intent.release.runtime.imageUri };
-}
-export function assertAwsSetupStackBinding(input: {
-  intent: AwsProviderSetupIntent;
+function assertAwsSetupStackBinding(input: {
+  intent: AwsEcsSetupIntent;
   roleArn: string;
   stack: AwsStack;
   parameters: Record<string, string>;
@@ -81,51 +65,65 @@ export function assertAwsSetupStackBinding(input: {
     throw new AwsSetupError('byoc_aws_stack_mismatch');
 }
 
-/** Initial Save proves the stack belongs to this intent and uses the approved release parameters. */
-export function awsConfigurationFromSetupStack(input: {
-  intent: AwsSetupIntent;
+/** New ECS allocations must use the exact ready stack and resource revision. */
+export function assertAwsEcsAllocationStack(
+  stack: AwsStack,
+  config: AwsEcsByocConfiguration
+): void {
+  assertAwsStackComplete(stack);
+  assertAwsStackVersions(stack, AWS_ECS_BYOC_TEMPLATE_VERSION);
+  const expected = {
+    Provider: 'aws-ecs',
+    RoleArn: config.roleArn,
+    Bucket: config.bucket,
+    ClusterArn: config.clusterArn,
+    TaskDefinitionArn: config.taskDefinitionArn,
+    CapacityProvider: config.capacityProvider,
+    ExecutionRoleArn: config.executionRoleArn,
+    RuntimeImage: config.runtimeImage,
+    PrivateSubnet: config.subnetId,
+    SandboxSecurityGroup: config.securityGroupId,
+    ProxyHostname: config.proxy.hostname,
+    TemplateVersion: String(config.templateVersion),
+    ProxyProtocolVersion: String(config.proxyProtocolVersion),
+  };
+  if (
+    stack.stackId !== config.stackId ||
+    stack.stackId.split(':')[4] !== config.roleArn.split(':')[4] ||
+    Object.entries(expected).some(([key, value]) => stack.outputs[key] !== value)
+  )
+    throw new AwsSetupError('byoc_aws_stack_mismatch');
+}
+
+/** Validate every ECS identity before using its bucket for proxy metadata. */
+export function awsEcsResourcesFromSetupStack(input: {
+  intent: AwsEcsSetupIntent;
   roleArn: string;
   stack: AwsStack;
-}): AwsByocConfiguration {
+}) {
   const { intent, roleArn, stack } = input;
-  assertAwsSetupStackBinding({ intent, roleArn, stack, parameters: awsSetupParameters(intent) });
-  const result = awsByocConfigurationSchema.safeParse({
+  assertAwsSetupStackBinding({ ...input, parameters: awsEcsSetupParameters(intent) });
+  if (
+    stack.outputs.Provider !== 'aws-ecs' ||
+    stack.outputs.RuntimeImage !== intent.release.runtime.imageUri
+  )
+    throw new AwsSetupError('byoc_aws_stack_mismatch');
+  const result = awsEcsResourceConfigurationSchema.safeParse({
     region: 'us-east-1',
     roleArn,
     externalId: intent.externalId,
     stackId: stack.stackId,
     bucket: stack.outputs.Bucket,
-    imageIdentifier: stack.outputs.ImageArn,
-    imageVersion: stack.outputs.ImageVersion,
-    connectorArn: stack.outputs.ConnectorArn,
-    templateVersion: version(stack.outputs.TemplateVersion),
-    proxyProtocolVersion: version(stack.outputs.ProxyProtocolVersion),
+    templateVersion: Number(stack.outputs.TemplateVersion),
+    proxyProtocolVersion: Number(stack.outputs.ProxyProtocolVersion),
+    clusterArn: stack.outputs.ClusterArn,
+    taskDefinitionArn: stack.outputs.TaskDefinitionArn,
+    capacityProvider: stack.outputs.CapacityProvider,
+    subnetId: stack.outputs.PrivateSubnet,
+    securityGroupId: stack.outputs.SandboxSecurityGroup,
+    executionRoleArn: stack.outputs.ExecutionRoleArn,
+    runtimeImage: stack.outputs.RuntimeImage,
   });
   if (!result.success) throw new AwsSetupError('byoc_aws_stack_mismatch');
   return result.data;
-}
-
-/** New allocations check the live minimum and exact persisted resources. Existing allocations keep their pins. */
-export function assertAwsAllocationStack(
-  stack: AwsStack,
-  configuration: AwsByocConfiguration
-): void {
-  assertAwsStackComplete(stack);
-  assertAwsStackVersions(stack);
-  const expected: Record<string, string> = {
-    RoleArn: configuration.roleArn,
-    Bucket: configuration.bucket,
-    ImageArn: configuration.imageIdentifier,
-    ImageVersion: configuration.imageVersion,
-    ConnectorArn: configuration.connectorArn,
-    TemplateVersion: String(configuration.templateVersion),
-    ProxyProtocolVersion: String(configuration.proxyProtocolVersion),
-    ...(configuration.proxy ? { ProxyHostname: configuration.proxy.hostname } : {}),
-  };
-  if (
-    stack.stackId !== configuration.stackId ||
-    stack.stackId.split(':')[4] !== configuration.roleArn.split(':')[4] ||
-    Object.entries(expected).some(([key, value]) => stack.outputs[key] !== value)
-  )
-    throw new AwsSetupError('byoc_aws_stack_mismatch');
 }

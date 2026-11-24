@@ -3,8 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { awsByocConfigurationSchema } from '@kilocode/worker-utils/aws-byoc';
-import { awsArchiveBaseImage, awsArchiveObjectKey } from '../../../src/shared/aws-archive.js';
+import { awsEcsByocConfigurationSchema } from '@kilocode/worker-utils/aws-ecs';
+import { awsEcsArchiveBaseImage, awsArchiveObjectKey } from '../../../src/shared/aws-archive.js';
 import type { RootfsArchiveDescriptor } from '../../../src/shared/rootfs-archive.js';
 import { createAwsFilesystemBuildArchive } from './aws-archive.js';
 
@@ -13,17 +13,26 @@ const identity = {
   buildId: '22222222-2222-4222-8222-222222222222',
   allocationId: '33333333-3333-4333-8333-333333333333',
 };
-const configuration = awsByocConfigurationSchema.parse({
+const configuration = awsEcsByocConfigurationSchema.parse({
   region: 'us-east-1',
   roleArn: 'arn:aws:iam::123456789012:role/customer',
   externalId: 'synthetic-external-id-000000000000000000000',
   stackId: 'arn:aws:cloudformation:us-east-1:123456789012:stack/customer/12345678-abcd',
   bucket: 'customer-artifacts',
-  imageIdentifier: 'arn:aws:lambda:us-east-1:123456789012:microvm-image:kilo',
-  imageVersion: '1.0',
-  connectorArn: 'arn:aws:lambda:us-east-1:123456789012:network-connector:customer:1',
-  templateVersion: 2,
+  templateVersion: 1,
   proxyProtocolVersion: 1,
+  proxy: {
+    generation: '55555555-5555-4555-8555-555555555555',
+    hostname: 'proxy.internal.example.com',
+    caFingerprint: 'b'.repeat(64),
+  },
+  clusterArn: 'arn:aws:ecs:us-east-1:123456789012:cluster/customer',
+  taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/customer:1',
+  capacityProvider: 'customer-managed',
+  subnetId: 'subnet-0123456789abcdef0',
+  securityGroupId: 'sg-0123456789abcdef0',
+  executionRoleArn: 'arn:aws:iam::123456789012:role/execution',
+  runtimeImage: `999999999999.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${'c'.repeat(64)}`,
 });
 
 async function fixture() {
@@ -40,7 +49,7 @@ async function fixture() {
   const controller = new AbortController();
   const archive = await createAwsFilesystemBuildArchive({
     identity,
-    baseImage: awsArchiveBaseImage('44444444-4444-4444-8444-444444444444', configuration),
+    baseImage: awsEcsArchiveBaseImage('44444444-4444-4444-8444-444444444444', configuration),
     root,
     signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
     client: {

@@ -56,7 +56,7 @@ export function createBuilderPreparation(deps: PreparationDeps): BuilderPreparat
         deadlineAt: build.deadline_at,
       };
       const provider = input.target?.provider;
-      if (provider === 'aws' || provider === 'aws-ecs') {
+      if (provider === 'aws-ecs') {
         if (!deps.aws) return { refused: 'unavailable' };
         try {
           const prepared = await deps.aws.input(build.id);
@@ -91,7 +91,7 @@ export function createBuilderPreparation(deps: PreparationDeps): BuilderPreparat
     },
     confirmArtifact(build) {
       const provider = parseBuildInput(build).target?.provider;
-      if (provider !== 'aws' && provider !== 'aws-ecs') return 'ready';
+      if (provider !== 'aws-ecs') return 'ready';
       if (!deps.aws) return 'archive_failed';
       try {
         deps.aws.assertReady(build.id);

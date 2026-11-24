@@ -14,10 +14,10 @@ const runner = {
   allocationId: '33333333-3333-4333-8333-333333333333',
   credential: 'a'.repeat(64),
 };
-function input(provider: 'aws' | 'aws-ecs') {
+function input() {
   return {
     ...runner,
-    provider,
+    provider: 'aws-ecs' as const,
     runnerCredential: mintRunnerCredential(runner, secret),
     sandboxId: 'ses-' + runner.buildId.replaceAll('-', ''),
     actorUserId: 'oauth/provider/build-actor',
@@ -27,13 +27,13 @@ function input(provider: 'aws' | 'aws-ecs') {
     expiresAt: Date.now() + 60_000,
   };
 }
-describe.each(['aws', 'aws-ecs'] as const)('%s build proxy purpose', provider => {
+describe('ECS build proxy purpose', () => {
   it('binds verified runner, actor, engine, connection and proxy generation without Session authority', () => {
-    const value = input(provider);
+    const value = input();
     const token = mintAwsBuildEgressCredential(value, secret);
     expect(verifyAwsBuildEgressCredential(token, secret)).toMatchObject({
       ...runner,
-      provider,
+      provider: 'aws-ecs',
       sandboxId: value.sandboxId,
       actorUserId: value.actorUserId,
       credentialId: value.credentialId,
@@ -50,13 +50,18 @@ describe.each(['aws', 'aws-ecs'] as const)('%s build proxy purpose', provider =>
   it.each(['environmentId', 'buildId', 'allocationId'] as const)(
     'rejects runner %s substitution before signing',
     field => {
-      const value = input(provider);
+      const value = input();
       value[field] = '66666666-6666-4666-8666-666666666666';
       expect(() => mintAwsBuildEgressCredential(value, secret)).toThrow('identity is invalid');
     }
   );
+  it('refuses a retired engine before signing', () => {
+    expect(() =>
+      mintAwsBuildEgressCredential({ ...input(), provider: 'aws' } as never, secret)
+    ).toThrow();
+  });
   it('refuses an unverified runner, another signer and expiry', () => {
-    const value = input(provider);
+    const value = input();
     expect(() =>
       mintAwsBuildEgressCredential(
         { ...value, runnerCredential: mintRunnerCredential(runner, 'other-secret') },

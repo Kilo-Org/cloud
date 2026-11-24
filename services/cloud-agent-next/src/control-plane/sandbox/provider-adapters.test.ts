@@ -42,9 +42,6 @@ const CONFIGURED_PINS: Record<AgentSandboxProvider, StoredProviderPin> = {
   'aws-ecs': pin('aws-ecs', {
     byoc: { userId: 'user-1', credentialId: '22222222-2222-4222-8222-222222222222' },
   }),
-  aws: pin('aws', {
-    byoc: { userId: 'user-1', credentialId: '22222222-2222-4222-8222-222222222222' },
-  }),
   cloudflare: pin('cloudflare'),
   vercel: pin('vercel', {
     allocationName: 'ses-abcdef-1',

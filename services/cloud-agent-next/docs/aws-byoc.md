@@ -1,13 +1,14 @@
 # AWS BYOC MVP
 
-The AWS MVP keeps Lambda MicroVMs and adds EC2-backed ECS isolated tasks as separate providers.
-The customer owns the VPC, compute and archive bucket. Owners in the `BYOC_AWS_IDS` cohort can select either engine after its connection is ready.
+The AWS MVP runs sandboxes as EC2-backed ECS isolated tasks (provider `aws-ecs`).
+The customer owns the VPC, compute and archive bucket. Owners in the `BYOC_AWS_IDS` cohort can select ECS after their connection is ready.
 The Worker owns session admission, lifecycle and credential exchange. Real SCM tokens stay in the Worker.
 Workspace disk persistence is outside the MVP.
 
 ## Compute decision
 
-The November 2026 spike tested the runtime-free image on Lambda MicroVMs. A later private EC2 launch
+The November 2026 spike first tested the runtime-free image on Lambda MicroVMs. The Lambda results below are history.
+A later private EC2 launch
 reached `RUNNING`, then confirmed `TERMINATED`. An ECS Managed Instances Graviton task with
 `ISOLATED_SANDBOX` reached `RUNNING` and exited with code zero. Its task stopped and its managed host terminated.
 The initial `PendingVerification` account restriction no longer blocks these probes.
@@ -44,7 +45,7 @@ Metadata's role path returned 404 before the security group closed; metadata was
 
 ## Launch contract
 
-The shared startup exceeds ECS and Lambda launch limits: approximately 42.5 KB before session environment values.
+The shared startup exceeds the ECS launch limit: approximately 42.5 KB before session environment values.
 An immutable S3 launch document carries typed argv and environment values. The provider API carries its short-lived
 URL, SHA256 and deadline. The loader rejects redirects, oversized documents, changed content and expired launches.
 The initial loader receives proxy configuration before it fetches the full environment.
@@ -53,8 +54,8 @@ The initial loader receives proxy configuration before it fetches the full envir
 reference. One durable operation record holds the exact provider request before submission. Recovery replays the same
 request and client token. It must not regenerate the launch URL or credential.
 
-Observed AWS behavior: replay after termination returned the original MicroVM ID and the cached initial `PENDING`
-response. A separate `GetMicrovm` returned `TERMINATED`. Replay recovers identity; only a fresh read supplies state.
+The Lambda spike showed that a replay after termination can return the original ID and a cached initial `PENDING`
+response, while a fresh read returns `TERMINATED`. The lifecycle therefore uses a replay for identity only; only a fresh read supplies state.
 `observe` remains read-only. Stop reconciles an ambiguous launch before confirming termination.
 
 A request checkpoint records whether submission has started. Stop can retire an unsubmitted request without launching compute.
@@ -71,11 +72,11 @@ The provider registry constructs AWS operation storage; the Sandbox DO supplies 
 Recovery without a physical ID replays only within five minutes. AWS does not document permanent client-token retention.
 After that bound, `provider_cleanup_required` fails affected work promptly. The Worker retains the exact request
 and blocks replacement allocations. An operator must identify
-and terminate the physical allocation before repairing that allocation. MicroVM automatic recovery after this bound remains unsupported; ECS uses the exact intent lookup described below.
+and terminate the physical allocation before repairing that allocation. ECS can also use the exact intent lookup described below.
 A known physical ID can still be stopped after the replay window.
 
-Lambda limits total lifetime to eight hours. The shared control plane stops active work two minutes before that limit
-with `provider_lifetime_exhausted`. Renewable leases cannot extend the deadline. Suspend and resume are unused.
+ECS has no compute lifetime limit. The allocation deadline is the verified proxy certificate expiry, described below.
+Renewable leases cannot extend past that deadline. Suspend and resume are unused.
 
 ## Bootstrap credential access
 
@@ -105,24 +106,23 @@ The signed URL also has a bounded lifetime. Its authority is separate from the p
 ## Shared AWS components
 
 `aws-compute-lifecycle.ts` owns reservation, exact-request checkpoints, recovery, stop fences and cleanup.
-`aws-launch-document.ts` owns the immutable S3 launch document used by both engines.
-Engine adapters own request construction, API state mapping and runtime identity checks.
-MicroVM records retain their original schema, storage prefix and `microvmId`. ECS records use a separate schema and `taskArn`.
+`aws-launch-document.ts` owns the immutable S3 launch document.
+The ECS adapter owns request construction, API state mapping and runtime identity checks.
+ECS operation records store the task ARN.
 
-Both engines share two-hop role assumption, S3 and proxy metadata access, role-session caching, and proxy startup.
-Connections and envelope purposes stay separate. An ECS lookup never falls back to a MicroVM connection.
+The adapter uses shared two-hop role assumption, S3 and proxy metadata access, role-session caching, and proxy startup.
+An ECS lookup reads `aws-ecs` connections and envelope purposes.
 The internal connection endpoint selects the exact provider, owner and credential ID.
 
 ECS has no eight-hour compute deadline. Its proxy credential expires at the verified certificate deadline.
-The Sandbox DO reads that expiry from its saved RunTask request and schedules its existing alarm.
-It does not poll AWS for this deadline or persist a second expiry value.
+Startup preparation returns that deadline. The operation record stores it as `deadlineAt` with the exact RunTask request.
+The Sandbox DO reads `deadlineAt` and schedules its existing alarm. It does not poll AWS or decode the credential for this deadline.
+A saved request without `deadlineAt` fails decode. Lease extensions and egress credentials past the deadline are refused.
 At expiry, preparing and active work fail with `byoc_aws_proxy_expired`, and compute cleanup starts.
 The failure does not wait for wrapper heartbeat loss or confirmed physical termination.
-MicroVM allocations retain their compute lifetime and `provider_lifetime_exhausted` reason.
-Both engines require eight hours of certificate validity before a new allocation starts.
+A new allocation requires eight hours of certificate validity before it starts.
 This reserve checks certificate health; it does not set an ECS compute deadline.
 Proxy policy refresh still checks current allocation, owner, connection, generation and lifecycle authority.
-Policy admission and durable storage now support both engines through shared components.
 ECS selection, preview, egress proxy and prepared environments are enabled. ECS workspace snapshots and metered billing remain disabled.
 Live ECS runtime acceptance remains unverified.
 
@@ -139,20 +139,20 @@ Runtime probe stdout remained unavailable. These checks do not establish complet
 
 ## Template and permission boundary
 
-`deploy/aws/template.json` version 2 includes the authenticated proxy and DNS controls.
-`build:aws-ecs-template` generates `deploy/aws/template.ecs.json` from that shared infrastructure and replaces compute resources.
-`test:aws-templates` checks generated output, compute isolation and shared resource contracts.
+`deploy/aws/template.ecs.json` is the only AWS release template. It includes the authenticated proxy, DNS controls and ECS compute.
+Edit it directly.
+`test:aws-templates` checks compute isolation, customer role authority and network contracts. It refuses any Lambda resource or action.
 DNS associations use priority 101 because AWS reserves priority 100.
-Both templates use AWS's default fail-closed DNS behavior. CloudFormation rejects a resource that explicitly sets that unmanaged default.
+The template uses AWS's default fail-closed DNS behavior. CloudFormation rejects a resource that explicitly sets that unmanaged default.
 AWS remains enrolled for internal testing. Same-account runtime and security acceptance remains required.
 Cross-account proof is deferred because the MVP test setup has one AWS account.
 
 The customer role trusts one fixed Kilo role ARN and an owner-bound ExternalId. It does not trust an IAM user.
-Compute operations target one MicroVM image. The role has no image mutation, connector mutation, shell-token or
-`iam:PassRole` authority for MicroVM compute. Same-account live checks verified the configured connector permission and rejected other connectors,
-public egress, an execution role and another image. Cross-account verification remains outstanding.
-The trusted adapter always selects the configured VPC connector and `NO_INGRESS`, with no execution role or idle policy.
-It verifies the networking and role fields returned by AWS before accepting an allocation.
+`RunTask` targets one task definition, cluster and capacity provider, with execute-command off.
+The role can pass only the sandbox execution role, and only to ECS tasks.
+It has no task-definition registration, service creation, execute-command or instance-launch authority.
+Before `RunTask`, the adapter checks the live task definition against the saved pins.
+Recovery accepts only a task in the pinned cluster with the saved `startedBy` value. Cross-account verification remains outstanding.
 
 Launch objects expire after one day. A stack created or updated from the current template expires prepared archives
 30 days after upload. An older stack keeps them until you update the stack.
@@ -164,7 +164,7 @@ The AWS API client reuses `aws4fetch`, an existing JavaScript dependency of work
 
 ## AWS runtime bundle
 
-Build the AWS image bootstrap ZIP with the repository script. It requires Node and the `zip` command.
+Build the ECS runtime image context ZIP with the repository script. It requires Node and the `zip` command.
 
 ```sh
 node services/cloud-agent-next/deploy/aws/build-runtime-bundle.mjs \
@@ -177,13 +177,13 @@ and installs Debian `python3` only in the AWS image. Other providers keep their 
 The filesystem archive helper uses Python standard-library Linux metadata and directory-relative operations.
 TypeScript retains provider access, authentication, lifecycle and archive orchestration. No pip packages are required.
 
-Only the Dockerfile and two named Node loaders enter the ZIP. The script does not copy environment files or a worktree.
+Only the Dockerfile and the Node launch loader enter the ZIP. The script does not copy environment files or a worktree.
+The image has no entrypoint of its own. The ECS task definition sets it.
 It fixes timestamps, permissions and member order, omits ZIP extra metadata, and refuses to replace an existing output file.
 It returns the ZIP byte count and SHA256. Publish only to private storage after artifact checks.
 
 These controls make ZIP bytes deterministic for the same input. Debian package updates can change resulting image contents.
-Publish and retain the resulting immutable MicroVM image version; do not claim reproducible image builds.
-MicroVM prepared-environment activation remains disabled until its authenticated builder and restore paths pass provider verification.
+The ECS release pins the resulting runtime image by digest. Do not claim reproducible image builds.
 
 ## Build preparation and repository denial
 
@@ -192,7 +192,7 @@ AWS build callbacks have a separate module; the compute provider does not own eg
 A broker refusal after initial admission preserves `repository_unauthorized` and starts cleanup immediately.
 Service, transport and unknown broker failures return `unavailable`. The builder can retry within the existing build deadline.
 Initial repository authorization and later capability issuance use the same failure classification.
-These rules do not enable MicroVM prepared environments or change the provider acceptance requirements.
+These rules do not change the provider acceptance requirements.
 
 ## Build SCM retirement
 
@@ -273,23 +273,22 @@ Draft setup and runtime configuration use separate encrypted envelope purposes. 
 The connection becomes ready only after live role, stack, release and proxy validation.
 The browser receives public account, role, stack and version fields. It never receives encrypted credentials or proxy identity.
 
-Operators must publish one immutable release before enabling setup. Set `AWS_BYOC_RELEASE` on the Worker
+Operators must publish one immutable release before enabling setup. Set `AWS_ECS_BYOC_RELEASE` on the Worker
 with this shape; replace the sample object hashes and repositories with the published release values:
 
 ```json
 {
   "format": 1,
-  "templateVersion": 2,
+  "provider": "aws-ecs",
+  "templateVersion": 1,
   "proxyProtocolVersion": 1,
   "template": {
     "bucket": "kilo-releases",
-    "key": "aws/<sha256>/template.json",
+    "key": "aws/<sha256>/template.ecs.json",
     "sha256": "<sha256>"
   },
   "runtime": {
-    "bucket": "kilo-releases",
-    "key": "aws/<sha256>/runtime.zip",
-    "sha256": "<sha256>",
+    "imageUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:<sha256>",
     "repositoryArn": "arn:aws:ecr:us-east-1:123456789012:repository/runtime"
   },
   "proxy": {
@@ -302,7 +301,7 @@ with this shape; replace the sample object hashes and repositories with the publ
 
 The runtime and proxy repositories must belong to the configured Kilo role account.
 Grant that role `s3:GetObject` on the exact template object. Before authorizing a customer account,
-grant its `BuildRole` access to the runtime ZIP and runtime ECR repository.
+grant its `SandboxExecutionRole` access to the runtime ECR repository.
 Grant its `ProxyExecutionRole` access to the proxy ECR repository.
 These grants require source bucket and repository policies. Customer IAM permissions alone cannot grant cross-account access.
 Onboarding does not modify release policies. It refuses new drafts for account IDs outside `customerAccounts`.
@@ -337,7 +336,7 @@ Final proxy deployment, prepared environment activation and two-account onboardi
 
 ## Shared compute recovery and failure handling
 
-MicroVM and ECS use the same durable lifecycle rules. Each engine retains its own stored reference and request codec.
+The ECS adapter uses the shared durable lifecycle rules with its own stored reference and request codec.
 A new request records whether submission is prepared, pending or uncertain. Legacy records without this field remain uncertain.
 The first Run request claims the prepared record atomically, after runtime access resolves.
 A concurrent claim makes rejection uncertain. A late refusal cannot retire a concurrent successful launch.
@@ -360,7 +359,6 @@ No replay starts after five minutes. One more minute lets a replay that started 
 After that, an empty page retires the operation, so a task that stopped after a lost reply does not block the sandbox.
 ECS keeps stopped tasks for about an hour. After that, `DescribeTasks` reports the stored ARN as missing and `StopTask` rejects it with HTTP 400.
 When both happen after the same settle period, Stop confirms termination. A recently launched task that reads missing stays retryable.
-MicroVM has no corresponding intent lookup; unidentified requests still require operator repair after five minutes.
 See [ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
 and [ECS IAM actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ecs.html).
 
@@ -368,9 +366,9 @@ The lifecycle persists confirmed compute termination before deleting the launch 
 If S3 cleanup fails, a recreated adapter retries that deletion without repeating the compute launch or stop.
 Task identity and configuration failures preserve their specific reason through provider coordination.
 Wrapper admission performs provider reads outside the Sandbox DO queue, then checks the allocation and connection again before binding.
-ECS retains its issued proxy-token deadline and snapshot startup path. It does not inherit the MicroVM lifetime cap.
+ECS keeps its stored proxy-token deadline and snapshot startup path.
 
-Local regressions verify both engines, concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
+Local regressions verify ECS concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
 AWS responses are simulated. Live uncertain recovery and customer deployment acceptance remain unverified.
 
 

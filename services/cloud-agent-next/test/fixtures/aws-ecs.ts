@@ -82,6 +82,11 @@ export const ECS_TEST_CREDENTIALS = {
 };
 
 /** Transport fake retains requests, documents and physical task effects across adapter restarts. */
+/** The fixture's proxy credential expiry. Its clock starts at 10_000. */
+const ECS_TEST_LIFETIME_MS = 30 * 86_400_000;
+/** The stored deadline when the fixture clock is not moved before launch. */
+export const ECS_TEST_DEADLINE_AT = 10_000 + ECS_TEST_LIFETIME_MS;
+
 export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
   const operations = new Map<string, AwsEcsOperation>();
   const documents = new Map<string, string>();
@@ -267,7 +272,10 @@ export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
           return { config, client, objects };
         },
         prepareSnapshot,
-        prepareStartup: async ({ startup }) => startup,
+        prepareStartup: async ({ startup }) => ({
+          startup,
+          deadlineAt: now + ECS_TEST_LIFETIME_MS,
+        }),
       });
     },
     rejectNextRun: (status: number, code: string) => {

@@ -160,8 +160,7 @@ export function createBuilderProvider(deps: {
       await adapterFor(allocation).ensureBillingAdmission(providerRef(allocation), billing);
     },
     async launch(allocation, launch, state) {
-      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
-        return aws().launch(allocation, launch, state);
+      if (allocation.provider === 'aws-ecs') return aws().launch(allocation, launch, state);
       if (allocation.provider === 'vercel') {
         const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
         if (!descriptor) throw new ProviderCreationError('invalid_configuration');
@@ -212,8 +211,7 @@ export function createBuilderProvider(deps: {
       await stub(allocation).ensureLeaseAtLeast(ref, leaseAtLeastMs());
     },
     async capture(allocation, captureId, state) {
-      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
-        return aws().capture(allocation, captureId);
+      if (allocation.provider === 'aws-ecs') return aws().capture(allocation, captureId);
       if (allocation.provider === 'vercel') {
         let opened;
         try {
@@ -246,8 +244,7 @@ export function createBuilderProvider(deps: {
       return stub(allocation).captureSnapshot(providerRef(allocation), captureId);
     },
     async stop(allocation, state) {
-      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
-        return aws().stop(allocation, state);
+      if (allocation.provider === 'aws-ecs') return aws().stop(allocation, state);
       if (allocation.provider === 'vercel') {
         return stopVercelBuilder({
           allocation,
@@ -294,7 +291,7 @@ export function builderAllocation(input: {
   nativeSandboxId: string;
 }): BuilderAllocation {
   const { target, allocationId, owner } = input;
-  if (target.provider === 'aws' || target.provider === 'aws-ecs')
+  if (target.provider === 'aws-ecs')
     return awsBuilderAllocation({
       target,
       environmentId: input.environmentId,

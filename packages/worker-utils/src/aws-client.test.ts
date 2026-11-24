@@ -13,16 +13,16 @@ describe('AWS signed transport', () => {
     const client = createAwsClient({
       credentials,
       region: 'us-east-1',
-      service: 'lambda',
+      service: 'ecs',
       fetch: async request => {
-        expect(request.headers.get('authorization')).toContain('/us-east-1/lambda/aws4_request');
+        expect(request.headers.get('authorization')).toContain('/us-east-1/ecs/aws4_request');
         expect(request.headers.get('x-amz-security-token')).toBe('test-token');
         expect(await request.text()).toBe('{"clientToken":"intent-1"}');
         expect(request.redirect).toBe('manual');
         return new Response('{}');
       },
     });
-    await client.request('https://lambda.us-east-1.amazonaws.com/2025-09-09/microvms', {
+    await client.request('https://ecs.us-east-1.amazonaws.com/', {
       method: 'POST',
       body: '{"clientToken":"intent-1"}',
     });

@@ -32,7 +32,7 @@ function egressPolicyOf(
   input: ProfileBuildInput,
   target: EnvironmentBuildTarget
 ): Pick<BuildInputRecord, 'egressPolicy'> {
-  if (target.provider !== 'aws' && target.provider !== 'aws-ecs') return {};
+  if (target.provider !== 'aws-ecs') return {};
   if (input.egressMode === undefined) return {};
   return {
     egressPolicy:

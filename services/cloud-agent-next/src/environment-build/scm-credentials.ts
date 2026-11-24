@@ -32,7 +32,7 @@ const buildScmShape = z
       .refine(id => !id.startsWith('dind-')),
     userId: z.string().min(1),
     orgId: z.string().min(1).optional(),
-    provider: z.enum(['aws', 'aws-ecs']),
+    provider: z.literal('aws-ecs'),
     containmentEnabled: z.literal(true),
     outboundContainerId: z.string().min(1),
     preparedAt: z.number().int().nonnegative(),
@@ -54,7 +54,7 @@ const buildScmShape = z
 
 /** The engine and immutable build allocation jointly identify broker authority. */
 export function awsBuildOutboundContainerId(input: {
-  provider: 'aws' | 'aws-ecs';
+  provider: 'aws-ecs';
   environmentId: string;
   buildId: string;
   allocationId: string;
@@ -126,7 +126,7 @@ type BuildOwner = Pick<
 /** The caller persists the complete grant before delivering any aliases to the builder. */
 export async function issueBuildScmGrant(input: {
   env: ScmEnv;
-  provider: 'aws' | 'aws-ecs';
+  provider: 'aws-ecs';
   owner: BuildOwner;
   members: readonly EnvironmentReferenceRepository[];
   now: number;

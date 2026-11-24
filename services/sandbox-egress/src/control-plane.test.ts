@@ -184,14 +184,14 @@ describe('proxy control-plane boundary', () => {
   });
 });
 
-describe.each(['aws', 'aws-ecs'] as const)('%s build proxy route', provider => {
+describe('ECS build proxy route', () => {
   const environmentId = '33333333-3333-4333-8333-333333333333';
   const buildId = '44444444-4444-4444-8444-444444444444';
   const buildClaims = {
     ...claims,
     type: 'aws_build_egress',
     aud: 'kilo-aws-build-egress',
-    provider,
+    provider: 'aws-ecs',
     environmentId,
     buildId,
     actorUserId: 'oauth/provider/actor',
@@ -212,6 +212,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s build proxy route', provider => {
     await expect(client(transport).loadPolicy(buildToken, signal())).resolves.toEqual(policy);
   });
   it.each([
+    { provider: 'aws' },
     { provider: 'unknown' },
     { type: 'aws_egress' },
     { aud: 'kilo-aws-egress' },

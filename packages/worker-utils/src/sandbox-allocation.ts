@@ -9,7 +9,6 @@ export const sandboxAllocationSchema = z.enum([
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
-  'aws-microvm-8g',
   'aws-ecs-8g',
 ]);
 
@@ -35,7 +34,6 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
-  'aws-microvm-8g',
   'aws-ecs-8g',
 ] as const satisfies readonly SandboxAllocation[];
 
@@ -74,13 +72,6 @@ const containersAllocationRequestSchema = z
   })
   .strict();
 
-const awsAllocationRequestSchema = z
-  .object({
-    provider: z.object({ id: z.literal('aws'), account: z.literal('byoc') }).strict(),
-    instanceType: z.literal('microvm-8g'),
-  })
-  .strict();
-
 const awsEcsAllocationRequestSchema = z
   .object({
     provider: z.object({ id: z.literal('aws-ecs'), account: z.literal('byoc') }).strict(),
@@ -90,7 +81,6 @@ const awsEcsAllocationRequestSchema = z
 
 export const sandboxAllocationRequestSchema = z.union([
   awsEcsAllocationRequestSchema,
-  awsAllocationRequestSchema,
   cloudflareAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
@@ -108,7 +98,6 @@ function isContainersAllocationRequest(
 
 const selectableSandboxAllocationRequestSchema = z.union([
   awsEcsAllocationRequestSchema,
-  awsAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
 ]);
@@ -119,7 +108,6 @@ export type SelectableSandboxAllocationRequest = z.infer<
 
 const allocationRequests = {
   'aws-ecs-8g': { provider: { id: 'aws-ecs', account: 'byoc' }, instanceType: 'ecs-8g' },
-  'aws-microvm-8g': { provider: { id: 'aws', account: 'byoc' }, instanceType: 'microvm-8g' },
   'isolated-standard': {
     provider: { id: 'cloudflare', account: 'kilo' },
     instanceType: 'isolated-standard',
@@ -203,7 +191,6 @@ export const selectableSandboxAllocationInputSchema = z.union([
 
 export const sandboxDestinationSchema = z.union([
   awsEcsAllocationRequestSchema,
-  awsAllocationRequestSchema,
   cloudflareAllocationRequestSchema.extend({
     instanceType: z.enum(['single', 'shared', 'isolated-standard', 'devcontainer']),
   }),

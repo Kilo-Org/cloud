@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { awsOperationSchema, type AwsOperation } from '../sandbox-control/aws-operation.js';
 import {
   awsEcsOperationSchema,
   type AwsEcsOperation,
 } from '../sandbox-control/aws-ecs-operation.js';
 import type { AwsComputeStorage } from '../sandbox-control/aws-compute-lifecycle.js';
-import { awsArchiveBaseImage, awsEcsArchiveBaseImage } from '../shared/aws-archive.js';
+import { awsEcsArchiveBaseImage } from '../shared/aws-archive.js';
 import { awsBuildArchiveStateSchema } from './aws-archive-storage.js';
 import { buildScmGrantSchema } from './scm-credentials.js';
 import type { AwsBuilderAllocation } from './aws-build-target.js';
@@ -15,7 +14,7 @@ import { BuilderStateInvalidError } from './builder-errors.js';
 const stateSchema = z
   .object({
     format: z.literal(1),
-    operation: z.union([awsOperationSchema, awsEcsOperationSchema]).optional(),
+    operation: awsEcsOperationSchema.optional(),
     credentialHash: z
       .string()
       .regex(/^[a-f0-9]{64}$/)
@@ -25,7 +24,6 @@ const stateSchema = z
   })
   .strict();
 export type AwsBuildState = z.infer<typeof stateSchema>;
-type BuildOperation = AwsOperation | AwsEcsOperation;
 
 /** One build owns the cell; each operation updates only its own field. */
 export function readAwsBuildState(raw: unknown, allocation: AwsBuilderAllocation): AwsBuildState {
@@ -34,29 +32,14 @@ export function readAwsBuildState(raw: unknown, allocation: AwsBuilderAllocation
   if (!parsed.success) throw new BuilderStateInvalidError();
   const state = parsed.data;
   const operation = state.operation;
-  if (operation) {
-    const selected =
-      allocation.provider === 'aws'
-        ? awsOperationSchema.safeParse(operation)
-        : awsEcsOperationSchema.safeParse(operation);
-    if (
-      !selected.success ||
-      operation.ref.sandboxId !== allocation.sandboxId ||
-      operation.ref.intentId !== allocation.allocationId
-    )
-      throw new BuilderStateInvalidError();
-    const base =
-      allocation.provider === 'aws'
-        ? awsArchiveBaseImage(
-            allocation.target.credentialId,
-            awsOperationSchema.parse(operation).config
-          )
-        : awsEcsArchiveBaseImage(
-            allocation.target.credentialId,
-            awsEcsOperationSchema.parse(operation).config
-          );
-    if (base !== allocation.target.baseImage) throw new BuilderStateInvalidError();
-  }
+  if (
+    operation &&
+    (operation.ref.sandboxId !== allocation.sandboxId ||
+      operation.ref.intentId !== allocation.allocationId ||
+      awsEcsArchiveBaseImage(allocation.target.credentialId, operation.config) !==
+        allocation.target.baseImage)
+  )
+    throw new BuilderStateInvalidError();
   if (state.archive && state.archive.descriptor.baseImage !== allocation.target.baseImage)
     throw new BuilderStateInvalidError();
   const grant = state.scm;
@@ -78,12 +61,11 @@ export function readAwsBuildState(raw: unknown, allocation: AwsBuilderAllocation
 }
 
 /** Reuse the common AWS lifecycle with exactly one immutable allocation per build. */
-export function createAwsBuilderOperationStorage<T extends BuildOperation>(input: {
+export function createAwsBuilderOperationStorage(input: {
   allocation: AwsBuilderAllocation;
   state: BuilderLifecycleState;
-  schema: z.ZodType<T>;
   beforeLaunch(): void;
-}): AwsComputeStorage<T> {
+}): AwsComputeStorage<AwsEcsOperation> {
   const read = (value: unknown) => readAwsBuildState(value, input.allocation);
   function owned(id: string) {
     if (id !== input.allocation.allocationId) throw new BuilderStateInvalidError();
@@ -97,7 +79,7 @@ export function createAwsBuilderOperationStorage<T extends BuildOperation>(input
       owned(id);
       const next = await input.state.update(raw => {
         const state = read(raw);
-        const operation = input.schema.parse(transition(state.operation));
+        const operation = awsEcsOperationSchema.parse(transition(state.operation));
         if (
           !state.operation ||
           (state.operation.phase === 'created' && operation.phase === 'launching')
@@ -105,7 +87,7 @@ export function createAwsBuilderOperationStorage<T extends BuildOperation>(input
           input.beforeLaunch();
         return read({ ...state, operation });
       });
-      return input.schema.parse(read(next).operation);
+      return awsEcsOperationSchema.parse(read(next).operation);
     },
     async list() {
       const state = read(await input.state.get());

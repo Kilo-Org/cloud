@@ -1,27 +1,22 @@
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
 import { hashSandboxCredential } from '../sandbox-control/credential.js';
-import { createAwsProviderAdapter } from '../sandbox-control/aws-provider.js';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import { createAwsEcsProviderAdapter } from '../sandbox-control/aws-ecs-provider.js';
-import { awsOperationSchema, encodeAwsProviderRef } from '../sandbox-control/aws-operation.js';
-import {
-  awsEcsOperationSchema,
-  encodeAwsEcsProviderRef,
-} from '../sandbox-control/aws-ecs-operation.js';
-import type { AwsComputeAdapter } from '../sandbox-control/aws-compute-lifecycle.js';
+import { encodeAwsEcsProviderRef } from '../sandbox-control/aws-ecs-operation.js';
+import type {
+  AwsComputeAdapter,
+  AwsPreparedStartup,
+} from '../sandbox-control/aws-compute-lifecycle.js';
 import type { ProviderStartup } from '../sandbox-control/provider.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
-import {
-  createAwsRuntimeAccessResolver,
-  createAwsEcsRuntimeAccessResolver,
-} from '../byoc/aws-runtime-access.js';
-import { validateAwsStartupStack, validateAwsEcsStartupStack } from '../byoc/aws-startup-stack.js';
+import { createAwsEcsRuntimeAccessResolver } from '../byoc/aws-runtime-access.js';
+import { validateAwsEcsStartupStack } from '../byoc/aws-startup-stack.js';
 import {
   awsProxyStartup,
   readPinnedAwsProxyDeployment,
   type AwsProxyMetadata,
 } from '../byoc/aws-proxy.js';
-import type { AwsEgressConfiguration } from '../egress/aws-scoped-admission.js';
 import {
   ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
   ENVIRONMENT_BUILD_RUNNER_ENV,
@@ -62,69 +57,34 @@ export function awsBuilderStartFailure(error: unknown): unknown {
   return error;
 }
 
-/** Compute differs by engine. Launch ordering, proxy setup and runner delivery stay common. */
+/** Launch ordering, proxy setup and runner delivery use the shared ECS allocation lifecycle. */
 export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }) {
   const now = deps.now ?? Date.now;
-  const microvmAccess = createAwsRuntimeAccessResolver(deps.env);
-  const ecsAccess = createAwsEcsRuntimeAccessResolver(deps.env);
+  const access = createAwsEcsRuntimeAccessResolver(deps.env);
   type Prepare = (
     startup: ProviderStartup,
-    config: AwsEgressConfiguration,
+    config: AwsEcsByocConfiguration,
     read: (signal?: AbortSignal) => Promise<AwsProxyMetadata>
-  ) => Promise<ProviderStartup>;
+  ) => Promise<AwsPreparedStartup>;
   function adapter(
     allocation: AwsBuilderAllocation,
     state: BuilderLifecycleState,
     beforeLaunch: () => void,
     prepare: Prepare
   ): AwsComputeAdapter {
-    if (allocation.provider === 'aws')
-      return createAwsProviderAdapter({
-        sandboxId: allocation.sandboxId,
-        now,
-        storage: createAwsBuilderOperationStorage({
-          allocation,
-          state,
-          schema: awsOperationSchema,
-          beforeLaunch,
-        }),
-        resolveRuntime: async pinned => {
-          if (pinned) return microvmAccess(pinned);
-          const selected = await resolveAwsBuildConfiguration(deps.env, allocation);
-          if (selected.provider !== 'aws') throw new BuilderTargetMismatchError();
-          return microvmAccess(selected.configuration);
-        },
-        async prepareStartup(input) {
-          const access = await microvmAccess(input.configuration);
-          await validateAwsStartupStack({
-            configuration: input.configuration,
-            read: signal => access.readStack(input.configuration.stackId, signal),
-          });
-          return prepare(input.startup, input.configuration, access.readProxyMetadata);
-        },
-      });
     return createAwsEcsProviderAdapter({
       sandboxId: allocation.sandboxId,
       now,
-      storage: createAwsBuilderOperationStorage({
-        allocation,
-        state,
-        schema: awsEcsOperationSchema,
-        beforeLaunch,
-      }),
-      resolveRuntime: async pinned => {
-        if (pinned) return ecsAccess(pinned);
-        const selected = await resolveAwsBuildConfiguration(deps.env, allocation);
-        if (selected.provider !== 'aws-ecs') throw new BuilderTargetMismatchError();
-        return ecsAccess(selected.configuration);
-      },
+      storage: createAwsBuilderOperationStorage({ allocation, state, beforeLaunch }),
+      resolveRuntime: async pinned =>
+        access(pinned ?? (await resolveAwsBuildConfiguration(deps.env, allocation))),
       async prepareStartup(input) {
-        const access = await ecsAccess(input.configuration);
+        const runtime = await access(input.configuration);
         await validateAwsEcsStartupStack({
           configuration: input.configuration,
-          read: signal => access.readStack(input.configuration.stackId, signal),
+          read: signal => runtime.readStack(input.configuration.stackId, signal),
         });
-        return prepare(input.startup, input.configuration, access.readProxyMetadata);
+        return prepare(input.startup, input.configuration, runtime.readProxyMetadata);
       },
     });
   }
@@ -175,6 +135,7 @@ export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }
           assertActive();
           if (Date.parse(deployment.expiresAt) <= launch.deadlineAt + 60_000)
             throw new BuilderTargetMismatchError();
+          const deadlineAt = Math.min(launch.deadlineAt, Date.parse(deployment.expiresAt));
           const credential = mintAwsBuildEgressCredential(
             {
               runnerCredential: launch.runner.credential,
@@ -187,11 +148,11 @@ export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }
               credentialId: allocation.target.credentialId,
               generation: deployment.generation,
               stackId: configuration.stackId,
-              expiresAt: Math.min(launch.deadlineAt, Date.parse(deployment.expiresAt)),
+              expiresAt: deadlineAt,
             },
             secret
           );
-          return awsProxyStartup(startup, deployment, credential);
+          return { startup: awsProxyStartup(startup, deployment, credential), deadlineAt };
         }
       );
       try {
@@ -234,10 +195,7 @@ export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }
     ): Promise<'terminal' | 'retryable'> {
       const current = readAwsBuildState(await state.get(), allocation);
       if (!current.operation) return 'terminal';
-      const ref =
-        current.operation.ref.provider === 'aws'
-          ? encodeAwsProviderRef(current.operation.ref)
-          : encodeAwsEcsProviderRef(current.operation.ref);
+      const ref = encodeAwsEcsProviderRef(current.operation.ref);
       const refuseCreate = () => {
         throw new BuilderStateInvalidError();
       };

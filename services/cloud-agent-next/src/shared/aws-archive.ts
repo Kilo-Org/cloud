@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import { rootfsArchiveDescriptorSchema } from './rootfs-archive.js';
 
 /**
  * The isolated wrapper build cannot resolve `@kilocode/worker-utils` values, so
- * `aws-archive.parity.test.ts` holds these equal to the BYOC configuration fields.
+ * `aws-archive.parity.test.ts` holds these equal to the ECS BYOC configuration fields.
  */
 export const awsArchiveIdentityFields = {
   region: z.literal('us-east-1'),
@@ -13,12 +12,6 @@ export const awsArchiveIdentityFields = {
   stackId: z
     .string()
     .regex(/^arn:aws:cloudformation:us-east-1:\d{12}:stack\/[A-Za-z0-9-]+\/[a-f0-9-]+$/),
-  imageIdentifier: z
-    .string()
-    .regex(/^arn:aws:lambda:us-east-1:\d{12}:microvm-image:[A-Za-z0-9_-]+$/),
-  imageVersion: z.string().regex(/^\d+\.\d+$/),
-};
-export const awsEcsArchiveIdentityFields = {
   runtimeImage: z
     .string()
     .regex(
@@ -29,31 +22,21 @@ export const awsEcsArchiveIdentityFields = {
     .regex(/^arn:aws:ecs:us-east-1:\d{12}:task-definition\/[A-Za-z0-9_-]{1,255}:[1-9]\d*$/),
 };
 
-const archiveLocation = z
+// The key order is part of the encoded identity. Stored targets compare encoded strings.
+const baseSchema = z
   .object({
     connectionId: z.uuid(),
     region: awsArchiveIdentityFields.region,
     bucket: awsArchiveIdentityFields.bucket,
     stackId: awsArchiveIdentityFields.stackId,
-  })
-  .strict();
-const baseSchema = archiveLocation
-  .extend({
-    imageIdentifier: awsArchiveIdentityFields.imageIdentifier,
-    imageVersion: awsArchiveIdentityFields.imageVersion,
-  })
-  .strict()
-  .refine(value => value.stackId.split(':')[4] === value.imageIdentifier.split(':')[4]);
-const ecsBaseSchema = archiveLocation
-  .extend({
     provider: z.literal('aws-ecs'),
-    ...awsEcsArchiveIdentityFields,
+    runtimeImage: awsArchiveIdentityFields.runtimeImage,
+    taskDefinitionArn: awsArchiveIdentityFields.taskDefinitionArn,
   })
   .strict()
   .refine(value => value.stackId.split(':')[4] === value.taskDefinitionArn.split(':')[4]);
-export type AwsArchiveBase = z.infer<typeof baseSchema> | z.infer<typeof ecsBaseSchema>;
-const BASE_PREFIX = 'aws-image:v1:';
-const ECS_BASE_PREFIX = 'aws-ecs-image:v1:';
+export type AwsArchiveBase = z.infer<typeof baseSchema>;
+const BASE_PREFIX = 'aws-ecs-image:v1:';
 const SNAPSHOT_PREFIX = 'aws-archive:v1:';
 const MAX_ENCODED_CHARS = 8192;
 
@@ -77,24 +60,14 @@ function decode(prefix: string, value: string): unknown {
 }
 
 /** Public compatibility identity. External IDs, role credentials and proxy secrets never enter snapshot IDs. */
-export function awsArchiveBaseImage(
-  connectionId: string,
-  configuration: AwsByocConfiguration
-): string {
-  const { region, bucket, stackId, imageIdentifier, imageVersion } = configuration;
-  return encode(
-    BASE_PREFIX,
-    baseSchema.parse({ connectionId, region, bucket, stackId, imageIdentifier, imageVersion })
-  );
-}
 export function awsEcsArchiveBaseImage(
   connectionId: string,
   configuration: AwsEcsByocConfiguration
 ): string {
   const { region, bucket, stackId, runtimeImage, taskDefinitionArn } = configuration;
   return encode(
-    ECS_BASE_PREFIX,
-    ecsBaseSchema.parse({
+    BASE_PREFIX,
+    baseSchema.parse({
       connectionId,
       region,
       bucket,
@@ -106,8 +79,6 @@ export function awsEcsArchiveBaseImage(
   );
 }
 export function decodeAwsArchiveBase(value: string): AwsArchiveBase | null {
-  if (value.startsWith(ECS_BASE_PREFIX))
-    return ecsBaseSchema.safeParse(decode(ECS_BASE_PREFIX, value)).data ?? null;
   return baseSchema.safeParse(decode(BASE_PREFIX, value)).data ?? null;
 }
 export const awsArchiveSnapshotSchema = z

@@ -78,7 +78,6 @@ export class SandboxNetworkPolicyError extends Error {
 }
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
-  z.object({ provider: z.literal('aws') }).strict(),
   z.object({ provider: z.literal('aws-ecs') }).strict(),
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
@@ -152,7 +151,7 @@ export type ProviderSnapshotStart = {
   /** The image the snapshot was captured from. */
   baseImage: string;
   /** The provider that captured it; absent only for callers that predate BYOC. */
-  provider?: 'cloudflare-containers' | 'vercel' | 'aws' | 'aws-ecs';
+  provider?: 'cloudflare-containers' | 'vercel' | 'aws-ecs';
 };
 
 export type ProviderLaunchOptions = {

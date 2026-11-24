@@ -8,17 +8,13 @@ import type { AwsEgressClaims } from '@kilocode/worker-utils/aws-egress';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { AwsEcsOperation } from '../sandbox-control/aws-ecs-operation.js';
 import { encodeAwsEcsProviderRef } from '../sandbox-control/aws-ecs-operation.js';
-import { resolveAwsEcsByocConfiguration } from '../byoc/aws-ecs-credential-resolver.js';
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
+import { resolveAwsEcsByocConfiguration } from '../byoc/aws-credential-resolver.js';
 import { resolveSecret } from '../auth.js';
-import { resolveAwsByocConfiguration } from '../byoc/aws-credential-resolver.js';
 import { createAwsRoleSessionCache } from '../byoc/aws-runtime-access.js';
 import { awsAccountAccess } from '../byoc/aws-account-access.js';
 import { readPinnedAwsProxyDeployment } from '../byoc/aws-proxy.js';
 import type { AwsProxyMetadata } from '../byoc/aws-proxy.js';
 import type { ByocSource } from '../byoc/owner.js';
-import type { AwsOperation } from '../sandbox-control/aws-operation.js';
-import { encodeAwsProviderRef } from '../sandbox-control/aws-operation.js';
 import { sandboxCredentialMatchesHash } from '../sandbox-control/credential.js';
 import {
   type ScopedScmGrant,
@@ -28,13 +24,10 @@ import {
 import type { Env } from '../types.js';
 import { AwsEgressAdmissionError as AdmissionFailure } from './aws-egress-error.js';
 
-export type AwsEgressConfiguration = AwsByocConfiguration | AwsEcsByocConfiguration;
-export type AwsEgressOperation = AwsOperation | (AwsEcsOperation & { deadlineAt?: never });
-
 export type AwsEgressProof = { credential: string; identity: string };
 export type AwsScopedEgressContext<G extends ScopedScmGrant> = ScopedScmAdmissionContext<G> & {
   byoc?: ByocSource;
-  operation: AwsEgressOperation | null;
+  operation: AwsEcsOperation | null;
   credentialHash?: string;
   allowlist?: readonly string[];
   audit: boolean;
@@ -46,14 +39,8 @@ export type AwsEgressIdentityClaims = Pick<
 type IssuedContext<C> = C & {
   byoc: ByocSource;
   credentialHash: string;
-  operation: AwsEgressOperation & {
-    config: AwsEgressConfiguration & { proxy: NonNullable<AwsByocConfiguration['proxy']> };
-    deadlineAt?: number;
-  };
+  operation: AwsEcsOperation & { deadlineAt: number };
 };
-function encodeOperationRef(ref: AwsEgressOperation['ref']): string {
-  return ref.provider === 'aws' ? encodeAwsProviderRef(ref) : encodeAwsEcsProviderRef(ref);
-}
 function issued<G extends ScopedScmGrant, C extends AwsScopedEgressContext<G>>(
   context: C,
   now: number
@@ -71,11 +58,11 @@ function issued<G extends ScopedScmGrant, C extends AwsScopedEgressContext<G>>(
     (context.byoc.userId === undefined || context.byoc.userId === context.ownerId) &&
     context.allocation.active &&
     context.allocation.allocationId === operation.ref.intentId &&
-    context.allocation.providerRef === encodeOperationRef(operation.ref) &&
+    context.allocation.providerRef === encodeAwsEcsProviderRef(operation.ref) &&
     (operation.phase === 'launching' || operation.phase === 'running') &&
     operation.request &&
-    (operation.ref.provider !== 'aws' ||
-      (operation.deadlineAt !== undefined && operation.deadlineAt > now))
+    operation.deadlineAt !== undefined &&
+    operation.deadlineAt > now
   );
 }
 function binding<G extends ScopedScmGrant>(context: AwsScopedEgressContext<G>) {
@@ -107,22 +94,19 @@ export function createAwsEgressIdentity<
     context: C,
     now: number
   ): AwsEgressIdentityClaims | null;
-  resolveConfiguration?: (
-    source: ByocSource,
-    provider: 'aws' | 'aws-ecs'
-  ) => Promise<AwsEgressConfiguration>;
-  readMetadata?: (configuration: AwsEgressConfiguration) => Promise<AwsProxyMetadata>;
+  resolveConfiguration?: (source: ByocSource) => Promise<AwsEcsByocConfiguration>;
+  readMetadata?: (configuration: AwsEcsByocConfiguration) => Promise<AwsProxyMetadata>;
   signingSecret?: () => Promise<string | undefined>;
   now?: () => number;
 }) {
   const now = deps.now ?? Date.now;
-  const access = createAwsRoleSessionCache((configuration: AwsEgressConfiguration) =>
+  const access = createAwsRoleSessionCache((configuration: AwsEcsByocConfiguration) =>
     awsAccountAccess(deps.env, configuration)
   );
   // One admission owner retains at most one deployment cache entry. Current owner
   // authorization is never cached, and failed reads cannot use stale metadata.
   let deployment: { key: string; validUntil: number; value: Promise<AwsProxyMetadata> } | undefined;
-  async function readDeployment(config: AwsEgressConfiguration, source: ByocSource) {
+  async function readDeployment(config: AwsEcsByocConfiguration, source: ByocSource) {
     const key = JSON.stringify([source, config]);
     const startedAt = now();
     if (deployment?.key === key && startedAt < deployment.validUntil) return deployment.value;
@@ -181,11 +165,9 @@ export function createAwsEgressIdentity<
     )
       throw new AdmissionFailure(401, 'invalid_identity');
     // A cached STS session never replaces the current owner/connection authorization read.
-    const current = await (deps.resolveConfiguration
-      ? deps.resolveConfiguration(context.byoc, context.operation.ref.provider)
-      : context.operation.ref.provider === 'aws'
-        ? resolveAwsByocConfiguration(deps.env, context.byoc)
-        : resolveAwsEcsByocConfiguration(deps.env, context.byoc));
+    const current = await (
+      deps.resolveConfiguration ?? resolveAwsEcsByocConfiguration.bind(null, deps.env)
+    )(context.byoc);
     if (JSON.stringify(current) !== JSON.stringify(config))
       throw new AdmissionFailure(403, 'connection_changed');
     const metadata = await readDeployment(config, context.byoc);
@@ -194,7 +176,7 @@ export function createAwsEgressIdentity<
     const expiresAt = Math.min(
       claims.exp * 1000,
       Date.parse(metadata.deployment.expiresAt),
-      context.operation.deadlineAt ?? Infinity
+      context.operation.deadlineAt
     );
     if (expiresAt <= now()) throw new AdmissionFailure(403, 'identity_expired');
     return { claims, expiresAt, initialBinding: binding(context) };

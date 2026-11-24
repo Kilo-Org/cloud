@@ -1,4 +1,5 @@
 import type { Env } from '../types.js';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { ByocSource } from '../byoc/owner.js';
 import type { AwsProxyMetadata } from '../byoc/aws-proxy.js';
 import type {
@@ -8,19 +9,13 @@ import type {
 import {
   createAwsEgressIdentity,
   type AwsScopedEgressContext,
-  type AwsEgressConfiguration,
   type AwsEgressIdentityClaims,
   type AwsEgressProof,
 } from './aws-egress-identity.js';
 import { awsEgressPolicy } from './aws-egress-policy.js';
 import { recordAwsEgressAudit } from './aws-egress-audit.js';
 import { admitAwsScm, type AwsScmAdmission } from './aws-scm-admission.js';
-export type {
-  AwsEgressProof,
-  AwsEgressConfiguration,
-  AwsEgressOperation,
-  AwsScopedEgressContext,
-} from './aws-egress-identity.js';
+export type { AwsEgressProof, AwsScopedEgressContext } from './aws-egress-identity.js';
 
 export function createAwsScopedEgressAdmission<
   G extends ScopedScmGrant,
@@ -38,11 +33,8 @@ export function createAwsScopedEgressAdmission<
     context: C,
     now: number
   ): AwsEgressIdentityClaims | null;
-  resolveConfiguration?: (
-    source: ByocSource,
-    provider: 'aws' | 'aws-ecs'
-  ) => Promise<AwsEgressConfiguration>;
-  readMetadata?: (configuration: AwsEgressConfiguration) => Promise<AwsProxyMetadata>;
+  resolveConfiguration?: (source: ByocSource) => Promise<AwsEcsByocConfiguration>;
+  readMetadata?: (configuration: AwsEcsByocConfiguration) => Promise<AwsProxyMetadata>;
   signingSecret?: () => Promise<string | undefined>;
   now?: () => number;
 }) {

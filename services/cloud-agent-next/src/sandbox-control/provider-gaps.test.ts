@@ -39,24 +39,6 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
         : 'AWS workspace archives are outside the MVP.',
   })),
   {
-    provider: 'aws',
-    feature: 'workspaceSnapshots',
-    class: 'gap',
-    reason: 'AWS workspace archives are outside the MVP.',
-  },
-  {
-    provider: 'aws',
-    feature: 'environmentSnapshots',
-    class: 'gap',
-    reason: 'MicroVM prepared environments need separate live acceptance.',
-  },
-  {
-    provider: 'aws',
-    feature: 'meteredBilling',
-    class: 'intentional',
-    reason: 'The customer pays AWS; Kilo does not meter BYOC compute.',
-  },
-  {
     provider: 'vercel',
     feature: 'workspaceSnapshots',
     class: 'gap',

@@ -400,18 +400,21 @@ describe('fetch disconnect endpoint', () => {
   const authorizationHeader = async (userId: string, audience?: string): Promise<string> => {
     const { token } = await signKiloToken({
       userId,
-      pepper: null,
       secret: jwtSecret,
-      expiresInSeconds: 60 * 60,
+      expiresInSeconds: 5 * 60,
       ...(audience ? { audience } : {}),
     });
     return `Bearer ${token}`;
   };
-  const modernAuthorizationHeader = async (userId: string, audience: string): Promise<string> => {
+  const modernAuthorizationHeader = async (
+    userId: string,
+    audience: string,
+    expiresInSeconds = 5 * 60
+  ): Promise<string> => {
     const { token } = await signModernKiloToken({
       userId,
       secret: jwtSecret,
-      expiresInSeconds: 60 * 60,
+      expiresInSeconds,
       audience,
       tokenPurpose: 'internal-service',
       credentialExchange: false,
@@ -420,18 +423,19 @@ describe('fetch disconnect endpoint', () => {
   };
   const rawAuthorizationHeader = (
     aud: unknown,
-    claims: { exp?: number; version?: number } = {}
+    claims: Record<string, unknown> & { exp?: number; version?: number; iat?: number } = {}
   ): string => {
     const now = Math.floor(Date.now() / 1000);
+    const iat = 'iat' in claims ? claims.iat : now;
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const payload = Buffer.from(
       JSON.stringify({
-        version: claims.version ?? 3,
+        version: 3,
         kiloUserId: 'user_1',
-        apiTokenPepper: null,
         aud,
-        iat: now,
-        exp: claims.exp ?? now + 60 * 60,
+        exp: (iat ?? now) + 5 * 60,
+        ...claims,
+        iat,
       })
     ).toString('base64url');
     const token = `${header}.${payload}.${createHmac('sha256', jwtSecret)
@@ -439,6 +443,19 @@ describe('fetch disconnect endpoint', () => {
       .digest('base64url')}`;
     return `Bearer ${token}`;
   };
+
+  const disconnectWith = (authorization: string) =>
+    handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          body: JSON.stringify(disconnectExpected),
+          headers: { 'Content-Type': 'application/json', Authorization: authorization },
+        }
+      ),
+      env
+    );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -476,6 +493,68 @@ describe('fetch disconnect endpoint', () => {
       ),
       env
     );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('accepts the legacy audience-less internal assertion', async () => {
+    const response = await disconnectWith(await authorizationHeader('user_1'));
+
+    expect(response.status).toBe(200);
+    expect(serviceMocks.disconnectUserAuthorization).toHaveBeenCalledWith(
+      'user_1',
+      disconnectExpected
+    );
+  });
+
+  it.each([
+    [
+      'a revoked audience-less user token',
+      () =>
+        signKiloToken({ userId: 'user_1', pepper: null, secret: jwtSecret, expiresInSeconds: 300 }),
+    ],
+    [
+      'a user token with a pepper claim and the disconnect audience',
+      () =>
+        signKiloToken({
+          userId: 'user_1',
+          pepper: 'pepper-current',
+          secret: jwtSecret,
+          expiresInSeconds: 300,
+          audience: GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+        }),
+    ],
+  ])('rejects %s', async (_name, sign) => {
+    const { token } = await sign();
+    const response = await disconnectWith(`Bearer ${token}`);
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an audience-less assertion living longer than five minutes', undefined, { exp: 0 }],
+    ['an audience-less assertion issued in the future', undefined, { iat: 120 }],
+    [
+      'an audience-less assertion with a purpose',
+      undefined,
+      { tokenPurpose: 'delegated-workload' },
+    ],
+    ['an audience-less assertion without an issue time', undefined, { iat: null }],
+    [
+      'a disconnect-audience assertion living longer than five minutes',
+      GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+      { exp: 0 },
+    ],
+  ])('rejects %s', async (_name, aud, shape) => {
+    const now = Math.floor(Date.now() / 1000);
+    const claims: Record<string, unknown> = {};
+    if ('exp' in shape) claims.exp = now + 301;
+    if ('iat' in shape) claims.iat = shape.iat === null ? undefined : now + Number(shape.iat);
+    if ('tokenPurpose' in shape) claims.tokenPurpose = shape.tokenPurpose;
+    if ('iat' in shape && shape.iat !== null) claims.exp = now + Number(shape.iat) + 300;
+    const response = await disconnectWith(rawAuthorizationHeader(aud, claims));
 
     expect(response.status).toBe(401);
     expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();

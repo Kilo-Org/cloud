@@ -118,7 +118,6 @@ import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
-  getUserFromSession,
   getUserFromSessionForCredentialIssuance,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
@@ -1176,17 +1175,13 @@ export const authOptions: NextAuthOptions = {
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
         // Account linking requires the person who started it: the pending link
-        // names a user, and the request must carry that user's web session. A
-        // request whose session does not name the same user is refused with the
-        // ordinary linking failure. The read above consumed the cookie, so a
-        // refusal is final.
+        // names a user, and the request must carry that user's web session,
+        // read with the session-only helper that applies the account's
+        // authorization checks. A request whose session does not name the same
+        // user is refused with the ordinary linking failure. The read above
+        // consumed the cookie, so a refusal is final.
         if (isAccountLinking && linkingSession) {
-          const claudeLinkingUser =
-            account.provider === 'claude'
-              ? (await getUserFromSessionForCredentialIssuance()).user
-              : undefined;
-          const linkingPrincipal =
-            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
+          const linkingPrincipal = (await getUserFromSessionForCredentialIssuance()).user;
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             // Apple answers with a cross-site form POST that cannot carry the
             // Lax session cookie. Park the identity as an explicit pending

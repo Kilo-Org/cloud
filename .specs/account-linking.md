@@ -85,6 +85,17 @@ way, including Apple from connected accounts.
 5. GitLab uses the generic rule: its OIDC provider emits the standard
    `email_verified` claim for the address the application may see.
 
+### Explicit link session
+
+1. An explicit link MUST be started only by a request that carries a
+   current web session of the account it names. A bearer credential MUST
+   NOT start one.
+2. An explicit link MUST be completed only by a request that carries a
+   current web session of that account.
+3. A revoked session, a session of a blocked account, and a request that
+   presents a bearer credential MUST each be treated as carrying no
+   session.
+
 ### Apple explicit linking
 
 1. Apple MUST be linkable from connected accounts.
@@ -166,6 +177,11 @@ way, including Apple from connected accounts.
 None.
 
 ## Changelog
+
+### 2026-11-24 -- Explicit link session
+
+- Added the current web session requirement for starting and completing
+  an explicit link.
 
 ### 2026-11-09 -- Initial spec
 

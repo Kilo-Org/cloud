@@ -2312,6 +2312,32 @@ describe('captureProxyError', () => {
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
   });
 
+  it('redacts secret-shaped values in the logged response', async () => {
+    const fakeKey = 'sk-or-v1-fake0000000000000000000000';
+    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
+    const data = await captureResponsesError(
+      {},
+      Response.json(
+        { error: { message: `invalid key ${fakeKey}`, echo: `Bearer ${fakeJwt}` } },
+        { status: 401 }
+      )
+    );
+
+    expect(data.first4kOfResponse).toBe(
+      '{"error":{"message":"invalid key [Filtered]","echo":"Bearer [Filtered]"}}'
+    );
+  });
+
+  it('redacts a secret that crosses the 4k limit before it truncates the response', async () => {
+    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
+    const data = await captureResponsesError(
+      {},
+      new Response(`${'x'.repeat(4090)} ${fakeJwt}`, { status: 400 })
+    );
+
+    expect(data.first4kOfResponse).toBe(`${'x'.repeat(4090)} [Filt`);
+  });
+
   it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
     const response = Response.json(
       { padding: 'x'.repeat(16 * 1024), error: { param: 'input', code: 'unknown_parameter' } },

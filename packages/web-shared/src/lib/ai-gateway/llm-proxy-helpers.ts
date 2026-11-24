@@ -13,6 +13,7 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { redactSecretValues } from '@kilocode/web-shared/lib/observability/sentry-secret-patterns';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
@@ -949,7 +950,7 @@ export async function captureProxyError(params: {
       const clonedReponse = response.clone();
       try {
         const responseText = await clonedReponse.text();
-        extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
+        extraErrorData.first4kOfResponse = redactSecretValues(responseText).slice(0, 4096);
         const parsed = parseJson(responseText.slice(0, 16 * 1024));
         if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
           const { param, code } = parsed.value.error;

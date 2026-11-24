@@ -30,7 +30,11 @@ cookie, so it authenticates callers by bearer token alone.
 ## Non-goals
 
 - Changing token lifetimes, claims, the pepper model or `KILO_TOKEN_VERSION`
-  semantics, beyond what is listed here.
+  semantics, beyond what is listed here. Replacing the five-year user token
+  lifetime is planned separately.
+- Client changes. How the CLI, the extensions and the mobile app react to the
+  cutover's 401 (refresh, or send the user back to sign-in) is handled outside
+  this plan.
 - Changing the NextAuth session cookie or the secrets that are already
   dedicated: `SESSION_SYNC_SECRET`, `SESSION_SHARE_JWT_SECRET_PROD`,
   `CALLBACK_TOKEN_SECRET`, `BOT_TOKEN_MINT_SECRET`, `MCP_CATALOG_TOKEN_SECRET`,
@@ -304,10 +308,9 @@ An ES256 token verifies only if:
 - **Rotation:** add the new public key to the JWKS everywhere, switch the
   issuer's private key, then remove the old public key after the longest
   lifetime that issuer mints. Key IDs carry a version so old and new keys can
-  coexist. The `kilo-web` key signs five-year tokens, so retiring one of its
-  keys has the same problem as this cutover. To avoid that, the long-lived user
-  token family should eventually get shorter lifetimes or refresh tokens; that
-  is out of scope here.
+  coexist. While the `kilo-web` key still signs five-year tokens, retiring one
+  of its keys forces re-authentication like this cutover. The separate work to
+  replace the five-year lifetime removes that constraint.
 
 ### Verification paths during the transition
 
@@ -561,11 +564,7 @@ Automation tokens are minted fresh per run, so after Phase 3 they are already
 ES256. Confirm this from the counters, broken down by verifier, lifetime bucket
 and the automation-marker booleans.
 
-Before cutover, also:
-
-- Confirm that the CLI, the extensions and the mobile app send users back to
-  sign-in when they get an HS256 refusal (see open questions).
-- Announce the date of the forced re-authentication.
+Before cutover, announce the date of the forced re-authentication.
 
 ### Phase 5: planned cutover
 
@@ -576,8 +575,7 @@ Before cutover, also:
    distinct, and the same 401 body as the version refusal ("Token version
    outdated, please re-authenticate"). `isRejectedCredentialReason` fails
    closed, so the new reason never falls back to anonymous. Workers return their
-   usual 401. Whether clients send users back to sign-in on these responses is
-   open question 2.
+   usual 401.
 3. Remove the `NEXTAUTH_SECRET` fallbacks from Phase 2.
 4. Remove `NEXTAUTH_SECRET` and `NEXTAUTH_SECRET_PROD` and `_DEV` from every
    Worker, and remove `NEXTAUTH_SECRET` from the `kilocode-ai-gateway` Vercel
@@ -590,11 +588,10 @@ NextAuth. Rotating it is then the separate log-everyone-out operation mentioned
 in the Goal.
 
 **Effect on users:** at cutover, every holder of a pre-Phase-3 HS256 user token
-is refused. Clients that hold a native or device-session refresh token can
-refresh on the 401 and receive an ES256 access token
-(`app/api/auth/native/refresh/route.ts`, `app/api/device-auth/token/route.ts`),
-so refresh-on-401 is the main client fix to confirm. Holders of five-year
-tokens, which have no refresh path, sign in again. Anyone who received a token
+is refused. A client that holds a native or device-session refresh token can
+refresh and receive an ES256 access token
+(`app/api/auth/native/refresh/route.ts`, `app/api/device-auth/token/route.ts`).
+Holders of five-year tokens, which have no refresh path, sign in again. Anyone who received a token
 after their issuer flipped in Phase 3 is unaffected. No token is refused before
 the cutover.
 
@@ -684,25 +681,16 @@ Other tests:
 
 ## Open questions
 
-1. **kiloclaw.** `docs/token-issuance-policy.md` mentions an October end of
-   life. If kiloclaw is already retired, drop it from scope. If not, is the
-   `KILOCLAW_KILO_CLI` flag still used? If it is retired, the machine key's
-   audiences can narrow to `kilo-gateway`.
-2. **Clients.** Do the CLI, the VS Code and JetBrains extensions and the mobile
-   app refresh on a 401 where they hold a refresh token, and otherwise send
-   users back to sign-in on the "please re-authenticate" 401 and on other
-   401s? The kilocode repository and apps/mobile need checking.
-3. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
+1. **kiloclaw CLI flag.** kiloclaw stays in scope. Is the `KILOCLAW_KILO_CLI`
+   flag still used? If it is retired, the machine key's audiences can narrow to
+   `kilo-gateway`.
+2. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
    `WEB_INTERNAL_SECRET`?
-4. **Attestation key.** Should the runtime-proxy attestation get a separate
+3. **Attestation key.** Should the runtime-proxy attestation get a separate
    `cloud-agent-next` key, so a leaked runtime-token key cannot forge
    attestations? Both keys would live in the same Worker, so the benefit is
    limited.
-5. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
+4. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
    cloud-agent-next and user-data-export? Neither declares it in its checked-in
    `wrangler.jsonc`. kiloclaw sets its secrets with `wrangler secret put`
    (`services/kiloclaw/wrangler.jsonc` comment).
-6. **Five-year lifetime.** Should new user tokens keep a five-year lifetime?
-   With per-issuer keys, a shorter lifetime plus refresh would make future
-   rotation of the `kilo-web` key possible without forcing everyone to sign in
-   again.

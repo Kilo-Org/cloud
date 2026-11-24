@@ -7,7 +7,10 @@
 
 import { init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import { scrubSentryEvent } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
+import {
+  scrubSentryBreadcrumb,
+  scrubSentryEvent,
+} from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
 if (process.env.NODE_ENV !== 'development') {
   init({
@@ -30,5 +33,6 @@ if (process.env.NODE_ENV !== 'development') {
     // The same scrubbing policy as initServerSentry, so an edge event leaves
     // this process with the same data as a server one.
     beforeSend: scrubSentryEvent,
+    beforeBreadcrumb: scrubSentryBreadcrumb,
   });
 }

@@ -1,4 +1,4 @@
-// The one scrubbing policy for Sentry events, called by both the
+// The one scrubbing policy for Sentry events and breadcrumbs, called by both the
 // Node.js and edge initializers. Keep this module edge-safe: SDK imports stay
 // type-only and no Node builtins are imported.
 
@@ -30,6 +30,16 @@ function scrubTags(tags: NonNullable<Event['tags']>): NonNullable<Event['tags']>
     }
   }
   return scrubbed;
+}
+
+// Console breadcrumbs hold formatted console text, which can carry a secret that
+// no pattern matches, so they are dropped like console logs.
+function isConsoleBreadcrumb(breadcrumb: Breadcrumb): boolean {
+  return breadcrumb.category === 'console';
+}
+
+export function scrubSentryBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
+  return isConsoleBreadcrumb(breadcrumb) ? null : scrubBreadcrumb(breadcrumb);
 }
 
 function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
@@ -83,7 +93,9 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
     event.tags = scrubTags(event.tags);
   }
   if (event.breadcrumbs) {
-    event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);
+    event.breadcrumbs = event.breadcrumbs
+      .filter(breadcrumb => !isConsoleBreadcrumb(breadcrumb))
+      .map(scrubBreadcrumb);
   }
   return event;
 }

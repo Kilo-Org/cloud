@@ -5,7 +5,10 @@
 
 import { httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import { scrubSentryEvent } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
+import {
+  scrubSentryBreadcrumb,
+  scrubSentryEvent,
+} from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
 export { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 
@@ -168,5 +171,7 @@ export function initServerSentry(): void {
 
       return scrubSentryEvent(event);
     },
+
+    beforeBreadcrumb: scrubSentryBreadcrumb,
   });
 }

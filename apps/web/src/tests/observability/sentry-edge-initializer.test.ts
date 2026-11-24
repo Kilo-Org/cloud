@@ -1,12 +1,17 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { Event } from '@sentry/nextjs';
+import type { Breadcrumb, Event } from '@sentry/nextjs';
 import {
   expectScrubbedServerEvent,
   leakyServerEvent,
 } from '@kilocode/web-shared/tests/helpers/sentry-event.helper';
 
 type BeforeSend = (event: Event) => Event | null;
-type EdgeOptions = { beforeSend: BeforeSend; integrations?: Array<{ name: string }> };
+type BeforeBreadcrumb = (breadcrumb: Breadcrumb) => Breadcrumb | null;
+type EdgeOptions = {
+  beforeSend: BeforeSend;
+  beforeBreadcrumb?: BeforeBreadcrumb;
+  integrations?: Array<{ name: string }>;
+};
 
 // The edge initializer calls `init` at module scope, so each test loads a fresh
 // copy of the real config module against a stubbed SDK and reads the options it
@@ -140,12 +145,21 @@ describe('edge Sentry initializer request data', () => {
   });
 });
 
-describe('edge Sentry initializer logs', () => {
+describe('edge Sentry initializer console output', () => {
   test('sends no console output to Sentry', async () => {
     const options = await loadEdgeOptions();
 
     expect(options.integrations?.map(integration => integration.name) ?? []).not.toContain(
       'ConsoleLogs'
     );
+  });
+
+  test('drops console breadcrumbs and scrubs the others', async () => {
+    const { beforeBreadcrumb } = await loadEdgeOptions();
+
+    expect(beforeBreadcrumb?.({ category: 'console', message: 'x [object Object]' })).toBeNull();
+    expect(
+      beforeBreadcrumb?.({ category: 'fetch', data: { url: '/api/models', authorization: 'fake' } })
+    ).toEqual({ category: 'fetch', data: { url: '/api/models', authorization: '[Filtered]' } });
   });
 });

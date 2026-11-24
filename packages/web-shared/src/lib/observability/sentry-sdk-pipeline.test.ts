@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import type * as SentryNextjs from '@sentry/nextjs';
 import type { Event, NodeOptions } from '@sentry/nextjs';
-import { captureException, close, flush, withIsolationScope, withScope } from '@sentry/nextjs';
+import {
+  addBreadcrumb,
+  captureException,
+  close,
+  flush,
+  withIsolationScope,
+  withScope,
+} from '@sentry/nextjs';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 type Transport = ReturnType<NonNullable<NodeOptions['transport']>>;
@@ -79,6 +86,42 @@ describe('initServerSentry through the real SDK pipeline', () => {
 
     expect(items.map(item => item.type)).not.toContain('log');
     expect(JSON.stringify(items)).not.toContain(FAKE_SECRET);
+  });
+
+  test('sends no console breadcrumbs with an event', async () => {
+    withIsolationScope(() => {
+      console.warn('x', { password: 'fake' });
+      console.error(`retry with ${FAKE_SECRET}`);
+      captureException(new Error('request failed'));
+    });
+
+    const [event] = await sentEvents();
+
+    expect(event?.breadcrumbs?.filter(crumb => crumb.category === 'console') ?? []).toEqual([]);
+    expect(JSON.stringify(event?.breadcrumbs ?? [])).not.toContain(FAKE_SECRET);
+  });
+
+  test('keeps other breadcrumbs and scrubs them', async () => {
+    withIsolationScope(() => {
+      addBreadcrumb({
+        category: 'fetch',
+        message: `GET /api/models Bearer ${FAKE_JWT}`,
+        data: { method: 'GET', status_code: 401, authorization: 'fake' },
+      });
+      captureException(new Error('request failed'));
+    });
+
+    const [event] = await sentEvents();
+
+    expect(
+      event?.breadcrumbs?.map(({ category, message, data }) => ({ category, message, data }))
+    ).toEqual([
+      {
+        category: 'fetch',
+        message: 'GET /api/models Bearer [Filtered]',
+        data: { method: 'GET', status_code: 401, authorization: '[Filtered]' },
+      },
+    ]);
   });
 
   test('drops a token nested in a callbackPath query value', async () => {

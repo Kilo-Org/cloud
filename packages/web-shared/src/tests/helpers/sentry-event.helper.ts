@@ -170,13 +170,6 @@ export function expectScrubbedServerEvent(result: Event | null | undefined): voi
   expect(result?.tags).toEqual({ source: 'openrouter-proxy', 'db.error_code': '57014' });
   expect(result?.breadcrumbs).toEqual([
     {
-      timestamp: 1732451230,
-      category: 'console',
-      level: 'log',
-      message: 'refreshing session [Filtered]',
-      data: { arguments: ['refreshing session', '[Filtered]'], logger: 'console' },
-    },
-    {
       timestamp: 1732451231,
       category: 'http',
       type: 'http',

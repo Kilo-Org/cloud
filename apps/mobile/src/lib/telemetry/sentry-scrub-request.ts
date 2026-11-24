@@ -16,21 +16,42 @@ export function isAllowedRequestHeader(name: string): boolean {
   return REQUEST_HEADER_ALLOWLIST.has(name.toLowerCase());
 }
 
+/** The only `request` fields an event keeps. */
+type ScrubbedRequest = {
+  method?: string;
+  url?: string;
+  headers?: Record<string, string>;
+};
+
+function scrubHeaders(headers: unknown): Record<string, string> | undefined {
+  if (headers == null || typeof headers !== 'object' || Array.isArray(headers)) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    Object.entries(headers).filter(
+      (entry): entry is [string, string] =>
+        isAllowedRequestHeader(entry[0]) && typeof entry[1] === 'string'
+    )
+  );
+}
+
 /**
- * Scrub a Sentry event's `request` in place: reduce `url` to origin and path,
- * delete `cookies`, `data` and `query_string`, and keep only the
- * {@link REQUEST_HEADER_ALLOWLIST} headers.
+ * The scrubbed copy of a Sentry event's `request`: a string `method`, `url`
+ * reduced to origin and path, and the {@link REQUEST_HEADER_ALLOWLIST} headers
+ * with string values. Every other field (`cookies`, `data`, `query_string`,
+ * `env`) is dropped.
  */
-export function scrubRequest(req: Record<string, unknown>): void {
+export function scrubRequest(req: Record<string, unknown>): ScrubbedRequest {
+  const scrubbed: ScrubbedRequest = {};
+  if (typeof req.method === 'string') {
+    scrubbed.method = req.method;
+  }
   if ('url' in req) {
-    req.url = typeof req.url === 'string' ? stripQueryString(req.url) : '';
+    scrubbed.url = typeof req.url === 'string' ? stripQueryString(req.url) : '';
   }
-  delete req.cookies;
-  delete req.data;
-  delete req.query_string;
-  if (req.headers != null && typeof req.headers === 'object') {
-    req.headers = Object.fromEntries(
-      Object.entries(req.headers).filter(([name]) => isAllowedRequestHeader(name))
-    );
+  const headers = scrubHeaders(req.headers);
+  if (headers !== undefined) {
+    scrubbed.headers = headers;
   }
+  return scrubbed;
 }

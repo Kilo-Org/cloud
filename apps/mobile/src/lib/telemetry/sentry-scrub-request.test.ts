@@ -23,7 +23,7 @@ describe('request scrubbing', () => {
 
     const result = scrubEvent(event);
 
-    expect(result.request).toEqual({
+    expect(result?.request).toEqual({
       url: 'https://api.example.com/trpc/getUser',
       headers: {
         'Content-Type': 'application/json',
@@ -33,9 +33,37 @@ describe('request scrubbing', () => {
     });
   });
 
+  it('drops env, string headers, and fields outside method, url, and headers', () => {
+    const result = scrubEvent({
+      request: {
+        method: 'POST',
+        url: 'https://api.example.com/a',
+        headers: 'Authorization: Bearer fake-token-value',
+        env: { HTTP_COOKIE: 'session=fake-cookie-value', REMOTE_ADDR: '192.0.2.1' },
+        fragment: 'fake-fragment-value',
+      },
+    });
+
+    expect(result?.request).toEqual({ method: 'POST', url: 'https://api.example.com/a' });
+  });
+
+  it('drops allowlisted headers whose value is not a string', () => {
+    const result = scrubEvent({
+      request: {
+        headers: {
+          accept: ['application/json', 'Bearer fake-token-value'],
+          'Content-Type': { value: 'fake-header-value' },
+          'User-Agent': 'kilo-app/1.0',
+        },
+      },
+    });
+
+    expect(result?.request).toEqual({ headers: { 'User-Agent': 'kilo-app/1.0' } });
+  });
+
   it('leaves a request with no headers otherwise unchanged', () => {
     const result = scrubEvent({ request: { url: 'https://api.example.com/a', method: 'GET' } });
 
-    expect(result.request).toEqual({ url: 'https://api.example.com/a', method: 'GET' });
+    expect(result?.request).toEqual({ url: 'https://api.example.com/a', method: 'GET' });
   });
 });

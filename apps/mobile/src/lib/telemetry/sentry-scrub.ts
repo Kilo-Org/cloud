@@ -425,8 +425,8 @@ function scrubExceptions(exception: Record<string, unknown>, contexts: unknown):
  *
  * - Reduces request URL, contexts.response URL, and contexts.network URL to
  *   their origin and path.
- * - Deletes `request.cookies`, `request.data`, `request.query_string`, and
- *   every request header outside the {@link scrubRequest} allowlist.
+ * - Rebuilds `request` from its method, URL, and allowlisted string headers
+ *   alone ({@link scrubRequest}).
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Rebuilds the app's payload context ({@link NETWORK_BODY_CONTEXT}) from its
  *   allow-listed fields alone and token-redacts every string it keeps, so
@@ -449,7 +449,7 @@ export function scrubEvent<T>(event: T): T | null {
     const e = event as Record<string, unknown>;
 
     if (e.request != null && typeof e.request === 'object') {
-      scrubRequest(e.request as Record<string, unknown>);
+      e.request = scrubRequest(e.request as Record<string, unknown>);
     }
 
     if (e.contexts != null && typeof e.contexts === 'object') {

@@ -236,6 +236,21 @@ describe('Token Functions', () => {
       expect(decoded.kiloUserId).toBe(mockUser.id);
       expect(decoded.aud).toBeUndefined();
     });
+
+    it('accepts a lifetime of up to one hour', () => {
+      const decoded = jwt.decode(
+        generateInternalServiceToken(mockUser.id, { expiresIn: 3600 })
+      ) as jwt.JwtPayload;
+
+      expect(decoded.apiTokenPepper).toBeUndefined();
+      expect(decoded.exp! - decoded.iat!).toBe(3600);
+    });
+
+    it('refuses a lifetime longer than one hour', () => {
+      expect(() => generateInternalServiceToken(mockUser.id, { expiresIn: 3601 })).toThrow(
+        'Internal service token lifetime exceeds one hour'
+      );
+    });
   });
 
   describe('generateApiToken', () => {

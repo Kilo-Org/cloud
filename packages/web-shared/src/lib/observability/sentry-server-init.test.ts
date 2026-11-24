@@ -125,12 +125,37 @@ describe('server Sentry beforeSend', () => {
     expect(beforeSend(leakyServerEvent(), { originalException: error })).toBeNull();
   });
 
-  test('still rewrites Drizzle query errors and scrubs the query context', () => {
-    const query = `select * from "byok_api_keys" where "api_key" = '${FAKE_JWT}'`;
+  test('still rewrites Drizzle query errors and keeps only the parameterized query', () => {
+    const query = 'select * from "byok_api_keys" where "api_key" = $1';
+    const error = Object.assign(new Error(`Failed query: ${query}\nparams: ${FAKE_JWT}`), {
+      query,
+      params: [FAKE_JWT],
+      cause: { code: '57014', message: 'canceling statement due to statement timeout' },
+    });
+    const event = errorEvent({
+      exception: {
+        values: [{ type: 'Error', value: `Failed query: ${query}\nparams: ${FAKE_JWT}` }],
+      },
+    });
+
+    const result = beforeSend(event, { originalException: error });
+
+    expect(result?.fingerprint).toEqual(['drizzle-query-error', '57014', 'PostgresError']);
+    expect(result?.tags).toEqual({ 'db.error_code': '57014' });
+    expect(result?.exception?.values).toEqual([
+      { type: 'PostgresError', value: 'canceling statement due to statement timeout' },
+    ]);
+    expect(result?.contexts?.drizzle_query).toEqual({ query });
+  });
+
+  test('removes input values from the database message of a Drizzle query error', () => {
+    const query = 'insert into "kilocode_users" ("email") values ($1)';
+    const message =
+      'duplicate key value violates unique constraint "kilocode_users_email_key" Key (email)=(person@example.com) already exists.';
     const error = Object.assign(new Error(`Failed query: ${query}`), {
       query,
-      params: [],
-      cause: { code: '57014', message: 'canceling statement due to statement timeout' },
+      params: ['person@example.com'],
+      cause: { code: '23505', message },
     });
     const event = errorEvent({
       exception: { values: [{ type: 'Error', value: `Failed query: ${query}` }] },
@@ -138,18 +163,9 @@ describe('server Sentry beforeSend', () => {
 
     const result = beforeSend(event, { originalException: error });
 
-    expect(result?.fingerprint).toEqual([
-      'drizzle-query-error',
-      '57014',
-      'canceling statement due to statement timeout',
-    ]);
-    expect(result?.tags).toEqual({ 'db.error_code': '57014' });
-    expect(result?.exception?.values).toEqual([
-      { type: 'PostgresError', value: 'canceling statement due to statement timeout' },
-    ]);
-    expect(result?.contexts?.drizzle_query).toEqual({
-      query: `select * from "byok_api_keys" where "api_key" = '[Filtered]'`,
-      wrapper_message: `Failed query: select * from "byok_api_keys" where "api_key" = '[Filtered]'`,
-    });
+    expect(result?.exception?.values?.[0]?.value).toBe(
+      'duplicate key value violates unique constraint "[Filtered]" Key (email)=([Filtered]) already exists.'
+    );
+    expect(JSON.stringify(result)).not.toContain('person@example.com');
   });
 });

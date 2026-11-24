@@ -55,6 +55,15 @@ function causeTypeName(cause: NonNullable<DrizzleQueryError['cause']>): string {
   return 'DatabaseError';
 }
 
+// Postgres quotes input values in its messages (`invalid input syntax for type
+// uuid: "..."`) and can append a key detail (`Key (email)=(...)`). Quoted
+// identifiers such as constraint names are filtered too.
+function withoutDatabaseInput(message: string): string {
+  return message
+    .replace(/"[^"]*"/g, '"[Filtered]"')
+    .replace(/\(([^()]*)\)=\([^()]*\)/g, '($1)=([Filtered])');
+}
+
 function isDrizzleWrapperException(value: { value?: string }): boolean {
   return typeof value.value === 'string' && value.value.startsWith('Failed query:');
 }
@@ -125,19 +134,19 @@ export function initServerSentry(): void {
         return null;
       }
 
-      // Drizzle wraps query errors with a `Failed query: <unique SQL>` message,
-      // which breaks Sentry grouping and hides the real root cause (e.g. a
-      // "statement timeout" on `error.cause`). Rewrite the primary exception so
-      // the reported error reflects the underlying cause, and move the failed
-      // query into a context so it stays visible on the issue without polluting
-      // the title or fingerprint.
+      // Drizzle wraps query errors with a `Failed query: <SQL>\nparams: <values>`
+      // message, which breaks Sentry grouping, carries the bound values (tokens,
+      // emails) and hides the real root cause (e.g. a "statement timeout" on
+      // `error.cause`). Rewrite the primary exception so the reported error
+      // reflects the cause without input values, keep only the parameterized
+      // query in a context, and group by SQLSTATE and cause type.
       if (isDrizzleQueryError(error)) {
         const cause = error.cause;
         const pgCode = cause?.code;
         event.fingerprint = [
           'drizzle-query-error',
           pgCode ?? 'generic',
-          cause?.message ?? 'generic',
+          cause ? causeTypeName(cause) : 'DrizzleQueryError',
         ];
         event.tags = {
           ...event.tags,
@@ -145,27 +154,28 @@ export function initServerSentry(): void {
         };
         event.contexts = {
           ...event.contexts,
-          drizzle_query: {
-            query: error.query,
-            wrapper_message: error.message,
-          },
+          drizzle_query: { query: error.query },
         };
 
-        if (cause) {
-          // Prefer the Drizzle wrapper so we keep the stack that points through
-          // our code, then drop serialized cause entries because they duplicate
-          // the rewritten primary exception.
-          const values = event.exception?.values;
-          if (values && values.length > 0) {
-            const primaryException =
-              values.find(isDrizzleWrapperException) ?? values[values.length - 1];
+        // Prefer the Drizzle wrapper so we keep the stack that points through
+        // our code, then drop serialized cause entries because they duplicate
+        // the rewritten primary exception.
+        const values = event.exception?.values;
+        if (values && values.length > 0) {
+          const primaryException =
+            values.find(isDrizzleWrapperException) ?? values[values.length - 1];
+          if (cause) {
             primaryException.type = causeTypeName(cause);
-            primaryException.value = cause.message ?? 'unknown database error';
-            event.exception = {
-              ...event.exception,
-              values: [primaryException],
-            };
+            primaryException.value = withoutDatabaseInput(
+              cause.message ?? 'unknown database error'
+            );
+          } else {
+            primaryException.value = `Failed query: ${error.query}`;
           }
+          event.exception = {
+            ...event.exception,
+            values: [primaryException],
+          };
         }
       }
 

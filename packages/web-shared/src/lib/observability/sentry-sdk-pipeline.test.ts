@@ -10,6 +10,7 @@ import {
   withIsolationScope,
   withScope,
 } from '@sentry/nextjs';
+import { DrizzleQueryError } from 'drizzle-orm';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 type Transport = ReturnType<NonNullable<NodeOptions['transport']>>;
@@ -41,6 +42,7 @@ const FAKE_SECRET = 'fake-secret-value-0000';
 // Kept away from the capture calls, because the SDK sends nearby source lines
 // as stack frame context.
 const FAKE_JWT = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
+const FAKE_DB_INPUT = 'fake-database-input-0000';
 
 type SentItem = { type: string; payload: unknown };
 
@@ -223,23 +225,37 @@ describe('initServerSentry through the real SDK pipeline', () => {
     expect(event?.user).toEqual({ id: 'user-fake-0123' });
   });
 
-  test('redacts a secret in the Drizzle error fingerprint', async () => {
-    const query = 'select 1';
+  test('sends a Drizzle query error without bound values or database input', async () => {
+    const query = 'update "dolthub_installations" set "access_token" = $1 where "id" = $2';
     captureException(
-      Object.assign(new Error(`Failed query: ${query}`), {
+      new DrizzleQueryError(
         query,
-        params: [],
-        cause: { code: '22P02', message: `invalid input syntax for type uuid: "${FAKE_JWT}"` },
-      })
+        [FAKE_SECRET, 'installation-1'],
+        Object.assign(new Error(`invalid input syntax for type uuid: "${FAKE_DB_INPUT}"`), {
+          code: '22P02',
+        })
+      )
     );
 
-    const [event] = await sentEvents();
+    const event = await sentEventFor('invalid input syntax for type uuid: "[Filtered]"');
 
-    expect(event?.fingerprint).toEqual([
-      'drizzle-query-error',
-      '22P02',
-      'invalid input syntax for type uuid: "[Filtered]"',
+    expect(event?.fingerprint).toEqual(['drizzle-query-error', '22P02', 'PostgresError']);
+    expect(event?.exception?.values?.map(({ type, value }) => ({ type, value }))).toEqual([
+      { type: 'PostgresError', value: 'invalid input syntax for type uuid: "[Filtered]"' },
     ]);
-    expect(JSON.stringify(event)).not.toContain(FAKE_JWT);
+    expect(event?.contexts?.drizzle_query).toEqual({ query });
+    expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
+    expect(JSON.stringify(event)).not.toContain(FAKE_DB_INPUT);
+  });
+
+  test('sends a Drizzle query error without a cause and without bound values', async () => {
+    const query = 'insert into "kilocode_users" ("email") values ($1)';
+    captureException(new DrizzleQueryError(query, [FAKE_SECRET]));
+
+    const event = await sentEventFor(`Failed query: ${query}`);
+
+    expect(event?.fingerprint).toEqual(['drizzle-query-error', 'generic', 'DrizzleQueryError']);
+    expect(event?.contexts?.drizzle_query).toEqual({ query });
+    expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
   });
 });

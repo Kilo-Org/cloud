@@ -94,9 +94,9 @@ export async function signKiloToken(params: {
   userId: string;
   /**
    * Omit (or pass `undefined`) to mint an internal assertion with no
-   * `apiTokenPepper` claim. Workers accept such a token only while it lives at
-   * most one hour (`isKiloTokenPepperCurrent`); an explicit `null` is compared
-   * against the account's current pepper.
+   * `apiTokenPepper` claim. Only receivers of internal assertions accept such a
+   * token, and only while it lives at most one hour (`isKiloTokenPepperCurrent`);
+   * an explicit `null` is compared against the account's current pepper.
    */
   pepper?: string | null;
   secret: string;

@@ -97,8 +97,8 @@ export const TOKEN_EXPIRY = {
  * version, plus an organizationId claim when the caller supplies one. Defaults to a
  * 1-hour expiry.
  *
- * The token has no pepper claim, so Workers accept it only while it lives at most one hour
- * (`isKiloTokenPepperCurrent`); a longer lifetime would survive a pepper rotation.
+ * The token has no pepper claim, so Session Ingest accepts it only while it lives at most one
+ * hour (`isKiloTokenPepperCurrent`); a longer lifetime would survive a pepper rotation.
  */
 export function generateInternalServiceToken(
   userId: string,

@@ -198,11 +198,16 @@ credential and the shared model-eligibility policy.
 A pepper rotation revokes every user credential in the web and in every Worker. `packages/worker-utils/src/kilo-token-pepper.ts` owns the decision:
 
 - A present `apiTokenPepper` claim, a string or `null`, must equal the account's current pepper. A claim that is `null` stops working when the pepper changes from `null` to a value.
-- `isKiloUserCredentialPepperCurrent` refuses an absent claim. The web gateway, `auto-routing` and `ai-attribution` use it, because no internal assertion is addressed to them. If they accepted claimless assertions, a Session Ingest assertion without an audience would become a web credential.
-- `isKiloTokenPepperCurrent` is the Worker rule in `verifyKiloBearerAgainstCurrentPepper`. It accepts an absent claim only on a short-lived internal assertion: `tokenPurpose: 'internal-service'`, an audience, and `exp - iat` of at most 3600 seconds.
-- Temporarily, the Worker rule also accepts an absent claim on a token without `tokenPurpose` when `exp - iat` is at most 3600 seconds. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` is off in production, so the 16 bounded web mint sites emit this legacy shape, and `generateInternalServiceToken` always does. Remove this branch when the flag is on in production (or the fallback is removed), `generateInternalServiceToken` has no callers, and one hour has passed since the last legacy mint.
+- `isKiloUserCredentialPepperCurrent` also refuses an absent claim. The web gateway, `auto-routing`, `ai-attribution` and `verifyKiloBearerAgainstCurrentPepper` (cloud-agent-next, event-service, kilo-chat, notifications) use it. No claimless token is addressed to these receivers.
+- `isKiloTokenPepperCurrent` also accepts an absent claim on a short-lived internal assertion. Only Session Ingest uses it, through `verifyKiloBearerOrInternalAssertionAgainstCurrentPepper`. The assertion needs `exp - iat` of at most 3600 seconds, `iat` at most 60 seconds ahead, at most 3600 seconds of remaining validity, and either `tokenPurpose: 'internal-service'` with an audience or no `tokenPurpose` (the legacy shape).
+- The legacy shape is temporary. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` is off in production, so the 17 `generateBoundedInternalServiceToken` sites emit it. The one direct `generateInternalServiceToken` caller (Bitbucket workspace access-token release, 300 seconds) always emits it. Remove the branch when the flag is on in production (or the fallback is removed), `generateInternalServiceToken` has no callers, and one hour has passed since the last legacy mint.
+- `internal-service` does not mean claimless. Workflow control tokens and the security-auto-analysis control and triage assertions carry the pepper claim. The triage assertion goes to the gateway.
+
+The git-token-service GitHub disconnect route accepts only the web's claimless assertion. A token with a pepper claim is refused. The assertion must live at most 300 seconds, its `iat` must be at most 60 seconds ahead, and it must have the disconnect audience or, temporarily, no audience and no `tokenPurpose`. The other git-token-service routes require an exact operation audience, which no user credential carries.
 
 `generateInternalServiceToken` refuses a lifetime above 3600 seconds. KiloClaw keeps its own rule, which treats an absent claim as `null`; it already rejects a claimless token after a rotation.
+
+Before this rule, the web accepted any token for an account without a pepper, including one with a stale string claim. Workers and `ai-attribution` skipped the comparison for an absent claim on every account.
 
 ## Dedicated Home widget credential
 

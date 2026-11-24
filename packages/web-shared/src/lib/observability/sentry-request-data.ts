@@ -168,7 +168,17 @@ function sanitizeQueryString(queryString: SentryQueryString): SentryQueryString 
   return kept;
 }
 
+// captureRequestError from @sentry/nextjs puts the request path, with its query,
+// into this context. It is the only context field the SDK fills from the URL.
+function sanitizeNextjsContext(event: Event): void {
+  const nextjs = event.contexts?.nextjs;
+  if (nextjs && typeof nextjs.request_path === 'string') {
+    nextjs.request_path = sanitizeRequestUrl(nextjs.request_path);
+  }
+}
+
 export function sanitizeSentryRequestData(event: Event): Event {
+  sanitizeNextjsContext(event);
   const request = event.request;
   if (!request) {
     return event;

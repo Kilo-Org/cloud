@@ -4,6 +4,7 @@ import type { Event, NodeOptions } from '@sentry/nextjs';
 import {
   addBreadcrumb,
   captureException,
+  captureRequestError,
   close,
   flush,
   withIsolationScope,
@@ -54,6 +55,12 @@ async function sentEvents(): Promise<Event[]> {
   return (await sentItems())
     .filter(item => item.type === 'event')
     .map(item => item.payload as Event);
+}
+
+async function sentEventFor(errorMessage: string): Promise<Event | undefined> {
+  return (await sentEvents()).find(event =>
+    event.exception?.values?.some(exception => exception.value === errorMessage)
+  );
 }
 
 let silencedConsole: jest.SpiedFunction<typeof console.warn>[];
@@ -142,11 +149,63 @@ describe('initServerSentry through the real SDK pipeline', () => {
     const [event] = await sentEvents();
 
     expect(event?.request).toEqual({
-      url: 'https://app.kilo.sh/users/sign_in?plan=pro',
-      query_string: 'plan=pro',
+      url: 'https://app.kilo.sh/users/sign_in?callbackPath=[Filtered]&plan=[Filtered]',
+      query_string: 'callbackPath=[Filtered]&plan=[Filtered]',
       headers: { host: 'app.kilo.sh', 'x-search': '[Filtered]' },
     });
   });
+
+  test('filters the query values of a request URL', async () => {
+    const input = encodeURIComponent(JSON.stringify({ json: { share_token: FAKE_JWT } }));
+    const query = `input=${input}`;
+
+    withIsolationScope(scope => {
+      scope.setSDKProcessingMetadata({
+        normalizedRequest: {
+          url: `https://app.kilo.sh/api/trpc/cliSessionsV2.getSharedSession?${query}`,
+          query_string: query,
+        },
+      });
+      captureException(new Error('share lookup failed'));
+    });
+
+    const [event] = await sentEvents();
+
+    expect(event?.request).toEqual({
+      url: 'https://app.kilo.sh/api/trpc/cliSessionsV2.getSharedSession?input=[Filtered]',
+      query_string: 'input=[Filtered]',
+      headers: {},
+    });
+  });
+
+  test.each([
+    [
+      'a nested callbackPath query',
+      `/users/sign_in?${new URLSearchParams({
+        callbackPath: `/pages-auth?audience=pages&state=${FAKE_SECRET}`,
+      }).toString()}`,
+      '/users/sign_in?callbackPath=[Filtered]',
+    ],
+    ['a share token path', `/s/${FAKE_JWT}`, '/s/:share_token'],
+  ])(
+    'applies the URL policy to the request path of %s in captureRequestError',
+    async (name, path, expected) => {
+      captureRequestError(
+        new Error(`render failed: ${name}`),
+        { path, method: 'GET', headers: { host: 'app.kilo.sh' } },
+        { routerKind: 'App Router', routePath: '/users/sign_in', routeType: 'render' }
+      );
+
+      const event = await sentEventFor(`render failed: ${name}`);
+
+      expect(event?.contexts?.nextjs).toEqual({
+        request_path: expected,
+        router_kind: 'App Router',
+        router_path: '/users/sign_in',
+        route_type: 'render',
+      });
+    }
+  );
 
   test('sends only the user id', async () => {
     withScope(scope => {

@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { and, asc, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { operation_ledgers, kiloclaw_subscriptions } from '@kilocode/db/schema';
+import { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 import { stopKiloClawStripeRenewal } from './stop-stripe-renewal';
@@ -17,6 +18,19 @@ const WORK_BUDGET_MS = 45 * 1000;
 const SETTLEMENT_RESERVE_MS = 5 * 1000;
 const PAGE_SIZE = 500;
 const FAILURE_LIMIT = 100;
+const RENEWING_STATUSES = [
+  KiloClawSubscriptionStatus.Active,
+  KiloClawSubscriptionStatus.Trialing,
+  KiloClawSubscriptionStatus.PastDue,
+  KiloClawSubscriptionStatus.Unpaid,
+];
+
+export type StripeRenewalPreviewCounts = {
+  renewing: number;
+  alreadyEnding: number;
+  canceled: number;
+  total: number;
+};
 
 export type StripeRenewalBatchActor = { id: string; email: string; name: string | null };
 
@@ -127,7 +141,7 @@ export async function createStripeRenewalBatchPreview(actor: StripeRenewalBatchA
   const id = crypto.randomUUID();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + PREVIEW_LIFETIME_MS).toISOString();
-  const total = await db.transaction(async tx => {
+  const preview = await db.transaction(async tx => {
     await tx.insert(operation_ledgers).values({
       operation_key: headerKey(id),
       domain: DOMAIN,
@@ -147,6 +161,14 @@ export async function createStripeRenewalBatchPreview(actor: StripeRenewalBatchA
       lease_expires_at: expiresAt,
       expires_at: new Date(now.getTime() + RETENTION_MS).toISOString(),
     });
+    const [breakdown] = await tx
+      .select({
+        renewing: sql<number>`count(*) filter (where ${inArray(kiloclaw_subscriptions.status, RENEWING_STATUSES)} and ${kiloclaw_subscriptions.cancel_at_period_end} = false)::int`,
+        alreadyEnding: sql<number>`count(*) filter (where ${kiloclaw_subscriptions.cancel_at_period_end} = true and ${ne(kiloclaw_subscriptions.status, KiloClawSubscriptionStatus.Canceled)})::int`,
+        canceled: sql<number>`count(*) filter (where ${eq(kiloclaw_subscriptions.status, KiloClawSubscriptionStatus.Canceled)})::int`,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(isNotNull(kiloclaw_subscriptions.stripe_subscription_id));
     let count = 0;
     let cursor: string | null = null;
     while (true) {
@@ -198,10 +220,15 @@ export async function createStripeRenewalBatchPreview(actor: StripeRenewalBatchA
       if (page.length < PAGE_SIZE) break;
       cursor = page.at(-1)?.id ?? null;
     }
-    return count;
+    return {
+      total: count,
+      renewing: breakdown?.renewing ?? 0,
+      alreadyEnding: breakdown?.alreadyEnding ?? 0,
+      canceled: breakdown?.canceled ?? 0,
+    } satisfies StripeRenewalPreviewCounts;
   });
 
-  return { id, total };
+  return { id, ...preview };
 }
 
 export async function purgeExpiredStripeRenewalBatches() {

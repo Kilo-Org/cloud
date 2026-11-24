@@ -1,7 +1,7 @@
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { LEGACY_KILOCLAW_PRICE_VERSION, KiloClawSubscriptionStatus } from '@kilocode/db';
 import { kiloclaw_subscriptions, operation_ledgers } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 
@@ -21,7 +21,11 @@ const actor = { id: 'admin-renewal-batch', email: 'admin@example.com', name: 'Ad
 
 async function subscription(
   stripeSubscriptionId: string | null,
-  payment_source: 'stripe' | 'credits'
+  payment_source: 'stripe' | 'credits',
+  options: {
+    status?: KiloClawSubscriptionStatus;
+    cancelAtPeriodEnd?: boolean;
+  } = {}
 ) {
   const user = await insertTestUser();
   await db.insert(kiloclaw_subscriptions).values({
@@ -30,7 +34,8 @@ async function subscription(
     payment_source,
     kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
     plan: 'standard',
-    status: 'active',
+    status: options.status ?? KiloClawSubscriptionStatus.Active,
+    cancel_at_period_end: options.cancelAtPeriodEnd ?? false,
   });
   return user;
 }
@@ -67,6 +72,70 @@ describe('admin Stripe renewal batch', () => {
     await expect(getStripeRenewalBatchStatus()).resolves.toEqual(
       expect.objectContaining({ run: expect.objectContaining({ updated: 1, failed: 0 }) })
     );
+  });
+
+  it('reports renewing, already-ending, and canceled counts while freezing every Stripe-backed row', async () => {
+    await subscription('sub_active', 'stripe');
+    await subscription('sub_trialing', 'stripe', {
+      status: KiloClawSubscriptionStatus.Trialing,
+    });
+    await subscription('sub_past_due', 'stripe', {
+      status: KiloClawSubscriptionStatus.PastDue,
+    });
+    await subscription('sub_unpaid', 'stripe', {
+      status: KiloClawSubscriptionStatus.Unpaid,
+    });
+    await subscription('sub_ending', 'stripe', { cancelAtPeriodEnd: true });
+    await subscription('sub_canceled_ending', 'stripe', {
+      status: KiloClawSubscriptionStatus.Canceled,
+      cancelAtPeriodEnd: true,
+    });
+    await subscription('sub_canceled', 'stripe', {
+      status: KiloClawSubscriptionStatus.Canceled,
+    });
+    await subscription(null, 'credits');
+
+    const preview = await createStripeRenewalBatchPreview(actor);
+
+    expect(preview).toMatchObject({
+      total: 7,
+      renewing: 4,
+      alreadyEnding: 1,
+      canceled: 2,
+    });
+    const manifest = await db
+      .select({ providerRef: operation_ledgers.provider_ref })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.resource_key, preview.id),
+          eq(operation_ledgers.intent, 'batch_item')
+        )
+      );
+    expect(manifest.map(row => row.providerRef).sort()).toEqual(
+      [
+        'sub_active',
+        'sub_canceled',
+        'sub_canceled_ending',
+        'sub_ending',
+        'sub_past_due',
+        'sub_trialing',
+        'sub_unpaid',
+      ].sort()
+    );
+  });
+
+  it('reports zero renewing subscriptions while keeping the check runnable for canceled rows', async () => {
+    await subscription('sub_only_canceled', 'stripe', {
+      status: KiloClawSubscriptionStatus.Canceled,
+    });
+
+    await expect(createStripeRenewalBatchPreview(actor)).resolves.toMatchObject({
+      total: 1,
+      renewing: 0,
+      alreadyEnding: 0,
+      canceled: 1,
+    });
   });
 
   it('does not allow another actor to start a frozen preview', async () => {

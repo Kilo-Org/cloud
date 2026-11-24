@@ -130,7 +130,8 @@ export function evaluateEffectiveModelAccessPolicy(
 export async function getEffectiveModelDecision(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
-  providerLookup: ProviderLookup = getProviderSlugsForModel
+  providerLookup: ProviderLookup = getProviderSlugsForModel,
+  route: 'gateway' | 'openrouter-catalog' = 'gateway'
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
   /** The refusal every organization-level rule returns, so its reason has one expression. */
@@ -151,13 +152,14 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'unrestricted') {
     return { allowed: true };
   }
-  if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
+  if (route === 'gateway' && (await isModelRestrictionExempt(modelId, policy.customLlmGrantee))) {
     return { allowed: true };
   }
   if (policy.memberGrant.mode === 'organization_baseline' && isOrganizationModelDenied()) {
     return organizationModelDenial();
   }
-  const pinnedProviders = await getModelInferenceProviders(modelId);
+  const pinnedProviders =
+    route === 'gateway' ? await getModelInferenceProviders(modelId) : undefined;
   const currentModelProviders =
     pinnedProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);

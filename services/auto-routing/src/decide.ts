@@ -7,6 +7,8 @@ import {
   type AutoRoutingDecision,
   type AutoRoutingDecisionResponse,
   type AutoRoutingMode,
+  type ClassifierRoute,
+  isVirtualAutoModelId,
   type CustomRouterDefinition,
   type CustomRouterReference,
   type MirrorPayload,
@@ -56,6 +58,7 @@ import { ClassifierRunError, classifyNormalizedInput } from './model-classifier'
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
 import { getAutoRoutingMode } from './routing-mode';
+import { organizationRoutingPolicy } from './organization-policy';
 import type { HonoEnv } from './hono-env';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
@@ -411,7 +414,8 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
 export async function runDecision(
   c: Context<HonoEnv>,
   payload: MirrorPayload,
-  target: DecisionTarget
+  target: DecisionTarget,
+  publicClassifierRoute?: ClassifierRoute | null
 ): Promise<DecisionRun> {
   const generation = Date.now();
   const requestStart = `${generation}:${performance.now()}`;
@@ -430,6 +434,37 @@ export async function runDecision(
   const constraints: RoutingConstraints | undefined = payload.constraints;
 
   const routingPrerequisites = target.loadRouting(timings);
+  // A public decision already checked the classifier together with its pool. On the gateway
+  // path the worker owns the effective classifier id (override, benchmark winner or default).
+  let orgRoute: ClassifierRoute | undefined;
+  if (payload.organizationId !== null) {
+    const routing = await routingPrerequisites;
+    const canRank = Object.values(routing.routingTable?.routes ?? {}).some(candidates =>
+      candidates.some(
+        candidate => !deniedModelIds.has(candidate.model) && !isVirtualAutoModelId(candidate.model)
+      )
+    );
+    const route =
+      canRank &&
+      (publicClassifierRoute !== undefined
+        ? publicClassifierRoute
+        : (
+            await organizationRoutingPolicy(c.env, {
+              organizationId: payload.organizationId,
+              userId: payload.userId,
+              modelIds: [],
+              classifierModel: await getClassifierModel(c.env),
+            })
+          )?.classifierRoute);
+    if (!route)
+      return {
+        response: emptyDecisionResponse(),
+        routingTable: routing.routingTable,
+        capabilities: routing.capabilities,
+        constraints,
+      };
+    orgRoute = route;
+  }
   const classifyAndBill = async (
     ctx: DecisionContext,
     classifierModel: string,
@@ -445,7 +480,12 @@ export async function runDecision(
       requestedModel: target.requestedModel,
     };
     try {
-      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+      const classifier = await classifyNormalizedInput(
+        c.env,
+        payload.input,
+        classifierModel,
+        orgRoute?.provider
+      );
       c.executionCtx.waitUntil(
         recordClassifierUsage(c.env, payload, identity, classifier.cost, usageCreatedAt)
       );
@@ -476,7 +516,7 @@ export async function runDecision(
     const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
       computeContentHashes(payload.input),
       hashIdentifierForTelemetry(payload.userId),
-      getClassifierModel(c.env),
+      orgRoute?.model ?? getClassifierModel(c.env),
       getDecisionLogSampleRate(c.env),
     ]);
     timings.prepMs = performance.now() - prepStartedAt;
@@ -503,6 +543,7 @@ export async function runDecision(
       }
     };
     const speculative: ClassificationRun | null =
+      !orgRoute &&
       (payload.input.messageCount === null || payload.input.messageCount <= 2) &&
       !getHotCachedClassification(hashes.exact, classifierModel, scope)
         ? { promise: runClassifier('speculative'), outcome: null }

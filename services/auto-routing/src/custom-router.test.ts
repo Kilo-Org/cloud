@@ -373,6 +373,7 @@ async function errorResponse(res: Response) {
 
 const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] = [];
+let classifierRoute: { model: string } | null | undefined;
 let gatewayFailuresLeft = 0;
 let gatewayFailureStatus = 503;
 
@@ -410,6 +411,7 @@ beforeEach(() => {
     isActive: true,
   });
   gatewayDeniedModelIds = [];
+  classifierRoute = { model: 'test/classifier' };
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
   fetchMock.mockReset().mockImplementation(async input => {
@@ -419,7 +421,7 @@ beforeEach(() => {
         gatewayFailuresLeft--;
         return new Response('down', { status: gatewayFailureStatus });
       }
-      return Response.json({ deniedModelIds: gatewayDeniedModelIds });
+      return Response.json({ deniedModelIds: gatewayDeniedModelIds, classifierRoute });
     }
     return new Response('not found', { status: 404 });
   });
@@ -1238,6 +1240,7 @@ describe('public custom router decide', () => {
       userId: USER_ID,
       organizationId: ORG_ID,
       modelIds: [SONNET],
+      classifierModel: 'test/classifier',
     });
   });
 
@@ -1256,13 +1259,14 @@ describe('public custom router decide', () => {
     const [call] = gatewayCalls();
     // The alias and the concrete target it stores from this same snapshot, so the worker can route
     // around a denied target instead of reaching the gateway and being refused there. A pin-less
-    // entry contributes exactly those two ids. `deniedOrganizationModelIds` de-duplicates and sorts
+    // entry contributes exactly those two ids. `organizationRoutingPolicy` de-duplicates and sorts
     // before it asks, so compare sorted membership rather than request order.
     expect(JSON.parse(call?.[1]?.body as string)).toEqual({
       userId: USER_ID,
       organizationId: ORG_ID,
       // Sorted by the policy helper: `openai/gpt-5.2` then `~anthropic/latest`.
       modelIds: [NEW_TARGET, ALIAS],
+      classifierModel: 'test/classifier',
     });
   });
 
@@ -1298,6 +1302,29 @@ describe('public custom router decide', () => {
   it('skips the organization policy for a personal context', async () => {
     await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
     expect(gatewayCalls()).toHaveLength(0);
+  });
+
+  it.each([null, undefined])(
+    'falls back without classification if the classifier route is %s',
+    async route => {
+      classifierRoute = route;
+      const { decision } = await decisionOf(
+        await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), { 'X-KiloCode-OrganizationId': ORG_ID })
+      );
+      expect(decision).toMatchObject({ model: SONNET, fallback: true });
+      await Promise.all(backgroundTasks);
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    }
+  );
+
+  it('never classifies when the organization denies the only downstream candidate', async () => {
+    gatewayDeniedModelIds = [SONNET];
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+    await Promise.all(backgroundTasks);
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('does not retry a policy failure that cannot clear', async () => {
@@ -1340,7 +1367,6 @@ describe('public custom router decide', () => {
 
   it('serves a listed client entry when the organization policy cannot be read', async () => {
     gatewayFailuresLeft = 2;
-    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
     const { decision } = await decisionOf(
       await post(
         CUSTOM_ROUTER_DECIDE_PATH,
@@ -1353,6 +1379,7 @@ describe('public custom router decide', () => {
       variant: 'fast',
       fallback: true,
     });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('refuses a user in a blocked email domain', async () => {

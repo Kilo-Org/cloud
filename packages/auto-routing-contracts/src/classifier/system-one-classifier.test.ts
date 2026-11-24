@@ -87,6 +87,22 @@ describe('classifyWithSystemOne', () => {
     );
   });
 
+  it('pins the permitted inference providers on every attempt', async () => {
+    const fetchMock = mockFetch(new Response(null, { status: 403 }));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }));
+    const provider = { only: ['permitted-host'] };
+    await expect(
+      classifyWithSystemOne(client, input, 'publisher/classifier', provider)
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(typeof init.body === 'string' ? JSON.parse(init.body) : null).toMatchObject({
+        model: 'publisher/classifier',
+        provider,
+      });
+    }
+  });
+
   it('picks the task type by summed probability before the subtype', async () => {
     // The single most likely route key is implementation/*, but debugging holds more mass.
     mockFetch(

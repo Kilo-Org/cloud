@@ -53,7 +53,8 @@ import {
 } from './custom-router-store';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
-import { deniedOrganizationModelIds } from './organization-policy';
+import { organizationRoutingPolicy } from './organization-policy';
+import { getClassifierModel } from './classifier-config';
 
 function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Handler<HonoEnv> {
   return async c => {
@@ -201,18 +202,19 @@ export const publicDecideHandler = publicHandler(async c => {
       })
     ),
   ];
-  const policyDeniedModelIds =
+  const policy =
     caller.organizationId === null
-      ? []
-      : await deniedOrganizationModelIds(c.env, {
+      ? undefined
+      : await organizationRoutingPolicy(c.env, {
           userId: caller.userId,
           organizationId: caller.organizationId,
           modelIds: gatewayModelIds,
+          classifierModel: await getClassifierModel(c.env),
         });
   // An unreadable policy admits no gateway entry. The listed client entries can still serve;
   // without one the request is retryable, not a permanently unavailable router.
   if (
-    policyDeniedModelIds === null &&
+    policy === null &&
     !router.entries.some(
       entry =>
         entry.kind === 'client' &&
@@ -227,7 +229,7 @@ export const publicDecideHandler = publicHandler(async c => {
       DEPENDENCY_RETRY_AFTER_SECONDS
     );
   }
-  const deniedModelIds = policyDeniedModelIds ?? gatewayModelIds;
+  const deniedModelIds = policy === null ? gatewayModelIds : (policy?.deniedModelIds ?? []);
 
   const body = { model: request.model, messages: request.messages, tools: request.tools };
   const input = normalizeClassifierInput('chat_completions', body);
@@ -266,7 +268,8 @@ export const publicDecideHandler = publicHandler(async c => {
   const run = await runDecision(
     c,
     payload,
-    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing),
+    policy === undefined ? undefined : (policy?.classifierRoute ?? null)
   );
   const decision = publicCustomRouterDecision(customRouterDecision(routing, run));
   // The verifier re-reads this pool on the primary and compares the signed dispatch with the

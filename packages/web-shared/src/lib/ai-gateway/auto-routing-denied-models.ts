@@ -2,13 +2,21 @@ import {
   isVirtualAutoModelId,
   type AutoRouter,
   type AutoRoutingDeniedModelsRequest,
+  type AutoRoutingDeniedModelsResponse,
+  type ClassifierRoute,
 } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   allowsInferenceProviderUserByok,
@@ -152,25 +160,59 @@ export async function collectDataCollectionRequiredAutoRoutingModelIds(
   );
 }
 
-// The gateway evaluation for named candidates, served to the auto-routing worker's CLI path.
-// A CLI request carries no provider privacy of its own, so only the organization's
-// data-collection setting can deny data-collection-required models.
-export async function deniedAutoRoutingModelIdsForMember(
+// The classifier uses Kilo's OpenRouter credential. A candidate served by the organization's
+// own provider key can be allowed downstream without authorizing that same model here.
+async function classifierRoute(
+  policy: EffectiveOrganizationModelPolicy,
+  configuredModel: string
+): Promise<ClassifierRoute | null> {
+  const model = await resolveOpenRouterModelAlias(configuredModel);
+  if (isLatestAliasId(model) || isVirtualAutoModelId(model)) return null;
+  let only: string[] | undefined;
+  for (const id of new Set([configuredModel, model])) {
+    const decision = await getEffectiveModelDecision(
+      policy,
+      id,
+      getProviderSlugsForModel,
+      'openrouter-catalog'
+    );
+    if (!decision.allowed) return null;
+    if (decision.eligibleProviderRoutes) {
+      const routes = decision.eligibleProviderRoutes;
+      only = only
+        ? only.filter(provider => routes.has(provider))
+        : withoutVirtualProvider([...routes]);
+      if (!only.length) return null;
+    }
+  }
+  const privacy = getEffectiveProviderPrivacy(undefined, policy.dataCollection);
+  return {
+    model,
+    ...(only || privacy.data_collection ? { provider: { ...privacy, ...(only && { only }) } } : {}),
+  };
+}
+
+export async function autoRoutingPolicyForMember(
   request: AutoRoutingDeniedModelsRequest
-): Promise<string[]> {
+): Promise<AutoRoutingDeniedModelsResponse> {
   const policy = await resolveOrganizationMemberModelPolicy({
     organizationId: request.organizationId,
     kiloUserId: request.userId,
     fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
-  const [deniedByPolicy, deniedByPrivacy] = await Promise.all([
-    deniedAutoRoutingCandidates(policy, candidateIds),
+  const [deniedByPolicy, deniedByPrivacy, route] = await Promise.all([
+    candidateIds.length ? deniedAutoRoutingCandidates(policy, candidateIds) : [],
+    candidateIds.length &&
     isDataCollectionExplicitlyDisallowed(
       getEffectiveProviderPrivacy(undefined, policy.dataCollection)
     )
       ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
+    request.classifierModel ? classifierRoute(policy, request.classifierModel) : undefined,
   ]);
-  return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];
+  return {
+    deniedModelIds: [...new Set([...deniedByPolicy, ...deniedByPrivacy])],
+    ...(route !== undefined && { classifierRoute: route }),
+  };
 }

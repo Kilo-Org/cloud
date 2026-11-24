@@ -42,6 +42,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import {
+  isEnkryptRejectingVerdict,
+  type EnkryptRejectingVerdict,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   autoRoutingUnavailableResponse,
@@ -102,9 +107,13 @@ type ModelResolution =
       failure: AutoRoutingFailure;
       autoModel: string | null;
       classifierCostUsd: number;
-    };
+    }
+  /** The input guardrail rejected the request before it reached a classifier. */
+  | { kind: 'guardrail_rejected'; verdict: EnkryptRejectingVerdict };
 
-export type AdmittedModelResolution = Exclude<ModelResolution, { kind: 'rejected' }>;
+type ClassifiedModelResolution = Exclude<ModelResolution, { kind: 'guardrail_rejected' }>;
+
+export type AdmittedModelResolution = Exclude<ClassifiedModelResolution, { kind: 'rejected' }>;
 
 type ModelResolutionContext = {
   request: ValidatedGatewayRequest;
@@ -117,6 +126,11 @@ type ModelResolutionContext = {
   callerPromise: Promise<GatewayCaller>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
+  /**
+   * The input guardrail's blocking verdict, awaited before any classifier call so a rejected
+   * request is never sent to the auto-routing worker.
+   */
+  guardrailVerdict: () => Promise<EnkryptGuardrailVerdict>;
 };
 
 type RoutingCaller = { userId: string; organizationId: string | null };
@@ -216,6 +230,15 @@ async function resolveAutoModelId(
     autoModel === KILO_AUTO_EFFICIENT_MODEL.id || autoModel === KILO_AUTO_BALANCED_MODEL.id;
   // Set by whichever decision runs; resolution only sees the decision itself.
   let classifierCostUsd = 0;
+  // Set when the input guardrail rejects the request before a classifier call. The decision then
+  // has no answer, and this rejection replaces whatever resolution follows from that.
+  let guardrailRejection: EnkryptRejectingVerdict | null = null;
+  const guardrailAllowsClassifier = async () => {
+    const verdict = await ctx.guardrailVerdict();
+    if (!isEnkryptRejectingVerdict(verdict)) return true;
+    guardrailRejection = verdict;
+    return false;
+  };
 
   const decisionForRouter = async (router: AutoRouter) => {
     const caller = await ctx.callerPromise;
@@ -228,6 +251,7 @@ async function resolveAutoModelId(
       policy => collectDeniedAutoRoutingModelIds(policy, router),
       options => collectDataCollectionRequiredAutoRoutingModelIds(router, options)
     );
+    if (!(await guardrailAllowsClassifier())) return null;
     const result = await fetchEfficientAutoDecision({
       ...decisionRequest(ctx, owner),
       ...(router === 'frontier' ? { router } : {}),
@@ -257,6 +281,7 @@ async function resolveAutoModelId(
           options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
         ),
       decide: async (router, deniedModelIds, aliasTargets) => {
+        if (!(await guardrailAllowsClassifier())) return { kind: 'unavailable' } as const;
         const outcome = await fetchCustomRouterDecision({
           ...decisionRequest(ctx, caller),
           router: router.baseRouter,
@@ -308,6 +333,12 @@ async function resolveAutoModelId(
     ctx.callerPromise.then(caller => (caller.kind === 'signed-in' ? caller.user : null)),
     ctx.balanceAndSettingsPromise.then(res => res.balance)
   );
+  if (guardrailRejection) {
+    // Efficient and balanced fall back to a default model without a decision; the rejection is
+    // logged with the request as the caller sent it.
+    ctx.request.body.model = requestedModel;
+    return { kind: 'guardrail_rejected', verdict: guardrailRejection };
+  }
   switch (result.kind) {
     case 'ok':
       return {
@@ -406,7 +437,7 @@ export function autoRoutingFailureResponse(failure: AutoRoutingFailure, requeste
  * only for workers still running the previous protocol.
  */
 export function billLegacyClassifierCost(
-  resolution: ModelResolution,
+  resolution: ClassifiedModelResolution,
   usage: ReturnType<typeof gatewayUsageContextBase>['context'] &
     Pick<MicrodollarUsageContext, 'api_kind' | 'requested_model' | 'feature' | 'clientRequestId'>
 ): void {

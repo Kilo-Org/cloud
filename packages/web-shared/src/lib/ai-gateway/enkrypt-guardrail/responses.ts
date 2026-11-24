@@ -167,13 +167,25 @@ export function enkryptOrganizationCreditsRequiredResponse(
 }
 
 /** Maps an input guardrail verdict to the gateway's rejection, or null to send the request upstream. */
+export function isEnkryptRejectingVerdict(
+  verdict: EnkryptGuardrailVerdict
+): verdict is EnkryptRejectingVerdict {
+  return verdict.action === 'block' || verdict.action === 'unavailable';
+}
+
+export function enkryptGuardrailRejectionResponse(
+  kind: GatewayChatApiKind,
+  verdict: EnkryptRejectingVerdict
+): NextResponse;
+export function enkryptGuardrailRejectionResponse(
+  kind: GatewayChatApiKind,
+  verdict: EnkryptGuardrailVerdict
+): NextResponse | null;
 export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
-  if (verdict.action === 'skip' || verdict.action === 'allow' || verdict.action === 'fail_open') {
-    return null;
-  }
+  if (!isEnkryptRejectingVerdict(verdict)) return null;
   return rejectionJson(kind, guardrailRejection(verdict, 'input'));
 }
 

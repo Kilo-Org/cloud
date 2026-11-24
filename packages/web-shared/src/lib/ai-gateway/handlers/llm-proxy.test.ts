@@ -6853,6 +6853,148 @@ describe('Enkrypt input guardrail', () => {
     });
   });
 
+  describe('before auto-routing classification', () => {
+    const haiku = 'anthropic/claude-haiku-4.5';
+    const haikuDecision: AutoRoutingDecision = {
+      model: haiku,
+      entry: { kind: 'gateway', model: haiku },
+      taskType: 'implementation',
+      subtaskType: 'feature_development',
+      source: 'benchmark',
+      tableVersion: 'v1',
+      sticky: false,
+      stale: false,
+      fallback: false,
+    };
+    const personalRouter: CustomRouterDefinition = {
+      id: '00000000-0000-4000-8000-000000000001',
+      ownerType: 'user',
+      ownerId: 'user-123',
+      slug: 'mine',
+      name: 'Mine',
+      baseRouter: 'frontier',
+      mode: 'best_accuracy',
+      entries: [{ kind: 'gateway', model: haiku }],
+      defaultEntryKey: `gateway:${haiku}`,
+    };
+
+    beforeEach(() => {
+      setOrganization({
+        enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+      });
+      mockedGetDirectByokModel.mockResolvedValue(null);
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
+      mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
+      mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: haikuDecision, costUsd: 0 });
+      mockedFindDecisionPool.mockResolvedValue({ router: personalRouter, aliasTargets: new Map() });
+      mockedFetchCustomRouterDecision.mockResolvedValue({
+        kind: 'ok',
+        decision: haikuDecision,
+        costUsd: 0,
+      });
+      const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+        '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+      );
+      mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+    });
+
+    it.each(['kilo-auto/efficient', 'kilo-auto/balanced', 'kilo-auto/frontier'])(
+      'blocks %s without calling the classifier',
+      async model => {
+        enkryptAnswers(injection);
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+        expectEnkryptScans(kiloDefaultScans(HELLO_SCAN_TEXT));
+        expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+          expect.objectContaining({
+            model,
+            logging: expect.objectContaining({
+              request: expect.objectContaining({ body: expect.objectContaining({ model }) }),
+            }),
+            error: { guardrail_rejection: 'block' },
+          })
+        );
+      }
+    );
+
+    it('blocks a custom router without calling its classifier', async () => {
+      enkryptAnswers(injection);
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'kilo-auto/custom/mine',
+          error: { guardrail_rejection: 'block' },
+        })
+      );
+    });
+
+    it('rejects without calling the classifier when the guardrail cannot scan', async () => {
+      setOrganization({
+        enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } },
+      });
+      enkryptAnswers({ summary: {}, result_message: null });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+      expect(response.status).toBe(503);
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('classifies and sends an allowed request', async () => {
+      enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+      expect(response.status).toBe(200);
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(haiku);
+    });
+
+    it('waits for the blocking scan before calling the classifier', async () => {
+      const scan = Promise.withResolvers<Response>();
+      const scanStarted = Promise.withResolvers<void>();
+      fetchSpy.mockImplementation(() => {
+        scanStarted.resolve();
+        return scan.promise;
+      });
+
+      const pending = handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+      await scanStarted.promise;
+      // Let routing work that does not depend on the verdict run up to the classifier gate.
+      for (let i = 0; i < 50; i++) await Promise.resolve();
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      scan.resolve(Response.json({ summary: { injection_attack: 0, pii: 0 } }));
+
+      expect((await pending).status).toBe(200);
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+    });
+
+    it('classifies and sends an auto request when the guardrail only logs', async () => {
+      setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
+      enkryptAnswers(injection);
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+      expect(response.status).toBe(200);
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('scans the system prompt and the full conversation separately and sends an allowed request upstream', async () => {
     setOrganization({
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },

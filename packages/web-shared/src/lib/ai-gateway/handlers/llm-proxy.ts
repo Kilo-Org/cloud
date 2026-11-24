@@ -35,7 +35,10 @@ import {
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { logUnrewrittenResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import {
+  logUnrewrittenResponse,
+  type RequestLoggingParams,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { AUTO_DECISION_HEADER } from '@kilocode/auto-routing-contracts';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -59,6 +62,7 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
+import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
 import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
@@ -266,7 +270,8 @@ export async function handleLlmProxyRequest(
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
   // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
-  // awaited just before the upstream call; log-only detectors are never awaited. Parts are
+  // awaited just before an auto-routing classifier call, if any, and before the upstream call;
+  // log-only detectors are never awaited. Parts are
   // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
@@ -284,6 +289,26 @@ export async function handleLlmProxyRequest(
     ),
     request.signal
   );
+  // Shared by the auto-routing classifier gate and the pre-upstream check, so the guardrail's
+  // measured added latency starts at whichever waits first.
+  let guardrailVerdictPromise: Promise<EnkryptGuardrailVerdict> | undefined;
+  const awaitGuardrailVerdict = () => (guardrailVerdictPromise ??= enkryptGuardrail.awaitVerdict());
+  const respondWithInputGuardrailRejection = async (
+    rejection: NextResponseType,
+    verdict: EnkryptGuardrailVerdict,
+    logging: RequestLoggingParams,
+    model: string
+  ) => {
+    // The disconnect was already logged; nobody reads this rejection.
+    if (request.signal.aborted) return rejection;
+    await logUnrewrittenResponse({
+      response: rejection.clone(),
+      model,
+      logging,
+      error: { guardrail_rejection: verdict.action },
+    });
+    return rejection;
+  };
 
   const logClientDisconnect = () => {
     // The request signal is forwarded to the upstream fetch and to the response
@@ -331,7 +356,27 @@ export async function handleLlmProxyRequest(
     callerPromise,
     balanceAndSettingsPromise,
     organizationGroupPolicyPromise,
+    guardrailVerdict: awaitGuardrailVerdict,
   });
+  if (modelResolution.kind === 'guardrail_rejected') {
+    // Only a signed-in caller reaches the classifier, so this caller has already resolved.
+    const caller = await callerPromise;
+    const { verdict } = modelResolution;
+    return await respondWithInputGuardrailRejection(
+      enkryptGuardrailRejectionResponse(requestBodyParsed.kind, verdict),
+      verdict,
+      {
+        usage_id: usageId,
+        user: caller.kind === 'signed-in' ? caller.user : null,
+        organization_id: (caller.kind === 'signed-in' && caller.organizationId) || null,
+        session_id: headers.sessionId,
+        vercel_request_id: headers.vercelRequestId,
+        request: requestBodyParsed,
+        enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
+      },
+      requestedModelLowerCased
+    );
+  }
   // An unavailable router yields to the caller's auth failure and still owes classifier cost, so
   // it is answered after admission.
   if (modelResolution.kind === 'rejected' && modelResolution.failure.kind !== 'unavailable') {
@@ -520,7 +565,7 @@ export async function handleLlmProxyRequest(
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  const requestLogging = {
+  const requestLogging: RequestLoggingParams = {
     usage_id: usageId,
     user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
@@ -529,21 +574,18 @@ export async function handleLlmProxyRequest(
     request: requestBodyParsed,
     enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
   };
-  const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
+  const guardrailVerdict = await awaitGuardrailVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
     requestBodyParsed.kind,
     guardrailVerdict
   );
   if (guardrailRejection) {
-    // The disconnect was already logged; nobody reads this rejection.
-    if (request.signal.aborted) return guardrailRejection;
-    await logUnrewrittenResponse({
-      response: guardrailRejection.clone(),
-      model: effectiveModelIdLowerCased,
-      logging: requestLogging,
-      error: { guardrail_rejection: guardrailVerdict.action },
-    });
-    return guardrailRejection;
+    return await respondWithInputGuardrailRejection(
+      guardrailRejection,
+      guardrailVerdict,
+      requestLogging,
+      effectiveModelIdLowerCased
+    );
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
   const anthropicUserProfile = await anthropicUserProfilePromise;

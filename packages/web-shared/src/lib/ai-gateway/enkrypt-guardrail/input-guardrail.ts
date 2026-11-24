@@ -30,7 +30,8 @@ import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-
 
 export type EnkryptInputGuardrail = {
   /**
-   * Await immediately before the upstream call. Never rejects. Waits only for the blocking
+   * Await immediately before the auto-routing classifier call, if any, and the upstream call.
+   * Never rejects. Waits only for the blocking
    * detectors' scan and, for a block, its cache write. The measured wait is the latency the
    * guardrail added to the request, and is stored in the report. A guardrail that only logs adds
    * none, so the report stores its log-only scan time instead. That is not what a blocking scan

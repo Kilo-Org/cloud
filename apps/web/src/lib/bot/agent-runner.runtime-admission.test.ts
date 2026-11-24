@@ -168,7 +168,8 @@ beforeEach(() => {
     mockPrepare.mockImplementation(async (input: PrepareSessionInput) => {
       const runtime = await createRuntimeAuthorization({
         token,
-        secret: NEXTAUTH_SECRET,
+        verificationSecret: NEXTAUTH_SECRET,
+        signingSecret: NEXTAUTH_SECRET,
         connectionString: 'postgres://unused',
         resourceKind: 'cloud-agent-next',
         resourceId: 'workspace_test',

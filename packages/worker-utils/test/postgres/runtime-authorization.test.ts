@@ -93,7 +93,8 @@ describe('runtime authorization bindings', () => {
 
     const created = await createRuntimeAuthorization({
       token: await admission({ userId, pepper, deviceSessionId }),
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: 'session',
@@ -104,7 +105,7 @@ describe('runtime authorization bindings', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: created.authorization,
-        secret,
+        signingSecret: secret,
         connectionString,
       })
     ).resolves.toMatchObject({ expiresAt: expect.any(String) });
@@ -118,7 +119,7 @@ describe('runtime authorization bindings', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: created.authorization,
-        secret,
+        signingSecret: secret,
         connectionString,
         onBindingRejected: reason => reasons.push(reason),
       })
@@ -140,7 +141,8 @@ describe('runtime authorization bindings', () => {
     await expect(
       createRuntimeAuthorization({
         token: await admission({ userId, pepper, deviceSessionId }),
-        secret,
+        verificationSecret: secret,
+        signingSecret: secret,
         connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: 'session',
@@ -160,7 +162,8 @@ describe('runtime authorization bindings', () => {
     await expect(
       createRuntimeAuthorization({
         token: await admission({ userId, pepper, deviceSessionId }),
-        secret,
+        verificationSecret: secret,
+        signingSecret: secret,
         connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: 'session',
@@ -181,7 +184,8 @@ describe('runtime authorization bindings', () => {
 
     const created = await createRuntimeAuthorization({
       token: await admission({ userId, pepper }),
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: 'session',
@@ -192,7 +196,7 @@ describe('runtime authorization bindings', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: created.authorization,
-        secret,
+        signingSecret: secret,
         connectionString,
       })
     ).resolves.toMatchObject({ expiresAt: expect.any(String) });

@@ -120,7 +120,8 @@ async function mintToken(options: {
 function delegate(token: string, organizationId: string) {
   return createRuntimeAuthorization({
     token,
-    secret,
+    verificationSecret: secret,
+    signingSecret: secret,
     connectionString: process.env.POSTGRES_URL!,
     resourceKind: 'cloud-agent-next',
     resourceId: 'session',

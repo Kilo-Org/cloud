@@ -1699,7 +1699,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       renew: authorization =>
         renewRuntimeAuthorization({
           authorization,
-          secret,
+          signingSecret: secret,
           connectionString: this.env.HYPERDRIVE.connectionString,
           onBindingRejected: reason =>
             logRuntimeAuthorizationDiagnostic(

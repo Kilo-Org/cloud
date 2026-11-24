@@ -57,7 +57,8 @@ export async function renewWorkspaceAuthorityForUserSend(input: {
     if (!secret) return;
     const created = await createRuntimeAuthorization({
       token: authToken,
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: workspaceSessionId,

@@ -195,7 +195,8 @@ async function preflightChatRuntimeAuthorization(
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   const created = await createRuntimeAuthorization({
     token: ctx.authToken,
-    secret,
+    verificationSecret: secret,
+    signingSecret: secret,
     connectionString: ctx.env.HYPERDRIVE.connectionString,
     resourceKind: 'cloud-agent-next',
     resourceId: metadata.identity.sessionId,

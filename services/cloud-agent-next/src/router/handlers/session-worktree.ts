@@ -665,7 +665,8 @@ async function createDestinationRuntimeAuthorization(
   try {
     const created = await createRuntimeAuthorization({
       token: ctx.authToken,
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,

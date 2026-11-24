@@ -423,7 +423,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     try {
       ({ token } = await renewRuntimeAuthorization({
         authorization: record.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: this.env.HYPERDRIVE.connectionString,
         onBindingRejected: reason => this.diagnostic('binding_check', reason),
       }));
@@ -450,7 +450,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     try {
       ({ token } = await renewRuntimeAuthorization({
         authorization: delegated,
-        secret,
+        signingSecret: secret,
         connectionString: this.env.HYPERDRIVE.connectionString,
         onBindingRejected: reason => this.diagnostic('binding_check', reason),
       }));

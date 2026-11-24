@@ -8147,7 +8147,8 @@ describe('createSessionWithLedger clone reconciliation', () => {
       await runCreate(ctx, input);
       expect(createRuntimeAuthorization).toHaveBeenCalledWith({
         token: ctx.authToken,
-        secret: 'registration-test-secret',
+        verificationSecret: 'registration-test-secret',
+        signingSecret: 'registration-test-secret',
         connectionString: ctx.env.HYPERDRIVE.connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,

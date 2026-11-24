@@ -254,7 +254,8 @@ describe('null-pepper personal webhook compatibility', () => {
     if (enabled) {
       const runtime = await createRuntimeAuthorization({
         token,
-        secret,
+        verificationSecret: secret,
+        signingSecret: secret,
         connectionString: 'unused',
         resourceKind: 'cloud-agent-next',
         resourceId: 'session-1',

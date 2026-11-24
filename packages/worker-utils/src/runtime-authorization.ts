@@ -85,7 +85,6 @@ type AdmissionDiagnostics = {
 };
 
 type CommonInput = {
-  secret: string;
   connectionString: string;
   adapters?: RuntimeAuthorizationAdapters;
 };
@@ -280,6 +279,8 @@ export async function createRuntimeAuthorization(
     AdmissionDiagnostics &
     BindingDiagnostics & {
       token: string;
+      verificationSecret: string;
+      signingSecret: string;
       resourceKind: RuntimeAuthorization['resourceKind'];
       resourceId: string;
       environment: RuntimeEnvironment;
@@ -299,7 +300,7 @@ export async function createRuntimeAuthorization(
     .max(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
     .default(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
     .parse(input.lifetimeMs);
-  const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
+  const auth = await verifyKiloTokenForPolicy(input.token, input.verificationSecret, {
     audience: resourceKind,
     mode: 'allow-legacy',
   });
@@ -407,14 +408,19 @@ export async function createRuntimeAuthorization(
     },
     env: environment,
   });
-  const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
+  const signed = await issueRuntimeToken(
+    authorization,
+    user.apiTokenPepper,
+    input.signingSecret,
+    now
+  );
   return { authorization, ...signed };
 }
 
 async function issueRuntimeToken(
   authorization: RuntimeAuthorization,
   pepper: string | null,
-  secret: string,
+  signingSecret: string,
   now: Date
 ): Promise<{ token: string; expiresAt: string }> {
   const maximumExpiration = Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000);
@@ -428,7 +434,7 @@ async function issueRuntimeToken(
   return signModernKiloToken({
     userId: authorization.userId,
     pepper,
-    secret,
+    secret: signingSecret,
     expiresInSeconds,
     now,
     audience: audiences,
@@ -450,7 +456,12 @@ async function issueRuntimeToken(
 }
 
 export async function renewRuntimeAuthorization(
-  input: CommonInput & BindingDiagnostics & { authorization: RuntimeAuthorization; now?: Date }
+  input: CommonInput &
+    BindingDiagnostics & {
+      authorization: RuntimeAuthorization;
+      signingSecret: string;
+      now?: Date;
+    }
 ): Promise<{ token: string; expiresAt: string }> {
   const authorization = RuntimeAuthorizationSchema.parse(input.authorization);
   if (authorization.state !== 'active') throw new RuntimeAuthorizationRevokedError();
@@ -459,7 +470,7 @@ export async function renewRuntimeAuthorization(
     throw new RuntimeAuthorizationExpiredError();
   }
   const { user } = await requireBindings(input, authorization);
-  return issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
+  return issueRuntimeToken(authorization, user.apiTokenPepper, input.signingSecret, now);
 }
 
 const sealedRecord = z.object({
@@ -469,7 +480,7 @@ const sealedRecord = z.object({
 
 export async function sealRuntimeAuthorization(
   record: RuntimeAuthorization,
-  secret: string
+  sealSecret: string
 ): Promise<string> {
   const authorization = RuntimeAuthorizationSchema.parse(record);
   return new SignJWT({ type: 'runtime-authorization-record', authorization })
@@ -477,15 +488,15 @@ export async function sealRuntimeAuthorization(
     .setAudience(`${authorization.resourceKind}:runtime-authorization-record`)
     .setIssuedAt()
     .setExpirationTime('5m')
-    .sign(new TextEncoder().encode(secret));
+    .sign(new TextEncoder().encode(sealSecret));
 }
 
 export async function unsealRuntimeAuthorization(
   sealed: string,
-  secret: string,
+  sealSecret: string,
   expected: Pick<RuntimeAuthorization, 'resourceKind' | 'resourceId' | 'userId' | 'organizationId'>
 ): Promise<RuntimeAuthorization> {
-  const { payload } = await jwtVerify(sealed, new TextEncoder().encode(secret), {
+  const { payload } = await jwtVerify(sealed, new TextEncoder().encode(sealSecret), {
     algorithms: ['HS256'],
   });
   const parsed = sealedRecord.parse(payload);

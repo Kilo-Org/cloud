@@ -39,7 +39,12 @@ describe('automation issuer to runtime compatibility', () => {
           organizationDeletedAt: null,
         }),
       };
-      const common = { secret, connectionString: 'unused', adapters };
+      const common = {
+        verificationSecret: secret,
+        signingSecret: secret,
+        connectionString: 'unused',
+        adapters,
+      };
       const runtime = await createRuntimeAuthorization({
         ...common,
         token: control,

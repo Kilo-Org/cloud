@@ -959,7 +959,8 @@ async function issueSessionRuntimeAuthorization(
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
     const created = await createRuntimeAuthorization({
       token: ctx.authToken,
-      secret: nextAuthSecret,
+      verificationSecret: nextAuthSecret,
+      signingSecret: nextAuthSecret,
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,

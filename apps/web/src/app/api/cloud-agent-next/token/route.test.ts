@@ -161,7 +161,8 @@ it('returns a token the Worker runtime-admission consumer accepts', async () => 
     const body = await response.json();
     const result = await createRuntimeAuthorization({
       token: body.token,
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: 'unused-test-adapter',
       resourceKind: 'cloud-agent-next',
       resourceId: 'workspace_token-exchange-test',

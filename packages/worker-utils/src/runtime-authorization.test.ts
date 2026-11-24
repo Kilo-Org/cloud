@@ -94,7 +94,8 @@ async function admission(
 }
 
 const commonInput = {
-  secret,
+  verificationSecret: secret,
+  signingSecret: secret,
   connectionString: 'postgres://unused',
   resourceKind: 'cloud-agent-next' as const,
   resourceId: 'session',
@@ -188,7 +189,8 @@ describe('runtime authorization', () => {
         runtimeAdmission: { source: 'automation', authorizationPepper: null },
       });
       const common = {
-        secret,
+        verificationSecret: secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: adapters(),
       };
@@ -285,7 +287,7 @@ describe('runtime authorization', () => {
 
     const renewed = await renewRuntimeAuthorization({
       authorization: created.authorization,
-      secret,
+      signingSecret: secret,
       connectionString: 'postgres://unused',
       adapters: adapters(),
       now: renewalTime,
@@ -309,7 +311,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: created.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: adapters(),
         now: deadline,
@@ -318,7 +320,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: created.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: adapters(),
         now: new Date(deadline.getTime() + 1),
@@ -454,7 +456,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: result.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: adapters(),
       })
@@ -474,7 +476,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: result.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: adapters(),
       })
@@ -485,7 +487,8 @@ describe('runtime authorization', () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:user`);
     const common = {
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: 'postgres://unused',
       environment: 'production' as const,
     };
@@ -524,7 +527,8 @@ describe('runtime authorization', () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:bot`);
     const common = {
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: 'postgres://unused',
       environment: 'production' as const,
     };
@@ -563,7 +567,8 @@ describe('runtime authorization', () => {
     await expect(
       createRuntimeAuthorization({
         token: control.token,
-        secret,
+        verificationSecret: secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         environment: 'production',
         resourceKind: 'cloud-agent-next',
@@ -576,7 +581,8 @@ describe('runtime authorization', () => {
 
   it('leaves a human-api delegation unbound and renewable without any device session', async () => {
     const common = {
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: 'postgres://unused',
       environment: 'production' as const,
     };
@@ -603,7 +609,8 @@ describe('runtime authorization', () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:user`);
     const common = {
-      secret,
+      verificationSecret: secret,
+      signingSecret: secret,
       connectionString: 'postgres://unused',
       environment: 'production' as const,
     };
@@ -668,7 +675,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: result.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: failingAdapters,
         onBindingRejected,
@@ -681,7 +688,7 @@ describe('runtime authorization', () => {
     await expect(
       renewRuntimeAuthorization({
         authorization: result.authorization,
-        secret,
+        signingSecret: secret,
         connectionString: 'postgres://unused',
         adapters: failingAdapters,
         onBindingRejected: () => {

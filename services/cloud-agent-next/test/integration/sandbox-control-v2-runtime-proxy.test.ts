@@ -452,7 +452,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
             renew: authorization =>
               renewRuntimeAuthorization({
                 authorization,
-                secret,
+                signingSecret: secret,
                 connectionString: 'fake',
                 now: new Date(Date.now()),
                 adapters: {

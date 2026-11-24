@@ -2,6 +2,7 @@ import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAppShellHandoff } from '@/lib/app-shell/handoff-token';
+import { requireSignedInSession } from '@/lib/trpc/require-signed-in-session';
 import {
   APP_SHELL_HANDOFF_PATH,
   appShellTargetSchema,
@@ -16,6 +17,7 @@ import {
  */
 export const appShellRouter = createTRPCRouter({
   mintHandoff: baseProcedure.input(appShellTargetSchema).mutation(async ({ ctx, input }) => {
+    requireSignedInSession(ctx);
     const organizationId = organizationIdOfTarget(input);
     if (organizationId) {
       await ensureMemberOrganizationAccess(ctx.user, organizationId);

@@ -134,8 +134,11 @@ describe('the shell tRPC entry point', () => {
     expect(shellPaths).toContain('gitlab.getInstallation');
   });
 
-  it('mounts the hand-off bridge the app opens shell pages with', () => {
-    expect(shellPaths).toContain('appShell.mintHandoff');
+  // A shell session that could mint hand-offs would renew itself past
+  // device-session revocation, so the app mints them on the main endpoint only.
+  it('does not mount the hand-off mint', () => {
+    expect(webPaths).toContain('appShell.mintHandoff');
+    expect(shellPaths).not.toContain('appShell.mintHandoff');
   });
 
   it('mounts every procedure the shell pages and the components they render name', () => {
@@ -172,7 +175,6 @@ describe('the shell tRPC entry point', () => {
   it('publishes no other top-level web namespace', () => {
     expect([...new Set(shellPaths.map(path => path.split('.')[0]))].sort()).toEqual(
       [
-        'appShell',
         'discord',
         'githubApps',
         'gitlab',

@@ -5,6 +5,8 @@ import {
   createSessionCallerForUser,
 } from '@/routers/test-utils';
 import { userRouter } from '@/routers/user-router';
+import { appShellProceduresRouter } from '@/routers/app-shell-procedures-router';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -21,11 +23,15 @@ import {
   passkey_credentials,
   session_step_up_proofs,
   user_activity_tokens,
+  user_auth_provider,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
@@ -500,6 +506,71 @@ describe('user router - skipCustomerSource', () => {
   });
 });
 
+describe('user router - unlinkAuthProvider', () => {
+  async function insertUserWithTwoSignInMethods(): Promise<User> {
+    const user = await insertTestUserAndGoogleAuth();
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: user.id,
+      provider: 'github',
+      provider_account_id: `github-${user.id}`,
+      email: user.google_user_email,
+      avatar_url: user.google_user_image_url,
+    });
+    return user;
+  }
+
+  async function linkedProviders(userId: string): Promise<string[]> {
+    const rows = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, userId));
+    return rows.map(row => row.provider).sort();
+  }
+
+  it('removes a sign-in method for a browser session', async () => {
+    const user = await insertUserWithTwoSignInMethods();
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).resolves.toEqual({
+      success: true,
+    });
+    expect(await linkedProviders(user.id)).toEqual(['google']);
+  });
+
+  it('removes a sign-in method for a bearer bound to a device session', async () => {
+    const user = await insertUserWithTwoSignInMethods();
+    const caller = await createNativeCallerForUser(user.id, crypto.randomUUID());
+
+    await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).resolves.toEqual({
+      success: true,
+    });
+    expect(await linkedProviders(user.id)).toEqual(['google']);
+  });
+
+  it('removes a sign-in method for an app-shell session', async () => {
+    const user = await insertUserWithTwoSignInMethods();
+    const caller = createCallerFactory(appShellProceduresRouter)({
+      user,
+      headersList: new Headers(),
+    });
+
+    await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).resolves.toEqual({
+      success: true,
+    });
+    expect(await linkedProviders(user.id)).toEqual(['google']);
+  });
+
+  it('refuses a bearer without a device session', async () => {
+    const user = await insertUserWithTwoSignInMethods();
+    const caller = await createBearerCallerForUser(user.id);
+
+    await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(await linkedProviders(user.id)).toEqual(['github', 'google']);
+  });
+});
+
 describe('session and API token reset mutations', () => {
   async function findRequiredUser(userId: string): Promise<User> {
     const user = await db.query.kilocode_users.findFirst({
@@ -514,7 +585,7 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await caller.user.resetAPIKey();
 
@@ -529,7 +600,7 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await caller.user.signOutBrowserSessions();
 
@@ -537,6 +608,42 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+  });
+
+  it('signs out browser sessions for a bearer bound to a device session', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'web-session-pepper-before' });
+    const caller = await createNativeCallerForUser(user.id, crypto.randomUUID());
+
+    await caller.user.signOutBrowserSessions();
+
+    const updated = await findRequiredUser(user.id);
+    expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
+  });
+
+  it('refuses a bearer without a device session for both mutations', async () => {
+    const user = await insertTestUser({
+      api_token_pepper: 'api-pepper-before',
+      web_session_pepper: 'web-session-pepper-before',
+    });
+    const caller = await createBearerCallerForUser(user.id);
+
+    await expect(caller.user.resetAPIKey()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.user.signOutBrowserSessions()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    const updated = await findRequiredUser(user.id);
+    expect(updated.api_token_pepper).toBe('api-pepper-before');
+    expect(updated.web_session_pepper).toBe('web-session-pepper-before');
+  });
+
+  it('refuses an API key reset for a bearer bound to a device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'api-pepper-before' });
+    const caller = await createNativeCallerForUser(user.id, crypto.randomUUID());
+
+    await expect(caller.user.resetAPIKey()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect((await findRequiredUser(user.id)).api_token_pepper).toBe('api-pepper-before');
   });
 
   it('lets admins reset a user API key without signing out browser sessions', async () => {

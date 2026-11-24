@@ -1,6 +1,5 @@
 import 'server-only';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { appShellRouter } from '@/routers/app-shell-router';
 import { discordRouter } from '@/routers/discord-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -34,15 +33,16 @@ import { userRouter } from '@/routers/user-router';
  *   provider detail pages' installation reads and connection actions. The
  *   organization-only GitHub procedures are absent because the shell suppresses
  *   the components that call them.
- * - `appShell.mintHandoff`: the bridge the app uses to open a shell page.
+ *
+ * `appShell.mintHandoff` is absent on purpose. The shell cookie carries only a
+ * user id, so a shell that could mint its own hand-offs would renew itself and
+ * outlive device-session revocation, an API key reset and browser sign-out.
+ * The app mints hand-offs on the main endpoint instead.
  *
  * Adding a procedure here widens that credential, so a page that needs a new
  * one must add it deliberately, with the same auth middleware it already uses.
  */
 export const appShellProceduresRouter = createTRPCRouter({
-  appShell: {
-    mintHandoff: appShellRouter.mintHandoff,
-  },
   models: {
     selectorList: modelsRouter.selectorList,
     preferred: modelsRouter.preferred,

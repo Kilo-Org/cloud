@@ -32,6 +32,7 @@ import {
 import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { requireSignedInSession } from '@/lib/trpc/require-signed-in-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
@@ -964,10 +965,20 @@ export const userRouter = createTRPCRouter({
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      requireSignedInSession(ctx);
       return assertNoTrpcError(await unlinkAuthProviderFromUser(ctx.user.id, input.provider));
     }),
 
+  // Only the web profile offers a key rotation, so only a browser session may
+  // ask for one. The check fails closed for a context without a derived
+  // credential.
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {
+    if (ctx.authViaToken || ctx.credential !== 'session') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Reset the API key from the Kilo web app, not with an API token.',
+      });
+    }
     await db
       .update(kilocode_users)
       .set({ api_token_pepper: crypto.randomUUID() })
@@ -977,6 +988,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
+    requireSignedInSession(ctx);
     await revokeWebSessions(ctx.user.id);
 
     return successResult();

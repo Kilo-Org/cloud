@@ -49,6 +49,34 @@ describe('appShell.mintHandoff', () => {
     });
   });
 
+  test('mints for a browser session and for a bearer bound to a device session', async () => {
+    const target = { page: 'connected-accounts' } as const;
+    const sessionCaller = createCaller({ user, authViaToken: false, credential: 'session' });
+    const deviceCaller = createCaller({
+      user,
+      authViaToken: true,
+      credential: 'human_bearer',
+      deviceSessionId: '00000000-0000-4000-8000-000000000002',
+    });
+
+    await expect(sessionCaller.mintHandoff(target)).resolves.toEqual({
+      path: '/app-shell/handoff?token=minted-token',
+    });
+    await expect(deviceCaller.mintHandoff(target)).resolves.toEqual({
+      path: '/app-shell/handoff?token=minted-token',
+    });
+    expect(mockMint).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not mint for a bearer without a device session', async () => {
+    const caller = createCaller({ user, authViaToken: true, credential: 'human_bearer' });
+
+    await expect(caller.mintHandoff({ page: 'connected-accounts' })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockMint).not.toHaveBeenCalled();
+  });
+
   test('refuses a target the shell does not host', async () => {
     const caller = createCaller({ user });
 

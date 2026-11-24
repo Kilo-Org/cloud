@@ -193,6 +193,17 @@ The shared Cloud Agent rollout flags select the credential format. Model calls r
 their separate API credential; session preparation and initiation use the workflow
 credential and the shared model-eligibility policy.
 
+## Current-pepper rule
+
+A pepper rotation revokes every user credential in the web and in every Worker. `packages/worker-utils/src/kilo-token-pepper.ts` owns the decision:
+
+- A present `apiTokenPepper` claim, a string or `null`, must equal the account's current pepper. A claim that is `null` stops working when the pepper changes from `null` to a value.
+- `isKiloUserCredentialPepperCurrent` refuses an absent claim. The web gateway, `auto-routing` and `ai-attribution` use it, because no internal assertion is addressed to them. If they accepted claimless assertions, a Session Ingest assertion without an audience would become a web credential.
+- `isKiloTokenPepperCurrent` is the Worker rule in `verifyKiloBearerAgainstCurrentPepper`. It accepts an absent claim only on a short-lived internal assertion: `tokenPurpose: 'internal-service'`, an audience, and `exp - iat` of at most 3600 seconds.
+- Temporarily, the Worker rule also accepts an absent claim on a token without `tokenPurpose` when `exp - iat` is at most 3600 seconds. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` is off in production, so the 16 bounded web mint sites emit this legacy shape, and `generateInternalServiceToken` always does. Remove this branch when the flag is on in production (or the fallback is removed), `generateInternalServiceToken` has no callers, and one hour has passed since the last legacy mint.
+
+`generateInternalServiceToken` refuses a lifetime above 3600 seconds. KiloClaw keeps its own rule, which treats an absent claim as `null`; it already rejects a claimless token after a rotation.
+
 ## Dedicated Home widget credential
 
 `activeSessions.widgetCredential({ organizationId })` issues a 30-day,

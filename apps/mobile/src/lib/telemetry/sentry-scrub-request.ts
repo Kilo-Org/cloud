@@ -2,7 +2,7 @@
  * is external and arbitrarily shaped, and the scrubber must never throw on a
  * malformed shape. */
 
-import { stripQueryString } from '@/lib/telemetry/request-target';
+import { scrubUrl } from '@/lib/telemetry/sentry-url-policy';
 
 /** The request headers an event keeps; matched case-insensitively. */
 const REQUEST_HEADER_ALLOWLIST: ReadonlySet<string> = new Set([
@@ -37,7 +37,7 @@ function scrubHeaders(headers: unknown): Record<string, string> | undefined {
 
 /**
  * The scrubbed copy of a Sentry event's `request`: a string `method`, `url`
- * reduced to origin and path, and the {@link REQUEST_HEADER_ALLOWLIST} headers
+ * through {@link scrubUrl}, and the {@link REQUEST_HEADER_ALLOWLIST} headers
  * with string values. Every other field (`cookies`, `data`, `query_string`,
  * `env`) is dropped.
  */
@@ -47,7 +47,7 @@ export function scrubRequest(req: Record<string, unknown>): ScrubbedRequest {
     scrubbed.method = req.method;
   }
   if ('url' in req) {
-    scrubbed.url = typeof req.url === 'string' ? stripQueryString(req.url) : '';
+    scrubbed.url = scrubUrl(req.url);
   }
   const headers = scrubHeaders(req.headers);
   if (headers !== undefined) {

@@ -36,6 +36,10 @@ type CoreClient = {
 };
 type SentryCore = {
   Client: new (options: Record<string, unknown>) => CoreClient;
+  getCurrentScope: () => { setClient: (client: CoreClient) => void };
+  getIsolationScope: () => { clear: () => void };
+  addBreadcrumb: (breadcrumb: Record<string, unknown>) => void;
+  captureEvent: (event: Record<string, unknown>) => string;
   createTransport: (
     options: unknown,
     send: (request: TransportRequest) => Promise<{ statusCode: number }>
@@ -49,8 +53,14 @@ const sentryCore = createRequire(requireFromApp.resolve('@sentry/react-native'))
   '@sentry/core'
 ) as SentryCore;
 
-/** Send one event through a core client built from the captured init options. */
-async function sendThroughInitOptions(event: Record<string, unknown>): Promise<unknown> {
+/**
+ * Record the breadcrumbs, then send one event, through a core client built
+ * from the captured init options.
+ */
+async function sendThroughInitOptions(
+  event: Record<string, unknown>,
+  breadcrumbs: readonly Record<string, unknown>[] = []
+): Promise<unknown> {
   const payloads: string[] = [];
   const client = new sentryCore.Client({
     ...captured.options,
@@ -65,8 +75,13 @@ async function sendThroughInitOptions(event: Record<string, unknown>): Promise<u
         return Promise.resolve({ statusCode: 200 });
       }),
   });
+  sentryCore.getIsolationScope().clear();
+  sentryCore.getCurrentScope().setClient(client);
   client.init();
-  client.captureEvent(event);
+  for (const breadcrumb of breadcrumbs) {
+    sentryCore.addBreadcrumb(breadcrumb);
+  }
+  sentryCore.captureEvent(event);
   await client.flush(1000);
   expect(payloads).toHaveLength(1);
   const item = (payloads[0] ?? '').split('\n')[2];
@@ -105,6 +120,31 @@ const scrubbedSpanData = {
 };
 
 const TRACE_ID = 'a'.repeat(32);
+
+const FAKE_SHARE_JWT = 'eyJhbGciOiJub25lIn0.eyJmYWtlIjoic2hhcmUifQ.fake-signature';
+const SHARE_LINK = `https://app.kilo.ai/s/${FAKE_SHARE_JWT}`;
+const SCRUBBED_SHARE_LINK = 'https://app.kilo.ai/s/[redacted]';
+const APP_SHARE_PATH = `/shared/${FAKE_SHARE_JWT}`;
+
+/** The breadcrumbs the SDK's deep link and navigation integrations record. */
+const shareLinkBreadcrumbs = [
+  { category: 'deeplink', type: 'navigation', message: SHARE_LINK, data: { url: SHARE_LINK } },
+  {
+    category: 'navigation',
+    type: 'navigation',
+    message: `Navigation to ${APP_SHARE_PATH}`,
+    data: { from: 'home', to: APP_SHARE_PATH },
+  },
+];
+
+const scrubbedShareBreadcrumbs = [
+  { category: 'deeplink', message: SCRUBBED_SHARE_LINK, data: { url: SCRUBBED_SHARE_LINK } },
+  {
+    category: 'navigation',
+    message: 'Navigation to /shared/[redacted]',
+    data: { from: 'home', to: '/shared/[redacted]' },
+  },
+];
 
 describe.each(['the declined module-scope init', 'the consented re-init'])(
   'Sentry envelopes after %s',
@@ -153,6 +193,77 @@ describe.each(['the declined module-scope init', 'the consented re-init'])(
         spans: [{ data: scrubbedSpanData }],
       });
       expect(JSON.stringify(payload)).not.toContain('fake-');
+    });
+
+    it('redacts a share token from an error, its request, and its breadcrumbs', async () => {
+      const payload = await sendThroughInitOptions(
+        { message: 'boom', request: { url: SHARE_LINK } },
+        shareLinkBreadcrumbs
+      );
+
+      expect(payload).toMatchObject({
+        request: { url: SCRUBBED_SHARE_LINK },
+        breadcrumbs: scrubbedShareBreadcrumbs,
+      });
+      expect(JSON.stringify(payload)).not.toContain('eyJ');
+    });
+
+    it('redacts a share token from a navigation transaction, its spans, and its breadcrumbs', async () => {
+      const shareSpanData = () => ({
+        'deeplink.url': SHARE_LINK,
+        url: SHARE_LINK,
+        'http.url': SHARE_LINK,
+        'url.full': SHARE_LINK,
+        'http.target': `/s/${FAKE_SHARE_JWT}`,
+        'url.path': APP_SHARE_PATH,
+      });
+      const scrubbedShareSpanData = {
+        'deeplink.url': SCRUBBED_SHARE_LINK,
+        url: SCRUBBED_SHARE_LINK,
+        'http.url': SCRUBBED_SHARE_LINK,
+        'url.full': SCRUBBED_SHARE_LINK,
+        'http.target': '/s/[redacted]',
+        'url.path': '/shared/[redacted]',
+      };
+
+      const payload = await sendThroughInitOptions(
+        {
+          type: 'transaction',
+          transaction: APP_SHARE_PATH,
+          start_timestamp: 1,
+          timestamp: 2,
+          request: { url: SHARE_LINK },
+          contexts: {
+            trace: { trace_id: TRACE_ID, span_id: 'b'.repeat(16), data: shareSpanData() },
+          },
+          spans: [
+            {
+              trace_id: TRACE_ID,
+              span_id: 'c'.repeat(16),
+              parent_span_id: 'b'.repeat(16),
+              start_timestamp: 1,
+              timestamp: 2,
+              op: 'navigation.processing',
+              description: `Navigation dispatch to screen ${APP_SHARE_PATH} mounted`,
+              data: shareSpanData(),
+            },
+          ],
+        },
+        shareLinkBreadcrumbs
+      );
+
+      expect(payload).toMatchObject({
+        transaction: '/shared/[redacted]',
+        request: { url: SCRUBBED_SHARE_LINK },
+        contexts: { trace: { data: scrubbedShareSpanData } },
+        spans: [
+          {
+            description: 'Navigation dispatch to screen /shared/[redacted] mounted',
+            data: scrubbedShareSpanData,
+          },
+        ],
+      });
+      expect(JSON.stringify(payload)).not.toContain('eyJ');
     });
   }
 );

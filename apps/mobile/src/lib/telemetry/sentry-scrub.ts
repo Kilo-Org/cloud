@@ -13,21 +13,16 @@
  * dropping fields this walker isn't meant to know about. The scrubbers must
  * therefore accept and return opaque values. */
 
-import { stripQueryString } from '@/lib/telemetry/request-target';
 import { scrubRequest } from '@/lib/telemetry/sentry-scrub-request';
-
-/** {@link stripQueryString} for the opaque values a Sentry payload carries. */
-function stripQuery(url: unknown): string {
-  return typeof url === 'string' ? stripQueryString(url) : '';
-}
+import { redactSharePaths, scrubUrl } from '@/lib/telemetry/sentry-url-policy';
 
 /**
- * The URL form telemetry carries: origin and path, with a long opaque run
+ * The URL form telemetry carries: {@link scrubUrl}, with a long opaque run
  * replaced by `[redacted]` and an app-set word-chain identifier
  * (`session.list`, `/api/auth/native/token`) kept readable.
  */
 export function redactUrlText(url: unknown): string {
-  return redactString(stripQuery(url), true);
+  return redactString(scrubUrl(url), true);
 }
 
 /** A `scheme://host[:port]` origin. */
@@ -156,13 +151,14 @@ function isIdentifierPath(path: readonly (string | number)[]): boolean {
  * they are the only copy of the diagnostic the app sends. A random token or a
  * JWT is not a word chain, so it is redacted at an identifier path too.
  * Everywhere else a run is redacted on shape alone. A `Bearer ` prefix names
- * the whole value a credential, so it redacts whole.
+ * the whole value a credential, so it redacts whole. A share-link credential
+ * ({@link redactSharePaths}) is redacted at every path.
  */
 function redactString(value: string, keepIdentifiers: boolean): string {
   if (value.startsWith('Bearer ')) {
     return '[redacted]';
   }
-  return value.replace(TOKEN_RUN_PATTERN, run =>
+  return redactSharePaths(value).replace(TOKEN_RUN_PATTERN, run =>
     keepIdentifiers && isIdentifierRun(run) ? run : '[redacted]'
   );
 }
@@ -423,8 +419,8 @@ function scrubExceptions(exception: Record<string, unknown>, contexts: unknown):
 /**
  * Scrub a Sentry event before it is sent.
  *
- * - Reduces request URL, contexts.response URL, and contexts.network URL to
- *   their origin and path.
+ * - Reduces request URL, contexts.response URL, and contexts.network URL with
+ *   {@link scrubUrl}.
  * - Rebuilds `request` from its method, URL, and allowlisted string headers
  *   alone ({@link scrubRequest}).
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
@@ -457,7 +453,7 @@ export function scrubEvent<T>(event: T): T | null {
       if (ctx.response != null && typeof ctx.response === 'object') {
         const resp = ctx.response as Record<string, unknown>;
         if ('url' in resp) {
-          resp.url = stripQuery(resp.url);
+          resp.url = scrubUrl(resp.url);
         }
       }
       for (const name of PAYLOAD_CONTEXT_NAMES) {
@@ -516,7 +512,8 @@ export function scrubEvent<T>(event: T): T | null {
  * Scrub a Sentry breadcrumb before it is attached.
  *
  * - Returns `null` for `console` breadcrumbs (they carry prompt/response text).
- * - Strips the query string from `breadcrumb.data.url`.
+ * - Reduces `breadcrumb.data.url` with {@link scrubUrl}, and redacts share-link
+ *   credentials in the message and every other string `data` field.
  * - Leaves navigation and fetch breadcrumbs otherwise intact.
  */
 export function scrubBreadcrumb<T>(breadcrumb: T): T | null {
@@ -531,10 +528,17 @@ export function scrubBreadcrumb<T>(breadcrumb: T): T | null {
       return null;
     }
 
+    if (typeof b.message === 'string') {
+      b.message = redactSharePaths(b.message);
+    }
     if (b.data != null && typeof b.data === 'object') {
       const data = b.data as Record<string, unknown>;
-      if ('url' in data) {
-        data.url = stripQuery(data.url);
+      for (const [key, value] of Object.entries(data)) {
+        if (key === 'url') {
+          data.url = scrubUrl(value);
+        } else if (typeof value === 'string') {
+          data[key] = redactSharePaths(value);
+        }
       }
     }
 

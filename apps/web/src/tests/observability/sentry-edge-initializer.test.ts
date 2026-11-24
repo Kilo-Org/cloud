@@ -1,12 +1,12 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { Event, Integration } from '@sentry/nextjs';
+import type { Event } from '@sentry/nextjs';
 import {
   expectScrubbedServerEvent,
   leakyServerEvent,
 } from '@kilocode/web-shared/tests/helpers/sentry-event.helper';
 
 type BeforeSend = (event: Event) => Event | null;
-type EdgeOptions = { beforeSend: BeforeSend; integrations?: Integration[] };
+type EdgeOptions = { beforeSend: BeforeSend; integrations?: Array<{ name: string }> };
 
 // The edge initializer calls `init` at module scope, so each test loads a fresh
 // copy of the real config module against a stubbed SDK and reads the options it

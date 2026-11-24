@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import type * as SentryNextjs from '@sentry/nextjs';
-import type { Envelope, Event, NodeOptions, Transport } from '@sentry/nextjs';
+import type { Event, NodeOptions } from '@sentry/nextjs';
 import { captureException, close, flush, withIsolationScope, withScope } from '@sentry/nextjs';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
+
+type Transport = ReturnType<NonNullable<NodeOptions['transport']>>;
+type Envelope = Parameters<Transport['send']>[0];
 
 const sentEnvelopes: Envelope[] = [];
 

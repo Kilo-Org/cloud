@@ -116,7 +116,7 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - internal-service tokens with no pepper claim;
 - existing operation-audience JWTs;
 - KiloClaw cookie and runtime credentials unless a resource opts in with their own modern policy;
-- Cloud Agent stream tickets and wrapper-dispatch tickets in `services/cloud-agent-next/src/auth.ts`;
+- Cloud Agent stream tickets in `services/cloud-agent-next/src/auth.ts`;
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
@@ -133,7 +133,7 @@ The earlier sections describe the Phase 1 contracts. The web reader integration 
 
 Both resource boundaries retain supported audience-less legacy tokens. Explicit audiences require exact matching, or membership in a valid audience array; null, empty, malformed, duplicate, and mismatched audiences are rejected. These changes do not add an environment check to ordinary web authentication, alter its historical timestamp handling, or migrate any signers.
 
-Do not treat every legacy-only verifier as a resource-migration target. Cloud Agent wrapper fallback must remain audience-less-only; REST `cloud-agent-next` tokens are not wrapper-dispatch capabilities. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
+Do not treat every legacy-only verifier as a resource-migration target. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
 
 ## Migration preconditions
 

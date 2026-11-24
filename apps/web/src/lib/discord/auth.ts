@@ -1,6 +1,6 @@
 import 'server-only';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { Owner } from '@/lib/integrations/core/types';
 

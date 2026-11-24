@@ -12,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { replacedChargedAnswer } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';

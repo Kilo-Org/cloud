@@ -16,7 +16,7 @@ const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
- * generateApiToken() / generateOrganizationApiToken() in src/lib/tokens.ts.
+ * generateApiToken() / generateOrganizationApiToken() in apps/web/src/lib/auth/kilo-token-signing.ts.
  * All optional fields beyond version+kiloUserId default to undefined when absent.
  */
 export const kiloTokenPayload = z.object({

@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 import { homedir } from 'os';
 import pLimit from 'p-limit';
 import { getAuthToken } from '@/scripts/lib/auth';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';

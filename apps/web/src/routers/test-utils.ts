@@ -1,7 +1,7 @@
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { rootRouter } from '@/routers/root-router';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 
 const createCaller = createCallerFactory(rootRouter);
 

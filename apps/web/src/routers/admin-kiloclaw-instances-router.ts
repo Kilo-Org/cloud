@@ -60,7 +60,7 @@ import type {
   ResizeMachineResponse,
   RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';

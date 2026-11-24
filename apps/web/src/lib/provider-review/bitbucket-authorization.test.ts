@@ -26,7 +26,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GIT_TOKEN_SERVICE_API_URL: 'https://token-service.example.com',
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateInternalServiceToken: jest.fn(() => 'svc-mock-token'),
   TOKEN_EXPIRY: { fiveMinutes: 300 },
 }));

@@ -1,7 +1,7 @@
 import { OpenCodeEditor } from '@/components/auth/OpenCodeEditor';
 import { DelayedLinks } from '@/components/auth/DelayedLinks';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { getUserFromSessionForCredentialIssuanceOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';

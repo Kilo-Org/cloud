@@ -5,7 +5,7 @@ import {
   createTRPCRouter,
   createTRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 

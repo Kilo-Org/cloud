@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import type * as securityFindingsModule from '@/lib/security-agent/db/security-findings';
 import type * as securityAnalysisModule from '@/lib/security-agent/db/security-analysis';
 import type * as triageModule from './triage-service';
-import type * as tokensModule from '@kilocode/web-shared/lib/tokens';
+import type * as tokensModule from '@/lib/auth/kilo-token-signing';
 import type { User } from '@kilocode/db/schema';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
@@ -64,7 +64,7 @@ jest.mock('./triage-service', () => ({
   triageSecurityFinding: mockTriageSecurityFinding,
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: mockGenerateApiToken,
   generateCloudAgentWorkflowToken: mockGenerateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken: mockGenerateWorkflowGatewayToken,

@@ -11,7 +11,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { eq } from 'drizzle-orm';
 
 beforeEach(() => {

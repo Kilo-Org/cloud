@@ -7,7 +7,7 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { SESSION_SYNC_WORKER_URL } from '@/lib/web-config.server';

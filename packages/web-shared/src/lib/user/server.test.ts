@@ -61,7 +61,7 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { signTestApiToken } from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -442,7 +442,7 @@ describe('getUserFromAuth', () => {
         api_token_pepper: 'bearer-scheme-pepper',
       });
       mockHeaders.mockResolvedValue(
-        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+        new Headers({ authorization: `${scheme} ${signTestApiToken(user)}` })
       );
 
       const result = await getUserFromAuth({ adminOnly: false });
@@ -458,7 +458,7 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'bearer-extra-space-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+      new Headers({ authorization: `Bearer  ${signTestApiToken(user)}` })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -666,7 +666,7 @@ describe('getUserFromAuth', () => {
       user.id,
       0
     );
-    const token = generateApiToken(user);
+    const token = signTestApiToken(user);
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -688,7 +688,7 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     try {
@@ -717,7 +717,7 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     try {
@@ -745,7 +745,7 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'cleanup-blocked-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     const refused = await getUserFromAuth({ adminOnly: false });
@@ -778,7 +778,7 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     try {
@@ -808,7 +808,7 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'cleanup-blocked-at-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     const refused = await getUserFromAuth({ adminOnly: false });
@@ -830,7 +830,7 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     try {
@@ -851,7 +851,7 @@ describe('getUserFromAuth', () => {
       0
     );
     await markOrganizationAsDeleted(organization.id);
-    const token = generateApiToken(user);
+    const token = signTestApiToken(user);
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -875,7 +875,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user)}`,
+        Authorization: `Bearer ${signTestApiToken(user)}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -901,7 +901,7 @@ describe('getUserFromAuth', () => {
           .values({ organization_id: parent.id, kilo_user_id: user.id, role });
         mockHeaders.mockResolvedValue(
           new Headers({
-            Authorization: `Bearer ${generateApiToken(user)}`,
+            Authorization: `Bearer ${signTestApiToken(user)}`,
             [ORGANIZATION_ID_HEADER]: child.id,
           })
         );
@@ -925,7 +925,7 @@ describe('getUserFromAuth', () => {
         .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user)}`,
+          Authorization: `Bearer ${signTestApiToken(user)}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -954,7 +954,7 @@ describe('getUserFromAuth', () => {
       await markOrganizationAsDeleted(parent.id);
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user)}`,
+          Authorization: `Bearer ${signTestApiToken(user)}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -979,7 +979,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user)}`,
+        Authorization: `Bearer ${signTestApiToken(user)}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -1007,7 +1007,7 @@ describe('getUserFromAuth', () => {
       .set({ sso_domain: ssoDomain })
       .where(eq(organizations.id, organization.id));
 
-    const token = generateApiToken(user);
+    const token = signTestApiToken(user);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1025,7 +1025,7 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = signTestApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1048,7 +1048,7 @@ describe('getUserFromAuth', () => {
         revoked_reason: 'logout',
       })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = signTestApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1067,7 +1067,7 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = signTestApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     let clock = Date.now();
@@ -1118,7 +1118,7 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'pre-rotation-pepper',
     });
     const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(user, { deviceSessionId });
+    const token = signTestApiToken(user, { deviceSessionId });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     // Rotate the pepper so the bearer token passes JWT verification but fails
@@ -1212,7 +1212,7 @@ describe('credential issuance authentication guards', () => {
   test('a bearer credential carries no webSessionId', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1274,7 +1274,7 @@ describe('credential issuance authentication guards', () => {
   test('leaves generic bearer authentication available', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({ Authorization: `Bearer ${signTestApiToken(user)}` })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1900,7 +1900,7 @@ describe('binary step-up enforcement (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin)}`,
+        Authorization: `Bearer ${signTestApiToken(admin)}`,
         'x-pathname': '/admin/api/private-users',
       })
     );
@@ -1977,7 +1977,7 @@ describe('step-up refusal telemetry (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin)}`,
+        Authorization: `Bearer ${signTestApiToken(admin)}`,
         'x-pathname': pathname,
         'x-forwarded-for': '203.0.113.9, 10.0.0.1',
       })
@@ -2266,7 +2266,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_super_admin: true,
       api_token_pepper: 'rest-admin-pepper',
     });
-    const token = generateApiToken(admin);
+    const token = signTestApiToken(admin);
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -2315,7 +2315,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
         api_token_pepper: `denied-${crypto.randomUUID()}`,
       });
       mockHeaders.mockResolvedValue(
-        new Headers({ Authorization: `Bearer ${generateApiToken(user, extra)}` })
+        new Headers({ Authorization: `Bearer ${signTestApiToken(user, extra)}` })
       );
 
       const result = await getUserFromAuth({ adminOnly: true });
@@ -2335,7 +2335,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: false,
       api_token_pepper: 'rest-nonadmin-pepper',
     });
-    const token = generateApiToken(nonAdmin);
+    const token = signTestApiToken(nonAdmin);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: true });
@@ -2356,7 +2356,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: true,
       api_token_pepper: 'rest-admin-noemit-pepper',
     });
-    const token = generateApiToken(admin);
+    const token = signTestApiToken(admin);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });

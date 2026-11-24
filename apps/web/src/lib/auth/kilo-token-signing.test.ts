@@ -16,15 +16,15 @@ import {
   verifyKiloTokenForResource,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { validateAuthorizationHeader, type JWTTokenPayload } from '@kilocode/web-shared/lib/tokens';
+import { signTestApiToken } from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import {
   generateApiToken,
   generateBoundedInternalServiceToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
-  validateAuthorizationHeader,
   type BoundedInternalServiceAudience,
-  type JWTTokenPayload,
-} from './tokens';
+} from './kilo-token-signing';
 
 // Test fixtures
 const mockUser: User = {
@@ -253,6 +253,24 @@ describe('Token Functions', () => {
       expect(decoded.env).toBe(process.env.NODE_ENV);
       // Organization ID should never be in the token
       expect(decoded.organizationId).toBeUndefined();
+    });
+
+    it.each([
+      ['defaults', undefined, undefined],
+      [
+        'organization claims and a custom lifetime',
+        { organizationId: 'org-1', organizationRole: 'member' as const },
+        { expiresIn: 900 },
+      ],
+    ])('matches the web-shared test signer (%s)', (_label, extraPayload, options) => {
+      const decode = (token: string) => {
+        const { iat, exp, ...claims } = jwt.decode(token) as jwt.JwtPayload;
+        return { claims, lifetime: exp! - iat! };
+      };
+
+      expect(decode(signTestApiToken(mockUser, extraPayload, options))).toEqual(
+        decode(generateApiToken(mockUser, extraPayload, options))
+      );
     });
 
     it('should generate different tokens for different users', () => {

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { createDelegatedResourceToken } from '@/lib/auth/resource-delegation';
-import { generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateOrganizationApiToken } from '@/lib/auth/kilo-token-signing';
 import { POST } from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -23,7 +23,7 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   canIssueLegacyOrganizationToken: jest.fn(async () => true),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateOrganizationApiToken: jest.fn(() => ({ token: 'legacy', expiresAt: 'expiry' })),
 }));
 

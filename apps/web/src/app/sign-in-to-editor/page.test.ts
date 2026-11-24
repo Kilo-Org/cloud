@@ -12,7 +12,7 @@ const mockOpenIdeAutomatically = jest.fn(() => null);
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@/lib/auth/kilo-token-signing', () => ({ generateApiToken: mockGenerateApiToken }));
 jest.mock('next/navigation', () => ({ redirect: mockRedirect }));
 jest.mock('next/headers', () => ({ cookies: jest.fn() }));
 jest.mock('@/components/auth/getExtensionUrl', () => ({ getExtensionUrl: mockGetExtensionUrl }));

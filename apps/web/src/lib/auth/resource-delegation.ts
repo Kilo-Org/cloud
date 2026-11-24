@@ -30,7 +30,7 @@ import {
   NEXTAUTH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 

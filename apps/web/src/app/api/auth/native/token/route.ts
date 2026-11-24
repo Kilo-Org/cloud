@@ -28,7 +28,7 @@ import {
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
 import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';

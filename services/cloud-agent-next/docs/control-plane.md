@@ -2424,7 +2424,7 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   at the top of its default `fetch`, so no route can forward one into a sandbox DO.
   The `transport` in the coordinates selects the upstream (`src/preview/upstreams.ts`):
   `durable-object` for `cloudflare-containers`, and `wrapper-tunnel` for every other provider that
-  supports preview (Vercel, AWS MicroVM and AWS ECS).
+  supports preview (Vercel and AWS ECS).
   See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
 - **No start, no wake.** Preview never starts, resumes or wakes an allocation. A request for a
   session whose sandbox is stopped or asleep fails without creating a generation; the user starts
@@ -2517,7 +2517,7 @@ Request and response bodies stream; there is no body-size cap.
 
 #### Preview tunnel (`wrapper-tunnel`)
 
-A provider without a private network path to its sandbox (today Vercel, AWS MicroVM and AWS ECS)
+A provider without a private network path to its sandbox (today Vercel and AWS ECS)
 reaches the dev server through the wrapper. `resolvePreviewTarget` gives such a provider
 `wrapper-tunnel` coordinates with the allocation id as `allocationRef`. The allocation id fences
 the preview cookie: a cookie for a replaced allocation gets 401. All the checks above (host,

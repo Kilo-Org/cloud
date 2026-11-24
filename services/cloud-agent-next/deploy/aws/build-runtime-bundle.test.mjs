@@ -32,17 +32,16 @@ test('creates deterministic ZIP bytes with only the approved source files and AW
     assert.equal(statSync(first).mode & 0o777, 0o600);
     assert.deepEqual(
       execFileSync('unzip', ['-Z1', first], { encoding: 'utf8' }).trim().split('\n'),
-      ['Dockerfile', 'hook.mjs', 'launch-document.mjs']
+      ['Dockerfile', 'launch-document.mjs']
     );
     const dockerfile = execFileSync('unzip', ['-p', first, 'Dockerfile'], { encoding: 'utf8' });
     assert.ok(dockerfile.startsWith(`FROM --platform=linux/amd64 ${baseImage}\n`));
     assert.match(dockerfile, /apt-get install -y --no-install-recommends python3/);
-    assert.match(
-      dockerfile,
-      /ENTRYPOINT \["\/usr\/local\/bin\/node", "\/opt\/kilo\/aws\/hook.mjs"\]/
-    );
+    assert.match(dockerfile, /\nCOPY launch-document\.mjs \/opt\/kilo\/aws\/\n/);
+    // The ECS task definition owns the entrypoint.
+    assert.doesNotMatch(dockerfile, /(?:^|\n)(?:ENTRYPOINT|CMD) /);
     assert.doesNotMatch(dockerfile, /(?:^|\n)(?:ENV|ARG) /);
-    for (const loader of ['hook.mjs', 'launch-document.mjs']) {
+    for (const loader of ['launch-document.mjs']) {
       assert.deepEqual(
         execFileSync('unzip', ['-p', first, loader]),
         readFileSync(new URL(`./runtime/${loader}`, import.meta.url))

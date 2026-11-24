@@ -6,12 +6,7 @@ import type { EgressMode } from './egress-allowlist';
  * provider without a table entry. This module imports nothing from
  * the catalog, to keep the dependency one-way.
  */
-export type SandboxProviderId =
-  | 'cloudflare'
-  | 'vercel'
-  | 'cloudflare-containers'
-  | 'aws'
-  | 'aws-ecs';
+export type SandboxProviderId = 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws-ecs';
 
 /**
  * Product features that a sandbox provider can support. Parity between
@@ -49,15 +44,6 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     preview: true,
     workspaceSnapshots: false,
     environmentSnapshots: true,
-    egressProxy: true,
-    egressProxySeesAll: true,
-    scmCliTools: true,
-    meteredBilling: false,
-  },
-  aws: {
-    preview: true,
-    workspaceSnapshots: false,
-    environmentSnapshots: false,
     egressProxy: true,
     egressProxySeesAll: true,
     scmCliTools: true,

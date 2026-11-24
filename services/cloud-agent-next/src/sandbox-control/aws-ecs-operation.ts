@@ -31,12 +31,19 @@ export const awsEcsOperationSchema = z
     request: ecsRunRequestSchema.optional(),
     requestAt: z.number().int().nonnegative().optional(),
     submission: z.enum(['prepared', 'pending', 'uncertain']).optional(),
+    deadlineAt: z.number().int().nonnegative().optional(),
     startSource: z.literal('repository').optional(),
     taskArn: awsEcsTaskArnSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
     const { request, config } = value;
+    if (request && value.deadlineAt === undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['deadlineAt'],
+        message: 'A request must store its proxy credential deadline',
+      });
     if (
       request &&
       (request.cluster !== config.clusterArn ||

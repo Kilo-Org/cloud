@@ -2,7 +2,7 @@ import type { prepareAwsSnapshotStartup } from '../sandbox-control/aws-snapshot-
 import type { Env } from '../types.js';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { ByocSource } from './owner.js';
-import { resolveAwsEcsByocConfiguration } from './aws-ecs-credential-resolver.js';
+import { resolveAwsEcsByocConfiguration } from './aws-credential-resolver.js';
 import { createAwsEcsRuntimeAccessResolver } from './aws-runtime-access.js';
 import { createAwsEcsProviderAdapter } from '../sandbox-control/aws-ecs-provider.js';
 import type { AwsEcsOperationStorage } from '../sandbox-control/aws-ecs-operation.js';
@@ -31,7 +31,6 @@ export function createByocAwsEcsProviderAdapter(deps: {
             const runtime = await resolveRuntime(input.configuration);
             return prepareSnapshot({
               ...input,
-              provider: 'aws-ecs',
               connectionId: deps.source.credentialId,
               currentConfiguration: () => resolveAwsEcsByocConfiguration(deps.env, deps.source),
               objects: runtime.objects,

@@ -1,8 +1,6 @@
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { Env } from '../types.js';
-import { awsRuntimeAccess } from './aws-credential-resolver.js';
-import { awsEcsRuntimeAccess } from './aws-ecs-credential-resolver.js';
+import { awsEcsRuntimeAccess } from './aws-credential-resolver.js';
 
 /** Cache role sessions inside one owner. Each caller still checks current connection authorization. */
 export function createAwsRoleSessionCache<
@@ -31,11 +29,6 @@ export function createAwsRoleSessionCache<
       }
     }
   };
-}
-export function createAwsRuntimeAccessResolver(env: Env) {
-  return createAwsRoleSessionCache((configuration: AwsByocConfiguration) =>
-    awsRuntimeAccess(env, configuration)
-  );
 }
 export function createAwsEcsRuntimeAccessResolver(env: Env) {
   return createAwsRoleSessionCache((configuration: AwsEcsByocConfiguration) =>

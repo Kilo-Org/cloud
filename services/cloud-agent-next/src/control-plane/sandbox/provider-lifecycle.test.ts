@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { awsProviderFixture } from '../../../test/fixtures/aws-provider.js';
+import { ecsProviderFixture } from '../../../test/fixtures/aws-ecs.js';
 import { ProviderLifecycleError } from '../../sandbox-control/provider-failure.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../shared/control-plane-protocol.js';
 import {
@@ -10,7 +10,7 @@ import {
 
 function admission(validate: () => Promise<void>, deadlineAt: number): ProviderHelloAdmission {
   return {
-    provider: Object.assign(awsProviderFixture().adapter(), { validateWrapperAdmission: validate }),
+    provider: Object.assign(ecsProviderFixture().adapter(), { validateWrapperAdmission: validate }),
     providerRef: 'aws-test-ref',
     connectionId: null,
     credential: 'test-credential',

@@ -113,7 +113,7 @@ export async function awsBuildHarness(transport: Awaited<ReturnType<typeof awsBu
             encryptedSecrets: {},
             egressMode: 'allowlist',
             egressAllowlist: ['registry.npmjs.org'],
-            sandboxAllocation: transport.provider === 'aws' ? 'aws-microvm-8g' : 'aws-ecs-8g',
+            sandboxAllocation: 'aws-ecs-8g',
           }),
           buildTarget: input =>
             resolveAwsEnvironmentBuildTarget(

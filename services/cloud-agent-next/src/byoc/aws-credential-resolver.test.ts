@@ -1,13 +1,14 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
-import {
-  AWS_BYOC_ENVELOPE_KEY_ID,
-  AWS_BYOC_ENVELOPE_SCHEME,
-} from '@kilocode/worker-utils/aws-byoc';
+import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
+import { AWS_ECS_BYOC_ENVELOPE_SCHEME } from '@kilocode/worker-utils/aws-ecs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
-import { fetchAwsByocConnection, resolveAwsByocConfiguration } from './aws-credential-resolver.js';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
+import {
+  fetchAwsByocConnection,
+  resolveAwsEcsByocConfiguration,
+} from './aws-credential-resolver.js';
 import { byocOwnerKey, type ByocSource } from './owner.js';
 
 const keys = generateKeyPairSync('rsa', {
@@ -15,104 +16,122 @@ const keys = generateKeyPairSync('rsa', {
   publicKeyEncoding: { type: 'spki', format: 'pem' },
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
 });
-const source = { userId: 'user/one', credentialId: '22222222-2222-4222-8222-222222222222' };
+const source = { userId: 'oauth/user-one', credentialId: '22222222-2222-4222-8222-222222222222' };
+const organization = {
+  organizationId: '11111111-1111-4111-8111-111111111111',
+  credentialId: source.credentialId,
+};
 const env = {
   KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test/',
   AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
 } as Env;
 
-function envelope(owner: ByocSource = source, config = AWS_TEST_CONFIGURATION) {
+function envelope(
+  owner: ByocSource = source,
+  config: unknown = ECS_TEST_CONFIG,
+  scheme = AWS_ECS_BYOC_ENVELOPE_SCHEME,
+  purpose = 'byoc-aws-ecs-configuration'
+) {
   return parseKeyedEnvelope(
     encryptKeyedEnvelope(
       JSON.stringify(config),
-      AWS_BYOC_ENVELOPE_SCHEME,
+      scheme,
       { keyId: AWS_BYOC_ENVELOPE_KEY_ID, publicKeyPem: keys.publicKey },
-      `byoc-aws-configuration:v1:${byocOwnerKey(owner)}:${owner.credentialId}`
+      `${purpose}:v1:${byocOwnerKey(owner)}:${owner.credentialId}`
     ),
-    AWS_BYOC_ENVELOPE_SCHEME
+    scheme
   );
 }
-function stubConnection(overrides: Record<string, unknown> = {}) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () =>
-      Response.json({
-        ...source,
-        setupStatus: 'ready',
-        credentialsEncrypted: envelope(),
-        ...overrides,
-      })
-    )
+function connection(overrides: Record<string, unknown> = {}, owner: ByocSource = source) {
+  const fetcher = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      ...owner,
+      setupStatus: 'ready',
+      credentialsEncrypted: envelope(owner),
+      ...overrides,
+    })
   );
+  vi.stubGlobal('fetch', fetcher);
+  return fetcher;
 }
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AWS BYOC connection authority', () => {
-  it('decrypts the exact personal owner and credential envelope', async () => {
-    stubConnection();
-    await expect(resolveAwsByocConfiguration(env, source)).resolves.toEqual(AWS_TEST_CONFIGURATION);
-    const [url, init] = vi.mocked(fetch).mock.calls[0];
+  it.each([source, organization])('decrypts only the selected owner: %j', async owner => {
+    const fetcher = connection({}, owner);
+    await expect(resolveAwsEcsByocConfiguration(env, owner)).resolves.toEqual(ECS_TEST_CONFIG);
+    const [url, init] = fetcher.mock.calls[0];
     if (typeof url !== 'string') throw new Error('Expected a URL string');
-    expect(new URL(url).searchParams.get('userId')).toBe(source.userId);
-    expect(new URL(url).searchParams.get('credentialId')).toBe(source.credentialId);
+    const query = new URL(url).searchParams;
+    expect(query.get('provider')).toBe('aws-ecs');
+    expect(query.get('credentialId')).toBe(owner.credentialId);
+    expect(query.get('userId')).toBe('userId' in owner ? owner.userId : null);
+    expect(query.get('organizationId')).toBe(
+      'organizationId' in owner ? owner.organizationId : null
+    );
     expect(init?.redirect).toBe('manual');
   });
-  it('decrypts an organization envelope without a personal owner', async () => {
-    const organization = {
-      organizationId: '11111111-1111-4111-8111-111111111111',
-      credentialId: source.credentialId,
-    };
-    stubConnection({
-      ...organization,
-      userId: undefined,
-      credentialsEncrypted: envelope(organization),
-    });
-    await expect(resolveAwsByocConfiguration(env, organization)).resolves.toEqual(
-      AWS_TEST_CONFIGURATION
-    );
-  });
   it.each([
-    { userId: 'user/two' },
+    { userId: 'oauth/other' },
     { credentialId: '33333333-3333-4333-8333-333333333333' },
-    { organizationId: '11111111-1111-4111-8111-111111111111' },
+    { organizationId: organization.organizationId },
   ])('rejects a response from another authority: %j', async override => {
-    stubConnection(override);
+    connection(override);
     await expect(fetchAwsByocConnection(env, source, source.credentialId)).rejects.toThrow(
       'byoc_aws_not_ready'
     );
   });
   it.each([
-    { ...source, userId: 'user/two' },
+    { ...source, userId: 'oauth/other' },
     { ...source, credentialId: '33333333-3333-4333-8333-333333333333' },
   ])('rejects ciphertext copied from another owner or credential: %j', async other => {
-    stubConnection({ credentialsEncrypted: envelope(other) });
-    await expect(resolveAwsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
+    connection({ credentialsEncrypted: envelope(other) });
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
+  });
+  it('rejects a foreign envelope scheme and purpose even when the plaintext is valid', async () => {
+    connection({
+      credentialsEncrypted: envelope(
+        source,
+        ECS_TEST_CONFIG,
+        'byoc-aws-configuration-rsa-aes-256-gcm',
+        'byoc-aws-configuration'
+      ),
+    });
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
   });
   it('rejects mixed AWS accounts in decrypted configuration', async () => {
-    stubConnection({
+    connection({
       credentialsEncrypted: envelope(source, {
-        ...AWS_TEST_CONFIGURATION,
-        imageIdentifier: 'arn:aws:lambda:us-east-1:999999999999:microvm-image:other',
+        ...ECS_TEST_CONFIG,
+        clusterArn: ECS_TEST_CONFIG.clusterArn.replace(/:\d{12}:/, ':999999999999:'),
       }),
     });
-    await expect(resolveAwsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
   });
   it('reports an outdated template separately from malformed configuration', async () => {
-    stubConnection({
-      credentialsEncrypted: envelope(source, { ...AWS_TEST_CONFIGURATION, templateVersion: 0 }),
+    connection({
+      credentialsEncrypted: envelope(source, { ...ECS_TEST_CONFIG, templateVersion: 0 }),
     });
-    await expect(resolveAwsByocConfiguration(env, source)).rejects.toThrow(
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow(
       'byoc_aws_stack_outdated'
     );
   });
   it('rejects an unready connection and a missing decryption key', async () => {
-    stubConnection({ setupStatus: 'building' });
-    await expect(resolveAwsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
-    stubConnection();
+    connection({ setupStatus: 'building' });
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow('byoc_aws_not_ready');
+    connection();
     await expect(
-      resolveAwsByocConfiguration({ ...env, AGENT_ENV_VARS_PRIVATE_KEY: undefined }, source)
+      resolveAwsEcsByocConfiguration({ ...env, AGENT_ENV_VARS_PRIVATE_KEY: undefined }, source)
     ).rejects.toThrow('byoc_aws_not_ready');
+  });
+  it('reports a missing connection without another lookup', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(resolveAwsEcsByocConfiguration(env, source)).rejects.toThrow(
+      'byoc_credential_missing'
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('refuses backend redirects without forwarding internal authentication', async () => {
     const transport = vi.fn<typeof fetch>(

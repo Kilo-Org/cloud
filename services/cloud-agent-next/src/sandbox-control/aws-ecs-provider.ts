@@ -1,7 +1,5 @@
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
-import jwt from 'jsonwebtoken';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
-import { awsProxyEgressClaimsSchema } from '@kilocode/worker-utils/aws-egress';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
   AwsEcsRunRejectedError,
@@ -15,6 +13,7 @@ import type { AwsObjectStore } from '../agent-sandbox/aws/object-store.js';
 import {
   createAwsComputeLifecycle,
   type AwsComputeAdapter,
+  type AwsPreparedStartup,
   type AwsPrepareSnapshot,
 } from './aws-compute-lifecycle.js';
 import {
@@ -42,7 +41,7 @@ export function createAwsEcsProviderAdapter(deps: {
     startup: ProviderStartup;
     ref: AwsEcsProviderRef;
     configuration: AwsEcsByocConfiguration;
-  }): Promise<ProviderStartup>;
+  }): Promise<AwsPreparedStartup>;
   prepareSnapshot?: AwsPrepareSnapshot<AwsEcsByocConfiguration, AwsEcsProviderRef>;
   now?: () => number;
 }): AwsComputeAdapter {
@@ -88,71 +87,47 @@ export function createAwsEcsProviderAdapter(deps: {
         : undefined;
     },
     engine: {
-      deadline(value) {
-        if (!value.request) return undefined;
-        // This server-owned checkpoint already contains the issued credential. Decoding its expiry
-        // schedules cleanup; it never authenticates an incoming token or changes its authority.
-        try {
-          const proxy = value.request.overrides.containerOverrides[0].environment.find(
-            field => field.name === 'HTTPS_PROXY'
-          )?.value;
-          const token = proxy ? decodeURIComponent(new URL(proxy).password) : '';
-          const claims = awsProxyEgressClaimsSchema.parse(jwt.decode(token));
-          if (
-            claims.sandboxId !== value.ref.sandboxId ||
-            claims.allocationId !== value.ref.intentId ||
-            claims.stackId !== value.config.stackId ||
-            claims.generation !== value.config.proxy.generation
-          )
-            return { at: 0, reason: 'invalid_configuration' };
-          return { at: claims.exp * 1000, reason: 'byoc_aws_proxy_expired' };
-        } catch {
-          return { at: 0, reason: 'invalid_configuration' };
-        }
-      },
       async prepare(config, ref, envelope) {
         const { client } = await deps.resolveRuntime(config);
         assertEcsTaskDefinition(await client.definition(config.taskDefinitionArn), config);
         const token = await sha256Hex(JSON.stringify([ref.sandboxId, ref.intentId]));
-        return {
-          request: ecsRunRequestSchema.parse({
-            cluster: config.clusterArn,
-            taskDefinition: config.taskDefinitionArn,
-            capacityProviderStrategy: [{ capacityProvider: config.capacityProvider, weight: 1 }],
-            count: 1,
-            clientToken: token,
-            startedBy: token,
-            networkConfiguration: {
-              awsvpcConfiguration: {
-                subnets: [config.subnetId],
-                securityGroups: [config.securityGroupId],
-                assignPublicIp: 'DISABLED',
+        return ecsRunRequestSchema.parse({
+          cluster: config.clusterArn,
+          taskDefinition: config.taskDefinitionArn,
+          capacityProviderStrategy: [{ capacityProvider: config.capacityProvider, weight: 1 }],
+          count: 1,
+          clientToken: token,
+          startedBy: token,
+          networkConfiguration: {
+            awsvpcConfiguration: {
+              subnets: [config.subnetId],
+              securityGroups: [config.securityGroupId],
+              assignPublicIp: 'DISABLED',
+            },
+          },
+          overrides: {
+            containerOverrides: [
+              {
+                name: 'sandbox',
+                command: [
+                  '--input-type=module',
+                  '-e',
+                  'import {startLaunchDocument} from "/opt/kilo/aws/launch-document.mjs";startLaunchDocument(JSON.parse(process.argv[1])).catch(()=>{console.error("AWS launch failed");process.exit(1)});',
+                  JSON.stringify(envelope),
+                ],
+                environment: envelope.proxy
+                  ? [
+                      { name: 'HTTP_PROXY', value: envelope.proxy },
+                      { name: 'HTTPS_PROXY', value: envelope.proxy },
+                      { name: 'NODE_USE_ENV_PROXY', value: '1' },
+                      { name: 'NO_PROXY', value: 'localhost,127.0.0.1,::1' },
+                    ]
+                  : [],
               },
-            },
-            overrides: {
-              containerOverrides: [
-                {
-                  name: 'sandbox',
-                  command: [
-                    '--input-type=module',
-                    '-e',
-                    'import {startLaunchDocument} from "/opt/kilo/aws/launch-document.mjs";startLaunchDocument(JSON.parse(process.argv[1])).catch(()=>{console.error("AWS launch failed");process.exit(1)});',
-                    JSON.stringify(envelope),
-                  ],
-                  environment: envelope.proxy
-                    ? [
-                        { name: 'HTTP_PROXY', value: envelope.proxy },
-                        { name: 'HTTPS_PROXY', value: envelope.proxy },
-                        { name: 'NODE_USE_ENV_PROXY', value: '1' },
-                        { name: 'NO_PROXY', value: 'localhost,127.0.0.1,::1' },
-                      ]
-                    : [],
-                },
-              ],
-            },
-            enableExecuteCommand: false,
-          }),
-        };
+            ],
+          },
+          enableExecuteCommand: false,
+        });
       },
       async discover(value) {
         if (!value.request) return undefined;

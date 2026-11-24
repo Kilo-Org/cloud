@@ -3,8 +3,8 @@ import { awsSetupRequestSchema } from '@kilocode/worker-utils/aws-onboarding-api
 import type { HonoContext } from '../hono-context.js';
 import { logger } from '../logger.js';
 import { readBoundedBody } from '../utils/read-bounded-body.js';
-import { awsProviderSetupEnrollment, createAwsProviderSetupIntent } from './aws-setup-intent.js';
-import { createAwsProviderSetupService } from './aws-setup-service.js';
+import { awsSetupEnrollment, createAwsSetupIntent } from './aws-setup-intent.js';
+import { createAwsSetupService } from './aws-setup-service.js';
 import { AwsSetupError } from './aws-stack-validation.js';
 
 /** Only the trusted web service supplies owner-bound persisted envelopes. */
@@ -27,8 +27,7 @@ export function registerAwsSetupRoutes(
     if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
     const input = parsed.data;
     try {
-      if (input.action === 'enrollment')
-        return c.json(awsProviderSetupEnrollment(c.env, input.owner, input.provider));
+      if (input.action === 'enrollment') return c.json(awsSetupEnrollment(c.env, input.owner));
       const binding = {
         owner: input.owner,
         credentialId: input.credentialId,
@@ -36,30 +35,15 @@ export function registerAwsSetupRoutes(
       };
       switch (input.action) {
         case 'prepare':
-          return c.json(
-            createAwsProviderSetupIntent(c.env, binding, input.accountId, input.provider)
-          );
+          return c.json(createAwsSetupIntent(c.env, binding, input.accountId));
         case 'instructions':
-          return c.json(
-            await createAwsProviderSetupService(c.env, input.provider).instructions(
-              binding,
-              input.envelope
-            )
-          );
+          return c.json(await createAwsSetupService(c.env).instructions(binding, input.envelope));
         case 'validate':
           return c.json(
-            await createAwsProviderSetupService(c.env, input.provider).validate(
-              binding,
-              input.envelope,
-              input.roleArn
-            )
+            await createAwsSetupService(c.env).validate(binding, input.envelope, input.roleArn)
           );
         case 'revalidate':
-          await createAwsProviderSetupService(c.env, input.provider).revalidate(
-            binding,
-            input.envelope,
-            input.roleArn
-          );
+          await createAwsSetupService(c.env).revalidate(binding, input.envelope, input.roleArn);
           return c.json({ verified: true });
       }
     } catch (error) {

@@ -46,7 +46,7 @@ const publishedSnapshotCommonSchema = z.object({
   environmentId: z.string().uuid(),
   owner: environmentOwnerSchema,
   revision: z.number().int().positive(),
-  provider: z.enum(['cloudflare-containers', 'vercel', 'aws', 'aws-ecs']),
+  provider: z.enum(['cloudflare-containers', 'vercel', 'aws-ecs']),
   baseImage: z.string().min(1),
   runtimeAbi: z.string().min(1),
   runtimeRelease: z.string().min(1).nullable(),
@@ -125,7 +125,7 @@ export function snapshotImageCompatibility(
   if (published.provider === 'cloudflare-containers' && published.runtimeRelease === null) {
     return 'incompatible';
   }
-  if (published.provider === 'aws' || published.provider === 'aws-ecs')
+  if (published.provider === 'aws-ecs')
     return current.baseImage === published.baseImage ? 'current' : 'incompatible';
   if (current.baseImage === null) {
     return published.provider === 'vercel' ? 'incompatible' : 'current';

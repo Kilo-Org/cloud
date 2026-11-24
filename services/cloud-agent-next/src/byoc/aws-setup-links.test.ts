@@ -1,12 +1,13 @@
 import { URL as FileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { awsSetupIntentSchema } from '@kilocode/worker-utils/aws-onboarding';
+import { awsEcsSetupIntentSchema } from '@kilocode/worker-utils/aws-onboarding';
 import { awsQuickCreateUrl } from './aws-setup-links.js';
 const hash = 'a'.repeat(64);
 function intent() {
-  return awsSetupIntentSchema.parse({
+  return awsEcsSetupIntentSchema.parse({
     format: 1,
+    provider: 'aws-ecs',
     accountId: '999999999999',
     stackName: 'kilo-' + 'b'.repeat(32),
     externalId: 'c'.repeat(64),
@@ -14,13 +15,12 @@ function intent() {
     controlPlaneUrl: 'https://worker.example.com',
     release: {
       format: 1,
-      templateVersion: 2,
+      provider: 'aws-ecs',
+      templateVersion: 1,
       proxyProtocolVersion: 1,
       template: { bucket: 'kilo-releases', key: `aws/${hash}/template.json`, sha256: hash },
       runtime: {
-        bucket: 'kilo-releases',
-        key: `aws/${hash}/runtime.zip`,
-        sha256: hash,
+        imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
         repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/runtime',
       },
       proxy: {
@@ -42,7 +42,7 @@ describe('AWS quick-create instructions', () => {
     expect(query.get('stackName')).toBe(value.stackName);
     expect(query.get('param_ExternalId')).toBe(value.externalId);
     const template = JSON.parse(
-      readFileSync(new FileURL('../../deploy/aws/template.json', import.meta.url), 'utf8')
+      readFileSync(new FileURL('../../deploy/aws/template.ecs.json', import.meta.url), 'utf8')
     );
     const keys = [...query.keys()].filter(key => key.startsWith('param_')).map(key => key.slice(6));
     expect(keys.sort()).toEqual(Object.keys(template.Parameters).sort());

@@ -70,11 +70,10 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
 BYOC_VERCEL_IDS=
 
-# AWS MVP enrollment. Empty is off. MicroVM and ECS keep separate private release manifests.
+# AWS MVP (ECS) enrollment. Empty is off. AWS_ECS_BYOC_RELEASE holds the private release manifest.
 BYOC_AWS_IDS=
 AWS_BYOC_KILO_ROLE_ARN=
 AWS_BYOC_CREDENTIALS=
-AWS_BYOC_RELEASE=
 AWS_ECS_BYOC_RELEASE=
 
 # Comma-separated user or organization IDs allowed to capture and restore registered workspace tail snapshots.

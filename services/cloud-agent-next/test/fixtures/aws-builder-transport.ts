@@ -1,21 +1,13 @@
 import type { GitTokenService } from '../../src/types.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
-import {
-  AWS_BYOC_ENVELOPE_KEY_ID,
-  AWS_BYOC_ENVELOPE_SCHEME,
-} from '@kilocode/worker-utils/aws-byoc';
+import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
 import { AWS_ECS_BYOC_ENVELOPE_SCHEME } from '@kilocode/worker-utils/aws-ecs';
 import { AWS_EGRESS_PUBLIC_KEY, AWS_EGRESS_SHARED_KEY } from '@kilocode/worker-utils/aws-egress';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { byocOwnerKey } from '../../src/byoc/owner.js';
-import {
-  microvmRunRequestSchema,
-  type Microvm,
-} from '../../src/agent-sandbox/aws/microvm-client.js';
 import { ecsRunRequestSchema } from '../../src/agent-sandbox/aws/ecs-client.js';
 import { environmentBuildRunnerSchema } from '../../src/shared/environment-build-protocol.js';
-import { AWS_TEST_CONFIGURATION } from './aws-provider.js';
 import { ECS_TEST_CONFIG, ecsDefinition, ecsTask } from './aws-ecs.js';
 
 export const AWS_BUILD_TEST_OWNER = {
@@ -32,25 +24,22 @@ const keys = generateKeyPairSync('rsa', {
 const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
 
 /** Simulate AWS HTTP only. Production signing, validation, adapters and durable state stay real. */
-export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
+export async function awsBuilderTransport() {
   const caCertificate = `-----BEGIN CERTIFICATE-----\n${'synthetic-public-ca'.repeat(12)}\n-----END CERTIFICATE-----`;
   const proxy = { ...ECS_TEST_CONFIG.proxy, caFingerprint: await sha256Hex(caCertificate) };
-  const config =
-    provider === 'aws' ? { ...AWS_TEST_CONFIGURATION, proxy } : { ...ECS_TEST_CONFIG, proxy };
+  const config = { ...ECS_TEST_CONFIG, proxy };
   const source = {
     organizationId: AWS_BUILD_TEST_OWNER.id,
     credentialId: AWS_BUILD_TEST_CREDENTIAL_ID,
   };
-  const scheme = provider === 'aws' ? AWS_BYOC_ENVELOPE_SCHEME : AWS_ECS_BYOC_ENVELOPE_SCHEME;
-  const purpose = provider === 'aws' ? 'byoc-aws-configuration' : 'byoc-aws-ecs-configuration';
   const envelope = parseKeyedEnvelope(
     encryptKeyedEnvelope(
       JSON.stringify(config),
-      scheme,
+      AWS_ECS_BYOC_ENVELOPE_SCHEME,
       { keyId: AWS_BYOC_ENVELOPE_KEY_ID, publicKeyPem: keys.publicKey },
-      `${purpose}:v1:${byocOwnerKey(source)}:${source.credentialId}`
+      `byoc-aws-ecs-configuration:v1:${byocOwnerKey(source)}:${source.credentialId}`
     ),
-    scheme
+    AWS_ECS_BYOC_ENVELOPE_SCHEME
   );
   const identity = {
     protocolVersion: 1,
@@ -71,7 +60,6 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
   const objects = new Map<string, { bytes: Uint8Array; checksum?: string }>();
   const deleted: string[] = [];
   const requests = new Map<string, string>();
-  const vms = new Map<string, Microvm>();
   const tasks = new Map<string, ReturnType<typeof ecsTask>>();
   const runStarted = Promise.withResolvers<void>();
   let onRun = async () => {};
@@ -96,22 +84,14 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
     TemplateVersion: String(config.templateVersion),
     ProxyProtocolVersion: '1',
     ProxyHostname: proxy.hostname,
-    ...('clusterArn' in config
-      ? {
-          Provider: 'aws-ecs',
-          ClusterArn: config.clusterArn,
-          TaskDefinitionArn: config.taskDefinitionArn,
-          CapacityProvider: config.capacityProvider,
-          ExecutionRoleArn: config.executionRoleArn,
-          RuntimeImage: config.runtimeImage,
-          PrivateSubnet: config.subnetId,
-          SandboxSecurityGroup: config.securityGroupId,
-        }
-      : {
-          ImageArn: config.imageIdentifier,
-          ImageVersion: config.imageVersion,
-          ConnectorArn: config.connectorArn,
-        }),
+    Provider: 'aws-ecs',
+    ClusterArn: config.clusterArn,
+    TaskDefinitionArn: config.taskDefinitionArn,
+    CapacityProvider: config.capacityProvider,
+    ExecutionRoleArn: config.executionRoleArn,
+    RuntimeImage: config.runtimeImage,
+    PrivateSubnet: config.subnetId,
+    SandboxSecurityGroup: config.securityGroupId,
   };
   async function run(request: { clientToken: string }, body: string) {
     await checkpoint(request);
@@ -126,7 +106,7 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
     const url = new URL(request.url);
     if (url.hostname === 'backend.test') {
       if (
-        url.searchParams.get('provider') !== provider ||
+        url.searchParams.get('provider') !== 'aws-ecs' ||
         url.searchParams.get('organizationId') !== source.organizationId
       )
         throw new Error('Test observed different connection authority');
@@ -173,42 +153,6 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
           ...(object.checksum ? { 'x-amz-checksum-sha256': object.checksum } : {}),
         },
       });
-    }
-    if (url.hostname.startsWith('lambda.')) {
-      if (request.method === 'POST') {
-        const body = await request.text();
-        const launch = microvmRunRequestSchema.parse(JSON.parse(body));
-        await run(launch, body);
-        let vm = vms.get(launch.clientToken);
-        if (!vm) {
-          vm = {
-            microvmId: `microvm-${vms.size + 1}`,
-            imageArn: launch.imageIdentifier,
-            imageVersion: launch.imageVersion,
-            maximumDurationInSeconds: launch.maximumDurationInSeconds,
-            state: 'RUNNING',
-            ingressNetworkConnectors: launch.ingressNetworkConnectors,
-            egressNetworkConnectors: launch.egressNetworkConnectors,
-          };
-          vms.set(launch.clientToken, vm);
-        }
-        runStarted.resolve();
-        await onRun();
-        if (loseReply) {
-          loseReply = false;
-          throw new Error('Synthetic lost Run reply');
-        }
-        return Response.json(vm);
-      }
-      const vm = [...vms.values()].find(
-        value => value.microvmId === url.pathname.split('/').at(-1)
-      );
-      if (!vm) return new Response(null, { status: 404 });
-      if (request.method === 'DELETE') {
-        vm.state = 'TERMINATED';
-        return new Response(null);
-      }
-      return Response.json(vm);
     }
     if (url.hostname.startsWith('ecs.')) {
       const body = await request.text();
@@ -266,14 +210,12 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
         throw error;
       }
     }) satisfies typeof fetch,
-    provider,
     config,
     privateKey: keys.privateKey,
     identity,
     objects,
     deleted,
     requests,
-    vms,
     tasks,
     runStarted: runStarted.promise,
     issueStarted: issueStarted.promise,
@@ -297,10 +239,8 @@ export async function awsBuilderTransport(provider: 'aws' | 'aws-ecs') {
     },
     issued: () => issued,
     runCalls: () => runCalls,
-    physicalCount: () => vms.size + tasks.size,
-    stopped: () =>
-      [...vms.values()].every(vm => vm.state === 'TERMINATED') &&
-      [...tasks.values()].every(task => task.lastStatus === 'STOPPED'),
+    physicalCount: () => tasks.size,
+    stopped: () => [...tasks.values()].every(task => task.lastStatus === 'STOPPED'),
     launch() {
       const bytes = [...objects.entries()].find(([key]) => key.startsWith('kilo/launch/'))?.[1]
         .bytes;

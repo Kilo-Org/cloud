@@ -29,6 +29,7 @@ export type AwsComputeOperation<Config, Ref extends AwsComputeRef, Request> = {
   /** Missing legacy certainty never proves that the request was not submitted. */
   submission?: 'prepared' | 'pending' | 'uncertain';
   physicalId?: string;
+  /** Proxy credential expiry. Written atomically with the issued request. */
   deadlineAt?: number;
   /** Absent on existing base-image launches. Written atomically with the issued request. */
   startSource?: 'repository';
@@ -45,6 +46,8 @@ export type AwsComputeAdapter = ProviderAdapter & {
   confirmAdmission(ref: string): Promise<void>;
   validateWrapperAdmission(ref: string): Promise<void>;
 };
+/** The issued proxy credential ends the allocation at `deadlineAt`. */
+export type AwsPreparedStartup = { startup: ProviderStartup; deadlineAt: number };
 export type AwsPrepareSnapshot<Config, Ref> = (input: {
   startup: ProviderStartup;
   ref: Ref;
@@ -179,15 +182,10 @@ export function createAwsComputeLifecycle<
     startup: ProviderStartup;
     ref: Ref;
     configuration: Config;
-  }): Promise<ProviderStartup>;
+  }): Promise<AwsPreparedStartup>;
   prepareSnapshot?: AwsPrepareSnapshot<Config, Ref>;
   engine: {
-    prepare(
-      config: Config,
-      ref: Ref,
-      envelope: AwsLaunchEnvelope
-    ): Promise<{ request: Request; deadlineAt?: number }>;
-    deadline?(value: AwsComputeOperation<Config, Ref, Request>): ProviderDeadline | undefined;
+    prepare(config: Config, ref: Ref, envelope: AwsLaunchEnvelope): Promise<Request>;
     discover?(value: AwsComputeOperation<Config, Ref, Request>): Promise<AwsDiscovery | undefined>;
     runner(config: Config): Promise<(request: Request) => Promise<string>>;
     isDefiniteRunRejection(error: unknown): boolean;
@@ -376,11 +374,12 @@ export function createAwsComputeLifecycle<
       if (value.phase === 'terminated' || value.phase === 'stopping')
         throw new Error('AWS allocation is stopping');
       if (!value.request) {
-        startup = await deps.prepareStartup({
+        const prepared = await deps.prepareStartup({
           startup,
           ref: value.ref,
           configuration: value.config,
         });
+        startup = prepared.startup;
         if (options?.snapshot && deps.prepareSnapshot) {
           try {
             startup = await deps.prepareSnapshot({
@@ -418,7 +417,7 @@ export function createAwsComputeLifecycle<
             }
             throw error;
           }
-          const prepared = await deps.engine.prepare(value.config, value.ref, envelope);
+          const request = await deps.engine.prepare(value.config, value.ref, envelope);
           // The exact request is checkpointed only while created, before any compute request.
           value = await change(value, current =>
             transitionAwsOperation(
@@ -427,7 +426,8 @@ export function createAwsComputeLifecycle<
                 type: 'prepared',
                 operation: {
                   ...current,
-                  ...prepared,
+                  request,
+                  deadlineAt: prepared.deadlineAt,
                   phase: 'launching',
                   submission: 'prepared',
                   requestAt: now(),
@@ -517,10 +517,9 @@ export function createAwsComputeLifecycle<
     },
     async allocationDeadline(ref) {
       const value = await operation(ref);
-      if (deps.engine.deadline) return deps.engine.deadline(value);
       return value.deadlineAt === undefined
         ? undefined
-        : { at: value.deadlineAt, reason: 'provider_lifetime_exhausted' };
+        : { at: value.deadlineAt, reason: 'byoc_aws_proxy_expired' };
     },
     async validateWrapperAdmission(ref) {
       let value = await operation(ref);

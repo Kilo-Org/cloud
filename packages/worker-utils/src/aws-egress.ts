@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { awsByocConfigurationSchema } from './aws-byoc';
+import { awsStackIdSchema } from './aws-byoc';
 import { egressDomainSchema } from './egress-allowlist';
 
 export const AWS_EGRESS_PROTOCOL_VERSION = 1;
@@ -19,7 +19,7 @@ export const AWS_EGRESS_SHARED_KEY = 'kilo/proxy/shared/auth.json';
 const deploymentIdentity = {
   protocolVersion: z.literal(AWS_EGRESS_PROTOCOL_VERSION),
   generation: z.uuid(),
-  stackId: awsByocConfigurationSchema.shape.stackId,
+  stackId: awsStackIdSchema,
 };
 export const awsEgressPublicDeploymentSchema = z
   .object({
@@ -61,7 +61,7 @@ export const awsBuildEgressClaimsSchema = z
     ...awsEgressClaimsSchema.omit({ type: true, aud: true }).shape,
     type: z.literal('aws_build_egress'),
     aud: z.literal(AWS_BUILD_EGRESS_AUDIENCE),
-    provider: z.enum(['aws', 'aws-ecs']),
+    provider: z.literal('aws-ecs'),
     environmentId: z.uuid(),
     buildId: z.uuid(),
     actorUserId: z.string().min(1).max(256),

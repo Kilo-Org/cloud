@@ -7,11 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ecsProviderFixture } from '../fixtures/aws-ecs.js';
 import { AWS_LAUNCH_RECOVERY_MS } from '../../src/sandbox-control/aws-compute-lifecycle.js';
 import { awsEcsOperationSchema } from '../../src/sandbox-control/aws-ecs-operation.js';
-import { awsProviderFixture } from '../fixtures/aws-provider.js';
-import {
-  awsOperationStorage,
-  awsEcsOperationStorage,
-} from '../../src/control-plane/sandbox/aws-operation-storage.js';
+import { awsEcsOperationStorage } from '../../src/control-plane/sandbox/aws-operation-storage.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 
 const namespace = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
@@ -63,12 +59,12 @@ describe('AWS durable launch checkpoint', () => {
     'keeps AWS failure %s semantics through the real DO alarm and route state',
     async status => {
       const sandboxId = `sbx_aws_failure_${status}`;
-      const fixture = awsProviderFixture(sandboxId);
+      const fixture = ecsProviderFixture(sandboxId);
       fixture.setNow(Date.now());
       const stub = namespace.getByName(sandboxId);
       await runInDurableObject(stub, async (instance, state) => {
         await instance.getAllocationState();
-        const adapter = fixture.adapter(awsOperationStorage(state.storage));
+        const adapter = fixture.adapter(awsEcsOperationStorage(state.storage));
         const allocationId = '11111111-1111-4111-8111-111111111111';
         const created = await adapter.create({ intentId: allocationId, createdAt: 10_000 });
         if (!('providerRef' in created)) throw new Error('Missing provider reference');
@@ -123,17 +119,17 @@ describe('AWS durable launch checkpoint', () => {
           status === 403 ? 'stopping' : 'starting'
         );
       });
-      expect(fixture.vms.size).toBe(1);
+      expect(fixture.tasks.size).toBe(1);
     }
   );
 
   it('replays an exact lost response after eviction using the persisted request and credential', async () => {
     const sandboxId = 'sbx_aws_durable_launch';
-    const fixture = awsProviderFixture(sandboxId);
+    const fixture = ecsProviderFixture(sandboxId);
     const stub = namespace.getByName(sandboxId);
     const ref = await runInDurableObject(stub, async (instance, state) => {
       await instance.getAllocationState();
-      const adapter = fixture.adapter(awsOperationStorage(state.storage));
+      const adapter = fixture.adapter(awsEcsOperationStorage(state.storage));
       const created = await adapter.create({ intentId: 'durable-1', createdAt: 10_000 });
       if (!('providerRef' in created)) throw new Error('Missing provider reference');
       fixture.loseNextReply();
@@ -145,11 +141,11 @@ describe('AWS durable launch checkpoint', () => {
       ).rejects.toThrow('TransportError');
       return created.providerRef;
     });
-    expect(fixture.vms.size).toBe(1);
+    expect(fixture.tasks.size).toBe(1);
     await evictDurableObject(stub);
     await runInDurableObject(stub, async (instance, state) => {
       await instance.getAllocationState();
-      const adapter = fixture.adapter(awsOperationStorage(state.storage));
+      const adapter = fixture.adapter(awsEcsOperationStorage(state.storage));
       await adapter.reconcileLaunch(ref);
       expect(fixture.submitted).toHaveLength(2);
       expect(fixture.submitted[1]).toEqual(fixture.submitted[0]);
@@ -157,7 +153,7 @@ describe('AWS durable launch checkpoint', () => {
       expect(fixture.launchedDocument().env.SANDBOX_CONTROL_CREDENTIAL).toBe('original-credential');
       expect(await adapter.stop(ref)).toBe('terminal');
     });
-    expect(fixture.vms.size).toBe(1);
-    expect([...fixture.vms.values()][0]?.current.state).toBe('TERMINATED');
+    expect(fixture.tasks.size).toBe(1);
+    expect([...fixture.tasks.values()][0]?.lastStatus).toBe('STOPPED');
   });
 });

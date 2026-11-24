@@ -13,7 +13,7 @@ function fixture() {
   const build: BuildGrant = {
     buildId: '11111111-1111-4111-8111-111111111111',
     sandboxId: logicalId,
-    provider: 'aws',
+    provider: 'aws-ecs',
     userId: session.userId,
     orgId: session.orgId,
     outboundContainerId: session.outboundContainerId,
@@ -26,7 +26,7 @@ function fixture() {
     sandboxId: logicalId,
     ownerId: build.userId,
     organizationId: build.orgId,
-    provider: 'aws',
+    provider: 'aws-ecs',
     allocation: { active: true, allocationId: 'allocation-build', providerRef: 'physical-build' },
     outboundContainerId: build.outboundContainerId ?? null,
     containmentEnabled: true,

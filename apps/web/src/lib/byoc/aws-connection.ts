@@ -6,13 +6,13 @@ import { byoc_connections, type ByocConnection } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
-import type { AwsSetupOwner, AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
 import {
-  awsProviderSetupEnvelope,
-  awsProviderConfigurationEnvelope,
-  awsProviderSetupIntentSchemaFor,
-  awsProviderConfigurationSchemaFor,
-} from '@kilocode/worker-utils/aws-ecs-onboarding';
+  awsEcsConfigurationEnvelope,
+  awsEcsSetupEnvelope,
+  awsEcsSetupIntentSchema,
+  type AwsSetupOwner,
+} from '@kilocode/worker-utils/aws-onboarding';
+import { awsEcsByocConfigurationSchema } from '@kilocode/worker-utils/aws-ecs';
 import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
 import {
   awsEnrollmentSchema,
@@ -29,8 +29,9 @@ const pendingMetadata = z
     templateVersion: z.number().int().positive(),
   })
   .strict();
+const provider = 'aws-ecs' as const;
 
-function ownerCondition(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+function ownerCondition(owner: AwsSetupOwner) {
   return and(
     eq(byoc_connections.provider, provider),
     owner.organizationId !== undefined
@@ -38,15 +39,15 @@ function ownerCondition(owner: AwsSetupOwner, provider: AwsSetupProvider) {
       : eq(byoc_connections.user_id, owner.userId)
   );
 }
-async function find(owner: AwsSetupOwner, provider: AwsSetupProvider) {
-  return db.query.byoc_connections.findFirst({ where: ownerCondition(owner, provider) });
+async function find(owner: AwsSetupOwner) {
+  return db.query.byoc_connections.findFirst({ where: ownerCondition(owner) });
 }
 function binding(owner: AwsSetupOwner, row: ByocConnection) {
   return { owner, credentialId: row.id, generation: row.build_generation };
 }
-function unchangedDraft(owner: AwsSetupOwner, row: ByocConnection, provider: AwsSetupProvider) {
+function unchangedDraft(owner: AwsSetupOwner, row: ByocConnection) {
   return and(
-    ownerCondition(owner, provider),
+    ownerCondition(owner),
     eq(byoc_connections.id, row.id),
     eq(byoc_connections.build_generation, row.build_generation),
     inArray(byoc_connections.setup_status, ['pending', 'failed'])
@@ -80,7 +81,7 @@ function seal(value: unknown, scheme: string, aad: string) {
 }
 
 /** Explicit projection: ciphertext, ExternalId and proxy credentials never enter a browser response. */
-export function awsStatusFromRow(row: ByocConnection, provider: AwsSetupProvider) {
+export function awsStatusFromRow(row: ByocConnection) {
   if (row.provider !== provider) throw new Error('Expected AWS connection');
   if (row.setup_status === 'ready') {
     const metadata = awsPublicConfigurationSchema.parse(row.config);
@@ -98,27 +99,23 @@ export function awsStatusFromRow(row: ByocConnection, provider: AwsSetupProvider
     ...pendingMetadata.parse(row.config),
   };
 }
-export async function getAwsComputeStatus(owner: AwsSetupOwner, provider: AwsSetupProvider) {
-  const row = await find(owner, provider);
-  return row ? awsStatusFromRow(row, provider) : null;
+export async function getAwsComputeStatus(owner: AwsSetupOwner) {
+  const row = await find(owner);
+  return row ? awsStatusFromRow(row) : null;
 }
-export function getAwsComputeEnrollment(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+export function getAwsComputeEnrollment(owner: AwsSetupOwner) {
   return awsSetupRequest({ action: 'enrollment', owner, provider }, awsEnrollmentSchema);
 }
 
-export async function prepareAwsCompute(
-  owner: AwsSetupOwner,
-  accountId: string,
-  provider: AwsSetupProvider
-) {
-  let row = await find(owner, provider);
+export async function prepareAwsCompute(owner: AwsSetupOwner, accountId: string) {
+  let row = await find(owner);
   if (!row) {
     const draft = { owner, credentialId: crypto.randomUUID(), generation: crypto.randomUUID() };
     const intent = await awsSetupRequest(
       { action: 'prepare', ...draft, accountId, provider },
-      awsProviderSetupIntentSchemaFor(provider)
+      awsEcsSetupIntentSchema
     );
-    const purpose = awsProviderSetupEnvelope(provider, draft);
+    const purpose = awsEcsSetupEnvelope(draft);
     const now = new Date().toISOString();
     await db
       .insert(byoc_connections)
@@ -139,10 +136,10 @@ export async function prepareAwsCompute(
       })
       .onConflictDoNothing();
     // A concurrent request can win the unique owner/provider key. Always use the persisted winner.
-    row = await find(owner, provider);
+    row = await find(owner);
   }
   if (!row) changed();
-  const status = awsStatusFromRow(row, provider);
+  const status = awsStatusFromRow(row);
   if (status.state === 'ready') changed();
   if (status.accountId !== accountId) {
     throw new TRPCError({
@@ -153,8 +150,8 @@ export async function prepareAwsCompute(
   }
   return status;
 }
-export async function getAwsComputeInstructions(owner: AwsSetupOwner, provider: AwsSetupProvider) {
-  const row = await find(owner, provider);
+export async function getAwsComputeInstructions(owner: AwsSetupOwner) {
+  const row = await find(owner);
   if (!row || row.setup_status === 'ready') changed();
   const instructions = await awsSetupRequest(
     {
@@ -165,7 +162,7 @@ export async function getAwsComputeInstructions(owner: AwsSetupOwner, provider: 
     },
     awsInstructionsSchema
   );
-  const current = await find(owner, provider);
+  const current = await find(owner);
   if (
     !current ||
     current.id !== row.id ||
@@ -175,12 +172,8 @@ export async function getAwsComputeInstructions(owner: AwsSetupOwner, provider: 
     changed();
   return instructions;
 }
-export async function validateAwsCompute(
-  owner: AwsSetupOwner,
-  roleArn: string,
-  provider: AwsSetupProvider
-) {
-  const row = await find(owner, provider);
+export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) {
+  const row = await find(owner);
   if (!row) changed();
   const input = { ...binding(owner, row), envelope: row.credentials_encrypted, roleArn, provider };
   const now = () => new Date().toISOString();
@@ -193,7 +186,7 @@ export async function validateAwsCompute(
       })
       .where(
         and(
-          ownerCondition(owner, provider),
+          ownerCondition(owner),
           eq(byoc_connections.id, row.id),
           eq(byoc_connections.build_generation, row.build_generation),
           eq(byoc_connections.setup_status, 'ready')
@@ -201,13 +194,13 @@ export async function validateAwsCompute(
       )
       .returning();
     if (!updated[0]) changed();
-    return awsStatusFromRow(updated[0], provider);
+    return awsStatusFromRow(updated[0]);
   }
   const configuration = await awsSetupRequest(
     { action: 'validate', ...input },
-    awsProviderConfigurationSchemaFor(provider)
+    awsEcsByocConfigurationSchema
   );
-  const purpose = awsProviderConfigurationEnvelope(provider, owner, row.id);
+  const purpose = awsEcsConfigurationEnvelope(owner, row.id);
   const verifiedAt = now();
   const updated = await db
     .update(byoc_connections)
@@ -226,23 +219,19 @@ export async function validateAwsCompute(
       setup_error: null,
       runtime: { last_verified_at: verifiedAt },
     })
-    .where(unchangedDraft(owner, row, provider))
+    .where(unchangedDraft(owner, row))
     .returning();
   if (!updated[0]) changed();
-  return awsStatusFromRow(updated[0], provider);
+  return awsStatusFromRow(updated[0]);
 }
 
 /** This removes only an unfinished local draft. It never deletes customer AWS resources. */
-export async function discardAwsComputeDraft(
-  owner: AwsSetupOwner,
-  generation: string,
-  provider: AwsSetupProvider
-) {
+export async function discardAwsComputeDraft(owner: AwsSetupOwner, generation: string) {
   const removed = await db
     .delete(byoc_connections)
     .where(
       and(
-        ownerCondition(owner, provider),
+        ownerCondition(owner),
         eq(byoc_connections.build_generation, generation),
         inArray(byoc_connections.setup_status, ['pending', 'failed'])
       )

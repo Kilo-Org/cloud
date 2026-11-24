@@ -4,8 +4,8 @@ import type { Env } from '../types.js';
 import {
   createAwsScopedEgressAdmission,
   type AwsScopedEgressContext,
-  type AwsEgressConfiguration,
 } from '../egress/aws-scoped-admission.js';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { ScopedScmAdmissionDependencies } from '../scm-broker/scoped-admission.js';
 import type { BuildScmGrant } from './scm-credentials.js';
 import { verifyAwsBuildEgressCredential } from './aws-egress-credential.js';
@@ -23,11 +23,8 @@ export function createAwsBuildEgressAdmission(deps: {
   readContext(): Promise<AwsBuildEgressContext>;
   resolve: ScopedScmAdmissionDependencies<BuildScmGrant, AwsBuildEgressContext>['resolve'];
   persist: ScopedScmAdmissionDependencies<BuildScmGrant, AwsBuildEgressContext>['persist'];
-  resolveConfiguration?: (
-    source: ByocSource,
-    provider: 'aws' | 'aws-ecs'
-  ) => Promise<AwsEgressConfiguration>;
-  readMetadata?: (configuration: AwsEgressConfiguration) => Promise<AwsProxyMetadata>;
+  resolveConfiguration?: (source: ByocSource) => Promise<AwsEcsByocConfiguration>;
+  readMetadata?: (configuration: AwsEcsByocConfiguration) => Promise<AwsProxyMetadata>;
   signingSecret?: () => Promise<string | undefined>;
   now?: () => number;
 }) {

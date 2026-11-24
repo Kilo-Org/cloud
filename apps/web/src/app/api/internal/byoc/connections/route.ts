@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const querySchema = z
-  .object({ provider: z.enum(['aws', 'aws-ecs']), credentialId: z.uuid().optional() })
+  .object({ provider: z.literal('aws-ecs'), credentialId: z.uuid().optional() })
   .and(
     z.union([
       z.object({ organizationId: z.uuid(), userId: z.never().optional() }),

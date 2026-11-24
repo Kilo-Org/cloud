@@ -35,6 +35,17 @@ describe('SandboxProviderBinding', () => {
     }
   });
 
+  it('accepts an ECS binding and rejects the MicroVM provider ID', () => {
+    const source = {
+      kind: 'byoc',
+      userId: 'oauth/user-1',
+      credentialId: '11111111-1111-4111-8111-111111111111',
+    };
+    const ecs = { kind: 'aws-ecs', source };
+    expect(SandboxProviderBindingSchema.parse(ecs)).toEqual(ecs);
+    expect(SandboxProviderBindingSchema.safeParse({ kind: 'aws', source }).success).toBe(false);
+  });
+
   it('maps legacy provider strings only to platform sources', () => {
     expect(bindingFromLegacyProvider('cloudflare')).toEqual({ kind: 'cloudflare' });
     expect(bindingFromLegacyProvider('vercel')).toEqual({

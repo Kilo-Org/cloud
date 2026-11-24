@@ -1,13 +1,5 @@
 'use client';
 import { useAwsComputeAccess } from '@/hooks/useAwsComputeAccess';
-import type { AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useAwsComputeData } from '@/hooks/useAwsComputeData';
@@ -29,33 +21,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export function AwsComputeSettings({ organizationId }: { organizationId?: string }) {
-  const [provider, setProvider] = useState<AwsSetupProvider>('aws');
   const hasAccess = useAwsComputeAccess({ organizationId, enabled: true });
   if (!hasAccess) return null;
-  return (
-    <AwsComputeForm
-      key={`${organizationId ?? 'personal'}:${provider}`}
-      organizationId={organizationId}
-      provider={provider}
-      onProviderChange={setProvider}
-    />
-  );
+  return <AwsComputeForm key={organizationId ?? 'personal'} organizationId={organizationId} />;
 }
-function AwsComputeForm({
-  organizationId,
-  provider,
-  onProviderChange,
-}: {
-  organizationId?: string;
-  provider: AwsSetupProvider;
-  onProviderChange: (provider: AwsSetupProvider) => void;
-}) {
+function AwsComputeForm({ organizationId }: { organizationId?: string }) {
   const id = useId();
   const [accountId, setAccountId] = useState('');
   const [roleArn, setRoleArn] = useState('');
   const [accountTouched, setAccountTouched] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
-  const data = useAwsComputeData(provider, organizationId);
+  const data = useAwsComputeData(organizationId);
   const status = data.status.data;
   const busy =
     data.prepare.isPending ||
@@ -118,33 +94,11 @@ function AwsComputeForm({
           </Badge>
         </div>
         <CardDescription>
-          Run sandboxes in your AWS account in US East (N. Virginia).
+          Run sandboxes as isolated ECS tasks on EC2 in your AWS account in US East (N. Virginia).
+          AWS host maintenance and proxy certificate expiry can stop a sandbox.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor={`${id}-provider`}>AWS provider</Label>
-          <Select
-            value={provider}
-            disabled={busy}
-            onValueChange={value => {
-              if (value === 'aws' || value === 'aws-ecs') onProviderChange(value);
-            }}
-          >
-            <SelectTrigger id={`${id}-provider`} className="min-h-11 w-full sm:min-h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="aws">Lambda MicroVM</SelectItem>
-              <SelectItem value="aws-ecs">EC2 · ECS isolated tasks</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-muted-foreground text-xs">
-            {provider === 'aws'
-              ? 'Sandboxes can run for up to eight hours.'
-              : 'Removes the eight-hour limit. AWS host maintenance and proxy certificate expiry can still stop a sandbox.'}
-          </p>
-        </div>
         {data.status.isPending || data.enrollment.isPending ? (
           <p className="text-muted-foreground text-sm" role="status">
             Loading AWS settings…
@@ -177,7 +131,7 @@ function AwsComputeForm({
               <p className="text-muted-foreground text-sm">
                 {status
                   ? 'This connection remains saved. Contact Kilo to enable AWS compute.'
-                  : 'This AWS provider is not enabled. Select another provider or contact Kilo.'}
+                  : 'AWS compute is not enabled. Contact Kilo.'}
               </p>
             )}
             {status?.state === 'ready' ? (

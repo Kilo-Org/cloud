@@ -20,10 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
-import {
-  ByocAwsProviderError,
-  fetchAwsProviderConnection,
-} from '../byoc/aws-credential-resolver.js';
+import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -1228,13 +1225,12 @@ async function allocateNewSession(
           credentialId: enrollment.credentialId,
         },
       };
-    } else if (sandboxProvider === 'aws' || sandboxProvider === 'aws-ecs') {
-      let connection: Awaited<ReturnType<typeof fetchAwsProviderConnection>>;
+    } else if (sandboxProvider === 'aws-ecs') {
+      let connection: Awaited<ReturnType<typeof fetchAwsByocConnection>>;
       try {
-        connection = await fetchAwsProviderConnection(
+        connection = await fetchAwsByocConnection(
           ctx.env,
-          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId },
-          sandboxProvider
+          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
         );
       } catch (error) {
         if (error instanceof ByocAwsProviderError && error.reason === 'byoc_credential_missing') {

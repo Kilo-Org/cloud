@@ -507,7 +507,8 @@ describe('hosted multi-repository grants', () => {
   });
 });
 
-describe.each(['aws', 'aws-ecs'] as const)('%s managed SCM certificate scope', provider => {
+describe('ECS managed SCM certificate scope', () => {
+  const provider = 'aws-ecs';
   it('rejects a custom additional repository before issuing any capability', async () => {
     const input = localPreparation();
     input.provider = provider;

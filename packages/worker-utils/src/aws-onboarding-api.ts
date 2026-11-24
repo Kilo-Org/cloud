@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { awsByocConfigurationSchema } from './aws-byoc';
 import {
-  awsSetupBindingSchema,
-  awsSetupOwnerSchema,
-  awsSetupProviderSchema,
-} from './aws-onboarding';
+  awsProxyProtocolVersionSchema,
+  awsRegionSchema,
+  awsRoleArnSchema,
+  awsStackIdSchema,
+  awsTemplateVersionSchema,
+} from './aws-byoc';
+import { awsSetupBindingSchema, awsSetupOwnerSchema } from './aws-onboarding';
 
-const provider = { provider: awsSetupProviderSchema.default('aws') };
+const provider = { provider: z.literal('aws-ecs') };
 const binding = { ...awsSetupBindingSchema.shape, ...provider };
 const stored = { ...binding, envelope: z.unknown() };
 export const awsSetupRequestSchema = z.discriminatedUnion('action', [
@@ -19,14 +21,14 @@ export const awsSetupRequestSchema = z.discriminatedUnion('action', [
     .object({
       action: z.literal('validate'),
       ...stored,
-      roleArn: awsByocConfigurationSchema.shape.roleArn,
+      roleArn: awsRoleArnSchema,
     })
     .strict(),
   z
     .object({
       action: z.literal('revalidate'),
       ...stored,
-      roleArn: awsByocConfigurationSchema.shape.roleArn,
+      roleArn: awsRoleArnSchema,
     })
     .strict(),
 ]);
@@ -46,11 +48,11 @@ export const awsInstructionsSchema = z
 export const awsVerificationSchema = z.object({ verified: z.literal(true) }).strict();
 export const awsPublicConfigurationSchema = z
   .object({
-    roleArn: awsByocConfigurationSchema.shape.roleArn,
-    stackId: awsByocConfigurationSchema.shape.stackId,
-    region: awsByocConfigurationSchema.shape.region,
-    templateVersion: awsByocConfigurationSchema.shape.templateVersion,
-    proxyProtocolVersion: awsByocConfigurationSchema.shape.proxyProtocolVersion,
+    roleArn: awsRoleArnSchema,
+    stackId: awsStackIdSchema,
+    region: awsRegionSchema,
+    templateVersion: awsTemplateVersionSchema,
+    proxyProtocolVersion: awsProxyProtocolVersionSchema,
     accountId: z.string().regex(/^\d{12}$/),
   })
   .strict();

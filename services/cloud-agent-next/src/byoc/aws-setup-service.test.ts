@@ -2,22 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
 import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
-import { awsSetupIntentSchema, type AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
 import {
-  awsEcsSetupIntentSchema,
-  awsProviderSetupEnvelope,
-  awsProviderConfigurationEnvelope,
-} from '@kilocode/worker-utils/aws-ecs-onboarding';
+  awsEcsConfigurationEnvelope,
+  awsEcsSetupEnvelope,
+} from '@kilocode/worker-utils/aws-onboarding';
 import { ecsDefinition } from '../../test/fixtures/aws-ecs.js';
 import { AWS_EGRESS_PUBLIC_KEY, AWS_EGRESS_SHARED_KEY } from '@kilocode/worker-utils/aws-egress';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
-  createAwsProviderSetupIntent,
-  readReadyAwsProviderConfiguration,
+  createAwsSetupIntent,
+  readReadyAwsConfiguration,
   type AwsSetupEnvironment,
 } from './aws-setup-intent.js';
-import { awsSetupParameters, awsEcsSetupParameters } from './aws-stack-validation.js';
-import { createAwsProviderSetupService } from './aws-setup-service.js';
+import { awsEcsSetupParameters } from './aws-stack-validation.js';
+import { createAwsSetupService } from './aws-setup-service.js';
 
 const keys = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -28,7 +26,7 @@ const hash = 'a'.repeat(64);
 const roleArn = 'arn:aws:iam::999999999999:role/customer';
 const escape = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-async function fixture(provider: AwsSetupProvider) {
+async function fixture() {
   const now = Date.now();
   let template = '{"AWSTemplateFormatVersion":"2010-09-09"}';
   const templateHash = await sha256Hex(template);
@@ -46,9 +44,10 @@ async function fixture(provider: AwsSetupProvider) {
     AWS_BYOC_KILO_ROLE_ARN: 'arn:aws:iam::123456789012:role/kilo',
     WORKER_URL: 'https://worker.example.com',
     AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
-    AWS_BYOC_RELEASE: JSON.stringify({
+    AWS_ECS_BYOC_RELEASE: JSON.stringify({
       format: 1,
-      templateVersion: 2,
+      provider: 'aws-ecs',
+      templateVersion: 1,
       proxyProtocolVersion: 1,
       template: {
         bucket: 'kilo-releases',
@@ -56,9 +55,7 @@ async function fixture(provider: AwsSetupProvider) {
         sha256: templateHash,
       },
       runtime: {
-        bucket: 'kilo-releases',
-        key: `aws/${hash}/runtime.zip`,
-        sha256: hash,
+        imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
         repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/runtime',
       },
       proxy: {
@@ -68,16 +65,7 @@ async function fixture(provider: AwsSetupProvider) {
       customerAccounts: ['999999999999'],
     }),
   };
-  env.AWS_ECS_BYOC_RELEASE = JSON.stringify({
-    ...JSON.parse(env.AWS_BYOC_RELEASE ?? '{}'),
-    provider: 'aws-ecs',
-    templateVersion: 1,
-    runtime: {
-      repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/runtime',
-      imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
-    },
-  });
-  const intent = createAwsProviderSetupIntent(env, binding, '999999999999', provider);
+  const intent = createAwsSetupIntent(env, binding, '999999999999');
   const seal = (value: unknown, scheme: string, aad: string) =>
     parseKeyedEnvelope(
       encryptKeyedEnvelope(
@@ -88,30 +76,24 @@ async function fixture(provider: AwsSetupProvider) {
       ),
       scheme
     );
-  const purpose = awsProviderSetupEnvelope(provider, binding);
+  const purpose = awsEcsSetupEnvelope(binding);
   const envelope = seal(intent, purpose.scheme, purpose.aad);
   const stackId = `arn:aws:cloudformation:us-east-1:999999999999:stack/${intent.stackName}/12345678-abcd`;
   const outputs: Record<string, string> = {
     RoleArn: roleArn,
     Bucket: 'customer-artifacts',
-    TemplateVersion: provider === 'aws' ? '2' : '1',
+    TemplateVersion: '1',
     ProxyProtocolVersion: '1',
-    ImageArn: 'arn:aws:lambda:us-east-1:999999999999:microvm-image:customer',
-    ImageVersion: '2.0',
-    ConnectorArn: 'arn:aws:lambda:us-east-1:999999999999:network-connector:customer:1',
     ProxyHostname: 'proxy.customer.internal',
+    Provider: 'aws-ecs',
+    ClusterArn: 'arn:aws:ecs:us-east-1:999999999999:cluster/customer',
+    TaskDefinitionArn: 'arn:aws:ecs:us-east-1:999999999999:task-definition/customer:1',
+    CapacityProvider: 'customer-managed',
+    PrivateSubnet: 'subnet-0123456789abcdef0',
+    SandboxSecurityGroup: 'sg-0123456789abcdef0',
+    ExecutionRoleArn: 'arn:aws:iam::999999999999:role/execution',
+    RuntimeImage: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
   };
-  if (provider === 'aws-ecs')
-    Object.assign(outputs, {
-      Provider: 'aws-ecs',
-      ClusterArn: 'arn:aws:ecs:us-east-1:999999999999:cluster/customer',
-      TaskDefinitionArn: 'arn:aws:ecs:us-east-1:999999999999:task-definition/customer:1',
-      CapacityProvider: 'customer-managed',
-      PrivateSubnet: 'subnet-0123456789abcdef0',
-      SandboxSecurityGroup: 'sg-0123456789abcdef0',
-      ExecutionRoleArn: 'arn:aws:iam::999999999999:role/execution',
-      RuntimeImage: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
-    });
   let definitionIsolation = 'ISOLATED_SANDBOX';
   let unavailableDefinitionReads = 0;
   let returnedStackId = stackId;
@@ -140,7 +122,7 @@ async function fixture(provider: AwsSetupProvider) {
     new Response(
       `<AssumeRoleResponse><AssumeRoleResult><Credentials><AccessKeyId>${key}</AccessKeyId><SecretAccessKey>KiloSecret0000000000000000000000000000000</SecretAccessKey><SessionToken>syntheticsessiontoken</SessionToken><Expiration>${new Date(now + 3_600_000).toISOString()}</Expiration></Credentials></AssumeRoleResult></AssumeRoleResponse>`
     );
-  const api = createAwsProviderSetupService(env, provider, {
+  const api = createAwsSetupService(env, {
     now: () => now,
     async fetch(request) {
       const url = new URL(request.url);
@@ -168,11 +150,7 @@ async function fixture(provider: AwsSetupProvider) {
       if (url.hostname.startsWith('cloudformation.')) {
         const body = new URLSearchParams(await request.text());
         expect([intent.stackName, stackId]).toContain(body.get('StackName'));
-        const parameters = Object.entries(
-          provider === 'aws'
-            ? awsSetupParameters(awsSetupIntentSchema.parse(intent))
-            : awsEcsSetupParameters(awsEcsSetupIntentSchema.parse(intent))
-        )
+        const parameters = Object.entries(awsEcsSetupParameters(intent))
           .map(
             ([key, value]) =>
               `<member><ParameterKey>${key}</ParameterKey><ParameterValue>${escape(value)}</ParameterValue></member>`
@@ -231,39 +209,33 @@ async function fixture(provider: AwsSetupProvider) {
       definitionIsolation = 'SHARED';
     },
     sealReady: (value: unknown) => {
-      const purpose = awsProviderConfigurationEnvelope(
-        provider,
-        binding.owner,
-        binding.credentialId
-      );
+      const purpose = awsEcsConfigurationEnvelope(binding.owner, binding.credentialId);
       return seal(value, purpose.scheme, purpose.aad);
     },
   };
 }
 
-describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', provider => {
-  if (provider === 'aws-ecs') {
-    it('retries a transient definition read and reports exhausted reads as unavailable', async () => {
-      const f = await fixture(provider);
-      f.failDefinitionReads(1);
-      await expect(f.api.validate(f.binding, f.envelope, roleArn)).resolves.toMatchObject({
-        taskDefinitionArn: f.outputs.TaskDefinitionArn,
-      });
-      f.failDefinitionReads(3);
-      await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
-        code: 'byoc_aws_stack_unavailable',
-      });
+describe('ECS onboarding validation service', () => {
+  it('retries a transient definition read and reports exhausted reads as unavailable', async () => {
+    const f = await fixture();
+    f.failDefinitionReads(1);
+    await expect(f.api.validate(f.binding, f.envelope, roleArn)).resolves.toMatchObject({
+      taskDefinitionArn: f.outputs.TaskDefinitionArn,
     });
-    it('rejects an unsafe actual task definition before returning ready configuration', async () => {
-      const f = await fixture(provider);
-      f.unsafeDefinition();
-      await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
-        code: 'byoc_aws_stack_mismatch',
-      });
+    f.failDefinitionReads(3);
+    await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
+      code: 'byoc_aws_stack_unavailable',
     });
-  }
+  });
+  it('rejects an unsafe actual task definition before returning ready configuration', async () => {
+    const f = await fixture();
+    f.unsafeDefinition();
+    await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
+      code: 'byoc_aws_stack_mismatch',
+    });
+  });
   it('verifies an immutable template before issuing its short-lived CloudFormation link', async () => {
-    const f = await fixture(provider);
+    const f = await fixture();
     const result = await f.api.instructions(f.binding, f.envelope);
     const url = new URL(result.launchUrl);
     const query = new URLSearchParams(url.hash.slice(url.hash.indexOf('?') + 1));
@@ -278,14 +250,13 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
     });
   });
   it('requires the exact ExternalId and returns a scoped configuration without AWS credentials', async () => {
-    const f = await fixture(provider);
+    const f = await fixture();
     const result = await f.api.validate(f.binding, f.envelope, roleArn);
     expect(result.roleArn).toBe(roleArn);
-    expect(result).toMatchObject(
-      provider === 'aws'
-        ? { imageVersion: '2.0' }
-        : { taskDefinitionArn: f.outputs.TaskDefinitionArn, runtimeImage: f.outputs.RuntimeImage }
-    );
+    expect(result).toMatchObject({
+      taskDefinitionArn: f.outputs.TaskDefinitionArn,
+      runtimeImage: f.outputs.RuntimeImage,
+    });
     expect(result.proxy).toEqual({
       generation: f.deployment.generation,
       hostname: f.deployment.hostname,
@@ -305,7 +276,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
     expect(JSON.stringify(result)).not.toContain(f.identity.secret);
   });
   it('refuses a role that accepts an omitted or incorrect ExternalId', async () => {
-    const f = await fixture(provider);
+    const f = await fixture();
     f.unsafeTrust();
     await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
       code: 'byoc_aws_external_id_not_enforced',
@@ -316,12 +287,12 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
     [503, 'byoc_aws_setup_unavailable'],
     [403, 'byoc_aws_role_unavailable'],
   ])('reports a %s customer role assumption as %s', async (status, code) => {
-    const f = await fixture(provider);
+    const f = await fixture();
     f.failCustomerRole(status);
     await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({ code });
   });
   it('checks the expected account after a named lookup', async () => {
-    const f = await fixture(provider);
+    const f = await fixture();
     f.wrongAccount();
     await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({
       code: 'byoc_aws_stack_mismatch',
@@ -331,7 +302,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
   it.each(['old-template', 'wrong-protocol', 'short-certificate', 'wrong-proxy-identity'])(
     'refuses %s before saving configuration',
     async change => {
-      const f = await fixture(provider);
+      const f = await fixture();
       if (change === 'old-template') f.outputs.TemplateVersion = '0';
       if (change === 'wrong-protocol') f.outputs.ProxyProtocolVersion = '2';
       if (change === 'short-certificate')
@@ -348,19 +319,15 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
     }
   );
   it('revalidates ready pins without a new release and refuses changed resources', async () => {
-    const f = await fixture(provider);
+    const f = await fixture();
     const configuration = await f.api.validate(f.binding, f.envelope, roleArn);
     const ready = f.sealReady(configuration);
-    f.env.AWS_BYOC_RELEASE = undefined;
     f.env.AWS_ECS_BYOC_RELEASE = undefined;
     await f.api.revalidate(f.binding, ready, roleArn);
-    if (provider === 'aws') f.outputs.ImageVersion = '9.0';
-    else f.outputs.RuntimeImage = f.outputs.RuntimeImage.replace('a'.repeat(64), 'b'.repeat(64));
+    f.outputs.RuntimeImage = f.outputs.RuntimeImage.replace('a'.repeat(64), 'b'.repeat(64));
     await expect(f.api.revalidate(f.binding, ready, roleArn)).rejects.toMatchObject({
       code: 'byoc_aws_connection_update_required',
     });
-    expect(readReadyAwsProviderConfiguration(f.env, f.binding, ready, provider)).toEqual(
-      configuration
-    );
+    expect(readReadyAwsConfiguration(f.env, f.binding, ready)).toEqual(configuration);
   });
 });

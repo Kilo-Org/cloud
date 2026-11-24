@@ -6,10 +6,10 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-const loaders = ['hook.mjs', 'launch-document.mjs'];
+const loaders = ['launch-document.mjs'];
 const modifiedAt = new Date('2000-01-01T00:00:00Z');
 
-/** Only loader source and a generated Dockerfile enter this bundle. Never copy a worktree or its environment. */
+/** Only the launch loader and a generated Dockerfile enter this bundle. Never copy a worktree or its environment. */
 export function buildAwsRuntimeBundle({ baseImage, output }) {
   const match =
     /^(\d{12}\.dkr\.ecr\.us-east-1\.amazonaws\.com)\/([a-z0-9][a-z0-9._/-]*)@sha256:([a-f0-9]{64})$/.exec(
@@ -25,8 +25,8 @@ export function buildAwsRuntimeBundle({ baseImage, output }) {
       `FROM --platform=linux/amd64 ${baseImage}`,
       'USER root',
       'RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/* && python3 --version',
-      'COPY hook.mjs launch-document.mjs /opt/kilo/aws/',
-      'ENTRYPOINT ["/usr/local/bin/node", "/opt/kilo/aws/hook.mjs"]',
+      // The ECS task definition sets the entrypoint. The image only carries the launch loader.
+      'COPY launch-document.mjs /opt/kilo/aws/',
       '',
     ].join('\n');
     const files = ['Dockerfile', ...loaders];

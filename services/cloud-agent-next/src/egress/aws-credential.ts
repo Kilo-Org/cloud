@@ -1,21 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { awsEgressClaimsSchema, AWS_EGRESS_AUDIENCE } from '@kilocode/worker-utils/aws-egress';
-import { AWS_MICROVM_MAXIMUM_DURATION_SECONDS } from '@kilocode/worker-utils/aws-byoc';
 import { verifySandboxLaunchCredential } from '../sandbox-control/credential.js';
 
 type AwsEgressMintIdentity = { launchCredential: string; generation: string; stackId: string };
 
-/** MicroVM credentials retain the provider's eight-hour lifetime. */
-export function mintAwsEgressCredential(input: AwsEgressMintIdentity, secret: string): string {
-  return mintAwsEgressCredentialUntil(
-    input,
-    secret,
-    Date.now() + AWS_MICROVM_MAXIMUM_DURATION_SECONDS * 1000
-  );
-}
-
 /** A distinct audience prevents proxy credentials from authorizing wrapper or preview sockets. */
-export function mintAwsEgressCredentialUntil(
+export function mintAwsEgressCredential(
   input: AwsEgressMintIdentity,
   secret: string,
   expiresAt: number

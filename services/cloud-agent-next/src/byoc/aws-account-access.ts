@@ -6,13 +6,13 @@ import {
   type AwsFetch,
 } from '@kilocode/worker-utils/aws-client';
 import { createAwsEgressMetadataReader } from '@kilocode/worker-utils/aws-egress-store';
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { Env } from '../types.js';
 import { createAwsObjectStore } from '../agent-sandbox/aws/object-store.js';
 import { ByocAwsProviderError } from './aws-errors.js';
 
 export type AwsAccountConfiguration = Pick<
-  AwsByocConfiguration,
+  AwsEcsByocConfiguration,
   'region' | 'roleArn' | 'externalId' | 'bucket' | 'stackId'
 >;
 
@@ -38,7 +38,7 @@ export async function assumeAwsKiloRole(
   });
 }
 
-/** Both engines use the same two-hop role trust and scoped S3, proxy and stack transport. */
+/** Runtime, egress and builds use the same two-hop role trust and scoped S3, proxy and stack transport. */
 export async function awsAccountAccess<Config extends AwsAccountConfiguration>(
   env: Env,
   configuration: Config

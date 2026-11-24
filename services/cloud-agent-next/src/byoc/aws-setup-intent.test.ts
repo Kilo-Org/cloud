@@ -1,26 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
+import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
 import {
-  AWS_BYOC_ENVELOPE_KEY_ID,
-  AWS_BYOC_ENVELOPE_SCHEME,
-} from '@kilocode/worker-utils/aws-byoc';
-import {
-  AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-  awsSetupEnvelopeAad,
+  awsEcsConfigurationEnvelope,
+  awsEcsSetupEnvelope,
 } from '@kilocode/worker-utils/aws-onboarding';
-import {
-  awsProviderSetupEnvelope,
-  awsProviderConfigurationEnvelope,
-} from '@kilocode/worker-utils/aws-ecs-onboarding';
 import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
   awsSetupEnrollment,
-  awsProviderSetupEnrollment,
-  createAwsProviderSetupIntent,
-  readAwsProviderSetupIntent,
-  readReadyAwsProviderConfiguration,
   createAwsSetupIntent,
   readAwsSetupIntent,
   readReadyAwsConfiguration,
@@ -44,15 +32,14 @@ function fixture() {
     AWS_BYOC_KILO_ROLE_ARN: 'arn:aws:iam::123456789012:role/kilo',
     WORKER_URL: 'https://worker.example.com',
     AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
-    AWS_BYOC_RELEASE: JSON.stringify({
+    AWS_ECS_BYOC_RELEASE: JSON.stringify({
       format: 1,
-      templateVersion: 2,
+      provider: 'aws-ecs',
+      templateVersion: 1,
       proxyProtocolVersion: 1,
       template: { bucket: 'kilo-releases', key: `aws/${hash}/template.json`, sha256: hash },
       runtime: {
-        bucket: 'kilo-releases',
-        key: `aws/${hash}/runtime.zip`,
-        sha256: hash,
+        imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
         repositoryArn: 'arn:aws:ecr:us-east-1:123456789012:repository/runtime',
       },
       proxy: {
@@ -62,32 +49,25 @@ function fixture() {
       customerAccounts: ['999999999999'],
     }),
   };
-  const release = JSON.parse(env.AWS_BYOC_RELEASE ?? '{}');
-  env.AWS_ECS_BYOC_RELEASE = JSON.stringify({
-    ...release,
-    provider: 'aws-ecs',
-    templateVersion: 1,
-    runtime: {
-      imageUri: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
-      repositoryArn: release.runtime.repositoryArn,
-    },
-  });
-  const seal = (value: unknown, scheme: string, aad: string) =>
+  const seal = (value: unknown, purpose: { scheme: string; aad: string }) =>
     parseKeyedEnvelope(
       encryptKeyedEnvelope(
         JSON.stringify(value),
-        scheme,
+        purpose.scheme,
         { keyId: AWS_BYOC_ENVELOPE_KEY_ID, publicKeyPem: keys.publicKey },
-        aad
+        purpose.aad
       ),
-      scheme
+      purpose.scheme
     );
-  return { env, binding, seal };
+  const draftPurpose = awsEcsSetupEnvelope(binding);
+  const readyPurpose = awsEcsConfigurationEnvelope(binding.owner, binding.credentialId);
+  return { env, binding, seal, draftPurpose, readyPurpose };
 }
 describe('owner-bound AWS setup intent', () => {
   it('creates a unique ExternalId and reads the persisted encrypted intent without changing pins', () => {
     const f = fixture();
     const intent = createAwsSetupIntent(f.env, f.binding, '999999999999');
+    expect(intent.provider).toBe('aws-ecs');
     expect(intent.externalId).toMatch(/^[a-f0-9]{64}$/);
     expect(intent.stackName).toBe('kilo-' + f.binding.credentialId.replaceAll('-', ''));
     const other = createAwsSetupIntent(
@@ -96,17 +76,13 @@ describe('owner-bound AWS setup intent', () => {
       '999999999999'
     );
     expect(other.externalId).not.toBe(intent.externalId);
-    const encrypted = f.seal(
-      intent,
-      AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-      awsSetupEnvelopeAad(f.binding)
-    );
+    const encrypted = f.seal(intent, f.draftPurpose);
     expect(readAwsSetupIntent(f.env, f.binding, encrypted)).toEqual(intent);
-    const changedRelease = JSON.parse(f.env.AWS_BYOC_RELEASE ?? '{}');
+    const changedRelease = JSON.parse(f.env.AWS_ECS_BYOC_RELEASE ?? '{}');
     changedRelease.customerAccounts.push('888888888888');
     expect(
       readAwsSetupIntent(
-        { ...f.env, AWS_BYOC_RELEASE: JSON.stringify(changedRelease) },
+        { ...f.env, AWS_ECS_BYOC_RELEASE: JSON.stringify(changedRelease) },
         f.binding,
         encrypted
       )
@@ -115,11 +91,7 @@ describe('owner-bound AWS setup intent', () => {
   it('rejects owner and generation substitution using real authenticated encryption', () => {
     const f = fixture();
     const intent = createAwsSetupIntent(f.env, f.binding, '999999999999');
-    const encrypted = f.seal(
-      intent,
-      AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-      awsSetupEnvelopeAad(f.binding)
-    );
+    const encrypted = f.seal(intent, f.draftPurpose);
     expect(() =>
       readAwsSetupIntent(f.env, { ...f.binding, owner: { userId: 'other-user' } }, encrypted)
     ).toThrow('setup changed');
@@ -141,71 +113,38 @@ describe('owner-bound AWS setup intent', () => {
   it('keeps draft credentials separate from runtime configuration authority', () => {
     const f = fixture();
     const intent = createAwsSetupIntent(f.env, f.binding, '999999999999');
-    const draft = f.seal(intent, AWS_BYOC_SETUP_ENVELOPE_SCHEME, awsSetupEnvelopeAad(f.binding));
+    const draft = f.seal(intent, f.draftPurpose);
     expect(() => readReadyAwsConfiguration(f.env, f.binding, draft)).toThrow(
       'setup is unavailable'
     );
-    const ready = f.seal(
-      AWS_TEST_CONFIGURATION,
-      AWS_BYOC_ENVELOPE_SCHEME,
-      `byoc-aws-configuration:v1:user:${f.binding.owner.userId}:${f.binding.credentialId}`
-    );
-    expect(readReadyAwsConfiguration(f.env, f.binding, ready)).toEqual(AWS_TEST_CONFIGURATION);
+    const ready = f.seal(ECS_TEST_CONFIG, f.readyPurpose);
+    expect(readReadyAwsConfiguration(f.env, f.binding, ready)).toEqual(ECS_TEST_CONFIG);
     expect(() => readAwsSetupIntent(f.env, f.binding, ready)).toThrow('setup changed');
+    // Even an envelope sealed with the draft purpose must contain an intent.
+    const substituted = f.seal(ECS_TEST_CONFIG, f.draftPurpose);
+    expect(() => readAwsSetupIntent(f.env, f.binding, substituted)).toThrow('setup changed');
+  });
+  it('rejects drafts from a retired envelope scheme', () => {
+    const f = fixture();
+    const intent = createAwsSetupIntent(f.env, f.binding, '999999999999');
+    const retired = f.seal(intent, {
+      scheme: 'byoc-aws-setup-rsa-aes-256-gcm',
+      aad: f.draftPurpose.aad,
+    });
+    expect(() => readAwsSetupIntent(f.env, f.binding, retired)).toThrow('setup changed');
   });
   it('refuses unavailable setup and customer accounts that lack release authorization', () => {
     const f = fixture();
     expect(awsSetupEnrollment(f.env, f.binding.owner)).toEqual({ enrolled: true, available: true });
-    expect(awsSetupEnrollment({ ...f.env, AWS_BYOC_RELEASE: '' }, f.binding.owner).available).toBe(
-      false
-    );
+    expect(
+      awsSetupEnrollment({ ...f.env, AWS_ECS_BYOC_RELEASE: '' }, f.binding.owner).available
+    ).toBe(false);
+    expect(() =>
+      createAwsSetupIntent({ ...f.env, AWS_ECS_BYOC_RELEASE: undefined }, f.binding, '999999999999')
+    ).toThrow('setup is unavailable');
     expect(() =>
       createAwsSetupIntent({ ...f.env, BYOC_AWS_IDS: '' }, f.binding, '999999999999')
     ).toThrow('setup is unavailable');
     expect(() => createAwsSetupIntent(f.env, f.binding, '888888888888')).toThrow('not enabled');
-  });
-});
-
-describe.each(['aws', 'aws-ecs'] as const)('exact %s setup authority', provider => {
-  const otherProvider = provider === 'aws' ? 'aws-ecs' : 'aws';
-  it('rejects cross-engine drafts and ready credentials with real authenticated encryption', () => {
-    const f = fixture();
-    const intent = createAwsProviderSetupIntent(f.env, f.binding, '999999999999', provider);
-    const purpose = awsProviderSetupEnvelope(provider, f.binding);
-    const draft = f.seal(intent, purpose.scheme, purpose.aad);
-    expect(readAwsProviderSetupIntent(f.env, f.binding, draft, provider)).toEqual(intent);
-    expect(() => readAwsProviderSetupIntent(f.env, f.binding, draft, otherProvider)).toThrow();
-    expect(() => readReadyAwsProviderConfiguration(f.env, f.binding, draft, provider)).toThrow();
-    const config = provider === 'aws' ? AWS_TEST_CONFIGURATION : ECS_TEST_CONFIG;
-    const runtimePurpose = awsProviderConfigurationEnvelope(
-      provider,
-      f.binding.owner,
-      f.binding.credentialId
-    );
-    const ready = f.seal(config, runtimePurpose.scheme, runtimePurpose.aad);
-    expect(readReadyAwsProviderConfiguration(f.env, f.binding, ready, provider)).toEqual(config);
-    expect(() =>
-      readReadyAwsProviderConfiguration(f.env, f.binding, ready, otherProvider)
-    ).toThrow();
-    expect(() => readAwsProviderSetupIntent(f.env, f.binding, ready, provider)).toThrow();
-    // Even an envelope sealed with the selected engine's purpose must contain that engine's schema.
-    const wrongIntent = createAwsProviderSetupIntent(
-      f.env,
-      f.binding,
-      '999999999999',
-      otherProvider
-    );
-    const substituted = f.seal(wrongIntent, purpose.scheme, purpose.aad);
-    expect(() => readAwsProviderSetupIntent(f.env, f.binding, substituted, provider)).toThrow();
-  });
-  it('uses only the selected operator release', () => {
-    const f = fixture();
-    const key = provider === 'aws' ? 'AWS_BYOC_RELEASE' : 'AWS_ECS_BYOC_RELEASE';
-    f.env[key] = undefined;
-    expect(awsProviderSetupEnrollment(f.env, f.binding.owner, provider).available).toBe(false);
-    expect(awsProviderSetupEnrollment(f.env, f.binding.owner, otherProvider).available).toBe(true);
-    expect(() =>
-      createAwsProviderSetupIntent(f.env, f.binding, '999999999999', provider)
-    ).toThrow();
   });
 });

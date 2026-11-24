@@ -2,24 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
 import { AwsEgressMetadataError } from '@kilocode/worker-utils/aws-egress-store';
 import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
   mintSandboxLaunchCredential,
   verifySandboxLaunchCredential,
 } from '../sandbox-control/credential.js';
 import { verifyAwsEgressCredential } from '../egress/aws-credential.js';
-import {
-  prepareAwsEcsProxyStartup,
-  prepareAwsProxyStartup,
-  readPinnedAwsProxyDeployment,
-} from './aws-proxy.js';
+import { prepareAwsEcsProxyStartup, readPinnedAwsProxyDeployment } from './aws-proxy.js';
 
 const secret = 'worker-test-key';
 const generation = '22222222-2222-4222-8222-222222222222';
 const allocationId = '11111111-1111-4111-8111-111111111111';
 const sandboxId = 'sbx_test_aws';
 const configuration = {
-  ...AWS_TEST_CONFIGURATION,
+  ...ECS_TEST_CONFIG,
   proxy: { generation, hostname: 'proxy.kilo.internal', caFingerprint: 'b'.repeat(64) },
 };
 function metadata() {
@@ -48,7 +43,7 @@ function fixture() {
     configuration,
     readMetadata: vi.fn(async () => value),
     signingSecret: secret,
-    ref: { provider: 'aws' as const, sandboxId, intentId: allocationId, createdAt: Date.now() },
+    ref: { provider: 'aws-ecs' as const, sandboxId, intentId: allocationId, createdAt: Date.now() },
     startup: {
       command: { argv: ['/bin/echo', 'hello'] },
       env: {
@@ -61,31 +56,21 @@ function fixture() {
   };
 }
 describe('AWS proxy launch admission', () => {
-  it('keeps ECS egress usable after eight hours and expires it at the deployment certificate boundary', async () => {
-    const common = fixture();
+  it('expires egress at the deployment certificate boundary and returns that deadline', async () => {
+    const input = fixture();
     const deployment = metadata();
-    const input = {
-      ...common,
-      configuration: { ...ECS_TEST_CONFIG, proxy: configuration.proxy },
-      ref: { ...common.ref, provider: 'aws-ecs' as const },
+    const result = await prepareAwsEcsProxyStartup({
+      ...input,
       readMetadata: async () => deployment,
-    };
-    const result = await prepareAwsEcsProxyStartup(input);
-    const token = new URL(result.env.HTTPS_PROXY).password;
+    });
+    const token = new URL(result.startup.env.HTTPS_PROXY).password;
     const expiresAt = Date.parse(deployment.deployment.expiresAt);
+    expect(result.deadlineAt).toBe(Math.floor(expiresAt / 1000) * 1000);
     expect(verifyAwsEgressCredential(token, secret, Date.now() + 28_801_000)).not.toBeNull();
-    expect(verifyAwsEgressCredential(token, secret)?.exp).toBe(Math.floor(expiresAt / 1000));
+    expect(verifyAwsEgressCredential(token, secret)?.exp).toBe(result.deadlineAt / 1000);
     expect(verifyAwsEgressCredential(token, secret, expiresAt)).toBeNull();
     expect(verifySandboxLaunchCredential(token, secret)).toBeNull();
     expect(JSON.stringify(result)).not.toContain(deployment.identity.secret);
-    const microvm = await prepareAwsProxyStartup(common);
-    expect(
-      verifyAwsEgressCredential(
-        new URL(microvm.env.HTTPS_PROXY).password,
-        secret,
-        Date.now() + 28_801_000
-      )
-    ).toBeNull();
   });
   it('requires the certificate health reserve for ECS without signing an already expired certificate', async () => {
     const common = fixture();
@@ -105,7 +90,7 @@ describe('AWS proxy launch admission', () => {
   });
   it('adds a separate allocation credential and public CA without sharing proxy identity', async () => {
     const input = fixture();
-    const result = await prepareAwsProxyStartup(input);
+    const { startup: result } = await prepareAwsEcsProxyStartup(input);
     const proxy = new URL(result.env.HTTPS_PROXY);
     expect(proxy.hostname).toBe(configuration.proxy.hostname);
     expect(proxy.port).toBe('3128');
@@ -129,20 +114,20 @@ describe('AWS proxy launch admission', () => {
         expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
       },
     });
-    await expect(prepareAwsProxyStartup(expired)).rejects.toMatchObject({
+    await expect(prepareAwsEcsProxyStartup(expired)).rejects.toMatchObject({
       reason: 'byoc_aws_proxy_expired',
     });
     const wrong = fixture();
     wrong.ref.intentId = '33333333-3333-4333-8333-333333333333';
-    await expect(prepareAwsProxyStartup(wrong)).rejects.toMatchObject({
+    await expect(prepareAwsEcsProxyStartup(wrong)).rejects.toMatchObject({
       reason: 'byoc_aws_connection_changed',
     });
   });
-  it('fails closed for missing pins and changed deployment identity', async () => {
+  it('fails closed for an unsupported protocol and changed deployment identity', async () => {
     const read = vi.fn(async () => metadata());
-    await expect(readPinnedAwsProxyDeployment(AWS_TEST_CONFIGURATION, read)).rejects.toMatchObject({
-      reason: 'byoc_aws_stack_outdated',
-    });
+    await expect(
+      readPinnedAwsProxyDeployment({ ...configuration, proxyProtocolVersion: 2 }, read)
+    ).rejects.toMatchObject({ reason: 'byoc_aws_stack_outdated' });
     expect(read).not.toHaveBeenCalled();
     for (const field of ['generation', 'hostname', 'caFingerprint', 'stackId'] as const) {
       const changed = metadata();

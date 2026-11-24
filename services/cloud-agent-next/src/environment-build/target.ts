@@ -1,4 +1,4 @@
-import { awsBuildTargetOptions, resolveAwsEnvironmentBuildTarget } from './aws-build-target.js';
+import { awsBuildTargetSchema, resolveAwsEnvironmentBuildTarget } from './aws-build-target.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import type {
   EnvironmentBuildInput,
@@ -35,7 +35,7 @@ import type { Env } from '../types.js';
 const vercelBuilderInstanceSchema = z.enum(['vercel-small', 'vercel-large']);
 
 export const environmentBuildTargetSchema = z.discriminatedUnion('provider', [
-  ...awsBuildTargetOptions,
+  awsBuildTargetSchema,
   z
     .object({
       provider: z.literal('cloudflare-containers'),
@@ -205,11 +205,8 @@ export async function resolveEnvironmentBuildTarget(args: {
     ...(args.egressMode === 'allowlist' ? { runtime: { egressMode: 'allowlist' } } : {}),
   });
 
-  if (
-    allocation !== undefined &&
-    ['aws', 'aws-ecs'].includes(getSandboxAllocationProvider(allocation))
-  ) {
-    return resolveAwsEnvironmentBuildTarget(env, reference, allocation);
+  if (allocation === 'aws-ecs-8g') {
+    return resolveAwsEnvironmentBuildTarget(env, reference);
   }
 
   if (allocation !== undefined && getSandboxAllocationProvider(allocation) === 'vercel') {
@@ -301,8 +298,7 @@ export function targetBaseImage(
   target: EnvironmentBuildTarget,
   nativeImage: () => Promise<string | null>
 ): Promise<string | null> {
-  if (target.provider === 'aws' || target.provider === 'aws-ecs')
-    return Promise.resolve(target.baseImage);
+  if (target.provider === 'aws-ecs') return Promise.resolve(target.baseImage);
   return target.provider === 'vercel'
     ? Promise.resolve(vercelSnapshotBaseImage(target))
     : nativeImage();

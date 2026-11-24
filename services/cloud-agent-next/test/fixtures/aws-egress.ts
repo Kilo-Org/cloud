@@ -3,49 +3,54 @@ import { vi } from 'vitest';
 import type { Env } from '../../src/types.js';
 import { ECS_TEST_CONFIG } from './aws-ecs.js';
 import { encodeAwsEcsProviderRef } from '../../src/sandbox-control/aws-ecs-operation.js';
-import { AWS_TEST_CONFIGURATION } from './aws-provider.js';
-import { encodeAwsProviderRef } from '../../src/sandbox-control/aws-operation.js';
 import {
   mintSandboxLaunchCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
-import {
-  mintAwsEgressCredential,
-  mintAwsEgressCredentialUntil,
-} from '../../src/egress/aws-credential.js';
+import { mintAwsEgressCredential } from '../../src/egress/aws-credential.js';
 import { grant, logicalId } from '../../src/scm-broker/test-fixtures.js';
-import { createAwsEgressAdmission, type AwsEgressContext } from '../../src/egress/aws-admission.js';
+import { createAwsSandboxEgress } from '../../src/egress/aws-sandbox-context.js';
+import type { AwsEcsOperation } from '../../src/sandbox-control/aws-ecs-operation.js';
+
+type SandboxContext = Awaited<
+  ReturnType<Parameters<typeof createAwsSandboxEgress>[0]['readContext']>
+>;
+/** The DO supplies the operation, credential hash and policy separately; tests mutate them here. */
+type AwsEgressFixtureContext = SandboxContext & {
+  operation: AwsEcsOperation | null;
+  credentialHash?: string;
+  allowlist?: readonly string[];
+  audit: boolean;
+};
 
 const generation = '22222222-2222-4222-8222-222222222222';
 const allocationId = '11111111-1111-4111-8111-111111111111';
 const secret = 'worker-signing-test';
 const credential = 'a'.repeat(64);
-export async function awsEgressFixture(
-  options: { provider?: 'aws' | 'aws-ecs'; now?: () => number } = {}
-) {
-  const provider = options.provider ?? 'aws';
+export async function awsEgressFixture(options: { now?: () => number } = {}) {
   let now = options.now?.() ?? Date.now();
+  const certificateExpiresAt = Math.floor((now + 86_400_000) / 1000) * 1000;
   const config = {
-    ...AWS_TEST_CONFIGURATION,
+    ...ECS_TEST_CONFIG,
     proxy: { generation, hostname: 'proxy.kilo.internal', caFingerprint: 'b'.repeat(64) },
   };
   const scope = grant();
-  scope.provider = 'aws';
+  scope.provider = 'aws-ecs';
   scope.orgId = '11111111-1111-4111-8111-111111111111';
   scope.preparedAt = now - 1000;
   scope.expiresAt = now + 3_600_000;
   const ref = {
-    provider: 'aws' as const,
+    provider: 'aws-ecs' as const,
     sandboxId: logicalId,
     intentId: allocationId,
     createdAt: now,
   };
-  const context: AwsEgressContext = {
+  const context: AwsEgressFixtureContext = {
     sandboxId: logicalId,
     ownerId: scope.userId,
-    provider: 'aws',
+    provider: 'aws-ecs',
     containmentEnabled: true,
-    allocation: { kind: 'creating', allocationId, providerRef: encodeAwsProviderRef(ref) },
+    allocation: { kind: 'creating', allocationId, providerRef: encodeAwsEcsProviderRef(ref) },
     byoc: {
       organizationId: '11111111-1111-4111-8111-111111111111',
       credentialId: '22222222-2222-4222-8222-222222222222',
@@ -55,50 +60,24 @@ export async function awsEgressFixture(
     grants: [scope],
     liveSessionIds: scope.members.map(member => member.sessionId),
     organizationId: scope.orgId,
-    available: true,
-    identityBinding: '',
     audit: true,
     operation: {
       ref,
       config,
       phase: 'launching',
-      deadlineAt: now + 28_680_000,
-      request: {
-        clientToken: allocationId,
-        imageIdentifier: config.imageIdentifier,
-        imageVersion: config.imageVersion,
-        ingressNetworkConnectors: [
-          'arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:NO_INGRESS',
-        ],
-        egressNetworkConnectors: [config.connectorArn],
-        logging: { disabled: {} },
-        maximumDurationInSeconds: 28_800,
-        runHookPayload: '{}',
-      },
-    },
-  };
-  if (provider === 'aws-ecs') {
-    const configuration = { ...ECS_TEST_CONFIG, proxy: config.proxy };
-    const ecsRef = { ...ref, provider: 'aws-ecs' as const };
-    scope.provider = 'aws-ecs';
-    context.provider = 'aws-ecs';
-    context.allocation.providerRef = encodeAwsEcsProviderRef(ecsRef);
-    context.operation = {
-      ref: ecsRef,
-      config: configuration,
-      phase: 'launching',
       requestAt: now,
+      deadlineAt: certificateExpiresAt,
       request: {
-        cluster: configuration.clusterArn,
-        taskDefinition: configuration.taskDefinitionArn,
-        capacityProviderStrategy: [{ capacityProvider: configuration.capacityProvider, weight: 1 }],
+        cluster: config.clusterArn,
+        taskDefinition: config.taskDefinitionArn,
+        capacityProviderStrategy: [{ capacityProvider: config.capacityProvider, weight: 1 }],
         count: 1,
         clientToken: allocationId,
         startedBy: allocationId,
         networkConfiguration: {
           awsvpcConfiguration: {
-            subnets: [configuration.subnetId],
-            securityGroups: [configuration.securityGroupId],
+            subnets: [config.subnetId],
+            securityGroups: [config.securityGroupId],
             assignPublicIp: 'DISABLED',
           },
         },
@@ -107,10 +86,9 @@ export async function awsEgressFixture(
         },
         enableExecuteCommand: false,
       },
-    };
-  }
-  if (!context.operation) throw new Error('Missing operation');
-  const pinnedConfiguration = context.operation.config;
+    },
+  };
+  const pinnedConfiguration = config;
   const metadata = {
     deployment: {
       protocolVersion: 1 as const,
@@ -120,7 +98,7 @@ export async function awsEgressFixture(
       port: 3128 as const,
       caFingerprint: config.proxy.caFingerprint,
       caCertificate: 'public-ca'.repeat(20),
-      expiresAt: new Date(now + 86_400_000).toISOString(),
+      expiresAt: new Date(certificateExpiresAt).toISOString(),
     },
     identity: {
       protocolVersion: 1 as const,
@@ -130,10 +108,7 @@ export async function awsEgressFixture(
     },
   };
   const proof = {
-    credential: (provider === 'aws'
-      ? mintAwsEgressCredential
-      : (identity: Parameters<typeof mintAwsEgressCredential>[0], key: string) =>
-          mintAwsEgressCredentialUntil(identity, key, Date.parse(metadata.deployment.expiresAt)))(
+    credential: mintAwsEgressCredential(
       {
         launchCredential: mintSandboxLaunchCredential(
           { sandboxId: logicalId, allocationId, credential },
@@ -142,7 +117,8 @@ export async function awsEgressFixture(
         generation,
         stackId: config.stackId,
       },
-      secret
+      secret,
+      certificateExpiresAt
     ),
     identity: metadata.identity.secret,
   };
@@ -159,16 +135,26 @@ export async function awsEgressFixture(
   const env = {
     GIT_TOKEN_SERVICE: { redeemGitHubSessionCapability: redeem },
     SANDBOX_CONTAINERS: { getByName: () => ({ recordEgressRequest }) },
+    WORKER_URL: 'https://agent.example.com',
   } as unknown as Env;
-  const api = createAwsEgressAdmission({
+  const unexpected = (operation: string) => async () => {
+    throw new Error(`Unexpected egress operation ${operation}`);
+  };
+  const api = createAwsSandboxEgress({
     env,
-    serial: async operation => operation(),
+    admission: { serial: async operation => operation(), resolve, persist },
     readContext: async () => structuredClone(context),
+    operationStorage: {
+      get: async () => structuredClone(context.operation),
+      list: unexpected('list'),
+      delete: unexpected('deletion'),
+      transaction: unexpected('update'),
+    } as unknown as Parameters<typeof createAwsSandboxEgress>[0]['operationStorage'],
+    readCredentialHash: async () => context.credentialHash,
+    readPolicy: () => ({ allowlist: context.allowlist, audit: context.audit }),
     resolveConfiguration,
     readMetadata,
     signingSecret: async () => secret,
-    resolve,
-    persist,
     now: () => options.now?.() ?? now,
   });
   return {

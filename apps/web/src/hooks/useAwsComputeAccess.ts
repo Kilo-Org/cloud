@@ -1,11 +1,9 @@
 'use client';
 
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
-const providers = ['aws', 'aws-ecs'] as const;
-
-/** Keep setup and repair reachable for either AWS engine. */
+/** Keep setup and repair reachable for enrolled owners and owners with a saved connection. */
 export function useAwsComputeAccess({
   organizationId,
   enabled,
@@ -14,24 +12,22 @@ export function useAwsComputeAccess({
   enabled: boolean;
 }): boolean {
   const trpc = useTRPC();
-  const enrollments = useQueries({
-    queries: providers.map(provider => ({
-      ...(organizationId !== undefined
-        ? trpc.organizations.awsCompute.getEnrollment.queryOptions({ organizationId, provider })
-        : trpc.awsCompute.getEnrollment.queryOptions({ provider })),
-      enabled,
-    })),
+  const enrollment = useQuery({
+    ...(organizationId !== undefined
+      ? trpc.organizations.awsCompute.getEnrollment.queryOptions({ organizationId })
+      : trpc.awsCompute.getEnrollment.queryOptions()),
+    enabled,
   });
-  const statuses = useQueries({
-    queries: providers.map(provider => ({
-      ...(organizationId !== undefined
-        ? trpc.organizations.awsCompute.getStatus.queryOptions({ organizationId, provider })
-        : trpc.awsCompute.getStatus.queryOptions({ provider })),
-      enabled,
-    })),
+  const status = useQuery({
+    ...(organizationId !== undefined
+      ? trpc.organizations.awsCompute.getStatus.queryOptions({ organizationId })
+      : trpc.awsCompute.getStatus.queryOptions()),
+    enabled,
   });
   return (
-    enrollments.some(query => (query.isSuccess && query.data.enrolled) || query.isError) ||
-    statuses.some(query => query.data != null || query.isError)
+    (enrollment.isSuccess && enrollment.data.enrolled) ||
+    enrollment.isError ||
+    status.data != null ||
+    status.isError
   );
 }

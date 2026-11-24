@@ -1,4 +1,3 @@
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { prepareAwsSnapshotStartup } from '../../sandbox-control/aws-snapshot-startup.js';
 import type { SandboxBillingInput } from '../../container-usage-context.js';
 import {
@@ -19,9 +18,8 @@ import type { SandboxContainers } from '../../sandbox-containers/SandboxContaine
 import type { VercelProviderLocator } from '../../sandbox-control/vercel-provider.js';
 import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
-import { createByocAwsProviderAdapter } from '../../byoc/aws-provider.js';
 import { createByocAwsEcsProviderAdapter } from '../../byoc/aws-ecs-provider.js';
-import { awsOperationStorage, awsEcsOperationStorage } from './aws-operation-storage.js';
+import { awsEcsOperationStorage } from './aws-operation-storage.js';
 
 /**
  * The provider registry for adapter construction. Provider facts are in
@@ -52,16 +50,13 @@ export type ProviderAdapterDeps = {
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
   readAcceptedRuntimeProxyHandles: () => Promise<ReadonlyMap<string, readonly string[]>>;
   getSandboxContainer: (id: string) => DurableObjectStub<SandboxContainers>;
-  operationStorage: Parameters<typeof awsOperationStorage>[0];
+  operationStorage: Parameters<typeof awsEcsOperationStorage>[0];
 };
 
 export function createProviderAdapter(
   pin: StoredProviderPin,
   deps: ProviderAdapterDeps
 ): ProviderAdapter {
-  const prepareAwsSnapshot = providerSupports(pin.provider, 'environmentSnapshots')
-    ? prepareAwsSnapshotStartup
-    : undefined;
   const allocationName = pin.allocationName ?? deps.sandboxId;
   switch (pin.provider) {
     case 'aws-ecs': {
@@ -71,17 +66,7 @@ export function createProviderAdapter(
         source: pin.byoc,
         sandboxId: deps.sandboxId,
         storage: awsEcsOperationStorage(deps.operationStorage),
-        prepareSnapshot: prepareAwsSnapshot,
-      });
-    }
-    case 'aws': {
-      if (!pin.byoc) throw new ProviderCreationError('invalid_configuration');
-      return createByocAwsProviderAdapter({
-        env: deps.env,
-        source: pin.byoc,
-        sandboxId: deps.sandboxId,
-        storage: awsOperationStorage(deps.operationStorage),
-        prepareSnapshot: prepareAwsSnapshot,
+        prepareSnapshot: prepareAwsSnapshotStartup,
       });
     }
     case 'vercel': {

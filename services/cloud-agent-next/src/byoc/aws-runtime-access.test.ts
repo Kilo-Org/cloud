@@ -1,60 +1,46 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
-import { awsRuntimeAccess } from './aws-credential-resolver.js';
-import { awsEcsRuntimeAccess } from './aws-ecs-credential-resolver.js';
+import { awsEcsRuntimeAccess } from './aws-credential-resolver.js';
 import { createAwsRoleSessionCache } from './aws-runtime-access.js';
 
 afterEach(() => vi.unstubAllGlobals());
 describe('shared AWS account transport', () => {
-  it.each(['MicroVM', 'ECS'] as const)(
-    'uses Kilo then customer role credentials for %s',
-    async engine => {
-      const env = {
-        AWS_BYOC_CREDENTIALS: JSON.stringify({
-          accessKeyId: 'AKIABOOT0000000000',
-          secretAccessKey: 'bootstrap',
-        }),
-        AWS_BYOC_KILO_ROLE_ARN: 'arn:aws:iam::999999999999:role/kilo',
-      } as Env;
-      let assumptions = 0;
-      const fetcher = vi.fn(async (request: Request) => {
-        if (request.url.includes('sts.')) {
-          const input = new URLSearchParams(await request.text());
-          assumptions++;
-          expect(input.get('RoleArn')).toBe(
-            assumptions === 1 ? env.AWS_BYOC_KILO_ROLE_ARN : ECS_TEST_CONFIG.roleArn
-          );
-          expect(input.get('ExternalId')).toBe(
-            assumptions === 1
-              ? null
-              : engine === 'ECS'
-                ? ECS_TEST_CONFIG.externalId
-                : AWS_TEST_CONFIGURATION.externalId
-          );
-          expect(request.headers.get('authorization')).toContain(
-            assumptions === 1 ? 'AKIABOOT0000000000' : 'ASIAKILO0000000000'
-          );
-          return new Response(
-            `<AssumeRoleResponse><Credentials><AccessKeyId>${assumptions === 1 ? 'ASIAKILO0000000000' : 'ASIACUSTOMER000000'}</AccessKeyId><SecretAccessKey>synthetic</SecretAccessKey><SessionToken>SyntheticToken</SessionToken><Expiration>${new Date(Date.now() + 3_600_000).toISOString()}</Expiration></Credentials></AssumeRoleResponse>`
-          );
-        }
-        expect(request.headers.get('authorization')).toContain('ASIACUSTOMER000000');
-        expect(request.url).toContain('customer-artifacts.s3.us-east-1.amazonaws.com/kilo/launch/');
-        return new Response(null);
-      });
-      vi.stubGlobal('fetch', fetcher);
-      const access =
-        engine === 'ECS'
-          ? await awsEcsRuntimeAccess(env, ECS_TEST_CONFIG)
-          : await awsRuntimeAccess(env, AWS_TEST_CONFIGURATION);
-      expect(access).not.toHaveProperty('credentials');
-      await access.objects.putLaunch('kilo/launch/allocation-1.json', '{}');
-      expect(assumptions).toBe(2);
-      expect(fetcher).toHaveBeenCalledTimes(3);
-    }
-  );
+  it('uses Kilo then customer role credentials', async () => {
+    const env = {
+      AWS_BYOC_CREDENTIALS: JSON.stringify({
+        accessKeyId: 'AKIABOOT0000000000',
+        secretAccessKey: 'bootstrap',
+      }),
+      AWS_BYOC_KILO_ROLE_ARN: 'arn:aws:iam::999999999999:role/kilo',
+    } as Env;
+    let assumptions = 0;
+    const fetcher = vi.fn(async (request: Request) => {
+      if (request.url.includes('sts.')) {
+        const input = new URLSearchParams(await request.text());
+        assumptions++;
+        expect(input.get('RoleArn')).toBe(
+          assumptions === 1 ? env.AWS_BYOC_KILO_ROLE_ARN : ECS_TEST_CONFIG.roleArn
+        );
+        expect(input.get('ExternalId')).toBe(assumptions === 1 ? null : ECS_TEST_CONFIG.externalId);
+        expect(request.headers.get('authorization')).toContain(
+          assumptions === 1 ? 'AKIABOOT0000000000' : 'ASIAKILO0000000000'
+        );
+        return new Response(
+          `<AssumeRoleResponse><Credentials><AccessKeyId>${assumptions === 1 ? 'ASIAKILO0000000000' : 'ASIACUSTOMER000000'}</AccessKeyId><SecretAccessKey>synthetic</SecretAccessKey><SessionToken>SyntheticToken</SessionToken><Expiration>${new Date(Date.now() + 3_600_000).toISOString()}</Expiration></Credentials></AssumeRoleResponse>`
+        );
+      }
+      expect(request.headers.get('authorization')).toContain('ASIACUSTOMER000000');
+      expect(request.url).toContain('customer-artifacts.s3.us-east-1.amazonaws.com/kilo/launch/');
+      return new Response(null);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const access = await awsEcsRuntimeAccess(env, ECS_TEST_CONFIG);
+    expect(access).not.toHaveProperty('credentials');
+    await access.objects.putLaunch('kilo/launch/allocation-1.json', '{}');
+    expect(assumptions).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
   it('preserves forbidden role errors without exposing AWS bodies', async () => {
     vi.stubGlobal('fetch', async () => new Response('sensitive body', { status: 403 }));
     const env = {

@@ -38,8 +38,6 @@ import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-p
 import { leaseAtLeastMs } from './deadlines.js';
 import { ecsProviderFixture } from '../../test/fixtures/aws-ecs.js';
 import { encodeAwsEcsProviderRef } from './aws-ecs-operation.js';
-import { awsProviderFixture } from '../../test/fixtures/aws-provider.js';
-import { encodeAwsProviderRef } from './aws-operation.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
 /**
@@ -89,7 +87,7 @@ const vercelConfig: VercelSandboxRuntimeConfig = {
  */
 type ContractHarness = {
   expectedRuntime?: CloudAgentRunContainer;
-  leaseModel?: 'fixed' | 'unbounded';
+  leaseModel?: 'fixed';
   name: AgentSandboxProvider;
   adapter: ProviderAdapter;
   /** Resolve a fresh owned ref through the adapter's own `create`. */
@@ -362,40 +360,6 @@ function vercelHarness(): ContractHarness {
  * below then runs against the new adapter. The retired `cloudflare` provider
  * starts no compute and has no harness.
  */
-function awsHarness(): ContractHarness {
-  const fixture = awsProviderFixture(SANDBOX);
-  const adapter = fixture.adapter();
-  return {
-    name: 'aws',
-    adapter,
-    create: () => requireRef(adapter),
-    foreignRef: () =>
-      encodeAwsProviderRef({
-        provider: 'aws',
-        sandboxId: FOREIGN,
-        intentId: intent.intentId,
-        createdAt: 0,
-      }),
-    setRunning: fixture.setRunning,
-    failObserve: fixture.failObserve,
-    failStop: fixture.failStop,
-    failCreate: () => fixture.failRuntime(new ProviderCreationError('invalid_configuration')),
-    launchedEnv: () => fixture.launchedDocument()?.env,
-    launchSupervisor: () => undefined,
-    launchInvocation: () => fixture.launchedDocument()?.argv,
-    leaseCalls: () => 0,
-    leaseMs: () => [],
-    leaseModel: 'fixed',
-    expectedRuntime: {
-      provider: 'aws',
-      sandboxId: SANDBOX,
-      instanceId: intent.intentId,
-      region: 'us-east-1',
-      instanceType: 'microvm-8g',
-    },
-  };
-}
-
 function awsEcsHarness(): ContractHarness {
   const fixture = ecsProviderFixture(SANDBOX);
   const adapter = fixture.adapter();
@@ -419,7 +383,7 @@ function awsEcsHarness(): ContractHarness {
     launchInvocation: () => fixture.launchedDocument().argv,
     leaseCalls: () => 0,
     leaseMs: () => [],
-    leaseModel: 'unbounded',
+    leaseModel: 'fixed',
     expectedRuntime: {
       provider: 'aws-ecs',
       sandboxId: SANDBOX,
@@ -434,7 +398,6 @@ const harnessFactories: Record<
   Exclude<AgentSandboxProvider, 'cloudflare'>,
   () => ContractHarness
 > = {
-  aws: awsHarness,
   'aws-ecs': awsEcsHarness,
   'cloudflare-containers': () => containersHarness(),
   vercel: vercelHarness,

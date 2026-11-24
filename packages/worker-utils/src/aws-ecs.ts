@@ -1,9 +1,18 @@
 import { z } from 'zod';
-import { awsByocConfigurationSchema, awsProxyPinSchema, isAwsRepositoryPath } from './aws-byoc';
+import {
+  awsBucketSchema,
+  awsExternalIdSchema,
+  awsProxyPinSchema,
+  awsProxyProtocolVersionSchema,
+  awsRegionSchema,
+  awsRoleArnSchema,
+  awsStackIdSchema,
+  awsTemplateVersionSchema,
+  isAwsRepositoryPath,
+} from './aws-byoc';
 
 export const AWS_ECS_BYOC_TEMPLATE_VERSION = 1;
 export const AWS_ECS_BYOC_ENVELOPE_SCHEME = 'byoc-aws-ecs-configuration-rsa-aes-256-gcm';
-const identity = awsByocConfigurationSchema.shape;
 const clusterArn = z.string().regex(/^arn:aws:ecs:us-east-1:\d{12}:cluster\/[A-Za-z0-9_-]{1,255}$/);
 const taskDefinitionArn = z
   .string()
@@ -12,22 +21,22 @@ export const awsEcsTaskArnSchema = z
   .string()
   .regex(/^arn:aws:ecs:us-east-1:\d{12}:task\/[A-Za-z0-9_-]{1,255}\/[a-f0-9]{32}$/);
 
-/** Independent provider configuration. Existing MicroVM fields and envelopes retain their current contract. */
+/** The customer stack resources that an ECS allocation uses. */
 export const awsEcsResourceConfigurationSchema = z
   .object({
-    region: identity.region,
-    roleArn: identity.roleArn,
-    externalId: identity.externalId,
-    stackId: identity.stackId,
-    bucket: identity.bucket,
-    templateVersion: z.number().int().nonnegative(),
-    proxyProtocolVersion: identity.proxyProtocolVersion,
+    region: awsRegionSchema,
+    roleArn: awsRoleArnSchema,
+    externalId: awsExternalIdSchema,
+    stackId: awsStackIdSchema,
+    bucket: awsBucketSchema,
+    templateVersion: awsTemplateVersionSchema,
+    proxyProtocolVersion: awsProxyProtocolVersionSchema,
     clusterArn,
     taskDefinitionArn,
     capacityProvider: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/),
     subnetId: z.string().regex(/^subnet-(?:[a-f0-9]{8}|[a-f0-9]{17})$/),
     securityGroupId: z.string().regex(/^sg-(?:[a-f0-9]{8}|[a-f0-9]{17})$/),
-    executionRoleArn: identity.roleArn,
+    executionRoleArn: awsRoleArnSchema,
     runtimeImage: z
       .string()
       .regex(

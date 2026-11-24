@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { awsEcsByocConfigurationSchema, awsEcsTaskArnSchema } from './aws-ecs';
-import { awsByocConfigurationSchema } from './aws-byoc';
 
 const account = '123456789012';
 const config = () => ({
@@ -24,10 +23,9 @@ const config = () => ({
   executionRoleArn: `arn:aws:iam::${account}:role/execution`,
   runtimeImage: `999999999999.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${'c'.repeat(64)}`,
 });
-describe('independent AWS ECS configuration', () => {
+describe('AWS ECS configuration', () => {
   it('accepts scoped customer resources and a digest-pinned private release image', () => {
     expect(awsEcsByocConfigurationSchema.parse(config())).toEqual(config());
-    expect(awsByocConfigurationSchema.safeParse(config()).success).toBe(false);
   });
   it.each(['clusterArn', 'taskDefinitionArn', 'executionRoleArn', 'stackId'] as const)(
     'rejects foreign customer resource %s',
@@ -48,7 +46,7 @@ describe('independent AWS ECS configuration', () => {
       false
     );
   });
-  it('requires proxy pins and rejects MicroVM fields', () => {
+  it('requires proxy pins and rejects unknown fields', () => {
     expect(awsEcsByocConfigurationSchema.safeParse({ ...config(), proxy: undefined }).success).toBe(
       false
     );

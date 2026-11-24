@@ -1,13 +1,8 @@
 import {
-  awsByocConfigurationSchema,
-  type AwsByocConfiguration,
-} from '@kilocode/worker-utils/aws-byoc';
-import {
   awsEcsByocConfigurationSchema,
   type AwsEcsByocConfiguration,
 } from '@kilocode/worker-utils/aws-ecs';
 import {
-  awsArchiveBaseImage,
   awsEcsArchiveBaseImage,
   awsArchiveMatchesBase,
   awsArchiveObjectKey,
@@ -132,43 +127,25 @@ try { process.execve(C.argv[0], C.argv, environment); }
 catch { await report('environment_restore_unavailable'); process.exit(C.failureExitCodes.environment_restore_unavailable); }
 `;
 
-type AwsArchiveRestoreTarget =
-  | { provider: 'aws'; configuration: AwsByocConfiguration }
-  | { provider: 'aws-ecs'; configuration: AwsEcsByocConfiguration };
-
 /** Restore before the fresh runtime and credentials start. A failed restore never starts that command. */
-export function renderAwsArchiveRestore(
-  input: AwsArchiveRestoreTarget & {
-    snapshotId: string;
-    connectionId: string;
-    downloadUrl: string;
-    /** The launch credential goes to this URL. It must be on the trusted Worker origin. */
-    reportUrl: string;
-    workerUrl: string;
-    allocationId: string;
-    deadlineAt: number;
-    command: ProviderStartupCommand;
-    /** Explicit so tests can use an isolated filesystem. Production always supplies '/'. */
-    filesystemRoot: string;
-  }
-): ProviderStartupCommand {
-  let baseImage: string;
-  switch (input.provider) {
-    case 'aws':
-      baseImage = awsArchiveBaseImage(
-        input.connectionId,
-        awsByocConfigurationSchema.parse(input.configuration)
-      );
-      break;
-    case 'aws-ecs':
-      baseImage = awsEcsArchiveBaseImage(
-        input.connectionId,
-        awsEcsByocConfigurationSchema.parse(input.configuration)
-      );
-      break;
-    default:
-      throw new Error('Unsupported AWS archive provider');
-  }
+export function renderAwsArchiveRestore(input: {
+  configuration: AwsEcsByocConfiguration;
+  snapshotId: string;
+  connectionId: string;
+  downloadUrl: string;
+  /** The launch credential goes to this URL. It must be on the trusted Worker origin. */
+  reportUrl: string;
+  workerUrl: string;
+  allocationId: string;
+  deadlineAt: number;
+  command: ProviderStartupCommand;
+  /** Explicit so tests can use an isolated filesystem. Production always supplies '/'. */
+  filesystemRoot: string;
+}): ProviderStartupCommand {
+  const baseImage = awsEcsArchiveBaseImage(
+    input.connectionId,
+    awsEcsByocConfigurationSchema.parse(input.configuration)
+  );
   const snapshot = decodeAwsArchiveSnapshot(input.snapshotId);
   if (!snapshot || !awsArchiveMatchesBase(snapshot, baseImage))
     throw new Error('AWS archive base is incompatible');

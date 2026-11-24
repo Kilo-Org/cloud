@@ -8,7 +8,6 @@ export const AGENT_SANDBOX_PROVIDERS = [
   'cloudflare',
   'vercel',
   'cloudflare-containers',
-  'aws',
   'aws-ecs',
 ] as const;
 
@@ -65,15 +64,6 @@ export const PROVIDER_DESCRIPTORS = {
   'aws-ecs': {
     label: 'AWS',
     reservedPreviewPorts: [],
-    launchEnv: { PATH: '/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin' },
-    requiresCustomerCredential: true,
-    uniqueAllocationName: true,
-    credentialTransport: 'explicit-proxy',
-    retired: false,
-  },
-  aws: {
-    label: 'AWS',
-    reservedPreviewPorts: [8080],
     launchEnv: { PATH: '/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin' },
     requiresCustomerCredential: true,
     uniqueAllocationName: true,

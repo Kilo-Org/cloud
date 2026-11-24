@@ -1,4 +1,4 @@
-import type { AwsEgressProof } from '../../egress/aws-admission.js';
+import type { AwsEgressProof } from '../../egress/aws-egress-identity.js';
 import type { AwsScmAdmission } from '../../egress/aws-scm-admission.js';
 import { createAwsSandboxEgress } from '../../egress/aws-sandbox-context.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';

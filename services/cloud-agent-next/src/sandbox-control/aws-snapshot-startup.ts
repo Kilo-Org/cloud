@@ -1,9 +1,7 @@
 import { withTimeout } from '@kilocode/worker-utils';
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { AwsObjectStore } from '../agent-sandbox/aws/object-store.js';
 import {
-  awsArchiveBaseImage,
   awsEcsArchiveBaseImage,
   awsArchiveMatchesBase,
   awsArchiveObjectKey,
@@ -16,25 +14,20 @@ import {
   type ProviderStartup,
 } from './provider.js';
 
-type Target =
-  | { provider: 'aws'; configuration: AwsByocConfiguration }
-  | { provider: 'aws-ecs'; configuration: AwsEcsByocConfiguration };
-
-/** The environment coordinator owns authorization and age. Both AWS engines share storage and restore admission. */
-export async function prepareAwsSnapshotStartup(
-  input: Target & {
-    connectionId: string;
-    currentConfiguration(): Promise<AwsByocConfiguration | AwsEcsByocConfiguration>;
-    objects: Pick<AwsObjectStore, 'inspectArchive' | 'downloadUrl'>;
-    snapshot: ProviderSnapshotStart;
-    startup: ProviderStartup;
-    workerUrl: string | undefined;
-    sandboxId: string;
-    allocationId: string;
-    deadlineAt: number;
-    now?: () => number;
-  }
-): Promise<ProviderStartup> {
+/** The environment coordinator owns authorization and age. This module owns storage and restore admission. */
+export async function prepareAwsSnapshotStartup(input: {
+  configuration: AwsEcsByocConfiguration;
+  connectionId: string;
+  currentConfiguration(): Promise<AwsEcsByocConfiguration>;
+  objects: Pick<AwsObjectStore, 'inspectArchive' | 'downloadUrl'>;
+  snapshot: ProviderSnapshotStart;
+  startup: ProviderStartup;
+  workerUrl: string | undefined;
+  sandboxId: string;
+  allocationId: string;
+  deadlineAt: number;
+  now?: () => number;
+}): Promise<ProviderStartup> {
   const now = input.now ?? Date.now;
   function budget() {
     const remaining = Math.min(5000, input.deadlineAt - now());
@@ -44,12 +37,8 @@ export async function prepareAwsSnapshotStartup(
   }
   budget();
   if (!input.workerUrl) throw new ProviderSnapshotCreationError('transient');
-  if (input.snapshot.provider !== input.provider)
-    throw new ProviderSnapshotCreationError('provenance');
-  const base =
-    input.provider === 'aws'
-      ? awsArchiveBaseImage(input.connectionId, input.configuration)
-      : awsEcsArchiveBaseImage(input.connectionId, input.configuration);
+  if (input.snapshot.provider !== 'aws-ecs') throw new ProviderSnapshotCreationError('provenance');
+  const base = awsEcsArchiveBaseImage(input.connectionId, input.configuration);
   const descriptor = decodeAwsArchiveSnapshot(input.snapshot.snapshotId);
   if (!descriptor || input.snapshot.baseImage !== base || !awsArchiveMatchesBase(descriptor, base))
     throw new ProviderSnapshotCreationError('image_mismatch');

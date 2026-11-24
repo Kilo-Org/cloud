@@ -1,11 +1,11 @@
 import { renderRuntimeBootstrap } from './runtime-bootstrap.js';
 import { renderAwsArchiveRestore } from './aws-archive-bootstrap.js';
 import {
-  awsArchiveBaseImage,
+  awsEcsArchiveBaseImage,
   awsArchiveObjectKey,
   encodeAwsArchiveSnapshot,
 } from '../shared/aws-archive.js';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import { Hono } from 'hono';
 import jwt from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
@@ -839,7 +839,7 @@ describe('AWS archive launch size and target admission', () => {
     const allocationId = '22222222-2222-4222-8222-222222222222';
     const archive = {
       format: 1 as const,
-      baseImage: awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION),
+      baseImage: awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG),
       sha256: 'c'.repeat(64),
       size: 10240,
       expandedBytes: 100,
@@ -859,8 +859,7 @@ describe('AWS archive launch size and target admission', () => {
     return {
       snapshotId: encodeAwsArchiveSnapshot(snapshot),
       connectionId,
-      provider: 'aws' as const,
-      configuration: AWS_TEST_CONFIGURATION,
+      configuration: ECS_TEST_CONFIG,
       downloadUrl: `https://customer-artifacts.s3.us-east-1.amazonaws.com/${awsArchiveObjectKey(snapshot)}?synthetic-signature=fixture`,
       reportUrl,
       workerUrl: 'https://worker.example.com',
@@ -904,7 +903,10 @@ describe('AWS archive launch size and target admission', () => {
       if (change === 'foreign-path')
         value.downloadUrl = value.downloadUrl.replace('/kilo/archives/', '/kilo/proxy/');
       if (change === 'foreign-base')
-        value.configuration = { ...value.configuration, imageVersion: '99.0' };
+        value.configuration = {
+          ...value.configuration,
+          taskDefinitionArn: value.configuration.taskDefinitionArn.replace(/:\d+$/, ':99'),
+        };
       if (change === 'foreign-report')
         value.reportUrl = 'https://attacker.example.com/sandbox-control/sbx-test/startup-failure';
       expect(() => renderAwsArchiveRestore(value)).toThrow(

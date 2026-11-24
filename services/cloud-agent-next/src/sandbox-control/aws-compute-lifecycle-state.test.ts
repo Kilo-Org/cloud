@@ -1,22 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import {
   awsRecoveryStep,
   transitionAwsOperation,
   AWS_LAUNCH_RECOVERY_MS,
 } from './aws-compute-lifecycle.js';
-import type { AwsOperation as MicrovmOperation } from './aws-operation.js';
 import type { AwsComputeOperation } from './aws-compute-lifecycle.js';
-type AwsOperation = AwsComputeOperation<
-  MicrovmOperation['config'],
-  MicrovmOperation['ref'],
-  NonNullable<MicrovmOperation['request']>
->;
+import type { AwsEcsOperation } from './aws-ecs-operation.js';
+type Config = AwsEcsOperation['config'];
+type Ref = AwsEcsOperation['ref'];
+type Request = NonNullable<AwsEcsOperation['request']>;
+type AwsOperation = AwsComputeOperation<Config, Ref, Request>;
 
 const now = 10_000;
 const created: AwsOperation = {
-  ref: { provider: 'aws', sandboxId: 'sbx_test', intentId: 'intent-1', createdAt: now },
-  config: AWS_TEST_CONFIGURATION,
+  ref: { provider: 'aws-ecs', sandboxId: 'sbx_test', intentId: 'intent-1', createdAt: now },
+  config: ECS_TEST_CONFIG,
   phase: 'created',
 };
 const prepared: AwsOperation = {
@@ -26,33 +25,34 @@ const prepared: AwsOperation = {
   requestAt: now,
   deadlineAt: now + 28_680_000,
   request: {
+    cluster: ECS_TEST_CONFIG.clusterArn,
+    taskDefinition: ECS_TEST_CONFIG.taskDefinitionArn,
+    capacityProviderStrategy: [{ capacityProvider: ECS_TEST_CONFIG.capacityProvider, weight: 1 }],
+    count: 1,
     clientToken: created.ref.intentId,
-    imageIdentifier: created.config.imageIdentifier,
-    imageVersion: created.config.imageVersion,
-    ingressNetworkConnectors: [
-      'arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:NO_INGRESS',
-    ],
-    egressNetworkConnectors: [created.config.connectorArn],
-    logging: { disabled: {} },
-    maximumDurationInSeconds: 28_800,
-    runHookPayload: '{}',
+    startedBy: created.ref.intentId,
+    networkConfiguration: {
+      awsvpcConfiguration: {
+        subnets: [ECS_TEST_CONFIG.subnetId],
+        securityGroups: [ECS_TEST_CONFIG.securityGroupId],
+        assignPublicIp: 'DISABLED',
+      },
+    },
+    overrides: {
+      containerOverrides: [{ name: 'sandbox', command: ['-e', 'void 0'], environment: [] }],
+    },
+    enableExecuteCommand: false,
   },
 };
 const apply = (
   operation: AwsOperation,
-  event: Parameters<
-    typeof transitionAwsOperation<
-      MicrovmOperation['config'],
-      MicrovmOperation['ref'],
-      NonNullable<MicrovmOperation['request']>
-    >
-  >[1]
+  event: Parameters<typeof transitionAwsOperation<Config, Ref, Request>>[1]
 ) => transitionAwsOperation(operation, event, now);
 
 describe('pure AWS operation decisions', () => {
   it('checkpoints preparation once and never replaces an issued request', () => {
     expect(apply(created, { type: 'prepared', operation: prepared })).toEqual(prepared);
-    const running: AwsOperation = { ...prepared, phase: 'running', physicalId: 'microvm-original' };
+    const running: AwsOperation = { ...prepared, phase: 'running', physicalId: 'task-original' };
     expect(apply(running, { type: 'prepared', operation: prepared })).toBe(running);
     expect(created.phase).toBe('created');
   });
@@ -105,13 +105,13 @@ describe('pure AWS operation decisions', () => {
 
   it('retains a late physical identity behind Stop, but refuses substitution or revival', () => {
     const stopping = apply(prepared, { type: 'stop' });
-    const identified = apply(stopping, { type: 'identified', physicalId: 'microvm-one' });
-    expect(identified).toMatchObject({ phase: 'stopping', physicalId: 'microvm-one' });
-    expect(() => apply(identified, { type: 'identified', physicalId: 'microvm-two' })).toThrow(
+    const identified = apply(stopping, { type: 'identified', physicalId: 'task-one' });
+    expect(identified).toMatchObject({ phase: 'stopping', physicalId: 'task-one' });
+    expect(() => apply(identified, { type: 'identified', physicalId: 'task-two' })).toThrow(
       'identity changed'
     );
     const terminal = apply(identified, { type: 'terminated' });
-    expect(apply(terminal, { type: 'identified', physicalId: 'microvm-two' })).toBe(terminal);
+    expect(apply(terminal, { type: 'identified', physicalId: 'task-two' })).toBe(terminal);
   });
 
   it('keeps phase transitions fenced and drops the request only after retirement', () => {
@@ -132,10 +132,7 @@ describe('pure AWS operation decisions', () => {
     ).toThrow();
     expect(awsRecoveryStep(prepared, now + AWS_LAUNCH_RECOVERY_MS + 1)).toBe('unsubmitted');
     expect(
-      awsRecoveryStep(
-        { ...uncertain, physicalId: 'microvm-known' },
-        now + AWS_LAUNCH_RECOVERY_MS + 1
-      )
+      awsRecoveryStep({ ...uncertain, physicalId: 'task-known' }, now + AWS_LAUNCH_RECOVERY_MS + 1)
     ).toBe('identified');
     expect(awsRecoveryStep(created, now)).toBe('absent');
     expect(

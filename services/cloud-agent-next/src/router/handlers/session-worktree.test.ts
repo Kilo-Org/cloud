@@ -204,7 +204,7 @@ function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): Session
       sandboxId,
       sandboxProvider,
       ...(sandboxProvider === 'vercel' ? { sandboxProviderBinding: BYOC_PROVIDER_BINDING } : {}),
-      ...(sandboxProvider === 'aws' || sandboxProvider === 'aws-ecs'
+      ...(sandboxProvider === 'aws-ecs'
         ? { sandboxProviderBinding: { ...BYOC_PROVIDER_BINDING, kind: sandboxProvider } }
         : {}),
       sandboxAllocation,

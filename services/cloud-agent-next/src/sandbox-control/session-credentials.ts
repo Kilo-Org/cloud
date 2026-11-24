@@ -1402,8 +1402,7 @@ export async function prepareCredentialGrant(
     repository: additionalRepositoryOf(member.source, existing, source, diagnostic),
   }));
   const additionalRepositories = additionalEntries.map(entry => entry.repository);
-  if (provider === 'aws' || provider === 'aws-ecs')
-    assertAwsScmRepositories([repository, ...additionalRepositories]);
+  if (provider === 'aws-ecs') assertAwsScmRepositories([repository, ...additionalRepositories]);
   if (
     existing &&
     (!isContainedSessionCredentialGrant(existing) ||

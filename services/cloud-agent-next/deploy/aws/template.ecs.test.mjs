@@ -1,40 +1,50 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { buildAwsEcsTemplate, renderAwsEcsTemplate } from './build-ecs-template.mjs';
 
-const source = JSON.parse(readFileSync(new URL('template.json', import.meta.url), 'utf8'));
-const target = new URL('template.ecs.json', import.meta.url);
-test('generated ECS release stays current and leaves the MicroVM source unchanged', async () => {
-  assert.equal(readFileSync(target, 'utf8'), await renderAwsEcsTemplate());
-  assert.deepEqual(
-    source,
-    JSON.parse(readFileSync(new URL('template.json', import.meta.url), 'utf8'))
+// template.ecs.json is the only AWS release template. These checks hold its security contract.
+const template = JSON.parse(readFileSync(new URL('template.ecs.json', import.meta.url), 'utf8'));
+const resources = template.Resources;
+const customerStatements = resources.CustomerRole.Properties.Policies[0].PolicyDocument.Statement;
+const customerActions = customerStatements.flatMap(statement => [statement.Action].flat());
+
+test('the release template declares ECS and contains no Lambda resource or authority', () => {
+  assert.equal(template.Metadata.KiloProvider, 'aws-ecs');
+  assert.deepEqual(template.Outputs.Provider, { Value: 'aws-ecs' });
+  for (const [name, resource] of Object.entries(resources))
+    assert.equal(resource.Type.startsWith('AWS::Lambda::'), false, name);
+  assert.equal(
+    customerActions.some(action => action.startsWith('lambda:')),
+    false
   );
-  assert.equal(source.Resources.RuntimeImage.Type, 'AWS::Lambda::MicrovmImage');
 });
-test('both engines use the same network, proxy, DNS and private artifact infrastructure', () => {
-  const ecs = buildAwsEcsTemplate();
-  for (const [name, resource] of Object.entries(source.Resources)) {
-    if (
-      [
-        'ConnectorOperatorRole',
-        'Connector',
-        'BuildRole',
-        'RuntimeImage',
-        'CustomerRole',
-        'DnsRules',
-      ].includes(name)
-    )
-      continue;
-    assert.deepEqual(ecs.Resources[name], resource, name);
-  }
-  assert.deepEqual(
-    ecs.Resources.DnsRules.Properties.FirewallRules.slice(1),
-    source.Resources.DnsRules.Properties.FirewallRules
+test('the customer role reads only public proxy metadata and writes only launch and archive objects', () => {
+  const s3 = customerStatements.filter(statement =>
+    [statement.Action].flat().some(action => action.startsWith('s3:'))
   );
-  assert.equal(ecs.Resources.SandboxSecurityGroup.Properties.SecurityGroupIngress, undefined);
-  assert.deepEqual(ecs.Resources.SandboxSecurityGroup.Properties.SecurityGroupEgress, [
+  assert.deepEqual(s3, [
+    {
+      Effect: 'Allow',
+      Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
+      Resource: [
+        { 'Fn::Sub': '${Artifacts.Arn}/kilo/launch/*' },
+        { 'Fn::Sub': '${Artifacts.Arn}/kilo/archives/*' },
+      ],
+    },
+    {
+      Effect: 'Allow',
+      Action: 's3:GetObject',
+      Resource: [
+        { 'Fn::Sub': '${Artifacts.Arn}/kilo/proxy/public/deployment.json' },
+        { 'Fn::Sub': '${Artifacts.Arn}/kilo/proxy/shared/auth.json' },
+      ],
+    },
+  ]);
+  assert.equal(JSON.stringify(resources.CustomerRole).includes('/kilo/proxy/private/'), false);
+});
+test('sandbox tasks accept no ingress and reach only the authenticated proxy', () => {
+  assert.equal(resources.SandboxSecurityGroup.Properties.SecurityGroupIngress, undefined);
+  assert.deepEqual(resources.SandboxSecurityGroup.Properties.SecurityGroupEgress, [
     {
       IpProtocol: 'tcp',
       FromPort: 3128,
@@ -44,7 +54,7 @@ test('both engines use the same network, proxy, DNS and private artifact infrast
   ]);
 });
 test('ECS task has Nitro isolation, no task role or external mounts, and the shared Node loader entrypoint', () => {
-  const task = buildAwsEcsTemplate().Resources.SandboxTask.Properties;
+  const task = resources.SandboxTask.Properties;
   assert.deepEqual(task.TrustedExecutionConfiguration, { IsolationMode: 'ISOLATED_SANDBOX' });
   assert.deepEqual(task.RequiresCompatibilities, ['MANAGED_INSTANCES']);
   assert.equal(task.NetworkMode, 'awsvpc');
@@ -54,11 +64,10 @@ test('ECS task has Nitro isolation, no task role or external mounts, and the sha
   assert.equal(task.ContainerDefinitions[0].Environment, undefined);
   assert.equal(task.ContainerDefinitions[0].Secrets, undefined);
   assert.deepEqual(task.ContainerDefinitions[0].Image, { Ref: 'RuntimeImageUri' });
-  assert.match(buildAwsEcsTemplate().Parameters.RuntimeImageUri.AllowedPattern, /@sha256/);
+  assert.match(template.Parameters.RuntimeImageUri.AllowedPattern, /@sha256/);
 });
 test('managed hosts enable Nitro, use private networking, and scale in after idle cleanup', () => {
-  const ecs = buildAwsEcsTemplate();
-  const capacity = ecs.Resources.SandboxCapacity.Properties.ManagedInstancesProvider;
+  const capacity = resources.SandboxCapacity.Properties.ManagedInstancesProvider;
   assert.equal(capacity.InstanceLaunchTemplate.NitroEnclavesEnabled, true);
   assert.equal(capacity.InstanceLaunchTemplate.CapacityOptionType, 'ON_DEMAND');
   assert.deepEqual(capacity.InstanceLaunchTemplate.NetworkConfiguration, {
@@ -66,15 +75,13 @@ test('managed hosts enable Nitro, use private networking, and scale in after idl
     SecurityGroups: [{ Ref: 'SandboxHostSecurityGroup' }],
   });
   assert.equal(capacity.InfrastructureOptimization.ScaleInAfter, 60);
-  assert.equal(ecs.Resources.SandboxHostSecurityGroup.Properties.SecurityGroupIngress, undefined);
+  assert.equal(resources.SandboxHostSecurityGroup.Properties.SecurityGroupIngress, undefined);
   const pass =
-    ecs.Resources.SandboxInfrastructureRole.Properties.Policies[0].PolicyDocument.Statement[0];
+    resources.SandboxInfrastructureRole.Properties.Policies[0].PolicyDocument.Statement[0];
   assert.deepEqual(pass.Resource, { 'Fn::GetAtt': ['SandboxInstanceRole', 'Arn'] });
 });
 test('customer lifecycle authority targets one exact task definition, cluster, capacity and execution role', () => {
-  const ecs = buildAwsEcsTemplate();
-  const statements = ecs.Resources.CustomerRole.Properties.Policies[0].PolicyDocument.Statement;
-  const run = statements.find(statement => statement.Action === 'ecs:RunTask');
+  const run = customerStatements.find(statement => statement.Action === 'ecs:RunTask');
   assert.deepEqual(run.Resource, { Ref: 'SandboxTask' });
   assert.deepEqual(run.Condition.ArnEquals, {
     'ecs:cluster': { 'Fn::GetAtt': ['SandboxCluster', 'Arn'] },
@@ -86,58 +93,42 @@ test('customer lifecycle authority targets one exact task definition, cluster, c
     },
   });
   assert.equal(run.Condition.StringEquals['ecs:enable-execute-command'], 'false');
-  const discovery = statements.filter(statement => statement.Action === 'ecs:ListTasks');
+  const discovery = customerStatements.filter(statement => statement.Action === 'ecs:ListTasks');
   assert.equal(discovery.length, 1);
   assert.equal(discovery[0].Resource, '*');
   assert.deepEqual(discovery[0].Condition, {
     ArnEquals: { 'ecs:cluster': { 'Fn::GetAtt': ['SandboxCluster', 'Arn'] } },
     StringEquals: { 'aws:RequestedRegion': { Ref: 'AWS::Region' } },
   });
-  const pass = statements.find(statement => statement.Action === 'iam:PassRole');
+  const pass = customerStatements.find(statement => statement.Action === 'iam:PassRole');
   assert.deepEqual(pass.Resource, { 'Fn::GetAtt': ['SandboxExecutionRole', 'Arn'] });
   assert.equal(pass.Condition.StringEquals['iam:PassedToService'], 'ecs-tasks.amazonaws.com');
-  const actions = statements.flatMap(statement => [statement.Action].flat());
-  assert.equal(
-    actions.some(action => action.startsWith('lambda:')),
-    false
-  );
   for (const action of [
     'ecs:ExecuteCommand',
     'ecs:RegisterTaskDefinition',
     'ecs:CreateService',
     'ec2:RunInstances',
   ])
-    assert.equal(actions.includes(action), false);
+    assert.equal(customerActions.includes(action), false);
 });
 test('task-definition metadata read uses AWS-required wildcard authority in only the stack region', () => {
-  const statements =
-    buildAwsEcsTemplate().Resources.CustomerRole.Properties.Policies[0].PolicyDocument.Statement;
-  const reads = statements.filter(statement => statement.Action === 'ecs:DescribeTaskDefinition');
+  const reads = customerStatements.filter(
+    statement => statement.Action === 'ecs:DescribeTaskDefinition'
+  );
   assert.equal(reads.length, 1);
   assert.equal(reads[0].Resource, '*');
   assert.deepEqual(reads[0].Condition, {
     StringEquals: { 'aws:RequestedRegion': { Ref: 'AWS::Region' } },
   });
 });
-test('shared S3 and proxy permissions remain the same for both customer roles', () => {
-  const ecs = buildAwsEcsTemplate();
-  const retained =
-    source.Resources.CustomerRole.Properties.Policies[0].PolicyDocument.Statement.filter(
-      statement => ![statement.Action].flat().some(action => action.startsWith('lambda:'))
-    );
-  const statements = ecs.Resources.CustomerRole.Properties.Policies[0].PolicyDocument.Statement;
-  assert.deepEqual(statements.slice(0, retained.length), retained);
-});
-
 test('private ECS discovery keeps bootstrap DNS exact and endpoint ingress restricted to managed hosts', () => {
-  const ecs = buildAwsEcsTemplate();
   for (const name of ['EcsEndpoint', 'EcsAgentEndpoint', 'EcsTelemetryEndpoint']) {
-    assert.equal(ecs.Resources[name].Properties.PrivateDnsEnabled, true);
-    assert.deepEqual(ecs.Resources[name].Properties.SecurityGroupIds, [
+    assert.equal(resources[name].Properties.PrivateDnsEnabled, true);
+    assert.deepEqual(resources[name].Properties.SecurityGroupIds, [
       { Ref: 'EcsEndpointSecurityGroup' },
     ]);
   }
-  assert.deepEqual(ecs.Resources.EcsEndpointSecurityGroup.Properties.SecurityGroupIngress, [
+  assert.deepEqual(resources.EcsEndpointSecurityGroup.Properties.SecurityGroupIngress, [
     {
       IpProtocol: 'tcp',
       FromPort: 443,
@@ -145,9 +136,13 @@ test('private ECS discovery keeps bootstrap DNS exact and endpoint ingress restr
       SourceSecurityGroupId: { Ref: 'SandboxHostSecurityGroup' },
     },
   ]);
-  const domains = ecs.Resources.EcsBootstrapDnsDomains.Properties.Domains;
+  const domains = resources.EcsBootstrapDnsDomains.Properties.Domains;
   assert.equal(domains.length, 4);
   assert.equal(JSON.stringify(domains).includes('*'), false);
   for (const name of ['ecs', 'ecs-a', 'ecs-t'])
     assert.ok(domains.some(domain => domain['Fn::Sub'] === name + '.${AWS::Region}.amazonaws.com'));
+  assert.equal(
+    resources.DnsRules.Properties.FirewallRules[0].FirewallDomainListId.Ref,
+    'EcsBootstrapDnsDomains'
+  );
 });

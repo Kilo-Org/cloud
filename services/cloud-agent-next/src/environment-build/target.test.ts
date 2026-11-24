@@ -30,14 +30,11 @@ vi.mock('../byoc/vercel-owner.js', async importOriginal => ({
 }));
 vi.mock('../byoc/aws-credential-resolver.js', async importOriginal => ({
   ...(await importOriginal<typeof awsCredentialResolver>()),
-  fetchAwsProviderConnection: fetchAwsConnection,
-}));
-vi.mock('../byoc/aws-ecs-credential-resolver.js', () => ({
+  fetchAwsByocConnection: fetchAwsConnection,
   resolveAwsEcsByocConfiguration: resolveEcsConfiguration,
 }));
 
 import { resolveEnvironmentBuildTarget } from './target.js';
-import { resolveAwsEnvironmentBuildTarget } from './aws-build-target.js';
 import {
   ByocCredentialMissingError,
   ByocCredentialResolverError,
@@ -97,23 +94,6 @@ beforeEach(() => {
 });
 
 describe('resolveEnvironmentBuildTarget', () => {
-  it('refuses the saved MicroVM build target before account resolution', async () => {
-    resolveSaved.mockResolvedValue('aws-microvm-8g');
-    expect(await target()).toEqual({
-      ok: false,
-      provider: 'aws',
-      reason: 'Environment snapshots are not supported by this provider',
-    });
-  });
-
-  it('applies the same capability gate to direct AWS build resolution', async () => {
-    expect(await resolveAwsEnvironmentBuildTarget(ENV, REFERENCE, 'aws-microvm-8g')).toEqual({
-      ok: false,
-      provider: 'aws',
-      reason: 'Environment snapshots are not supported by this provider',
-    });
-  });
-
   it('routes a saved ECS allocation to the ECS builder and pins its connection and base', async () => {
     resolveSaved.mockResolvedValue('aws-ecs-8g');
     fetchAwsConnection.mockResolvedValue({ credentialId: CREDENTIAL_ID, setupStatus: 'ready' });
@@ -127,7 +107,7 @@ describe('resolveEnvironmentBuildTarget', () => {
         baseImage: awsEcsArchiveBaseImage(CREDENTIAL_ID, ECS_TEST_CONFIG),
       },
     });
-    expect(fetchAwsConnection).toHaveBeenCalledWith(ENV, { organizationId: OWNER.id }, 'aws-ecs');
+    expect(fetchAwsConnection).toHaveBeenCalledWith(ENV, { organizationId: OWNER.id });
     expect(resolveEcsConfiguration).toHaveBeenCalledWith(ENV, {
       organizationId: OWNER.id,
       credentialId: CREDENTIAL_ID,

@@ -27,6 +27,7 @@ import {
 import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
   getBalanceAndOrgSettings,
+  getBalanceForOrganizationUser,
   type BalancePayer,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
@@ -346,6 +347,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
     return mockDecisionSecret;
   },
   ENKRYPT_API_KEY: 'test-enkrypt-key',
+  INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
@@ -6662,6 +6664,69 @@ describe('Enkrypt input guardrail', () => {
     summary: { injection_attack: 1, pii: 0 },
     result_message: 'Potential prompt injection detected.',
   };
+
+  it('rejects a routed request before either classifier or final model can receive it', async () => {
+    setOrganization({
+      enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(
+      jest.requireActual<typeof AutoModelResolution>(
+        '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+      ).applyResolvedAutoModel
+    );
+    enkryptAnswers(injection);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+    expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies the same detectors to a public decision preflight and accounts its scan', async () => {
+    const { handleAutoRoutingInputGuardrailRequest } =
+      await import('./auto-routing-input-guardrail');
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    jest.mocked(getBalanceForOrganizationUser).mockResolvedValue({
+      balance: 1,
+      payer: payerWithBalance(1),
+      settings: {
+        kilo_encrypt: true,
+        enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+      },
+    });
+    enkryptAnswers(injection);
+    const request = (token: string) =>
+      new Request('http://localhost/preflight', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: 'user-123',
+          organizationId,
+          sessionId: 'session-public',
+          model: 'kilo-auto/custom/mine',
+          messages: [{ role: 'tool', tool_call_id: 'call', content: 'blocked tool result' }],
+        }),
+      });
+    expect((await handleAutoRoutingInputGuardrailRequest(request('wrong'))).status).toBe(401);
+    expect(getBalanceForOrganizationUser).not.toHaveBeenCalled();
+    const response = await handleAutoRoutingInputGuardrailRequest(request('test-internal-secret'));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+    expectEnkryptScans(kiloDefaultScans('[tool result]\nblocked tool result'));
+    await Promise.all(
+      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+    );
+    expect(recordEnkryptUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId,
+        kiloUserId: 'user-123',
+        sessionId: 'session-public',
+        decision: 'blocked',
+      })
+    );
+  });
 
   it.each([
     { balance: 0, route: 'paid' },

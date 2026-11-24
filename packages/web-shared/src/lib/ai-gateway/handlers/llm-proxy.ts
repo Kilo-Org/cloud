@@ -19,6 +19,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   findCustomLlm,
@@ -255,19 +256,17 @@ export async function handleLlmProxyRequest(
   // double-charge. Every other request keeps a fresh server-side id.
   const usageId = benchmark ? benchmark.assignment.usageId : randomUUID();
 
-  const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
-    ([caller, account]) =>
-      admitEnkryptGuardrail(caller, account, () =>
-        organizationGroupContextPromise.then(
-          context => context?.groups.map(group => group.id) ?? []
-        )
-      )
+  const authSpan = startInactiveSpan({ name: 'auth-check' });
+  const [caller, account] = await Promise.all([
+    callerPromise.finally(() => authSpan.end()),
+    balanceAndSettingsPromise,
+  ]);
+  const enkryptAdmission = await admitEnkryptGuardrail(caller, account, () =>
+    organizationGroupContextPromise.then(context => context?.groups.map(group => group.id) ?? [])
   );
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
-  // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
-  // awaited just before the upstream call; log-only detectors are never awaited. Parts are
-  // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
+  // Extract inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
       inputGuardrail =>
@@ -308,10 +307,9 @@ export async function handleLlmProxyRequest(
     request.signal.addEventListener('abort', logClientDisconnect, { once: true });
   }
 
-  const { settings: privacySettings } = await balanceAndSettingsPromise;
   const effectivePrivacy = getEffectiveProviderPrivacy(
     requestPrivacy,
-    privacySettings?.data_collection
+    account.settings?.data_collection
   );
   if (Object.keys(effectivePrivacy).length > 0) {
     requestBodyParsed.body.provider = { ...requestProvider, ...effectivePrivacy };
@@ -319,6 +317,36 @@ export async function handleLlmProxyRequest(
 
   // Snapshot normalized privacy before model-specific provider transforms.
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
+
+  const requestLogging = {
+    usage_id: usageId,
+    user: caller.kind === 'signed-in' ? caller.user : null,
+    organization_id: caller.kind === 'signed-in' ? (caller.organizationId ?? null) : null,
+    session_id: headers.sessionId,
+    vercel_request_id: headers.vercelRequestId,
+    request: requestBodyParsed,
+    enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
+  };
+  async function inputGuardrailRejection() {
+    const verdict = await enkryptGuardrail.awaitVerdict();
+    const response = enkryptGuardrailRejectionResponse(requestBodyParsed.kind, verdict);
+    if (response && !request.signal.aborted) {
+      await logUnrewrittenResponse({
+        response: response.clone(),
+        model: requestBodyParsed.body.model.toLowerCase(),
+        logging: requestLogging,
+        error: { guardrail_rejection: verdict.action },
+      });
+    }
+    return response;
+  }
+  // Wait once at the first inference boundary. Direct requests still overlap their scan with
+  // provider selection and archive that routing decision even when a detector blocks.
+  const guardBeforeResolution = isKiloAutoModel(requestedModelLowerCased);
+  if (guardBeforeResolution) {
+    const rejection = await inputGuardrailRejection();
+    if (rejection) return rejection;
+  }
 
   const modelResolution = await resolveModel({
     request: requestBodyParsed,
@@ -368,20 +396,16 @@ export async function handleLlmProxyRequest(
   const clientIp = bareIpLiteral(ipAddress);
 
   if (isPubliclyFreeModel) {
-    const freeModelCaller = await callerPromise;
-    if (freeModelCaller.kind === 'rejected') return freeModelCaller.response;
+    if (caller.kind === 'rejected') return caller.response;
     const rateLimited = await freeModelRateLimitRejection({
       request,
-      caller: freeModelCaller,
+      caller,
       model: servedModelLowerCased,
       feature,
     });
     if (rateLimited) return rateLimited;
   }
 
-  const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const caller = await callerPromise;
-  authSpan.end();
   if (caller.kind === 'rejected') return caller.response;
   if (caller.kind === 'anonymous' && !isPubliclyFreeModel) return paidModelAuthRequiredResponse();
   const { user } = caller;
@@ -520,30 +544,9 @@ export async function handleLlmProxyRequest(
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  const requestLogging = {
-    usage_id: usageId,
-    user: caller.kind === 'signed-in' ? caller.user : null,
-    organization_id: organizationId || null,
-    session_id: usageContext.session_id,
-    vercel_request_id: headers.vercelRequestId,
-    request: requestBodyParsed,
-    enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
-  };
-  const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
-  const guardrailRejection = enkryptGuardrailRejectionResponse(
-    requestBodyParsed.kind,
-    guardrailVerdict
-  );
-  if (guardrailRejection) {
-    // The disconnect was already logged; nobody reads this rejection.
-    if (request.signal.aborted) return guardrailRejection;
-    await logUnrewrittenResponse({
-      response: guardrailRejection.clone(),
-      model: effectiveModelIdLowerCased,
-      logging: requestLogging,
-      error: { guardrail_rejection: guardrailVerdict.action },
-    });
-    return guardrailRejection;
+  if (!guardBeforeResolution) {
+    const rejection = await inputGuardrailRejection();
+    if (rejection) return rejection;
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
   const anthropicUserProfile = await anthropicUserProfilePromise;

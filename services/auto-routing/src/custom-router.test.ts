@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_DENIED_MODELS_PATH,
+  AUTO_ROUTING_INPUT_GUARDRAIL_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
@@ -1225,6 +1226,71 @@ describe('public custom router decide', () => {
       )
     );
     expect(decision).toMatchObject({ model: 'client:lmstudio/gemma', fallback: true });
+  });
+
+  it.each([
+    {
+      status: 400,
+      body: { error_type: 'guardrail_blocked', error: { message: 'Blocked' } },
+      code: 'forbidden',
+    },
+    { status: 200, body: { error: 'unexpected success' }, code: 'internal_error' },
+    { status: 503, body: {}, code: 'internal_error' },
+  ])(
+    'does not classify, charge, or return even a client-only fallback when guardrail preflight answers $status',
+    async ({ status, body, code }) => {
+      findOrganizationMemberBalanceRow.mockResolvedValue(
+        memberBalanceRow({
+          settings: { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: true } } },
+        })
+      );
+      findCustomRouter.mockResolvedValue(
+        customRouter({ entries: [ollama], defaultEntryKey: 'client:ollama/qwen3:32b' })
+      );
+      fetchMock.mockResolvedValue(Response.json(body, { status }));
+      const req = decideBody();
+      const res = await post(CUSTOM_ROUTER_DECIDE_PATH, req, {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      });
+      expect(await errorCode(res)).toBe(code);
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(requestUrl(url)).toBe(
+        `https://gateway.example.test${AUTO_ROUTING_INPUT_GUARDRAIL_PATH}`
+      );
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer internal-secret');
+      expect(JSON.parse(init?.body as string)).toMatchObject({
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        messages: req.messages,
+      });
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      expect(recordUsage).not.toHaveBeenCalled();
+    }
+  );
+
+  it('waits for an explicit preflight allow before classifying', async () => {
+    findOrganizationMemberBalanceRow.mockResolvedValue(
+      memberBalanceRow({
+        settings: { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: true } } },
+      })
+    );
+    const started = Promise.withResolvers<void>();
+    const verdict = Promise.withResolvers<Response>();
+    fetchMock.mockImplementation(async url => {
+      if (requestUrl(url).endsWith(AUTO_ROUTING_INPUT_GUARDRAIL_PATH)) {
+        started.resolve();
+        return verdict.promise;
+      }
+      return Response.json({ deniedModelIds: [] });
+    });
+    const pending = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    await started.promise;
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    verdict.resolve(new Response(null, { status: 204 }));
+    await decisionOf(await pending);
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
   });
 
   it('asks the gateway for the policy on the router gateway entries with the internal secret', async () => {

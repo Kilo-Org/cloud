@@ -5,7 +5,6 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { topUpInProgressResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import type { GatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import type {
   BalanceAndOrgSettings,
   BalancePayer,
@@ -65,7 +64,9 @@ async function isInEnkryptInputGuardrailGroup(
  * that the member is not in does not apply to them.
  */
 export async function admitEnkryptGuardrail(
-  caller: GatewayCaller,
+  caller:
+    | { kind: 'anonymous' | 'rejected' }
+    | { kind: 'signed-in'; user: { id: string }; organizationId?: string },
   account: Pick<BalanceAndOrgSettings, 'settings' | 'payer'>,
   memberGroupIds: () => Promise<readonly string[]>
 ): Promise<EnkryptGuardrailAdmission> {

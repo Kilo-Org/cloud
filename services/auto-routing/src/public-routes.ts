@@ -34,7 +34,7 @@ import {
   CustomRouterError,
   customRouterErrorResponse,
   DEPENDENCY_RETRY_AFTER_SECONDS,
-  loadPayerBalanceUsd,
+  loadDecideAdmission,
   loadOrganizationBalanceUsd,
   type Caller,
 } from './caller-auth';
@@ -53,6 +53,7 @@ import {
 } from './custom-router-store';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
+import { checkDecideInputGuardrail } from './input-guardrail';
 import { deniedOrganizationModelIds } from './organization-policy';
 
 function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Handler<HonoEnv> {
@@ -119,11 +120,6 @@ function requirePaidUsageBalance(balanceUsd: number): void {
   }
 }
 
-// Public routes admit a caller only when the caller's payer balance can fund paid usage.
-async function requireCallerPaidUsageBalance(caller: Caller): Promise<void> {
-  requirePaidUsageBalance(await loadPayerBalanceUsd(caller));
-}
-
 // An eval is paid by the router owner: the caller's own balance for a personal router, or the
 // organization balance for an organization router. Either payer admits the request here;
 // loadEditableRouter applies the exact owner rule afterwards.
@@ -172,7 +168,8 @@ async function loadServingRouter(
 
 export const publicDecideHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  await requireCallerPaidUsageBalance(caller);
+  const admission = await loadDecideAdmission(caller);
+  requirePaidUsageBalance(admission.balanceUsd);
   const { byteLength, json } = await readJson(c, MAX_DECIDE_REQUEST_BODY_BYTES);
   const request = parseBody(CustomRouterDecideRequestSchema, json);
   const reference = parseCustomRouterModelId(request.model);
@@ -232,6 +229,19 @@ export const publicDecideHandler = publicHandler(async c => {
   const body = { model: request.model, messages: request.messages, tools: request.tools };
   const input = normalizeClassifierInput('chat_completions', body);
   if (!input) throw new CustomRouterError('invalid_request', 'Messages cannot be classified');
+  if (admission.guardrailOrganizationId !== null) {
+    await checkDecideInputGuardrail(
+      c.env,
+      {
+        ...body,
+        userId: caller.userId,
+        organizationId: admission.guardrailOrganizationId,
+        sessionId: request.sessionId,
+        clientRequestId: request.clientRequestId,
+      },
+      c.req.raw.signal
+    );
+  }
   const requiredInputModalities = detectRequiredInputModalities(body);
   const promptTokensEstimate = estimateRoutingTokens(body);
   const payload: MirrorPayload = {

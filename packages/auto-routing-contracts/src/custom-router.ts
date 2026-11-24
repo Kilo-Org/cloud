@@ -1167,6 +1167,17 @@ export const InternalClientEvalResultRequestSchema = ClientEvalResultUploadSchem
 export type InternalClientEvalResultRequest = z.infer<typeof InternalClientEvalResultRequestSchema>;
 
 export const AUTO_ROUTING_DENIED_MODELS_PATH = '/api/v1/internal/auto-routing/denied-models';
+export const AUTO_ROUTING_INPUT_GUARDRAIL_PATH = '/api/v1/internal/auto-routing/input-guardrail';
+export const AutoRoutingInputGuardrailRequestSchema = CustomRouterDecideRequestSchema.pick({
+  model: true,
+  messages: true,
+  tools: true,
+  sessionId: true,
+  clientRequestId: true,
+}).extend({ userId: z.string().min(1), organizationId: z.uuid() });
+export type AutoRoutingInputGuardrailRequest = z.infer<
+  typeof AutoRoutingInputGuardrailRequestSchema
+>;
 
 /**
  * What one pool entry dispatches: its pinned concrete target when the benchmark worker still

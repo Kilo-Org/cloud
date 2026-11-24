@@ -177,14 +177,27 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
 
 // The organization pays in an organization context, within the member's allowance; otherwise
 // the user pays.
-export async function loadPayerBalanceUsd(caller: Caller): Promise<number> {
-  if (caller.organizationId === null) return caller.userBalanceMicrodollars / 1_000_000;
+export async function loadDecideAdmission(caller: Caller) {
+  if (caller.organizationId === null) {
+    return {
+      balanceUsd: caller.userBalanceMicrodollars / 1_000_000,
+      guardrailOrganizationId: null,
+    };
+  }
   const row = await findOrganizationMemberBalanceRow(
     caller.db,
     caller.organizationId,
     caller.userId
   );
-  return row ? organizationMemberBalance(row).balanceMicrodollars / 1_000_000 : 0;
+  return {
+    balanceUsd: row ? organizationMemberBalance(row).balanceMicrodollars / 1_000_000 : 0,
+    // The gateway owns detector and member-group evaluation. Avoid transferring the conversation
+    // a second time for organizations that haven't enabled the input guardrail.
+    guardrailOrganizationId:
+      row?.settings.kilo_encrypt === true && row.settings.enkrypt?.input_guardrail?.enabled === true
+        ? caller.organizationId
+        : null,
+  };
 }
 
 export async function loadOrganizationBalanceUsd(

@@ -1247,13 +1247,20 @@ describe('public custom router decide', () => {
       findCustomRouter.mockResolvedValue(
         customRouter({ entries: [ollama], defaultEntryKey: 'client:ollama/qwen3:32b' })
       );
-      fetchMock.mockResolvedValue(Response.json(body, { status }));
+      const gatewayFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((url, init) =>
+        requestUrl(url).endsWith(AUTO_ROUTING_INPUT_GUARDRAIL_PATH)
+          ? Promise.resolve(Response.json(body, { status }))
+          : gatewayFetch(url, init)
+      );
       const req = decideBody();
       const res = await post(CUSTOM_ROUTER_DECIDE_PATH, req, {
         'X-KiloCode-OrganizationId': ORG_ID,
       });
       expect(await errorCode(res)).toBe(code);
-      const [url, init] = fetchMock.mock.calls[0]!;
+      const [url, init] = fetchMock.mock.calls.find(([input]) =>
+        requestUrl(input).endsWith(AUTO_ROUTING_INPUT_GUARDRAIL_PATH)
+      )!;
       expect(requestUrl(url)).toBe(
         `https://gateway.example.test${AUTO_ROUTING_INPUT_GUARDRAIL_PATH}`
       );
@@ -1276,12 +1283,13 @@ describe('public custom router decide', () => {
     );
     const started = Promise.withResolvers<void>();
     const verdict = Promise.withResolvers<Response>();
-    fetchMock.mockImplementation(async url => {
+    const gatewayFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url, init) => {
       if (requestUrl(url).endsWith(AUTO_ROUTING_INPUT_GUARDRAIL_PATH)) {
         started.resolve();
         return verdict.promise;
       }
-      return Response.json({ deniedModelIds: [] });
+      return gatewayFetch(url, init);
     });
     const pending = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
       'X-KiloCode-OrganizationId': ORG_ID,

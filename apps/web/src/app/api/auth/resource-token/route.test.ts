@@ -8,7 +8,7 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
 }));
 jest.mock('@/lib/auth/resource-delegation', () => ({
   isDelegableResource: (value: string) =>
-    ['api', 'gateway', 'attribution', 'html-deploy', 'pages', 'pages-dev'].includes(value),
+    ['api', 'gateway', 'attribution', 'pages', 'pages-dev'].includes(value),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
 }));
 
@@ -26,7 +26,7 @@ it('rejects personal attribution issuance because the reader requires organizati
   expect(createDelegatedResourceToken).not.toHaveBeenCalled();
 });
 
-it.each(['api', 'gateway', 'html-deploy', 'pages', 'pages-dev'])(
+it.each(['api', 'gateway', 'pages', 'pages-dev'])(
   'retains personal %s negotiation',
   async resource => {
     const response = await POST(

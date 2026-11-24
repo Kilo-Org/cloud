@@ -11,7 +11,6 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
-  HTML_DEPLOY_AUDIENCE,
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
   PAGES_AUDIENCE,
@@ -44,13 +43,7 @@ const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
   TOKEN_EXPIRY.default,
 ];
 
-export type DelegableResource =
-  | 'api'
-  | 'gateway'
-  | 'attribution'
-  | 'html-deploy'
-  | 'pages'
-  | 'pages-dev';
+export type DelegableResource = 'api' | 'gateway' | 'attribution' | 'pages' | 'pages-dev';
 type PagesResource = Extract<DelegableResource, 'pages' | 'pages-dev'>;
 const PAGES_TOKEN_MAX_SECONDS = 5 * 60;
 
@@ -119,7 +112,6 @@ function resourceAudience(resource: Resource): string {
     api: KILO_API_AUDIENCE,
     gateway: KILO_GATEWAY_AUDIENCE,
     attribution: AI_ATTRIBUTION_AUDIENCE,
-    'html-deploy': HTML_DEPLOY_AUDIENCE,
     pages: PAGES_AUDIENCE,
     'pages-dev': PAGES_DEV_AUDIENCE,
     'cloud-agent-next': CLOUD_AGENT_NEXT_AUDIENCE,
@@ -131,7 +123,6 @@ export function isDelegableResource(value: unknown): value is DelegableResource 
     value === 'api' ||
     value === 'gateway' ||
     value === 'attribution' ||
-    value === 'html-deploy' ||
     value === 'pages' ||
     value === 'pages-dev'
   );

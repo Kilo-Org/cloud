@@ -167,7 +167,7 @@ export function FreeTrialWarningBanner({
       {/* Upgrade button for owners */}
       {shouldShowUpgradeButton && (
         <Button onClick={onUpgradeClick} variant={buttonVariant} className="shrink-0">
-          Upgrade Now
+          Checkout Now
         </Button>
       )}
     </div>

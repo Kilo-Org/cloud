@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isKiloTokenPepperCurrent, isKiloUserCredentialPepperCurrent } from './kilo-token-pepper';
+import {
+  isKiloClaimlessInternalAssertion,
+  isKiloTokenPepperCurrent,
+  isKiloUserCredentialPepperCurrent,
+} from './kilo-token-pepper';
 
 const iat = 1_800_000_000;
 
@@ -146,5 +150,57 @@ describe('isKiloTokenPepperCurrent', () => {
         )
       ).toBe(false);
     }
+  });
+});
+
+describe('isKiloClaimlessInternalAssertion', () => {
+  const disconnect = 'git-token-service:github-user-authorizations:disconnect';
+  const fiveMinutes = { maxLifetimeSeconds: 300, audience: disconnect };
+
+  it('accepts a modern assertion for the required audience within the lifetime', () => {
+    expect(
+      isKiloClaimlessInternalAssertion(
+        { tokenPurpose: 'internal-service', aud: disconnect, iat, exp: iat + 300 },
+        fiveMinutes,
+        iat
+      )
+    ).toBe(true);
+  });
+
+  it('accepts the temporary legacy shape without an audience or with the required one', () => {
+    expect(isKiloClaimlessInternalAssertion({ iat, exp: iat + 300 }, fiveMinutes, iat)).toBe(true);
+    expect(
+      isKiloClaimlessInternalAssertion({ aud: disconnect, iat, exp: iat + 300 }, fiveMinutes, iat)
+    ).toBe(true);
+  });
+
+  it('rejects a pepper claim, another purpose, another audience or a longer lifetime', () => {
+    const base = { tokenPurpose: 'internal-service', aud: disconnect, iat, exp: iat + 300 };
+    expect(
+      isKiloClaimlessInternalAssertion({ ...base, apiTokenPepper: null }, fiveMinutes, iat)
+    ).toBe(false);
+    expect(
+      isKiloClaimlessInternalAssertion({ ...base, tokenPurpose: 'human-api' }, fiveMinutes, iat)
+    ).toBe(false);
+    expect(
+      isKiloClaimlessInternalAssertion({ ...base, aud: 'session-ingest' }, fiveMinutes, iat)
+    ).toBe(false);
+    expect(
+      isKiloClaimlessInternalAssertion(
+        { aud: 'session-ingest', iat, exp: iat + 300 },
+        fiveMinutes,
+        iat
+      )
+    ).toBe(false);
+    expect(isKiloClaimlessInternalAssertion({ ...base, exp: iat + 301 }, fiveMinutes, iat)).toBe(
+      false
+    );
+    expect(
+      isKiloClaimlessInternalAssertion(
+        { tokenPurpose: 'internal-service', iat, exp: iat + 300 },
+        { maxLifetimeSeconds: 300 },
+        iat
+      )
+    ).toBe(false);
   });
 });

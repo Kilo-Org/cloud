@@ -547,6 +547,11 @@ describe('fetch disconnect endpoint', () => {
       GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
       { exp: 0 },
     ],
+    [
+      'a claimless human-api token with the disconnect audience',
+      GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+      { tokenPurpose: 'human-api' },
+    ],
   ])('rejects %s', async (_name, aud, shape) => {
     const now = Math.floor(Date.now() / 1000);
     const claims: Record<string, unknown> = {};

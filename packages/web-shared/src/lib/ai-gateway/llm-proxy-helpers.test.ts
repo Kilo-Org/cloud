@@ -2307,7 +2307,7 @@ describe('captureProxyError', () => {
       )
     );
 
-    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data.upstreamErrorParam).toBe('a'.repeat(512));
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
   });
@@ -2328,14 +2328,27 @@ describe('captureProxyError', () => {
     );
   });
 
-  it('redacts a secret that crosses the 4k limit before it truncates the response', async () => {
-    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
+  it.each([
+    ['a JWT', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU'],
+    ['a provider key', 'sk-or-v1-fake0000000000000000000000'],
+  ])('drops the part of %s that the 4k limit cuts', async (_name, secret) => {
     const data = await captureResponsesError(
       {},
-      new Response(`${'x'.repeat(4090)} ${fakeJwt}`, { status: 400 })
+      new Response(`${'x '.repeat(2045)} ${secret}`, { status: 400 })
     );
 
-    expect(data.first4kOfResponse).toBe(`${'x'.repeat(4090)} [Filt`);
+    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2045)} [Truncated]`);
+  });
+
+  it('redacts only the first 4k of a long response', async () => {
+    const started = performance.now();
+    const data = await captureResponsesError(
+      {},
+      new Response('eyJ-'.repeat(50_000), { status: 400 })
+    );
+
+    expect(performance.now() - started).toBeLessThan(50);
+    expect(data.first4kOfResponse).toBe('[Truncated]');
   });
 
   it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
@@ -2345,7 +2358,7 @@ describe('captureProxyError', () => {
     );
     const data = await captureResponsesError({}, response);
 
-    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data).not.toHaveProperty('upstreamErrorParam');
     expect(data).not.toHaveProperty('upstreamErrorCode');
     expect(await response.json()).toMatchObject({ error: { param: 'input' } });

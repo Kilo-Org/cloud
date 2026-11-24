@@ -950,7 +950,7 @@ export async function captureProxyError(params: {
       const clonedReponse = response.clone();
       try {
         const responseText = await clonedReponse.text();
-        extraErrorData.first4kOfResponse = redactSecretValues(responseText).slice(0, 4096);
+        extraErrorData.first4kOfResponse = redactSecretValues(responseText, 4096);
         const parsed = parseJson(responseText.slice(0, 16 * 1024));
         if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
           const { param, code } = parsed.value.error;

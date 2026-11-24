@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  MAX_REDACTED_TEXT_LENGTH,
   redactSecretValues,
   scrubSecretRecord,
   scrubSecrets,
@@ -67,6 +68,48 @@ describe('redactSecretValues', () => {
     'eyJ.not-a-token',
   ])('keeps %s', input => {
     expect(redactSecretValues(input)).toBe(input);
+  });
+
+  test.each([
+    ['repeated JWT starts', 'eyJ-'.repeat(50_000)],
+    ['repeated JWT starts after one dot', `eyJ.${'eyJ-'.repeat(50_000)}`],
+    ['a JWT start with one long segment', `eyJa.${'a'.repeat(200_000)}`],
+    ['a bearer prefix with long whitespace', `Bearer${' '.repeat(200_000)}`],
+    ['repeated key prefixes', 'sk-x '.repeat(40_000)],
+  ])('redacts 200 KB of %s in linear time', (_name, input) => {
+    const started = performance.now();
+    redactSecretValues(input, input.length);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
+  test('keeps text up to the length limit unchanged', () => {
+    const text = 'a '.repeat(MAX_REDACTED_TEXT_LENGTH / 2);
+
+    expect(redactSecretValues(text)).toBe(text);
+  });
+
+  test('truncates longer text and marks the cut', () => {
+    const result = redactSecretValues('a '.repeat(MAX_REDACTED_TEXT_LENGTH));
+
+    expect(result).toBe(`${'a '.repeat(MAX_REDACTED_TEXT_LENGTH / 2)}[Truncated]`);
+  });
+
+  test.each([
+    ['a provider key', 'error sk-or-v1-fake0123456789abcdef0123', 'error [Truncated]'],
+    ['a JWT', `error ${FAKE_JWT}`, 'error [Truncated]'],
+    [
+      'a bearer value',
+      'Authorization: Bearer fake_kilo_token_0123',
+      'Authorization: Bearer [Truncated]',
+    ],
+  ])('drops the part of %s that the cut leaves', (_name, input, expected) => {
+    expect(redactSecretValues(input, 26)).toBe(expected);
+  });
+
+  test('redacts a whole secret before the cut', () => {
+    expect(redactSecretValues(`${FAKE_JWT} and more text`, FAKE_JWT.length + 5)).toBe(
+      '[Filtered] and [Truncated]'
+    );
   });
 });
 

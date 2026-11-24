@@ -3,6 +3,8 @@
 // SDK runtime values and no Node builtins.
 
 export const FILTERED_VALUE = '[Filtered]';
+export const MAX_REDACTED_TEXT_LENGTH = 32 * 1024;
+const TRUNCATED_MARKER = '[Truncated]';
 const CIRCULAR = '[Circular]';
 const MAX_DEPTH = 12;
 const MAX_ENTRIES = 1000;
@@ -12,7 +14,9 @@ const BASIC_PATTERN = /\b(Basic)\s+[A-Za-z0-9+/]{16,}={0,2}/gi;
 
 const SECRET_VALUE_PATTERNS = [
   // A JWS has three segments and a JWE has five; a JWE can have an empty key segment.
-  /\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]*){2,4}/g,
+  // The first segment stops before another `-eyJ`, so a run such as `eyJ-eyJ-...`
+  // is scanned once and not once for every start, which keeps the match linear.
+  /\beyJ(?:[A-Za-z0-9_]|-(?!eyJ))+(?:\.[A-Za-z0-9_-]*){2,4}/g,
   /\bsk-[A-Za-z0-9_-]{20,}/g,
   /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
@@ -50,14 +54,30 @@ const SENSITIVE_KEY_PAIRS = new Set([
   'signing key',
 ]);
 
-export function redactSecretValues(text: string): string {
-  let redacted = text
+// Every character that a secret pattern can match after its prefix.
+const SECRET_CHARACTER = /[A-Za-z0-9._~+/=-]/;
+
+function withoutTrailingSecretCharacters(text: string): string {
+  let end = text.length;
+  while (end > 0 && SECRET_CHARACTER.test(text[end - 1])) {
+    end--;
+  }
+  return text.slice(0, end);
+}
+
+// Text over the limit is cut first, so the patterns never run on unbounded
+// input. The characters before the cut that could be the start of a secret are
+// dropped too, because a cut secret is too short for its pattern to match.
+export function redactSecretValues(text: string, maxLength = MAX_REDACTED_TEXT_LENGTH): string {
+  const truncated = text.length > maxLength;
+  const kept = truncated ? withoutTrailingSecretCharacters(text.slice(0, maxLength)) : text;
+  let redacted = kept
     .replace(BEARER_PATTERN, `$1 ${FILTERED_VALUE}`)
     .replace(BASIC_PATTERN, `$1 ${FILTERED_VALUE}`);
   for (const pattern of SECRET_VALUE_PATTERNS) {
     redacted = redacted.replace(pattern, FILTERED_VALUE);
   }
-  return redacted;
+  return truncated ? `${redacted}${TRUNCATED_MARKER}` : redacted;
 }
 
 function keyWords(key: string): string[] {

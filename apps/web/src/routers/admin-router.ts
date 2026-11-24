@@ -983,6 +983,7 @@ export const adminRouter = createTRPCRouter({
       .mutation(async ({ input, ctx }) => {
         const isBlocking = Boolean(input.blocked_reason);
         let didTransition = false;
+        let didBlock = false;
 
         const previousBlock = await db.transaction(async tx => {
           const [current] = await tx
@@ -1000,12 +1001,16 @@ export const adminRouter = createTRPCRouter({
           didTransition = isBlocking !== wasBlocked;
 
           if (input.blocked_reason) {
-            await blockUser({
+            didBlock = await blockUser({
               kiloUserId: input.userId,
               reason: input.blocked_reason,
               blockedByKiloUserId: ctx.user.id,
               dbOrTx: tx,
             });
+            // Blocking also signs the user out of the browser.
+            if (didBlock) {
+              await revokeWebSessions(input.userId, tx);
+            }
           } else {
             if (isGoneOrDeletingBlockedReason(current?.blocked_reason ?? null)) {
               throw new TRPCError({
@@ -1026,9 +1031,18 @@ export const adminRouter = createTRPCRouter({
           return current;
         });
 
-        // Blocking is attributed on the user row; unblocking clears those
-        // columns, so the audit row is the only record of who lifted it.
-        if (didTransition && !isBlocking) {
+        // Unblocking clears the attribution on the user row, so the audit rows
+        // are the only lasting record of who blocked and who lifted it.
+        if (didBlock && input.blocked_reason) {
+          await recordAdminAction(ctx, {
+            action: 'user.block',
+            target: userActionTarget(input.userId),
+            message: 'Blocked user (revoked browser, API and device sessions)',
+            metadata: {
+              blockedReason: redactEmailAddressesInAuditText(input.blocked_reason),
+            },
+          });
+        } else if (didTransition && !isBlocking) {
           await recordAdminAction(ctx, {
             action: 'user.unblock',
             target: userActionTarget(input.userId),

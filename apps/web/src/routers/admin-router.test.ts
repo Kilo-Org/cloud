@@ -2,6 +2,8 @@ import { afterEach, describe, test, expect, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
+  device_refresh_tokens,
+  device_sessions,
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
@@ -37,14 +39,18 @@ async function getBlockState(id: string) {
       blocked_at: true,
       blocked_by_kilo_user_id: true,
       api_token_pepper: true,
+      web_session_pepper: true,
     },
   });
 }
 
 describe('admin.users.updateBlockStatus', () => {
-  test('blocking a user rotates the api_token_pepper', async () => {
+  test('blocking a user rotates the api_token_pepper and the web_session_pepper', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
+    const user = await insertTestUser({
+      api_token_pepper: 'initial-pepper',
+      web_session_pepper: 'initial-session-pepper',
+    });
 
     const caller = await createCallerForUser(admin.id);
     const result = await caller.admin.users.updateBlockStatus({
@@ -59,12 +65,46 @@ describe('admin.users.updateBlockStatus', () => {
     expect(after?.blocked_at).not.toBeNull();
     expect(after?.api_token_pepper).toEqual(expect.any(String));
     expect(after?.api_token_pepper).not.toBe('initial-pepper');
+    expect(after?.web_session_pepper).toEqual(expect.any(String));
+    expect(after?.web_session_pepper).not.toBe('initial-session-pepper');
   });
 
-  test('unblocking clears block fields and leaves the pepper untouched', async () => {
+  test('blocking a user revokes device sessions and their unconsumed refresh tokens', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id, user_agent: 'AdminBlockTest/1.0' })
+      .returning({ id: device_sessions.id });
+    const tokenHash = `admin-block-${session.id}`;
+    await db.insert(device_refresh_tokens).values({
+      token_hash: tokenHash,
+      device_session_id: session.id,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.updateBlockStatus({
+      userId: user.id,
+      blocked_reason: 'manual admin block',
+    });
+
+    const afterSession = await db.query.device_sessions.findFirst({
+      where: eq(device_sessions.id, session.id),
+    });
+    expect(afterSession?.revoked_at).not.toBeNull();
+    expect(afterSession?.revoked_reason).toBe('user_blocked');
+    const afterToken = await db.query.device_refresh_tokens.findFirst({
+      where: eq(device_refresh_tokens.token_hash, tokenHash),
+    });
+    expect(afterToken).toBeUndefined();
+  });
+
+  test('unblocking clears block fields and leaves the peppers untouched', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({
       api_token_pepper: 'blocked-pepper',
+      web_session_pepper: 'blocked-session-pepper',
       blocked_reason: 'previously blocked',
       blocked_at: new Date().toISOString(),
     });
@@ -80,14 +120,16 @@ describe('admin.users.updateBlockStatus', () => {
     expect(after?.blocked_reason).toBeNull();
     expect(after?.blocked_at).toBeNull();
     expect(after?.blocked_by_kilo_user_id).toBeNull();
-    // Unblock must not rotate the pepper (it is not a revocation event).
+    // Unblock must not rotate the peppers (it is not a revocation event).
     expect(after?.api_token_pepper).toBe('blocked-pepper');
+    expect(after?.web_session_pepper).toBe('blocked-session-pepper');
   });
 
-  test('blocking an already-blocked user preserves the original block and pepper', async () => {
+  test('blocking an already-blocked user preserves the original block and peppers', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({
       api_token_pepper: 'first-block-pepper',
+      web_session_pepper: 'first-block-session-pepper',
       blocked_reason: 'first reason',
       blocked_at: new Date().toISOString(),
     });
@@ -99,9 +141,10 @@ describe('admin.users.updateBlockStatus', () => {
     });
 
     const after = await getBlockState(user.id);
-    // Existing block is never overwritten; the original reason and pepper stand.
+    // Existing block is never overwritten; the original reason and peppers stand.
     expect(after?.blocked_reason).toBe('first reason');
     expect(after?.api_token_pepper).toBe('first-block-pepper');
+    expect(after?.web_session_pepper).toBe('first-block-session-pepper');
   });
 
   test('unblocking a deletion-in-progress user is refused and leaves fields intact', async () => {
@@ -192,13 +235,41 @@ describe('admin action audit logging', () => {
     expect(audits[0]?.metadata?.previousBlockedAt).toEqual(expect.any(String));
   });
 
-  test('blocking and no-op unblocks do not write unblock audits', async () => {
+  test('blocking records who blocked the user and why, without email addresses', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
     const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.updateBlockStatus({
+      userId: user.id,
+      blocked_reason: 'abuse reported by reporter@example.com',
+    });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'user.block',
+      target_type: 'user',
+      target_id: user.id,
+      metadata: { blockedReason: 'abuse reported by [redacted-email]' },
+    });
+  });
+
+  test('no-op unblocks, repeated blocks and unknown users write no audits', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const blocked = await insertTestUser({
+      blocked_reason: 'abuse',
+      blocked_at: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(admin.id);
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
-    await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: 'abuse' });
+    await caller.admin.users.updateBlockStatus({ userId: blocked.id, blocked_reason: 'again' });
+    await caller.admin.users.updateBlockStatus({
+      userId: `missing-${user.id}`,
+      blocked_reason: 'abuse',
+    });
 
     expect(await getAdminActionAudits(admin.id)).toHaveLength(0);
   });

@@ -58,6 +58,8 @@ export async function bulkBlockUsers(
       // Rotate per-row in SQL so each blocked user gets a distinct new pepper,
       // invalidating their existing API tokens across every pepper-checking service.
       api_token_pepper: sql`gen_random_uuid()::text`,
+      // Rotating the web session pepper signs each blocked user out of the browser.
+      web_session_pepper: sql`gen_random_uuid()::text`,
     })
     // Re-check `blocked_reason IS NULL` in the update itself: the "already
     // blocked" filter above runs in a separate read, so without this guard a

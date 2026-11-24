@@ -30,6 +30,7 @@ import {
   renamePasskey as renameOwnedPasskey,
 } from '@/lib/auth/passkey';
 import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { logPasskeyLifecycleEvent } from '@/lib/auth/passkey-lifecycle-log';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
@@ -896,6 +897,12 @@ export const userRouter = createTRPCRouter({
           }
         }
       );
+      logPasskeyLifecycleEvent({
+        event: 'passkey_deleted',
+        kiloUserId: ctx.user.id,
+        passkeyId: input.id,
+        credential: ctx.credential ?? null,
+      });
       return successResult();
     }),
 

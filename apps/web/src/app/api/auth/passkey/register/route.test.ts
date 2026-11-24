@@ -16,6 +16,10 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
   evaluateStepUp: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
+  logExceptInTest: jest.fn(),
+}));
 
 import {
   getUserFromAuth,
@@ -30,6 +34,7 @@ import {
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -58,6 +63,14 @@ const fakeUser = {
 };
 
 const challengeId = '11111111-1111-4111-8111-111111111111';
+
+function loggedPasskeyEvents(): unknown[] {
+  return jest
+    .mocked(logExceptInTest)
+    .mock.calls.flatMap(([line]: unknown[]) =>
+      typeof line === 'string' && line.startsWith('{"event":"passkey_') ? [JSON.parse(line)] : []
+    );
+}
 
 /** One attestation as the browser's credential API returns it, JSON-encoded. */
 const attestation = {
@@ -178,7 +191,10 @@ describe('POST /api/auth/passkey/register', () => {
   });
 
   it('binds the credential to the session user, ignoring the request body', async () => {
-    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+    mockVerifyRegistration.mockResolvedValue({
+      id: 'passkey-row-1',
+      credential_id: 'credential-1',
+    } as never);
 
     const response = await POST(
       createRequest({
@@ -198,6 +214,14 @@ describe('POST /api/auth/passkey/register', () => {
       attestation,
       'session-pepper-1'
     );
+    expect(loggedPasskeyEvents()).toEqual([
+      {
+        event: 'passkey_enrolled',
+        kiloUserId: 'user-1',
+        passkeyId: 'passkey-row-1',
+        credential: 'session',
+      },
+    ]);
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -250,6 +274,7 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'CHALLENGE_ALREADY_USED' });
+    expect(loggedPasskeyEvents()).toEqual([]);
   });
 
   it('refuses a stale admin enrollment without a fresh sign-in or step-up proof', async () => {
@@ -622,7 +647,7 @@ describe('POST /api/auth/passkey/register (native app)', () => {
         if (!(await consume(db as never))) {
           throw new PasskeyVerificationError('PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID');
         }
-        return { credential_id: 'credential-1' } as never;
+        return { id: 'passkey-row-1', credential_id: 'credential-1' } as never;
       }
     );
 
@@ -650,6 +675,14 @@ describe('POST /api/auth/passkey/register (native app)', () => {
       error: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
     });
     expect(mockVerifyNativeRegistration).toHaveBeenCalledTimes(1);
+    expect(loggedPasskeyEvents()).toEqual([
+      {
+        event: 'passkey_enrolled',
+        kiloUserId: user.id,
+        passkeyId: 'passkey-row-1',
+        credential: 'human_bearer',
+      },
+    ]);
   });
 
   it('audits an admin enrollment from the native path as a bearer enrollment', async () => {

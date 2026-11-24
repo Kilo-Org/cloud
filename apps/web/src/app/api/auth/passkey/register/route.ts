@@ -24,6 +24,7 @@ import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { logPasskeyLifecycleEvent } from '@/lib/auth/passkey-lifecycle-log';
 import { captureException } from '@sentry/nextjs';
 
 /**
@@ -256,6 +257,12 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
       tx => consumePasskeyManagementAuthorization({ ...narrowedGrant, fromDb: tx })
     );
 
+    logPasskeyLifecycleEvent({
+      event: 'passkey_enrolled',
+      kiloUserId: user.id,
+      passkeyId: credential.id,
+      credential: auth.credential,
+    });
     await recordAdminPasskeyEnrollment({
       user,
       credential: 'human_bearer',
@@ -332,6 +339,12 @@ export async function POST(request: NextRequest) {
       webSessionPepper
     );
 
+    logPasskeyLifecycleEvent({
+      event: 'passkey_enrolled',
+      kiloUserId: user.id,
+      passkeyId: credential.id,
+      credential: 'session',
+    });
     await recordAdminPasskeyEnrollment({
       user,
       credential: 'session',

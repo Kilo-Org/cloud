@@ -76,9 +76,20 @@ which no Kilo service accepts and which is out of scope.
 Under these rules, the following existing behaviour changes with ES256:
 
 - Non-web issuers must always set an explicit audience and an allowed
-  `tokenPurpose`. In practice the modern token shape becomes mandatory for
-  security-auto-analysis and webhook-agent-ingest when they switch to ES256;
-  their legacy-shape flag-off branch stays HS256-only.
+  `tokenPurpose`. security-auto-analysis and webhook-agent-ingest already do:
+  `SHARED_RESOURCE_TOKENS_ENABLED` is `"true"` in both environments of their
+  `wrangler.jsonc`, so they mint the modern shape today. Their legacy-shape
+  branch behind that flag is unused; delete it when they switch to ES256
+  rather than keep it HS256-only.
+
+security-auto-analysis runs no Kilo CLI itself. It is a cron- and queue-driven
+Worker that triages and extracts findings with direct LLM calls to the gateway
+(`/api/openrouter/chat/completions`, `aud: kilo-gateway`), launches Cloud Agent
+sessions for analysis and remediation through the `CLOUD_AGENT_NEXT` binding
+(`aud: cloud-agent-next`), and reads session transcripts from session-ingest
+(`aud: session-ingest`). The Kilo CLI runs inside those Cloud Agent sessions
+with a runtime token minted by `cloud-agent-next`, not with a
+security-auto-analysis token.
 - The kiloclaw machine key moves from the legacy shape to the modern shape
   (`signModernKiloToken`) with `tokenPurpose: 'delegated-workload'`,
   `credentialExchange: false` and the audience array
@@ -114,7 +125,7 @@ when that issuer flips in Phase 3, and turning its flag back off rolls it back.
 |---|---|---|
 | apps/web | `kilo-api`, general bearer authentication (`validateAuthorizationHeader`) | `kilo-web`, `cloud-agent-next` (runtime token, workspace MCP grant), `kiloclaw` (in-instance CLI) |
 | apps/web | `kilo-api`, credential exchange, account bearers, resource delegation (`verifyKiloTokenForPolicy` in `user/server.ts` and `resource-delegation.ts`) | `kilo-web` |
-| apps/web | `kilo-gateway`, Exa route | `kilo-web`, `cloud-agent-next`, `kiloclaw` |
+| apps/web | `kilo-gateway`, Exa route | `kilo-web`, `cloud-agent-next`, `kiloclaw` (security-auto-analysis's gateway token only calls chat completions) |
 | apps/web | `cloud-agent-next`, balance route | `kilo-web`, `security-auto-analysis`, `webhook-agent-ingest` |
 | apps/web | `pages`, `pages-dev` | `kilo-web` |
 | apps/web | runtime-proxy attestation | `cloud-agent-next` |
@@ -522,8 +533,9 @@ Switch each issuer's flag in turn, watching the counters and the 401 rates
 after each step. Rollback is turning the flag off, since HS256 is still
 verified.
 
-1. `webhook-agent-ingest` and `security-auto-analysis`. Force the modern token
-   shape, with explicit audiences.
+1. `webhook-agent-ingest` and `security-auto-analysis`. Both already mint the
+   modern shape with explicit audiences; delete their unused legacy-shape
+   branch in the same change.
 2. `kilo-web` short-lived cross-service tokens: stream tickets, transcript
    tokens, bounded internal-service tokens and git, export and deletion
    assertions.
@@ -694,7 +706,3 @@ Other tests:
    With per-issuer keys, a shorter lifetime plus refresh would make future
    rotation of the `kilo-web` key possible without forcing everyone to sign in
    again.
-7. **Exa route issuers.** The apps/web Exa route (`kilo-gateway`) lists
-   `kilo-web`, `cloud-agent-next` and `kiloclaw`. Confirm from the counters
-   during Phase 3 that `security-auto-analysis` tokens never reach it; if they
-   do, add it.

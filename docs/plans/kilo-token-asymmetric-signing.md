@@ -107,8 +107,8 @@ security-auto-analysis token.
   (`services/kiloclaw/plugins/kiloclaw-customizer/src/kilo-exa-web-search-provider.ts`,
   which apps/web checks for `kilo-gateway`), and, when `KILOCLAW_KILO_CLI=true`,
   to the Kilo CLI inside the instance as `KILO_API_KEY`
-  (`controller/src/bootstrap.ts`). Narrow the array if that CLI flag is
-  retired. apps/web also mints machine keys (`apps/web/src/routers/kiloclaw-router.ts`,
+  (`controller/src/bootstrap.ts`). The plan assumes that flag is in use, so the
+  key keeps `kilo-api` and `session-ingest`. apps/web also mints machine keys (`apps/web/src/routers/kiloclaw-router.ts`,
   `generateApiToken`); it must mint them in the same modern shape with the same
   audience array, so an instance's key has the same scope whichever side minted
   it last. The kiloclaw
@@ -237,10 +237,13 @@ ES256 path and the cookie with `KILOCLAW_COOKIE_SECRET`.
 delegated-resource signer and verifies them itself
 (`app/api/pages-auth/exchange/route.ts`). They are same-service by definition,
 but they share the Kilo token builder and the audience map with cross-service
-delegated tokens. Proposal: sign them with the `kilo-web` ES256 key. Verifying
+delegated tokens. Decision: sign them with the `kilo-web` ES256 key. Verifying
 your own token with its public key costs nothing, and keeping them in this
-family avoids a second signer in `resource-delegation.ts`. Decide this in
-review.
+family avoids a second signer and verifier in `resource-delegation.ts` and the
+exchange route. They are user-held bearer tokens that pass through a Pages
+deployment, like other delegated tokens; the exchange call site accepts only
+`kilo-web` and keeps its strict claim set, so the choice of key gives no extra
+reach.
 
 **No other Worker has a same-service use of `NEXTAUTH_SECRET`.**
 
@@ -681,16 +684,20 @@ Other tests:
 
 ## Open questions
 
-1. **kiloclaw CLI flag.** kiloclaw stays in scope. Is the `KILOCLAW_KILO_CLI`
-   flag still used? If it is retired, the machine key's audiences can narrow to
-   `kilo-gateway`.
-2. **Pages tokens.** Sign them with the `kilo-web` ES256 key (proposed), or with
-   `WEB_INTERNAL_SECRET`?
-3. **Attestation key.** Should the runtime-proxy attestation get a separate
-   `cloud-agent-next` key, so a leaked runtime-token key cannot forge
-   attestations? Both keys would live in the same Worker, so the benefit is
-   limited.
-4. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
+1. **Deployed bindings.** How are `NEXTAUTH_SECRET` values set today for
    cloud-agent-next and user-data-export? Neither declares it in its checked-in
    `wrangler.jsonc`. kiloclaw sets its secrets with `wrangler secret put`
-   (`services/kiloclaw/wrangler.jsonc` comment).
+   (`services/kiloclaw/wrangler.jsonc` comment). The answer decides where their
+   new keys and secrets are configured and what Phase 5 removes.
+
+## Decisions
+
+- **kiloclaw machine key audiences.** Assume `KILOCLAW_KILO_CLI` is in use, so
+  the key keeps `kilo-gateway`, `kilo-api` and `session-ingest`.
+- **Pages tokens.** Signed with the `kilo-web` ES256 key (see
+  [Same-service uses and their new secrets](#same-service-uses-and-their-new-secrets)).
+- **Runtime-proxy attestation key.** No separate key: attestations are signed
+  with the `cloud-agent-next` key. A second key would live in the same Worker,
+  next to the first, so any compromise that leaks one leaks both. The
+  attestation stays distinguishable through its own verifier, its existing
+  `iss: 'kilocode-runtime-proxy'` check and its 30-second lifetime.

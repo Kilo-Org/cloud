@@ -4,6 +4,7 @@ import { SignJWT } from 'jose';
 import { clearSecretCacheForTest } from './cached-secret';
 import { signKiloToken } from './kilo-token';
 import { verifyKiloBearerAgainstCurrentPepper, type KiloUserPepperResult } from './kilo-token-auth';
+import { signModernKiloToken } from './kilo-token-policy';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
@@ -125,6 +126,22 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
   it('rejects a user token with a null pepper when the stored pepper is non-null', async () => {
     userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
     const { token } = await signToken({ pepper: null, tokenSource: 'kilo-chat' });
+
+    await expect(verifyToken(token)).resolves.toBeNull();
+  });
+
+  it('revokes a leaked user token when the pepper rotates from null to a value', async () => {
+    userResultByUserId.set('user-xyz-789', { pepper: null, blocked: false });
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: null,
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 157_680_000,
+      env: 'production',
+    });
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-rotated', blocked: false });
 
     await expect(verifyToken(token)).resolves.toBeNull();
   });
@@ -490,16 +507,19 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
     userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
   });
 
-  async function signInternalToken(): Promise<string> {
+  async function signInternalToken(
+    options: { lifetimeSeconds?: number; issuedAt?: boolean } = {}
+  ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
-    return new SignJWT({
+    const signer = new SignJWT({
       version: 3,
       kiloUserId: 'user-xyz-789',
     })
       .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt(now)
-      .setExpirationTime(now + 3600)
-      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+      .setExpirationTime(now + (options.lifetimeSeconds ?? 3600));
+    return (options.issuedAt === false ? signer : signer.setIssuedAt(now)).sign(
+      new TextEncoder().encode(TEST_JWT_SECRET)
+    );
   }
 
   function verifyInternalToken(token: string, workerEnv?: string) {
@@ -516,6 +536,46 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
     const token = await signInternalToken();
 
     await expect(verifyInternalToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+
+  it('accepts a modern audience-bound internal-service assertion without a pepper claim', async () => {
+    const { token } = await signModernKiloToken({
+      userId: 'user-xyz-789',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      audience: 'session-ingest',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: TEST_JWT_SECRET,
+        connectionString: 'postgres://test',
+        getUserPepper,
+        resourceAudience: { audience: 'session-ingest', mode: 'allow-legacy' },
+      })
+    ).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+
+  it('rejects a claimless token that lives longer than one hour for an account with a pepper', async () => {
+    const token = await signInternalToken({ lifetimeSeconds: 157_680_000 });
+
+    await expect(verifyInternalToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects a claimless long-lived token for an account without a pepper', async () => {
+    userResultByUserId.set('user-xyz-789', { pepper: null, blocked: false });
+    const token = await signInternalToken({ lifetimeSeconds: 3601 });
+
+    await expect(verifyInternalToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects a claimless token without an issue time', async () => {
+    const token = await signInternalToken({ issuedAt: false, lifetimeSeconds: 300 });
+
+    await expect(verifyInternalToken(token)).resolves.toBeNull();
   });
 
   it('fails when workerEnv is provided', async () => {

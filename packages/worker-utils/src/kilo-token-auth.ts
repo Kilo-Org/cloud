@@ -1,9 +1,11 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { decodeJwt } from 'jose';
 
 import { getCachedSecret } from './cached-secret';
 import { verifyKiloToken } from './kilo-token';
+import { isKiloTokenPepperCurrent } from './kilo-token-pepper';
 import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
 
 export type KiloBearerAuthResult = {
@@ -59,7 +61,8 @@ export async function findKiloUserPepper(
  * Verify a Kilo bearer against the account's current pepper and active state.
  *
  * Returns null only for a credential the caller must not retry: malformed,
- * expired, wrong env, unknown user, blocked user, or a stale pepper.
+ * expired, wrong env, unknown user, blocked user, or a stale pepper
+ * (`isKiloTokenPepperCurrent`).
  * A dependency failure (secret store, database) throws, so a caller can map an
  * outage to a retryable 503 instead of reporting it as an invalid token.
  */
@@ -114,9 +117,8 @@ export async function verifyKiloBearerAgainstCurrentPepper(
     return null;
   }
 
-  // Pepper equality is skipped only when the claim is absent (internal
-  // service tokens). A present claim — string or null — is always compared.
-  if (payload.apiTokenPepper !== undefined && result.pepper !== payload.apiTokenPepper) {
+  // The projected payload drops `tokenPurpose` and `aud`; the signature is already verified.
+  if (!isKiloTokenPepperCurrent({ ...decodeJwt(params.token), ...payload }, result.pepper)) {
     return null;
   }
 

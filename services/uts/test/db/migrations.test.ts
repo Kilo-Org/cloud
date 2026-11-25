@@ -9,7 +9,7 @@ import {
   loadMigrations,
 } from '../../scripts/migrator';
 import { IDENTITY_STORE_TABLES } from '../../src/db/rows';
-import { TestDatabase } from './harness';
+import { TestDatabase, sqlStateOf } from './harness';
 
 describe('identity-store migrations', () => {
   let db: TestDatabase;
@@ -47,6 +47,23 @@ describe('identity-store migrations', () => {
        GROUP BY 1`
     );
     expect(owners.rows.map(row => row.owner)).toEqual(['uts_owner']);
+  });
+
+  it('set the 10-second idle limit for every session and take TEMP from PUBLIC', async () => {
+    const admin = await db.connect();
+    const settings = await admin.query<{ setconfig: string[] }>(
+      `SELECT setconfig FROM pg_db_role_setting
+       WHERE setdatabase = (SELECT oid FROM pg_database WHERE datname = current_database())
+         AND setrole = 0`
+    );
+    expect(settings.rows).toEqual([{ setconfig: ['idle_in_transaction_session_timeout=10s'] }]);
+    const show = await admin.query<{ idle_in_transaction_session_timeout: string }>(
+      'SHOW idle_in_transaction_session_timeout'
+    );
+    expect(show.rows[0].idle_in_transaction_session_timeout).toBe('10s');
+
+    const app = await db.connect('uts_app_a');
+    expect(await sqlStateOf(() => app.query('CREATE TEMP TABLE scratch (id int)'))).toBe('42501');
   });
 
   it('stop when an applied migration changed', async () => {

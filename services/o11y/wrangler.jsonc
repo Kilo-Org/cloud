@@ -136,21 +136,23 @@
   "env": {
     // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
     // Bindings are not inherited, so the block repeats each one; the STS binding targets sts-local.
+    // Every resource id is a local placeholder that `wrangler dev` simulates, and the cron is
+    // emptied, so a stray `wrangler deploy --env local` reaches no production schedule, data or
+    // secret.
     "local": {
       "name": "o11y-local",
       "workers_dev": false,
       "routes": [],
+      "triggers": { "crons": [] },
       "analytics_engine_datasets": [
-        { "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics" },
-        { "binding": "O11Y_SESSION_METRICS", "dataset": "o11y_session_metrics" },
+        { "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics_local" },
+        { "binding": "O11Y_SESSION_METRICS", "dataset": "o11y_session_metrics_local" },
       ],
       "pipelines": [
-        { "stream": "70379355c2d741fc8b4527e69b501f52", "binding": "API_METRICS_STREAM" },
-        { "stream": "82c1fc4073bb4830a6670e920b9823c2", "binding": "SESSION_METRICS_STREAM" },
+        { "stream": "o11y-local-api-metrics", "binding": "API_METRICS_STREAM" },
+        { "stream": "o11y-local-session-metrics", "binding": "SESSION_METRICS_STREAM" },
       ],
-      "kv_namespaces": [
-        { "binding": "O11Y_ALERT_STATE", "id": "aef43060c5334b9995450a780eea94fb" },
-      ],
+      "kv_namespaces": [{ "binding": "O11Y_ALERT_STATE", "id": "o11y-local-alert-state" }],
       "services": [
         {
           "binding": "STS",
@@ -167,30 +169,31 @@
         "O11Y_API_BASE_URL": "https://api.kilo.ai",
         "SECRETS_SOURCE": "secrets-store",
       },
+      // Canonical secret names (design 4.7) in a local placeholder store, never the production one.
       "secrets_store_secrets": [
         {
           "binding": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "store_id": "o11y-local",
           "secret_name": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
         },
         {
           "binding": "O11Y_CF_AE_API_TOKEN",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "store_id": "o11y-local",
           "secret_name": "O11Y_CF_AE_API_TOKEN",
         },
         {
           "binding": "O11Y_SLACK_WEBHOOK_PAGE",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "store_id": "o11y-local",
           "secret_name": "O11Y_SLACK_WEBHOOK_PAGE",
         },
         {
           "binding": "O11Y_SLACK_WEBHOOK_TICKET",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "store_id": "o11y-local",
           "secret_name": "O11Y_SLACK_WEBHOOK_TICKET",
         },
         {
           "binding": "O11Y_CF_CONTAINERS_API_TOKEN",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "store_id": "o11y-local",
           "secret_name": "O11Y_CF_CONTAINERS_API_TOKEN",
         },
       ],

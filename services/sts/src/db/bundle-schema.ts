@@ -3,7 +3,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
 
-/** One row, id 1: the workload's current bundle, sealed with `bundle_key.seal_key`. */
+/** One row, id 1: the workload's current bundle, sealed with the object's seal key. */
 export const bundle = sqliteTable('bundle', {
   id: integer('id').primaryKey(),
   workload: text('workload').$type<WorkloadName>().notNull(),
@@ -18,8 +18,8 @@ export const bundle = sqliteTable('bundle', {
 });
 
 /**
- * One row, id 1: the AES-GCM key that seals the bundle and the HMAC key its ETag is computed
- * under. Both are generated in this object and never leave it.
+ * Legacy: an earlier revision kept the seal and ETag keys here. `BundleDO` moves a row it finds to
+ * KV storage once and deletes it; nothing writes this table, so no SQL statement binds a key.
  */
 export const bundleKey = sqliteTable('bundle_key', {
   id: integer('id').primaryKey(),

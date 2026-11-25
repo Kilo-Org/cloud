@@ -5,6 +5,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { calculateJwkThumbprint, exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { z } from 'zod';
 import migrations from '../../drizzle.signer/migrations';
+import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/signer-schema';
 import { readConfig, type Env, type ManagerLoginClaims } from '../env';
 
@@ -41,6 +42,15 @@ const ALGORITHM = 'ES256';
 const LOGIN_JWT_LIFETIME = '2m';
 
 type SigningState = { key: CryptoKey; kid: string; jwks: ManagerJwks };
+
+/** KV storage key of the signing key (see `crypto/key-store.ts`). */
+const SIGNING_KEY_NAME = 'manager-signing-key';
+
+const StoredSigningKeySchema = z.strictObject({
+  kid: z.string().min(1),
+  privateJwk: z.string().min(1),
+  publicJwk: z.string().min(1),
+});
 
 /**
  * Holds the ECDSA P-256 key STS logs in to the manager with (design 4.2, 4.4). The key is generated
@@ -86,21 +96,36 @@ export class SignerDO extends DurableObject<Env> {
   }
 
   private async loadOrCreateKey(): Promise<SigningState> {
-    const row = this.db.select().from(schema.signingKey).where(eq(schema.signingKey.id, 1)).get();
-    if (row !== undefined) return await this.adoptKey(row.kid, row.privateJwk, row.publicJwk);
-
-    // Generated extractable only so the private JWK can be stored in this object's own storage;
-    // the key used for signing is re-imported non-extractable.
-    const pair = await generateKeyPair(ALGORITHM, { extractable: true });
-    const privateJwk = JSON.stringify(await exportJWK(pair.privateKey));
-    const publicJwk = await exportJWK(pair.publicKey);
-    const kid = await calculateJwkThumbprint(publicJwk);
-    const publicJwkJson = JSON.stringify(publicJwk);
-    this.db
-      .insert(schema.signingKey)
-      .values({ id: 1, kid, privateJwk, publicJwk: publicJwkJson, createdAt: Date.now() })
-      .run();
-    return await this.adoptKey(kid, privateJwk, publicJwkJson);
+    const stored = await loadOrCreateKey({
+      storage: this.ctx.storage,
+      name: SIGNING_KEY_NAME,
+      schema: StoredSigningKeySchema,
+      legacy: () => {
+        const row = this.db
+          .select()
+          .from(schema.signingKey)
+          .where(eq(schema.signingKey.id, 1))
+          .get();
+        return row === undefined
+          ? null
+          : { kid: row.kid, privateJwk: row.privateJwk, publicJwk: row.publicJwk };
+      },
+      dropLegacy: () => {
+        this.db.delete(schema.signingKey).where(eq(schema.signingKey.id, 1)).run();
+      },
+      create: async () => {
+        // Generated extractable only so the private JWK can be stored in this object's own
+        // storage; the key used for signing is re-imported non-extractable.
+        const pair = await generateKeyPair(ALGORITHM, { extractable: true });
+        const publicJwk = await exportJWK(pair.publicKey);
+        return {
+          kid: await calculateJwkThumbprint(publicJwk),
+          privateJwk: JSON.stringify(await exportJWK(pair.privateKey)),
+          publicJwk: JSON.stringify(publicJwk),
+        };
+      },
+    });
+    return await this.adoptKey(stored.kid, stored.privateJwk, stored.publicJwk);
   }
 
   private async adoptKey(

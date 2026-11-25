@@ -154,7 +154,6 @@ export const INERT_ENVIRONMENT_KEYS: readonly string[] = [
   'minify',
   'mtls_certificates',
   'no_bundle',
-  'observability',
   'pipelines',
   'placement',
   'preserve_file_names',
@@ -163,10 +162,8 @@ export const INERT_ENVIRONMENT_KEYS: readonly string[] = [
   'ratelimits',
   'rules',
   'secrets',
-  'secrets_store_secrets',
   'send_email',
   'stream',
-  'triggers',
   'tsconfig',
   'unsafe_hello_world',
   'upload_source_maps',
@@ -286,6 +283,18 @@ const DispatchNamespaceSchema = z.strictObject({
   remote: z.boolean().optional(),
 });
 
+const ObservabilitySchema = z.looseObject({
+  traces: z.looseObject({ enabled: z.boolean().optional() }).optional(),
+});
+
+const TriggersSchema = z.looseObject({ crons: z.array(z.string()).optional() });
+
+const SecretsStoreSecretSchema = z.strictObject({
+  binding: z.string(),
+  store_id: z.string(),
+  secret_name: z.string(),
+});
+
 const RouteObjectSchema = z.strictObject({
   pattern: z.string(),
   zone_id: z.string().optional(),
@@ -326,6 +335,8 @@ const BINDING_SHAPE = {
   streaming_tail_consumers: z.array(StreamingTailConsumerSchema).optional(),
   dispatch_namespaces: z.array(DispatchNamespaceSchema).optional(),
   unsafe: z.unknown().optional(),
+  observability: ObservabilitySchema.optional(),
+  secrets_store_secrets: z.array(SecretsStoreSecretSchema).optional(),
 };
 
 const ENVIRONMENT_SHAPE = {
@@ -335,6 +346,7 @@ const ENVIRONMENT_SHAPE = {
   routes: z.array(RouteSchema).optional(),
   migrations: z.array(MigrationSchema).optional(),
   exports: z.record(z.string(), ExportSchema).optional(),
+  triggers: TriggersSchema.optional(),
   previews: z.looseObject(BINDING_SHAPE).optional(),
 };
 
@@ -374,6 +386,7 @@ export const CLASSIFIED_KEYS: Readonly<Record<string, readonly string[]>> = {
   'migrations[]': Object.keys(MigrationSchema.shape),
   'migrations[].transferred_classes[]': Object.keys(TransferredClassSchema.shape),
   'exports.*': EXPORT_KEYS,
+  'secrets_store_secrets[]': Object.keys(SecretsStoreSecretSchema.shape),
 };
 
 export type WorkerConfig = { path: string; config: z.infer<typeof WorkerConfigSchema> };
@@ -397,6 +410,13 @@ type Block = {
   routes: Array<z.infer<typeof RouteSchema>>;
   migrations: Array<z.infer<typeof MigrationSchema>>;
   exports: Record<string, z.infer<typeof ExportSchema>>;
+  /**
+   * The observability settings the block deploys with. Wrangler inherits `observability` whole
+   * into a named environment that leaves it out, so this is the block's own or the top level's.
+   */
+  observability: z.infer<typeof ObservabilitySchema> | undefined;
+  /** The block's own `triggers`; a named environment that leaves it out inherits the top level's. */
+  triggers: z.infer<typeof TriggersSchema> | undefined;
 };
 
 export function parseWorkerConfig(path: string, raw: unknown): WorkerConfig {
@@ -437,8 +457,10 @@ function blockOf(
   env: string | null,
   block: Environment,
   allowed: ReadonlySet<string>,
-  deployedName: string | undefined
+  deployedName: string | undefined,
+  inheritedObservability: z.infer<typeof ObservabilitySchema> | undefined
 ): Block[] {
+  const observability = block.observability ?? inheritedObservability;
   const own: Block = {
     env,
     preview: false,
@@ -450,6 +472,8 @@ function blockOf(
     routes: [...(block.route === undefined ? [] : [block.route]), ...(block.routes ?? [])],
     migrations: block.migrations ?? [],
     exports: block.exports ?? {},
+    observability,
+    triggers: block.triggers,
   };
   if (block.previews === undefined) return [own];
   const preview: Block = {
@@ -463,6 +487,8 @@ function blockOf(
     routes: [],
     migrations: [],
     exports: {},
+    observability: block.previews.observability ?? observability,
+    triggers: undefined,
   };
   return [own, preview];
 }
@@ -471,14 +497,22 @@ function blocksOf({ path, config }: WorkerConfig): Block[] {
   // Wrangler inherits neither bindings nor vars into a named environment, so each block stands on
   // its own; an absent `name` deploys as `<top-level name>-<env>`.
   return [
-    ...blockOf(`${path} (top level)`, null, config, TOP_LEVEL_KEYS, config.name),
+    ...blockOf(
+      `${path} (top level)`,
+      null,
+      config,
+      TOP_LEVEL_KEYS,
+      config.name,
+      config.observability
+    ),
     ...Object.entries(config.env ?? {}).flatMap(([env, block]) =>
       blockOf(
         `${path} (env.${env})`,
         env,
         block,
         ENVIRONMENT_KEYS,
-        block.name ?? (config.name === undefined ? undefined : `${config.name}-${env}`)
+        block.name ?? (config.name === undefined ? undefined : `${config.name}-${env}`),
+        config.observability
       )
     ),
   ];
@@ -531,6 +565,57 @@ function stsBindingProblems(
     problems.push(
       `${block.where}: policy ${caller} does not list ${served}, which ${binding.service} serves`
     );
+  }
+  return problems;
+}
+
+/** The account's one Secrets Store; production and non-production secrets share it by suffix. */
+const PRODUCTION_SECRETS_STORE = '342a86d9e3a94da698e82d0c6e2a36f0';
+const NON_PRODUCTION_SECRET = /_(DEV|DEVELOPMENT|LOCAL|STAGING|TEST)$/;
+
+/**
+ * Settings that keep a secret-holding Worker's material out of places STS does not control: the
+ * Worker that holds secrets (STS, the relay, or any config that binds STS) records no traces,
+ * since a trace keeps outbound URLs (a Slack webhook URL is a secret) and Durable Object SQL
+ * bindings (STS keeps keys in SQL). A non-production block of a config that binds STS reads no
+ * production secret from the shared Secrets Store and runs no production schedule, so an accidental
+ * `wrangler deploy --env local` cannot act as production.
+ */
+function secretHolderProblems(
+  blocks: readonly Block[],
+  bindsSts: boolean,
+  productionCrons: readonly string[]
+): string[] {
+  const problems: string[] = [];
+  for (const block of blocks) {
+    const traces = block.observability?.traces?.enabled;
+    if (traces !== false) {
+      problems.push(
+        `${block.where}: observability.traces.enabled resolves to ${String(traces)}; it must be false, as a trace records outbound URLs and Durable Object SQL bindings`
+      );
+    }
+    if (!bindsSts || (block.env === null && !block.preview)) continue;
+    for (const secret of block.bindings.secrets_store_secrets ?? []) {
+      if (
+        secret.store_id === PRODUCTION_SECRETS_STORE &&
+        !NON_PRODUCTION_SECRET.test(secret.secret_name)
+      ) {
+        problems.push(
+          `${block.where}: ${secret.binding} reads ${secret.secret_name} from the production Secrets Store; a non-production block reads only a _DEV, _DEVELOPMENT, _LOCAL, _STAGING or _TEST secret there`
+        );
+      }
+    }
+    if (block.preview || productionCrons.length === 0) continue;
+    const crons = block.triggers?.crons;
+    if (crons === undefined) {
+      problems.push(
+        `${block.where} inherits the production crons ${JSON.stringify(productionCrons)}; set triggers.crons to []`
+      );
+    } else if (block.env !== 'staging' && crons.length > 0) {
+      problems.push(
+        `${block.where} sets triggers.crons ${JSON.stringify(crons)}; only staging may run schedules outside production, so set []`
+      );
+    }
   }
   return problems;
 }
@@ -714,7 +799,11 @@ export function workerConfigProblems(
   for (const worker of configs) {
     const caller = worker.config.name;
     const blocks = blocksOf(worker);
-    let bindsSts = false;
+    const bindsSts = blocks.some(
+      block =>
+        !block.preview &&
+        (block.bindings.services ?? []).some(binding => isStsName(binding.service))
+    );
     for (const block of blocks) {
       for (const key of block.unknownKeys) {
         problems.push(
@@ -740,10 +829,12 @@ export function workerConfigProblems(
             `${block.where}: ${binding.binding} binds ${binding.service}; no Worker binds the audit relay`
           );
         } else if (isStsName(binding.service)) {
-          bindsSts ||= !block.preview;
           problems.push(...stsBindingProblems(caller, block, binding, workerBindingPolicies));
         }
       }
+    }
+    if (caller === 'sts' || caller === 'audit-relay' || bindsSts) {
+      problems.push(...secretHolderProblems(blocks, bindsSts, worker.config.triggers?.crons ?? []));
     }
     // `props.caller` is the top-level name in every block, so every block of a config that binds
     // STS must deploy as that Worker: the top level as itself, each env block as `<name>-<env>`.

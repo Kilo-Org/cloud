@@ -20,28 +20,15 @@ function isSharedResourceTokensEnabled(value: string | boolean | undefined): boo
 
 export async function generateInternalServiceToken(
   userId: string,
-  secret: string,
-  sharedResourceTokensEnabled: string | boolean | undefined
+  secret: string
 ): Promise<string> {
-  if (isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
-    const { token } = await signModernKiloToken({
-      userId,
-      secret,
-      expiresInSeconds: ONE_HOUR_SECONDS,
-      audience: SESSION_INGEST_AUDIENCE,
-      tokenPurpose: 'internal-service',
-      credentialExchange: false,
-    });
-    return token;
-  }
-
-  // No `pepper` field: verifiers treat an absent apiTokenPepper claim as
-  // "skip pepper comparison" for internal-service tokens (see
-  // verifyKiloBearerAgainstCurrentPepper in @kilocode/worker-utils).
-  const { token } = await signKiloToken({
+  const { token } = await signModernKiloToken({
     userId,
     secret,
     expiresInSeconds: ONE_HOUR_SECONDS,
+    audience: SESSION_INGEST_AUDIENCE,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
   });
   return token;
 }

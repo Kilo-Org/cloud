@@ -209,7 +209,7 @@ describe('authMiddleware', () => {
     expect(response.status).toBe(status);
   });
 
-  it('preserves absent pepper claim semantics', async () => {
+  it('refuses a token without a pepper claim', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
       secret: TEST_JWT_SECRET,
@@ -218,7 +218,7 @@ describe('authMiddleware', () => {
       audience: KILO_CHAT_AUDIENCE,
     });
     const { response } = await request(token);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(401);
   });
 
   it.each([

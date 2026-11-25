@@ -123,6 +123,7 @@ describe('DeviceAuthPage requesting client', () => {
       provider: 'github',
       email: 'octo@example.com',
       displayName: 'octocat',
+      needsEmailedCode: true,
     });
 
     const element = (await DeviceAuthPage({
@@ -133,6 +134,7 @@ describe('DeviceAuthPage requesting client', () => {
       provider: 'github',
       email: 'octo@example.com',
       displayName: 'octocat',
+      needsEmailedCode: true,
     });
   });
 

@@ -10,6 +10,7 @@ import {
   generateApiToken,
   generateWorkflowGatewayToken,
   generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
 } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
@@ -32,7 +33,11 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 test('preparing modern workflows preserves authentication for an existing null-pepper CLI token', async () => {
   const user = await insertTestUser({ api_token_pepper: null });
-  const token = generateApiToken(user, { createdOnPlatform: 'cli' });
+  const token = generateApiToken(
+    user,
+    { createdOnPlatform: 'cli' },
+    { expiresIn: TOKEN_EXPIRY.thirtyDays }
+  );
   mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
   const before = await getUserFromAuth({ adminOnly: false });
@@ -51,7 +56,11 @@ test('preparing modern workflows preserves authentication for an existing null-p
 
 test('null-pepper modern credentials enforce audiences and genuine rotation revokes every old credential', async () => {
   const user = await insertTestUser({ api_token_pepper: null });
-  const cliToken = generateApiToken(user, { createdOnPlatform: 'cli' });
+  const cliToken = generateApiToken(
+    user,
+    { createdOnPlatform: 'cli' },
+    { expiresIn: TOKEN_EXPIRY.thirtyDays }
+  );
   const prepared = await prepareCloudAgentWorkflowUser(user);
   expect(prepared.api_token_pepper).toBeNull();
   const gatewayToken = generateWorkflowGatewayToken(prepared, { tokenSource: 'reviewer' });

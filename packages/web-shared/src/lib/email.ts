@@ -28,6 +28,8 @@ export const subjects = {
   signInCode: 'Your Kilo Code sign-in code',
   accountLinkCode: 'Kilo: Confirm adding a sign-in method',
   newSignInMethod: 'Kilo: A new sign-in method was added to your account',
+  signInMethodRemoved: 'Kilo: A sign-in method was removed from your account',
+  signInMethodChangeCode: 'Kilo: Your code to change a sign-in method',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
@@ -361,13 +363,43 @@ export async function sendAccountLinkCodeEmail(
   });
 }
 
+/** Where and when a sign-in method change came from, for the notice email. */
+export type SignInMethodChangeRequestDetails = {
+  changedAt: Date;
+  ip: string | null;
+  /** An approximate location from the request's geolocation headers. */
+  location: string | null;
+  /** The browser and operating system from the user agent. */
+  device: string | null;
+};
+
+function signInMethodChangeDetails(details: SignInMethodChangeRequestDetails): RawHtml {
+  const time = `${details.changedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  const lines = [
+    `Time: ${time}`,
+    `IP address: ${details.ip ?? 'Unknown'}`,
+    `Approximate location: ${details.location ?? 'Unknown'}`,
+    `Browser: ${details.device ?? 'Unknown'}`,
+  ];
+  return new RawHtml(lines.map(escapeHtml).join('<br />'));
+}
+
+function connectedAccountsLink(): RawHtml {
+  const connectedAccountsUrl = `${NEXTAUTH_URL}/connected-accounts`;
+  return new RawHtml(
+    `<a class="kc-strong" href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
+      connectedAccountsUrl
+    )}</a>`
+  );
+}
+
 export async function sendNewSignInMethodEmail(
   email: string,
   providerName: string,
-  linkedIdentity: { email: string; displayName?: string | null }
+  linkedIdentity: { email: string; displayName?: string | null },
+  details: SignInMethodChangeRequestDetails
 ): Promise<SendResult> {
   const displayName = linkedIdentity.displayName?.trim();
-  const connectedAccountsUrl = `${NEXTAUTH_URL}/connected-accounts`;
   return send({
     to: email,
     templateName: 'newSignInMethod',
@@ -377,11 +409,42 @@ export async function sendNewSignInMethodEmail(
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
         : linkedIdentity.email,
-      connected_accounts_link: new RawHtml(
-        `<a class="kc-strong" href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
-          connectedAccountsUrl
-        )}</a>`
-      ),
+      change_details: signInMethodChangeDetails(details),
+      connected_accounts_link: connectedAccountsLink(),
+    },
+  });
+}
+
+export async function sendSignInMethodRemovedEmail(
+  email: string,
+  providerName: string,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'signInMethodRemoved',
+    templateVars: {
+      email,
+      provider_name: providerName,
+      change_details: signInMethodChangeDetails(details),
+      connected_accounts_link: connectedAccountsLink(),
+    },
+  });
+}
+
+export async function sendSignInMethodChangeCodeEmail(
+  email: string,
+  props: { code: string; change: 'link' | 'unlink'; providerName: string; expiresInMinutes: number }
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'signInMethodChangeCode',
+    templateVars: {
+      code: props.code,
+      email,
+      change_action: props.change === 'link' ? 'add' : 'remove',
+      provider_name: props.providerName,
+      expires_in: `${props.expiresInMinutes} minutes`,
     },
   });
 }

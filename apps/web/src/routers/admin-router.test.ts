@@ -753,3 +753,33 @@ describe('admin.syncProviders manual sync', () => {
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });
 });
+
+describe('admin.users.addNote', () => {
+  test('returns the note author without credential or token columns', async () => {
+    const appStoreAccountToken = crypto.randomUUID();
+    const admin = await insertTestUser({
+      is_admin: true,
+      google_user_name: 'Note Author',
+      api_token_pepper: 'add-note-api-pepper',
+      web_session_pepper: 'add-note-web-pepper',
+      app_store_account_token: appStoreAccountToken,
+    });
+    const target = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+
+    const note = await caller.admin.users.addNote({
+      kilo_user_id: target.id,
+      noteContent: 'checked billing history',
+    });
+
+    expect(note.admin_kilo_user).toEqual({
+      id: admin.id,
+      google_user_name: 'Note Author',
+      google_user_email: admin.google_user_email,
+    });
+    const serialized = JSON.stringify(note);
+    expect(serialized).not.toContain('add-note-api-pepper');
+    expect(serialized).not.toContain('add-note-web-pepper');
+    expect(serialized).not.toContain(appStoreAccountToken);
+  });
+});

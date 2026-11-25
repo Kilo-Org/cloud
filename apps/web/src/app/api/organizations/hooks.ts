@@ -387,6 +387,20 @@ export function useUpdateKiloEncrypt() {
   );
 }
 
+export function useUpdateAllowNonSsoSignInMethods() {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateAllOrganizationData();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.admin.updateAllowNonSsoSignInMethods.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
 export function useUpdateMinimumBalanceAlert() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

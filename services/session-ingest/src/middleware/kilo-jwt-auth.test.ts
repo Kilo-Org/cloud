@@ -391,6 +391,25 @@ describe('kiloJwtAuthMiddleware', () => {
     expect(await res.json()).toEqual({ user_id: 'usr_123' });
   });
 
+  it('rejects a long-lived token without a pepper claim after a pepper rotation', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-rotated', blockedReason: null });
+    const { token } = await signKiloToken({
+      userId: 'usr_123',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 30 * 24 * 60 * 60,
+    });
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
   it('rejects an internal token (no pepper) for a blocked account', async () => {
     userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'manual block' });
     const token = await signInternalToken();

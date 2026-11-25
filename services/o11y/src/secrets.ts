@@ -44,11 +44,21 @@ export function secretsSource(
   return parsed.data;
 }
 
+/** The source holds no value, or an empty one, for a secret o11y reads. */
+export class SecretNotConfiguredError extends Error {
+  constructor(name: O11ySecretName) {
+    super(`${name} secret is not configured`);
+    this.name = 'SecretNotConfiguredError';
+  }
+}
+
+/** Resolves a non-empty value; an empty value throws `SecretNotConfiguredError` on either source. */
 export async function readO11ySecret(
   env: O11ySecretsEnv,
   name: O11ySecretName,
   ctx?: SecretsExecutionContext
 ): Promise<string> {
+  let value: string | null | undefined;
   if (secretsSource(env) === 'sts') {
     const binding = env.STS;
     if (binding === undefined) {
@@ -59,10 +69,10 @@ export async function readO11ySecret(
       client = createWorkerSecrets(binding);
       stsClients.set(binding, client);
     }
-    return client.get(name, ctx);
+    value = await client.get(name, ctx);
+  } else {
+    value = await env[name]?.get();
   }
-
-  const value = await env[name]?.get();
-  if (!value) throw new Error(`${name} secret is not configured`);
+  if (!value) throw new SecretNotConfiguredError(name);
   return value;
 }

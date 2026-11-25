@@ -9,7 +9,12 @@ import { sendAlertNotification, type SloAlertPayload } from '../src/alerting/not
 import { queryErrorRates } from '../src/alerting/query';
 import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
 import { resolveQueueId } from '../src/alerting/queue-lookup';
-import { readO11ySecret, secretsSource, type O11ySecretName } from '../src/secrets';
+import {
+  SecretNotConfiguredError,
+  readO11ySecret,
+  secretsSource,
+  type O11ySecretName,
+} from '../src/secrets';
 
 const ETAG = '"0123456789abcdef"';
 const CONTAINERS_TOKEN = 'O11Y_CF_CONTAINERS_API_TOKEN';
@@ -237,6 +242,31 @@ describe('every o11y secret read site over the STS source', () => {
     expect(refused.status).toBe(401);
     expect(reads).toEqual([]);
   });
+
+  it.each(['secrets-store', 'sts'] as const)(
+    'refuses an empty admin header when the %s value is empty',
+    async source => {
+      const name = 'O11Y_KILO_GATEWAY_CLIENT_SECRET';
+      const { env: store } = storeEnv({ [name]: '' });
+      const { binding } = stsBinding(bundle({ [name]: '' }));
+      const env = { ...store, SECRETS_SOURCE: source, STS: binding } as unknown as Env;
+      const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin, c => c.text('ok'));
+      const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
+
+      const withEmpty = await app.request(
+        '/admin',
+        { headers: { 'X-O11Y-ADMIN-TOKEN': '' } },
+        env,
+        executionCtx
+      );
+      const withoutHeader = await app.request('/admin', {}, env, executionCtx);
+
+      expect(withEmpty.status).toBe(401);
+      expect(withoutHeader.status).toBe(401);
+      await expect(readO11ySecret(env, name)).rejects.toThrow(SecretNotConfiguredError);
+      await expect(readO11ySecret(env, name)).rejects.toThrow(`${name} secret is not configured`);
+    }
+  );
 
   it('queries Analytics Engine with the bundle token', async () => {
     const { env, reads } = stsOnlyEnv();

@@ -3306,6 +3306,9 @@ importers:
 
   services/o11y:
     dependencies:
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client

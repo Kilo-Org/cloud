@@ -43,8 +43,16 @@ export type KeyRingChange =
   | { change: 'activated'; kid: string; retiredKid: string | null }
   | { change: 'removed'; kid: string; lastTokenExp: number };
 
-/** One emergency removal, audited as `ai.kilo.sts.token_key.revoked`. */
-export type KeyRevocation = { kid: string; state: TokenKeyState; replacementKid: string | null };
+/**
+ * One emergency removal, audited as `ai.kilo.sts.token_key.revoked`: a listed kid, or the `next`
+ * key dropped with its shard's listed current key (`same_ring`).
+ */
+export type KeyRevocation = {
+  kid: string;
+  state: TokenKeyState;
+  cause: 'listed' | 'same_ring';
+  replacementKid: string | null;
+};
 
 export type KeyRingAdvance = {
   ring: KeyRing;
@@ -72,9 +80,10 @@ function nextActivation(current: TokenKey, now: number): number {
 
 /**
  * Applies every change due at `now`, in order: emergency removals (a removed current key is
- * replaced by a freshly generated one at once), a first key for an empty ring, the next key's
- * publication, its activation, and the removal of retired keys past their grace period. Running
- * it again at the same time changes nothing.
+ * replaced by a freshly generated one at once, and takes the shard's `next` key with it, which a
+ * leak of the same storage exposes too; a removed next key is replaced by a fresh next key), a
+ * first key for an empty ring, the next key's publication, its activation, and the removal of
+ * retired keys past their grace period. Running it again at the same time changes nothing.
  */
 export async function advanceKeyRing(
   ring: KeyRing,
@@ -89,10 +98,21 @@ export async function advanceKeyRing(
   const revocations: KeyRevocation[] = [];
   let keys = ring.keys.map(key => ({ ...key }));
 
-  for (const key of keys.filter(candidate => revokedKids.includes(candidate.kid))) {
-    revocations.push({ kid: key.kid, state: key.state, replacementKid: null });
+  const currentListed = keys.some(key => key.state === 'current' && revokedKids.includes(key.kid));
+  for (const key of keys) {
+    if (revokedKids.includes(key.kid)) {
+      revocations.push({ kid: key.kid, state: key.state, cause: 'listed', replacementKid: null });
+    } else if (currentListed && key.state === 'next') {
+      revocations.push({
+        kid: key.kid,
+        state: key.state,
+        cause: 'same_ring',
+        replacementKid: null,
+      });
+    }
   }
-  keys = keys.filter(key => !revokedKids.includes(key.kid));
+  const dropped = new Set(revocations.map(revocation => revocation.kid));
+  keys = keys.filter(key => !dropped.has(key.kid));
 
   if (!keys.some(key => key.state === 'current')) {
     const replacement = newKey(await generate(), 'current', now, now);
@@ -100,6 +120,15 @@ export async function advanceKeyRing(
     const revokedCurrent = revocations.find(revocation => revocation.state === 'current');
     if (revokedCurrent === undefined) changes.push({ change: 'created', kid: replacement.kid });
     else revokedCurrent.replacementKid = replacement.kid;
+  }
+  const revokedNext = revocations.find(revocation => revocation.state === 'next');
+  if (revokedNext !== undefined) {
+    // A fresh next key, published now and active no sooner than a full publish-ahead period on.
+    const current = keys.find(key => key.state === 'current');
+    if (current === undefined) throw new Error('the key ring has no current key');
+    const replacement = newKey(await generate(), 'next', now, nextActivation(current, now));
+    keys.push(replacement);
+    revokedNext.replacementKid = replacement.kid;
   }
 
   for (;;) {
@@ -155,6 +184,17 @@ export function recordSignedExp(ring: KeyRing, kid: string, exp: number): boolea
   if (key === undefined || rounded <= key.maxExp) return false;
   key.maxExp = rounded;
   return true;
+}
+
+/**
+ * Raises each key of `next` to the latest `exp` `latest` records for it, so a ring built from an
+ * older copy never forgets a token signed meanwhile.
+ */
+export function keepLatestSignedExp(next: KeyRing, latest: KeyRing): void {
+  for (const key of next.keys) {
+    const seen = latest.keys.find(candidate => candidate.kid === key.kid);
+    if (seen !== undefined && seen.maxExp > key.maxExp) key.maxExp = seen.maxExp;
+  }
 }
 
 /**

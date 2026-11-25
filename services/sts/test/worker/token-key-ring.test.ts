@@ -6,6 +6,7 @@ import {
 } from '../../src/constants';
 import {
   advanceKeyRing,
+  keepLatestSignedExp,
   keyRingDueAt,
   publishedKeys,
   recordSignedExp,
@@ -123,7 +124,7 @@ describe('token key ring rotation', () => {
 });
 
 describe('emergency key removal', () => {
-  it('drops the current key at once, never signs with it again, and promotes a fresh key', async () => {
+  it('drops the current key and its ring-mate next key at once, and promotes fresh keys', async () => {
     const generate = keyFactory();
     const first = await ringAt({ keys: [] }, START, generate);
     const published = await ringAt(first.ring, START + 23 * DAY_MS, generate);
@@ -131,20 +132,37 @@ describe('emergency key removal', () => {
     expect(keyRingDueAt(published.ring, [kid(1)], now)).toBe(now);
 
     const revoked = await ringAt(published.ring, now, generate, [kid(1)]);
+    // The next key lives in the same storage as the leaked current key, so it goes too.
     expect(revoked.revocations).toEqual([
-      { kid: kid(1), state: 'current', replacementKid: kid(3) },
+      { kid: kid(1), state: 'current', cause: 'listed', replacementKid: kid(3) },
+      { kid: kid(2), state: 'next', cause: 'same_ring', replacementKid: kid(4) },
     ]);
     expect(revoked.changes).toEqual([]);
-    expect(states(revoked.ring)).toEqual({ [kid(2)]: 'next', [kid(3)]: 'current' });
-    expect(publishedKeys(revoked.ring).map(key => key.kid)).not.toContain(kid(1));
-    // The fresh key signs from now; the published next key keeps its date.
+    expect(states(revoked.ring)).toEqual({ [kid(3)]: 'current', [kid(4)]: 'next' });
+    const served = publishedKeys(revoked.ring).map(key => key.kid);
+    expect(served).not.toContain(kid(1));
+    expect(served).not.toContain(kid(2));
+    // The fresh key signs from now; the fresh next key is published now for its full 30 days.
     expect(revoked.ring.keys.find(key => key.kid === kid(3))?.activatesAt).toBe(now);
-    expect(keyRingDueAt(revoked.ring, [kid(1)], now)).toBe(START + 30 * DAY_MS);
+    expect(revoked.ring.keys.find(key => key.kid === kid(4))?.activatesAt).toBe(
+      now + TOKEN_KEY_CURRENT_MS
+    );
+    expect(keyRingDueAt(revoked.ring, [kid(1)], now)).toBe(now + TOKEN_KEY_CURRENT_MS);
 
-    // Still listed later: nothing more to do, and the kid never comes back.
+    // Still listed later: nothing more to do, and neither kid comes back.
     const later = await ringAt(revoked.ring, now + DAY_MS, generate, [kid(1)]);
     expect(later.revocations).toEqual([]);
-    expect(later.ring.keys.map(key => key.kid)).not.toContain(kid(1));
+    expect(later.ring.keys.map(key => key.kid)).toEqual([kid(3), kid(4)]);
+  });
+
+  it('drops only the current key when the ring has no next key yet', async () => {
+    const generate = keyFactory();
+    const first = await ringAt({ keys: [] }, START, generate);
+    const revoked = await ringAt(first.ring, START + DAY_MS, generate, [kid(1)]);
+    expect(revoked.revocations).toEqual([
+      { kid: kid(1), state: 'current', cause: 'listed', replacementKid: kid(2) },
+    ]);
+    expect(states(revoked.ring)).toEqual({ [kid(2)]: 'current' });
   });
 
   it('drops a next or retired key without touching the current one', async () => {
@@ -152,22 +170,39 @@ describe('emergency key removal', () => {
     const first = await ringAt({ keys: [] }, START, generate);
     const published = await ringAt(first.ring, START + 23 * DAY_MS, generate);
     const nextRevoked = await ringAt(published.ring, START + 23 * DAY_MS + 1, generate, [kid(2)]);
-    expect(nextRevoked.revocations).toEqual([{ kid: kid(2), state: 'next', replacementKid: null }]);
-    // Inside the publish window, a replacement next key is published at once, 7 days ahead.
-    expect(nextRevoked.changes).toEqual([
-      {
-        change: 'published',
-        kid: kid(3),
-        activatesAt: START + 23 * DAY_MS + 1 + TOKEN_KEY_PUBLISH_AHEAD_MS,
-      },
+    // A replacement next key is published at once, 7 days ahead.
+    expect(nextRevoked.revocations).toEqual([
+      { kid: kid(2), state: 'next', cause: 'listed', replacementKid: kid(3) },
     ]);
+    expect(nextRevoked.changes).toEqual([]);
+    expect(nextRevoked.ring.keys.find(key => key.kid === kid(3))?.activatesAt).toBe(
+      START + 23 * DAY_MS + 1 + TOKEN_KEY_PUBLISH_AHEAD_MS
+    );
     expect(states(nextRevoked.ring)).toEqual({ [kid(1)]: 'current', [kid(3)]: 'next' });
 
     const switched = await ringAt(published.ring, START + 30 * DAY_MS, generate);
     const retiredRevoked = await ringAt(switched.ring, START + 30 * DAY_MS + 1, generate, [kid(1)]);
     expect(retiredRevoked.revocations).toEqual([
-      { kid: kid(1), state: 'retired', replacementKid: null },
+      { kid: kid(1), state: 'retired', cause: 'listed', replacementKid: null },
     ]);
     expect(states(retiredRevoked.ring)).toEqual({ [kid(2)]: 'current' });
+  });
+});
+
+describe('signed exp merge', () => {
+  it('keeps an exp recorded on the live ring while a rotation built its ring from an older copy', async () => {
+    const generate = keyFactory();
+    const live = (await ringAt({ keys: [] }, START, generate)).ring;
+    // The rotation copies the ring, then a mint records a token on the live ring meanwhile.
+    const rotation = await ringAt(live, START + 23 * DAY_MS, generate);
+    expect(recordSignedExp(live, kid(1), 1_900_000_000)).toBe(true);
+    expect(rotation.ring.keys.find(key => key.kid === kid(1))?.maxExp).toBe(0);
+
+    keepLatestSignedExp(rotation.ring, live);
+    expect(rotation.ring.keys.find(key => key.kid === kid(1))?.maxExp).toBe(1_900_000_020);
+    // A lower live value never lowers the rotation's.
+    live.keys[0].maxExp = 0;
+    keepLatestSignedExp(rotation.ring, live);
+    expect(rotation.ring.keys.find(key => key.kid === kid(1))?.maxExp).toBe(1_900_000_020);
   });
 });

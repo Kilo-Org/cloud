@@ -342,8 +342,10 @@ export function tokenKeyRotatedEvent(input: {
 }
 
 /**
- * A key listed in `TOKEN_SIGNING_KIDS_REVOKED` was dropped from the ring: it never signs again and
- * leaves the key set. A dropped current key is replaced by a freshly generated one at once.
+ * A key left the ring in an emergency: it never signs again and leaves the key set. `cause` is
+ * `listed` for a kid in `TOKEN_SIGNING_KIDS_REVOKED`, or `same_ring` for the `next` key of a shard
+ * whose current key was listed (one storage leak exposes both). A dropped current or next key is
+ * replaced by a freshly generated one at once.
  */
 export function tokenKeyRevokedEvent(input: {
   environment: StsEnvironment;
@@ -367,6 +369,7 @@ export function tokenKeyRevokedEvent(input: {
         environment: input.environment,
         kid: revocation.kid,
         state: revocation.state,
+        cause: revocation.cause,
         replacementKid: revocation.replacementKid ?? 'none',
       },
     },

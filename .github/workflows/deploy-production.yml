@@ -26,6 +26,24 @@ env:
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
+  # This workflow runs only from main. The job holds no credential, so it can
+  # report the reason a run was rejected instead of skipping silently.
+  verify-main:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REPOSITORY" != "Kilo-Org/cloud" ]; then
+            echo "::error::This workflow must be run from the canonical Kilo-Org/cloud repository. Got: $GITHUB_REPOSITORY"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
   # Only a successful CI run may start an automatic deploy; the poll and the
   # dispatch pass the same guard unchanged. Every later job depends on this one,
   # so a CI completion that must not deploy skips the whole run. The deployed
@@ -45,9 +63,16 @@ jobs:
   # runs first, so an unreachable database fails here before the migrations try
   # the same connection.
   db-gate:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # The ref check is named here: this job holds the production environment and
+    # repo secrets, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
     environment: production
@@ -87,9 +112,16 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # The ref check is named here: this job maps a repo secret into the reusable
+    # workflow, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -99,9 +131,16 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-ai-gateway:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # The ref check is named here: this job maps a repo secret into the reusable
+    # workflow, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -111,12 +150,15 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   promote-app:
-    needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
+    needs: [verify-main, stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
     # Guard: privileged workflow — only the canonical repo may run it.
+    # The ref check is named here too: this job maps the promote tokens, so it
+    # must not start when verify-main failed.
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
+        needs.verify-main.result == 'success' &&
         needs.stage-app.result == 'success' &&
         needs.db-gate.result == 'success' &&
         (
@@ -133,10 +175,16 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-ai-gateway:
-    needs: [stage-ai-gateway, db-gate]
+    needs: [verify-main, stage-ai-gateway, db-gate]
     # stage-ai-gateway skips when there is nothing to deploy, which skips this job too.
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud'
+    # This condition names the ref check itself: the job maps the Axiom and
+    # Vercel tokens, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success'
+      }}
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -169,11 +217,12 @@ jobs:
   # deploy-order contract). record-deployment below still requires every Vercel
   # leg and this deploy.
   deploy-workers:
-    needs: [db-gate, check-changes, detect-workers]
+    needs: [verify-main, db-gate, check-changes, detect-workers]
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
+        needs.verify-main.result == 'success' &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success'
@@ -188,8 +237,16 @@ jobs:
   # The kilo-mcp changelog, GitHub Release and SBOM. It runs after every
   # successful worker deploy and releases only when the kilo-mcp bundle changed.
   kilo-mcp-release:
-    needs: [check-changes, deploy-workers]
-    if: ${{ github.repository == 'Kilo-Org/cloud' && !cancelled() && needs.deploy-workers.result == 'success' }}
+    needs: [verify-main, check-changes, deploy-workers]
+    # Guard: privileged workflow — only the canonical repo may run it, and its
+    # `secrets: inherit` needs an explicit ref-check result.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        !cancelled() &&
+        needs.verify-main.result == 'success' &&
+        needs.deploy-workers.result == 'success'
+      }}
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller).
     permissions:
@@ -208,6 +265,7 @@ jobs:
   record-deployment:
     needs:
       [
+        verify-main,
         check-changes,
         db-gate,
         stage-app,
@@ -220,6 +278,7 @@ jobs:
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
+        needs.verify-main.result == 'success' &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&
         needs.stage-app.result == 'success' &&

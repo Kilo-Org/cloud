@@ -150,12 +150,14 @@ jobs:
       # catalog job runs (`.github/workflows/kilo-mcp-catalog.yml`): the shared
       # `MCP_CATALOG_TOKEN_SECRET` is exchanged for a one-hour token that belongs
       # to the internal benchmarking bot account, never a maintainer's login.
+      # The step runs on main, like every downstream job that consumes the
+      # credential.
       # continue-on-error: notes are never worth a failed release. A mint that
       # fails leaves the step's output empty, and the notes step then writes the
       # deterministic block and warns.
       - name: Mint changelog token
         id: mint-notes
-        if: steps.check.outputs.should_build == 'true'
+        if: steps.check.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
         continue-on-error: true
         env:
           MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
@@ -183,7 +185,7 @@ jobs:
 
       - name: Notes for the changelog
         id: notes
-        if: steps.check.outputs.should_build == 'true'
+        if: steps.check.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
         env:
           # The minted one-hour token. Empty when the mint failed: the script
           # still runs, falls back to the deterministic block and warns.

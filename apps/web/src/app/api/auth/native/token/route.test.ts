@@ -3081,7 +3081,7 @@ describe('POST /api/auth/native/token', () => {
       });
     });
 
-    it('checks an Android sign-in by its user agent', async () => {
+    it('checks an Android sign-in without a device key', async () => {
       mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
       const request = new NextRequest('http://localhost:3000/api/auth/native/token', {
         method: 'POST',
@@ -3095,7 +3095,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockScheduleNewSignInCheck).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'email',
-          device: { kind: 'user_agent', userAgent: 'Kilo-Code/1.0.4 (android)' },
+          device: { kind: 'no_install_key' },
         })
       );
     });

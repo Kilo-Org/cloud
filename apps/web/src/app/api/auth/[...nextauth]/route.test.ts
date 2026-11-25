@@ -127,14 +127,13 @@ describe('browser device cookie', () => {
   }
 
   /** A NextAuth handler that completes a sign-in, as the `jwt` callback does. */
-  function completeSignIn() {
+  function completeSignIn(headers: HeadersInit = {}) {
     let claimed: ReturnType<typeof claimWebSignInDevice> = null;
     mockNextAuthHttpHandler.mockImplementation(async () => {
       claimed = claimWebSignInDevice();
-      return new Response(null, {
-        status: 302,
-        headers: { Location: 'https://app.kilo.ai/users/after-sign-in' },
-      });
+      const response = new Headers(headers);
+      response.set('Location', 'https://app.kilo.ai/users/after-sign-in');
+      return new Response(null, { status: 302, headers: response });
     });
     return () => claimed;
   }
@@ -152,7 +151,7 @@ describe('browser device cookie', () => {
     expect(claimed()?.device).toEqual({ kind: 'browser_cookie', secret: value });
     expect(setCookie).toMatch(/HttpOnly/i);
     expect(setCookie).toMatch(/Secure/i);
-    expect(setCookie).toMatch(/SameSite=lax/i);
+    expect(setCookie).toMatch(/SameSite=None/);
     expect(setCookie).toMatch(/Path=\//);
     expect(setCookie).toMatch(/Max-Age=34560000/);
   });
@@ -164,6 +163,51 @@ describe('browser device cookie', () => {
 
     expect(claimed()?.device).toEqual({ kind: 'browser_cookie', secret: existingSecret });
     expect(response.headers.get('set-cookie')).toContain(`__Host-kilo-device=${existingSecret}`);
+  });
+
+  test("Apple's cross-site form POST callback keeps the browser cookie", async () => {
+    const claimed = completeSignIn();
+    const request = new NextRequest('https://app.kilo.ai/api/auth/callback/apple', {
+      method: 'POST',
+      headers: {
+        cookie: `__Host-kilo-device=${existingSecret}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        origin: 'https://appleid.apple.com',
+      },
+      body: new URLSearchParams({ code: 'c', state: 's' }),
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ nextauth: ['callback', 'apple'] }),
+    });
+
+    expect(claimed()?.device).toEqual({ kind: 'browser_cookie', secret: existingSecret });
+    const deviceCookies = response.headers
+      .getSetCookie()
+      .filter(cookie => cookie.startsWith('__Host-kilo-device='));
+    expect(deviceCookies).toHaveLength(1);
+    expect(/^__Host-kilo-device=([^;]+)/.exec(deviceCookies[0] ?? '')?.[1]).toBe(existingSecret);
+  });
+
+  test("NextAuth's own Set-Cookie headers pass through byte for byte", async () => {
+    const sessionToken =
+      '__Secure-next-auth.session-token=fake-session-token.part-2; Path=/; Expires=Fri, 25 Dec 2026 12:00:00 GMT; HttpOnly; Secure; SameSite=Lax';
+    const clearedState =
+      '__Secure-next-auth.state=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; Secure; SameSite=None; Partitioned';
+    const headers = new Headers({ 'x-nextauth': 'kept' });
+    headers.append('set-cookie', sessionToken);
+    headers.append('set-cookie', clearedState);
+    completeSignIn(headers);
+
+    const response = await GET(signInRequest(), context);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('x-nextauth')).toBe('kept');
+    const setCookies = response.headers.getSetCookie();
+    expect(setCookies).toHaveLength(3);
+    expect(setCookies[0]).toBe(sessionToken);
+    expect(setCookies[1]).toBe(clearedState);
+    expect(setCookies[2]).toMatch(/^__Host-kilo-device=[A-Za-z0-9_-]{43}; /);
   });
 
   test('a malformed cookie is replaced', async () => {

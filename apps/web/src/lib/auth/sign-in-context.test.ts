@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import * as z from 'zod';
 import { user_sign_in_contexts } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -68,22 +69,25 @@ describe('sign-in keys', () => {
     expect(hashSignInKey('user-a', 'device', 'DE 203.0.0.0/16')).not.toBe(one);
   });
 
-  test('a native device is its iOS attested key, else its user agent', () => {
-    expect(
-      nativeSignInDevice({ platform: 'ios', keyId: 'key-1' }, 'Kilo-Code/1.0.4 (ios)')
-    ).toEqual({ kind: 'ios_attested_key', keyId: 'key-1' });
-    expect(nativeSignInDevice({ platform: 'android' }, 'Kilo-Code/1.0.4 (android)')).toEqual({
-      kind: 'user_agent',
-      userAgent: 'Kilo-Code/1.0.4 (android)',
+  test('a native device is its iOS attested key, else it has no install key', () => {
+    expect(nativeSignInDevice({ platform: 'ios', keyId: 'key-1' })).toEqual({
+      kind: 'ios_attested_key',
+      keyId: 'key-1',
     });
+    expect(nativeSignInDevice({ platform: 'ios' })).toEqual({ kind: 'no_install_key' });
+    expect(nativeSignInDevice({ platform: 'android' })).toEqual({ kind: 'no_install_key' });
+    expect(hashSignInDevice('user-a', { kind: 'no_install_key' })).toBeNull();
   });
 });
 
 describe('recordSignInContext', () => {
-  async function signIn(userId: string, device: string, network: string | null, now: Date) {
+  async function signIn(userId: string, device: string | null, network: string | null, now: Date) {
     return recordSignInContext({
       userId,
-      deviceKeyHash: hashSignInDevice(userId, { kind: 'browser_cookie', secret: device }),
+      deviceKeyHash:
+        device === null
+          ? hashSignInDevice(userId, { kind: 'no_install_key' })
+          : hashSignInDevice(userId, { kind: 'browser_cookie', secret: device }),
       networkKeyHash: network === null ? null : hashSignInKey(userId, 'network', network),
       now,
     });
@@ -131,11 +135,8 @@ describe('recordSignInContext', () => {
     const user = await insertTestUser();
     await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
 
-    const first = await signIn(user.id, 'stranger-1', 'US 192.0.0.0/16', at(HOUR));
-    expect(first).toEqual({
+    await expect(signIn(user.id, 'stranger-1', 'US 192.0.0.0/16', at(HOUR))).resolves.toEqual({
       kind: 'new_device_new_network',
-      deviceKeyHash: hashSignInDevice(user.id, { kind: 'browser_cookie', secret: 'stranger-1' }),
-      networkKeyHash: hashSignInKey(user.id, 'network', 'US 192.0.0.0/16'),
     });
 
     await expect(
@@ -173,6 +174,43 @@ describe('recordSignInContext', () => {
     expect((await rows(user.id)).filter(row => row.kind === 'device')).toHaveLength(2);
   });
 
+  test('a capped sign-in records nothing, so its context can notify after the cap', async () => {
+    const user = await insertTestUser();
+    await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
+    await signIn(user.id, 'stranger-1', 'US 192.0.0.0/16', at(HOUR));
+
+    await expect(
+      signIn(user.id, 'stranger-2', 'BR 100.64.0.0/16', at(HOUR + 30 * 60_000))
+    ).resolves.toEqual({ kind: 'notice_capped' });
+    const stranger2 = hashSignInDevice(user.id, { kind: 'browser_cookie', secret: 'stranger-2' });
+    const brazil = hashSignInKey(user.id, 'network', 'BR 100.64.0.0/16');
+    const keys = (await rows(user.id)).map(row => row.key_hash);
+    expect(keys).not.toContain(stranger2);
+    expect(keys).not.toContain(brazil);
+
+    await expect(
+      signIn(user.id, 'stranger-2', 'BR 100.64.0.0/16', at(2 * HOUR + 1))
+    ).resolves.toEqual({ kind: 'new_device_new_network' });
+  });
+
+  test('an app sign-in without an install key is decided on the network alone', async () => {
+    const user = await insertTestUser();
+    await expect(signIn(user.id, null, 'DE 203.0.0.0/16', start)).resolves.toEqual({
+      kind: 'bootstrap',
+    });
+    expect((await rows(user.id)).map(row => row.kind)).toEqual(['network']);
+
+    // The same app (same user agent) on a known network is not new.
+    await expect(signIn(user.id, null, 'DE 203.0.0.0/16', at(HOUR))).resolves.toEqual({
+      kind: 'known',
+    });
+    // On a new network it is: the app never counts as a known device.
+    await expect(signIn(user.id, null, 'US 192.0.0.0/16', at(2 * HOUR))).resolves.toEqual({
+      kind: 'new_device_new_network',
+    });
+    expect((await rows(user.id)).filter(row => row.kind === 'device')).toHaveLength(0);
+  });
+
   test('a context not seen for 90 days is deleted, and counts as new again', async () => {
     const user = await insertTestUser();
     const laptop = hashSignInDevice(user.id, { kind: 'browser_cookie', secret: 'laptop' });
@@ -186,8 +224,6 @@ describe('recordSignInContext', () => {
 
     await expect(signIn(user.id, 'laptop', 'US 192.0.0.0/16', at(96 * DAY))).resolves.toEqual({
       kind: 'new_device_new_network',
-      deviceKeyHash: laptop,
-      networkKeyHash: hashSignInKey(user.id, 'network', 'US 192.0.0.0/16'),
     });
   });
 
@@ -197,9 +233,9 @@ describe('recordSignInContext', () => {
     await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
     await signIn(user.id, 'phone', 'FR 198.51.0.0/16', at(80 * DAY));
 
-    await expect(signIn(user.id, 'laptop', 'US 192.0.0.0/16', at(95 * DAY))).resolves.toMatchObject(
-      { kind: 'new_device_new_network', deviceKeyHash: laptop }
-    );
+    await expect(signIn(user.id, 'laptop', 'US 192.0.0.0/16', at(95 * DAY))).resolves.toEqual({
+      kind: 'new_device_new_network',
+    });
     // The expired network row is deleted; the laptop row is refreshed, not deleted.
     expect((await rows(user.id)).map(row => row.kind).sort()).toEqual([
       'device',
@@ -211,13 +247,61 @@ describe('recordSignInContext', () => {
     expect((await rows(user.id)).map(row => row.key_hash)).toContain(laptop);
   });
 
-  test('a user with only expired contexts starts over without a notice', async () => {
+  test('a user with only expired contexts is not new to detection, and is notified', async () => {
     const user = await insertTestUser();
     await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
 
     await expect(signIn(user.id, 'stranger', 'US 192.0.0.0/16', at(91 * DAY))).resolves.toEqual({
-      kind: 'bootstrap',
+      kind: 'new_device_new_network',
     });
-    expect(await rows(user.id)).toHaveLength(2);
+    // The expired rows are deleted; the new device, network and notice rows remain.
+    expect((await rows(user.id)).map(row => row.kind).sort()).toEqual([
+      'device',
+      'network',
+      'notice',
+    ]);
+  });
+
+  test('the prune skips an expired row another sign-in holds, instead of waiting on it', async () => {
+    const user = await insertTestUser();
+    const laptop = hashSignInDevice(user.id, { kind: 'browser_cookie', secret: 'laptop' });
+    await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
+    await signIn(user.id, 'phone', 'DE 203.0.0.0/16', at(80 * DAY));
+
+    // Another sign-in from the laptop holds its expired row, as its upsert
+    // does until it commits. The prune must neither wait on it nor delete it.
+    const holderPid = Promise.withResolvers<number>();
+    const release = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      const { rows: pidRows } = await tx.execute(sql`SELECT pg_backend_pid()::int AS pid`);
+      await tx.execute(sql`
+        SELECT 1 FROM user_sign_in_contexts
+        WHERE user_id = ${user.id} AND kind = 'device' AND key_hash = ${laptop}
+        FOR UPDATE
+      `);
+      holderPid.resolve(z.object({ pid: z.number() }).parse(pidRows[0]).pid);
+      await release.promise;
+    });
+    const pid = await holderPid.promise;
+
+    let settled = false;
+    const pending = signIn(user.id, 'tablet', 'DE 203.0.0.0/16', at(95 * DAY)).finally(() => {
+      settled = true;
+    });
+    // Until the sign-in settles, look for a backend blocked by the holder.
+    let waitedOnHolder = false;
+    while (!settled && !waitedOnHolder) {
+      const { rows: blocked } = await db.execute(sql`
+        SELECT 1 FROM pg_stat_activity
+        WHERE datname = current_database() AND ${pid}::int = ANY(pg_blocking_pids(pid))
+      `);
+      waitedOnHolder = blocked.length > 0;
+    }
+    release.resolve();
+    await holder;
+
+    expect(waitedOnHolder).toBe(false);
+    await expect(pending).resolves.toEqual({ kind: 'known' });
+    expect((await rows(user.id)).map(row => row.key_hash)).toContain(laptop);
   });
 });

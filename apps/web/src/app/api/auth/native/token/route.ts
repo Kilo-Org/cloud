@@ -176,7 +176,7 @@ function checkNativeSignIn(
   return scheduleNewSignInCheck({
     user,
     method,
-    device: nativeSignInDevice(admission, request.headers.get('user-agent')),
+    device: nativeSignInDevice(admission),
     headers: request.headers,
   });
 }

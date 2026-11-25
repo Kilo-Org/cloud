@@ -10,6 +10,23 @@ import { callerAddressOrNull } from '@/lib/auth/caller-address';
  * Sign-in context detection: has this user signed in from this device, or
  * from this network, before? A notice is due only when both are new (design
  * 5.13: a new address alone is a carrier or VPN change, not a posture change).
+ *
+ * A client without a per-install key (the Android app, or an iOS app whose
+ * admission proof names no attested key) has no device signal: such a device
+ * is never recorded and never counts as known, so the decision rests on the
+ * network alone. A sign-in from a known network is not new; one from a new
+ * network is, subject to the same bootstrap and hourly cap as any other.
+ *
+ * Residual risk:
+ * - A VPN or residential proxy that exits in the victim's country and IPv4
+ *   /16 makes the network known, so the sign-in is silent.
+ * - A stolen device cookie makes the device known. Stealing it takes the same
+ *   access to the browser that already gives the session.
+ * - The hourly cap lets the first new sign-in notify, but hides a second one
+ *   within the hour.
+ * - The network key trusts the platform's forwarded-for header.
+ * - No raw address is stored, but a network digest is recoverable by
+ *   enumerating countries and prefixes with the user id as the salt.
  */
 
 /** A context not seen for this long is forgotten, and counts as new again. */
@@ -24,44 +41,43 @@ export type SignInDevice =
   /** The App Attest key of one iOS install, which the admission proof names. */
   | { kind: 'ios_attested_key'; keyId: string }
   /**
-   * The app's user agent, for a native client whose admission proof carries no
-   * per-install key (Android Play Integrity). It names only the platform and
-   * the app version, so it is a weak device signal; the network must be new as
-   * well before a notice fires.
+   * A native client whose admission proof carries no per-install key (Android
+   * Play Integrity). Its user agent names only the platform and the app
+   * version, the same for every install, so it is no device signal at all.
    */
-  | { kind: 'user_agent'; userAgent: string | null };
+  | { kind: 'no_install_key' };
 
 export type SignInContextDecision =
   /** The request carried no usable client address: the device is recorded, nothing is decided. */
   | { kind: 'no_network' }
-  /** The user had no recent context, so this one is recorded without a notice. */
+  /** The user had no recorded context at all, so this one is recorded without a notice. */
   | { kind: 'bootstrap' }
-  /** The device or the network was seen before. */
+  /** The device or the network was seen within the retention window. */
   | { kind: 'known' }
   /** Both are new, but a new-sign-in notice already went out within the interval. */
   | { kind: 'notice_capped' }
   /** Both are new: this sign-in owns the notice. */
-  | { kind: 'new_device_new_network'; deviceKeyHash: string; networkKeyHash: string };
+  | { kind: 'new_device_new_network' };
 
-function deviceKeyMaterial(device: SignInDevice): string {
+function deviceKeyMaterial(device: SignInDevice): string | null {
   switch (device.kind) {
     case 'browser_cookie':
       return `browser_cookie:${device.secret}`;
     case 'ios_attested_key':
       return `ios_attested_key:${device.keyId}`;
-    case 'user_agent':
-      return `user_agent:${device.userAgent ?? ''}`;
+    case 'no_install_key':
+      return null;
   }
 }
 
 /** The device of a native sign-in, from its verified admission proof. */
-export function nativeSignInDevice(
-  admission: { platform: 'ios' | 'android'; keyId?: string },
-  userAgent: string | null
-): SignInDevice {
+export function nativeSignInDevice(admission: {
+  platform: 'ios' | 'android';
+  keyId?: string;
+}): SignInDevice {
   return admission.platform === 'ios' && admission.keyId
     ? { kind: 'ios_attested_key', keyId: admission.keyId }
-    : { kind: 'user_agent', userAgent };
+    : { kind: 'no_install_key' };
 }
 
 function ipv6Hextets(address: string): string[] {
@@ -117,8 +133,10 @@ export function hashSignInKey(userId: string, kind: 'device' | 'network', value:
   return createHash('sha256').update(`${userId}\u0000${kind}\u0000${value}`).digest('hex');
 }
 
-export function hashSignInDevice(userId: string, device: SignInDevice): string {
-  return hashSignInKey(userId, 'device', deviceKeyMaterial(device));
+/** The device key of a sign-in; null for a device without a per-install key. */
+export function hashSignInDevice(userId: string, device: SignInDevice): string | null {
+  const material = deviceKeyMaterial(device);
+  return material === null ? null : hashSignInKey(userId, 'device', material);
 }
 
 const decisionRowSchema = z.object({
@@ -132,19 +150,29 @@ const decisionRowSchema = z.object({
  * Records one sign-in's device and network for the user and decides whether
  * it is a new device on a new network, in one statement:
  *
- * - reads whether the user has any context seen in the retention window, and
- *   whether this device and this network are among them;
+ * - reads whether the user has any device or network row at all (bootstrap
+ *   is the first recorded sign-in, not the first after a gap), and whether
+ *   this device and this network were seen in the retention window;
  * - when both are new and the user has history, claims the per-user notice
  *   row only if the last notice is older than the interval. The claim is an
  *   upsert whose condition is checked against the latest committed row, so two
  *   concurrent sign-ins cannot both claim it;
- * - upserts the device and network rows (refreshing `last_seen_at`);
+ * - upserts the device and network rows (refreshing `last_seen_at`), except
+ *   when the notice is capped: a silenced context stays unknown, so a later
+ *   sign-in from it can still notify;
  * - deletes the user's rows not seen within the retention window, except the
  *   rows this statement writes.
+ *
+ * Lock order: `seen` reads `notice`, and `pruned` reads `seen`, so the
+ * statement takes its row locks as notice row, then device row, then network
+ * row, then the prune. The prune locks with SKIP LOCKED, so it never waits:
+ * a row another sign-in is upserting is left for a later prune. Only the
+ * upserts wait, always in the same order, and a statement that has finished
+ * its upserts waits on nothing, so two concurrent sign-ins cannot deadlock.
  */
 export async function recordSignInContext(params: {
   userId: string;
-  deviceKeyHash: string;
+  deviceKeyHash: string | null;
   networkKeyHash: string | null;
   now?: Date;
 }): Promise<SignInContextDecision> {
@@ -158,12 +186,19 @@ export async function recordSignInContext(params: {
     WITH recent AS (
       SELECT
         count(*) > 0 AS has_context,
-        coalesce(bool_or(kind = 'device' AND key_hash = ${deviceKeyHash}), false) AS device_known,
-        coalesce(bool_or(kind = 'network' AND key_hash = ${networkKeyHash}::text), false) AS network_known
+        coalesce(bool_or(
+          kind = 'device'
+          AND key_hash IS NOT DISTINCT FROM ${deviceKeyHash}::text
+          AND last_seen_at > ${retentionCutoff}::timestamptz
+        ), false) AS device_known,
+        coalesce(bool_or(
+          kind = 'network'
+          AND key_hash IS NOT DISTINCT FROM ${networkKeyHash}::text
+          AND last_seen_at > ${retentionCutoff}::timestamptz
+        ), false) AS network_known
       FROM user_sign_in_contexts
       WHERE user_id = ${userId}
         AND kind IN ('device', 'network')
-        AND last_seen_at > ${retentionCutoff}::timestamptz
     ),
     candidate AS (
       SELECT (
@@ -190,16 +225,23 @@ export async function recordSignInContext(params: {
       FROM (VALUES ('device', ${deviceKeyHash}::text), ('network', ${networkKeyHash}::text))
         AS v(kind, key_hash)
       WHERE v.key_hash IS NOT NULL
+        AND (NOT (SELECT is_candidate FROM candidate) OR EXISTS (SELECT 1 FROM notice))
       ON CONFLICT (user_id, kind, key_hash) DO UPDATE
         SET last_seen_at = greatest(user_sign_in_contexts.last_seen_at, excluded.last_seen_at)
+      RETURNING 1
     ),
     pruned AS (
       DELETE FROM user_sign_in_contexts
-      WHERE user_id = ${userId}
-        AND last_seen_at <= ${retentionCutoff}::timestamptz
-        AND NOT (kind = 'device' AND key_hash = ${deviceKeyHash})
-        AND NOT (kind = 'network' AND key_hash IS NOT DISTINCT FROM ${networkKeyHash}::text)
-        AND NOT (kind = 'notice' AND (SELECT is_candidate FROM candidate))
+      WHERE ctid IN (
+        SELECT ctid FROM user_sign_in_contexts
+        WHERE user_id = ${userId}
+          AND last_seen_at <= ${retentionCutoff}::timestamptz
+          AND NOT (kind = 'device' AND key_hash IS NOT DISTINCT FROM ${deviceKeyHash}::text)
+          AND NOT (kind = 'network' AND key_hash IS NOT DISTINCT FROM ${networkKeyHash}::text)
+          AND NOT (kind = 'notice' AND (SELECT is_candidate FROM candidate))
+          AND (SELECT count(*) FROM seen) >= 0
+        FOR UPDATE SKIP LOCKED
+      )
     )
     SELECT
       recent.has_context,
@@ -214,5 +256,5 @@ export async function recordSignInContext(params: {
   if (!row.has_context) return { kind: 'bootstrap' };
   if (row.device_known || row.network_known) return { kind: 'known' };
   if (!row.notified) return { kind: 'notice_capped' };
-  return { kind: 'new_device_new_network', deviceKeyHash, networkKeyHash };
+  return { kind: 'new_device_new_network' };
 }

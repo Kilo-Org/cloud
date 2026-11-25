@@ -19,13 +19,16 @@ import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
 const mockScheduleSecurityNotice = jest.mocked(scheduleSecurityNotice);
 const mockCaptureException = jest.mocked(captureException);
 
-function requestHeaders(address: string, country: string) {
+const CHROME_ON_MACOS =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const ANDROID_APP = 'Kilo-Code/1.0.4 (android)';
+
+function requestHeaders(address: string, country: string, userAgent = CHROME_ON_MACOS) {
   return new Headers({
     'x-vercel-forwarded-for': address,
     'x-vercel-ip-country': country,
     'x-vercel-ip-city': 'Berlin',
-    'user-agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'user-agent': userAgent,
   });
 }
 
@@ -65,6 +68,32 @@ describe('scheduleNewSignInCheck', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  test('a same-version Android sign-in is decided on the network alone', async () => {
+    const user = await insertTestUser();
+    const android = (address: string, country: string) =>
+      scheduleNewSignInCheck({
+        user,
+        method: 'email',
+        device: { kind: 'no_install_key' },
+        headers: requestHeaders(address, country, ANDROID_APP),
+      });
+
+    // The victim's phone, then the same app version from a known network.
+    await android('203.0.113.45', 'DE');
+    await android('203.0.113.99', 'DE');
+    expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
+
+    // The same app version from a new network notifies.
+    await android('192.0.2.10', 'US');
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledTimes(1);
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledWith(
+      user,
+      { type: 'new_sign_in', method: 'email' },
+      expect.objectContaining({ location: 'Berlin, US' })
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
   test('a failed detection resolves and is reported without user data', async () => {
     // No such user row: the statement fails on its foreign key.
     const user = { id: `missing-${crypto.randomUUID()}`, google_user_email: 'a@example.com' };
@@ -80,8 +109,9 @@ describe('scheduleNewSignInCheck', () => {
 
     expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    expect(mockCaptureException).toHaveBeenCalledWith(expect.anything(), {
-      tags: { source: 'sign_in_context_check' },
-    });
+    const [reported, context] = mockCaptureException.mock.calls[0] ?? [];
+    expect(reported).toEqual(new Error('sign_in_context_check_failed'));
+    expect(reported).not.toHaveProperty('cause');
+    expect(context).toEqual({ tags: { source: 'sign_in_context_check' } });
   });
 });

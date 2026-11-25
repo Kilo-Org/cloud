@@ -1,7 +1,7 @@
 import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
-import { NextResponse, type NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import * as z from 'zod';
 import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import type { SignInDevice } from '@/lib/auth/sign-in-context';
@@ -16,6 +16,12 @@ import type { SignInDevice } from '@/lib/auth/sign-in-context';
  * it; the NextAuth route runs the handler inside `withWebSignInDevice`, the
  * `jwt` callback claims the device through `claimWebSignInDevice`, and the
  * route then adds the cookie to the response it returns.
+ *
+ * In production the cookie is `SameSite=None`: Apple returns to the callback
+ * with a cross-site form POST, which carries no `Lax` cookie. The cookie only
+ * identifies the browser and grants nothing, so sending it cross-site is
+ * harmless. `None` requires `Secure`, which a development server on plain
+ * HTTP cannot set, so development keeps `Lax`.
  */
 export const WEB_SIGN_IN_DEVICE_COOKIE = IS_DEVELOPMENT ? 'kilo-device' : '__Host-kilo-device';
 /** The longest lifetime browsers accept for a cookie. */
@@ -23,15 +29,35 @@ const WEB_SIGN_IN_DEVICE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
 
 const deviceSecretSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 
-type WebSignInScope = { secret: string; headers: Headers; claimed: boolean };
+type WebSignInScope = {
+  /** The well-formed device cookie the request carries, if any. */
+  current: string | null;
+  headers: Headers;
+  /** The device a sign-in claimed; the response sets it as the cookie. */
+  claimed: string | null;
+};
 
 const scope = new AsyncLocalStorage<WebSignInScope>();
 
+function deviceCookie(secret: string): string {
+  const attributes = [
+    `${WEB_SIGN_IN_DEVICE_COOKIE}=${secret}`,
+    'Path=/',
+    `Max-Age=${WEB_SIGN_IN_DEVICE_MAX_AGE_SECONDS}`,
+    'HttpOnly',
+    ...(IS_DEVELOPMENT ? ['SameSite=Lax'] : ['Secure', 'SameSite=None']),
+  ];
+  return attributes.join('; ');
+}
+
 /**
- * Runs one NextAuth request with the browser's device cookie in scope (a new
- * value when the request carries none or a malformed one). When a sign-in
- * claimed the device, the returned response sets the cookie, refreshing its
- * lifetime; any other response is returned unchanged.
+ * Runs one NextAuth request with the browser's device cookie in scope. When a
+ * sign-in claimed the device, the returned response also sets the cookie,
+ * refreshing its lifetime; any other response is returned unchanged.
+ *
+ * The cookie is appended to a copy of NextAuth's headers, so every
+ * Set-Cookie NextAuth wrote (session token, cleared cookies) passes through
+ * byte for byte.
  */
 export async function withWebSignInDevice(
   request: NextRequest,
@@ -41,35 +67,31 @@ export async function withWebSignInDevice(
     request.cookies.get(WEB_SIGN_IN_DEVICE_COOKIE)?.value
   );
   const state: WebSignInScope = {
-    secret: current.success ? current.data : randomBytes(32).toString('base64url'),
+    current: current.success ? current.data : null,
     headers: request.headers,
-    claimed: false,
+    claimed: null,
   };
   const response = await scope.run(state, handler);
-  if (!state.claimed) return response;
+  if (state.claimed === null) return response;
 
-  const withCookie = new NextResponse(response.body, {
+  const headers = new Headers(response.headers);
+  headers.append('set-cookie', deviceCookie(state.claimed));
+  return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers,
   });
-  withCookie.cookies.set(WEB_SIGN_IN_DEVICE_COOKIE, state.secret, {
-    path: '/',
-    httpOnly: true,
-    secure: !IS_DEVELOPMENT,
-    sameSite: 'lax',
-    maxAge: WEB_SIGN_IN_DEVICE_MAX_AGE_SECONDS,
-  });
-  return withCookie;
 }
 
 /**
  * The device and headers of the browser sign-in in progress, and a mark that
- * the response must set the device cookie. Null outside a NextAuth request.
+ * the response must set the device cookie: the browser's cookie, or a new
+ * value when it carries none or a malformed one. Null outside a NextAuth
+ * request.
  */
 export function claimWebSignInDevice(): { device: SignInDevice; headers: Headers } | null {
   const state = scope.getStore();
   if (!state) return null;
-  state.claimed = true;
-  return { device: { kind: 'browser_cookie', secret: state.secret }, headers: state.headers };
+  state.claimed ??= state.current ?? randomBytes(32).toString('base64url');
+  return { device: { kind: 'browser_cookie', secret: state.claimed }, headers: state.headers };
 }

@@ -6,8 +6,6 @@ import { organizations, type User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
-import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import {
   resolveSsoAuthorityForDomain,
@@ -19,32 +17,6 @@ import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-au
 import type { SignInMethodChangeRefusal } from '@/lib/auth/sign-in-method-change-codes';
 
 export type SignInMethodChange = 'link' | 'unlink';
-
-/**
- * Whether this browser session proved its holder recently: a primary sign-in
- * in the last ten minutes, or a live step-up proof for this session. Passkey
- * enrollment uses this rule. A failed step-up read throws, so the caller fails
- * closed.
- */
-export async function isRecentlyProvenSession(params: {
-  userId: string;
-  webSessionId?: string;
-  authenticatedAt?: number;
-}): Promise<boolean> {
-  if (
-    typeof params.authenticatedAt === 'number' &&
-    Date.now() - params.authenticatedAt * 1000 <= STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS
-  ) {
-    return true;
-  }
-  if (!params.webSessionId) return false;
-  const evaluation = await evaluateStepUp({
-    userId: params.userId,
-    webSessionId: params.webSessionId,
-    actionClass: 'platform_read',
-  });
-  return evaluation.state.status === 'fresh';
-}
 
 async function ssoAuthorityForUser(user: Pick<User, 'google_user_email'>) {
   const domain = getLowerDomainFromEmail(user.google_user_email);

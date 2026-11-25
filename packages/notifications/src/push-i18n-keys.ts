@@ -1,4 +1,5 @@
 import type en from './locales/en.json';
+import { ACCOUNT_SECURITY_EVENTS, type AccountSecurityEvent } from './push-data';
 import { type InternalDispatchSecurityFindingRequest } from './rpc-schemas';
 
 /**
@@ -56,6 +57,66 @@ export const SECURITY_FINDING_PUSH_TITLE_KEYS = {
 export const SECURITY_FINDING_PUSH_BODY_KEY =
   'internal.securityFinding.body' satisfies PushCatalogKey;
 
+/** The leaf of the generic body an account-security notice reads. */
+export const ACCOUNT_SECURITY_BODY_LEAF = 'accountSecurity';
+
+/**
+ * The catalog entry that titles each account-security notice: the title names
+ * what happened to the account.
+ */
+export const ACCOUNT_SECURITY_PUSH_TITLE_KEYS = {
+  passkey_added: 'internal.accountSecurity.passkeyAdded.title',
+  passkey_removed: 'internal.accountSecurity.passkeyRemoved.title',
+  sign_in_method_linked: 'internal.accountSecurity.signInMethodLinked.title',
+  sign_in_method_unlinked: 'internal.accountSecurity.signInMethodUnlinked.title',
+  device_sign_in_approved: 'internal.accountSecurity.deviceSignInApproved.title',
+  api_key_reset: 'internal.accountSecurity.apiKeyReset.title',
+  browser_sessions_revoked: 'internal.accountSecurity.browserSessionsRevoked.title',
+  new_sign_in: 'internal.accountSecurity.newSignIn.title',
+} as const satisfies Record<AccountSecurityEvent, PushCatalogKey>;
+
+/**
+ * What an account-security notice can say about where the action came from.
+ * The device label and the approximate location are each optional, so the
+ * body has one sentence per combination rather than a template with an empty
+ * hole in it.
+ */
+export const ACCOUNT_SECURITY_PUSH_CONTEXTS = [
+  'deviceAndLocation',
+  'device',
+  'location',
+  'unknown',
+] as const;
+export type AccountSecurityPushContext = (typeof ACCOUNT_SECURITY_PUSH_CONTEXTS)[number];
+
+/** The catalog entry that carries each context's body line, shared by every event. */
+export const ACCOUNT_SECURITY_PUSH_BODY_KEYS = {
+  deviceAndLocation: 'internal.accountSecurity.body.deviceAndLocation',
+  device: 'internal.accountSecurity.body.device',
+  location: 'internal.accountSecurity.body.location',
+  unknown: 'internal.accountSecurity.body.unknown',
+} as const satisfies Record<AccountSecurityPushContext, PushCatalogKey>;
+
+/**
+ * The `i18nKey` an account-security push names: one per event and context
+ * pair. It is not a catalog entry itself; the shared maps below resolve it to
+ * the event's title and the context's body.
+ */
+export function accountSecurityPushI18nKey(
+  event: AccountSecurityEvent,
+  context: AccountSecurityPushContext
+): string {
+  return `accountSecurity:${event}:${context}`;
+}
+
+const ACCOUNT_SECURITY_PUSH_KEY_PAIRS = ACCOUNT_SECURITY_EVENTS.flatMap(event =>
+  ACCOUNT_SECURITY_PUSH_CONTEXTS.map(context => ({
+    i18nKey: accountSecurityPushI18nKey(event, context),
+    title: ACCOUNT_SECURITY_PUSH_TITLE_KEYS[event],
+    body: ACCOUNT_SECURITY_PUSH_BODY_KEYS[context],
+  }))
+);
+
 /**
  * The shared title entry of each push kind, by the `i18nKey` the push names.
  *
@@ -68,6 +129,7 @@ const SHARED_TITLE_KEYS: ReadonlyMap<string, PushCatalogKey> = new Map([
   [SECURITY_LIFECYCLE_I18N_KEY, GENERIC_PUSH_TITLE_KEY],
   [AGENT_SESSION_NOTIFICATION_I18N_KEY, SESSION_TITLE_KEY],
   [SESSION_READY_I18N_KEY, SESSION_TITLE_KEY],
+  ...ACCOUNT_SECURITY_PUSH_KEY_PAIRS.map(pair => [pair.i18nKey, pair.title] as const),
 ]);
 
 /**
@@ -83,6 +145,7 @@ const SHARED_BODY_KEYS: ReadonlyMap<string, PushCatalogKey> = new Map([
   ...Object.values(SECURITY_FINDING_PUSH_TITLE_KEYS).map(
     titleKey => [titleKey, SECURITY_FINDING_PUSH_BODY_KEY] as const
   ),
+  ...ACCOUNT_SECURITY_PUSH_KEY_PAIRS.map(pair => [pair.i18nKey, pair.body] as const),
 ]);
 
 /**

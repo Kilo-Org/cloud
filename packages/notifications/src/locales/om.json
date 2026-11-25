@@ -8,7 +8,8 @@
       "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
       "securityUpdate": "Sakatta'a nagaa keessa bakka jijjiiramni jira",
       "agentBriefing": "Gabaasi agenteessaa kee qophaa'aa jira",
-      "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
+      "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu",
+      "accountSecurity": "Herrega kee irratti sochiin nageenyaa ture"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Diinqii SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Furtuun seenaa herrega keetti dabalame"
+      },
+      "passkeyRemoved": {
+        "title": "Furtuun seenaa herrega kee irraa haqame"
+      },
+      "signInMethodLinked": {
+        "title": "Malli seensaa herrega keetti dabalame"
+      },
+      "signInMethodUnlinked": {
+        "title": "Malli seensaa herrega kee irraa haqame"
+      },
+      "deviceSignInApproved": {
+        "title": "Seensi meeshaa irraa mirkanaa’e"
+      },
+      "apiKeyReset": {
+        "title": "Furtuun API haaromfame"
+      },
+      "browserSessionsRevoked": {
+        "title": "Barbaadduu hunda irraa baate"
+      },
+      "newSignIn": {
+        "title": "Seensa haaraa herrega keetti"
+      },
+      "body": {
+        "deviceAndLocation": "{{device}} irraa, {{location}} bira. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
+        "device": "{{device}} irraa. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
+        "location": "{{location}} bira. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
+        "unknown": "Isin miti? Amma nageenya herrega keessanii ilaalaa."
+      }
     }
   },
   "sessionReady": {

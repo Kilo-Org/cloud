@@ -8,7 +8,8 @@
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
       "securityUpdate": "Nlele nchekwa nwere mmelite",
       "agentBriefing": "Akụkọ ndị nnọchi anya gị dị njikere",
-      "activeAgentsGlanceable": "Ndị nnọchi anya na-arụ ọrụ nwere mmelite"
+      "activeAgentsGlanceable": "Ndị nnọchi anya na-arụ ọrụ nwere mmelite",
+      "accountSecurity": "E nwere ọrụ nchekwa na akaụntụ gị"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Mmebi SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Etinyere passkey na akaụntụ gị"
+      },
+      "passkeyRemoved": {
+        "title": "Ewepụrụ passkey na akaụntụ gị"
+      },
+      "signInMethodLinked": {
+        "title": "Etinyere ụzọ ịbanye na akaụntụ gị"
+      },
+      "signInMethodUnlinked": {
+        "title": "Ewepụrụ ụzọ ịbanye na akaụntụ gị"
+      },
+      "deviceSignInApproved": {
+        "title": "Akwadoro ịbanye site na ngwaọrụ"
+      },
+      "apiKeyReset": {
+        "title": "Edoghachiri igodo API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Ọpụọla na ihe nchọgharị niile"
+      },
+      "newSignIn": {
+        "title": "Ịbanye ọhụrụ na akaụntụ gị"
+      },
+      "body": {
+        "deviceAndLocation": "Site na {{device}} nso {{location}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
+        "device": "Site na {{device}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
+        "location": "Nso {{location}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
+        "unknown": "Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a."
+      }
     }
   },
   "sessionReady": {

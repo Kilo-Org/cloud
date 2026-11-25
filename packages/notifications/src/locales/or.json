@@ -8,7 +8,8 @@
       "securityFinding": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର",
       "securityUpdate": "ଏକ ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଅପଡେଟ୍ ଅଛି",
       "agentBriefing": "ଆପଣଙ୍କ ଏଜେଣ୍ଟ ରିପୋର୍ଟ ପ୍ରସ୍ତୁତ ଅଛି",
-      "activeAgentsGlanceable": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକରେ ଅପଡେଟ୍ ଅଛି"
+      "activeAgentsGlanceable": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକରେ ଅପଡେଟ୍ ଅଛି",
+      "accountSecurity": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ସୁରକ୍ଷା କାର୍ଯ୍ୟକଳାପ ହୋଇଥିଲା"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ଉଲ୍ଲଂଘନ"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ପାସକି ଯୋଡ଼ାଗଲା"
+      },
+      "passkeyRemoved": {
+        "title": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରୁ ପାସକି କଢ଼ାଗଲା"
+      },
+      "signInMethodLinked": {
+        "title": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ସାଇନ୍-ଇନ୍ ପଦ୍ଧତି ଯୋଡ଼ାଗଲା"
+      },
+      "signInMethodUnlinked": {
+        "title": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରୁ ସାଇନ୍-ଇନ୍ ପଦ୍ଧତି କଢ଼ାଗଲା"
+      },
+      "deviceSignInApproved": {
+        "title": "ଡିଭାଇସ୍ ସାଇନ୍-ଇନ୍ ଅନୁମୋଦିତ ହେଲା"
+      },
+      "apiKeyReset": {
+        "title": "API କି ରିସେଟ୍ ହେଲା"
+      },
+      "browserSessionsRevoked": {
+        "title": "ସମସ୍ତ ବ୍ରାଉଜରରୁ ସାଇନ୍ ଆଉଟ୍ ହେଲା"
+      },
+      "newSignIn": {
+        "title": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ନୂଆ ସାଇନ୍-ଇନ୍"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} ନିକଟରେ {{device}}ରୁ. ଏହା ଆପଣ ନୁହଁନ୍ତି? ବର୍ତ୍ତମାନ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସୁରକ୍ଷା ଯାଞ୍ଚ କରନ୍ତୁ.",
+        "device": "{{device}}ରୁ. ଏହା ଆପଣ ନୁହଁନ୍ତି? ବର୍ତ୍ତମାନ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସୁରକ୍ଷା ଯାଞ୍ଚ କରନ୍ତୁ.",
+        "location": "{{location}} ନିକଟରୁ. ଏହା ଆପଣ ନୁହଁନ୍ତି? ବର୍ତ୍ତମାନ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସୁରକ୍ଷା ଯାଞ୍ଚ କରନ୍ତୁ.",
+        "unknown": "ଏହା ଆପଣ ନୁହଁନ୍ତି? ବର୍ତ୍ତମାନ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସୁରକ୍ଷା ଯାଞ୍ଚ କରନ୍ତୁ."
+      }
     }
   },
   "sessionReady": {

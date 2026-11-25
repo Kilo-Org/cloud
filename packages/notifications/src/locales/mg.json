@@ -8,7 +8,8 @@
       "securityFinding": "Misy hitan'ny fiarovana mila jerena",
       "securityUpdate": "Misy fanavaozana ny fisavana fiarovana",
       "agentBriefing": "Vonona ny tatitry ny agentanao",
-      "activeAgentsGlanceable": "Misy fanavaozana ny mpandraharaha mavitrika"
+      "activeAgentsGlanceable": "Misy fanavaozana ny mpandraharaha mavitrika",
+      "accountSecurity": "Nisy hetsika momba ny fiarovana tao amin’ny kaontinao"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Fanitsakitsahana SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Nampiana passkey ny kaontinao"
+      },
+      "passkeyRemoved": {
+        "title": "Nesorina tamin’ny kaontinao ny passkey iray"
+      },
+      "signInMethodLinked": {
+        "title": "Nampiana fomba fidirana ny kaontinao"
+      },
+      "signInMethodUnlinked": {
+        "title": "Nesorina tamin’ny kaontinao ny fomba fidirana iray"
+      },
+      "deviceSignInApproved": {
+        "title": "Nankatoavina ny fidirana avy amin’ny fitaovana"
+      },
+      "apiKeyReset": {
+        "title": "Naverina ho voalohany ny lakile API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Nivoaka tamin’ny mpitety rehetra"
+      },
+      "newSignIn": {
+        "title": "Fidirana vaovao ao amin’ny kaontinao"
+      },
+      "body": {
+        "deviceAndLocation": "Avy amin’ny {{device}} akaikin’i {{location}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
+        "device": "Avy amin’ny {{device}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
+        "location": "Akaikin’i {{location}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
+        "unknown": "Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao."
+      }
     }
   },
   "sessionReady": {

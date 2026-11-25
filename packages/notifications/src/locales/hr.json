@@ -8,7 +8,8 @@
       "securityFinding": "Sigurnosni nalaz zahtijeva pozornost",
       "securityUpdate": "Sigurnosna provjera ima ažuriranje",
       "agentBriefing": "Vaše izvješće agenta je spremno",
-      "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
+      "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje",
+      "accountSecurity": "Na vašem računu bilo je sigurnosne aktivnosti"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Kršenje SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Pristupni ključ dodan je na vaš račun"
+      },
+      "passkeyRemoved": {
+        "title": "Pristupni ključ uklonjen je s vašeg računa"
+      },
+      "signInMethodLinked": {
+        "title": "Način prijave dodan je na vaš račun"
+      },
+      "signInMethodUnlinked": {
+        "title": "Način prijave uklonjen je s vašeg računa"
+      },
+      "deviceSignInApproved": {
+        "title": "Prijava s uređaja je odobrena"
+      },
+      "apiKeyReset": {
+        "title": "API ključ je poništen"
+      },
+      "browserSessionsRevoked": {
+        "title": "Odjavljeni ste iz svih preglednika"
+      },
+      "newSignIn": {
+        "title": "Nova prijava na vaš račun"
+      },
+      "body": {
+        "deviceAndLocation": "S uređaja {{device}} u blizini {{location}}. Niste vi? Odmah provjerite sigurnost svog računa.",
+        "device": "S uređaja {{device}}. Niste vi? Odmah provjerite sigurnost svog računa.",
+        "location": "U blizini {{location}}. Niste vi? Odmah provjerite sigurnost svog računa.",
+        "unknown": "Niste vi? Odmah provjerite sigurnost svog računa."
+      }
     }
   },
   "sessionReady": {

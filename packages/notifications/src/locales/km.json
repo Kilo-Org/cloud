@@ -8,7 +8,8 @@
       "securityFinding": "ការរកឃើញសុវត្ថិភាពត្រូវការការយកចិត្តទុកដាក់",
       "securityUpdate": "ការត្រួតពិនិត្យសុវត្ថិភាពមានការធ្វើបច្ចុប្បន្នភាព",
       "agentBriefing": "របាយការណ៍ភ្នាក់ងាររបស់អ្នករួចរាល់ហើយ",
-      "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព"
+      "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព",
+      "accountSecurity": "មានសកម្មភាពសុវត្ថិភាពនៅលើគណនីរបស់អ្នក"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "ការរំលោភ SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "បានបន្ថែមសោចូលទៅគណនីរបស់អ្នក"
+      },
+      "passkeyRemoved": {
+        "title": "បានដកសោចូលចេញពីគណនីរបស់អ្នក"
+      },
+      "signInMethodLinked": {
+        "title": "បានបន្ថែមវិធីចូលទៅគណនីរបស់អ្នក"
+      },
+      "signInMethodUnlinked": {
+        "title": "បានដកវិធីចូលចេញពីគណនីរបស់អ្នក"
+      },
+      "deviceSignInApproved": {
+        "title": "បានអនុម័តការចូលពីឧបករណ៍"
+      },
+      "apiKeyReset": {
+        "title": "បានកំណត់សោ API ឡើងវិញ"
+      },
+      "browserSessionsRevoked": {
+        "title": "បានចាកចេញពីកម្មវិធីរុករកទាំងអស់"
+      },
+      "newSignIn": {
+        "title": "ការចូលថ្មីទៅគណនីរបស់អ្នក"
+      },
+      "body": {
+        "deviceAndLocation": "ពី {{device}} នៅជិត {{location}}។ មិនមែនជាអ្នកទេ? សូមពិនិត្យសុវត្ថិភាពគណនីរបស់អ្នកឥឡូវនេះ។",
+        "device": "ពី {{device}}។ មិនមែនជាអ្នកទេ? សូមពិនិត្យសុវត្ថិភាពគណនីរបស់អ្នកឥឡូវនេះ។",
+        "location": "នៅជិត {{location}}។ មិនមែនជាអ្នកទេ? សូមពិនិត្យសុវត្ថិភាពគណនីរបស់អ្នកឥឡូវនេះ។",
+        "unknown": "មិនមែនជាអ្នកទេ? សូមពិនិត្យសុវត្ថិភាពគណនីរបស់អ្នកឥឡូវនេះ។"
+      }
     }
   },
   "sessionReady": {

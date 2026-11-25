@@ -8,7 +8,8 @@
       "securityFinding": "Təhlükəsizlik tapıntısı diqqət tələb edir",
       "securityUpdate": "Təhlükəsizlik yoxlamasında yenilənmə var",
       "agentBriefing": "Agent hesabatınız hazırdır",
-      "activeAgentsGlanceable": "Aktiv agentlərdə yenilənmə var"
+      "activeAgentsGlanceable": "Aktiv agentlərdə yenilənmə var",
+      "accountSecurity": "Hesabınızda təhlükəsizlik fəaliyyəti oldu"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pozuntusu"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Hesabınıza giriş açarı əlavə edildi"
+      },
+      "passkeyRemoved": {
+        "title": "Hesabınızdan giriş açarı silindi"
+      },
+      "signInMethodLinked": {
+        "title": "Hesabınıza giriş üsulu əlavə edildi"
+      },
+      "signInMethodUnlinked": {
+        "title": "Hesabınızdan giriş üsulu silindi"
+      },
+      "deviceSignInApproved": {
+        "title": "Cihazdan girişə icazə verildi"
+      },
+      "apiKeyReset": {
+        "title": "API açarı sıfırlandı"
+      },
+      "browserSessionsRevoked": {
+        "title": "Bütün brauzerlərdən çıxış edildi"
+      },
+      "newSignIn": {
+        "title": "Hesabınıza yeni giriş"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} yaxınlığında {{device}} cihazından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
+        "device": "{{device}} cihazından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
+        "location": "{{location}} yaxınlığından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
+        "unknown": "Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın."
+      }
     }
   },
   "sessionReady": {

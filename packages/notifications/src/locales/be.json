@@ -8,7 +8,8 @@
       "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі",
       "securityUpdate": "Праверка бяспекі мае абнаўленне",
       "agentBriefing": "Ваша зводка агента гатова",
-      "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
+      "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне",
+      "accountSecurity": "У вашым уліковым запісе была актыўнасць, звязаная з бяспекай"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Парушэнне SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ключ доступу дададзены ў ваш уліковы запіс"
+      },
+      "passkeyRemoved": {
+        "title": "Ключ доступу выдалены з вашага ўліковага запісу"
+      },
+      "signInMethodLinked": {
+        "title": "Спосаб уваходу дададзены ў ваш уліковы запіс"
+      },
+      "signInMethodUnlinked": {
+        "title": "Спосаб уваходу выдалены з вашага ўліковага запісу"
+      },
+      "deviceSignInApproved": {
+        "title": "Уваход з прылады адобраны"
+      },
+      "apiKeyReset": {
+        "title": "Ключ API скінуты"
+      },
+      "browserSessionsRevoked": {
+        "title": "Выкананы выхад з усіх браўзераў"
+      },
+      "newSignIn": {
+        "title": "Новы ўваход у ваш уліковы запіс"
+      },
+      "body": {
+        "deviceAndLocation": "З {{device}} побач з {{location}}. Гэта былі не вы? Праверце бяспеку ўліковага запісу зараз.",
+        "device": "З {{device}}. Гэта былі не вы? Праверце бяспеку ўліковага запісу зараз.",
+        "location": "Побач з {{location}}. Гэта былі не вы? Праверце бяспеку ўліковага запісу зараз.",
+        "unknown": "Гэта былі не вы? Праверце бяспеку ўліковага запісу зараз."
+      }
     }
   },
   "sessionReady": {

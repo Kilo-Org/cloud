@@ -8,7 +8,8 @@
       "securityFinding": "एक सुरक्षा निष्कर्ष पर ध्यान देने की आवश्यकता है",
       "securityUpdate": "एक सुरक्षा जाँच में अपडेट है",
       "agentBriefing": "आपकी एजेंट ब्रीफ़िंग तैयार है",
-      "activeAgentsGlanceable": "सक्रिय एजेंटों में एक अपडेट है"
+      "activeAgentsGlanceable": "सक्रिय एजेंटों में एक अपडेट है",
+      "accountSecurity": "आपके खाते में सुरक्षा गतिविधि हुई"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA उल्लंघन"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "आपके खाते में पासकी जोड़ी गई"
+      },
+      "passkeyRemoved": {
+        "title": "आपके खाते से पासकी हटाई गई"
+      },
+      "signInMethodLinked": {
+        "title": "आपके खाते में साइन-इन तरीका जोड़ा गया"
+      },
+      "signInMethodUnlinked": {
+        "title": "आपके खाते से साइन-इन तरीका हटाया गया"
+      },
+      "deviceSignInApproved": {
+        "title": "डिवाइस साइन-इन स्वीकृत हुआ"
+      },
+      "apiKeyReset": {
+        "title": "API कुंजी रीसेट की गई"
+      },
+      "browserSessionsRevoked": {
+        "title": "सभी ब्राउज़र से साइन आउट किया गया"
+      },
+      "newSignIn": {
+        "title": "आपके खाते में नया साइन-इन"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} के पास {{device}} से. यह आप नहीं थे? अभी अपने खाते की सुरक्षा की समीक्षा करें.",
+        "device": "{{device}} से. यह आप नहीं थे? अभी अपने खाते की सुरक्षा की समीक्षा करें.",
+        "location": "{{location}} के पास से. यह आप नहीं थे? अभी अपने खाते की सुरक्षा की समीक्षा करें.",
+        "unknown": "यह आप नहीं थे? अभी अपने खाते की सुरक्षा की समीक्षा करें."
+      }
     }
   },
   "sessionReady": {

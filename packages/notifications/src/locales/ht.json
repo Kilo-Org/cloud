@@ -8,7 +8,8 @@
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
       "agentBriefing": "Rapò ajan ou pare",
-      "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon"
+      "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon",
+      "accountSecurity": "Te gen aktivite sekirite sou kont ou"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Vyolasyon SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Yo ajoute yon passkey nan kont ou"
+      },
+      "passkeyRemoved": {
+        "title": "Yo retire yon passkey nan kont ou"
+      },
+      "signInMethodLinked": {
+        "title": "Yo ajoute yon metòd koneksyon nan kont ou"
+      },
+      "signInMethodUnlinked": {
+        "title": "Yo retire yon metòd koneksyon nan kont ou"
+      },
+      "deviceSignInApproved": {
+        "title": "Yo apwouve koneksyon yon aparèy"
+      },
+      "apiKeyReset": {
+        "title": "Yo reyinisyalize kle API a"
+      },
+      "browserSessionsRevoked": {
+        "title": "Ou dekonekte nan tout navigatè yo"
+      },
+      "newSignIn": {
+        "title": "Nouvo koneksyon nan kont ou"
+      },
+      "body": {
+        "deviceAndLocation": "Depi {{device}} toupre {{location}}. Se pa ou? Verifye sekirite kont ou kounye a.",
+        "device": "Depi {{device}}. Se pa ou? Verifye sekirite kont ou kounye a.",
+        "location": "Toupre {{location}}. Se pa ou? Verifye sekirite kont ou kounye a.",
+        "unknown": "Se pa ou? Verifye sekirite kont ou kounye a."
+      }
     }
   },
   "sessionReady": {

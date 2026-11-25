@@ -8,7 +8,8 @@
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
       "securityUpdate": "Bir güvenlik kontrolünde güncelleme var",
       "agentBriefing": "Ajan raporunuz hazır",
-      "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
+      "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var",
+      "accountSecurity": "Hesabınızda güvenlik etkinliği oldu"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ihlali"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Hesabınıza geçiş anahtarı eklendi"
+      },
+      "passkeyRemoved": {
+        "title": "Hesabınızdan geçiş anahtarı kaldırıldı"
+      },
+      "signInMethodLinked": {
+        "title": "Hesabınıza oturum açma yöntemi eklendi"
+      },
+      "signInMethodUnlinked": {
+        "title": "Hesabınızdan oturum açma yöntemi kaldırıldı"
+      },
+      "deviceSignInApproved": {
+        "title": "Cihazdan oturum açma onaylandı"
+      },
+      "apiKeyReset": {
+        "title": "API anahtarı sıfırlandı"
+      },
+      "browserSessionsRevoked": {
+        "title": "Tüm tarayıcılarda oturum kapatıldı"
+      },
+      "newSignIn": {
+        "title": "Hesabınızda yeni oturum açma"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} yakınındaki {{device}} cihazından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
+        "device": "{{device}} cihazından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
+        "location": "{{location}} yakınından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
+        "unknown": "Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin."
+      }
     }
   },
   "sessionReady": {

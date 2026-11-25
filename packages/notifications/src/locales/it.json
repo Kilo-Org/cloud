@@ -8,7 +8,8 @@
       "securityFinding": "Un risultato di sicurezza richiede attenzione",
       "securityUpdate": "Un controllo di sicurezza ha un aggiornamento",
       "agentBriefing": "Il tuo briefing dell'agente è pronto",
-      "activeAgentsGlanceable": "Gli agenti attivi hanno un aggiornamento"
+      "activeAgentsGlanceable": "Gli agenti attivi hanno un aggiornamento",
+      "accountSecurity": "C'è stata attività di sicurezza sul tuo account"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Violazione SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Passkey aggiunta al tuo account"
+      },
+      "passkeyRemoved": {
+        "title": "Passkey rimossa dal tuo account"
+      },
+      "signInMethodLinked": {
+        "title": "Metodo di accesso aggiunto al tuo account"
+      },
+      "signInMethodUnlinked": {
+        "title": "Metodo di accesso rimosso dal tuo account"
+      },
+      "deviceSignInApproved": {
+        "title": "Accesso da dispositivo approvato"
+      },
+      "apiKeyReset": {
+        "title": "Chiave API reimpostata"
+      },
+      "browserSessionsRevoked": {
+        "title": "Disconnesso da tutti i browser"
+      },
+      "newSignIn": {
+        "title": "Nuovo accesso al tuo account"
+      },
+      "body": {
+        "deviceAndLocation": "Da {{device}} vicino a {{location}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
+        "device": "Da {{device}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
+        "location": "Vicino a {{location}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
+        "unknown": "Non sei stato tu? Controlla subito la sicurezza del tuo account."
+      }
     }
   },
   "sessionReady": {

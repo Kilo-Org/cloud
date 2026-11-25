@@ -8,7 +8,8 @@
       "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
       "securityUpdate": "Segurtasun-egiaztapen batek eguneratze bat du",
       "agentBriefing": "Zure agentearen jarduera-txostena prest dago",
-      "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
+      "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute",
+      "accountSecurity": "Segurtasun-jarduera egon da zure kontuan"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA haustura"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Sarbide-gako bat gehitu da zure kontura"
+      },
+      "passkeyRemoved": {
+        "title": "Sarbide-gako bat kendu da zure kontutik"
+      },
+      "signInMethodLinked": {
+        "title": "Saioa hasteko metodo bat gehitu da zure kontura"
+      },
+      "signInMethodUnlinked": {
+        "title": "Saioa hasteko metodo bat kendu da zure kontutik"
+      },
+      "deviceSignInApproved": {
+        "title": "Gailu baten saio-hasiera onartu da"
+      },
+      "apiKeyReset": {
+        "title": "API gakoa berrezarri da"
+      },
+      "browserSessionsRevoked": {
+        "title": "Arakatzaile guztietako saioak itxi dira"
+      },
+      "newSignIn": {
+        "title": "Saio-hasiera berria zure kontuan"
+      },
+      "body": {
+        "deviceAndLocation": "{{device}} gailutik, {{location}} inguruan. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
+        "device": "{{device}} gailutik. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
+        "location": "{{location}} inguruan. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
+        "unknown": "Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna."
+      }
     }
   },
   "sessionReady": {

@@ -8,7 +8,8 @@
       "securityFinding": "Tokeo la usalama linahitaji umakini",
       "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
       "agentBriefing": "Ripoti yako ya wakala wa programu iko tayari",
-      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
+      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho",
+      "accountSecurity": "Kulikuwa na shughuli za usalama kwenye akaunti yako"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ukiukaji wa SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ufunguo wa siri umeongezwa kwenye akaunti yako"
+      },
+      "passkeyRemoved": {
+        "title": "Ufunguo wa siri umeondolewa kwenye akaunti yako"
+      },
+      "signInMethodLinked": {
+        "title": "Njia ya kuingia imeongezwa kwenye akaunti yako"
+      },
+      "signInMethodUnlinked": {
+        "title": "Njia ya kuingia imeondolewa kwenye akaunti yako"
+      },
+      "deviceSignInApproved": {
+        "title": "Kuingia kwa kifaa kumeidhinishwa"
+      },
+      "apiKeyReset": {
+        "title": "Ufunguo wa API umewekwa upya"
+      },
+      "browserSessionsRevoked": {
+        "title": "Umetoka kwenye vivinjari vyote"
+      },
+      "newSignIn": {
+        "title": "Kuingia kupya kwenye akaunti yako"
+      },
+      "body": {
+        "deviceAndLocation": "Kutoka {{device}} karibu na {{location}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "device": "Kutoka {{device}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "location": "Karibu na {{location}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "unknown": "Si wewe? Kagua usalama wa akaunti yako sasa."
+      }
     }
   },
   "sessionReady": {

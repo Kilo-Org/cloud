@@ -147,22 +147,17 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import {
-  AUTH_PROVIDER_DISPLAY_NAMES,
   hosted_domain_specials,
   knownSignupStepUpMethods,
   type AuthErrorType,
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
-import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
-import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
-import {
-  currentSignInMethodChangeAuditRequest,
-  currentSignInMethodChangeRequestDetails,
-} from '@/lib/auth/sign-in-method-change-request';
+import { currentSignInMethodChangeAuditRequest } from '@/lib/auth/sign-in-method-change-request';
+import { currentSecurityNoticeRequest, scheduleSecurityNotice } from '@/lib/security-notices';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -1041,8 +1036,8 @@ export async function linkAccountToExistingUser(
   );
 
   if (!isNoOpRelink) {
-    // Read while the request is still in scope; the email goes after the response.
-    const details = await currentSignInMethodChangeRequestDetails();
+    // Read while the request is still in scope; the notice goes after the response.
+    const noticeRequest = await currentSecurityNoticeRequest();
     await recordSignInMethodChange({
       user: existingUser,
       change: 'link',
@@ -1050,37 +1045,22 @@ export async function linkAccountToExistingUser(
       request: await currentSignInMethodChangeAuditRequest(),
     });
 
-    if (authProviderData.provider !== 'fake-login') {
-      // Sent after the response: the notice must never delay or fail the sign-in.
-      await runAfterResponse(async () => {
-        try {
-          const notice = await sendNewSignInMethodEmail(
-            existingUser.google_user_email,
-            AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
-            {
-              email: authProviderData.google_user_email,
-              displayName: authProviderData.display_name ?? null,
-            },
-            details
-          );
-          if (!notice.sent) {
-            captureException(new Error('New sign-in method notice was not sent'), {
-              tags: {
-                operation: 'sign_in_method_change_notice',
-                provider: authProviderData.provider,
-              },
-              extra: { reason: notice.reason },
-            });
-          }
-        } catch (error) {
-          captureException(error, {
-            tags: {
-              operation: 'sign_in_method_change_notice',
-              provider: authProviderData.provider,
-            },
-          });
-        }
-      });
+    // Only the call that wrote the link row reports it, and never the test login.
+    if (authProviderData.provider !== 'fake-login' && linkResult.linkedAt !== null) {
+      await scheduleSecurityNotice(
+        existingUser,
+        {
+          type: 'sign_in_method_linked',
+          provider: authProviderData.provider,
+          providerAccountId: authProviderData.provider_account_id,
+          linkedIdentity: {
+            email: authProviderData.google_user_email,
+            displayName: authProviderData.display_name ?? null,
+          },
+          linkedAt: new Date(linkResult.linkedAt),
+        },
+        noticeRequest
+      );
     }
   }
 
@@ -2610,7 +2590,8 @@ export async function getWorkOSOrganization(domain: string) {
 }
 
 type LinkAuthErrors = 'ACCOUNT-ALREADY-LINKED' | 'PROVIDER-ALREADY-LINKED' | 'LINKING-FAILED';
-export type LinkAuthProviderResult = OptionalError<LinkAuthErrors>;
+/** `linkedAt` is when the link row was written, or null when the identical account was already linked. */
+export type LinkAuthProviderResult = Result<{ linkedAt: string | null }, LinkAuthErrors>;
 
 export type AuthProviderLinking = Omit<UserAuthProvider, 'created_at'>;
 
@@ -2640,7 +2621,7 @@ export async function linkAuthProviderToUser(
     // not fail on an already-present row. A different account id for the same
     // provider stays PROVIDER-ALREADY-LINKED.
     if (existingProvider.provider_account_id === authProviderData.provider_account_id) {
-      return successResult();
+      return successResult({ linkedAt: null });
     }
     return failureResult('PROVIDER-ALREADY-LINKED');
   }
@@ -2654,7 +2635,7 @@ export async function linkAuthProviderToUser(
     return failureResult('LINKING-FAILED');
   }
 
-  return successResult();
+  return successResult({ linkedAt: newAuthProvider.created_at });
 }
 
 async function tryVerifyDiscordGuildMembership(

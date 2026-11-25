@@ -8,7 +8,8 @@
       "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
       "securityUpdate": "ການກວດສອບຄວາມປອດໄພມີການອັບເດດ",
       "agentBriefing": "ລາຍງານກິດຈະກຳຂອງເອເຈນຂຽນໂຄດຂອງທ່ານພ້ອມແລ້ວ",
-      "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
+      "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ",
+      "accountSecurity": "ມີກິດຈະກຳດ້ານຄວາມປອດໄພໃນບັນຊີຂອງທ່ານ"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "ການລະເມີດ SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "ເພີ່ມກະແຈຜ່ານເຂົ້າໃນບັນຊີຂອງທ່ານແລ້ວ"
+      },
+      "passkeyRemoved": {
+        "title": "ລຶບກະແຈຜ່ານອອກຈາກບັນຊີຂອງທ່ານແລ້ວ"
+      },
+      "signInMethodLinked": {
+        "title": "ເພີ່ມວິທີເຂົ້າສູ່ລະບົບໃນບັນຊີຂອງທ່ານແລ້ວ"
+      },
+      "signInMethodUnlinked": {
+        "title": "ລຶບວິທີເຂົ້າສູ່ລະບົບອອກຈາກບັນຊີຂອງທ່ານແລ້ວ"
+      },
+      "deviceSignInApproved": {
+        "title": "ອະນຸມັດການເຂົ້າສູ່ລະບົບຈາກອຸປະກອນແລ້ວ"
+      },
+      "apiKeyReset": {
+        "title": "ຣີເຊັດກະແຈ API ແລ້ວ"
+      },
+      "browserSessionsRevoked": {
+        "title": "ອອກຈາກລະບົບໃນທຸກບຣາວເຊີແລ້ວ"
+      },
+      "newSignIn": {
+        "title": "ການເຂົ້າສູ່ລະບົບໃໝ່ໃນບັນຊີຂອງທ່ານ"
+      },
+      "body": {
+        "deviceAndLocation": "ຈາກ {{device}} ໃກ້ {{location}}. ບໍ່ແມ່ນທ່ານບໍ? ກວດສອບຄວາມປອດໄພບັນຊີຂອງທ່ານດຽວນີ້.",
+        "device": "ຈາກ {{device}}. ບໍ່ແມ່ນທ່ານບໍ? ກວດສອບຄວາມປອດໄພບັນຊີຂອງທ່ານດຽວນີ້.",
+        "location": "ໃກ້ {{location}}. ບໍ່ແມ່ນທ່ານບໍ? ກວດສອບຄວາມປອດໄພບັນຊີຂອງທ່ານດຽວນີ້.",
+        "unknown": "ບໍ່ແມ່ນທ່ານບໍ? ກວດສອບຄວາມປອດໄພບັນຊີຂອງທ່ານດຽວນີ້."
+      }
     }
   },
   "sessionReady": {

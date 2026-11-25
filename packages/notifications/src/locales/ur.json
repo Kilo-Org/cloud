@@ -8,7 +8,8 @@
       "securityFinding": "سیکیورٹی کے معاملے پر توجہ کی ضرورت ہے",
       "securityUpdate": "سیکیورٹی چیک میں اپڈیٹ ہے",
       "agentBriefing": "آپ کی ایجنٹ بریفنگ تیار ہے",
-      "activeAgentsGlanceable": "فعال ایجنٹس میں اپڈیٹ ہے"
+      "activeAgentsGlanceable": "فعال ایجنٹس میں اپڈیٹ ہے",
+      "accountSecurity": "آپ کے اکاؤنٹ میں سیکیورٹی سرگرمی ہوئی"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA خلاف ورزی"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "آپ کے اکاؤنٹ میں پاس کی شامل کی گئی"
+      },
+      "passkeyRemoved": {
+        "title": "آپ کے اکاؤنٹ سے پاس کی ہٹا دی گئی"
+      },
+      "signInMethodLinked": {
+        "title": "آپ کے اکاؤنٹ میں سائن ان کا طریقہ شامل کیا گیا"
+      },
+      "signInMethodUnlinked": {
+        "title": "آپ کے اکاؤنٹ سے سائن ان کا طریقہ ہٹا دیا گیا"
+      },
+      "deviceSignInApproved": {
+        "title": "ڈیوائس سائن ان منظور ہو گیا"
+      },
+      "apiKeyReset": {
+        "title": "API کلید ری سیٹ کر دی گئی"
+      },
+      "browserSessionsRevoked": {
+        "title": "تمام براؤزرز سے سائن آؤٹ کر دیا گیا"
+      },
+      "newSignIn": {
+        "title": "آپ کے اکاؤنٹ میں نیا سائن ان"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} کے قریب {{device}} سے۔ یہ آپ نہیں تھے؟ ابھی اپنے اکاؤنٹ کی سیکیورٹی کا جائزہ لیں۔",
+        "device": "{{device}} سے۔ یہ آپ نہیں تھے؟ ابھی اپنے اکاؤنٹ کی سیکیورٹی کا جائزہ لیں۔",
+        "location": "{{location}} کے قریب سے۔ یہ آپ نہیں تھے؟ ابھی اپنے اکاؤنٹ کی سیکیورٹی کا جائزہ لیں۔",
+        "unknown": "یہ آپ نہیں تھے؟ ابھی اپنے اکاؤنٹ کی سیکیورٹی کا جائزہ لیں۔"
+      }
     }
   },
   "sessionReady": {

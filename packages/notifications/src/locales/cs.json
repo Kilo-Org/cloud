@@ -8,7 +8,8 @@
       "securityFinding": "Nález zabezpečení vyžaduje pozornost",
       "securityUpdate": "Kontrola zabezpečení má aktualizaci",
       "agentBriefing": "Váš přehled agenta je připraven",
-      "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
+      "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci",
+      "accountSecurity": "Na vašem účtu proběhla bezpečnostní aktivita"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Porušení SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "K vašemu účtu byl přidán přístupový klíč"
+      },
+      "passkeyRemoved": {
+        "title": "Z vašeho účtu byl odebrán přístupový klíč"
+      },
+      "signInMethodLinked": {
+        "title": "K vašemu účtu byla přidána metoda přihlášení"
+      },
+      "signInMethodUnlinked": {
+        "title": "Z vašeho účtu byla odebrána metoda přihlášení"
+      },
+      "deviceSignInApproved": {
+        "title": "Přihlášení zařízení bylo schváleno"
+      },
+      "apiKeyReset": {
+        "title": "Klíč API byl resetován"
+      },
+      "browserSessionsRevoked": {
+        "title": "Byli jste odhlášeni ze všech prohlížečů"
+      },
+      "newSignIn": {
+        "title": "Nové přihlášení k vašemu účtu"
+      },
+      "body": {
+        "deviceAndLocation": "Ze zařízení {{device}} poblíž {{location}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
+        "device": "Ze zařízení {{device}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
+        "location": "Poblíž {{location}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
+        "unknown": "Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu."
+      }
     }
   },
   "sessionReady": {

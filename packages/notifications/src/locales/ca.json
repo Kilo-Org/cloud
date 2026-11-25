@@ -8,7 +8,8 @@
       "securityFinding": "Una troballa de seguretat necessita atenció",
       "securityUpdate": "Una comprovació de seguretat té una actualització",
       "agentBriefing": "El teu informe de l'agent està llest",
-      "activeAgentsGlanceable": "Els agents actius tenen una actualització"
+      "activeAgentsGlanceable": "Els agents actius tenen una actualització",
+      "accountSecurity": "Hi ha hagut activitat de seguretat al teu compte"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Incompliment d'SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "S'ha afegit una clau d'accés al teu compte"
+      },
+      "passkeyRemoved": {
+        "title": "S'ha eliminat una clau d'accés del teu compte"
+      },
+      "signInMethodLinked": {
+        "title": "S'ha afegit un mètode d'inici de sessió al teu compte"
+      },
+      "signInMethodUnlinked": {
+        "title": "S'ha eliminat un mètode d'inici de sessió del teu compte"
+      },
+      "deviceSignInApproved": {
+        "title": "S'ha aprovat l'inici de sessió d'un dispositiu"
+      },
+      "apiKeyReset": {
+        "title": "S'ha restablert la clau de l'API"
+      },
+      "browserSessionsRevoked": {
+        "title": "S'ha tancat la sessió a tots els navegadors"
+      },
+      "newSignIn": {
+        "title": "Nou inici de sessió al teu compte"
+      },
+      "body": {
+        "deviceAndLocation": "Des de {{device}} a prop de {{location}}. No has estat tu? Revisa ara la seguretat del teu compte.",
+        "device": "Des de {{device}}. No has estat tu? Revisa ara la seguretat del teu compte.",
+        "location": "A prop de {{location}}. No has estat tu? Revisa ara la seguretat del teu compte.",
+        "unknown": "No has estat tu? Revisa ara la seguretat del teu compte."
+      }
     }
   },
   "sessionReady": {

@@ -8,7 +8,8 @@
       "securityFinding": "Öryggisfundur þarfnast athygli",
       "securityUpdate": "Öryggisathugun hefur uppfærslu",
       "agentBriefing": "Agent-yfirlitið þitt er tilbúið",
-      "activeAgentsGlanceable": "Virkir umboðsmenn hafa uppfærslu"
+      "activeAgentsGlanceable": "Virkir umboðsmenn hafa uppfærslu",
+      "accountSecurity": "Öryggisvirkni átti sér stað á reikningnum þínum"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brot"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Aðgangslykli bætt við reikninginn þinn"
+      },
+      "passkeyRemoved": {
+        "title": "Aðgangslykill fjarlægður af reikningnum þínum"
+      },
+      "signInMethodLinked": {
+        "title": "Innskráningarleið bætt við reikninginn þinn"
+      },
+      "signInMethodUnlinked": {
+        "title": "Innskráningarleið fjarlægð af reikningnum þínum"
+      },
+      "deviceSignInApproved": {
+        "title": "Innskráning tækis samþykkt"
+      },
+      "apiKeyReset": {
+        "title": "API-lykill endurstilltur"
+      },
+      "browserSessionsRevoked": {
+        "title": "Skráð út úr öllum vöfrum"
+      },
+      "newSignIn": {
+        "title": "Ný innskráning á reikninginn þinn"
+      },
+      "body": {
+        "deviceAndLocation": "Frá {{device}} nálægt {{location}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
+        "device": "Frá {{device}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
+        "location": "Nálægt {{location}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
+        "unknown": "Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna."
+      }
     }
   },
   "sessionReady": {

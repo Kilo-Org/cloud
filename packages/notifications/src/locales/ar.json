@@ -8,7 +8,8 @@
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
       "securityUpdate": "فحص أمان به تحديث",
       "agentBriefing": "تقرير الوكيل لديك جاهز",
-      "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
+      "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث",
+      "accountSecurity": "حدث نشاط أمني في حسابك"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "خرق SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "تمت إضافة مفتاح مرور إلى حسابك"
+      },
+      "passkeyRemoved": {
+        "title": "تمت إزالة مفتاح مرور من حسابك"
+      },
+      "signInMethodLinked": {
+        "title": "تمت إضافة طريقة تسجيل دخول إلى حسابك"
+      },
+      "signInMethodUnlinked": {
+        "title": "تمت إزالة طريقة تسجيل دخول من حسابك"
+      },
+      "deviceSignInApproved": {
+        "title": "تمت الموافقة على تسجيل الدخول من جهاز"
+      },
+      "apiKeyReset": {
+        "title": "تمت إعادة تعيين مفتاح API"
+      },
+      "browserSessionsRevoked": {
+        "title": "تم تسجيل الخروج من جميع المتصفحات"
+      },
+      "newSignIn": {
+        "title": "تسجيل دخول جديد إلى حسابك"
+      },
+      "body": {
+        "deviceAndLocation": "من {{device}} بالقرب من {{location}}. لست أنت؟ راجع أمان حسابك الآن.",
+        "device": "من {{device}}. لست أنت؟ راجع أمان حسابك الآن.",
+        "location": "بالقرب من {{location}}. لست أنت؟ راجع أمان حسابك الآن.",
+        "unknown": "لست أنت؟ راجع أمان حسابك الآن."
+      }
     }
   },
   "sessionReady": {

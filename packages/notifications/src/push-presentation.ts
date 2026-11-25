@@ -150,6 +150,7 @@ export function androidChannelIdForPushDataToAppVersion(
     case 'spend_alert':
     case 'security_finding':
     case 'security_lifecycle':
+    case 'account_security':
       return undefined;
     default: {
       // Exhaustiveness: a new push variant must be classified above, so one
@@ -351,8 +352,11 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'low_balance':
     case 'spend_alert':
       return 'balance';
+    // Every installed build created the `security` channel, so an
+    // account-security notice never falls back to the default channel.
     case 'security_finding':
     case 'security_lifecycle':
+    case 'account_security':
       return 'security';
     case 'agent_briefing':
       return 'agent-briefing';

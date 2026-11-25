@@ -8,7 +8,8 @@
       "securityFinding": "Turbetuvastus vajab tähelepanu",
       "securityUpdate": "Turvakontrollil on uuendus",
       "agentBriefing": "Sinu agendi ülevaade on valmis",
-      "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
+      "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus",
+      "accountSecurity": "Sinu kontol toimus turvategevus"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA rikkumine"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Sinu kontole lisati pääsuvõti"
+      },
+      "passkeyRemoved": {
+        "title": "Sinu kontolt eemaldati pääsuvõti"
+      },
+      "signInMethodLinked": {
+        "title": "Sinu kontole lisati sisselogimisviis"
+      },
+      "signInMethodUnlinked": {
+        "title": "Sinu kontolt eemaldati sisselogimisviis"
+      },
+      "deviceSignInApproved": {
+        "title": "Seadme sisselogimine kinnitati"
+      },
+      "apiKeyReset": {
+        "title": "API-võti lähtestati"
+      },
+      "browserSessionsRevoked": {
+        "title": "Kõigist brauseritest logiti välja"
+      },
+      "newSignIn": {
+        "title": "Uus sisselogimine sinu kontole"
+      },
+      "body": {
+        "deviceAndLocation": "Seadmest {{device}} asukoha {{location}} lähedalt. Polnud sina? Vaata kohe üle oma konto turvalisus.",
+        "device": "Seadmest {{device}}. Polnud sina? Vaata kohe üle oma konto turvalisus.",
+        "location": "Asukoha {{location}} lähedalt. Polnud sina? Vaata kohe üle oma konto turvalisus.",
+        "unknown": "Polnud sina? Vaata kohe üle oma konto turvalisus."
+      }
     }
   },
   "sessionReady": {

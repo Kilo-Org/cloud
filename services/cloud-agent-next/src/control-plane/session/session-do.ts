@@ -224,6 +224,11 @@ import {
 } from './message-settlement.js';
 import { setupCommandLabel } from './setup-command-label.js';
 import {
+  nextTransportRecovery,
+  parseTransportRecovery,
+  type TransportRecovery,
+} from './transport-recovery.js';
+import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
   type SharedWorktreeChangesPeer,
@@ -670,7 +675,17 @@ const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
-type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
+/**
+ * One bounded transport pass. `unansweredSince` carries the open window of
+ * unanswered recovery passes into the pass that the alarm consumes.
+ * `unanswered` records that the pass asked for another recovery pass.
+ */
+type TransportPass = {
+  deadlineAt: number;
+  scheduleRecovery: boolean;
+  unansweredSince?: number;
+  unanswered?: boolean;
+};
 
 function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
   if (raw == null) return undefined;
@@ -812,7 +827,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
   private workspaceStop: WorkspaceStopState = { epoch: 0, at: 0, attempts: [] };
-  private transportRecoveryAt: number | null = null;
+  private transportRecovery: TransportRecovery | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
@@ -1305,12 +1320,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.workspaceStop = stop.success ? stop.data : { epoch: 0, at: 0, attempts: [] };
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
-    const recoveryAt = z
-      .number()
-      .int()
-      .nonnegative()
-      .safeParse(await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY));
-    this.transportRecoveryAt = recoveryAt.success ? recoveryAt.data : null;
+    this.transportRecovery = parseTransportRecovery(
+      await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY),
+      this.sessionTimers()
+    );
     const parsedLocator = parseWipeLocator(
       await this.ctx.storage.get<unknown>(WIPE_LOCATOR_KEY),
       Date.now()
@@ -2564,13 +2577,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
-          this.transportRecoveryAt !== null ||
+          this.transportRecovery !== null ||
           (this.route.state === 'preparing' &&
             parsed.state !== 'unknown' &&
             (parsed.attemptId !== this.route.attemptId || parsed.state !== 'preparing')))
       ) {
         const pass = this.transportPass();
-        pass.scheduleRecovery = this.transportRecoveryAt !== null;
+        pass.scheduleRecovery = this.transportRecovery !== null;
         await this.recoverQueued(pass, parsed);
         await this.armAlarm();
         return;
@@ -2826,9 +2839,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.settleMessages(ids, 'failed', reason);
         }
       }
-      if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
+      const recovery = this.transportRecovery;
+      if (recovery !== null && recovery.dueAt <= now) {
+        // Read the window start before clearing it, or every pass restarts it.
         await this.clearTransportRecovery();
-        await this.recoverQueued(this.transportPass(false));
+        const pass: TransportPass = { ...this.transportPass(), unansweredSince: recovery.since };
+        await this.recoverQueued(pass);
+        if (!pass.unanswered) {
+          logControlDiagnostic('session_transport_recovery', {
+            sessionId: this.sessionId,
+            outcome: 'answered',
+            unansweredMs: Math.max(0, Date.now() - recovery.since),
+          });
+        }
       } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
         await this.recoverQueued(this.transportPass(false));
       }
@@ -2898,7 +2921,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
-      this.transportRecoveryAt,
+      this.transportRecovery?.dueAt ?? null,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
@@ -3748,7 +3771,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.runtimeAuthorization = undefined;
     this.messages = [];
     this.route = { state: 'unknown' };
-    this.transportRecoveryAt = null;
+    this.transportRecovery = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
@@ -4345,23 +4368,64 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { deadlineAt: Date.now() + this.sessionTimers().sandboxRpcDeadlineMs, scheduleRecovery };
   }
 
+  /**
+   * Arms the next recovery pass after a pass that could not make progress. The
+   * window of unanswered passes is bounded (spec "Queued transport recovery"):
+   * at its end, queued work fails with a specific reason, not at the backstop.
+   */
   private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
+    pass.unanswered = true;
     if (
       !pass.scheduleRecovery ||
-      this.transportRecoveryAt !== null ||
+      this.transportRecovery !== null ||
       !this.messages.some(message => message.state === 'queued')
     )
       return;
-    const dueAt = Date.now() + this.sessionTimers().transportRecoveryMs;
-    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, dueAt);
-    this.transportRecoveryAt = dueAt;
+    const now = Date.now();
+    const since = pass.unansweredSince ?? now;
+    const next = nextTransportRecovery(since, now, this.sessionTimers());
+    logControlDiagnostic(
+      'session_transport_recovery',
+      {
+        sessionId: this.sessionId,
+        outcome: next === null ? 'exhausted' : 'scheduled',
+        unansweredMs: now - since,
+        nextDueAt: next?.dueAt,
+      },
+      next === null ? 'warn' : 'info'
+    );
+    if (next === null) {
+      await this.failUnansweredQueued();
+      return;
+    }
+    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, next);
+    this.transportRecovery = next;
     await this.armAlarm();
   }
 
+  /**
+   * Fails queued work when recovery passes stayed unanswered for the whole
+   * window. Accepted work keeps its own backstop: the runtime may still own it.
+   */
+  private async failUnansweredQueued(): Promise<void> {
+    const reason = 'sandbox_unreachable';
+    if (this.route.state === 'preparing') {
+      this.finalizeAttempt(this.route.attemptId, { status: 'failed', safeError: reason });
+    }
+    this.finishWorktreePreparation();
+    await this.captureQueuedRouteContainer(this.route);
+    this.emitCloudStatus({ type: 'error', message: reason });
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      reason
+    );
+  }
+
   private async clearTransportRecovery(): Promise<void> {
-    if (this.transportRecoveryAt === null) return;
+    if (this.transportRecovery === null) return;
     await this.ctx.storage.delete(TRANSPORT_RECOVERY_KEY);
-    this.transportRecoveryAt = null;
+    this.transportRecovery = null;
   }
 
   private sandboxRpcConfig(pass: TransportPass) {

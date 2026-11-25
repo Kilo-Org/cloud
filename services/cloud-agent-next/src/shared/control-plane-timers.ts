@@ -16,6 +16,8 @@ export type ControlPlaneTimers = {
     acceptedBackstopMs: number;
     sandboxRpcDeadlineMs: number;
     transportRecoveryMs: number;
+    /** How long recovery passes may stay unanswered before queued work fails. */
+    transportRecoveryWindowMs: number;
     /** Total bound on serving one scope handle through a surviving member. */
     scopeResolutionMs: number;
   };
@@ -205,7 +207,12 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
       // under the facade's retry budget: a handle that cannot be served in this
       // window fails as `unavailable` rather than hanging the proxy response.
       scopeResolutionMs: 6_000,
+      // Recovery passes run 15 s, 30 s and 60 s apart. The first unanswered
+      // pass 90 s after the window started fails queued work: one storage stall
+      // lasts about 30 s before its reset, and a reset object answers again
+      // within about 90 s.
       transportRecoveryMs: ms(15_000),
+      transportRecoveryWindowMs: ms(90_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
       acceptedBackstopMs: wrapper.turnHardCapMs + ACCEPTED_BACKSTOP_MARGIN_MS,

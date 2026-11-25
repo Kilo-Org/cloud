@@ -97,6 +97,31 @@ describe('control-plane external-work bounds', () => {
   });
 });
 
+describe('queued transport recovery bound', () => {
+  it.each(['1', '10'])(
+    'fails unanswered queued work long before the queued backstop at divisor %s',
+    divisor => {
+      const session = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: divisor }).session;
+      // The last pass can start just before the window ends; it then waits the
+      // longest delay and its own pass deadline before it gives up.
+      const giveUpMs =
+        session.transportRecoveryWindowMs +
+        4 * session.transportRecoveryMs +
+        session.sandboxRpcDeadlineMs;
+
+      expect(giveUpMs).toBeLessThan(session.queuedBackstopMs / 10);
+    }
+  );
+
+  it('scales the recovery window with the development divisor', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' }).session;
+
+    expect(scaled.transportRecoveryWindowMs).toBe(
+      CONTROL_PLANE_TIMERS.session.transportRecoveryWindowMs / 10
+    );
+  });
+});
+
 describe('sandbox idle policy for route origins', () => {
   it('keeps the interactive window for a sandbox without routes', () => {
     expect(sandboxIdlePolicyForOrigins([])).toBe('interactive');

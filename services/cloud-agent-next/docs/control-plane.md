@@ -252,13 +252,21 @@ RPCs may still finish remotely; queued replay keeps immutable IDs/intents and ac
 duplicate delivery. Accepted messages are never replayed and terminal messages remain final.
 
 Exhausted transport retries preserve queued intent and schedule at most one durable Session-level
-deadline, 15 seconds later, folded into the existing alarm. The alarm consumes it before one
-bounded recovery pass. It reads the passive `status(sessionId).view`, then prepares unknown/old
-failed work or delivers ready work. A returned ready view after `not_ready` does not recursively
-deliver. A failed recovery pass does not self-rearm: owner notifications and the original backstops
-remain, and a fresh user interaction or new authoritative recovery hint permits another opportunity.
-Delivered/terminal queued work and normal preparing/reconnecting owner views cancel the obligation.
-Reconstruction honors the stored deadline without moving message or Sandbox-owned deadlines.
+deadline, folded into the existing alarm. The stored obligation is the due time and `since`, the
+start of the current window of unanswered passes. The alarm reads `since`, consumes the deadline
+and runs one bounded recovery pass. It reads the passive `status(sessionId).view`, then prepares
+unknown/old failed work or delivers ready work. A returned ready view after `not_ready` does not
+recursively deliver. A pass that cannot make progress arms the next pass of the same window: 15 s
+after the window opens, then 30 s, then 60 s apart. The delay comes from `now - since`, never from
+a pass counter. The first such pass at least 90 s after `since` ends the window instead: queued
+work fails as `sandbox_unreachable` and an open preparation row closes with that reason. Accepted
+work keeps its own backstop. With the 2 s pass deadline, a window that opens at the first failure
+ends about 111 s later; the queued backstop stays the last resort. A consumed pass that is answered
+and does not arm another pass ends the window, so the next failure opens a new one. Delivered or
+terminal queued work and normal preparing/reconnecting owner views cancel the obligation.
+Reconstruction honors the stored deadline and window without moving message or Sandbox-owned
+deadlines. A stored bare due time from an earlier deploy reads as a window opened one delay
+earlier.
 
 When queued work still names a failed attempt, transport recovery is unresolved, or a preparing
 route receives terminal/readiness or different-attempt hints, notifications first confirm the
@@ -266,7 +274,7 @@ Sandbox's current passive view. That authority, never UUID ordering,
 rebinds the attempt fence. New-attempt progress/ready is adopted; genuinely failed new attempts settle
 work with their own reason. The old failed attempt cannot settle an unstarted retry; if still current,
 preparation is retried within the bounded pass. Failed confirmation keeps the existing scheduled
-obligation, but cannot rearm a consumed pass for a replay of that old attempt. Stale notifications
+obligation and its window: a notification never moves the deadline or `since`. Stale notifications
 remain rejected after rebinding, and transport errors never synthesize an `unknown` route view.
 Matching preparing notifications retain their step; matching failed notifications retain their
 subtype only when the passive view also confirms the failure reason, before terminal settlement.
@@ -1526,7 +1534,7 @@ them through one development-only override.
 | Session DO | Queued backstop | From send: reconnect window + one preparation attempt + 3 min | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 12 h 5 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
-| Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
+| Session DO | Queued transport recovery | 15 s, 30 s, then 60 s apart inside one 90 s window of unanswered passes; development-only scaling | Passive status then bounded prepare/deliver; an unanswered pass arms the next one, and the first unanswered pass at least 90 s into the window fails queued work (`sandbox_unreachable`) |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
 | Sandbox DO | Native billing admission | 1 min across meter retries, durable per route attempt | Route `failed` (`billing_unavailable`) |
 | Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
@@ -1589,6 +1597,7 @@ them through one development-only override.
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
 | Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
+| Sandbox DO does not answer (RPC error, reset or timeout) | Session DO transport recovery | Passes 15 s, 30 s and 60 s apart | Queued fail (`sandbox_unreachable`) about 111 s after the first failure; accepted work keeps its backstop |
 | User Stop while preparing | Session DO + Sandbox DO | Cancel every chat in the workspace and stop the allocation; a ready route aborts the Kilo session only | Queued and accepted `cancelled`; preparation closes as `preparation_cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |

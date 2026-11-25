@@ -93,21 +93,42 @@ async function rows(stub: DurableObjectStub<SandboxSessionV2>) {
   );
 }
 
+type StoredRecovery = { dueAt: number; since: number };
+
+async function storedRecovery(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<StoredRecovery | undefined> {
+  return runInDurableObject(stub, (_instance, state) =>
+    state.storage.get<StoredRecovery>(RECOVERY_KEY)
+  );
+}
+
 async function recoveryAt(stub: DurableObjectStub<SandboxSessionV2>) {
-  return runInDurableObject(stub, (_instance, state) => state.storage.get<number>(RECOVERY_KEY));
+  return (await storedRecovery(stub))?.dueAt;
 }
 
 async function alarmAt(stub: DurableObjectStub<SandboxSessionV2>) {
   return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
 
-async function recover(stub: DurableObjectStub<SandboxSessionV2>, peer: FakeSandboxPeer) {
+/**
+ * Moves the stored recovery deadline, and its window start by the same amount,
+ * to now and runs the alarm. Returns the moved obligation.
+ */
+async function recover(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  peer: FakeSandboxPeer
+): Promise<StoredRecovery> {
   await installPeer(stub, peer);
-  await runInDurableObject(stub, async (instance, state) => {
-    const dueAt = Date.now() - 1;
-    await state.storage.put(RECOVERY_KEY, dueAt);
-    Object.assign(instance, { transportRecoveryAt: dueAt });
+  return runInDurableObject(stub, async (instance, state) => {
+    const armed = await state.storage.get<StoredRecovery>(RECOVERY_KEY);
+    if (armed === undefined) throw new Error('No transport recovery is armed');
+    const shift = armed.dueAt - Date.now() + 1;
+    const due = { dueAt: armed.dueAt - shift, since: armed.since - shift };
+    await state.storage.put(RECOVERY_KEY, due);
+    Object.assign(instance, { transportRecovery: due });
     await instance.alarm();
+    return due;
   });
 }
 
@@ -510,7 +531,8 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await bounded(stub.send(prompt('m1')));
       expect((await rows(stub))[0]?.state).toBe('queued');
       await bounded(recover(stub, peer));
-      expect(await recoveryAt(stub)).toBeUndefined();
+      // The unanswered pass arms the next one; Stop must clear it.
+      expect(await recoveryAt(stub)).toEqual(expect.any(Number));
       await bounded(stub.stop());
       const terminal = (await rows(stub))[0];
       expect(terminal?.state).toBe('cancelled');
@@ -554,7 +576,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
   }, 10_000);
 
   it.each(['status', 'prepare'] as const)(
-    'bounds hung %s in the consumed recovery pass without rearming',
+    'bounds hung %s in a recovery pass and arms the next pass of the same window',
     async operation => {
       const { stub, peer } = await setup();
       peer.prepareError = new Error('unreachable');
@@ -573,12 +595,14 @@ describe('SandboxSessionV2 queued transport recovery', () => {
         peer.prepare = async () => pending.promise;
       }
       try {
-        await bounded(recover(stub, peer));
-        expect(await recoveryAt(stub)).toBeUndefined();
+        const before = Date.now();
+        const due = await bounded(recover(stub, peer));
+        const next = await storedRecovery(stub);
+        expect(next?.since).toBe(due.since);
+        expect(next?.dueAt).toBeGreaterThanOrEqual(before + 30_000);
+        expect(next?.dueAt).toBeLessThanOrEqual(Date.now() + 30_000);
         expect((await rows(stub))[0]?.state).toBe('queued');
-        expect(await alarmAt(stub)).toBe(
-          (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
-        );
+        expect(await alarmAt(stub)).toBe(next?.dueAt);
       } finally {
         pending.resolve(peer.view('preparing'));
       }
@@ -608,7 +632,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await bounded(recover(stub, peer));
       expect(peer.deliverCalls).toHaveLength(1);
       expect((await rows(stub))[0]?.state).toBe('queued');
-      expect(await recoveryAt(stub)).toBeUndefined();
+      expect(await recoveryAt(stub)).toEqual(expect.any(Number));
     } finally {
       pending.resolve('sent');
     }
@@ -756,7 +780,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     }
   );
 
-  it('does not apply old failed A to a fresh queued retry; confirmation failure retains but does not rearm the pass', async () => {
+  it('does not apply old failed A to a fresh queued retry; confirmation failure keeps one recovery window', async () => {
     const { stub, peer } = await setup();
     await stub.send(prompt('old'));
     peer.prepareView = {
@@ -783,19 +807,20 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     peer.statusError = new Error('status unavailable');
     await stub.onRoute(peer.view('ready'));
     expect(await recoveryAt(stub)).toBe(dueAt);
-    await recover(stub, peer);
-    expect(await recoveryAt(stub)).toBeUndefined();
+    const due = await recover(stub, peer);
+    // The unanswered pass arms the next pass of the same window.
+    const next = await storedRecovery(stub);
+    expect(next).toEqual({ dueAt: expect.any(Number), since: due.since });
     expect((await rows(stub))[1]?.state).toBe('queued');
     const statusCalls = peer.statusCalls.length;
     await runInDurableObject(stub, instance => instance.alarm());
     expect(peer.statusCalls).toHaveLength(statusCalls);
-    expect(await alarmAt(stub)).toBe(
-      (await rows(stub))[1]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
-    );
+    expect(await alarmAt(stub)).toBe(next?.dueAt);
+    // A stale or unconfirmed hint does not move the deadline or the window start.
     await stub.onRoute({ state: 'ready', attemptId: 'unconfirmed-stale-hint' });
-    expect(await recoveryAt(stub)).toBeUndefined();
+    expect(await storedRecovery(stub)).toEqual(next);
     await stub.send(prompt('fresh-interaction'));
-    expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+    expect(await storedRecovery(stub)).toEqual(next);
   });
 
   it('reconstructs the persisted deadline without moving message backstops', async () => {
@@ -803,15 +828,16 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     peer.prepareError = new Error('unreachable');
     await stub.send(prompt('m1'));
     const original = (await rows(stub))[0];
-    const dueAt = await recoveryAt(stub);
-    expect(dueAt).toEqual(expect.any(Number));
+    const stored = await storedRecovery(stub);
+    expect(stored).toEqual({ dueAt: expect.any(Number), since: expect.any(Number) });
     await evictAllDurableObjects();
     const revived = sessions.getByName(sessionId);
     await installPeer(revived, peer);
-    expect(await recoveryAt(revived)).toBe(dueAt);
-    expect(await alarmAt(revived)).toBe(dueAt);
+    expect(await storedRecovery(revived)).toEqual(stored);
+    expect(await alarmAt(revived)).toBe(stored?.dueAt);
     peer.prepareError = null;
     peer.prepareView = peer.view('ready');
+    // A deploy before the recovery window stored a bare due time.
     await runInDurableObject(revived, (_instance, state) =>
       state.storage.put(RECOVERY_KEY, Date.now() - 1)
     );
@@ -826,7 +852,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     expect(await recoveryAt(reconstructed)).toBeUndefined();
   });
 
-  it('permits a fresh recovery opportunity only after status confirms a genuinely new owner hint', async () => {
+  it('acts on a new owner hint only after status confirms it, inside the open recovery window', async () => {
     const { stub, peer } = await setup();
     await stub.send(prompt('old'));
     peer.prepareView = {
@@ -843,7 +869,8 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     await stub.send(prompt('retry'));
     peer.statusError = new Error('unreachable');
     await recover(stub, peer);
-    expect(await recoveryAt(stub)).toBeUndefined();
+    const window = await storedRecovery(stub);
+    expect(window).toEqual({ dueAt: expect.any(Number), since: expect.any(Number) });
     peer.statusError = null;
     peer.attemptId = 'authoritative-new-B';
     peer.prepareView = peer.view('ready');
@@ -853,7 +880,8 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       route: { state: 'ready', attemptId: peer.attemptId },
     });
     expect((await rows(stub))[1]?.state).toBe('queued');
-    expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+    // The failed delivery stays inside the armed window; it does not restart it.
+    expect(await storedRecovery(stub)).toEqual(window);
   });
 
   it.each(['stop', 'cancel', 'delete'] as const)(
@@ -894,4 +922,220 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       expect([reports.length, callbacks.length]).toEqual(counts);
     }
   );
+});
+
+describe('SandboxSessionV2 bounded transport recovery', () => {
+  const unreachable = () =>
+    Object.assign(new Error('Durable Object storage operation exceeded timeout'), {
+      retryable: false,
+    });
+
+  async function captureQueues(stub: DurableObjectStub<SandboxSessionV2>) {
+    const reports: unknown[] = [];
+    const callbacks: unknown[] = [];
+    await runInDurableObject(stub, instance => {
+      instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+        send: async (report: unknown) => {
+          reports.push(report);
+        },
+      } as never;
+      instance.env.CALLBACK_QUEUE = {
+        send: async (job: unknown) => {
+          callbacks.push(job);
+        },
+      } as never;
+    });
+    return { reports, callbacks };
+  }
+
+  /** Runs one due recovery pass and checks the delay to the next one. */
+  async function expectNextPass(
+    stub: DurableObjectStub<SandboxSessionV2>,
+    peer: FakeSandboxPeer,
+    delayMs: number
+  ) {
+    const before = Date.now();
+    const due = await bounded(recover(stub, peer));
+    const after = Date.now();
+    const next = await storedRecovery(stub);
+    expect(next?.since).toBe(due.since);
+    expect(next!.dueAt).toBeGreaterThanOrEqual(before + delayMs);
+    expect(next!.dueAt).toBeLessThanOrEqual(after + delayMs);
+    expect(await alarmAt(stub)).toBe(next!.dueAt);
+  }
+
+  it('re-arms an unanswered recovery pass and prepares again when the sandbox then answers unknown', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareError = unreachable();
+    await stub.send(prompt('m1'));
+    expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+
+    peer.prepareError = null;
+    peer.statusErrors = [unreachable()];
+    peer.statusViews = [{ state: 'unknown' }];
+    peer.prepareView = peer.view('preparing');
+    await recover(stub, peer);
+    expect(peer.statusCalls).toHaveLength(1);
+    expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+
+    await recover(stub, peer);
+    expect(peer.statusCalls).toHaveLength(2);
+    expect(peer.prepareCalls).toHaveLength(2);
+    expect((await rows(stub))[0]).toMatchObject({ state: 'queued', reason: null });
+    await expect(stub.getSession()).resolves.toMatchObject({
+      route: { state: 'preparing', attemptId: peer.attemptId },
+    });
+  });
+
+  it('surfaces the known terminal reason when a later pass reaches the sandbox', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareError = unreachable();
+    await stub.send(prompt('m1'));
+    peer.statusErrors = [unreachable()];
+    await recover(stub, peer);
+    expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+
+    peer.attemptId = 'failed-B';
+    peer.statusViews = [
+      {
+        state: 'failed',
+        attemptId: peer.attemptId,
+        reason: 'workspace_setup_failed',
+        subtype: 'git_authentication_failed',
+      },
+    ];
+    await recover(stub, peer);
+    expect((await rows(stub))[0]).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+    expect(await stub.getMessageResult('m1')).toMatchObject({
+      type: 'found',
+      result: {
+        status: 'failed',
+        failure: { code: 'workspace_setup_failed', subtype: 'git_authentication_failed' },
+      },
+    });
+    expect(await recoveryAt(stub)).toBeUndefined();
+    expect(peer.prepareCalls).toHaveLength(1);
+  });
+
+  it.each(['error', 'held'] as const)(
+    'fails queued work as sandbox_unreachable at the end of the window when every pass fails (%s)',
+    async mode => {
+      const { stub, peer } = await setup();
+      const { reports, callbacks } = await captureQueues(stub);
+      const pending = held<never>();
+      let statusCalls = 0;
+      if (mode === 'error') {
+        peer.prepareError = unreachable();
+        peer.statusError = unreachable();
+      } else {
+        peer.prepare = async input => {
+          peer.prepareCalls.push(input);
+          return pending.promise;
+        };
+        peer.status = async () => {
+          statusCalls += 1;
+          return pending.promise;
+        };
+      }
+      try {
+        await bounded(stub.send(prompt('m1')));
+        const first = await storedRecovery(stub);
+        expect(first!.dueAt - first!.since).toBe(15_000);
+
+        await expectNextPass(stub, peer, 30_000);
+        await expectNextPass(stub, peer, 60_000);
+        expect((await rows(stub))[0]).toMatchObject({ state: 'queued', reason: null });
+        expect(reports).toHaveLength(0);
+
+        await bounded(recover(stub, peer));
+        expect((await rows(stub))[0]).toMatchObject({
+          state: 'failed',
+          reason: 'sandbox_unreachable',
+        });
+        expect(await recoveryAt(stub)).toBeUndefined();
+        expect(reports).toHaveLength(1);
+        expect(callbacks).toHaveLength(1);
+        expect(mode === 'error' ? peer.statusCalls.length : statusCalls).toBe(3);
+        expect(peer.prepareCalls).toHaveLength(1);
+
+        const after = [peer.statusCalls.length, statusCalls, peer.prepareCalls.length];
+        await runInDurableObject(stub, instance => instance.alarm());
+        expect([peer.statusCalls.length, statusCalls, peer.prepareCalls.length]).toEqual(after);
+        expect([reports.length, callbacks.length]).toEqual([1, 1]);
+      } finally {
+        pending.resolve(undefined as never);
+      }
+    },
+    20_000
+  );
+
+  it('fails queued work whose delivery stays unanswered, with one deliver per pass', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('ready');
+    const delivery = held<ControlPlaneDeliverResult>();
+    peer.deliver = async payload => {
+      peer.deliverCalls.push(payload);
+      return delivery.promise;
+    };
+    try {
+      await bounded(stub.send(prompt('m1')));
+      await expectNextPass(stub, peer, 30_000);
+      await expectNextPass(stub, peer, 60_000);
+      await bounded(recover(stub, peer));
+      expect((await rows(stub))[0]).toMatchObject({
+        state: 'failed',
+        reason: 'sandbox_unreachable',
+      });
+      expect(peer.deliverCalls).toHaveLength(4);
+      expect(await recoveryAt(stub)).toBeUndefined();
+    } finally {
+      delivery.resolve('sent');
+    }
+  }, 20_000);
+
+  it('ends the window when a pass is answered and opens a new one at the next failure', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareError = unreachable();
+    await stub.send(prompt('m1'));
+    peer.statusErrors = [unreachable()];
+    const firstPass = await recover(stub, peer);
+    expect((await storedRecovery(stub))?.since).toBe(firstPass.since);
+
+    peer.prepareError = null;
+    peer.prepareView = peer.view('ready');
+    await recover(stub, peer);
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+    expect(await storedRecovery(stub)).toBeUndefined();
+
+    peer.deliverError = unreachable();
+    const before = Date.now();
+    await stub.send(prompt('m2'));
+    const fresh = await storedRecovery(stub);
+    expect(fresh!.since).toBeGreaterThanOrEqual(before);
+    expect(fresh!.dueAt - fresh!.since).toBe(15_000);
+    expect((await rows(stub))[1]?.state).toBe('queued');
+  });
+
+  it('reads a bare due time from an earlier deploy as a window opened one delay before it', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareError = unreachable();
+    await stub.send(prompt('m1'));
+    const legacyDueAt = Date.now() - 1;
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put(RECOVERY_KEY, legacyDueAt)
+    );
+    await evictAllDurableObjects();
+    const revived = sessions.getByName(sessionId);
+    await installPeer(revived, peer);
+    peer.statusError = unreachable();
+    await runInDurableObject(revived, instance => instance.alarm());
+    expect(await storedRecovery(revived)).toEqual({
+      dueAt: expect.any(Number),
+      since: legacyDueAt - 15_000,
+    });
+    expect((await rows(revived))[0]?.state).toBe('queued');
+  });
 });

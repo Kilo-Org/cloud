@@ -48,6 +48,9 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   deliverDelayMs = 0;
   deliverError: Error | null = null;
   statusError: Error | null = null;
+  /** Optional status queues: each call throws the next error, else returns the next view. */
+  statusErrors: Error[] = [];
+  statusViews: ControlPlaneRouteView[] = [];
   readonly statusCalls: string[] = [];
   /** Optional fence returned by `getRuntimeCredentialProxyFence` (H4 tests). */
   runtimeCredentialProxyFence: ControlRuntimeCredentialProxyFenceScope | null = null;
@@ -125,9 +128,11 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   async status(payload: { sessionId: string }) {
     this.statusCalls.push(payload.sessionId);
     if (this.statusError !== null) throw this.statusError;
+    const error = this.statusErrors.shift();
+    if (error !== undefined) throw error;
     return {
       sessionId: payload.sessionId,
-      view: injectAttempt(this.prepareView, this.attemptId),
+      view: injectAttempt(this.statusViews.shift() ?? this.prepareView, this.attemptId),
       workspacePreparing: this.workspacePreparing,
       workspaceStopEpoch: this.stopEpoch,
       workspaceStopAt: this.stopAt,

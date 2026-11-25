@@ -17,12 +17,24 @@ function daysAgo(days: number): Date {
   return new Date(now.getTime() - days * DAY_MS);
 }
 
+/** One maintenance call: at most one CREATE or DROP. */
 async function maintain(at: Date, daysAhead = 7) {
   const result = await owner.query<{ action: string; partition_name: string }>(
     'SELECT * FROM uts.audit_partition_maintenance_at($1, $2)',
     [at, daysAhead]
   );
   return result.rows;
+}
+
+/** Calls maintenance until it creates nothing more, the way the cron does, and returns the names. */
+async function createPartitions(at: Date, daysAhead: number): Promise<string[]> {
+  const created: string[] = [];
+  for (;;) {
+    const rows = await maintain(at, daysAhead);
+    const step = rows.find(row => row.action === 'created');
+    if (step === undefined) return created;
+    created.push(step.partition_name);
+  }
 }
 
 async function partitions(): Promise<string[]> {
@@ -70,11 +82,12 @@ describe('audit partition maintenance', () => {
     for (let day = 0; day <= 7; day++) expect(names).toContain(partitionFor(day));
   });
 
-  it('creates only the missing days', async () => {
+  it('creates only the missing days, one per call', async () => {
     expect(await maintain(now)).toEqual([]);
     expect(await maintain(new Date(now.getTime() + DAY_MS))).toEqual([
       { action: 'created', partition_name: partitionFor(8) },
     ]);
+    expect(await maintain(new Date(now.getTime() + DAY_MS))).toEqual([]);
   });
 
   it('rejects a lead outside 1 to 31 days', async () => {
@@ -83,7 +96,7 @@ describe('audit partition maintenance', () => {
   });
 
   it('drops an old partition only after every shard relayed every row in it', async () => {
-    await maintain(daysAgo(10), 1);
+    expect(await createPartitions(daysAgo(10), 1)).toEqual([partitionFor(-10), partitionFor(-9)]);
     const old = partitionFor(-10);
     const rows = await insertRowsAt(new Date(daysAgo(10).setUTCHours(12, 0, 0, 0)));
     expect(new Set(rows.map(row => row.shard)).size).toBe(8);
@@ -104,9 +117,32 @@ describe('audit partition maintenance', () => {
   });
 
   it('keeps a relayed partition until its newest row is 7 days old', async () => {
-    await maintain(daysAgo(8), 1);
-    const results = await maintain(now);
-    expect(results).toEqual([{ action: 'dropped', partition_name: partitionFor(-8) }]);
+    await createPartitions(daysAgo(8), 1);
+    expect(await maintain(now)).toEqual([{ action: 'dropped', partition_name: partitionFor(-8) }]);
+    expect(await maintain(now)).toEqual([]);
     expect(await partitions()).toContain(partitionFor(-7));
+  });
+
+  it('drops one partition per call, oldest first', async () => {
+    expect(await createPartitions(daysAgo(20), 2)).toHaveLength(3);
+    for (const day of [-20, -19, -18]) {
+      expect(await maintain(now)).toEqual([
+        { action: 'dropped', partition_name: partitionFor(day) },
+      ]);
+    }
+    expect(await maintain(now)).toEqual([]);
+  });
+
+  it('leaves a partition whose name carries no day alone', async () => {
+    await owner.query(
+      `CREATE TABLE uts.audit_events_archive PARTITION OF uts.audit_events
+       FOR VALUES FROM ('2020-01-01 00:00:00+00') TO ('2020-01-02 00:00:00+00')`
+    );
+    try {
+      expect(await maintain(now)).toEqual([]);
+      expect(await partitions()).toContain('audit_events_archive');
+    } finally {
+      await owner.query('DROP TABLE uts.audit_events_archive');
+    }
   });
 });

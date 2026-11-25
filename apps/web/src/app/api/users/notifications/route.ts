@@ -7,12 +7,16 @@ import { type NextRequest, NextResponse } from 'next/server';
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ error: string } | { notifications: KiloNotification[] }>> {
-  const { user, authFailedResponse } = await getUserFromAuth({
+  const { user, authFailedResponse, credentialsRejected } = await getUserFromAuth({
     adminOnly: false,
   });
 
   if (authFailedResponse) {
     if (authFailedResponse.status === 401) {
+      console.warn('[notifications] returning reauthenticate notification after auth failure', {
+        credentialsRejected: credentialsRejected ?? false,
+        userAgent: request.headers.get('user-agent'),
+      });
       return NextResponse.json({ notifications: [reauthenticateNotification()] });
     }
     return authFailedResponse;

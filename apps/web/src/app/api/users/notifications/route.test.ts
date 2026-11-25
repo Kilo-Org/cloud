@@ -22,6 +22,7 @@ afterEach(() => {
 
 it('returns a reauthenticate notification when authentication fails', async () => {
   jest.useFakeTimers({ now: new Date('2026-11-25T23:59:00Z') });
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   auth.mockResolvedValue({
     user: null,
     authFailedResponse: NextResponse.json(failureResult('Invalid API token'), { status: 401 }),
@@ -42,6 +43,11 @@ it('returns a reauthenticate notification when authentication fails', async () =
     ],
   });
   expect(generate).not.toHaveBeenCalled();
+  expect(warn).toHaveBeenCalledWith(
+    '[notifications] returning reauthenticate notification after auth failure',
+    { credentialsRejected: true, userAgent: null }
+  );
+  warn.mockRestore();
 });
 
 it('passes through authorization refusals', async () => {

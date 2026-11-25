@@ -38,6 +38,7 @@ import {
   device_sessions,
   device_refresh_tokens,
   native_attested_keys,
+  user_sign_in_contexts,
   native_admission_challenges,
   stytch_fingerprints,
   kiloclaw_instances,
@@ -8230,6 +8231,29 @@ describe('User', () => {
           .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should delete sign-in contexts', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const seenAt = new Date().toISOString();
+      for (const userId of [user.id, otherUser.id]) {
+        await db.insert(user_sign_in_contexts).values({
+          user_id: userId,
+          kind: 'network',
+          key_hash: 'a'.repeat(64),
+          first_seen_at: seenAt,
+          last_seen_at: seenAt,
+        });
+      }
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db
+        .select({ userId: user_sign_in_contexts.user_id })
+        .from(user_sign_in_contexts)
+        .where(inArray(user_sign_in_contexts.user_id, [user.id, otherUser.id]));
+      expect(remaining).toEqual([{ userId: otherUser.id }]);
     });
 
     it('should delete native attested keys and admission challenges', async () => {

@@ -5,6 +5,7 @@ jest.mock('@/lib/user/next-auth-options', () => ({
 }));
 
 import { NextRequest } from 'next/server';
+import { claimWebSignInDevice } from '@/lib/auth/web-sign-in-device';
 import { GET, POST } from './route';
 
 beforeEach(() => {
@@ -112,5 +113,75 @@ describe('POST /api/auth/[...nextauth]', () => {
     expect(mockNextAuthHttpHandler).toHaveBeenCalledTimes(1);
     expect(mockNextAuthHttpHandler).toHaveBeenCalledWith(request, context);
     expect(await request.text()).toBe('csrfToken=test-csrf&token=test-token&ticket=test-ticket');
+  });
+});
+
+describe('browser device cookie', () => {
+  const context = { params: Promise.resolve({ nextauth: ['callback', 'google'] }) };
+  const existingSecret = 'A'.repeat(43);
+
+  function signInRequest(cookie?: string) {
+    return new NextRequest('https://app.kilo.ai/api/auth/callback/google?code=c&state=s', {
+      headers: cookie ? { cookie } : {},
+    });
+  }
+
+  /** A NextAuth handler that completes a sign-in, as the `jwt` callback does. */
+  function completeSignIn() {
+    let claimed: ReturnType<typeof claimWebSignInDevice> = null;
+    mockNextAuthHttpHandler.mockImplementation(async () => {
+      claimed = claimWebSignInDevice();
+      return new Response(null, {
+        status: 302,
+        headers: { Location: 'https://app.kilo.ai/users/after-sign-in' },
+      });
+    });
+    return () => claimed;
+  }
+
+  test('a sign-in sets the cookie whose value the detection recorded', async () => {
+    const claimed = completeSignIn();
+
+    const response = await GET(signInRequest(), context);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://app.kilo.ai/users/after-sign-in');
+    const setCookie = response.headers.get('set-cookie') ?? '';
+    const value = /__Host-kilo-device=([^;]+)/.exec(setCookie)?.[1];
+    expect(value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(claimed()?.device).toEqual({ kind: 'browser_cookie', secret: value });
+    expect(setCookie).toMatch(/HttpOnly/i);
+    expect(setCookie).toMatch(/Secure/i);
+    expect(setCookie).toMatch(/SameSite=lax/i);
+    expect(setCookie).toMatch(/Path=\//);
+    expect(setCookie).toMatch(/Max-Age=34560000/);
+  });
+
+  test('a sign-in keeps the browser cookie it already holds', async () => {
+    const claimed = completeSignIn();
+
+    const response = await GET(signInRequest(`__Host-kilo-device=${existingSecret}`), context);
+
+    expect(claimed()?.device).toEqual({ kind: 'browser_cookie', secret: existingSecret });
+    expect(response.headers.get('set-cookie')).toContain(`__Host-kilo-device=${existingSecret}`);
+  });
+
+  test('a malformed cookie is replaced', async () => {
+    const claimed = completeSignIn();
+
+    await GET(signInRequest('__Host-kilo-device=short'), context);
+
+    const device = claimed()?.device;
+    expect(device?.kind === 'browser_cookie' && device.secret).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  test('a request that signs nobody in leaves the cookie alone', async () => {
+    const nextAuthResponse = new Response(null, { status: 200 });
+    mockNextAuthHttpHandler.mockResolvedValue(nextAuthResponse);
+
+    const response = await GET(signInRequest(), context);
+
+    expect(response).toBe(nextAuthResponse);
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
 });

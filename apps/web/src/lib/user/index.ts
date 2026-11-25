@@ -55,6 +55,7 @@ import {
   device_auth_requests,
   device_sessions,
   native_attested_keys,
+  user_sign_in_contexts,
   auto_top_up_configs,
   auto_routing_custom_routers,
   platform_integrations,
@@ -1815,6 +1816,7 @@ export async function anonymizeCloudUserData(
   // device_sessions cascade deletes device_refresh_tokens via FK
   await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
   await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
+  await tx.delete(user_sign_in_contexts).where(eq(user_sign_in_contexts.user_id, userId));
   // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
   await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
   await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));

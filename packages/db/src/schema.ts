@@ -12091,6 +12091,36 @@ export const native_attested_keys = pgTable(
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 
+/**
+ * The devices and networks a user has signed in from, so a sign-in from an
+ * unseen device on an unseen network can be noticed. Holds only SHA-256 hex
+ * digests of the keys, never a raw address or cookie value.
+ *
+ * `device` and `network` rows are the sign-in contexts. The single `notice`
+ * row per user records when the last new-sign-in notice was sent
+ * (`last_seen_at`), so the notice is capped per user. Rows not seen for 90
+ * days are deleted on that user's next sign-in.
+ */
+export const user_sign_in_contexts = pgTable(
+  'user_sign_in_contexts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'device' | 'network' | 'notice'>(),
+    key_hash: text().notNull(),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.user_id, table.kind, table.key_hash] }),
+    check(
+      'user_sign_in_contexts_kind_check',
+      sql`${table.kind} IN ('device', 'network', 'notice')`
+    ),
+  ]
+);
+
 // ── W3-B operation ledger and analytics outbox (P1-A-08a / P2-A-04) ──────
 
 /**

@@ -67,17 +67,21 @@ whether granted directly, through `PUBLIC` or through an inherited role.
   needs. Lifetimes from design section 5.3 are CHECK constraints too.
 - A gate pass serves one action of its own account once: each table that records a gated action
   holds a constant `gate_pass_action` column, a foreign key on (pass, account, action) and a unique
-  pass id.
-- An org bot key outlives its creator's account (design section 5.8): deleting the account deletes
-  its gate passes, and the key's `created_by` and `gate_pass_id` become NULL together.
+  pass id. A pass is never swept while a credential refers to it: those foreign keys refuse the
+  delete, and an org bot key lets go of its pass only once it is flagged, kept or revoked.
+- Every new org bot key needs a gate pass (a `BEFORE INSERT` trigger refuses one without). Deleting
+  the creator's account flags the creator's active keys, as member removal does (design section
+  5.8), so they stop after 7 days unless an org admin keeps them. `created_by` keeps the creator's
+  id as history; only `gate_pass_id` becomes NULL when the account's passes go with it.
 - `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour, not on
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
 - The app login still writes the credential tables directly. When the mint, refresh and revoke
   functions land, they become security-definer functions that write the credential row and its
   audit row together, and the app login loses direct writes on the credential tables, so no
   credential can change without its audit row.
-- `IdentityStoreError` keeps only the SQLSTATE, the constraint and the table. The server's error
-  detail can quote the refused row, so it never leaves `src/db/client.ts`.
+- `IdentityStoreError` keeps only the SQLSTATE, the constraint, the table, and for a failed
+  connection the system error code (`ECONNREFUSED`, `ETIMEDOUT`, ...). The server's error detail can
+  quote the refused row, so it never leaves `src/db/client.ts`.
 
 ### Audit outbox
 
@@ -109,17 +113,27 @@ partition's (`shard`, `txid`, `id`) index and the read never touches a relayed r
 filters on the watermark instead walks every relayed row of the shard on each read.
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of
-the next 7 days, or else drops the first partition whose rows are all older than 7 days and all
-relayed. Every check (one index probe per shard on the partition) runs before the one CREATE or
-DROP, so the parent's `ACCESS EXCLUSIVE` lock lasts only for that DDL; a DDL that waits 200 ms for
-its lock gives up, and the next call retries. The cron calls it until it returns no `created` or
+the next 7 days. Otherwise it takes the first partition whose rows are all older than 7 days and all
+relayed: it truncates it while it holds data, which locks only that partition (no insert reaches an
+old day), and drops it once it is empty. Every check (one index probe per shard on the partition)
+runs before the one CREATE, TRUNCATE or DROP. The DROP is the only step that takes the parent's
+`ACCESS EXCLUSIVE` lock, and it only removes empty files; a DDL that waits 200 ms for its lock gives
+up, and the next call retries. The cron calls it until it returns no `created`, `truncated` or
 `dropped` row. A partition whose name is not `audit_events_YYYYMMDD` is left alone.
 
 The `event` column holds an `AuditEvent` from `@kilocode/sts-contracts`. `uts.is_audit_event` checks
 it in the database as strictly as `AuditEventSchema` does, narrowed to UTS sources, UTS event types
-and the three OCSF classes in use, because a row the relay could not parse would stall its shard. A
-second CHECK refuses a token value (`kilo_pat_`, `kilo_rt_`, `kilo_bot_` or a JWT) anywhere in a
-row and a bare email address as the account or the actor.
+and the three OCSF classes in use, because a row the relay could not parse would stall its shard.
+
+A second CHECK, `audit_events_no_credential`, is stricter than the contract. Event authors must know
+it, because a refused audit row fails the whole credential statement:
+
+- No string anywhere in the event may hold `kilo_pat_`, `kilo_rt_` or `kilo_bot_` followed by 16 or
+  more of `A-Za-z0-9_-`, or a JWT shape (`eyJ...` then two dots). A mention of a prefix alone, such
+  as "malformed kilo_pat_ value", passes. Refer to a token by its id or reference instead.
+- `account_id` and the actor id may not be a bare email address.
+
+The audit event contract slice adds the same refusal to `AuditEventSchema`, so both match.
 
 A row is at most 8 KB, so one row always fits one queue message (60 KB compressed). A full 500-row
 read of real mint events does not: 500 mixed mints (1 to 4 tokens each) compress to about 70 KB and

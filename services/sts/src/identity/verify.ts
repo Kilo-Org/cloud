@@ -3,47 +3,52 @@ import {
   createRemoteJWKSet,
   customFetch,
   decodeJwt,
+  errors,
   jwtVerify,
   type JWTPayload,
   type RemoteJWKSet,
 } from 'jose';
 import { z } from 'zod';
-import type { Policy, PolicyIdentity } from '../policy/schema';
+import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
+import { GITHUB_PRIVILEGED_EVENTS, type Policy, type PolicyIdentity } from '../policy/schema';
 
 const DiscoverySchema = z.object({
   issuer: z.string().min(1),
   jwks_uri: z.url(),
 });
 
-export type IdentityProvider = 'vercel' | 'fly' | 'github';
+export type IdentityProvider = 'fly' | 'github';
 export type DeniedReason = 'identity_rejected' | 'unknown_workload' | 'environment_mismatch';
 
 export type VerifyOutcome =
   | { status: 'verified'; workload: WorkloadName; provider: IdentityProvider }
-  | { status: 'denied'; reason: DeniedReason };
+  | { status: 'denied'; reason: DeniedReason }
+  /** A provider's discovery document or key set could not be fetched; the caller retries. */
+  | { status: 'unavailable' };
 
-const VERCEL_ISSUER_PREFIX = 'https://oidc.vercel.com/';
 const FLY_ISSUER_PREFIX = 'https://oidc.fly.io/';
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
-/** All three providers sign with RS256; the discovery documents say so. */
+/** Both providers sign with RS256; their discovery documents say so. */
 const ALGORITHMS = ['RS256'];
 const CLOCK_TOLERANCE_SECONDS = 60;
+
+/** A provider endpoint failed: network error, timeout, non-200, or a body that is not JSON. */
+class ProviderUnavailableError extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'ProviderUnavailableError';
+  }
+}
 
 function issuerFor(identity: PolicyIdentity): string | null {
   switch (identity.kind) {
     case 'worker-binding':
       return null;
-    case 'vercel-oidc':
-      return `${VERCEL_ISSUER_PREFIX}${identity.teamSlug}`;
     case 'fly-oidc':
       return `${FLY_ISSUER_PREFIX}${identity.org}`;
     case 'github-oidc':
       return GITHUB_ISSUER;
   }
-}
-
-function audienceFor(identity: PolicyIdentity, stsIssuer: string): string {
-  return identity.kind === 'vercel-oidc' ? `https://vercel.com/${identity.teamSlug}` : stsIssuer;
 }
 
 function claim(payload: JWTPayload, name: string): string | null {
@@ -52,24 +57,31 @@ function claim(payload: JWTPayload, name: string): string | null {
 }
 
 function isKnownProviderIssuer(issuer: string): boolean {
-  if (issuer === GITHUB_ISSUER || issuer === 'https://oidc.vercel.com') return true;
-  if (!issuer.startsWith(VERCEL_ISSUER_PREFIX) && !issuer.startsWith(FLY_ISSUER_PREFIX)) {
-    return false;
-  }
-  const slug = issuer.slice(
-    issuer.startsWith(VERCEL_ISSUER_PREFIX) ? VERCEL_ISSUER_PREFIX.length : FLY_ISSUER_PREFIX.length
+  if (issuer === GITHUB_ISSUER) return true;
+  return (
+    issuer.startsWith(FLY_ISSUER_PREFIX) &&
+    /^[a-z0-9][a-z0-9-]{0,62}$/.test(issuer.slice(FLY_ISSUER_PREFIX.length))
   );
-  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(slug);
 }
 
-function denied(reason: DeniedReason): VerifyOutcome {
-  return { status: 'denied', reason };
+function isPrivilegedEvent(event: string | null): boolean {
+  return GITHUB_PRIVILEGED_EVENTS.some(privileged => privileged === event);
+}
+
+/** Classifies a failed `jwtVerify`: a dependency failure is retryable, anything else is a rejection. */
+function isDependencyFailure(error: unknown): boolean {
+  return (
+    error instanceof ProviderUnavailableError ||
+    error instanceof errors.JWKSTimeout ||
+    error instanceof errors.JWKSInvalid
+  );
 }
 
 /**
- * Verifies provider workload tokens and maps them to a policy. Each policy's own
- * fields decide the issuer, audience, and claim bindings, so an unlisted identity
- * can never match. Discovery and JWKS responses are cached for the isolate.
+ * Verifies provider workload tokens and maps them to a policy. Each policy's own fields decide the
+ * issuer and the claim bindings, so an unlisted identity can never match. The audience is always
+ * this STS's issuer. Discovery and key sets are cached for the isolate; a fetch that fails is not
+ * cached, and it makes the answer `unavailable`, never a rejection (design 7).
  */
 export class IdentityVerifier {
   private readonly jwks = new Map<string, Promise<RemoteJWKSet>>();
@@ -83,17 +95,44 @@ export class IdentityVerifier {
     }
   ) {}
 
-  private async jwksFor(issuer: string): Promise<RemoteJWKSet> {
+  private async providerFetch(url: string, init?: RequestInit): Promise<Response> {
+    const timeout = AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await this.options.fetch(url, {
+        ...init,
+        signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
+      });
+    } catch {
+      throw new ProviderUnavailableError('provider request failed');
+    }
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw new ProviderUnavailableError(`provider answered ${response.status}`);
+    }
+    const text = await response.text();
+    try {
+      JSON.parse(text);
+    } catch {
+      throw new ProviderUnavailableError('provider answered with a body that is not JSON');
+    }
+    return new Response(text, { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+
+  private jwksFor(issuer: string): Promise<RemoteJWKSet> {
     const existing = this.jwks.get(issuer);
     if (existing) return existing;
 
     const created = (async () => {
-      const response = await this.options.fetch(`${issuer}/.well-known/openid-configuration`);
-      if (!response.ok) throw new Error(`discovery failed with status ${response.status}`);
-      const document = DiscoverySchema.parse(await response.json());
-      if (document.issuer !== issuer) throw new Error('discovery issuer does not match');
-      return createRemoteJWKSet(new URL(document.jwks_uri), {
-        [customFetch]: this.options.fetch,
+      const response = await this.providerFetch(`${issuer}/.well-known/openid-configuration`);
+      const document = DiscoverySchema.safeParse(await response.json());
+      if (!document.success) throw new ProviderUnavailableError('discovery document is invalid');
+      if (document.data.issuer !== issuer) {
+        throw new ProviderUnavailableError('discovery issuer does not match');
+      }
+      return createRemoteJWKSet(new URL(document.data.jwks_uri), {
+        timeoutDuration: PROVIDER_FETCH_TIMEOUT_MS,
+        [customFetch]: (url, init) => this.providerFetch(url, init),
       });
     })();
     this.jwks.set(issuer, created);
@@ -106,55 +145,42 @@ export class IdentityVerifier {
     try {
       unverified = decodeJwt(token);
     } catch {
-      return denied('identity_rejected');
+      return { status: 'denied', reason: 'identity_rejected' };
     }
     const issuer = claim(unverified, 'iss');
-    if (issuer === null) return denied('identity_rejected');
+    if (issuer === null) return { status: 'denied', reason: 'identity_rejected' };
 
     const candidates = this.options.policies.filter(
       policy => issuerFor(policy.identity) === issuer
     );
     if (candidates.length === 0) {
-      return denied(isKnownProviderIssuer(issuer) ? 'unknown_workload' : 'identity_rejected');
+      return {
+        status: 'denied',
+        reason: isKnownProviderIssuer(issuer) ? 'unknown_workload' : 'identity_rejected',
+      };
     }
 
-    const audience = audienceFor(candidates[0].identity, this.options.issuer);
     let payload: JWTPayload;
     try {
       const result = await jwtVerify(token, await this.jwksFor(issuer), {
         issuer,
-        audience,
+        audience: this.options.issuer,
         algorithms: ALGORITHMS,
         clockTolerance: CLOCK_TOLERANCE_SECONDS,
       });
       payload = result.payload;
-    } catch {
-      return denied('identity_rejected');
+    } catch (error) {
+      if (isDependencyFailure(error)) return { status: 'unavailable' };
+      return { status: 'denied', reason: 'identity_rejected' };
     }
 
     let environmentMismatch = false;
     for (const policy of candidates) {
       const identity = policy.identity;
       switch (identity.kind) {
-        case 'vercel-oidc': {
-          if (claim(payload, 'project_id') !== identity.projectId) continue;
-          if (!policy.environments.includes(this.options.environment)) {
-            environmentMismatch = true;
-            continue;
-          }
-          const environment = claim(payload, 'environment');
-          if (environment === null) return denied('identity_rejected');
-          const servedByThisDeployment =
-            this.options.environment === 'production'
-              ? environment === 'production'
-              : environment !== 'production';
-          if (!servedByThisDeployment || !identity.vercelEnvironments.includes(environment)) {
-            environmentMismatch = true;
-            continue;
-          }
-          return { status: 'verified', workload: policy.workload, provider: 'vercel' };
-        }
         case 'fly-oidc': {
+          if (claim(payload, 'org_id') !== identity.orgId) continue;
+          if (claim(payload, 'app_id') !== identity.appId) continue;
           if (claim(payload, 'org_name') !== identity.org) continue;
           if (claim(payload, 'app_name') !== identity.app) continue;
           if (!policy.environments.includes(this.options.environment)) {
@@ -166,10 +192,19 @@ export class IdentityVerifier {
         case 'github-oidc': {
           if (claim(payload, 'repository_id') !== identity.repositoryId) continue;
           if (claim(payload, 'repository_owner_id') !== identity.repositoryOwnerId) continue;
-          const refMatches = identity.refs?.includes(claim(payload, 'ref') ?? '') === true;
-          const environmentMatches =
-            identity.environments?.includes(claim(payload, 'environment') ?? '') === true;
-          if (!refMatches && !environmentMatches) return denied('identity_rejected');
+          // From here the token names this policy's repository: a failed binding is a
+          // rejection, not an unknown workload.
+          const environment = claim(payload, 'environment');
+          if (identity.environments && !identity.environments.includes(environment ?? '')) {
+            return { status: 'denied', reason: 'identity_rejected' };
+          }
+          if (identity.refs && !identity.refs.includes(claim(payload, 'ref') ?? '')) {
+            return { status: 'denied', reason: 'identity_rejected' };
+          }
+          const event = claim(payload, 'event_name');
+          if (isPrivilegedEvent(event) && !identity.allowedEvents?.some(name => name === event)) {
+            return { status: 'denied', reason: 'identity_rejected' };
+          }
           if (!policy.environments.includes(this.options.environment)) {
             environmentMismatch = true;
             continue;
@@ -181,6 +216,9 @@ export class IdentityVerifier {
       }
     }
 
-    return denied(environmentMismatch ? 'environment_mismatch' : 'unknown_workload');
+    return {
+      status: 'denied',
+      reason: environmentMismatch ? 'environment_mismatch' : 'unknown_workload',
+    };
   }
 }

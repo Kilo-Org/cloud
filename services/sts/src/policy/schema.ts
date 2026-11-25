@@ -5,48 +5,64 @@ import {
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 
-const TeamSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
+const SlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
+const StableIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+const NumericIdSchema = z.string().regex(/^[0-9]{1,20}$/);
 const RefSchema = z.string().regex(/^refs\/[A-Za-z0-9._/-]{1,200}$/);
-const IdentifierSchema = z.string().min(1).max(64);
-const EnvironmentValueSchema = z.string().min(1).max(64);
+const GithubEnvironmentSchema = z.string().min(1).max(255);
+
+/**
+ * GitHub events that run with the base repository's privileges on code or input from someone
+ * else. A token from one of them is refused unless the policy names the event.
+ */
+export const GITHUB_PRIVILEGED_EVENTS = [
+  'pull_request_target',
+  'workflow_run',
+  'issue_comment',
+] as const;
 
 export const WorkerBindingIdentitySchema = z.strictObject({
   kind: z.literal('worker-binding'),
 });
 
-export const VercelIdentitySchema = z.strictObject({
-  kind: z.literal('vercel-oidc'),
-  teamSlug: TeamSlugSchema,
-  projectId: IdentifierSchema,
-  vercelEnvironments: z.array(EnvironmentValueSchema).min(1).max(16),
-});
-
+/**
+ * Fly machine tokens (https://fly.io/docs/security/openid-connect/). The org slug picks the issuer;
+ * the stable `org_id` and `app_id` claims bind the identity, so a renamed or recreated app with
+ * the same name is refused.
+ */
 export const FlyIdentitySchema = z.strictObject({
   kind: z.literal('fly-oidc'),
-  org: TeamSlugSchema,
-  app: TeamSlugSchema,
+  org: SlugSchema,
+  orgId: StableIdSchema,
+  app: SlugSchema,
+  appId: StableIdSchema,
 });
 
+/**
+ * GitHub Actions tokens bound to the repository and owner ids. `environments` binds the GitHub
+ * environment claim and is required for any policy that grants production; `refs` is an extra
+ * filter. https://docs.github.com/en/actions/reference/security/oidc
+ */
 export const GithubIdentitySchema = z
   .strictObject({
     kind: z.literal('github-oidc'),
-    repositoryId: z.string().regex(/^[0-9]{1,20}$/),
-    repositoryOwnerId: z.string().regex(/^[0-9]{1,20}$/),
+    repositoryId: NumericIdSchema,
+    repositoryOwnerId: NumericIdSchema,
+    environments: z.array(GithubEnvironmentSchema).min(1).max(32).optional(),
     refs: z.array(RefSchema).min(1).max(32).optional(),
-    environments: z.array(EnvironmentValueSchema).min(1).max(32).optional(),
+    allowedEvents: z.array(z.enum(GITHUB_PRIVILEGED_EVENTS)).min(1).max(3).optional(),
   })
-  .refine(identity => (identity.refs === undefined) !== (identity.environments === undefined), {
-    message: 'github-oidc requires exactly one of refs or environments',
+  .refine(identity => identity.environments !== undefined || identity.refs !== undefined, {
+    message: 'github-oidc binds environments, refs, or both',
   });
 
 export const PolicyIdentitySchema = z.discriminatedUnion('kind', [
   WorkerBindingIdentitySchema,
-  VercelIdentitySchema,
   FlyIdentitySchema,
   GithubIdentitySchema,
 ]);
 
-function hasDuplicates(values: string[]): boolean {
+function hasDuplicates(values: readonly string[]): boolean {
   return new Set(values).size !== values.length;
 }
 
@@ -69,7 +85,7 @@ export const PolicySnapshotEntrySchema = z.strictObject({
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
 
-const ENVIRONMENT_SUFFIX = /_(PROD|STAGING|DEV|DEVELOPMENT)$/;
+const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
 /** Cross-field checks a single schema cannot express. Returns one message per problem. */
 export function policyFileProblems(policy: Policy): string[] {
@@ -83,14 +99,17 @@ export function policyFileProblems(policy: Policy): string[] {
       );
     }
   }
-  if (policy.identity.kind === 'vercel-oidc' && hasDuplicates(policy.identity.vercelEnvironments)) {
-    problems.push('vercelEnvironments contains a duplicate');
-  }
   if (policy.identity.kind === 'github-oidc') {
-    const { refs, environments } = policy.identity;
+    const { refs, environments, allowedEvents } = policy.identity;
     if (refs && hasDuplicates(refs)) problems.push('refs contains a duplicate');
     if (environments && hasDuplicates(environments)) {
-      problems.push('environments contains a duplicate');
+      problems.push('identity.environments contains a duplicate');
+    }
+    if (allowedEvents && hasDuplicates(allowedEvents)) {
+      problems.push('allowedEvents contains a duplicate');
+    }
+    if (policy.environments.includes('production') && environments === undefined) {
+      problems.push('a github-oidc policy that grants production must bind identity.environments');
     }
   }
   return problems;

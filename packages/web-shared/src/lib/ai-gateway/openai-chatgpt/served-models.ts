@@ -17,7 +17,7 @@ import { OPENAI_CHATGPT_API_URL, readOpenAiChatGptPartnerKey } from './upstream'
  * answers it with `404 The model does not exist or you do not have access to
  * it`. Routing one of those to the delegated upstream fails the request instead
  * of leaving it on its existing route, so eligibility asks the project for the
- * served list first.
+ * served list first; routing then serves such a variant on its base model.
  *
  * The lookup uses the same base URL as the inference request, so a stub or an
  * alternate host answers both.

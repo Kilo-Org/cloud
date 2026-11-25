@@ -159,7 +159,41 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 async function resolveOpenAiChatGptUpstreamModel(modelId: string): Promise<string | null> {
   const model = (await resolveOpenRouterModelAlias(modelId.trim())).trim();
   if (!isOpenAiChatGptModel(model)) return null;
-  return model.replace(OPENAI_MODEL_PREFIX, '');
+  return model.replace(OPENAI_MODEL_PREFIX, '').toLowerCase();
+}
+
+/**
+ * A catalog variant that api.openai.com serves as a request parameter on the
+ * base model rather than as a model id of its own.
+ * https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode
+ * https://developers.openai.com/api/docs/guides/fast-mode
+ */
+type OpenAiChatGptModelVariant = 'pro' | 'fast';
+
+const MODEL_VARIANT_SUFFIX = /-(pro|fast)$/;
+
+export type OpenAiChatGptUpstreamModel = {
+  model: string;
+  variant: OpenAiChatGptModelVariant | null;
+};
+
+/**
+ * The served upstream model for a candidate id, or null when the project serves
+ * neither the id nor, for a `-pro` or `-fast` variant, its base model. An id the
+ * project serves as-is wins, so a legacy Pro model such as `gpt-5.5-pro` keeps
+ * its own model id; a newer `gpt-6-luna-pro` is served as `gpt-6-luna` in pro
+ * reasoning mode, and `gpt-6-luna-fast` as `gpt-6-luna` on the Fast tier.
+ */
+async function resolveServedUpstreamModel(
+  candidate: string
+): Promise<OpenAiChatGptUpstreamModel | null> {
+  if (await isOpenAiModelServed(candidate)) return { model: candidate, variant: null };
+
+  const match = MODEL_VARIANT_SUFFIX.exec(candidate);
+  if (!match) return null;
+  const model = candidate.slice(0, match.index);
+  if (!(await isOpenAiModelServed(model))) return null;
+  return { model, variant: match[1] === 'pro' ? 'pro' : 'fast' };
 }
 
 /**
@@ -257,16 +291,12 @@ async function readServableStoredConnection(
 async function eligibleUpstreamModelForOwner(
   input: OpenAiChatGptRoutingInput,
   owner: OpenAiChatGptOwner
-): Promise<string | null> {
-  const upstreamModel = await getOpenAiChatGptCandidateModel(
-    input.request.kind,
-    input.requestedModel
-  );
-  if (!upstreamModel) return null;
+): Promise<OpenAiChatGptUpstreamModel | null> {
+  const candidate = await getOpenAiChatGptCandidateModel(input.request.kind, input.requestedModel);
+  if (!candidate) return null;
 
-  if (!(await isOpenAiModelServed(upstreamModel))) {
-    return null;
-  }
+  const upstreamModel = await resolveServedUpstreamModel(candidate);
+  if (!upstreamModel) return null;
 
   if (!(await readServableStoredConnection(owner, logSharedConnectorGone))) return null;
 
@@ -293,9 +323,9 @@ export async function getOpenAiChatGptByokModelIds(
 
   const tagged = await Promise.all(
     candidateModelIds.map(async modelId => {
-      const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
-      if (!upstreamModel) return null;
-      return (await isOpenAiModelServed(upstreamModel)) ? modelId : null;
+      const candidate = await resolveOpenAiChatGptUpstreamModel(modelId);
+      if (!candidate) return null;
+      return (await resolveServedUpstreamModel(candidate)) ? modelId : null;
     })
   );
   return new Set(tagged.filter((id): id is string => id !== null));
@@ -458,10 +488,11 @@ function defaultFunctionToolStrict(tools: GatewayResponsesRequest['tools']): boo
 export function buildOpenAiChatGptProvider(
   apiKey: string,
   accessToken: string,
-  upstreamModel: string,
+  upstream: OpenAiChatGptUpstreamModel,
   owner?: OpenAiChatGptOwner
 ): Provider | null {
   if (apiKey.trim().length === 0) return null;
+  const upstreamModel = upstream.model;
 
   return {
     type: OPENAI_CHATGPT_PROVIDER_ID,
@@ -492,7 +523,8 @@ export function buildOpenAiChatGptProvider(
       // supported by the delegated flow, so the request is forced stateless.
       if (body.store !== false) normalizations.add('store_disabled');
       body.store = false;
-      // Subscription sharing rejects gateway routing, non-default tiers, and sampling parameters.
+      // Subscription sharing rejects gateway routing, sampling parameters and caller-chosen tiers;
+      // only a `-fast` model variant sets a tier, below.
       for (const field of [
         'conversation',
         'background',
@@ -505,6 +537,11 @@ export function buildOpenAiChatGptProvider(
           Reflect.deleteProperty(body, field);
           normalizations.add(`${field}_removed`);
         }
+      }
+      // ChatGPT's own model catalog lists Fast as service tier `priority`.
+      if (upstream.variant === 'fast') {
+        body.service_tier = 'priority';
+        normalizations.add('fast_variant_to_service_tier');
       }
       if (defaultFunctionToolStrict(body.tools))
         normalizations.add('function_tool_strict_defaulted');
@@ -537,6 +574,10 @@ export function buildOpenAiChatGptProvider(
           if (effort === undefined) delete reasoning.effort;
           else reasoning.effort = effort;
         }
+      }
+      if (upstream.variant === 'pro') {
+        body.reasoning = { ...body.reasoning, mode: 'pro' };
+        normalizations.add('pro_variant_to_reasoning_mode');
       }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once

@@ -455,6 +455,117 @@ describe('checkOpenAiChatGptByok', () => {
     }
   );
 
+  describe('model variants', () => {
+    const SERVED = new Set(['gpt-6-luna', 'gpt-6.1-sol', 'gpt-5.5', 'gpt-5.5-pro']);
+
+    beforeEach(() => {
+      jest.mocked(isOpenAiModelServed).mockImplementation(async modelId => SERVED.has(modelId));
+    });
+
+    it('serves a `-pro` variant on its base model in pro reasoning mode', async () => {
+      const provider = await buildProviderForTest('openai/gpt-6-luna-pro');
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-6-luna-pro',
+        input: 'hello',
+        reasoning: { effort: 'high', summary: 'auto' },
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.model).toBe('gpt-6-luna');
+      expect(body.reasoning).toEqual({ effort: 'high', summary: 'auto', mode: 'pro' });
+      expect('service_tier' in body).toBe(false);
+    });
+
+    it('sets pro reasoning mode when the request carries no reasoning object', async () => {
+      const provider = await buildProviderForTest('openai/gpt-6-luna-pro');
+      const body: GatewayResponsesRequest = { model: 'openai/gpt-6-luna-pro', input: 'hello' };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.reasoning).toEqual({ mode: 'pro' });
+    });
+
+    it('serves a `-fast` variant on its base model with the priority tier', async () => {
+      const provider = await buildProviderForTest('openai/gpt-6-luna-fast');
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-6-luna-fast',
+        input: 'hello',
+        service_tier: 'flex',
+        reasoning: { effort: 'low' },
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.model).toBe('gpt-6-luna');
+      expect(body.service_tier).toBe('priority');
+      expect(body.reasoning).toEqual({ effort: 'low' });
+    });
+
+    it('sets the priority tier on a `-fast` variant without a caller tier', async () => {
+      const provider = await buildProviderForTest('openai/gpt-6-luna-fast');
+      const body: GatewayResponsesRequest = { model: 'openai/gpt-6-luna-fast', input: 'hello' };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.service_tier).toBe('priority');
+      expect(logExceptInTest).toHaveBeenCalledWith(
+        expect.stringContaining('fast_variant_to_service_tier')
+      );
+    });
+
+    it('maps ultra effort for the base model of a `-pro` variant', async () => {
+      const provider = await buildProviderForTest('openai/gpt-6.1-sol-pro');
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-6.1-sol-pro',
+        input: 'hello',
+        reasoning: { effort: 'ultra' as never },
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.model).toBe('gpt-6.1-sol');
+      expect(body.reasoning).toEqual({ effort: 'max', mode: 'pro' });
+    });
+
+    it('matches a variant id case-insensitively', async () => {
+      const provider = await buildProviderForTest('OpenAI/GPT-6-Luna-Pro');
+      const body: GatewayResponsesRequest = { model: 'OpenAI/GPT-6-Luna-Pro', input: 'hello' };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.model).toBe('gpt-6-luna');
+      expect(body.reasoning).toEqual({ mode: 'pro' });
+    });
+
+    it('keeps a served Pro model id as-is', async () => {
+      const provider = await buildProviderForTest('openai/gpt-5.5-pro');
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-5.5-pro',
+        input: 'hello',
+        reasoning: { effort: 'high' },
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.model).toBe('gpt-5.5-pro');
+      expect(body.reasoning).toEqual({ effort: 'high' });
+    });
+
+    it('tags a variant BYOK-available only when its base model is served', async () => {
+      await expect(
+        getOpenAiChatGptByokModelIds(USER_OWNER, [
+          'openai/gpt-6-luna-pro',
+          'openai/gpt-6-luna-fast',
+          'openai/gpt-5.5-pro',
+          'openai/gpt-6-sol-pro',
+        ])
+      ).resolves.toEqual(
+        new Set(['openai/gpt-6-luna-pro', 'openai/gpt-6-luna-fast', 'openai/gpt-5.5-pro'])
+      );
+    });
+  });
+
   it('drops the sampling parameters', async () => {
     const provider = await buildProviderForTest();
     const body: GatewayResponsesRequest = {
@@ -829,7 +940,9 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   it('builds no provider without the deployment partner key', () => {
-    expect(buildOpenAiChatGptProvider('', DELEGATED_TOKEN, 'gpt-5-nano')).toBeNull();
+    expect(
+      buildOpenAiChatGptProvider('', DELEGATED_TOKEN, { model: 'gpt-5-nano', variant: null })
+    ).toBeNull();
   });
 
   it('returns no provider for an ineligible request without reading the connection', async () => {
@@ -899,20 +1012,19 @@ describe('checkOpenAiChatGptByok', () => {
     expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5-nano');
   });
 
-  it('keeps a `-pro` reasoning-mode slug off the delegated route', async () => {
-    // `pro` is a reasoning mode on the base model, not an API model id, so the
-    // project does not serve `gpt-5.6-luna-pro`.
+  it('keeps a `-pro` or `-fast` variant off the delegated route when its base model is not served', async () => {
     jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
 
-    await expect(
-      checkOpenAiChatGptByok(
-        routingInput({
-          request: responsesRequest('openai/gpt-5.6-luna-pro'),
-          requestedModel: 'openai/gpt-5.6-luna-pro',
-        })
-      )
-    ).resolves.toBeNull();
+    for (const model of ['openai/gpt-5.6-luna-pro', 'openai/gpt-5.6-luna-fast']) {
+      await expect(
+        checkOpenAiChatGptByok(
+          routingInput({ request: responsesRequest(model), requestedModel: model })
+        )
+      ).resolves.toBeNull();
+    }
     expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-pro');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-fast');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna');
   });
 
   it('is not eligible when no connection is stored', async () => {

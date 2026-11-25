@@ -39,6 +39,23 @@ function bundleResponse(result: BundleResult): Response {
 
 type ParsedBody = { ok: true; value: BundleRequest } | { ok: false };
 
+/** Provider discovery and key sets are cached in the verifier, so one instance serves the isolate. */
+let verifierCache: { key: string; instance: IdentityVerifier } | null = null;
+
+function identityVerifier(config: StsConfig): IdentityVerifier {
+  const key = `${config.issuer}|${config.environment}`;
+  const cached = verifierCache;
+  if (cached !== null && cached.key === key) return cached.instance;
+  const instance = new IdentityVerifier({
+    policies: policyIndex.all(),
+    environment: config.environment,
+    issuer: config.issuer,
+    fetch: (input, init) => fetch(input, init),
+  });
+  verifierCache = { key, instance };
+  return instance;
+}
+
 async function readBundleRequest(request: Request): Promise<ParsedBody> {
   const text = await request.text();
   if (text.trim() === '') return { ok: true, value: {} };
@@ -85,13 +102,7 @@ async function bundleRequest(request: Request, env: Env, config: StsConfig): Pro
     return bundleResponse({ status: 'denied', reason: 'identity_rejected' });
   }
 
-  const verifier = new IdentityVerifier({
-    policies: policyIndex.all(),
-    environment: config.environment,
-    issuer: config.issuer,
-    fetch: (input, init) => fetch(input, init),
-  });
-  const outcome = await verifier.verify(token);
+  const outcome = await identityVerifier(config).verify(token);
   if (outcome.status === 'denied') {
     return bundleResponse({ status: 'denied', reason: outcome.reason });
   }

@@ -60,10 +60,26 @@ function codeStepError(errorCode: string | null): CodeStepError | null {
   }
 }
 
+/**
+ * The last code the card requested. The card keeps it while the dialog is
+ * closed, so reopening the dialog before the code expires lets the person
+ * enter the code that is already in their mailbox.
+ */
+export type SignInMethodChallenge = {
+  change: 'link' | 'unlink';
+  provider: AuthProviderId;
+  challengeId: string;
+  /** Milliseconds since the epoch. */
+  expiresAt: number;
+};
+
 export type SignInMethodCodeDialogProps = {
   open: boolean;
   change: 'link' | 'unlink';
   provider: AuthProviderId;
+  /** The card's last requested code, or null. */
+  challenge: SignInMethodChallenge | null;
+  onChallengeChange: (challenge: SignInMethodChallenge | null) => void;
   onOpenChange: (open: boolean) => void;
   /**
    * Reports a page error code for a failure this dialog does not show itself,
@@ -80,29 +96,39 @@ export type SignInMethodCodeDialogProps = {
 
 /**
  * The one-time code step for a sign-in method change. The code is emailed to the
- * account's primary address when the dialog opens, and the change itself is
- * confirmed by `onVerified`, so a wrong code keeps the person in the dialog.
+ * account's primary address when the dialog opens, unless the card still holds
+ * an unexpired code for the same change. The change itself is confirmed by
+ * `onVerified`, so a wrong code keeps the person in the dialog.
  */
 export function SignInMethodCodeDialog({
   open,
   change,
   provider,
+  challenge,
+  onChallengeChange,
   onOpenChange,
   onError,
   onVerified,
 }: SignInMethodCodeDialogProps) {
   const trpc = useTRPC();
-  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [expiresInMinutes, setExpiresInMinutes] = useState<number | null>(null);
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<CodeStepError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const requestedKey = useRef<string | null>(null);
 
+  const challengeId =
+    challenge?.change === change && challenge.provider === provider ? challenge.challengeId : null;
+
   const requestCode = useMutation(
     trpc.user.requestSignInMethodChangeCode.mutationOptions({
-      onSuccess: data => {
-        setChallengeId(data.challengeId);
+      onSuccess: (data, variables) => {
+        onChallengeChange({
+          change: variables.change,
+          provider: variables.provider,
+          challengeId: data.challengeId,
+          expiresAt: Date.now() + data.expiresInMinutes * 60_000,
+        });
         setExpiresInMinutes(data.expiresInMinutes);
         setCode('');
         setCodeError(null);
@@ -116,14 +142,13 @@ export function SignInMethodCodeDialog({
     })
   );
 
-  // One code per open: a new provider, change or open sends exactly one email.
-  // The ref keeps a repeated effect run (a strict-mode double mount) from
-  // sending a second code, which the server would refuse as a cooldown.
+  // One code per open: a new provider, change or open sends at most one email,
+  // and none while the card holds an unexpired code for this change. The ref
+  // keeps a repeated effect run (a strict-mode double mount) from sending a
+  // second code, which the server would refuse as a cooldown.
   useEffect(() => {
     if (!open) {
       requestedKey.current = null;
-      setChallengeId(null);
-      setExpiresInMinutes(null);
       setCode('');
       setCodeError(null);
       setIsSubmitting(false);
@@ -133,10 +158,18 @@ export function SignInMethodCodeDialog({
     const key = `${change}:${provider}`;
     if (requestedKey.current === key) return;
     requestedKey.current = key;
-    setChallengeId(null);
-    setExpiresInMinutes(null);
     setCode('');
     setCodeError(null);
+    const remainingMs =
+      challenge?.change === change && challenge.provider === provider
+        ? challenge.expiresAt - Date.now()
+        : 0;
+    if (remainingMs > 0) {
+      setExpiresInMinutes(Math.ceil(remainingMs / 60_000));
+      return;
+    }
+    onChallengeChange(null);
+    setExpiresInMinutes(null);
     requestCode.mutate({ change, provider });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- send one code per open
   }, [open, change, provider]);
@@ -157,6 +190,8 @@ export function SignInMethodCodeDialog({
     setCodeError(null);
     try {
       await onVerified(code, challengeId);
+      // The code works once.
+      onChallengeChange(null);
       onOpenChange(false);
     } catch (error) {
       const pageError = signInMethodChangeError(error);

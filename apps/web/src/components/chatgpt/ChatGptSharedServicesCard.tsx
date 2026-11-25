@@ -14,7 +14,10 @@ import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView'
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES } from '@/lib/auth/sign-in-method-change-codes';
-import { SignInMethodCodeDialog } from '@/components/profile/SignInMethodCodeDialog';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * The organization's shared-services ChatGPT connection. It is one connection
@@ -279,6 +282,7 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
   );
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const handleConnect = () => {
     setAuthErrorCode(null);
@@ -336,6 +340,8 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
         open={isCodeDialogOpen}
         change="link"
         provider="openai"
+        challenge={codeChallenge}
+        onChallengeChange={setCodeChallenge}
         onOpenChange={setIsCodeDialogOpen}
         onError={error => setAuthErrorCode(error)}
         onVerified={handleCodeVerified}

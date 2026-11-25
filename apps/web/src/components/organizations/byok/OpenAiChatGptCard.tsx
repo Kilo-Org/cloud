@@ -14,7 +14,10 @@ import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
 import { SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES } from '@/lib/auth/sign-in-method-change-codes';
-import { SignInMethodCodeDialog } from '@/components/profile/SignInMethodCodeDialog';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * The BYOK entry for a delegated "Sign in with ChatGPT" connection. It is not a
@@ -434,6 +437,7 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
 
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const handleConnect = () => {
     // A retry starts from a clean state so the failure copy never overlaps the
@@ -496,6 +500,8 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
         open={isCodeDialogOpen}
         change="link"
         provider="openai"
+        challenge={codeChallenge}
+        onChallengeChange={setCodeChallenge}
         onOpenChange={setIsCodeDialogOpen}
         onError={error => setAuthErrorCode(error)}
         onVerified={handleCodeVerified}

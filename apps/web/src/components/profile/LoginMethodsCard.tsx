@@ -11,7 +11,7 @@ import { signIn } from 'next-auth/react';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { useClaudeSignInConfigured } from '@/lib/auth/claude/use-claude-sign-in-configured';
-import { SignInMethodCodeDialog } from './SignInMethodCodeDialog';
+import { SignInMethodCodeDialog, type SignInMethodChallenge } from './SignInMethodCodeDialog';
 
 export type AuthProvider = {
   provider: AuthProviderId;
@@ -46,6 +46,7 @@ export function LoginMethodsCard({
 }: LoginMethodsCardProps) {
   const trpc = useTRPC();
   const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
   const alreadyLinkedProviders = new Set(providers.map(o => o.provider));
   const claudeConfigured = useClaudeSignInConfigured();
   const availableProviders = AccountLinkingProviders.filter(
@@ -112,6 +113,8 @@ export function LoginMethodsCard({
           open
           change="link"
           provider={codeProvider}
+          challenge={codeChallenge}
+          onChallengeChange={setCodeChallenge}
           onOpenChange={open => {
             if (!open) setCodeProvider(null);
           }}

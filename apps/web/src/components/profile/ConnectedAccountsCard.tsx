@@ -10,7 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { AuthProvider } from './LoginMethodsCard';
 import { UnlinkAccountDialog } from './UnlinkAccountDialog';
-import { SignInMethodCodeDialog } from './SignInMethodCodeDialog';
+import { SignInMethodCodeDialog, type SignInMethodChallenge } from './SignInMethodCodeDialog';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 
@@ -31,6 +31,7 @@ export function ConnectedAccountsCard({
   const [unlinkingProvider, setUnlinkingProvider] = useState<AuthProviderId | null>(null);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState<AuthProviderId | null>(null);
   const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
   const trpc = useTRPC();
 
   const unlinkMutation = useMutation(
@@ -65,6 +66,8 @@ export function ConnectedAccountsCard({
           open
           change="unlink"
           provider={codeProvider}
+          challenge={codeChallenge}
+          onChallengeChange={setCodeChallenge}
           onOpenChange={open => {
             if (!open) setCodeProvider(null);
           }}

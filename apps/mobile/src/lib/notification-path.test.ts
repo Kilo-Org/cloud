@@ -123,6 +123,22 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?org=org-spend&via=push');
   });
 
+  it.each([
+    ['passkey_added', '/(app)/(tabs)/(3_profile)/passkeys?via=push'],
+    ['passkey_removed', '/(app)/(tabs)/(3_profile)/passkeys?via=push'],
+    ['sign_in_method_linked', '/(app)/(tabs)/(3_profile)/login-methods?via=push'],
+    ['sign_in_method_unlinked', '/(app)/(tabs)/(3_profile)/login-methods?via=push'],
+    ['device_sign_in_approved', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+    ['new_sign_in', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+    ['api_key_reset', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+    ['browser_sessions_revoked', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+  ] as const)(
+    'routes an account_security %s notice to the screen that reviews it',
+    (event, path) => {
+      expect(notificationPathForData({ type: 'account_security', event })).toBe(path);
+    }
+  );
+
   it('routes security_finding notifications for personal scope', () => {
     expect(
       notificationPathForData({

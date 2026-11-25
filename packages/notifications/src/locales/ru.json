@@ -8,7 +8,8 @@
       "securityFinding": "Результат безопасности требует внимания",
       "securityUpdate": "У проверки безопасности есть обновление",
       "agentBriefing": "Ваша сводка агента готова",
-      "activeAgentsGlanceable": "У активных агентов есть обновление"
+      "activeAgentsGlanceable": "У активных агентов есть обновление",
+      "accountSecurity": "В вашем аккаунте была активность, связанная с безопасностью"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Нарушение SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "В ваш аккаунт добавлен ключ доступа"
+      },
+      "passkeyRemoved": {
+        "title": "Из вашего аккаунта удалён ключ доступа"
+      },
+      "signInMethodLinked": {
+        "title": "В ваш аккаунт добавлен способ входа"
+      },
+      "signInMethodUnlinked": {
+        "title": "Из вашего аккаунта удалён способ входа"
+      },
+      "deviceSignInApproved": {
+        "title": "Вход с устройства одобрен"
+      },
+      "apiKeyReset": {
+        "title": "Ключ API сброшен"
+      },
+      "browserSessionsRevoked": {
+        "title": "Выполнен выход из всех браузеров"
+      },
+      "newSignIn": {
+        "title": "Новый вход в ваш аккаунт"
+      },
+      "body": {
+        "deviceAndLocation": "С {{device}} рядом с {{location}}. Это были не вы? Проверьте безопасность аккаунта прямо сейчас.",
+        "device": "С {{device}}. Это были не вы? Проверьте безопасность аккаунта прямо сейчас.",
+        "location": "Рядом с {{location}}. Это были не вы? Проверьте безопасность аккаунта прямо сейчас.",
+        "unknown": "Это были не вы? Проверьте безопасность аккаунта прямо сейчас."
+      }
     }
   },
   "sessionReady": {

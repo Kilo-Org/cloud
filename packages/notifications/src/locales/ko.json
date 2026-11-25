@@ -8,7 +8,8 @@
       "securityFinding": "보안 발견 사항 확인이 필요합니다",
       "securityUpdate": "보안 검사에 업데이트가 있습니다",
       "agentBriefing": "에이전트 브리핑이 준비되었습니다",
-      "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다"
+      "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다",
+      "accountSecurity": "계정에서 보안 관련 활동이 있었습니다"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 위반"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "계정에 패스키가 추가되었습니다"
+      },
+      "passkeyRemoved": {
+        "title": "계정에서 패스키가 삭제되었습니다"
+      },
+      "signInMethodLinked": {
+        "title": "계정에 로그인 방법이 추가되었습니다"
+      },
+      "signInMethodUnlinked": {
+        "title": "계정에서 로그인 방법이 삭제되었습니다"
+      },
+      "deviceSignInApproved": {
+        "title": "기기 로그인이 승인되었습니다"
+      },
+      "apiKeyReset": {
+        "title": "API 키가 재설정되었습니다"
+      },
+      "browserSessionsRevoked": {
+        "title": "모든 브라우저에서 로그아웃되었습니다"
+      },
+      "newSignIn": {
+        "title": "계정에 새로운 로그인"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} 근처의 {{device}}에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
+        "device": "{{device}}에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
+        "location": "{{location}} 근처에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
+        "unknown": "본인이 아닌가요? 지금 계정 보안을 확인하세요."
+      }
     }
   },
   "sessionReady": {

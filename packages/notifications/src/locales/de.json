@@ -8,7 +8,8 @@
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
       "securityUpdate": "Eine Sicherheitsprüfung hat ein Update",
       "agentBriefing": "Dein Agenten-Briefing ist bereit",
-      "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
+      "activeAgentsGlanceable": "Aktive Agenten haben ein Update",
+      "accountSecurity": "Es gab Sicherheitsaktivität in deinem Konto"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-Verletzung"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Passkey zu deinem Konto hinzugefügt"
+      },
+      "passkeyRemoved": {
+        "title": "Passkey aus deinem Konto entfernt"
+      },
+      "signInMethodLinked": {
+        "title": "Anmeldemethode zu deinem Konto hinzugefügt"
+      },
+      "signInMethodUnlinked": {
+        "title": "Anmeldemethode aus deinem Konto entfernt"
+      },
+      "deviceSignInApproved": {
+        "title": "Geräteanmeldung genehmigt"
+      },
+      "apiKeyReset": {
+        "title": "API-Schlüssel zurückgesetzt"
+      },
+      "browserSessionsRevoked": {
+        "title": "Von allen Browsern abgemeldet"
+      },
+      "newSignIn": {
+        "title": "Neue Anmeldung bei deinem Konto"
+      },
+      "body": {
+        "deviceAndLocation": "Von {{device}} in der Nähe von {{location}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
+        "device": "Von {{device}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
+        "location": "In der Nähe von {{location}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
+        "unknown": "Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos."
+      }
     }
   },
   "sessionReady": {

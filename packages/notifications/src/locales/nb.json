@@ -8,7 +8,8 @@
       "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
       "securityUpdate": "En sikkerhetssjekk har en oppdatering",
       "agentBriefing": "Agentbriefen din er klar",
-      "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
+      "activeAgentsGlanceable": "Aktive agenter har en oppdatering",
+      "accountSecurity": "Det har vært sikkerhetsaktivitet på kontoen din"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brudd"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Tilgangsnøkkel lagt til på kontoen din"
+      },
+      "passkeyRemoved": {
+        "title": "Tilgangsnøkkel fjernet fra kontoen din"
+      },
+      "signInMethodLinked": {
+        "title": "Påloggingsmetode lagt til på kontoen din"
+      },
+      "signInMethodUnlinked": {
+        "title": "Påloggingsmetode fjernet fra kontoen din"
+      },
+      "deviceSignInApproved": {
+        "title": "Pålogging fra enhet godkjent"
+      },
+      "apiKeyReset": {
+        "title": "API-nøkkel tilbakestilt"
+      },
+      "browserSessionsRevoked": {
+        "title": "Logget ut av alle nettlesere"
+      },
+      "newSignIn": {
+        "title": "Ny pålogging på kontoen din"
+      },
+      "body": {
+        "deviceAndLocation": "Fra {{device}} nær {{location}}. Var det ikke deg? Gå gjennom kontosikkerheten nå.",
+        "device": "Fra {{device}}. Var det ikke deg? Gå gjennom kontosikkerheten nå.",
+        "location": "Nær {{location}}. Var det ikke deg? Gå gjennom kontosikkerheten nå.",
+        "unknown": "Var det ikke deg? Gå gjennom kontosikkerheten nå."
+      }
     }
   },
   "sessionReady": {

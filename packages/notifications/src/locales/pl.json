@@ -8,7 +8,8 @@
       "securityFinding": "Wynik bezpieczeństwa wymaga uwagi",
       "securityUpdate": "Kontrola bezpieczeństwa ma aktualizację",
       "agentBriefing": "Twój raport agenta jest gotowy",
-      "activeAgentsGlanceable": "Aktywni agenci mają aktualizację"
+      "activeAgentsGlanceable": "Aktywni agenci mają aktualizację",
+      "accountSecurity": "Na Twoim koncie wystąpiła aktywność związana z bezpieczeństwem"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Naruszenie SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Do Twojego konta dodano klucz dostępu"
+      },
+      "passkeyRemoved": {
+        "title": "Z Twojego konta usunięto klucz dostępu"
+      },
+      "signInMethodLinked": {
+        "title": "Do Twojego konta dodano metodę logowania"
+      },
+      "signInMethodUnlinked": {
+        "title": "Z Twojego konta usunięto metodę logowania"
+      },
+      "deviceSignInApproved": {
+        "title": "Zatwierdzono logowanie z urządzenia"
+      },
+      "apiKeyReset": {
+        "title": "Zresetowano klucz API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Wylogowano ze wszystkich przeglądarek"
+      },
+      "newSignIn": {
+        "title": "Nowe logowanie na Twoje konto"
+      },
+      "body": {
+        "deviceAndLocation": "Z {{device}} w pobliżu {{location}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
+        "device": "Z {{device}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
+        "location": "W pobliżu {{location}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
+        "unknown": "To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta."
+      }
     }
   },
   "sessionReady": {

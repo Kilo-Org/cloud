@@ -25,6 +25,7 @@ import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/adm
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { captureException } from '@sentry/nextjs';
+import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/security-notices';
 
 /**
  * Vercel Firewall rate-limit rule applied to `{ action: 'options' }`, keyed
@@ -262,6 +263,11 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
       authViaToken: true,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
@@ -338,6 +344,11 @@ export async function POST(request: NextRequest) {
       authViaToken: false,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {

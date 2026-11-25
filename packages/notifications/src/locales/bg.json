@@ -8,7 +8,8 @@
       "securityFinding": "Открит проблем със сигурността изисква внимание",
       "securityUpdate": "Проверка за сигурност има актуализация",
       "agentBriefing": "Вашият агентски брифинг е готов",
-      "activeAgentsGlanceable": "Активните агенти имат актуализация"
+      "activeAgentsGlanceable": "Активните агенти имат актуализация",
+      "accountSecurity": "Имаше активност, свързана със сигурността, в профила ви"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA нарушение"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Към профила ви е добавен ключ за достъп"
+      },
+      "passkeyRemoved": {
+        "title": "От профила ви е премахнат ключ за достъп"
+      },
+      "signInMethodLinked": {
+        "title": "Към профила ви е добавен метод за вход"
+      },
+      "signInMethodUnlinked": {
+        "title": "От профила ви е премахнат метод за вход"
+      },
+      "deviceSignInApproved": {
+        "title": "Входът от устройство е одобрен"
+      },
+      "apiKeyReset": {
+        "title": "API ключът е нулиран"
+      },
+      "browserSessionsRevoked": {
+        "title": "Излязохте от всички браузъри"
+      },
+      "newSignIn": {
+        "title": "Нов вход в профила ви"
+      },
+      "body": {
+        "deviceAndLocation": "От {{device}} близо до {{location}}. Не сте вие? Прегледайте сигурността на профила си сега.",
+        "device": "От {{device}}. Не сте вие? Прегледайте сигурността на профила си сега.",
+        "location": "Близо до {{location}}. Не сте вие? Прегледайте сигурността на профила си сега.",
+        "unknown": "Не сте вие? Прегледайте сигурността на профила си сега."
+      }
     }
   },
   "sessionReady": {

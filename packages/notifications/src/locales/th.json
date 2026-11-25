@@ -8,7 +8,8 @@
       "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
       "securityUpdate": "การตรวจสอบความปลอดภัยมีการอัปเดต",
       "agentBriefing": "รายงานกิจกรรมเอเจนต์ของคุณพร้อมแล้ว",
-      "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
+      "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต",
+      "accountSecurity": "มีกิจกรรมด้านความปลอดภัยในบัญชีของคุณ"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "ละเมิด SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "เพิ่มพาสคีย์ในบัญชีของคุณแล้ว"
+      },
+      "passkeyRemoved": {
+        "title": "นำพาสคีย์ออกจากบัญชีของคุณแล้ว"
+      },
+      "signInMethodLinked": {
+        "title": "เพิ่มวิธีลงชื่อเข้าใช้ในบัญชีของคุณแล้ว"
+      },
+      "signInMethodUnlinked": {
+        "title": "นำวิธีลงชื่อเข้าใช้ออกจากบัญชีของคุณแล้ว"
+      },
+      "deviceSignInApproved": {
+        "title": "อนุมัติการลงชื่อเข้าใช้จากอุปกรณ์แล้ว"
+      },
+      "apiKeyReset": {
+        "title": "รีเซ็ตคีย์ API แล้ว"
+      },
+      "browserSessionsRevoked": {
+        "title": "ออกจากระบบในทุกเบราว์เซอร์แล้ว"
+      },
+      "newSignIn": {
+        "title": "การลงชื่อเข้าใช้ใหม่ในบัญชีของคุณ"
+      },
+      "body": {
+        "deviceAndLocation": "จาก {{device}} ใกล้ {{location}} ไม่ใช่คุณใช่ไหม ตรวจสอบความปลอดภัยของบัญชีของคุณตอนนี้",
+        "device": "จาก {{device}} ไม่ใช่คุณใช่ไหม ตรวจสอบความปลอดภัยของบัญชีของคุณตอนนี้",
+        "location": "ใกล้ {{location}} ไม่ใช่คุณใช่ไหม ตรวจสอบความปลอดภัยของบัญชีของคุณตอนนี้",
+        "unknown": "ไม่ใช่คุณใช่ไหม ตรวจสอบความปลอดภัยของบัญชีของคุณตอนนี้"
+      }
     }
   },
   "sessionReady": {

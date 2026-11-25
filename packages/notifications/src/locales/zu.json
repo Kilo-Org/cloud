@@ -8,7 +8,8 @@
       "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa",
       "securityUpdate": "Ukuhlola kokuphepha kunokubuyekezwa",
       "agentBriefing": "Umbiko we-ejenti wakho ulungile",
-      "activeAgentsGlanceable": "Ama-ejenti asebenzayo anokubuyekezwa"
+      "activeAgentsGlanceable": "Ama-ejenti asebenzayo anokubuyekezwa",
+      "accountSecurity": "Kube nomsebenzi wokuphepha ku-akhawunti yakho"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ukwephulwa kwe-SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ukhiye wokungena wengezwe ku-akhawunti yakho"
+      },
+      "passkeyRemoved": {
+        "title": "Ukhiye wokungena ususiwe ku-akhawunti yakho"
+      },
+      "signInMethodLinked": {
+        "title": "Indlela yokungena yengezwe ku-akhawunti yakho"
+      },
+      "signInMethodUnlinked": {
+        "title": "Indlela yokungena isusiwe ku-akhawunti yakho"
+      },
+      "deviceSignInApproved": {
+        "title": "Ukungena kwedivayisi kugunyaziwe"
+      },
+      "apiKeyReset": {
+        "title": "Ukhiye we-API usethwe kabusha"
+      },
+      "browserSessionsRevoked": {
+        "title": "Uphume kuwo wonke amabhrawuza"
+      },
+      "newSignIn": {
+        "title": "Ukungena okusha ku-akhawunti yakho"
+      },
+      "body": {
+        "deviceAndLocation": "Kusuka ku-{{device}} eduze kwe-{{location}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
+        "device": "Kusuka ku-{{device}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
+        "location": "Eduze kwe-{{location}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
+        "unknown": "Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje."
+      }
     }
   },
   "sessionReady": {

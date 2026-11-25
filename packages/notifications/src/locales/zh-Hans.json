@@ -8,7 +8,8 @@
       "securityFinding": "安全发现需要关注",
       "securityUpdate": "安全检查有更新",
       "agentBriefing": "您的智能体简报已准备好",
-      "activeAgentsGlanceable": "活跃智能体有更新"
+      "activeAgentsGlanceable": "活跃智能体有更新",
+      "accountSecurity": "你的账户有安全相关活动"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 违约"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "你的账户已添加通行密钥"
+      },
+      "passkeyRemoved": {
+        "title": "你的账户已移除通行密钥"
+      },
+      "signInMethodLinked": {
+        "title": "你的账户已添加登录方式"
+      },
+      "signInMethodUnlinked": {
+        "title": "你的账户已移除登录方式"
+      },
+      "deviceSignInApproved": {
+        "title": "设备登录已获批准"
+      },
+      "apiKeyReset": {
+        "title": "API 密钥已重置"
+      },
+      "browserSessionsRevoked": {
+        "title": "已从所有浏览器退出登录"
+      },
+      "newSignIn": {
+        "title": "你的账户有新的登录"
+      },
+      "body": {
+        "deviceAndLocation": "来自 {{location}} 附近的 {{device}}。不是你本人？请立即检查你的账户安全。",
+        "device": "来自 {{device}}。不是你本人？请立即检查你的账户安全。",
+        "location": "来自 {{location}} 附近。不是你本人？请立即检查你的账户安全。",
+        "unknown": "不是你本人？请立即检查你的账户安全。"
+      }
     }
   },
   "sessionReady": {

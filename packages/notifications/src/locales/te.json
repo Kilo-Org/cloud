@@ -8,7 +8,8 @@
       "securityFinding": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం",
       "securityUpdate": "భద్రతా తనిఖీకి నవీకరణ ఉంది",
       "agentBriefing": "మీ ఏజెంట్ బ్రీఫింగ్ సిద్ధంగా ఉంది",
-      "activeAgentsGlanceable": "చురుకైన ఏజెంట్లకు నవీకరణ ఉంది"
+      "activeAgentsGlanceable": "చురుకైన ఏజెంట్లకు నవీకరణ ఉంది",
+      "accountSecurity": "మీ ఖాతాలో భద్రతా కార్యకలాపం జరిగింది"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ఉల్లంఘన"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "మీ ఖాతాకు పాస్‌కీ జోడించబడింది"
+      },
+      "passkeyRemoved": {
+        "title": "మీ ఖాతా నుండి పాస్‌కీ తీసివేయబడింది"
+      },
+      "signInMethodLinked": {
+        "title": "మీ ఖాతాకు సైన్-ఇన్ పద్ధతి జోడించబడింది"
+      },
+      "signInMethodUnlinked": {
+        "title": "మీ ఖాతా నుండి సైన్-ఇన్ పద్ధతి తీసివేయబడింది"
+      },
+      "deviceSignInApproved": {
+        "title": "పరికర సైన్-ఇన్ ఆమోదించబడింది"
+      },
+      "apiKeyReset": {
+        "title": "API కీ రీసెట్ చేయబడింది"
+      },
+      "browserSessionsRevoked": {
+        "title": "అన్ని బ్రౌజర్‌ల నుండి సైన్ అవుట్ చేయబడింది"
+      },
+      "newSignIn": {
+        "title": "మీ ఖాతాకు కొత్త సైన్-ఇన్"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} సమీపంలోని {{device}} నుండి. ఇది మీరు కాదా? ఇప్పుడే మీ ఖాతా భద్రతను సమీక్షించండి.",
+        "device": "{{device}} నుండి. ఇది మీరు కాదా? ఇప్పుడే మీ ఖాతా భద్రతను సమీక్షించండి.",
+        "location": "{{location}} సమీపం నుండి. ఇది మీరు కాదా? ఇప్పుడే మీ ఖాతా భద్రతను సమీక్షించండి.",
+        "unknown": "ఇది మీరు కాదా? ఇప్పుడే మీ ఖాతా భద్రతను సమీక్షించండి."
+      }
     }
   },
   "sessionReady": {

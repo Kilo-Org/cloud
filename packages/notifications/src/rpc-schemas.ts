@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
-import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
+import {
+  accountSecurityEventSchema,
+  cloudAgentSessionRaiseShape,
+  pushDataSchema,
+} from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // The pre-localized copy a producer may attach to a push.
@@ -456,11 +460,37 @@ export type InternalDispatchAgentBriefingRequest = z.infer<
   typeof internalDispatchAgentBriefingRequestSchema
 >;
 
+/**
+ * Bound on the short request labels an account-security notice shows: a
+ * browser and operating system ("Chrome on macOS") or a city and country.
+ */
+const ACCOUNT_SECURITY_LABEL_MAX_LENGTH = 120;
+
+/**
+ * Account-security notice for one account owner. `idempotencyKey` is derived
+ * by the producer from the event (a credential id, a request id, a time
+ * bucket), so a repeated dispatch of one event collapses to one push. `device`
+ * and `location` describe where the action came from and are null when the
+ * request did not say; the push names them only in full previews.
+ */
+export const internalDispatchAccountSecurityRequestSchema = z.object({
+  kind: z.literal('account_security'),
+  recipientUserId: nonEmptyStringSchema,
+  event: accountSecurityEventSchema,
+  idempotencyKey: nonEmptyStringSchema.max(200),
+  device: nonEmptyStringSchema.max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH).nullable(),
+  location: nonEmptyStringSchema.max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH).nullable(),
+});
+export type InternalDispatchAccountSecurityRequest = z.infer<
+  typeof internalDispatchAccountSecurityRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
   internalDispatchAgentBriefingRequestSchema,
+  internalDispatchAccountSecurityRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

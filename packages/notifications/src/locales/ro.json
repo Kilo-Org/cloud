@@ -8,7 +8,8 @@
       "securityFinding": "O constatare de securitate necesită atenție",
       "securityUpdate": "O verificare de securitate are o actualizare",
       "agentBriefing": "Raportul agentului tău este gata",
-      "activeAgentsGlanceable": "Agenții activi au o actualizare"
+      "activeAgentsGlanceable": "Agenții activi au o actualizare",
+      "accountSecurity": "A existat activitate de securitate în contul tău"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Încălcare SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Cheie de acces adăugată în contul tău"
+      },
+      "passkeyRemoved": {
+        "title": "Cheie de acces eliminată din contul tău"
+      },
+      "signInMethodLinked": {
+        "title": "Metodă de conectare adăugată în contul tău"
+      },
+      "signInMethodUnlinked": {
+        "title": "Metodă de conectare eliminată din contul tău"
+      },
+      "deviceSignInApproved": {
+        "title": "Conectarea de pe dispozitiv a fost aprobată"
+      },
+      "apiKeyReset": {
+        "title": "Cheia API a fost resetată"
+      },
+      "browserSessionsRevoked": {
+        "title": "Deconectat din toate browserele"
+      },
+      "newSignIn": {
+        "title": "Conectare nouă în contul tău"
+      },
+      "body": {
+        "deviceAndLocation": "De pe {{device}} lângă {{location}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
+        "device": "De pe {{device}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
+        "location": "Lângă {{location}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
+        "unknown": "Nu ai fost tu? Verifică acum securitatea contului tău."
+      }
     }
   },
   "sessionReady": {

@@ -4,6 +4,7 @@ import {
   pushDataSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
+  type InternalDispatchAccountSecurityRequest,
   type InternalDispatchLowBalanceRequest,
   type InternalDispatchSecurityFindingRequest,
   type InternalDispatchSecurityLifecycleRequest,
@@ -80,6 +81,20 @@ function spendAlert(
     amountUsd: 42.5,
     thresholdUsd: 40,
     dedupeKey: 'org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
+    ...overrides,
+  };
+}
+
+function accountSecurity(
+  overrides: Partial<InternalDispatchAccountSecurityRequest> = {}
+): InternalDispatchAccountSecurityRequest {
+  return {
+    kind: 'account_security',
+    recipientUserId: 'user-a',
+    event: 'passkey_added',
+    idempotencyKey: 'passkey_added:event-digest',
+    device: 'Chrome on macOS',
+    location: 'Berlin, DE',
     ...overrides,
   };
 }
@@ -804,5 +819,70 @@ describe('dispatchInternalPushCore', () => {
       { userId: 'user-b', outcome: 'delivered' },
     ]);
     expect(calls.dispatchPushInputs.map(i => i.userId)).toEqual(['user-a', 'user-b']);
+  });
+
+  it('account_security dispatches one push keyed on the event with a schema-valid payload', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(accountSecurity(), deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toEqual([
+      {
+        userId: 'user-a',
+        presenceContext: null,
+        idempotencyKey: 'account-security:passkey_added:event-digest',
+        badge: null,
+        push: {
+          title: 'Passkey added to your account',
+          body: 'From Chrome on macOS near Berlin, DE. Not you? Review your account security now.',
+          i18nKey: 'accountSecurity:passkey_added:deviceAndLocation',
+          i18nParams: { device: 'Chrome on macOS', location: 'Berlin, DE' },
+          data: { type: 'account_security', event: 'passkey_added' },
+          sound: 'default',
+          priority: 'high',
+        },
+      },
+    ]);
+    expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0]?.push.data).success).toBe(true);
+  });
+
+  it('account_security names only what the request carried', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      accountSecurity({ event: 'api_key_reset', device: null, location: null }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs[0]?.push).toMatchObject({
+      title: 'API key reset',
+      body: 'Not you? Review your account security now.',
+      i18nKey: 'accountSecurity:api_key_reset:unknown',
+      i18nParams: {},
+    });
+  });
+
+  it('account_security cannot be turned off: it sends with every category off', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        agentPushEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        balanceAlertsEnabled: false,
+        spendAlertsEnabled: false,
+        securityFindingsEnabled: false,
+      },
+    });
+    const result = await dispatchInternalPushCore(accountSecurity(), deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('account_security still sends when the preference read fails', async () => {
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(accountSecurity(), deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
   });
 });

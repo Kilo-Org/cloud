@@ -8,7 +8,8 @@
       "securityFinding": "Безбедносно наоѓање бара внимание",
       "securityUpdate": "Безбедносна проверка има ажурирање",
       "agentBriefing": "Вашиот извештај за активноста на агентот е готов",
-      "activeAgentsGlanceable": "Активните агенти имаат ажурирање"
+      "activeAgentsGlanceable": "Активните агенти имаат ажурирање",
+      "accountSecurity": "Имаше безбедносна активност на вашата сметка"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Повреда на SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "На вашата сметка е додаден клуч за пристап"
+      },
+      "passkeyRemoved": {
+        "title": "Од вашата сметка е отстранет клуч за пристап"
+      },
+      "signInMethodLinked": {
+        "title": "На вашата сметка е додаден начин на најава"
+      },
+      "signInMethodUnlinked": {
+        "title": "Од вашата сметка е отстранет начин на најава"
+      },
+      "deviceSignInApproved": {
+        "title": "Најавата од уред е одобрена"
+      },
+      "apiKeyReset": {
+        "title": "API-клучот е ресетиран"
+      },
+      "browserSessionsRevoked": {
+        "title": "Одјавени сте од сите прелистувачи"
+      },
+      "newSignIn": {
+        "title": "Нова најава на вашата сметка"
+      },
+      "body": {
+        "deviceAndLocation": "Од {{device}} близу {{location}}. Не сте вие? Проверете ја безбедноста на сметката сега.",
+        "device": "Од {{device}}. Не сте вие? Проверете ја безбедноста на сметката сега.",
+        "location": "Близу {{location}}. Не сте вие? Проверете ја безбедноста на сметката сега.",
+        "unknown": "Не сте вие? Проверете ја безбедноста на сметката сега."
+      }
     }
   },
   "sessionReady": {

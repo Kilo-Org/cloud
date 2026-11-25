@@ -18,11 +18,9 @@ import {
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
   sendSignInMethodChangeCodeEmail,
-  sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import type { User } from '@kilocode/db/schema';
 import {
   consumeSignInMethodChangeCode,
   createSignInMethodChangeCode,
@@ -30,7 +28,7 @@ import {
   SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
   type SignInMethodChangeCodeBinding,
 } from '@/lib/auth/sign-in-method-change-email-code';
-import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
+import { currentSecurityNoticeRequest, scheduleSecurityNotice } from '@/lib/security-notices';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -822,32 +820,6 @@ async function spendSignInMethodChangeCode(
   if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
 }
 
-/**
- * Tells the account owner about an unlink after it happened. A failed email
- * does not undo the unlink; it is reported.
- */
-async function sendSignInMethodRemovedNotice(
-  user: Pick<User, 'google_user_email'>,
-  provider: AuthProviderId
-): Promise<void> {
-  const details = await currentSignInMethodChangeRequestDetails();
-  try {
-    const notice = await sendSignInMethodRemovedEmail(
-      user.google_user_email,
-      AUTH_PROVIDER_DISPLAY_NAMES[provider],
-      details
-    );
-    if (!notice.sent) {
-      captureException(new Error('Sign-in method removed notice was not sent'), {
-        tags: { operation: 'sign_in_method_change_notice', provider },
-        extra: { reason: notice.reason },
-      });
-    }
-  } catch (error) {
-    captureException(error, { tags: { operation: 'sign_in_method_change_notice', provider } });
-  }
-}
-
 // Passkey enrollment and management change which authenticators can sign in
 // as this account, so they are never authorized by a bare bearer token. A
 // browser session keeps its existing rules; a native app session must present
@@ -1022,16 +994,29 @@ export const userRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
       }
 
+      // Set inside the management transaction; read once it has committed.
+      const removed: { passkey: { id: string; name: string | null } | null } = { passkey: null };
       await runWithPasskeyManagement(
         ctx,
         { operation: 'remove', authorization: input.managementAuthorization },
         async fromDb => {
-          const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
-          if (!deleted) {
+          removed.passkey = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
+          if (!removed.passkey) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
           }
         }
       );
+      if (removed.passkey) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'passkey_removed',
+            passkeyId: removed.passkey.id,
+            passkeyName: removed.passkey.name,
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
       return successResult();
     }),
 
@@ -1117,7 +1102,11 @@ export const userRouter = createTRPCRouter({
         provider: input.provider,
         request: { ip: ctx.ip, route: ctx.trpcPath },
       });
-      await sendSignInMethodRemovedNotice(ctx.user, input.provider);
+      await scheduleSecurityNotice(
+        ctx.user,
+        { type: 'sign_in_method_unlinked', provider: input.provider },
+        await currentSecurityNoticeRequest()
+      );
       return result;
     }),
 
@@ -1191,11 +1180,22 @@ export const userRouter = createTRPCRouter({
       invalidateDeviceSession(sessionId);
     }
 
+    await scheduleSecurityNotice(
+      ctx.user,
+      { type: 'api_key_reset' },
+      await currentSecurityNoticeRequest()
+    );
+
     return successResult();
   }),
 
   signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
     await revokeWebSessions(ctx.user.id);
+    await scheduleSecurityNotice(
+      ctx.user,
+      { type: 'browser_sessions_revoked' },
+      await currentSecurityNoticeRequest()
+    );
 
     return successResult();
   }),

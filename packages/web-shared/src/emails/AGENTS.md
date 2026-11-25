@@ -89,8 +89,14 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
-| `newSignInMethod.html` | `provider_name`, `linked_identity`, `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` (rendered HTML anchor), `support_email` (populated by `renderTemplate`), `email`, `year` | — |
-| `signInMethodRemoved.html` | `provider_name`, `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` (rendered HTML anchor), `support_email` (populated by `renderTemplate`), `email`, `year` | — |
+| `newSignInMethod.html` | `provider_name`, `linked_identity`, plus the security-notice variables below | — |
+| `signInMethodRemoved.html` | `provider_name`, plus the security-notice variables below | — |
+| `passkeyAdded.html` | `passkey_label` (rendered HTML: the passkey's name, or `unnamed`), plus the security-notice variables below | — |
+| `passkeyRemoved.html` | `passkey_label` (rendered HTML: the passkey's name, or `unnamed`), plus the security-notice variables below | — |
+| `deviceSignInApproved.html` | `client_label` (rendered HTML: the requesting client, from its stored request), `request_ip` (the requesting client's address), plus the security-notice variables below, where `change_details` describes the approving browser | — |
+| `apiKeyReset.html` | the security-notice variables below | — |
+| `browserSessionsRevoked.html` | the security-notice variables below | — |
+| `newSignIn.html` | `method_name` (sign-in method display name), plus the security-notice variables below | — |
 | `signInMethodChangeCode.html` | `code`, `change_action` (`add` or `remove`), `provider_name`, `email`, `expires_in`, `support_email` (populated by `renderTemplate`), `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
@@ -129,3 +135,5 @@ Every template must include this branding footer below the content table:
 | `spendAlert.html` | `scope_name`, `kind_label`, `amount_usd`, `threshold_usd`, `spend_url`, `cta_label`, `year`. One email per authorized billing contact; the single CTA opens that scope's spend view (`/usage` for a personal scope, `/organizations/<id>/usage-details` for an organization). | — |
 | `kiloPassOrgBlocked.html` | `organization_name`, `manage_url`, `year` | — |
 | `autoRoutingPoolConverted.html` | `pool_owner`, `router_name`, `model_id`, `manage_url`, `year`. ADR 0005 cutover notice: the owner's saved Efficient pool became a custom router. `manage_url` is `/profile` for a user and `/organizations/<id>/providers-and-models` for an organization. | — |
+
+Security-notice variables, shared by every account-security notice above and built by `securityNoticeVars()` in `email.ts`: `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` and `profile_link` (rendered HTML anchors; navigation only, never a link that changes state), `support_email` (populated by `renderTemplate`), `email`, `year`.

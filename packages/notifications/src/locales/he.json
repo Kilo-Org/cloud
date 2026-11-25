@@ -8,7 +8,8 @@
       "securityFinding": "ממצא אבטחה דורש תשומת לב",
       "securityUpdate": "לבדיקת אבטחה יש עדכון",
       "agentBriefing": "דוח פעילות הסוכן שלך מוכן",
-      "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
+      "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון",
+      "accountSecurity": "הייתה פעילות אבטחה בחשבון שלך"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "הפרת SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "מפתח גישה נוסף לחשבון שלך"
+      },
+      "passkeyRemoved": {
+        "title": "מפתח גישה הוסר מהחשבון שלך"
+      },
+      "signInMethodLinked": {
+        "title": "שיטת כניסה נוספה לחשבון שלך"
+      },
+      "signInMethodUnlinked": {
+        "title": "שיטת כניסה הוסרה מהחשבון שלך"
+      },
+      "deviceSignInApproved": {
+        "title": "כניסה ממכשיר אושרה"
+      },
+      "apiKeyReset": {
+        "title": "מפתח ה-API אופס"
+      },
+      "browserSessionsRevoked": {
+        "title": "התנתקת מכל הדפדפנים"
+      },
+      "newSignIn": {
+        "title": "כניסה חדשה לחשבון שלך"
+      },
+      "body": {
+        "deviceAndLocation": "מ-{{device}} ליד {{location}}. זה לא היית את/ה? בדוק/י עכשיו את אבטחת החשבון שלך.",
+        "device": "מ-{{device}}. זה לא היית את/ה? בדוק/י עכשיו את אבטחת החשבון שלך.",
+        "location": "ליד {{location}}. זה לא היית את/ה? בדוק/י עכשיו את אבטחת החשבון שלך.",
+        "unknown": "זה לא היית את/ה? בדוק/י עכשיו את אבטחת החשבון שלך."
+      }
     }
   },
   "sessionReady": {

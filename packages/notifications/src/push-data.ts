@@ -98,6 +98,25 @@ function refineSessionLiveUpdate(
 export const ANSWER_DRAFT_MAX_LENGTH = 2000;
 
 /**
+ * The account-security actions that send the account owner a notice. The web
+ * producer names the event, the push payload carries it so a tap can open the
+ * screen that reviews that kind of credential, and the push copy titles the
+ * notice by it.
+ */
+export const ACCOUNT_SECURITY_EVENTS = [
+  'passkey_added',
+  'passkey_removed',
+  'sign_in_method_linked',
+  'sign_in_method_unlinked',
+  'device_sign_in_approved',
+  'api_key_reset',
+  'browser_sessions_revoked',
+  'new_sign_in',
+] as const;
+export const accountSecurityEventSchema = z.enum(ACCOUNT_SECURITY_EVENTS);
+export type AccountSecurityEvent = z.infer<typeof accountSecurityEventSchema>;
+
+/**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
  * Zod-parsed by the mobile notification handler before use.
@@ -157,6 +176,13 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('security_lifecycle'),
     ...securityLifecyclePayloadShape,
+  }),
+  // Account-security notice. Carries the event name only — never a device,
+  // location, address, or credential name — so the payload itself says nothing
+  // the lock screen's generic copy must hide.
+  z.object({
+    type: z.literal('account_security'),
+    event: accountSecurityEventSchema,
   }),
   // Aggregate snapshot remains privacy-minimal. Optional Home-only details
   // travel beside it for background Home widget updates and are never copied

@@ -8,7 +8,8 @@
       "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
       "securityUpdate": "የደህንነት ፍተሻ ማዘመኛ አለው",
       "agentBriefing": "የወኪል ሪፖርትዎ ዝግጁ ነው",
-      "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
+      "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው",
+      "accountSecurity": "በመለያዎ ላይ የደህንነት እንቅስቃሴ ነበር"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "የSLA ጥሰት"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "የይለፍ ቁልፍ ወደ መለያዎ ታክሏል"
+      },
+      "passkeyRemoved": {
+        "title": "የይለፍ ቁልፍ ከመለያዎ ተወግዷል"
+      },
+      "signInMethodLinked": {
+        "title": "የመግቢያ ዘዴ ወደ መለያዎ ታክሏል"
+      },
+      "signInMethodUnlinked": {
+        "title": "የመግቢያ ዘዴ ከመለያዎ ተወግዷል"
+      },
+      "deviceSignInApproved": {
+        "title": "የመሣሪያ መግቢያ ጸድቋል"
+      },
+      "apiKeyReset": {
+        "title": "የAPI ቁልፍ ዳግም ተጀምሯል"
+      },
+      "browserSessionsRevoked": {
+        "title": "ከሁሉም አሳሾች ወጥተዋል"
+      },
+      "newSignIn": {
+        "title": "ወደ መለያዎ አዲስ መግቢያ"
+      },
+      "body": {
+        "deviceAndLocation": "ከ{{device}} በ{{location}} አቅራቢያ። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
+        "device": "ከ{{device}}። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
+        "location": "በ{{location}} አቅራቢያ። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
+        "unknown": "እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።"
+      }
     }
   },
   "sessionReady": {

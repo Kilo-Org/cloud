@@ -8,7 +8,8 @@
       "securityFinding": "Un hallazgo de seguridad necesita atención",
       "securityUpdate": "Un control de seguridad tiene una actualización",
       "agentBriefing": "Tu informe del agente está listo",
-      "activeAgentsGlanceable": "Los agentes activos tienen una actualización"
+      "activeAgentsGlanceable": "Los agentes activos tienen una actualización",
+      "accountSecurity": "Hubo actividad de seguridad en tu cuenta"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Incumplimiento de SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Se añadió una llave de acceso a tu cuenta"
+      },
+      "passkeyRemoved": {
+        "title": "Se eliminó una llave de acceso de tu cuenta"
+      },
+      "signInMethodLinked": {
+        "title": "Se añadió un método de inicio de sesión a tu cuenta"
+      },
+      "signInMethodUnlinked": {
+        "title": "Se eliminó un método de inicio de sesión de tu cuenta"
+      },
+      "deviceSignInApproved": {
+        "title": "Se aprobó el inicio de sesión de un dispositivo"
+      },
+      "apiKeyReset": {
+        "title": "Se restableció la clave de API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Se cerró la sesión en todos los navegadores"
+      },
+      "newSignIn": {
+        "title": "Nuevo inicio de sesión en tu cuenta"
+      },
+      "body": {
+        "deviceAndLocation": "Desde {{device}} cerca de {{location}}. ¿No fuiste tú? Revisa ahora la seguridad de tu cuenta.",
+        "device": "Desde {{device}}. ¿No fuiste tú? Revisa ahora la seguridad de tu cuenta.",
+        "location": "Cerca de {{location}}. ¿No fuiste tú? Revisa ahora la seguridad de tu cuenta.",
+        "unknown": "¿No fuiste tú? Revisa ahora la seguridad de tu cuenta."
+      }
     }
   },
   "sessionReady": {

@@ -8,7 +8,8 @@
       "securityFinding": "Um achado de segurança precisa de atenção",
       "securityUpdate": "Uma verificação de segurança tem uma atualização",
       "agentBriefing": "Seu relatório do agente está pronto",
-      "activeAgentsGlanceable": "Os agentes ativos têm uma atualização"
+      "activeAgentsGlanceable": "Os agentes ativos têm uma atualização",
+      "accountSecurity": "Houve atividade de segurança na sua conta"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Violação de SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Chave de acesso adicionada à sua conta"
+      },
+      "passkeyRemoved": {
+        "title": "Chave de acesso removida da sua conta"
+      },
+      "signInMethodLinked": {
+        "title": "Método de login adicionado à sua conta"
+      },
+      "signInMethodUnlinked": {
+        "title": "Método de login removido da sua conta"
+      },
+      "deviceSignInApproved": {
+        "title": "Login de dispositivo aprovado"
+      },
+      "apiKeyReset": {
+        "title": "Chave de API redefinida"
+      },
+      "browserSessionsRevoked": {
+        "title": "Sessão encerrada em todos os navegadores"
+      },
+      "newSignIn": {
+        "title": "Novo login na sua conta"
+      },
+      "body": {
+        "deviceAndLocation": "De {{device}} perto de {{location}}. Não foi você? Revise agora a segurança da sua conta.",
+        "device": "De {{device}}. Não foi você? Revise agora a segurança da sua conta.",
+        "location": "Perto de {{location}}. Não foi você? Revise agora a segurança da sua conta.",
+        "unknown": "Não foi você? Revise agora a segurança da sua conta."
+      }
     }
   },
   "sessionReady": {

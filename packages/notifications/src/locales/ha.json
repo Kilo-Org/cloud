@@ -8,7 +8,8 @@
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
       "securityUpdate": "Wani duban tsaro yana da sabuntawa",
       "agentBriefing": "Rahoton ayyukan wakilin coding naka ya shirya",
-      "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
+      "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa",
+      "accountSecurity": "An sami ayyukan tsaro a asusunka"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ƙetare SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "An ƙara maɓallin shiga a asusunka"
+      },
+      "passkeyRemoved": {
+        "title": "An cire maɓallin shiga daga asusunka"
+      },
+      "signInMethodLinked": {
+        "title": "An ƙara hanyar shiga a asusunka"
+      },
+      "signInMethodUnlinked": {
+        "title": "An cire hanyar shiga daga asusunka"
+      },
+      "deviceSignInApproved": {
+        "title": "An amince da shiga daga na’ura"
+      },
+      "apiKeyReset": {
+        "title": "An sake saita maɓallin API"
+      },
+      "browserSessionsRevoked": {
+        "title": "An fita daga dukkan masu bincike"
+      },
+      "newSignIn": {
+        "title": "Sabon shiga a asusunka"
+      },
+      "body": {
+        "deviceAndLocation": "Daga {{device}} kusa da {{location}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
+        "device": "Daga {{device}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
+        "location": "Kusa da {{location}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
+        "unknown": "Ba kai ba ne? Duba tsaron asusunka yanzu."
+      }
     }
   },
   "sessionReady": {

@@ -8,7 +8,8 @@
       "securityFinding": "Kailangan ng atensyon ang isang security finding",
       "securityUpdate": "May update ang isang security check",
       "agentBriefing": "Handa na ang iyong briefing ng agent",
-      "activeAgentsGlanceable": "May update ang mga aktibong ahente"
+      "activeAgentsGlanceable": "May update ang mga aktibong ahente",
+      "accountSecurity": "Nagkaroon ng aktibidad sa seguridad sa iyong account"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Paglabag sa SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "May idinagdag na passkey sa iyong account"
+      },
+      "passkeyRemoved": {
+        "title": "May inalis na passkey sa iyong account"
+      },
+      "signInMethodLinked": {
+        "title": "May idinagdag na paraan ng pag-sign in sa iyong account"
+      },
+      "signInMethodUnlinked": {
+        "title": "May inalis na paraan ng pag-sign in sa iyong account"
+      },
+      "deviceSignInApproved": {
+        "title": "Inaprubahan ang pag-sign in ng device"
+      },
+      "apiKeyReset": {
+        "title": "Na-reset ang API key"
+      },
+      "browserSessionsRevoked": {
+        "title": "Na-sign out sa lahat ng browser"
+      },
+      "newSignIn": {
+        "title": "Bagong pag-sign in sa iyong account"
+      },
+      "body": {
+        "deviceAndLocation": "Mula sa {{device}} malapit sa {{location}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
+        "device": "Mula sa {{device}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
+        "location": "Malapit sa {{location}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
+        "unknown": "Hindi ikaw? Suriin ngayon ang seguridad ng iyong account."
+      }
     }
   },
   "sessionReady": {

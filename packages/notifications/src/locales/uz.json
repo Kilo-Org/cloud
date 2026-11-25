@@ -8,7 +8,8 @@
       "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
       "securityUpdate": "Xavfsizlik tekshiruvida yangilanish bor",
       "agentBriefing": "Agent brifingingiz tayyor",
-      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
+      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor",
+      "accountSecurity": "Hisobingizda xavfsizlik faoliyati bo‘ldi"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA buzilishi"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Hisobingizga kirish kaliti qo‘shildi"
+      },
+      "passkeyRemoved": {
+        "title": "Hisobingizdan kirish kaliti olib tashlandi"
+      },
+      "signInMethodLinked": {
+        "title": "Hisobingizga kirish usuli qo‘shildi"
+      },
+      "signInMethodUnlinked": {
+        "title": "Hisobingizdan kirish usuli olib tashlandi"
+      },
+      "deviceSignInApproved": {
+        "title": "Qurilmadan kirish tasdiqlandi"
+      },
+      "apiKeyReset": {
+        "title": "API kaliti qayta o‘rnatildi"
+      },
+      "browserSessionsRevoked": {
+        "title": "Barcha brauzerlardan chiqildi"
+      },
+      "newSignIn": {
+        "title": "Hisobingizga yangi kirish"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} yaqinidagi {{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "device": "{{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "location": "{{location}} yaqinidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "unknown": "Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring."
+      }
     }
   },
   "sessionReady": {

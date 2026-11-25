@@ -57,6 +57,32 @@ export function notificationPathForData(data: PushData): string | null {
       const base = getSecurityAgentPath(data.scope, `findings/${data.findingId}`) as string;
       return `${base}?via=push`;
     }
+    case 'account_security': {
+      // Each notice opens the screen where its credential can be reviewed and
+      // removed: passkeys, sign-in methods, or the signed-in sessions, which
+      // include the device a sign-in or an approval created.
+      const { event } = data;
+      switch (event) {
+        case 'passkey_added':
+        case 'passkey_removed': {
+          return '/(app)/(tabs)/(3_profile)/passkeys?via=push';
+        }
+        case 'sign_in_method_linked':
+        case 'sign_in_method_unlinked': {
+          return '/(app)/(tabs)/(3_profile)/login-methods?via=push';
+        }
+        case 'device_sign_in_approved':
+        case 'new_sign_in':
+        case 'api_key_reset':
+        case 'browser_sessions_revoked': {
+          return '/(app)/(tabs)/(3_profile)/device-sessions?via=push';
+        }
+        default: {
+          const _exhaustiveEvent: never = event;
+          return _exhaustiveEvent;
+        }
+      }
+    }
     case 'active_agents_glanceable':
     case 'session_live_update': {
       // Neither glanceable payload opens a session chat by itself: the

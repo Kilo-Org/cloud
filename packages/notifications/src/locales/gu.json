@@ -8,7 +8,8 @@
       "securityFinding": "સુરક્ષા તારણ ધ્યાનની જરૂર છે",
       "securityUpdate": "સુરક્ષા તપાસમાં અપડેટ છે",
       "agentBriefing": "તમારા એજન્ટનો રિપોર્ટ તૈયાર છે",
-      "activeAgentsGlanceable": "સક્રિય એજન્ટોમાં અપડેટ છે"
+      "activeAgentsGlanceable": "સક્રિય એજન્ટોમાં અપડેટ છે",
+      "accountSecurity": "તમારા એકાઉન્ટ પર સુરક્ષા પ્રવૃત્તિ થઈ હતી"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ભંગ"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "તમારા એકાઉન્ટમાં પાસકી ઉમેરાઈ"
+      },
+      "passkeyRemoved": {
+        "title": "તમારા એકાઉન્ટમાંથી પાસકી દૂર કરાઈ"
+      },
+      "signInMethodLinked": {
+        "title": "તમારા એકાઉન્ટમાં સાઇન-ઇન પદ્ધતિ ઉમેરાઈ"
+      },
+      "signInMethodUnlinked": {
+        "title": "તમારા એકાઉન્ટમાંથી સાઇન-ઇન પદ્ધતિ દૂર કરાઈ"
+      },
+      "deviceSignInApproved": {
+        "title": "ઉપકરણ સાઇન-ઇન મંજૂર થયું"
+      },
+      "apiKeyReset": {
+        "title": "API કી રીસેટ થઈ"
+      },
+      "browserSessionsRevoked": {
+        "title": "બધા બ્રાઉઝરમાંથી સાઇન આઉટ થયા"
+      },
+      "newSignIn": {
+        "title": "તમારા એકાઉન્ટમાં નવું સાઇન-ઇન"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} નજીક {{device}} પરથી. તમે નથી? હમણાં જ તમારા એકાઉન્ટની સુરક્ષા તપાસો.",
+        "device": "{{device}} પરથી. તમે નથી? હમણાં જ તમારા એકાઉન્ટની સુરક્ષા તપાસો.",
+        "location": "{{location}} નજીકથી. તમે નથી? હમણાં જ તમારા એકાઉન્ટની સુરક્ષા તપાસો.",
+        "unknown": "તમે નથી? હમણાં જ તમારા એકાઉન્ટની સુરક્ષા તપાસો."
+      }
     }
   },
   "sessionReady": {

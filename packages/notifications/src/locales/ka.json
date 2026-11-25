@@ -8,7 +8,8 @@
       "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
       "securityUpdate": "უსაფრთხოების შემოწმებას განახლება აქვს",
       "agentBriefing": "თქვენი აგენტის ანგარიში მზადაა",
-      "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
+      "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ",
+      "accountSecurity": "თქვენს ანგარიშზე იყო უსაფრთხოების აქტივობა"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA დარღვევა"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "თქვენს ანგარიშს დაემატა წვდომის გასაღები"
+      },
+      "passkeyRemoved": {
+        "title": "თქვენი ანგარიშიდან წაიშალა წვდომის გასაღები"
+      },
+      "signInMethodLinked": {
+        "title": "თქვენს ანგარიშს დაემატა შესვლის მეთოდი"
+      },
+      "signInMethodUnlinked": {
+        "title": "თქვენი ანგარიშიდან წაიშალა შესვლის მეთოდი"
+      },
+      "deviceSignInApproved": {
+        "title": "მოწყობილობიდან შესვლა დადასტურდა"
+      },
+      "apiKeyReset": {
+        "title": "API გასაღები გადაყენდა"
+      },
+      "browserSessionsRevoked": {
+        "title": "გამოხვედით ყველა ბრაუზერიდან"
+      },
+      "newSignIn": {
+        "title": "ახალი შესვლა თქვენს ანგარიშზე"
+      },
+      "body": {
+        "deviceAndLocation": "{{device}}-დან, {{location}}-ის მახლობლად. ეს თქვენ არ იყავით? ახლავე გადახედეთ ანგარიშის უსაფრთხოებას.",
+        "device": "{{device}}-დან. ეს თქვენ არ იყავით? ახლავე გადახედეთ ანგარიშის უსაფრთხოებას.",
+        "location": "{{location}}-ის მახლობლად. ეს თქვენ არ იყავით? ახლავე გადახედეთ ანგარიშის უსაფრთხოებას.",
+        "unknown": "ეს თქვენ არ იყავით? ახლავე გადახედეთ ანგარიშის უსაფრთხოებას."
+      }
     }
   },
   "sessionReady": {

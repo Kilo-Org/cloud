@@ -8,7 +8,8 @@
       "securityFinding": "Temuan keamanan perlu diperhatikan",
       "securityUpdate": "Pemeriksaan keamanan memiliki pembaruan",
       "agentBriefing": "Laporan aktivitas agen Anda sudah siap",
-      "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
+      "activeAgentsGlanceable": "Agen aktif memiliki pembaruan",
+      "accountSecurity": "Ada aktivitas keamanan di akun Anda"
     }
   },
   "agentSession": {
@@ -42,6 +43,38 @@
     },
     "securityFindingSlaBreach": {
       "title": "Pelanggaran SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Passkey ditambahkan ke akun Anda"
+      },
+      "passkeyRemoved": {
+        "title": "Passkey dihapus dari akun Anda"
+      },
+      "signInMethodLinked": {
+        "title": "Metode masuk ditambahkan ke akun Anda"
+      },
+      "signInMethodUnlinked": {
+        "title": "Metode masuk dihapus dari akun Anda"
+      },
+      "deviceSignInApproved": {
+        "title": "Masuk dari perangkat disetujui"
+      },
+      "apiKeyReset": {
+        "title": "Kunci API diatur ulang"
+      },
+      "browserSessionsRevoked": {
+        "title": "Keluar dari semua browser"
+      },
+      "newSignIn": {
+        "title": "Proses masuk baru ke akun Anda"
+      },
+      "body": {
+        "deviceAndLocation": "Dari {{device}} di dekat {{location}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
+        "device": "Dari {{device}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
+        "location": "Di dekat {{location}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
+        "unknown": "Bukan Anda? Tinjau keamanan akun Anda sekarang."
+      }
     }
   },
   "sessionReady": {

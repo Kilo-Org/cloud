@@ -29,6 +29,12 @@ export const subjects = {
   accountLinkCode: 'Kilo: Confirm adding a sign-in method',
   newSignInMethod: 'Kilo: A new sign-in method was added to your account',
   signInMethodRemoved: 'Kilo: A sign-in method was removed from your account',
+  passkeyAdded: 'Kilo: A passkey was added to your account',
+  passkeyRemoved: 'Kilo: A passkey was removed from your account',
+  deviceSignInApproved: 'Kilo: A device sign-in was approved for your account',
+  apiKeyReset: 'Kilo: Your API token was reset',
+  browserSessionsRevoked: 'Kilo: You were signed out of all browsers',
+  newSignIn: 'Kilo: New sign-in to your account',
   signInMethodChangeCode: 'Kilo: Your code to change a sign-in method',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
@@ -384,13 +390,28 @@ function signInMethodChangeDetails(details: SignInMethodChangeRequestDetails): R
   return new RawHtml(lines.map(escapeHtml).join('<br />'));
 }
 
-function connectedAccountsLink(): RawHtml {
-  const connectedAccountsUrl = `${NEXTAUTH_URL}/connected-accounts`;
+function appPageLink(pagePath: '/connected-accounts' | '/profile'): RawHtml {
+  const url = `${NEXTAUTH_URL}${pagePath}`;
   return new RawHtml(
-    `<a class="kc-strong" href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
-      connectedAccountsUrl
-    )}</a>`
+    `<a class="kc-strong" href="${escapeHtml(url)}" style="color: #1a1a1a">${escapeHtml(url)}</a>`
   );
+}
+
+/**
+ * The variables every security notice shares: where and when the action came
+ * from, and navigational links to the pages its "If this was not you" steps
+ * name. Neither link changes anything when opened.
+ */
+function securityNoticeVars(
+  email: string,
+  details: SignInMethodChangeRequestDetails
+): TemplateVars {
+  return {
+    email,
+    change_details: signInMethodChangeDetails(details),
+    connected_accounts_link: appPageLink('/connected-accounts'),
+    profile_link: appPageLink('/profile'),
+  };
 }
 
 export async function sendNewSignInMethodEmail(
@@ -404,13 +425,11 @@ export async function sendNewSignInMethodEmail(
     to: email,
     templateName: 'newSignInMethod',
     templateVars: {
-      email,
+      ...securityNoticeVars(email, details),
       provider_name: providerName,
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
         : linkedIdentity.email,
-      change_details: signInMethodChangeDetails(details),
-      connected_accounts_link: connectedAccountsLink(),
     },
   });
 }
@@ -423,11 +442,100 @@ export async function sendSignInMethodRemovedEmail(
   return send({
     to: email,
     templateName: 'signInMethodRemoved',
+    templateVars: { ...securityNoticeVars(email, details), provider_name: providerName },
+  });
+}
+
+/** A passkey's own name, or a plain word when it was never named. */
+function passkeyLabel(passkeyName: string | null): RawHtml {
+  return renderNonAutolinkedText(passkeyName?.trim() || 'unnamed');
+}
+
+export async function sendPasskeyAddedEmail(
+  email: string,
+  passkeyName: string | null,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'passkeyAdded',
     templateVars: {
-      email,
-      provider_name: providerName,
-      change_details: signInMethodChangeDetails(details),
-      connected_accounts_link: connectedAccountsLink(),
+      ...securityNoticeVars(email, details),
+      passkey_label: passkeyLabel(passkeyName),
+    },
+  });
+}
+
+export async function sendPasskeyRemovedEmail(
+  email: string,
+  passkeyName: string | null,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'passkeyRemoved',
+    templateVars: {
+      ...securityNoticeVars(email, details),
+      passkey_label: passkeyLabel(passkeyName),
+    },
+  });
+}
+
+/**
+ * `requester` is the device that asked to sign in, read from its stored
+ * request; `details` is where the approval was given, which can be a
+ * different place.
+ */
+export async function sendDeviceSignInApprovedEmail(
+  email: string,
+  requester: { clientLabel: string | null; requestIp: string | null },
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'deviceSignInApproved',
+    templateVars: {
+      ...securityNoticeVars(email, details),
+      client_label: renderNonAutolinkedText(requester.clientLabel ?? 'an unidentified device'),
+      request_ip: requester.requestIp ?? 'Unknown',
+    },
+  });
+}
+
+export async function sendApiKeyResetEmail(
+  email: string,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'apiKeyReset',
+    templateVars: securityNoticeVars(email, details),
+  });
+}
+
+export async function sendBrowserSessionsRevokedEmail(
+  email: string,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'browserSessionsRevoked',
+    templateVars: securityNoticeVars(email, details),
+  });
+}
+
+/** `methodName` is the sign-in method's display name, or null when it is not one this build names. */
+export async function sendNewSignInEmail(
+  email: string,
+  methodName: string | null,
+  details: SignInMethodChangeRequestDetails
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'newSignIn',
+    templateVars: {
+      ...securityNoticeVars(email, details),
+      method_name: methodName ?? 'a sign-in method',
     },
   });
 }

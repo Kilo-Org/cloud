@@ -18,14 +18,20 @@ import { getRegistryDOStub } from './RegistryDO';
 export type VerifyPassKind = 'daily' | 'full';
 
 /**
- * Objects one alarm reads before it yields and re-arms. Each read is one R2 GET plus a gunzip, a
- * schema parse and a SHA-256 of at most 500 events, so a slice stays well inside an alarm's CPU
- * (30 s) and subrequest (10,000) limits. `AUDIT_VERIFY_SLICE_OBJECTS` overrides it; only the test
- * config sets it, to force a pass across many slices.
+ * What one alarm reads before it yields and re-arms. Each object is one R2 GET plus a gunzip, a
+ * schema parse and a SHA-256 of its decompressed JSON, so CPU follows bytes, not objects: a
+ * slice stops at 1,000 objects or after the object that passes 64 MiB decompressed, which keeps
+ * it well inside an alarm's 30 s CPU and 10,000-subrequest limits even when every batch is a
+ * full 500 events. `AUDIT_VERIFY_SLICE_OBJECTS` overrides the object count; only the test config
+ * sets it, to force a pass across many slices.
  */
 export const VERIFY_SLICE_OBJECTS = 1000;
-/** A slice that throws (R2 or a Durable Object hop) is retried this many times, then paged. */
-const MAX_SLICE_ERRORS = 5;
+export const VERIFY_SLICE_BYTES = 64 * 1024 * 1024;
+/**
+ * Slices of one pass that may end without finishing, then the pass fails and pages. A slice
+ * counts itself before it walks, so one the runtime kills (CPU limit, eviction) is counted too.
+ */
+export const MAX_SLICE_ERRORS = 5;
 const SLICE_ERROR_RETRY_MS = 60_000;
 /** Design 8.1 runs the full pass monthly; it pages once one has not completed in this window. */
 export const FULL_PASS_DEADLINE_MS = 35 * 24 * 60 * 60 * 1000;
@@ -169,35 +175,47 @@ export class VerifierDO extends DurableObject<Env> {
     if (await this.nextPass()) await this.ctx.storage.setAlarm(Date.now());
   }
 
-  /** Walks at most `budget` objects of one pass: the daily pass first, then the full pass. */
-  private async runSlice(budget: number): Promise<SliceResult> {
+  /** Walks one budgeted slice of one pass: the daily pass first, then the full pass. */
+  private async runSlice(budget: { objects: number; bytes: number }): Promise<SliceResult> {
     const pass = await this.nextPass();
     if (!pass) return { kind: 'idle' };
+    if (pass.errors >= MAX_SLICE_ERRORS) {
+      return this.failPass(
+        pass,
+        'archive_read',
+        `${pass.errors} slices in a row ended without finishing`
+      );
+    }
+    // The marker: this slice counts as failed until it saves progress, completes or fails, so a
+    // slice the runtime kills is seen by the next alarm (the runtime's retry, or the next cron).
+    const started: VerifyPass = { ...pass, errors: pass.errors + 1 };
+    await this.ctx.storage.put(passKey(pass.kind), started);
     try {
-      return await this.walkPass(pass, budget);
+      return await this.walkPass(started, budget);
     } catch (error) {
-      const errors = pass.errors + 1;
       console.error(
         JSON.stringify({
           event: 'audit_relay.verification_slice_error',
           pass: pass.kind,
-          errors,
+          errors: started.errors,
           error: errorName(error),
         })
       );
-      if (errors < MAX_SLICE_ERRORS) {
-        await this.ctx.storage.put(passKey(pass.kind), { ...pass, errors });
-        return { kind: 'retry', pass: pass.kind, errors };
+      if (started.errors < MAX_SLICE_ERRORS) {
+        return { kind: 'retry', pass: pass.kind, errors: started.errors };
       }
       return this.failPass(
-        pass,
+        started,
         'archive_read',
-        `slice failed ${errors} times: ${errorName(error)}`
+        `slice failed ${started.errors} times: ${errorName(error)}`
       );
     }
   }
 
-  private async walkPass(pass: VerifyPass, budget: number): Promise<SliceResult> {
+  private async walkPass(
+    pass: VerifyPass,
+    budget: { objects: number; bytes: number }
+  ): Promise<SliceResult> {
     const heads = await withDORetry(
       () => getRegistryDOStub(this.env),
       stub => stub.listStreams(),
@@ -222,7 +240,7 @@ export class VerifierDO extends DurableObject<Env> {
       }
     }
 
-    let remaining = budget;
+    const remaining = { ...budget };
     let objects = pass.objects;
     for (; index < heads.length; index += 1) {
       const head = heads[index];
@@ -235,7 +253,8 @@ export class VerifierDO extends DurableObject<Env> {
         budget: remaining,
       });
       if (walk.kind === 'failed') return this.failPass(pass, walk.reason, walk.detail);
-      remaining -= walk.objects;
+      remaining.objects -= walk.objects;
+      remaining.bytes -= walk.bytes;
       objects += walk.objects;
       if (walk.kind === 'paused') {
         await this.ctx.storage.put(passKey(pass.kind), {
@@ -312,9 +331,11 @@ export class VerifierDO extends DurableObject<Env> {
     );
   }
 
-  private sliceBudget(): number {
+  private sliceBudget(): { objects: number; bytes: number } {
     const configured = Number(this.env.AUDIT_VERIFY_SLICE_OBJECTS);
-    return Number.isInteger(configured) && configured > 0 ? configured : VERIFY_SLICE_OBJECTS;
+    const objects =
+      Number.isInteger(configured) && configured > 0 ? configured : VERIFY_SLICE_OBJECTS;
+    return { objects, bytes: VERIFY_SLICE_BYTES };
   }
 
   private async nextPass(): Promise<VerifyPass | null> {

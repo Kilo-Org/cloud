@@ -20,10 +20,11 @@ export type ArchivedBatch = z.infer<typeof ArchivedBatchSchema>;
 
 /**
  * What an archive key holds. `corrupt` is an object that exists but does not decode to an
- * `ArchivedBatch`; an R2 I/O failure is thrown instead, because a retry can fix it.
+ * `ArchivedBatch`; an R2 I/O failure is thrown instead, because a retry can fix it. `bytes` is the
+ * decompressed JSON size, which the verifier budgets a slice by.
  */
 export type ArchivedRead =
-  | { kind: 'ok'; object: ArchivedBatch }
+  | { kind: 'ok'; object: ArchivedBatch; bytes: number }
   | { kind: 'missing' }
   | { kind: 'corrupt'; detail: string };
 
@@ -134,7 +135,7 @@ export async function readArchivedObject(
       JSON.parse(new TextDecoder().decode(json)) as unknown
     );
     if (!parsed.success) return { kind: 'corrupt', detail: 'schema' };
-    return { kind: 'ok', object: parsed.data };
+    return { kind: 'ok', object: parsed.data, bytes: json.byteLength };
   } catch (error) {
     return { kind: 'corrupt', detail: errorName(error) };
   }

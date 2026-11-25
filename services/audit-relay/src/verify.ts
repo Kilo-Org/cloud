@@ -19,14 +19,15 @@ export type VerifyFailureReason =
   | 'head';
 
 export type StreamWalk =
-  | { kind: 'done'; position: ChainPosition; objects: number }
-  | { kind: 'paused'; position: ChainPosition; objects: number }
+  | { kind: 'done'; position: ChainPosition; objects: number; bytes: number }
+  | { kind: 'paused'; position: ChainPosition; objects: number; bytes: number }
   | { kind: 'failed'; reason: VerifyFailureReason; detail: string };
 
 const LIST_PAGE = 1000;
 
 /**
- * Recomputes one stream's chain from `from` to `head`, reading at most `budget` objects.
+ * Recomputes one stream's chain from `from` to `head`, reading at most `budget.objects` objects
+ * and stopping after the object that takes the decompressed total past `budget.bytes`.
  *
  * The listing starts after the object at `from.seq`, so a walk never re-reads what an earlier
  * pass verified. When `checkpoint` is given, the chain must land on its sequence at an object
@@ -41,12 +42,13 @@ export async function walkStream(
     from: ChainPosition;
     checkpoint: ChainPosition | null;
     head: ChainPosition;
-    budget: number;
+    budget: { objects: number; bytes: number };
   }
 ): Promise<StreamWalk> {
   const { stream, checkpoint, head, budget } = input;
   let position = input.from;
   let objects = 0;
+  let bytes = 0;
   const prefix = archiveStreamPrefix(stream);
   const fail = (reason: VerifyFailureReason, detail: string): StreamWalk => ({
     kind: 'failed',
@@ -65,11 +67,13 @@ export async function walkStream(
   }
 
   while (position.seq < head.seq) {
-    if (objects >= budget) return { kind: 'paused', position, objects };
+    if (objects >= budget.objects || bytes >= budget.bytes) {
+      return { kind: 'paused', position, objects, bytes };
+    }
     const page = await bucket.list({
       prefix,
       startAfter: position.seq > 0 ? archiveObjectKey(stream, position.seq) : undefined,
-      limit: Math.min(LIST_PAGE, budget - objects),
+      limit: Math.min(LIST_PAGE, budget.objects - objects),
     });
     if (page.objects.length === 0) {
       return fail('head', `archive ends at ${position.seq}, registry head is ${head.seq}`);
@@ -98,6 +102,7 @@ export async function walkStream(
       const previousSeq = position.seq;
       position = { seq, hash };
       objects += 1;
+      bytes += read.bytes;
 
       if (checkpoint && previousSeq < checkpoint.seq && seq >= checkpoint.seq) {
         if (seq !== checkpoint.seq) {
@@ -111,11 +116,12 @@ export async function walkStream(
         return fail('head', `${key} passes the registry head ${head.seq}`);
       }
       if (seq === head.seq) break;
+      if (bytes >= budget.bytes) break;
     }
   }
 
   if (position.hash !== head.hash) {
     return fail('head', `archive hash at ${position.seq} is not the registry head`);
   }
-  return { kind: 'done', position, objects };
+  return { kind: 'done', position, objects, bytes };
 }

@@ -1,21 +1,20 @@
+import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
 import { checkpointKey, createHourlyCheckpoint, readCheckpointFile } from '../src/checkpoint';
 import { getStreamDOStub } from '../src/dos/StreamDO';
-import { FULL_PASS_DEADLINE_MS, getVerifierDOStub } from '../src/dos/VerifierDO';
+import { FULL_PASS_DEADLINE_MS, MAX_SLICE_ERRORS, getVerifierDOStub } from '../src/dos/VerifierDO';
 import type { VerifierStatus } from '../src/dos/VerifierDO';
 import { archiveObjectKey, gzipJson } from '../src/relay/archive';
 import {
   auditBatch,
   axiomOk,
   env,
+  pageTexts,
   readArchived,
   recordingFetch,
   uniqueStream,
-  type CapturedRequest,
 } from './helpers';
 
-const SLACK_WEBHOOK = 'https://hooks.slack.test/audit-relay';
 const hour = (h: number) => Date.UTC(2026, 10, 25, h, 0, 0);
 const hourKey = (h: number) => checkpointKey(new Date(hour(h)).toISOString());
 
@@ -61,14 +60,6 @@ async function settled(): Promise<VerifierStatus> {
     },
     { timeout: 10_000, interval: 20 }
   );
-}
-
-const PageSchema = z.object({ text: z.string() });
-
-function pageTexts(requests: CapturedRequest[]): string[] {
-  return requests
-    .filter(request => request.url === SLACK_WEBHOOK)
-    .map(request => PageSchema.parse(JSON.parse(request.body ?? '{}')).text);
 }
 
 describe('VerifierDO', () => {
@@ -161,5 +152,45 @@ describe('VerifierDO', () => {
         /^bot: audit-relay full chain verification has not completed for 36 days$/
       )
     );
+  });
+});
+
+describe('VerifierDO slices', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fails and pages a pass whose slices keep ending without finishing', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stub = verifier();
+    // What five slices killed by the runtime (CPU limit, eviction) leave: each counted itself
+    // before it walked and never saved progress.
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('pass:full', {
+        kind: 'full',
+        startedAt: Date.now(),
+        anchorKey: null,
+        targetKey: null,
+        from: {},
+        checkpoint: {},
+        cursor: null,
+        objects: 0,
+        errors: MAX_SLICE_ERRORS,
+      });
+      await state.storage.setAlarm(Date.now() + 60_000);
+    });
+
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const status = await stub.status();
+    expect(status.running).toEqual([]);
+    expect(status.full).toMatchObject({
+      outcome: 'failed',
+      reason: 'archive_read',
+      detail: `${MAX_SLICE_ERRORS} slices in a row ended without finishing`,
+    });
+    expect(pageTexts(http.requests)).toEqual([
+      `bot: audit-relay full chain verification failed (archive_read): ${MAX_SLICE_ERRORS} slices in a row ended without finishing`,
+    ]);
   });
 });

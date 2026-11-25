@@ -6,6 +6,11 @@
  * client component and must read the same codes the server refuses with. A code
  * never changes meaning; copy is carried separately.
  */
+import {
+  SIGN_IN_METHOD_CHANGE_REFUSAL_CODES,
+  SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES,
+} from '@/lib/auth/sign-in-method-change-codes';
+
 export const DEVICE_AUTH_REFUSAL_CODES = {
   /** The body named a `requesting_client` that fails its schema. */
   invalidRequestingClient: 'INVALID_REQUESTING_CLIENT',
@@ -27,6 +32,15 @@ export const DEVICE_AUTH_REFUSAL_CODES = {
   clientConfirmationMismatch: 'CLIENT_CONFIRMATION_MISMATCH',
   /** The approval for a request carrying a live pending link chose nothing. */
   pendingLinkChoiceRequired: 'PENDING_LINK_CHOICE_REQUIRED',
+  // Adding the pending link is a sign-in method link, so it needs the code
+  // emailed for it. These share the sign-in method change codes, so the code
+  // dialog reads them the same way as a refusal from Connected accounts.
+  /** The approval adds the pending link without a correct emailed code. */
+  pendingLinkCodeInvalid: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid,
+  /** Too many wrong codes for the account. */
+  pendingLinkCodeLocked: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked,
+  /** The approving browser session has no session id to bind the code to. */
+  pendingLinkReauthRequired: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.sessionReauthRequired,
 } as const;
 
 export type DeviceAuthRefusalCode =
@@ -59,6 +73,11 @@ const REFUSAL_COPY: Readonly<Record<DeviceAuthRefusalCode, string>> = {
     'Confirm the app named in this request before approving it.',
   [DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired]:
     'Choose whether to add the sign-in method before approving.',
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid]:
+    SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeInvalid,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeLocked,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired]:
+    SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.sessionReauthRequired,
 };
 
 const copyByCode = new Map<string, string>(Object.entries(REFUSAL_COPY));

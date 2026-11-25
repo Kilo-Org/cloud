@@ -21,6 +21,15 @@ import { deviceAuthRefusalCopy } from '@/lib/device-auth/refusal-codes';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
 import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
 import { getProviderById } from '@/lib/auth/provider-metadata';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
+import {
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  SignInMethodChangeRefusedError,
+  isSignInMethodChangeRefusalCode,
+} from '@/lib/auth/sign-in-method-change-codes';
 
 type DeviceAuthClientProps = {
   code: string;
@@ -48,6 +57,8 @@ const apiErrorSchema = z.object({
  * whatever sentence the server happened to carry.
  */
 export type ApiRefusal = { code?: string; message?: string };
+
+type ApprovalResult = { ok: true } | { ok: false; status: number; refusal: ApiRefusal };
 
 async function readApiRefusal(response: Response): Promise<ApiRefusal> {
   const data: unknown = await response.json().catch(() => null);
@@ -120,6 +131,8 @@ export function DeviceAuthClient({
   // No preselected attach: the approver chooses whether the pending link is
   // added, and Authorize stays disabled until they do.
   const [addPendingLink, setAddPendingLink] = useState<boolean | null>(null);
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const displayName = user.name.trim() || user.email;
   const shellClassName = getDeviceAuthShellClassName(isAppMode);
@@ -139,58 +152,89 @@ export function DeviceAuthClient({
     window.location.assign(getDeviceAuthSignInUrl(code, { app: isAppMode }));
   };
 
+  const postApproval = async (emailedCode?: {
+    code: string;
+    challengeId: string;
+  }): Promise<ApprovalResult> => {
+    const response = await fetch('/api/device-auth/tokens', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        ...(requestingClient ? { confirmed_client_id: requestingClient.clientId } : {}),
+        ...(pendingLink ? { add_pending_link: addPendingLink === true } : {}),
+        ...(emailedCode
+          ? {
+              pending_link_code: emailedCode.code,
+              pending_link_challenge_id: emailedCode.challengeId,
+            }
+          : {}),
+      }),
+    });
+    if (response.ok) return { ok: true };
+    return { ok: false, status: response.status, refusal: await readApiRefusal(response) };
+  };
+
+  const showApproval = (result: ApprovalResult) => {
+    if (result.ok) {
+      setStatus('success');
+      closeDeviceAuthWindowIfAppMode(isAppMode);
+      return;
+    }
+    if (result.status === 401) {
+      redirectToSignIn();
+      return;
+    }
+    setStatus('error');
+    setErrorMessage(refusalMessage(result.refusal, 'Failed to authorize device'));
+  };
+
+  // Adding a pending link to an existing account is a sign-in method link, so
+  // the approval carries the code emailed for it, like Connected accounts.
+  const needsEmailedCode = pendingLink?.needsEmailedCode === true && addPendingLink === true;
+
+  const approveWithEmailedCode = async (emailedCode: string, challengeId: string) => {
+    const result = await postApproval({ code: emailedCode, challengeId });
+    // A code refusal goes back to the dialog, which shows it there.
+    const refusalCode = result.ok ? undefined : result.refusal.code;
+    if (refusalCode && isSignInMethodChangeRefusalCode(refusalCode)) {
+      throw new SignInMethodChangeRefusedError(refusalCode);
+    }
+    showApproval(result);
+  };
+
   const handleAuthorize = async (approved: boolean) => {
+    if (approved && needsEmailedCode) {
+      setIsCodeDialogOpen(true);
+      return;
+    }
     setStatus('loading');
     setErrorMessage('');
 
     if (approved) {
-      // Approve: POST to /api/device-auth/tokens
-      const response = await fetch('/api/device-auth/tokens', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code,
-          ...(requestingClient ? { confirmed_client_id: requestingClient.clientId } : {}),
-          ...(pendingLink ? { add_pending_link: addPendingLink === true } : {}),
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          redirectToSignIn();
-          return;
-        }
-        setStatus('error');
-        setErrorMessage(
-          refusalMessage(await readApiRefusal(response), 'Failed to authorize device')
-        );
-        return;
-      }
-    } else {
-      // Deny: DELETE to /api/device-auth/codes/:code
-      const response = await fetch(`/api/device-auth/codes/${code}`, {
-        method: 'DELETE',
-        headers: {
-          'x-device-auth-viewer-token': viewerToken,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          redirectToSignIn();
-          return;
-        }
-        setStatus('error');
-        setErrorMessage(refusalMessage(await readApiRefusal(response), 'Failed to deny device'));
-        return;
-      }
-      setStatus('denied');
-      closeDeviceAuthWindowIfAppMode(isAppMode);
+      showApproval(await postApproval());
       return;
     }
-    setStatus('success');
+    // Deny: DELETE to /api/device-auth/codes/:code
+    const response = await fetch(`/api/device-auth/codes/${code}`, {
+      method: 'DELETE',
+      headers: {
+        'x-device-auth-viewer-token': viewerToken,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        redirectToSignIn();
+        return;
+      }
+      setStatus('error');
+      setErrorMessage(refusalMessage(await readApiRefusal(response), 'Failed to deny device'));
+      return;
+    }
+    setStatus('denied');
     closeDeviceAuthWindowIfAppMode(isAppMode);
   };
 
@@ -360,6 +404,11 @@ export function DeviceAuthClient({
                 This app also asks to add {getProviderById(pendingLink.provider).name} (
                 {pendingLink.displayName || pendingLink.email}) to your account
               </p>
+              {pendingLink.needsEmailedCode ? (
+                <p className="text-muted-foreground text-xs">
+                  To add it, enter the code we email to {user.email}.
+                </p>
+              ) : null}
               <div className="space-y-2">
                 <div className="flex items-start gap-2 pointer-coarse:min-h-11">
                   <input
@@ -449,6 +498,23 @@ export function DeviceAuthClient({
           </div>
         </CardContent>
       </Card>
+      {pendingLink?.needsEmailedCode ? (
+        <SignInMethodCodeDialog
+          open={isCodeDialogOpen}
+          change="link"
+          provider={pendingLink.provider}
+          challenge={codeChallenge}
+          onChallengeChange={setCodeChallenge}
+          onOpenChange={setIsCodeDialogOpen}
+          onError={pageError => {
+            setStatus('error');
+            setErrorMessage(
+              SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[pageError] ?? 'Failed to authorize device'
+            );
+          }}
+          onVerified={approveWithEmailedCode}
+        />
+      ) : null}
     </div>
   );
 }

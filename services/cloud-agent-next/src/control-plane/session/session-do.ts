@@ -4414,7 +4414,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     this.finishWorktreePreparation();
     await this.captureQueuedRouteContainer(this.route);
-    this.emitCloudStatus({ type: 'error', message: reason });
+    // A ready route may still run accepted work, so its status stays ready.
+    if (this.route.state !== 'ready' && this.route.state !== 'reconnecting') {
+      this.emitCloudStatus({ type: 'error', message: reason });
+    }
     await this.settleMessages(
       this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
       'failed',

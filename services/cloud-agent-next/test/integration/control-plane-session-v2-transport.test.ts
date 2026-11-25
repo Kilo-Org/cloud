@@ -1,6 +1,6 @@
 import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
@@ -105,6 +105,22 @@ async function storedRecovery(
 
 async function recoveryAt(stub: DurableObjectStub<SandboxSessionV2>) {
   return (await storedRecovery(stub))?.dueAt;
+}
+
+async function latestCloudStatus(stub: DurableObjectStub<SandboxSessionV2>) {
+  return runInDurableObject(stub, (_instance, state) => {
+    const [row] = drizzle(state.storage)
+      .select()
+      .from(events)
+      .where(eq(events.stream_event_type, 'cloud.status'))
+      .orderBy(desc(events.id))
+      .limit(1)
+      .all();
+    return row === undefined
+      ? undefined
+      : (JSON.parse(row.payload) as { cloudStatus: { type: string; message?: string } })
+          .cloudStatus;
+  });
 }
 
 async function alarmAt(stub: DurableObjectStub<SandboxSessionV2>) {
@@ -1056,6 +1072,10 @@ describe('SandboxSessionV2 bounded transport recovery', () => {
           reason: 'sandbox_unreachable',
         });
         expect(await recoveryAt(stub)).toBeUndefined();
+        expect(await latestCloudStatus(stub)).toEqual({
+          type: 'error',
+          message: 'sandbox_unreachable',
+        });
         expect(reports).toHaveLength(1);
         expect(callbacks).toHaveLength(1);
         expect(mode === 'error' ? peer.statusCalls.length : statusCalls).toBe(3);
@@ -1091,6 +1111,8 @@ describe('SandboxSessionV2 bounded transport recovery', () => {
       });
       expect(peer.deliverCalls).toHaveLength(4);
       expect(await recoveryAt(stub)).toBeUndefined();
+      // Accepted work may still run on the ready route, so its status stays ready.
+      expect(await latestCloudStatus(stub)).toMatchObject({ type: 'ready' });
     } finally {
       delivery.resolve('sent');
     }

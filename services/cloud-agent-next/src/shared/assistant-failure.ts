@@ -437,6 +437,17 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   ) {
     return 'invalid_request';
   }
+  // The ChatGPT subscription route reports the plan limit, the subscription
+  // sharing limit and the workspace admin limit with these texts. Each limit
+  // belongs to the user's ChatGPT account, so a fresh session reaches it again.
+  // They are checked before the generic rate-limit and credit patterns.
+  if (
+    /\b(?:subscription sharing usage limit|chatgpt usage limit reached|usage limit your chatgpt workspace admin set)\b/.test(
+      message
+    )
+  ) {
+    return 'chatgpt_usage_limit';
+  }
   if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
     return 'insufficient_credits';
   }

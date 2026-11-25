@@ -691,7 +691,7 @@ it.each([
   ['provider.budget-limit', 'rate_limited', 'provider', 'rate_limited'],
   ['provider.model-budget-limit', 'rate_limited', 'provider', 'rate_limited'],
   ['provider.go-limit', 'rate_limited', 'provider', 'rate_limited'],
-  ['provider.chatgpt-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.chatgpt-limit', 'chatgpt_usage_limit', 'user', 'chatgpt_usage_limit'],
   ['provider.internal', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
   ['provider.transport', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
   ['provider.invalid-output', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
@@ -753,6 +753,44 @@ it.each([
   });
   expect(translated).toMatchObject({ name: 'APIError', data: { statusCode: status } });
   expect(classifyAssistantFailure(translated).reason).toBe(reason);
+});
+
+// Kilo v2 0.0.0-v2-141 sets `status` from the provider HTTP status, which is 200
+// for an error inside a streamed response. It types the workspace-admin limit by
+// its HTTP tag, not as `provider.chatgpt-limit`.
+const CHATGPT_LIMIT_TEXT =
+  'ChatGPT usage limit reached. Check ChatGPT Settings → Usage for details.';
+const CHATGPT_WORKSPACE_LIMIT_TEXT =
+  "You've reached the usage limit your ChatGPT workspace admin set for you. Ask them to raise it in the OpenAI Admin Console.";
+
+it.each([
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT },
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT, status: 200 },
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT, status: 429 },
+  { type: 'provider.rate-limit', message: CHATGPT_WORKSPACE_LIMIT_TEXT },
+  { type: 'provider.quota', message: CHATGPT_WORKSPACE_LIMIT_TEXT },
+  { type: 'provider.rate-limit', message: CHATGPT_WORKSPACE_LIMIT_TEXT, status: 429 },
+  {
+    type: 'provider.no-route',
+    message: 'The ChatGPT user has reached their Subscription Sharing usage limit',
+  },
+])('classifies the native ChatGPT usage limit %j', error => {
+  const translated = nativeTurnError(error);
+  expect(translated.data.message).toBe(
+    'The ChatGPT usage limit was reached; check usage in ChatGPT settings'
+  );
+  const failure = classifyAssistantFailure(translated, 'managed');
+  expect(failure.reason).toBe('chatgpt_usage_limit');
+  expect(failure.terminalCode).toBeUndefined();
+  expect(
+    classifyCloudAgentFailure({
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      assistantReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+    })
+  ).toEqual({ responsibility: 'user', reason: 'chatgpt_usage_limit' });
 });
 
 it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(

@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
+import {
+  assistantFailureMessage,
+  classifyAssistantFailure,
+} from '../../../src/shared/assistant-failure.js';
 
 export const nativeErrorSchema = z.object({
   type: z.string(),
@@ -44,6 +47,17 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
       : 'APIError';
   const data = status === undefined ? {} : { statusCode: status };
   const message = classifyAssistantFailure(error.message);
+  const byokPrefix = message.providerOwnership === 'byok' ? '[BYOK] ' : '';
+  // The ChatGPT limit belongs to the user's ChatGPT account. Kilo v2 types only
+  // the plan limit as `provider.chatgpt-limit`; the other limit texts arrive with
+  // other types or a 200 stream status. The status must not turn it into a
+  // provider rate limit that code review retries.
+  if (error.type === 'provider.chatgpt-limit' || message.reason === 'chatgpt_usage_limit') {
+    return {
+      name,
+      data: { ...data, message: `${byokPrefix}${assistantFailureMessage('chatgpt_usage_limit')}` },
+    };
+  }
   // Generic request rejections omit the native context-overflow classification.
   const structured = classifyAssistantFailure({
     name,
@@ -63,9 +77,7 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
     data: {
       ...data,
       message:
-        structured.reason === 'unknown'
-          ? error.message
-          : `${message.providerOwnership === 'byok' ? '[BYOK] ' : ''}${structured.safeMessage}`,
+        structured.reason === 'unknown' ? error.message : `${byokPrefix}${structured.safeMessage}`,
     },
   };
 }

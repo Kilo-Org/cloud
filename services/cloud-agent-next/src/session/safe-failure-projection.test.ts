@@ -174,6 +174,58 @@ describe('native v2 failure attribution', () => {
   });
 });
 
+describe('ChatGPT usage limit', () => {
+  const CHATGPT_USAGE_LIMIT_MESSAGE =
+    'The ChatGPT usage limit was reached; check usage in ChatGPT settings';
+
+  // The OpenAI stream text (gateway logs), and the two Kilo v2 0.0.0-v2-141 texts
+  // for `subscription_sharing_usage_limit_exceeded` and the workspace-admin limit.
+  it.each([
+    'The ChatGPT user has reached their Subscription Sharing usage limit',
+    'ChatGPT usage limit reached. Check ChatGPT Settings → Usage for details.',
+    "You've reached the usage limit your ChatGPT workspace admin set for you. Ask them to raise it in the OpenAI Admin Console.",
+  ])('classifies %s with a specific safe message', text => {
+    for (const source of [
+      text,
+      { name: 'APIError', data: { message: text } },
+      { name: 'APIError', data: { statusCode: 200, message: text } },
+      { name: 'APIError', data: { statusCode: 429, message: text } },
+      { name: 'APIError', data: { statusCode: 402, message: text } },
+    ]) {
+      const failure = classifyAssistantFailure(source);
+      expect(failure).toEqual({
+        reason: 'chatgpt_usage_limit',
+        providerOwnership: 'unknown',
+        safeMessage: CHATGPT_USAGE_LIMIT_MESSAGE,
+      });
+      const safeError = projectSafeAssistantError(source);
+      expect(safeError).toBe(CHATGPT_USAGE_LIMIT_MESSAGE);
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+    }
+  });
+
+  it.each([
+    ['Usage limit exceeded', 'rate_limited'],
+    ['You have reached your usage limit', 'unknown'],
+    ["ChatGPT usage can't be checked right now. Try again later.", 'unknown'],
+  ] as const)('does not claim the unrelated text %s', (text, reason) => {
+    expect(classifyAssistantFailure(text).reason).toBe(reason);
+  });
+
+  it('keeps the gateway credit 402 as insufficient credits', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 402,
+          message: 'Add credits to continue, or switch to a free model',
+          responseBody: JSON.stringify({ error_type: 'usage_limit_exceeded' }),
+        },
+      }).reason
+    ).toBe('insufficient_credits');
+  });
+});
+
 describe('projectSafeAssistantError', () => {
   it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
     const error = {

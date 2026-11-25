@@ -1,34 +1,103 @@
-import { BUNDLE_DENIED_REASONS } from '@kilocode/sts-contracts';
+import {
+  AudienceSchema,
+  BUNDLE_DENIED_REASONS,
+  MINT_DENIED_REASONS,
+  ScopeSchema,
+} from '@kilocode/sts-contracts';
 import { z } from 'zod';
 import { getDenialStub } from '../dos/stubs';
 import type { Env, StsConfig } from '../env';
 
 /**
- * A refused bundle read from a caller STS identified: a Worker with valid props, or a provider
- * token whose signature verified. Claims are the provider's stable ids (never the token).
+ * Why STS refused a token request: a per-token reason, or a whole call whose identity verified but
+ * whose policy does not fit it (`identity_rejected`, `environment_mismatch`).
  */
-export type Denial = {
+export const TOKEN_DENIED_REASONS = [
+  ...MINT_DENIED_REASONS,
+  'identity_rejected',
+  'environment_mismatch',
+] as const;
+export type TokenDeniedReason = (typeof TOKEN_DENIED_REASONS)[number];
+
+type DenialBase = {
   channel: 'worker-binding' | 'http';
-  reason: (typeof BUNDLE_DENIED_REASONS)[number];
   actor: string;
   claims: Record<string, string>;
 };
 
-export const DenialSchema: z.ZodType<Denial> = z.strictObject({
+/**
+ * A refused bundle read from a caller STS identified: a Worker with valid props, or a provider
+ * token whose signature verified. Claims are the provider's stable ids (never the token). `kind`
+ * is absent on denials recorded before token denials existed.
+ */
+export type BundleDenial = DenialBase & {
+  kind?: 'bundle';
+  reason: (typeof BUNDLE_DENIED_REASONS)[number];
+};
+
+/** A refused token from an identified caller; a whole-call refusal names no audience or scope. */
+export type TokenDenial = DenialBase & {
+  kind: 'token';
+  reason: TokenDeniedReason;
+  audience?: string;
+  scope?: string;
+};
+
+export type Denial = BundleDenial | TokenDenial;
+
+const DenialBaseSchema = {
   channel: z.enum(['worker-binding', 'http']),
-  reason: z.enum(BUNDLE_DENIED_REASONS),
   actor: z.string().min(1).max(256),
   claims: z
     .record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(256))
     .refine(claims => Object.keys(claims).length <= 16, { message: 'at most 16 claims' }),
-});
+};
+
+export const DenialSchema: z.ZodType<Denial> = z.union([
+  z.strictObject({
+    ...DenialBaseSchema,
+    kind: z.literal('bundle').optional(),
+    reason: z.enum(BUNDLE_DENIED_REASONS),
+  }),
+  z.strictObject({
+    ...DenialBaseSchema,
+    kind: z.literal('token'),
+    reason: z.enum(TOKEN_DENIED_REASONS),
+    audience: AudienceSchema.max(256).optional(),
+    scope: ScopeSchema.max(256).optional(),
+  }),
+]);
 
 /** Identical denials in one minute merge into one row; this is the identity they merge on. */
 export function denialKey(denial: Denial): string {
   const claims = Object.keys(denial.claims)
     .sort()
     .map(name => [name, denial.claims[name]]);
+  if (denial.kind === 'token') {
+    return JSON.stringify([
+      'token',
+      denial.channel,
+      denial.reason,
+      denial.actor,
+      denial.audience ?? null,
+      denial.scope ?? null,
+      claims,
+    ]);
+  }
   return JSON.stringify([denial.channel, denial.reason, denial.actor, claims]);
+}
+
+/** The row that counts a reason's denials past the per-minute distinct limit. */
+export function overflowKey(denial: Denial): string {
+  return denial.kind === 'token' ? `overflow:token:${denial.reason}` : `overflow:${denial.reason}`;
+}
+
+/** What an overflow row records: the kind, channel and reason, no actor details. */
+export function overflowDenial(denial: Denial): Denial {
+  const base = { channel: denial.channel, actor: 'overflow', claims: {} };
+  return denial.kind === 'token'
+    ? { ...base, kind: 'token', reason: denial.reason }
+    : { ...base, reason: denial.reason };
 }
 
 /** Distinct denials one isolate sends per minute before it counts the rest as overflow. */
@@ -68,7 +137,7 @@ export function utcMinute(time: number): string {
  * denial object; `sent` is false until a send of this entry succeeded or is in flight.
  */
 function entryKey(count: { denial: Denial; overflow: boolean }): string {
-  return count.overflow ? `overflow:${count.denial.reason}` : denialKey(count.denial);
+  return count.overflow ? overflowKey(count.denial) : denialKey(count.denial);
 }
 
 type Pending = {
@@ -84,11 +153,13 @@ type Pending = {
  * occurrence of a denial in a minute is sent at once; repeats are only counted, and the counts of
  * a minute that has ended ride along with the next hop this isolate makes, each with its own
  * minute. So one isolate sends at most one record call per distinct denial per minute, and a
- * replayed token costs no hop at all after its first use. A failed send gives its counts back and
+ * replayed token costs no hop at all after its first use. The denials of one request (a mint call
+ * refused for several audiences) go out in one hop. A failed send gives its counts back and
  * starts a backoff (10 s, doubling to 60 s, reset by a success) during which every denial is only
  * counted; the first denial after it sends everything held. So an isolate makes at most one hop
- * per backoff period while the denial object fails. Past `MAX_ISOLATE_DISTINCT_PER_MINUTE` distinct denials a minute, further ones are counted
- * per reason as overflow. Counts still pending when the isolate ends are lost.
+ * per backoff period while the denial object fails. Past `MAX_ISOLATE_DISTINCT_PER_MINUTE` distinct
+ * denials a minute, further ones are counted per kind and reason as overflow. Counts still pending
+ * when the isolate ends are lost.
  */
 export class DenialBuffer {
   private readonly pending = new Map<string, Pending>();
@@ -104,10 +175,10 @@ export class DenialBuffer {
   ) {}
 
   /**
-   * Returns the hop to run after the response, or null when this denial only adds to a count. While
-   * a backoff after a failed send runs, every denial is only counted.
+   * Returns the hop to run after the response, or null when these denials only add to counts.
+   * While a backoff after a failed send runs, every denial is only counted.
    */
-  add(denial: Denial): Promise<void> | null {
+  add(...denials: Denial[]): Promise<void> | null {
     const now = this.now();
     const minute = utcMinute(now);
     for (const [key, entry] of this.pending) {
@@ -116,21 +187,22 @@ export class DenialBuffer {
       this.pending.delete(key);
     }
 
-    const overflow =
-      !this.pending.has(denialKey(denial)) && this.pending.size >= MAX_ISOLATE_DISTINCT_PER_MINUTE;
-    const key = overflow ? `overflow:${denial.reason}` : denialKey(denial);
-    let entry = this.pending.get(key);
-    if (entry === undefined) {
-      const recorded: Denial = overflow
-        ? { channel: denial.channel, reason: denial.reason, actor: 'overflow', claims: {} }
-        : denial;
-      entry = { minute, denial: recorded, overflow, unsent: 0, sent: false };
-      this.pending.set(key, entry);
+    for (const denial of denials) {
+      const overflow =
+        !this.pending.has(denialKey(denial)) &&
+        this.pending.size >= MAX_ISOLATE_DISTINCT_PER_MINUTE;
+      const key = overflow ? overflowKey(denial) : denialKey(denial);
+      let entry = this.pending.get(key);
+      if (entry === undefined) {
+        const recorded = overflow ? overflowDenial(denial) : denial;
+        entry = { minute, denial: recorded, overflow, unsent: 0, sent: false };
+        this.pending.set(key, entry);
+      }
+      entry.unsent += 1;
     }
-    entry.unsent += 1;
     if (now < this.holdUntil) return null;
 
-    // Ended counts, the new entry, and any a failed send gave back go out with this hop.
+    // Ended counts, the new entries, and any a failed send gave back go out with this hop.
     const batch = [...this.retry.values()];
     this.retry.clear();
     for (const waiting of this.pending.values()) {
@@ -189,18 +261,22 @@ export class DenialBuffer {
 const buffers = new Map<string, DenialBuffer>();
 
 /**
- * Counts one refused read in this isolate's buffer and returns the denial-object hop to pass to
- * `waitUntil`, or null. A failed hop is logged and its counts are kept for the next hop: the read
- * is refused either way.
+ * Counts refused requests in this isolate's buffer and returns the one denial-object hop to pass
+ * to `waitUntil`, or null. A failed hop is logged and its counts are kept for the next hop: the
+ * request is refused either way.
  */
-export function recordDenial(env: Env, config: StsConfig, denial: Denial): Promise<void> | null {
+export function recordDenial(
+  env: Env,
+  config: StsConfig,
+  ...denials: Denial[]
+): Promise<void> | null {
   let buffer = buffers.get(config.environment);
   if (buffer === undefined) {
     buffer = new DenialBuffer(
       counts => getDenialStub(env, config).record(counts),
       () => Date.now(),
       (error, counts) => {
-        console.error('sts: bundle denials could not be recorded; kept for the next hop', {
+        console.error('sts: denials could not be recorded; kept for the next hop', {
           denials: counts.length,
           error: error instanceof Error ? error.name : 'unknown',
         });
@@ -208,7 +284,7 @@ export function recordDenial(env: Env, config: StsConfig, denial: Denial): Promi
     );
     buffers.set(config.environment, buffer);
   }
-  return buffer.add(denial);
+  return buffer.add(...denials);
 }
 
 /** Test seam: forgets every isolate buffer, so a test's first denial is sent again. */

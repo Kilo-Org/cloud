@@ -88,3 +88,43 @@ export const VERIFIER_RETRY_AFTER_SECONDS = 30;
 
 /** A bundle object call failed (an error, a reset or the deadline): the caller retries after this. */
 export const BUNDLE_OBJECT_RETRY_AFTER_SECONDS = 30;
+
+/** A mint request is at most 8 audience and scope pairs; anything above this is refused unread. */
+export const TOKEN_REQUEST_MAX_BODY_BYTES = 4 * 1024;
+
+/**
+ * STS stops waiting for the token signer after this long and answers `unavailable`. A mint signs at
+ * most 8 tokens and appends one row, with no call out of the object, so 5 s covers a cold start of
+ * the object in the EU with room to spare; a caller cannot cancel an RPC (see serveBundle).
+ */
+export const TOKEN_SIGNER_DEADLINE_MS = 5_000;
+
+/**
+ * A failed mint (signer error, deadline, failed audit append): the caller retries after this. A
+ * client renews at 80 % of a 5-minute token, so its current token still has 60 s left.
+ */
+export const TOKEN_SIGNER_RETRY_AFTER_SECONDS = 10;
+
+/** A mint whose lifetime, capped at the attestation's `exp`, is below this is refused. */
+export const MIN_TOKEN_LIFETIME_SECONDS = 60;
+
+/** A token-signing key signs for 30 days (design 5.7). */
+export const TOKEN_KEY_CURRENT_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** The next key is published this long before it signs, so every verifier holds it first. */
+export const TOKEN_KEY_PUBLISH_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A retired key stays published this long after the last token it signed expires. */
+export const TOKEN_KEY_RETIRED_GRACE_MS = 10 * 60 * 1000;
+
+/** Each isolate serves the token key set from memory this long; the response's max-age matches. */
+export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;
+
+/**
+ * Token signer objects per environment; a workload always mints on the same one (by a hash of its
+ * name), and the key set lists the keys of all of them. One object has a soft limit of 1,000
+ * requests per second (https://developers.cloudflare.com/durable-objects/platform/limits/). At
+ * 200,000 caller instances plus about 2,200 Vercel instances, each minting once per 4 minutes, STS
+ * makes about 843 mint calls per second: 4 objects keep each near 210, about a fifth of the limit.
+ */
+export const TOKEN_SIGNER_SHARDS = 4;

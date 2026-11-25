@@ -3,9 +3,10 @@
 // Worker directories with `find services -name wrangler.jsonc -not -path "*/test/fixtures/*"`, and
 // test/repo/worker-configs.test.ts fails if a test config sits anywhere else. Every value is local
 // and synthetic. BROKER binds this Worker's own ProbeBroker entrypoint, as a consumer binds
-// SecretsBroker, so the bundle read is a real RPC call; SELF sends real requests to STS's own
-// HTTP routes. The Worker and queue names stay outside the `sts-*` and `kilo-audit-*` names
-// test/repo/worker-configs.ts reserves for deployments.
+// SecretsBroker, so the bundle read is a real RPC call; MINTER does the same for mint calls, with
+// a test policy and scope registry; SELF sends real requests to STS's own HTTP routes. The Worker
+// and queue names stay outside the `sts-*` and `kilo-audit-*` names test/repo/worker-configs.ts
+// reserves for deployments.
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "name": "secrets-broker-rpc-test",
@@ -33,6 +34,7 @@
     "MANAGER_ENVIRONMENT_SLUG": "development",
     "MANAGER_IDENTITY_ID": "test-identity-id",
     "DO_JURISDICTION": "none",
+    "TOKEN_SIGNING_KIDS_REVOKED": "",
   },
   "services": [
     {
@@ -40,6 +42,12 @@
       "service": "secrets-broker-rpc-test",
       "entrypoint": "ProbeBroker",
       "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "MINTER",
+      "service": "secrets-broker-rpc-test",
+      "entrypoint": "ProbeMinter",
+      "props": { "caller": "sts-runtime-probe" },
     },
     { "binding": "SELF", "service": "secrets-broker-rpc-test" },
   ],
@@ -52,10 +60,12 @@
       { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
       { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+      { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
   ],
 }

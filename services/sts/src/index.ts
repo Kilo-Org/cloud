@@ -3,6 +3,7 @@ export { BundleDO } from './dos/BundleDO';
 export { DenialDO } from './dos/DenialDO';
 export { RefresherDO } from './dos/RefresherDO';
 export { SignerDO } from './dos/SignerDO';
+export { TokenSignerDO } from './dos/TokenSignerDO';
 
 import { withDORetry } from '@kilocode/worker-utils';
 import { getRefresherStub } from './dos/stubs';

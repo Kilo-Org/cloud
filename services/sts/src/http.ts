@@ -1,29 +1,49 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import {
   BundleRequestSchema,
+  JWKS_CACHE_CONTROL,
+  JWKS_PATH,
   STS_BUNDLE_HTTP_PATH,
   STS_FETCHED_AT_HEADER,
   STS_STALE_HEADER,
   bundleResultHttpStatus,
+  mintResultHttpStatus,
   type BundleRequest,
   type BundleResult,
+  type MintResult,
 } from '@kilocode/sts-contracts';
 import { recordDenial } from './audit/denials';
 import { serveBundle } from './broker';
 import {
   BUNDLE_REQUEST_MAX_BODY_BYTES,
+  TOKEN_JWKS_CACHE_MS,
+  TOKEN_REQUEST_MAX_BODY_BYTES,
+  TOKEN_SIGNER_DEADLINE_MS,
+  TOKEN_SIGNER_SHARDS,
   VERIFIER_RETRY_AFTER_SECONDS,
   WEBHOOK_MAX_BODY_BYTES,
 } from './constants';
-import { getRefresherStub, getSignerStub } from './dos/stubs';
+import { getRefresherStub, getSignerStub, getTokenSignerStub } from './dos/stubs';
 import type { ManagerJwks } from './dos/SignerDO';
+import type { TokenJwks } from './dos/TokenSignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
 import { IdentityVerifier } from './identity/verify';
 import { WebhookGate, type WebhookOutcome } from './infisical/webhook';
-import { policyIndex } from './policy';
+import type { PolicyIndex } from './policy/load';
+import { callWithDeadline } from './rpc';
+import {
+  defaultMintAuthority,
+  serveMint,
+  type MintAuthority,
+  type MintCaller,
+} from './tokens/mint';
+import type { TokenJwk } from './tokens/key-ring';
 
 /** Infisical posts `secrets.modified` for this environment here (README). */
 export const MANAGER_WEBHOOK_PATH = '/manager-webhook';
+
+/** A caller outside the account posts a mint request here with its provider OIDC token. */
+export const TOKEN_HTTP_PATH = '/v1/token';
 
 /** The key set changes only when the signer key does, so an isolate serves it from memory. */
 const JWKS_CACHE_MS = 5 * 60 * 1000;
@@ -34,10 +54,13 @@ const JWKS_CACHE_MS = 5 * 60 * 1000;
  */
 let jwksCache: { environment: string; jwks: ManagerJwks; expiresAt: number } | null = null;
 
+/** The service-token key set, plain data as above. */
+let tokenJwksCache: { environment: string; jwks: TokenJwks; expiresAt: number } | null = null;
+
 let gateCache: { environment: string; gate: WebhookGate } | null = null;
 
 /** Provider discovery and key sets are cached in the verifier, so one instance serves the isolate. */
-let verifierCache: { key: string; instance: IdentityVerifier } | null = null;
+let verifierCache: { key: string; policies: PolicyIndex; instance: IdentityVerifier } | null = null;
 
 function jsonResponse(body: unknown, status: number, cacheControl: string): Response {
   return new Response(JSON.stringify(body), {
@@ -63,18 +86,34 @@ export function bundleResponse(result: BundleResult): Response {
   return new Response(JSON.stringify(result), { status, headers });
 }
 
-function identityVerifier(config: StsConfig): IdentityVerifier {
+function identityVerifier(config: StsConfig, policies: PolicyIndex): IdentityVerifier {
   const key = `${config.issuer}|${config.environment}`;
   const cached = verifierCache;
-  if (cached !== null && cached.key === key) return cached.instance;
+  if (cached !== null && cached.key === key && cached.policies === policies) {
+    return cached.instance;
+  }
   const instance = new IdentityVerifier({
-    policies: policyIndex.all(),
+    policies: policies.all(),
     environment: config.environment,
     issuer: config.issuer,
     fetch: (input, init) => fetch(input, init),
   });
-  verifierCache = { key, instance };
+  verifierCache = { key, policies, instance };
   return instance;
+}
+
+function bearerToken(request: Request): string {
+  const authorization = request.headers.get('authorization');
+  return authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : '';
+}
+
+/** Maps a mint result to its HTTP response; exported for the response-shape tests. */
+export function mintResponse(result: MintResult): Response {
+  const headers = new Headers({ 'cache-control': 'no-store', 'content-type': 'application/json' });
+  if (result.status === 'unavailable') {
+    headers.set('retry-after', String(result.retryAfterSeconds));
+  }
+  return new Response(JSON.stringify(result), { status: mintResultHttpStatus(result), headers });
 }
 
 /**
@@ -158,21 +197,158 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
   return jsonResponse(jwks, 200, 'public, max-age=300');
 }
 
+/**
+ * The service-token key set (design 5.7): the next, current and retired-in-grace keys of every
+ * token signer shard. Each isolate serves it from memory for `TOKEN_JWKS_CACHE_MS`, the
+ * response's max-age; a request that finds no fresh copy calls each shard itself, in parallel and
+ * bounded like a mint, and stores the plain result only when every shard answered. A kid listed in
+ * `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in the signer, so an emergency removal
+ * never waits on the object.
+ */
+async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
+  const cached = tokenJwksCache;
+  let jwks: TokenJwks;
+  if (
+    cached !== null &&
+    cached.environment === config.environment &&
+    cached.expiresAt > Date.now()
+  ) {
+    jwks = cached.jwks;
+  } else {
+    const outcomes = await Promise.all(
+      Array.from({ length: TOKEN_SIGNER_SHARDS }, (_, shard) =>
+        callWithDeadline(
+          async (): Promise<TokenJwks> =>
+            await withDORetry(
+              () => getTokenSignerStub(env, config, shard),
+              stub => stub.getJwks(),
+              'sts.getTokenJwks'
+            ),
+          TOKEN_SIGNER_DEADLINE_MS
+        )
+      )
+    );
+    const keys: TokenJwk[] = [];
+    for (const outcome of outcomes) {
+      if (outcome.status !== 'answered') {
+        console.warn('sts: token key set could not be loaded', {
+          outcome: outcome.status,
+          reason:
+            outcome.status === 'failed' && outcome.error instanceof Error
+              ? outcome.error.name
+              : 'none',
+        });
+        return unavailableResponse();
+      }
+      keys.push(...outcome.value.keys.map(key => ({ ...key })));
+    }
+    jwks = { keys };
+    tokenJwksCache = {
+      environment: config.environment,
+      jwks,
+      expiresAt: Date.now() + TOKEN_JWKS_CACHE_MS,
+    };
+  }
+  const keys = jwks.keys.filter(key => !config.revokedTokenKids.includes(key.kid));
+  return jsonResponse({ keys }, 200, JWKS_CACHE_CONTROL);
+}
+
+/**
+ * `POST /v1/token`: a provider OIDC token in `Authorization`, a mint request as the body. A token
+ * that did not verify is refused and only logged. A verified identity whose policy refuses it is
+ * audited as a token denial: one whose binding failed is refused whole, one that maps to no policy
+ * here gets every token denied `unknown_workload`. The body is read only after the token verified.
+ */
+async function tokenRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: StsConfig,
+  authority: MintAuthority
+): Promise<Response> {
+  const token = bearerToken(request);
+  if (token.length === 0) return mintResponse({ status: 'identity_rejected' });
+
+  const outcome = await identityVerifier(config, authority.policies).verify(token);
+  if (outcome.status === 'unavailable') {
+    return mintResponse({ status: 'unavailable', retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS });
+  }
+  let caller: MintCaller;
+  if (outcome.status === 'verified') {
+    caller = {
+      channel: 'http',
+      workload: outcome.workload,
+      identity: outcome.provider,
+      attestationExp: outcome.attestationExp,
+      claims: { provider: outcome.provider },
+    };
+  } else {
+    const { subject } = outcome;
+    if (subject === undefined) {
+      console.warn('sts: token request refused: token not verified', {
+        environment: config.environment,
+        reason: outcome.reason,
+      });
+      return mintResponse({ status: 'identity_rejected' });
+    }
+    const claims = { provider: subject.provider, ...subject.claims };
+    if (outcome.reason === 'identity_rejected') {
+      const hop = recordDenial(env, config, {
+        kind: 'token',
+        channel: 'http',
+        reason: 'identity_rejected',
+        actor: subject.actor,
+        claims,
+      });
+      if (hop !== null) ctx.waitUntil(hop);
+      return mintResponse({ status: 'identity_rejected' });
+    }
+    // No policy here names this identity: every requested token is denied `unknown_workload`.
+    caller = {
+      channel: 'http',
+      workload: subject.actor,
+      identity: subject.provider,
+      attestationExp: null,
+      claims,
+    };
+  }
+
+  const text = await readCappedText(request, TOKEN_REQUEST_MAX_BODY_BYTES);
+  if (text === null) {
+    return new Response(JSON.stringify({ status: 'invalid_request' } satisfies MintResult), {
+      status: 413,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return mintResponse({ status: 'invalid_request' });
+  }
+  return mintResponse(
+    await serveMint(env, config, {
+      caller,
+      request: body,
+      waitUntil: promise => ctx.waitUntil(promise),
+      authority,
+    })
+  );
+}
+
 async function bundleRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  config: StsConfig
+  config: StsConfig,
+  authority: MintAuthority
 ): Promise<Response> {
-  const authorization = request.headers.get('authorization');
-  const token = authorization?.startsWith('Bearer ')
-    ? authorization.slice('Bearer '.length).trim()
-    : '';
+  const token = bearerToken(request);
   if (token.length === 0) {
     return bundleResponse({ status: 'denied', reason: 'identity_rejected' });
   }
 
-  const outcome = await identityVerifier(config).verify(token);
+  const outcome = await identityVerifier(config, authority.policies).verify(token);
   if (outcome.status === 'denied') {
     if (outcome.subject === undefined) {
       console.warn('sts: bundle request refused: token not verified', {
@@ -277,10 +453,15 @@ function unavailableResponse(): Response {
   });
 }
 
+/**
+ * Every HTTP route. `authority` (the policies and scope registry) is the shipped one in a
+ * deployment; a test fixture passes its own.
+ */
 export async function handleRequest(
   request: Request,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
+  authority: MintAuthority = defaultMintAuthority
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
@@ -288,8 +469,14 @@ export async function handleRequest(
   if (request.method === 'GET' && pathname === MANAGER_JWKS_PATH) {
     return await keySet(env, config);
   }
+  if (request.method === 'GET' && pathname === JWKS_PATH) {
+    return await tokenKeySet(env, config);
+  }
+  if (request.method === 'POST' && pathname === TOKEN_HTTP_PATH) {
+    return await tokenRequest(request, env, ctx, config, authority);
+  }
   if (request.method === 'POST' && pathname === STS_BUNDLE_HTTP_PATH) {
-    return await bundleRequest(request, env, ctx, config);
+    return await bundleRequest(request, env, ctx, config, authority);
   }
   if (request.method === 'POST' && pathname === MANAGER_WEBHOOK_PATH) {
     return await managerWebhook(request, env, config);

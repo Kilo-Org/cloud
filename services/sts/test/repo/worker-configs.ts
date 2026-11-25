@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { StsEnvironment } from '@kilocode/sts-contracts';
+import { STS_ISSUERS, type StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
+import { EnvVarsSchema } from '../../src/env';
 import type { Policy } from '../../src/policy/schema';
 
 /**
@@ -98,6 +99,18 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
 ]);
 
 const STS_ENTRYPOINT = 'SecretsBroker';
+
+/**
+ * Durable Object classes only STS defines (design 5.7: only STS binds its own objects). A config
+ * outside `services/sts/` that binds a class by one of these names fails. `SignerDO` is left out:
+ * the audit relay defines a class of its own by that name.
+ */
+export const STS_CLASS_NAMES: readonly string[] = [
+  'BundleDO',
+  'RefresherDO',
+  'DenialDO',
+  'TokenSignerDO',
+];
 
 // Prefix matches, wider than the deployment lists on purpose: a binding to a name that only looks
 // like STS or the relay fails here instead of slipping past an exact-name list.
@@ -823,6 +836,15 @@ export function workerConfigProblems(
       problems.push(...internalReferenceProblems(block));
       problems.push(...auditQueueProblems(block));
       problems.push(...archiveBucketProblems(block));
+      if (!worker.path.startsWith('services/sts/')) {
+        for (const object of block.bindings.durable_objects?.bindings ?? []) {
+          if (STS_CLASS_NAMES.includes(object.class_name)) {
+            problems.push(
+              `${block.where}: ${object.name} binds Durable Object class ${object.class_name}, which only STS defines and binds`
+            );
+          }
+        }
+      }
       for (const binding of block.bindings.services ?? []) {
         if (isAuditRelayName(binding.service)) {
           problems.push(
@@ -887,6 +909,32 @@ export function internalWorkerProblems(configs: readonly WorkerConfig[]): string
       problems.push(
         `${worker.path} deploys ${deployed}; AUDIT_RELAY_DEPLOYMENTS lists ${expectedRelay}`
       );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Problems with the vars of each STS deployment block: Wrangler inherits no vars into an env
+ * block, and `readConfig` refuses every request when one is missing or malformed (a bad kid in
+ * `TOKEN_SIGNING_KIDS_REVOKED`, say), so each block must pass `EnvVarsSchema` on its own, and its
+ * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`).
+ */
+export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
+  const problems: string[] = [];
+  for (const worker of configs.filter(({ config }) => config.name === 'sts')) {
+    for (const block of blocksOf(worker).filter(candidate => !candidate.preview)) {
+      const vars = EnvVarsSchema.safeParse(block.bindings.vars ?? {});
+      if (!vars.success) {
+        problems.push(`${block.where}: vars do not pass EnvVarsSchema: ${vars.error.message}`);
+        continue;
+      }
+      const expected = STS_ISSUERS[vars.data.STS_ENVIRONMENT];
+      if (vars.data.STS_ISSUER !== expected) {
+        problems.push(
+          `${block.where}: STS_ISSUER is ${vars.data.STS_ISSUER}, expected ${expected}`
+        );
+      }
     }
   }
   return problems;

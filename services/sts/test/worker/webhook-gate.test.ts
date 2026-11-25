@@ -120,6 +120,40 @@ describe('webhook gate', () => {
     expect(subject.loads()).toBe(2);
   });
 
+  it('retries a failed first load from one request a minute; the others answer 503', async () => {
+    let failing = true;
+    const subject = gate({ failLoads: () => failing });
+    const body = subject.body();
+    const signature = await signWebhook(SECRET, body);
+    await expect(subject.verify(body, signature)).rejects.toThrow('refresher unavailable');
+    expect(subject.loads()).toBe(1);
+
+    subject.advance(61_000);
+    const later = subject.body();
+    const laterSignature = await signWebhook(SECRET, later);
+    const retries = await Promise.allSettled([
+      subject.verify(later, laterSignature),
+      subject.verify(later, laterSignature),
+      subject.verify(later, laterSignature),
+    ]);
+    expect(
+      retries.map(result => (result.status === 'rejected' ? String(result.reason) : 'answered'))
+    ).toEqual([
+      'Error: refresher unavailable',
+      'Error: webhook secret load failed less than a reload interval ago',
+      'Error: webhook secret load failed less than a reload interval ago',
+    ]);
+    expect(subject.loads()).toBe(2);
+
+    failing = false;
+    subject.advance(61_000);
+    const recovered = subject.body();
+    expect(await subject.verify(recovered, await signWebhook(SECRET, recovered))).toEqual({
+      status: 'refresh',
+    });
+    expect(subject.loads()).toBe(3);
+  });
+
   it('refuses a missing signature and a stale timestamp, and ignores another environment', async () => {
     const subject = gate();
     const body = subject.body();

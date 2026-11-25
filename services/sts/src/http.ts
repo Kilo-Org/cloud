@@ -145,12 +145,15 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
   ) {
     return jsonResponse(cached.jwks, 200, 'public, max-age=300');
   }
-  const fetched = await withDORetry(
+  // Partial: only a workerd RPC result carries a disposer (see serveBundle in broker.ts).
+  const fetched: ManagerJwks & Partial<Disposable> = await withDORetry(
     () => getSignerStub(env, config),
     stub => stub.getJwks(),
     'sts.getJwks'
   );
+  // A plain copy (nested values are plain data after structured clone), then the result's disposer.
   const jwks: ManagerJwks = { keys: fetched.keys };
+  fetched[Symbol.dispose]?.();
   jwksCache = { environment: config.environment, jwks, expiresAt: Date.now() + JWKS_CACHE_MS };
   return jsonResponse(jwks, 200, 'public, max-age=300');
 }

@@ -7,7 +7,7 @@ import {
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
 import { recordDenial, type Denial } from './audit/denials';
-import { BUNDLE_OBJECT_RETRY_AFTER_SECONDS } from './constants';
+import { BUNDLE_OBJECT_DEADLINE_MS, BUNDLE_OBJECT_RETRY_AFTER_SECONDS } from './constants';
 import { getBundleStub } from './dos/stubs';
 import { readConfig, type Env, type StsConfig } from './env';
 import { policyExists, policyFor } from './policy';
@@ -69,10 +69,21 @@ export async function serveWorkerCall(
   return await serveBundle(env, config, caller, request);
 }
 
+/** What the deadline settles with when the bundle object has not answered in time. */
+const DEADLINE = Symbol('deadline');
+
 /**
  * One hop to the workload's bundle object. Deliberately not retried: a delivery appends an audit
  * row, so a retry after a committed append would audit the same read twice. A failed hop answers
  * `unavailable`; the caller keeps its copy and retries after 30 seconds.
+ *
+ * The hop is bounded by `BUNDLE_OBJECT_DEADLINE_MS` (`options.deadlineMs` overrides it). A caller
+ * cannot cancel an RPC, and a Durable Object waiting on one stays in memory, billed, until it
+ * completes, so STS stops waiting itself and answers `unavailable`. Its context then ends and
+ * workerd cancels the call on this side only: the bundle object finishes its own work, so a fill
+ * still running stores the bundle and serves the next read. The trade-off: a delivery the bundle
+ * object commits after the deadline is audited though the caller never got it, and the caller's
+ * retry is audited again.
  *
  * The answer is a plain copy, and the bundle object's RPC result is disposed here. workerd gives
  * every object an RPC call returns a disposer, and a method that returns an object with a disposer
@@ -83,22 +94,46 @@ export async function serveBundle(
   env: Env,
   config: StsConfig,
   workload: string,
-  request: BundleRequest
+  request: BundleRequest,
+  options: { deadlineMs?: number } = {}
 ): Promise<BundleResult> {
   const parsed = BundleRequestSchema.parse(request);
   // Partial: only a workerd RPC result carries a disposer, and only on its top-level object.
-  let result: BundleResult & Partial<Disposable>;
+  // Created in an async callback, so a stub that throws as it is made becomes a rejection that
+  // the catch below answers.
+  const call: Promise<BundleResult & Partial<Disposable>> = Promise.try(
+    async () =>
+      await getBundleStub(env, config, workload).getBundle(workload, config.environment, parsed)
+  );
+  const deadline = Promise.withResolvers<typeof DEADLINE>();
+  const timer = setTimeout(
+    () => deadline.resolve(DEADLINE),
+    options.deadlineMs ?? BUNDLE_OBJECT_DEADLINE_MS
+  );
+  let result: (BundleResult & Partial<Disposable>) | typeof DEADLINE;
   try {
-    result = await getBundleStub(env, config, workload).getBundle(
-      workload,
-      config.environment,
-      parsed
-    );
+    result = await Promise.race([call, deadline.promise]);
   } catch (error) {
     console.error('sts: bundle object call failed', {
       workload,
       reason: error instanceof Error ? error.name : 'unknown',
     });
+    return {
+      status: 'unavailable',
+      reason: 'internal',
+      retryAfterSeconds: BUNDLE_OBJECT_RETRY_AFTER_SECONDS,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+  if (result === DEADLINE) {
+    console.error('sts: bundle object did not answer before the deadline', { workload });
+    // A result that still lands while this context lives is disposed. Once the context ends,
+    // workerd has cancelled the call, so no result arrives and nothing is held open.
+    void call.then(
+      late => late[Symbol.dispose]?.(),
+      () => undefined
+    );
     return {
       status: 'unavailable',
       reason: 'internal',

@@ -25,7 +25,8 @@ export const BUNDLE_REQUEST_MAX_BODY_BYTES = 4 * 1024;
 /**
  * A Worker isolate reloads the webhook secret from the refresher at most this often, after a
  * signature that fails or a load that failed, so a forged flood costs at most one refresher hop
- * per isolate per minute.
+ * per isolate per minute once the secret is loaded. After a failed first load, one request per
+ * minute retries and the others answer 503 meanwhile.
  */
 export const WEBHOOK_KEY_RELOAD_MS = 60 * 1000;
 
@@ -34,10 +35,20 @@ export const BACKOFF_BASE_MS = 15 * 1000;
 export const BACKOFF_CAP_MS = REFRESH_INTERVAL_MS;
 
 /**
- * Bound on one manager request. A fill makes at most a login and one parallel pair of reads, so it
- * finishes inside the secrets client's 25-second first-load window.
+ * Bound on one manager request. A fill attempt makes at most a login and one parallel pair of
+ * reads, so it takes at most 2 x 8 = 16 seconds and finishes inside the secrets client's 25-second
+ * first-load window.
  */
 export const MANAGER_FETCH_TIMEOUT_MS = 8_000;
+
+/**
+ * STS stops waiting for a bundle object after this long and answers `unavailable`. 20 s covers a
+ * fill attempt's 16 s (MANAGER_FETCH_TIMEOUT_MS) plus the object hops, and stays under the client's
+ * 25-second request bound, so the client gets this answer rather than its own timeout. A fill that
+ * needs a second attempt (`withDORetry` in BundleDO reruns it after a Durable Object error) can run
+ * past it; that fill still finishes inside the bundle object and serves the next read.
+ */
+export const BUNDLE_OBJECT_DEADLINE_MS = 20_000;
 
 /** Bound on one provider discovery or key-set fetch while verifying a workload token. */
 export const PROVIDER_FETCH_TIMEOUT_MS = 5_000;
@@ -72,5 +83,5 @@ export const MANAGER_RETRY_AFTER_SECONDS = 60;
 /** A provider key set or discovery document is unreachable: the caller retries after this. */
 export const VERIFIER_RETRY_AFTER_SECONDS = 30;
 
-/** A bundle object call failed (an error or a reset): the caller retries after this. */
+/** A bundle object call failed (an error, a reset or the deadline): the caller retries after this. */
 export const BUNDLE_OBJECT_RETRY_AFTER_SECONDS = 30;

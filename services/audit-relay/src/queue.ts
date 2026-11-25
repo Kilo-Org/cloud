@@ -131,6 +131,22 @@ async function applyOutcome(
       );
       message.ack();
       return;
+    case 'duplicate_mismatch':
+      console.error(
+        JSON.stringify({
+          event: 'audit_relay.duplicate_mismatch',
+          stream: outcome.stream,
+          fromSeq: outcome.fromSeq,
+          toSeq: outcome.toSeq,
+          reason: outcome.reason,
+        })
+      );
+      await pageOperator(
+        env,
+        `audit stream ${outcome.stream} received seq ${outcome.fromSeq}..${outcome.toSeq} again and it disagrees with the archive: ${outcome.reason}`
+      );
+      message.ack();
+      return;
   }
 }
 

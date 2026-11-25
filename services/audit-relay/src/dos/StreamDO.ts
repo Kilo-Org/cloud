@@ -3,8 +3,14 @@ import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
 import { SecretUnavailableError } from '@kilocode/secrets-client';
 import { withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
-import { ArchiveConflictError, writeArchivedBatch } from '../relay/archive';
+import {
+  ArchiveConflictError,
+  archiveObjectKey,
+  readArchivedObject,
+  writeArchivedBatch,
+} from '../relay/archive';
 import { ingestAuditEvents } from '../relay/axiom';
+import { canonicalJson } from '../relay/canonical';
 import { GENESIS_HASH, chainHash } from '../relay/chain';
 import { errorName } from '../relay/error-name';
 import { secretsFor } from '../secrets';
@@ -49,7 +55,8 @@ export type HotStoreGap = {
  * One batch's fate. `accepted` means archived and delivered to Axiom; `duplicate` means the batch
  * was already archived (`replayed` says an owed hot-copy range was re-ingested); `retry` asks the
  * queue for another attempt; `hot_gap` means archived but the hot copy is deferred to a replay job;
- * `dropped` is a non-retryable failure that lost the batch entirely.
+ * `dropped` is a non-retryable failure that lost the batch entirely; `duplicate_mismatch` is a
+ * batch at or below the head that disagrees with the archive and is paged and acked unused.
  */
 export type StreamOutcome =
   | {
@@ -75,7 +82,21 @@ export type StreamOutcome =
       toSeq: number;
       reason: HotCopyFailureReason;
     }
-  | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' };
+  | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' }
+  | {
+      kind: 'duplicate_mismatch';
+      stream: string;
+      fromSeq: number;
+      toSeq: number;
+      reason: DuplicateMismatchReason;
+    };
+
+/**
+ * Why a batch at or below the head disagrees with the archive: `content` differs from the object
+ * at its `toSeq`, `unaligned` names a `toSeq` no object ends at, `corrupt` finds an object there
+ * that does not decode.
+ */
+export type DuplicateMismatchReason = 'content' | 'unaligned' | 'corrupt';
 
 type HotCopyResult =
   | { kind: 'delivered' }
@@ -198,11 +219,43 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * A batch at or below the head was already archived. If owed hot-copy rows overlap it, the
+   * A batch at or below the head was already archived. It must agree with the archive before
+   * anything else: a redelivery is byte-identical, so a difference is a forged or corrupted
+   * message and is paged, never replayed. If owed hot-copy rows overlap an agreeing batch, the
    * redelivery is the second chance: ingest the events of those rows the message carries
    * (at-least-once, deduped by event id) and clear the rows it fully covers.
    */
   private async replayIfOwed(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
+    let agreement: 'match' | DuplicateMismatchReason;
+    try {
+      agreement = await this.compareWithArchive(batch);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'audit_relay.duplicate_check_failed',
+          stream: batch.stream,
+          toSeq: batch.toSeq,
+          error: errorName(error),
+        })
+      );
+      return {
+        kind: 'retry',
+        stream: batch.stream,
+        fromSeq: batch.fromSeq,
+        reason: 'archive',
+        delaySeconds: FAILURE_RETRY_SECONDS,
+      };
+    }
+    if (agreement !== 'match') {
+      return {
+        kind: 'duplicate_mismatch',
+        stream: batch.stream,
+        fromSeq: batch.fromSeq,
+        toSeq: batch.toSeq,
+        reason: agreement,
+      };
+    }
+
     const owed = await this.owedRowsWithin(batch);
     if (owed.length === 0) {
       return {
@@ -230,6 +283,35 @@ export class StreamDO extends DurableObject<Env> {
       headSeq: head.seq,
       replayed: true,
     };
+  }
+
+  /**
+   * Compares a duplicate with the archived object that ends at its `toSeq`. When the duplicate
+   * covers the whole object, its trimmed form must re-hash to the stored chain hash; when it
+   * covers only a suffix of the object (the producer split differently), the overlapping events
+   * must serialise identically, which is the same test because the hash is
+   * `sha256(prevHash || canonicalJson(batch))`. Throws on an R2 failure, which a retry fixes.
+   */
+  private async compareWithArchive(batch: AuditBatch): Promise<'match' | DuplicateMismatchReason> {
+    const read = await readArchivedObject(
+      this.env.AUDIT_ARCHIVE,
+      archiveObjectKey(batch.stream, batch.toSeq)
+    );
+    if (read.kind === 'missing') return 'unaligned';
+    if (read.kind === 'corrupt') return 'corrupt';
+    const archived = read.object;
+    if (archived.batch.toSeq !== batch.toSeq) return 'content';
+
+    if (batch.fromSeq <= archived.batch.fromSeq) {
+      const trimmed: AuditBatch = {
+        ...batch,
+        fromSeq: archived.batch.fromSeq,
+        events: batch.events.slice(archived.batch.fromSeq - batch.fromSeq),
+      };
+      return (await chainHash(archived.prevHash, trimmed)) === archived.hash ? 'match' : 'content';
+    }
+    const overlap = archived.batch.events.slice(batch.fromSeq - archived.batch.fromSeq);
+    return canonicalJson(overlap) === canonicalJson(batch.events) ? 'match' : 'content';
   }
 
   // Rows are disjoint archived ranges keyed by toSeq, so the ones overlapping the batch are the

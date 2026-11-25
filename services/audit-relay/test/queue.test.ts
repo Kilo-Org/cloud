@@ -112,4 +112,24 @@ describe('queue handler', () => {
       text: expect.stringMatching(/^bot: audit stream .* without the hot copy: axiom_rejected$/),
     });
   });
+
+  it('pages and acks a duplicate whose content differs from the archive', async () => {
+    const stream = uniqueStream('queue-forged');
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    await runQueue('kilo-audit', [await encoded(stream)]);
+
+    const { result } = await runQueue('kilo-audit', [await encoded(stream)]);
+
+    expect(result.retryMessages).toEqual([]);
+    expect(result.explicitAcks).toHaveLength(1);
+    const pages = http.requests.filter(
+      request => request.url === 'https://hooks.slack.test/audit-relay'
+    );
+    expect(pages.map(page => JSON.parse(page.body ?? '{}'))).toEqual([
+      {
+        text: `bot: audit stream ${stream} received seq 1..2 again and it disagrees with the archive: content`,
+      },
+    ]);
+  });
 });

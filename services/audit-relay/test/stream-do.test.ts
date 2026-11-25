@@ -2,8 +2,8 @@ import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
-import { archiveObjectKey } from '../src/relay/archive';
-import { GENESIS_HASH } from '../src/relay/chain';
+import { archiveObjectKey, writeArchivedBatch } from '../src/relay/archive';
+import { GENESIS_HASH, chainHash } from '../src/relay/chain';
 import {
   auditBatch,
   axiomOk,
@@ -58,14 +58,69 @@ describe('StreamDO', () => {
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
 
-    accepted(await stub.acceptBatch(auditBatch(1, 2, stream)));
-    const duplicate = await stub.acceptBatch(auditBatch(1, 2, stream));
+    const batch = auditBatch(1, 2, stream);
+    accepted(await stub.acceptBatch(batch));
+    const duplicate = await stub.acceptBatch(batch);
 
     expect(duplicate).toMatchObject({ kind: 'duplicate', toSeq: 2, headSeq: 2 });
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
     expect(http.requests).toHaveLength(1);
+  });
+
+  it('accepts a redelivered suffix of an archived batch that matches it', async () => {
+    const stream = uniqueStream('duplicate-suffix');
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stub = getStreamDOStub(env, stream);
+    const batch = auditBatch(1, 4, stream);
+    accepted(await stub.acceptBatch(batch));
+
+    const suffix = { ...batch, fromSeq: 3, events: batch.events.slice(2) };
+    expect(await stub.acceptBatch(suffix)).toMatchObject({ kind: 'duplicate', toSeq: 4 });
+  });
+
+  it('reports a duplicate whose content differs from the archive and never replays it', async () => {
+    const stream = uniqueStream('duplicate-forged');
+    let reject = true;
+    const http = recordingFetch(() =>
+      reject ? new Response('invalid', { status: 400 }) : axiomOk()
+    );
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+    const batch = auditBatch(1, 2, stream);
+    expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'hot_gap' });
+    reject = false;
+
+    const forged = auditBatch(1, 2, stream);
+    expect(await stub.acceptBatch(forged)).toEqual({
+      kind: 'duplicate_mismatch',
+      stream,
+      fromSeq: 1,
+      toSeq: 2,
+      reason: 'content',
+    });
+    const suffix = { ...forged, fromSeq: 2, events: forged.events.slice(1) };
+    expect(await stub.acceptBatch(suffix)).toMatchObject({
+      kind: 'duplicate_mismatch',
+      reason: 'content',
+    });
+    expect(http.requests).toHaveLength(1);
+    expect(await stub.hotStoreGaps()).toHaveLength(1);
+  });
+
+  it('reports a duplicate that ends inside an archived batch', async () => {
+    const stream = uniqueStream('duplicate-unaligned');
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stub = getStreamDOStub(env, stream);
+    const batch = auditBatch(1, 4, stream);
+    accepted(await stub.acceptBatch(batch));
+
+    const prefix = { ...batch, toSeq: 2, events: batch.events.slice(0, 2) };
+    expect(await stub.acceptBatch(prefix)).toMatchObject({
+      kind: 'duplicate_mismatch',
+      reason: 'unaligned',
+    });
   });
 
   it('retries a gap and accepts the batch once the missing range arrives', async () => {
@@ -172,7 +227,8 @@ describe('StreamDO', () => {
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
 
-    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+    const first = auditBatch(1, 2, stream);
+    expect(await stub.acceptBatch(first)).toMatchObject({
       kind: 'hot_gap',
     });
     expect(await stub.acceptBatch(auditBatch(3, 5, stream))).toMatchObject({
@@ -186,7 +242,7 @@ describe('StreamDO', () => {
     ]);
     expect((await stub.hotStoreGaps()).map(gap => [gap.fromSeq, gap.toSeq])).toEqual([[1, 2]]);
 
-    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+    expect(await stub.acceptBatch(first)).toMatchObject({
       kind: 'duplicate',
       replayed: true,
     });
@@ -199,11 +255,14 @@ describe('StreamDO', () => {
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
 
-    // Exactly what the commit write leaves if the instance dies before the ingest: the head and
-    // the pending row for the archived range, and nothing delivered.
+    // Exactly what the commit write leaves if the instance dies before the ingest: the archive
+    // object, the head and the pending row for the archived range, and nothing delivered.
+    const batch = auditBatch(1, 2, stream);
+    const hash = await chainHash(GENESIS_HASH, batch);
+    await writeArchivedBatch(env.AUDIT_ARCHIVE, { batch, prevHash: GENESIS_HASH, hash });
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.put({
-        head: { seq: 2, hash: 'a'.repeat(64) },
+        head: { seq: 2, hash },
         'hot_copy:000000000002': {
           stream,
           fromSeq: 1,
@@ -214,7 +273,7 @@ describe('StreamDO', () => {
       });
     });
 
-    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+    expect(await stub.acceptBatch(batch)).toMatchObject({
       kind: 'duplicate',
       replayed: true,
     });

@@ -99,8 +99,10 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 
-  let hashPromise: Promise<string> | null = null;
-  const workloadHashes = new Map<string, Promise<string>>();
+  // Hashes are kept as strings, never promises, so no request awaits a digest another request
+  // started (workerd ties a promise to the request that created it).
+  let policyHash: string | null = null;
+  const workloadHashes = new Map<string, string>();
   return {
     all: () => policies,
     forEnvironment: environment =>
@@ -112,18 +114,14 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
       return policy;
     },
     snapshot: () => entries,
-    hash: () => {
-      hashPromise ??= sha256Base64Url(JSON.stringify(entries));
-      return hashPromise;
-    },
-    workloadHash: workload => {
-      let pending = workloadHashes.get(workload);
-      if (pending === undefined) {
-        const secrets = [...(byWorkload.get(workload)?.secrets ?? [])].sort();
-        pending = sha256Base64Url(JSON.stringify({ workload, secrets }));
-        workloadHashes.set(workload, pending);
-      }
-      return pending;
+    hash: async () => (policyHash ??= await sha256Base64Url(JSON.stringify(entries))),
+    workloadHash: async workload => {
+      const cached = workloadHashes.get(workload);
+      if (cached !== undefined) return cached;
+      const secrets = [...(byWorkload.get(workload)?.secrets ?? [])].sort();
+      const hash = await sha256Base64Url(JSON.stringify({ workload, secrets }));
+      workloadHashes.set(workload, hash);
+      return hash;
     },
   };
 }

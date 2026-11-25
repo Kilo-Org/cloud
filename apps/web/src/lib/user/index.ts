@@ -2670,11 +2670,11 @@ async function tryVerifyDiscordGuildMembership(
   }
 }
 
-export async function unlinkAuthProviderFromUser(
+/** Whether the provider can be unlinked: it is linked and is not the last method. */
+export async function checkAuthProviderUnlink(
   kiloUserId: string,
   provider: AuthProviderId
 ): Promise<OptionalError<TRPCError>> {
-  // Safety check: ensure user has at least 2 auth providers before unlinking
   const userProviders = await getUserAuthProviders(kiloUserId);
 
   if (userProviders.length <= 1)
@@ -2684,14 +2684,23 @@ export async function unlinkAuthProviderFromUser(
       cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod),
     });
 
-  const providerToUnlink = userProviders.find(p => p.provider === provider);
-  if (!providerToUnlink) {
+  if (!userProviders.some(p => p.provider === provider)) {
     return trpcFailure({
       code: 'BAD_REQUEST',
       message: `User does not have a linked ${provider} account`,
       cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.notLinked),
     });
   }
+
+  return successResult();
+}
+
+export async function unlinkAuthProviderFromUser(
+  kiloUserId: string,
+  provider: AuthProviderId
+): Promise<OptionalError<TRPCError>> {
+  const unlinkable = await checkAuthProviderUnlink(kiloUserId, provider);
+  if (!unlinkable.success) return unlinkable;
 
   await db
     .delete(user_auth_provider)

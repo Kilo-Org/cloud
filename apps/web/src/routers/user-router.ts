@@ -8,6 +8,7 @@ import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCr
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
+  checkAuthProviderUnlink,
   getUserAuthProviders,
   SoftDeletePreconditionError,
   unlinkAuthProviderFromUser,
@@ -800,20 +801,16 @@ async function signInMethodChangeBinding(
   };
 }
 
-async function assertSignInMethodChangeAllowed(
-  ctx: TRPCContext,
-  params: {
-    change: SignInMethodChange;
-    provider: AuthProviderId;
-    code: string | undefined;
-    challengeId: string | undefined;
-  }
+/** Uses the emailed code for the change, or refuses the change. */
+async function spendSignInMethodChangeCode(
+  binding: SignInMethodChangeCodeBinding,
+  code: string | undefined,
+  challengeId: string | undefined
 ): Promise<void> {
-  const binding = await signInMethodChangeBinding(ctx, params.change, params.provider);
-  if (!params.code || !params.challengeId) {
+  if (!code || !challengeId) {
     throw signInMethodChangeRefused('codeInvalid');
   }
-  const result = await consumeSignInMethodChangeCode(binding, params.code, params.challengeId);
+  const result = await consumeSignInMethodChangeCode(binding, code, challengeId);
   if (result === 'invalid') throw signInMethodChangeRefused('codeInvalid');
   if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
 }
@@ -1074,12 +1071,8 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      await assertSignInMethodChangeAllowed(ctx, {
-        change: 'link',
-        provider: input.provider,
-        code: input.code,
-        challengeId: input.challengeId,
-      });
+      const binding = await signInMethodChangeBinding(ctx, 'link', input.provider);
+      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
 
       try {
         // Create a secure linking session
@@ -1103,12 +1096,10 @@ export const userRouter = createTRPCRouter({
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertSignInMethodChangeAllowed(ctx, {
-        change: 'unlink',
-        provider: input.provider,
-        code: input.code,
-        challengeId: input.challengeId,
-      });
+      const binding = await signInMethodChangeBinding(ctx, 'unlink', input.provider);
+      // A refused unlink must not spend the code.
+      assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
+      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
       const result = assertNoTrpcError(
         await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
       );
@@ -1134,6 +1125,10 @@ export const userRouter = createTRPCRouter({
         });
       }
       const binding = await signInMethodChangeBinding(ctx, input.change, input.provider);
+      if (input.change === 'unlink') {
+        // No code is sent for an unlink that would be refused.
+        assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
+      }
       const created = await createSignInMethodChangeCode(binding);
       if (created.status === 'locked') throw signInMethodChangeRefused('codeLocked');
       if (created.status === 'cooldown') throw signInMethodChangeRefused('codeCooldown');

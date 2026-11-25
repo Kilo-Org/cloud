@@ -335,6 +335,9 @@ describe('user.linkAuthProvider', () => {
 
   it('refuses a code made for another change, provider, browser session or user', async () => {
     const user = await insertUser();
+    // The unlink code needs a method that can be unlinked.
+    await addProvider(user.id, 'google');
+    await addProvider(user.id, 'github');
     await setSessionCookie(user);
     const caller = await createSessionCallerForUser(user.id);
 
@@ -535,6 +538,48 @@ describe('user.unlinkAuthProvider', () => {
     );
     expect(await providersOf(user.id)).toEqual(['github', 'google']);
     expect(mockSendRemoved).not.toHaveBeenCalled();
+  });
+
+  it('sends no code for an unlink that would remove the last method or a method not linked', async () => {
+    const user = await insertUser();
+    await addProvider(user.id, 'google');
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'unlink', provider: 'google' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod));
+
+    await addProvider(user.id, 'github');
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'unlink', provider: 'gitlab' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.notLinked));
+    expect(mockSendCode).not.toHaveBeenCalled();
+  });
+
+  it('does not spend the code when the unlink is refused', async () => {
+    const user = await insertUser();
+    await addProvider(user.id, 'google');
+    await addProvider(user.id, 'github');
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'unlink', 'github');
+
+    await db
+      .delete(user_auth_provider)
+      .where(
+        and(eq(user_auth_provider.kilo_user_id, user.id), eq(user_auth_provider.provider, 'google'))
+      );
+    await expect(
+      caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod));
+    expect(await providersOf(user.id)).toEqual(['github']);
+
+    await addProvider(user.id, 'google');
+    await expect(
+      caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
+    ).resolves.toEqual({ success: true });
+    expect(await providersOf(user.id)).toEqual(['google']);
   });
 
   it('unlinks with the code, writes the admin audit row and sends the notice', async () => {

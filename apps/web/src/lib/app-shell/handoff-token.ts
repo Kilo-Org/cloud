@@ -17,14 +17,14 @@ export const APP_SHELL_HANDOFF_TTL_SECONDS = 120;
  * path is stored with the token, so the consuming request cannot choose where
  * the shell opens.
  *
- * `webSessionPepper` is the pepper of the account row the caller authenticated
- * with. The token is good only while the account still has that pepper, so a
- * session revocation between mint and consume leaves it unusable.
+ * The row records the account's web-session pepper, read from the primary in
+ * the inserting statement; a request's user row may come from a replica that
+ * lags a rotation. The token is good only while the account keeps that pepper,
+ * so a session revocation between mint and consume leaves it unusable.
  */
 export async function createAppShellHandoff(params: {
   userId: string;
   targetPath: string;
-  webSessionPepper: string | null;
 }): Promise<string> {
   if (!isAppShellPath(params.targetPath)) {
     throw new Error(`Refusing to mint an app-shell hand-off for ${params.targetPath}`);
@@ -35,7 +35,7 @@ export async function createAppShellHandoff(params: {
     token_hash: crypto.createHash('sha256').update(token).digest('hex'),
     kilo_user_id: params.userId,
     target_path: params.targetPath,
-    web_session_pepper: params.webSessionPepper,
+    web_session_pepper: sql`(SELECT ${kilocode_users.web_session_pepper} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${params.userId})`,
     expires_at: new Date(Date.now() + APP_SHELL_HANDOFF_TTL_SECONDS * 1000).toISOString(),
   });
 

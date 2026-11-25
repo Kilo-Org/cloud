@@ -219,13 +219,11 @@ describe('blockUser (integration)', () => {
     const spent = await createAppShellHandoff({
       userId: user.id,
       targetPath: '/app-shell/github-app',
-      webSessionPepper: user.web_session_pepper,
     });
     await expect(consumeAppShellHandoff(spent)).resolves.not.toBeNull();
     const pending = await createAppShellHandoff({
       userId: user.id,
       targetPath: '/app-shell/connected-accounts',
-      webSessionPepper: user.web_session_pepper,
     });
 
     const didBlock = await blockUser({ kiloUserId: user.id, reason: 'hand-off block' });

@@ -46,19 +46,6 @@ describe('appShell.mintHandoff', () => {
     expect(mockMint).toHaveBeenCalledWith({
       userId: 'user-1',
       targetPath: '/app-shell/integrations/slack',
-      webSessionPepper: null,
-    });
-  });
-
-  test("binds the hand-off to the caller's web-session pepper", async () => {
-    const caller = createCaller({ user: { ...user, web_session_pepper: 'pepper-at-mint' } });
-
-    await caller.mintHandoff({ page: 'connected-accounts' });
-
-    expect(mockMint).toHaveBeenCalledWith({
-      userId: 'user-1',
-      targetPath: '/app-shell/connected-accounts',
-      webSessionPepper: 'pepper-at-mint',
     });
   });
 
@@ -91,7 +78,6 @@ describe('appShell.mintHandoff', () => {
     expect(mockMint).toHaveBeenCalledWith({
       userId: 'user-1',
       targetPath: `/app-shell/organizations/${ORGANIZATION_ID}/sso`,
-      webSessionPepper: null,
     });
   });
 

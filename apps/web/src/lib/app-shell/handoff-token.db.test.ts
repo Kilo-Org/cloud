@@ -22,7 +22,6 @@ async function mintHandoff(targetPath: string, webSessionPepper: string | null =
   const token = await createAppShellHandoff({
     userId: user.id,
     targetPath,
-    webSessionPepper: user.web_session_pepper,
   });
   return { token, userId: user.id };
 }
@@ -173,7 +172,7 @@ describe('app shell hand-off tokens', () => {
     createdUserIds.push(user.id);
 
     await expect(
-      createAppShellHandoff({ userId: user.id, targetPath: '/credits', webSessionPepper: null })
+      createAppShellHandoff({ userId: user.id, targetPath: '/credits' })
     ).rejects.toThrow(/app-shell/);
   });
 });

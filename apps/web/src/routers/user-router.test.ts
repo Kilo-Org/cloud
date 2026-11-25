@@ -529,7 +529,6 @@ describe('session and API token reset mutations', () => {
     await createAppShellHandoff({
       userId: user.id,
       targetPath: '/app-shell/github-app',
-      webSessionPepper: user.web_session_pepper,
     });
     const caller = await createCallerForUser(user.id);
 
@@ -568,7 +567,6 @@ describe('session and API token reset mutations', () => {
     const handoff = await createAppShellHandoff({
       userId: user.id,
       targetPath: '/app-shell/github-app',
-      webSessionPepper: user.web_session_pepper,
     });
     const caller = await createCallerForUser(user.id);
 
@@ -607,7 +605,6 @@ describe('session and API token reset mutations', () => {
     const handoff = await createAppShellHandoff({
       userId: target.id,
       targetPath: '/app-shell/connected-accounts',
-      webSessionPepper: target.web_session_pepper,
     });
     const caller = await createCallerForUser(admin.id);
 

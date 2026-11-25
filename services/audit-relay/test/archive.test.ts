@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ArchiveConflictError,
   archiveObjectKey,
+  putImmutable,
   readArchivedObject,
   writeArchivedBatch,
 } from '../src/relay/archive';
@@ -60,5 +61,42 @@ describe('writeArchivedBatch', () => {
     expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject({
       kind: 'corrupt',
     });
+  });
+});
+
+describe('putImmutable', () => {
+  it('writes a free key and never replaces a taken one, even without a lock rule', async () => {
+    const key = `${uniqueStream('immutable')}/object`;
+    const original = new TextEncoder().encode('original');
+
+    expect(await putImmutable(env.AUDIT_ARCHIVE, key, original, 'text/plain')).toBe('written');
+    expect(
+      await putImmutable(env.AUDIT_ARCHIVE, key, new TextEncoder().encode('rewrite'), 'text/plain')
+    ).toBe('existing');
+    const stored = await env.AUDIT_ARCHIVE.get(key);
+    expect(await stored?.text()).toBe('original');
+  });
+
+  it('rejects a different batch at a taken key on a bucket with no lock rule', async () => {
+    const stream = uniqueStream('archive-unlocked');
+    const batch = auditBatch(1, 2, stream);
+    const hash = await chainHash(GENESIS_HASH, batch);
+    expect(
+      await writeArchivedBatch(env.AUDIT_ARCHIVE, { batch, prevHash: GENESIS_HASH, hash })
+    ).toBe('written');
+    expect(
+      await writeArchivedBatch(env.AUDIT_ARCHIVE, { batch, prevHash: GENESIS_HASH, hash })
+    ).toBe('existing');
+
+    const forged = auditBatch(1, 2, stream);
+    const forgedHash = await chainHash(GENESIS_HASH, forged);
+    await expect(
+      writeArchivedBatch(env.AUDIT_ARCHIVE, {
+        batch: forged,
+        prevHash: GENESIS_HASH,
+        hash: forgedHash,
+      })
+    ).rejects.toThrow(ArchiveConflictError);
+    expect((await readArchived(stream, 2)).hash).toBe(hash);
   });
 });

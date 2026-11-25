@@ -77,8 +77,12 @@ export function gzipJson(value: unknown): Promise<Uint8Array<ArrayBuffer>> {
 }
 
 /**
- * Writes an object only if the key is free. A bucket-lock rule rejects the write to a key that
- * already exists; that is success for the caller to confirm by reading the stored object back.
+ * Writes an object only if the key is free, so immutability does not rest on the lock rule alone.
+ * The put carries `If-None-Match: *` (R2 accepts RFC 7232 conditional headers in `onlyIf` and
+ * returns null when the precondition fails, without storing:
+ * https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations).
+ * A bucket-lock rule can also reject the write to an existing key. Either way the key is taken,
+ * and the caller confirms what it holds by reading it back.
  */
 export async function putImmutable(
   bucket: ArchiveBucket,
@@ -86,14 +90,18 @@ export async function putImmutable(
   body: Uint8Array,
   contentType: string
 ): Promise<'written' | 'existing'> {
+  let stored: R2Object | null;
   try {
-    await bucket.put(key, body, { httpMetadata: { contentType } });
-    return 'written';
+    stored = await bucket.put(key, body, {
+      onlyIf: new Headers({ 'if-none-match': '*' }),
+      httpMetadata: { contentType },
+    });
   } catch (error) {
     const existing = await bucket.head(key);
     if (!existing) throw error;
     return 'existing';
   }
+  return stored === null ? 'existing' : 'written';
 }
 
 export async function writeArchivedBatch(

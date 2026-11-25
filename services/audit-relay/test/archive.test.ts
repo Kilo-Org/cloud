@@ -57,8 +57,8 @@ describe('writeArchivedBatch', () => {
     await expect(writeArchivedBatch(lockedBucket(env.AUDIT_ARCHIVE), object)).rejects.toThrow(
       ArchiveConflictError
     );
-    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject(
-      { kind: 'corrupt' }
-    );
+    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject({
+      kind: 'corrupt',
+    });
   });
 });

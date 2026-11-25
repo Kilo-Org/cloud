@@ -63,9 +63,7 @@ describe('StreamDO', () => {
     const duplicate = await stub.acceptBatch(batch);
 
     expect(duplicate).toMatchObject({ kind: 'duplicate', toSeq: 2, headSeq: 2 });
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
-      archiveObjectKey(stream, 2),
-    ]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
     expect(http.requests).toHaveLength(1);
   });
 
@@ -210,17 +208,13 @@ describe('StreamDO', () => {
     const batch = auditBatch(1, 2, stream);
     const failed = await stub.acceptBatch(batch);
     expect(failed).toMatchObject({ kind: 'retry', reason: 'axiom', delaySeconds: 60 });
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
-      archiveObjectKey(stream, 2),
-    ]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
 
     failing = false;
     // The head advanced with the archive write, so the retry is a duplicate that re-ingests the
     // recorded hot-store gap instead of writing the archive object again.
     expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'duplicate', replayed: true });
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
-      archiveObjectKey(stream, 2),
-    ]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
     expect(http.requests).toHaveLength(2);
     expect(await stub.hotStoreGaps()).toEqual([]);
     expect(await readArchived(stream, 2)).toMatchObject({

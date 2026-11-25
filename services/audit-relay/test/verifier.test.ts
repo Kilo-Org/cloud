@@ -157,7 +157,9 @@ describe('VerifierDO', () => {
     const pagesBefore = pageTexts(http.requests).length;
     await verifier().startPass('daily', Date.now() + FULL_PASS_DEADLINE_MS + 24 * 60 * 60 * 1000);
     expect(pageTexts(http.requests).slice(pagesBefore)).toContainEqual(
-      expect.stringMatching(/^bot: audit-relay full chain verification has not completed for 36 days$/)
+      expect.stringMatching(
+        /^bot: audit-relay full chain verification has not completed for 36 days$/
+      )
     );
   });
 });

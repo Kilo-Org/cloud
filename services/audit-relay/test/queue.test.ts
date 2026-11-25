@@ -71,9 +71,7 @@ describe('queue handler', () => {
 
     expect(result.retryBatch.retry).toBe(false);
     expect(result.retryMessages).toEqual([]);
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
-      archiveObjectKey(stream, 2),
-    ]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
   });
 
   it('retries a gap message with a delay', async () => {
@@ -224,14 +222,18 @@ describe('queue handler', () => {
       (await encodeAuditBatch(auditBatch(3, 5, stream))).buffer,
     ]);
 
-    expect(result.retryMessages).toEqual([expect.objectContaining({ msgId: batch.messages[0].id })]);
+    expect(result.retryMessages).toEqual([
+      expect.objectContaining({ msgId: batch.messages[0].id }),
+    ]);
     const pages = http.requests.filter(
       request => request.url === 'https://hooks.slack.test/audit-relay'
     );
     expect(pages.map(page => JSON.parse(page.body ?? '{}'))).toEqual([
       {
         text: expect.stringMatching(
-          new RegExp(`^bot: audit stream ${stream} has waited \\d+ s for seq 1 and turned away 10 later batches$`)
+          new RegExp(
+            `^bot: audit stream ${stream} has waited \\d+ s for seq 1 and turned away 10 later batches$`
+          )
         ),
       },
     ]);

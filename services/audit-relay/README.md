@@ -222,6 +222,13 @@ StreamDO archives the missing batch and dedupes the rest.
 | `AXIOM_URL` | `https://api.axiom.co` |
 | `AUDIT_ENVIRONMENT` | `production` / `staging` / `local` |
 
+Observability is logs only (`observability.traces.enabled: false`, every environment): a trace
+records each outbound fetch with its full URL
+(https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/), and the
+Slack paging webhook URL is itself the secret, in the path, where `redact_query_string` cannot
+reach it. Workers Logs and Logpush stay on; they carry the Worker's own log lines, none of which
+includes a URL it fetched. Keep traces off while the Worker fetches a secret URL.
+
 Retries are bounded: `max_retries: 24` with `retry_delay: 60`; a gap retry waits 30 s and an
 archive failure 60 s doubling to 15 minutes, each consuming one retry. A message that exhausts
 them lands in the DLQ (above), whose consumer has `max_retries: 100` with `retry_delay: 900`.

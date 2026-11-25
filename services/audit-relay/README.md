@@ -262,35 +262,40 @@ stream-wide hot-copy failure and owes its rows to Axiom until the token can be r
 of owed rows per stream per day). Without the Slack webhook, every page fails and only the
 `audit_relay.page_failed` log line remains.
 
-1. **Queues and the DLQ** (the consumer attachment comes from `wrangler.jsonc`):
+1. **Queues and the DLQ** with a 14-day message retention (the consumer attachment comes from
+   `wrangler.jsonc`). STS starts sending audit events within 5 minutes of its own deploy, which
+   can come before this Worker's; a message older than the retention is dropped and its stream
+   stalls behind a gap, so merge this Worker within the retention:
 
    ```sh
-   pnpm exec wrangler queues create kilo-audit
-   pnpm exec wrangler queues create kilo-audit-dlq
-   pnpm exec wrangler queues create kilo-audit-staging
-   pnpm exec wrangler queues create kilo-audit-staging-dlq
+   for queue in kilo-audit kilo-audit-dlq kilo-audit-staging kilo-audit-staging-dlq; do
+     pnpm exec wrangler queues create "$queue"
+     pnpm exec wrangler queues update "$queue" --message-retention-period-secs 1209600
+   done
    ```
 
-   Verify: `pnpm exec wrangler queues info kilo-audit` (and the other three) prints the queue.
+   Verify: `pnpm exec wrangler queues info kilo-audit` (and the other three) prints the queue, and
+   the Queues API shows `message_retention_period: 1209600` for each.
 
-2. **R2 bucket in the EU jurisdiction with 400-day lock rules** on the archive, the checkpoints and
-   the dead letters:
+2. **R2 bucket in the EU jurisdiction with lock rules** on the archive, the checkpoints and the
+   dead letters: 400 days in production, 1 day in staging (staging holds test data only):
 
    ```sh
-   for bucket in kilo-audit-archive kilo-audit-archive-staging; do
-     pnpm exec wrangler r2 bucket create "$bucket" -J eu
-     pnpm exec wrangler r2 bucket lock add "$bucket" archive-400-days streams/ \
-       --retention-days 400 -J eu
-     pnpm exec wrangler r2 bucket lock add "$bucket" checkpoints-400-days checkpoints/ \
-       --retention-days 400 -J eu
-     pnpm exec wrangler r2 bucket lock add "$bucket" dead-letter-400-days dead-letter/ \
-       --retention-days 400 -J eu
-   done
+   lock() { # bucket, retention in days, rule-name suffix
+     pnpm exec wrangler r2 bucket create "$1" -J eu
+     for rule in archive:streams/ checkpoints:checkpoints/ dead-letter:dead-letter/; do
+       pnpm exec wrangler r2 bucket lock add "$1" "${rule%%:*}-$3" "${rule#*:}" \
+         --retention-days "$2" -J eu
+     done
+   }
+   lock kilo-audit-archive 400 400-days
+   lock kilo-audit-archive-staging 1 1-day
    ```
 
    Verify: `pnpm exec wrangler r2 bucket info kilo-audit-archive -J eu` shows the bucket,
    `pnpm exec wrangler r2 bucket lock list kilo-audit-archive -J eu` lists exactly the three rules
-   at 400 days, and `wrangler deploy --dry-run` shows `kilo-audit-archive (eu)` for the binding.
+   at 400 days (staging: at 1 day), and `wrangler deploy --dry-run` shows
+   `kilo-audit-archive (eu)` for the binding.
    The copy of each checkpoint outside the Cloudflare account, which keeps the proof past the lock
    rule, is a separate task owned by Anaconda security.
 

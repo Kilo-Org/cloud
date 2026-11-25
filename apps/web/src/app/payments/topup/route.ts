@@ -17,6 +17,10 @@ import {
   CHARGE_GATE_BLOCKED_MESSAGE,
   decideCheckoutCharge,
 } from '@kilocode/web-shared/lib/bouncer/charge-gate';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -131,6 +135,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
       },
     });
     return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+  }
+
+  if (organizationId) {
+    await recordElevatedOrganizationAdminAction(
+      adminActionContextFromHeaders(currentUser, request.headers),
+      {
+        organizationId,
+        requiredRoles: ORGANIZATION_BILLING_ROLES,
+        action: 'organization.topup_checkout.create',
+        message: 'Created a top-up checkout session',
+        metadata: { amountUsd: validationResult.amount ?? null, origin },
+      }
+    );
   }
 
   return NextResponse.redirect(url, { status: 303 });

@@ -26,9 +26,12 @@ afterEach(() => {
   else process.env.OPENROUTER_ORG_ID = originalOrg;
 });
 
+const postRequest = () =>
+  new Request('http://localhost:3000/admin/api/safety-identifiers', { method: 'POST' });
+
 test.each([
-  ['GET', GET],
-  ['POST', POST],
+  ['GET', () => GET()],
+  ['POST', () => POST(postRequest())],
 ])('%s requires admin authorization and leaves users untouched', async (_method, handler) => {
   const user = await insertTestUser();
   const denied = NextResponse.json(
@@ -61,7 +64,7 @@ test('GET returns the number of users missing a safety identifier', async () => 
 test('POST backfills missing identifiers and returns the batch result', async () => {
   const user = await insertTestUser();
 
-  const response = await POST();
+  const response = await POST(postRequest());
 
   expect(response.status).toBe(200);
   await expect(response.json()).resolves.toEqual({ processed: 1, remaining: false });

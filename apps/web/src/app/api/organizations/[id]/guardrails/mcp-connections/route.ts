@@ -8,6 +8,11 @@ import {
   MCP_CONNECT_CLIENTS,
   type McpConnectionResult,
 } from '@/lib/organizations/guardrails/mcp-connections';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const MAX_MCP_CONNECTIONS_PER_REQUEST = 50;
 
@@ -66,12 +71,21 @@ export async function POST(
     return NextResponse.json({ error: z.prettifyError(body.error) }, { status: 400 });
   }
 
-  return NextResponse.json(
-    await evaluateAndRecordMcpConnections({
-      organization: data.organization,
-      kiloUserId: data.user.id,
-      client: body.data.client,
-      connections: body.data.connections,
-    })
+  const response = await evaluateAndRecordMcpConnections({
+    organization: data.organization,
+    kiloUserId: data.user.id,
+    client: body.data.client,
+    connections: body.data.connections,
+  });
+  await recordElevatedOrganizationAdminAction(
+    adminActionContextFromHeaders(data.user, request.headers),
+    {
+      organizationId,
+      requiredRoles: ORGANIZATION_ROLES,
+      action: 'organization.mcp_connections.report',
+      message: 'Reported MCP connections',
+      metadata: { client: body.data.client, connectionCount: body.data.connections.length },
+    }
   );
+  return NextResponse.json(response);
 }

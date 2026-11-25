@@ -60,6 +60,10 @@ import {
 } from '@/lib/integrations/github/install-state';
 import { verifyAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
@@ -312,7 +316,7 @@ export async function GET(request: NextRequest) {
 
 async function handleNewInstallFlow(
   request: NextRequest,
-  user: { id: string; google_user_email: string; google_user_name: string },
+  user: User,
   installRow: GitHubInstallState,
   installationId: string,
   setupAction: string | null
@@ -334,12 +338,32 @@ async function handleNewInstallFlow(
   });
 }
 
+/** Records an organization GitHub write a Kilo admin made through the admin bypass. */
+async function recordElevatedGitHubWrite(
+  request: NextRequest,
+  user: User,
+  owner: Owner,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  if (owner.type !== 'org') return;
+  await recordElevatedOrganizationAdminAction(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId: owner.id,
+      requiredRoles: ORGANIZATION_MANAGE_ROLES,
+      action: 'organization.github.connect',
+      message: 'GitHub: App installation recorded',
+      metadata,
+    }
+  );
+}
+
 /**
  * Handles access checks, pending approval, and installation storage.
  */
 async function handleCoreInstallFlow(params: {
   request: NextRequest;
-  user: { id: string; google_user_email: string; google_user_name: string };
+  user: User;
   owner: Owner;
   ownerId: string;
   returnTo: string | null;
@@ -352,11 +376,7 @@ async function handleCoreInstallFlow(params: {
 
   // Verify user has access to the owner
   if (owner.type === 'org') {
-    await ensureOrganizationAccess(
-      { user: user as unknown as User },
-      owner.id,
-      ORGANIZATION_MANAGE_ROLES
-    );
+    await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
   } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));
@@ -490,6 +510,10 @@ async function handleCoreInstallFlow(params: {
             githubRequester,
             githubRequest,
             githubAppType,
+          });
+          await recordElevatedGitHubWrite(params.request, user, owner, {
+            setupAction,
+            githubAccountId: githubRequest.accountId,
           });
         }
       }
@@ -923,6 +947,12 @@ async function handleCoreInstallFlow(params: {
         repositoriesAdded: repositories,
       });
     }
+
+    await recordElevatedGitHubWrite(params.request, user, owner, {
+      setupAction,
+      installationId,
+      githubAppType,
+    });
   }
 
   // Redirect to success page

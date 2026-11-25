@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import { admin_action_audit_logs, credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
 import { eq } from 'drizzle-orm';
 import { POST } from './route';
@@ -576,5 +576,56 @@ describe('POST /admin/api/users/add-credit', () => {
     expect(
       transactions.every(transaction => transaction.created_by_kilo_user_id === admin.id)
     ).toBe(true);
+  });
+
+  it('records a grant row naming the operator and the recipient', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({ email: recipient.google_user_email, credit_category: 'custom', amount_usd: 7 })
+    );
+
+    expect(response.status).toBe(200);
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.credit.grant',
+        outcome: 'success',
+        target_type: 'user',
+        target_id: recipient.id,
+        metadata: { amountUsd: 7, creditKind: 'promotional', creditCategory: 'custom' },
+      }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain(recipient.google_user_email);
+  });
+
+  it('records a failure row when the grant is refused with a 400', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser({ blocked_reason: 'abuse' });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({ email: recipient.google_user_email, credit_category: 'custom', amount_usd: 7 })
+    );
+
+    expect(response.status).toBe(400);
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.credit.grant',
+        outcome: 'failure',
+        target_type: 'user',
+        target_id: recipient.id,
+        metadata: { adjustment: 'user.credit.grant', errorCode: '400' },
+      }),
+    ]);
   });
 });

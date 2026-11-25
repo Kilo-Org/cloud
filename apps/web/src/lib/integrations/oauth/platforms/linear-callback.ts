@@ -42,6 +42,10 @@ import {
   organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -373,7 +377,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       async tx => {
         const conflicting = await getConflictingLinearInstallation(owner, organizationId, tx);
         if (conflicting) {
-          return { response: conflictRedirect, previousWorkspace: null };
+          return { response: conflictRedirect, previousWorkspace: null, installed: false };
         }
 
         const previousInstallation = await linearAdapter.getInstallation(organizationId);
@@ -415,7 +419,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           });
 
           if (error instanceof LinearWorkspaceAlreadyConnectedError) {
-            return { response: conflictRedirect, previousWorkspace: null };
+            return { response: conflictRedirect, previousWorkspace: null, installed: false };
           }
           throw error;
         }
@@ -427,9 +431,23 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         return {
           response: NextResponse.redirect(new URL(successPath, APP_URL)),
           previousWorkspace,
+          installed: true,
         };
       }
     );
+
+    if (install.installed && owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: owner.id,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          action: 'organization.linear.connect',
+          message: 'Linear: OAuth connection stored',
+          metadata: { linearOrganizationId: organizationId },
+        }
+      );
+    }
 
     // The workspace this install replaces is retired only after the connection
     // write has committed, giving the two writes one outcome.

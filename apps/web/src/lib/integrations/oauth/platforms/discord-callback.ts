@@ -34,6 +34,10 @@ import {
   organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 /**
  * Discord OAuth Callback
@@ -248,6 +252,19 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
 
       throw error;
+    }
+
+    if (owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: owner.id,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          action: 'organization.discord.connect',
+          message: 'Discord: OAuth connection stored',
+          metadata: { integrationId: installation.integration.id },
+        }
+      );
     }
 
     // 10. A connection the write did not move was read a moment before it

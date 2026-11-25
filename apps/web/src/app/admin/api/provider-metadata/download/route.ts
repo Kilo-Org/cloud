@@ -11,7 +11,9 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
 import {
   adminActionContextFromHeaders,
+  auditedAdminRoute,
   recordAdminAction,
+  setAdminAuditActor,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   formatTimestamp,
@@ -83,7 +85,13 @@ function after(row: Row) {
   );
 }
 
-export async function GET(request: NextRequest) {
+// A GET that writes: the export records its own row once it has matches.
+export const GET = auditedAdminRoute(
+  { kind: 'handler', actions: ['provider_metadata.download'] },
+  downloadProviderMetadata
+);
+
+async function downloadProviderMetadata(request: NextRequest) {
   const startedAt = Date.now();
   await connection();
 
@@ -91,7 +99,8 @@ export async function GET(request: NextRequest) {
   if (authFailedResponse) {
     return authFailedResponse;
   }
-  if (!user || !(await canCurrentUserExportApiRequestLogs(user.id))) {
+  setAdminAuditActor(user);
+  if (!(await canCurrentUserExportApiRequestLogs(user.id))) {
     return jsonError('API request log export access required', 403);
   }
 

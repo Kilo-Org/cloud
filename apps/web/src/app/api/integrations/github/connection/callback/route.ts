@@ -20,6 +20,10 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import type { User } from '@kilocode/db/schema';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function redirect(path: string, error?: string) {
   const url = new URL(path, APP_URL);
@@ -118,6 +122,18 @@ export async function GET(request: NextRequest) {
       },
     });
     if (!completed.ok) return redirect(path, completed.reason);
+    if (attempt.owner_type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: attempt.owner_id,
+          requiredRoles: ORGANIZATION_MANAGE_ROLES,
+          action: 'organization.github.connect',
+          message: 'GitHub: connection attempt completed',
+          metadata: { integrationId: completed.integrationId, attemptId: attempt.id },
+        }
+      );
+    }
     return redirect(`${path}?github_connection=success`);
   } catch (error) {
     if (isInstallationAdministrationListingOverflow(error)) {

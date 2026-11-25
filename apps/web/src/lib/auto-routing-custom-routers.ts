@@ -32,6 +32,11 @@ import {
   type AutoRoutingCustomRouter,
   type User,
 } from '@kilocode/db/schema';
+import type { AdminActionAuditAction } from '@kilocode/db/schema-types';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getCustomRouterStatus,
   getPlatformMeasurements,
@@ -96,6 +101,7 @@ function invalidRequest(error: z.ZodError): CustomRouterApiError {
 export type CustomRouterRequestContext = {
   user: User;
   organization: { id: string; canEdit: boolean } | null;
+  headers: Headers;
 };
 
 async function resolveRequestContext(request: NextRequest): Promise<CustomRouterRequestContext> {
@@ -117,7 +123,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
     );
   }
   const organizationId = authOrganizationId ?? queryOrganizationId;
-  if (!organizationId) return { user: auth.user, organization: null };
+  if (!organizationId) return { user: auth.user, organization: null, headers: request.headers };
   if (!z.uuid().safeParse(organizationId).success) {
     throw new CustomRouterApiError('invalid_request', 'Invalid organization ID');
   }
@@ -130,6 +136,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
         id: organizationId,
         canEdit: ORGANIZATION_BILLING_ROLES.some(editorRole => editorRole === role),
       },
+      headers: request.headers,
     };
   } catch (error) {
     if (error instanceof TRPCError) {
@@ -149,6 +156,25 @@ export async function handleCustomRouterRequest(
     if (error instanceof CustomRouterApiError) return customRouterErrorResponse(error);
     throw error;
   }
+}
+
+/** Records an organization router write a Kilo admin made through the admin bypass. */
+async function recordElevatedRouterWrite(
+  context: CustomRouterRequestContext,
+  owner: CustomRouterOwner,
+  params: { action: AdminActionAuditAction; message: string; slug: string }
+): Promise<void> {
+  if (owner.type !== 'org') return;
+  await recordElevatedOrganizationAdminAction(
+    adminActionContextFromHeaders(context.user, context.headers),
+    {
+      organizationId: owner.id,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: params.action,
+      message: params.message,
+      metadata: { slug: params.slug },
+    }
+  );
 }
 
 function bodyTooLarge(): CustomRouterApiError {
@@ -800,6 +826,11 @@ export async function createCustomRouterResponse(
     return toCustomRouterDefinition(row);
   });
 
+  await recordElevatedRouterWrite(context, owner, {
+    action: 'organization.custom_router.create',
+    message: 'Created a custom router',
+    slug: input.slug,
+  });
   return singleRouterResponse(router, true, 201);
 }
 
@@ -920,6 +951,11 @@ export async function updateCustomRouterResponse(
     return saveRouter(tx, next);
   });
 
+  await recordElevatedRouterWrite(context, owner, {
+    action: 'organization.custom_router.update',
+    message: 'Updated a custom router',
+    slug,
+  });
   return singleRouterResponse(router, true);
 }
 
@@ -983,6 +1019,11 @@ export async function deleteCustomRouterResponse(
       .delete(auto_routing_custom_routers)
       .where(eq(auto_routing_custom_routers.id, current.id));
   });
+  await recordElevatedRouterWrite(context, owner, {
+    action: 'organization.custom_router.delete',
+    message: 'Deleted a custom router',
+    slug,
+  });
   return new NextResponse(null, { status: 204 });
 }
 
@@ -1038,6 +1079,11 @@ export async function registerClientEntryResponse(
     return saveRouter(tx, { ...current, entries });
   });
 
+  await recordElevatedRouterWrite(context, owner, {
+    action: 'organization.custom_router.client_entry.register',
+    message: 'Registered a custom router client entry',
+    slug,
+  });
   return singleRouterResponse(router, true);
 }
 
@@ -1072,5 +1118,10 @@ export async function removeClientEntryResponse(
     });
   });
 
+  await recordElevatedRouterWrite(context, owner, {
+    action: 'organization.custom_router.client_entry.remove',
+    message: 'Removed a custom router client entry',
+    slug,
+  });
   return singleRouterResponse(router, true);
 }

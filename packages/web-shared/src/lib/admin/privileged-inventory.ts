@@ -1,3 +1,4 @@
+import type { AdminActionAuditAction } from '@kilocode/db/schema-types';
 import type {
   PrivilegedActionClass,
   PrivilegedTargetKind,
@@ -905,6 +906,171 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'support_write',
     surface: 'trpc',
     occurrences: 5,
+  },
+];
+
+/** Admin console GET handlers that write, and so must be audited like a write. */
+export const ADMIN_REST_WRITING_GET_ROUTES: readonly string[] = [
+  '/admin/api/api-request-log/download',
+  '/admin/api/provider-metadata/download',
+];
+
+export type OrganizationElevationAudit =
+  | { kind: 'recorded'; actions: readonly [AdminActionAuditAction, ...AdminActionAuditAction[]] }
+  | { kind: 'skipped'; reason: string };
+
+/**
+ * Route handlers that can write to an organization through the admin bypass of
+ * getAuthorizedOrgContext / ensureOrganizationAccess, directly or through a
+ * helper, with how a Kilo admin's elevated write is audited: the actions the
+ * handler records with recordElevatedOrganizationAdminAction, or why it records
+ * nothing. `route` is the App Router path, as in the REST inventory.
+ */
+export type OrganizationElevationWriteSite = {
+  route: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  audit: OrganizationElevationAudit;
+};
+
+const STATE_ONLY_CONNECT =
+  'starts the OAuth flow: signs state and reserves the attempt; the callback records the connection';
+
+export const organizationElevationWriteSites: readonly OrganizationElevationWriteSite[] = [
+  {
+    route: '/api/organizations/[id]/user-tokens',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.token.mint'] },
+  },
+  {
+    route: '/api/organizations/[id]/guardrails/mcp-connections',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.mcp_connections.report'] },
+  },
+  {
+    route: '/api/auto-routing/mode',
+    method: 'PUT',
+    audit: { kind: 'recorded', actions: ['organization.auto_routing_mode.set'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.create'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]',
+    method: 'PATCH',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.update'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]',
+    method: 'DELETE',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.delete'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.client_entry.register'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+    method: 'DELETE',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.client_entry.remove'] },
+  },
+  {
+    route: '/api/integrations/github/callback',
+    method: 'GET',
+    audit: { kind: 'recorded', actions: ['organization.github.connect'] },
+  },
+  {
+    route: '/api/integrations/github/connection/callback',
+    method: 'GET',
+    audit: { kind: 'recorded', actions: ['organization.github.connect'] },
+  },
+  {
+    route: '/api/integrations/google/callback',
+    method: 'GET',
+    audit: { kind: 'recorded', actions: ['organization.google.connect'] },
+  },
+  {
+    route: '/api/integrations/google/disconnect',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.google.disconnect'] },
+  },
+  {
+    route: '/api/integrations/[platform]/callback',
+    method: 'GET',
+    audit: {
+      kind: 'recorded',
+      actions: [
+        'organization.bitbucket.update',
+        'organization.discord.connect',
+        'organization.dolthub.connect',
+        'organization.gitlab.connect',
+        'organization.linear.connect',
+        'organization.slack.connect',
+      ],
+    },
+  },
+  {
+    route: '/payments/topup',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.topup_checkout.create'] },
+  },
+  {
+    route: '/api/claw/openclaw-export',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.kiloclaw_workspace.export'] },
+  },
+  {
+    route: '/api/cloud-agent/sessions/stream-ticket',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.cloud_agent_session.stream_ticket'] },
+  },
+  {
+    route: '/api/integrations/google/connect',
+    method: 'GET',
+    audit: {
+      kind: 'skipped',
+      reason: 'signs OAuth state only; the callback records the connection',
+    },
+  },
+  {
+    route: '/api/integrations/[platform]/connect',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: STATE_ONLY_CONNECT },
+  },
+  {
+    route: '/api/integrations/[platform]/connect',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: STATE_ONLY_CONNECT },
+  },
+  {
+    route: '/app-shell/connect/[platform]',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: STATE_ONLY_CONNECT },
+  },
+  {
+    route: '/app-shell/connect/[platform]',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: STATE_ONLY_CONNECT },
+  },
+  {
+    route: '/organizations/[id]/integrations/linear/reinstall',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects to the connect flow; writes nothing' },
+  },
+  {
+    route: '/organizations/[id]/integrations/slack/reinstall',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects to the connect flow; writes nothing' },
+  },
+  {
+    route: '/api/internal/glanceable-agents-snapshot',
+    method: 'POST',
+    audit: {
+      kind: 'skipped',
+      reason: 'membership-only guard (ensureMemberOrganizationAccess) with no admin bypass',
+    },
   },
 ];
 

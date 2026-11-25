@@ -11,6 +11,11 @@ import {
   getKiloClawGoogleOAuthConnection,
 } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 const OrganizationIdSchema = z.string().uuid();
 
@@ -97,6 +102,19 @@ export async function POST(request: NextRequest) {
 
     const kiloclawClient = new KiloClawInternalClient();
     await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
+
+    if (organizationId) {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId,
+          requiredRoles: ORGANIZATION_ROLES,
+          action: 'organization.google.disconnect',
+          message: 'Google: OAuth connection removed',
+          metadata: { instanceId: instance.id, hadConnection: Boolean(existingConnection) },
+        }
+      );
+    }
 
     return NextResponse.redirect(
       new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),

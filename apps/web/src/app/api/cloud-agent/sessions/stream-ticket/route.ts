@@ -10,6 +10,11 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -106,14 +111,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: sessionAccess.refusal }, { status: 403 });
     }
 
-    return NextResponse.json(
-      signStreamTicket({
-        userId: user.id,
-        kiloSessionId: sessionOwnership.kiloSessionId,
-        cloudAgentSessionId,
-        ...sessionAccess.ticketFields,
-      })
-    );
+    const ticket = signStreamTicket({
+      userId: user.id,
+      kiloSessionId: sessionOwnership.kiloSessionId,
+      cloudAgentSessionId,
+      ...sessionAccess.ticketFields,
+    });
+    if (organizationId) {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId,
+          requiredRoles: ORGANIZATION_ROLES,
+          action: 'organization.cloud_agent_session.stream_ticket',
+          message: 'Signed a cloud agent stream ticket',
+          metadata: { cloudAgentSessionId },
+        }
+      );
+    }
+    return NextResponse.json(ticket);
   } catch (error) {
     return handleTRPCError(error);
   }

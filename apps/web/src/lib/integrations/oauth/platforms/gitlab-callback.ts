@@ -25,6 +25,10 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
 import { oauthStateHash } from '@/lib/integrations/oauth/callback-safety';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 function buildGitLabRedirectPath(
@@ -197,6 +201,18 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
 
     if (stored.instanceChanged || stored.accountChanged) {
       await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
+    }
+    if (owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: owner.id,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          action: 'organization.gitlab.connect',
+          message: 'GitLab: OAuth connection stored',
+          metadata: { integrationId: stored.integrationId },
+        }
+      );
     }
 
     const successPath = verifiedState.returnTo

@@ -9,6 +9,10 @@ import {
   upsertDoltHubInstallation,
 } from '@/lib/integrations/dolthub-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
@@ -129,6 +133,17 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       owner,
       tokens,
     });
+    if (owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: owner.id,
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          action: 'organization.dolthub.connect',
+          message: 'DoltHub: OAuth connection stored',
+        }
+      );
+    }
 
     const successPath = verified.returnTo
       ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=installed')

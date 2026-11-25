@@ -13,6 +13,11 @@ import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Large workspaces can take a while to archive; raise the function timeout so
 // the streamed download isn't killed mid-flight (mirrors the api-request-log
@@ -117,6 +122,19 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
     console.error('[openclaw-export] export request failed:', err);
     return jsonError('Export failed', 500);
+  }
+
+  if (organizationId) {
+    await recordElevatedOrganizationAdminAction(
+      adminActionContextFromHeaders(user, request.headers),
+      {
+        organizationId,
+        requiredRoles: ORGANIZATION_ROLES,
+        action: 'organization.kiloclaw_workspace.export',
+        message: 'Exported the KiloClaw workspace',
+        metadata: { instanceId: instance.id, format, encrypted: password !== undefined },
+      }
+    );
   }
 
   const contentType =

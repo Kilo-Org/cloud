@@ -18,6 +18,11 @@ import {
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 /**
  * Build the post-OAuth redirect path. The query-string fragment is appended
@@ -246,6 +251,22 @@ export async function GET(request: NextRequest) {
       },
       verifiedState.instanceId
     );
+
+    if (verifiedState.owner.type === 'org') {
+      await recordElevatedOrganizationAdminAction(
+        adminActionContextFromHeaders(user, request.headers),
+        {
+          organizationId: verifiedState.owner.id,
+          requiredRoles: ORGANIZATION_ROLES,
+          action: 'organization.google.connect',
+          message: 'Google: OAuth connection stored',
+          metadata: {
+            instanceId: verifiedState.instanceId,
+            capabilities: verifiedState.capabilities,
+          },
+        }
+      );
+    }
 
     const successPath = verifiedState.returnTo
       ? appendQueryParam(verifiedState.returnTo, 'success', 'google_connected')

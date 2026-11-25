@@ -4,17 +4,20 @@ import path from 'node:path';
 import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
+  ADMIN_REST_WRITING_GET_ROUTES,
   ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
   TARGET_ID_FIELD_BY_ADMIN_PROCEDURE,
   actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
+  organizationElevationWriteSites,
   privilegedGuardTiers,
   resolvesOwnStepUp,
   targetIdFieldForAdminProcedure,
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { isAuditedAdminRoute } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   SUPPORT_NEVER_KEYS,
   SUPPORT_READ_ALLOWLIST,
@@ -418,6 +421,75 @@ describe('privileged inventory covers discovered route handlers', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+});
+
+describe('admin console route writes are audited', () => {
+  test('every admin API write handler is built with auditedAdminRoute', async () => {
+    const writingGets = new Set(ADMIN_REST_WRITING_GET_ROUTES);
+    const unaudited: string[] = [];
+
+    for (const file of walkFiles(path.join(APP_ROOT, 'admin/api'))) {
+      if (path.basename(file) !== 'route.ts') continue;
+      const route = routePathFromAppFile(file);
+      // The route set is discovered from the file tree, so the specifier is runtime data.
+      const routeModule: Record<string, unknown> = await import(file);
+      const methods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+      if (writingGets.delete(route)) methods.push('GET');
+      for (const method of methods) {
+        const handler = routeModule[method];
+        if (handler !== undefined && !isAuditedAdminRoute(handler)) {
+          unaudited.push(`${route} ${method}`);
+        }
+      }
+    }
+
+    expect(unaudited).toEqual([]);
+    // A writing GET that moved or was renamed must not drop out of the check.
+    expect([...writingGets]).toEqual([]);
+  }, 120_000);
+});
+
+describe('organization admin bypass write sites are audited', () => {
+  const classified = new Set(
+    organizationElevationWriteSites.map(site => `${site.route} ${site.method}`)
+  );
+
+  test('every route write behind an organization guard has an audit classification', () => {
+    const unclassified: string[] = [];
+
+    for (const discovered of discoverRESTRoutes()) {
+      if (!discovered.organizationContext || discovered.route.startsWith('/admin/')) continue;
+      for (const method of discovered.methods) {
+        if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') continue;
+        if (!classified.has(`${discovered.route} ${method}`)) {
+          unclassified.push(
+            `${discovered.route} ${method} (${path.relative(REPO_ROOT, discovered.file)})`
+          );
+        }
+      }
+    }
+
+    expect(unclassified).toEqual([]);
+  });
+
+  test('every classified site is a mounted handler with recorded actions or a reason', () => {
+    const mounted = new Map(
+      discoverRESTRoutes().map(discovered => [discovered.route, discovered.methods])
+    );
+    const problems: string[] = [];
+
+    for (const site of organizationElevationWriteSites) {
+      if (!mounted.get(site.route)?.includes(site.method)) {
+        problems.push(`${site.route} ${site.method}: no such route handler`);
+      }
+      if (site.audit.kind === 'skipped' && site.audit.reason.trim() === '') {
+        problems.push(`${site.route} ${site.method}: skipped without a reason`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+    expect(classified.size).toBe(organizationElevationWriteSites.length);
   });
 });
 

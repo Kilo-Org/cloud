@@ -10,10 +10,12 @@ import { config, env } from './test-env';
 
 beforeEach(async () => {
   stubOfflineNetwork();
+  // The refresher goes first: a refresh still running from the last test could otherwise push a
+  // bundle, sealed with a key the bundle reset just deleted, into a cleared bundle object.
+  await resetRefresherObject(getRefresherStub(env, config));
   for (const workload of ['o11y', 'audit-relay']) {
     await resetBundleObject(getBundleStub(env, config, workload));
   }
-  await resetRefresherObject(getRefresherStub(env, config));
 });
 
 afterEach(() => {

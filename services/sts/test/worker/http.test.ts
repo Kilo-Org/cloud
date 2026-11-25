@@ -63,6 +63,19 @@ describe('bundle HTTP route', () => {
     expect(await response.json()).toEqual({ status: 'denied', reason: 'unknown_workload' });
   });
 
+  it('recognizes a Vercel team issuer that no policy names as an unknown workload', async () => {
+    for (const team of ['kilocode', 'team_ItxRShuUkJaEd9GmXMEEgunb']) {
+      const response = await SELF.fetch(`${config.issuer}/v1/bundle`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${unsignedToken({ iss: `https://oidc.vercel.com/${team}`, aud: config.issuer })}`,
+        },
+      });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ status: 'denied', reason: 'unknown_workload' });
+    }
+  });
+
   it('sends the stale flag and fetchedAt as headers on a 304', async () => {
     const fetchedAt = new Date().toISOString();
     const response = bundleResponse({ status: 'not_modified', etag: ETAG, stale: true, fetchedAt });

@@ -10,14 +10,21 @@ import {
 } from 'jose';
 import { z } from 'zod';
 import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
-import { GITHUB_PRIVILEGED_EVENTS, type Policy, type PolicyIdentity } from '../policy/schema';
+import {
+  GITHUB_PRIVILEGED_EVENTS,
+  VERCEL_ISSUER_PREFIX,
+  vercelStsEnvironments,
+  type Policy,
+  type PolicyIdentity,
+  type VercelEnvironment,
+} from '../policy/schema';
 
 const DiscoverySchema = z.object({
   issuer: z.string().min(1),
   jwks_uri: z.url(),
 });
 
-export type IdentityProvider = 'fly' | 'github';
+export type IdentityProvider = 'fly' | 'github' | 'vercel';
 export type DeniedReason = 'identity_rejected' | 'unknown_workload' | 'environment_mismatch';
 
 /**
@@ -32,16 +39,26 @@ export type VerifiedSubject = {
 };
 
 export type VerifyOutcome =
-  | { status: 'verified'; workload: WorkloadName; provider: IdentityProvider }
+  | {
+      status: 'verified';
+      workload: WorkloadName;
+      provider: IdentityProvider;
+      /** The provider token's own `exp` and `iat`, in seconds; a minted token never outlives it. */
+      attestationExp: number;
+      attestationIat: number;
+    }
   | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
   | { status: 'unavailable' };
 
 const FLY_ISSUER_PREFIX = 'https://oidc.fly.io/';
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
-/** Both providers sign with RS256; their discovery documents say so. */
+/** Vercel's team issuers, by slug or by team id; a policy names the exact one. */
+const VERCEL_TEAM = /^([a-z0-9][a-z0-9-]{0,62}|team_[A-Za-z0-9]{1,64})$/;
+/** Every provider signs with RS256; their discovery documents say so. */
 const ALGORITHMS = ['RS256'];
 const CLOCK_TOLERANCE_SECONDS = 60;
+const FLY_ORG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 /** A provider endpoint failed: network error, timeout, non-200, or a body that is not JSON. */
 class ProviderUnavailableError extends Error {
@@ -59,6 +76,8 @@ function issuerFor(identity: PolicyIdentity): string | null {
       return `${FLY_ISSUER_PREFIX}${identity.org}`;
     case 'github-oidc':
       return GITHUB_ISSUER;
+    case 'vercel-oidc':
+      return identity.issuer;
   }
 }
 
@@ -69,10 +88,18 @@ function claim(payload: JWTPayload, name: string): string | null {
 
 function isKnownProviderIssuer(issuer: string): boolean {
   if (issuer === GITHUB_ISSUER) return true;
+  if (issuer.startsWith(VERCEL_ISSUER_PREFIX)) {
+    return VERCEL_TEAM.test(issuer.slice(VERCEL_ISSUER_PREFIX.length));
+  }
   return (
-    issuer.startsWith(FLY_ISSUER_PREFIX) &&
-    /^[a-z0-9][a-z0-9-]{0,62}$/.test(issuer.slice(FLY_ISSUER_PREFIX.length))
+    issuer.startsWith(FLY_ISSUER_PREFIX) && FLY_ORG.test(issuer.slice(FLY_ISSUER_PREFIX.length))
   );
+}
+
+/** Only called for an issuer some policy names, so anything else is a Fly org issuer. */
+function providerFor(issuer: string): IdentityProvider {
+  if (issuer === GITHUB_ISSUER) return 'github';
+  return issuer.startsWith(VERCEL_ISSUER_PREFIX) ? 'vercel' : 'fly';
 }
 
 const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
@@ -85,6 +112,8 @@ const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
     'event_name',
   ],
   fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
+  // Ids only: team and project names can be renamed and never authorize.
+  vercel: ['owner_id', 'project_id', 'environment', 'custom_environment_id'],
 };
 
 function verifiedSubject(
@@ -97,11 +126,49 @@ function verifiedSubject(
     const value = claim(payload, name);
     if (value !== null) claims[name] = value.slice(0, 200);
   }
-  const providerId =
-    provider === 'github'
-      ? `github:${claims.repository_id ?? 'unknown'}`
-      : `fly:${claims.org_id ?? 'unknown'}/${claims.app_id ?? 'unknown'}`;
-  return { provider, actor: workload ?? providerId, claims };
+  return { provider, actor: workload ?? providerId(provider, claims), claims };
+}
+
+function providerId(provider: IdentityProvider, claims: Record<string, string>): string {
+  switch (provider) {
+    case 'github':
+      return `github:${claims.repository_id ?? 'unknown'}`;
+    case 'fly':
+      return `fly:${claims.org_id ?? 'unknown'}/${claims.app_id ?? 'unknown'}`;
+    case 'vercel':
+      return `vercel:${claims.owner_id ?? 'unknown'}/${claims.project_id ?? 'unknown'}`;
+  }
+}
+
+/**
+ * A Vercel token's `sub` is `owner:<team slug>:project:<project name>:environment:<environment>`
+ * (https://vercel.com/docs/oidc/reference). The names only have to agree with the token's own
+ * claims and issuer; the ids decide the policy.
+ */
+function isConsistentVercelToken(payload: JWTPayload, teamSlug: string): boolean {
+  const owner = claim(payload, 'owner');
+  const project = claim(payload, 'project');
+  const environment = claim(payload, 'environment');
+  if (owner !== teamSlug || project === null || environment === null) return false;
+  return claim(payload, 'sub') === `owner:${owner}:project:${project}:environment:${environment}`;
+}
+
+/**
+ * The policy entry a Vercel token's environment matches. A custom environment matches only by its
+ * stable `custom_environment_id`, never by its slug.
+ */
+function listedVercelEnvironment(
+  payload: JWTPayload,
+  listed: readonly VercelEnvironment[]
+): VercelEnvironment | null {
+  if (payload.custom_environment_id !== undefined) {
+    const id = claim(payload, 'custom_environment_id');
+    return (
+      listed.find(entry => typeof entry !== 'string' && entry.customEnvironmentId === id) ?? null
+    );
+  }
+  const environment = claim(payload, 'environment');
+  return listed.find(entry => entry === environment) ?? null;
 }
 
 function isPrivilegedEvent(event: string | null): boolean {
@@ -217,7 +284,27 @@ export class IdentityVerifier {
       return { status: 'denied', reason: 'identity_rejected' };
     }
 
-    const provider: IdentityProvider = issuer === GITHUB_ISSUER ? 'github' : 'fly';
+    const provider = providerFor(issuer);
+    const { exp, iat } = payload;
+    // jose checks `exp` and `nbf` but not a future `iat`; both times must be present.
+    if (exp === undefined || iat === undefined) {
+      return { status: 'denied', reason: 'identity_rejected' };
+    }
+    if (iat > Math.floor(Date.now() / 1000) + CLOCK_TOLERANCE_SECONDS) {
+      return { status: 'denied', reason: 'identity_rejected' };
+    }
+    // An exchanged Vercel token carries exactly one audience; anything else (the team-wide default
+    // `https://vercel.com/<team>`, or a list naming STS among others) did not come from the exchange.
+    if (provider === 'vercel' && payload.aud !== this.options.issuer) {
+      return { status: 'denied', reason: 'identity_rejected' };
+    }
+    const verified = (workload: WorkloadName): VerifyOutcome => ({
+      status: 'verified',
+      workload,
+      provider,
+      attestationExp: exp,
+      attestationIat: iat,
+    });
     const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
       status: 'denied',
       reason,
@@ -236,7 +323,7 @@ export class IdentityVerifier {
             mismatchedWorkload = policy.workload;
             continue;
           }
-          return { status: 'verified', workload: policy.workload, provider: 'fly' };
+          return verified(policy.workload);
         }
         case 'github-oidc': {
           if (claim(payload, 'repository_id') !== identity.repositoryId) continue;
@@ -258,7 +345,25 @@ export class IdentityVerifier {
             mismatchedWorkload = policy.workload;
             continue;
           }
-          return { status: 'verified', workload: policy.workload, provider: 'github' };
+          return verified(policy.workload);
+        }
+        case 'vercel-oidc': {
+          if (claim(payload, 'owner_id') !== identity.teamId) continue;
+          if (claim(payload, 'project_id') !== identity.projectId) continue;
+          // From here the token names this policy's project: a failed binding is a rejection.
+          if (!isConsistentVercelToken(payload, identity.teamSlug)) {
+            return rejected(policy.workload, 'identity_rejected');
+          }
+          const source = listedVercelEnvironment(payload, identity.environments);
+          if (source === null) return rejected(policy.workload, 'identity_rejected');
+          if (
+            !policy.environments.includes(this.options.environment) ||
+            !vercelStsEnvironments(source).includes(this.options.environment)
+          ) {
+            mismatchedWorkload = policy.workload;
+            continue;
+          }
+          return verified(policy.workload);
         }
         case 'worker-binding':
           continue;

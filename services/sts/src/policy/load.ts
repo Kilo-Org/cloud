@@ -1,7 +1,7 @@
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
 import { sha256Base64Url } from '../crypto/hash';
-import { PolicySchema, policyFileProblems, type Policy } from './schema';
+import { PolicySchema, policyFileProblems, vercelEnvironmentKey, type Policy } from './schema';
 
 export type PolicySnapshotEntry = {
   workload: string;
@@ -34,6 +34,8 @@ function canonicalIdentity(policy: Policy): string {
       return `fly-oidc|${identity.org}|${identity.orgId}|${identity.app}|${identity.appId}`;
     case 'github-oidc':
       return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${sortedList(identity.environments)}|${sortedList(identity.refs)}|${sortedList(identity.allowedEvents)}`;
+    case 'vercel-oidc':
+      return `vercel-oidc|${identity.issuer}|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
   }
 }
 
@@ -46,6 +48,8 @@ function bindingKey(policy: Policy): string | null {
       return `fly-oidc|${identity.orgId}|${identity.appId}`;
     case 'github-oidc':
       return `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}`;
+    case 'vercel-oidc':
+      return `vercel-oidc|${identity.teamId}|${identity.projectId}`;
   }
 }
 

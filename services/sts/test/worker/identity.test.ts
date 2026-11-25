@@ -96,12 +96,19 @@ const GITHUB_CLAIMS = {
 };
 
 describe('Fly machine identity', () => {
-  it('accepts a machine token bound to the policy org and app ids', async () => {
+  it('accepts a machine token bound to the policy org and app ids, with its exp and iat', async () => {
     const { verify, provider } = await fixture('production');
-    expect(await verify(await signToken(provider(FLY_ISSUER), FLY_CLAIMS))).toEqual({
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 900,
+    });
+    expect(await verify(token)).toEqual({
       status: 'verified',
       workload: 'fly-app',
       provider: 'fly',
+      attestationExp: issuedAt + 900,
+      attestationIat: issuedAt,
     });
   });
 
@@ -129,7 +136,7 @@ describe('Fly machine identity', () => {
 describe('GitHub Actions identity', () => {
   it('accepts a token bound to the repository ids, the environment and the ref', async () => {
     const { verify, provider } = await fixture('production');
-    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toEqual({
+    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toMatchObject({
       status: 'verified',
       workload: 'github-deploy',
       provider: 'github',
@@ -173,7 +180,7 @@ describe('GitHub Actions identity', () => {
       ref: 'refs/heads/main',
       event_name: 'workflow_run',
     });
-    expect(await verify(token)).toEqual({
+    expect(await verify(token)).toMatchObject({
       status: 'verified',
       workload: 'github-review',
       provider: 'github',

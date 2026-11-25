@@ -61,7 +61,11 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateInternalServiceToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -1138,6 +1142,47 @@ describe('getUserFromAuth', () => {
     expect(result.authFailedResponse).toBeNull();
     expect(result.user?.id).toBe(user.id);
     expect(result.deviceSessionId).toBeUndefined();
+  });
+
+  test('rejects a short-lived internal assertion without a pepper claim for an account with a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'claimless-peppered-pepper' });
+    const token = generateInternalServiceToken(user.id, { expiresIn: 300 });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('rejects an audience-less internal assertion without a pepper claim for an account without a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateInternalServiceToken(user.id);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('revokes a user token when the pepper rotates from null to a value', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'rotated-from-null-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
   });
 
   test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {

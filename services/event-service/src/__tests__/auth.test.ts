@@ -219,13 +219,11 @@ describe('authenticateToken', () => {
     expect(lookup).toHaveBeenCalledWith('postgres://test', 'user-xyz-789');
   });
 
-  it('allows absent peppers but rejects explicit null peppers for a user with a current pepper', async () => {
+  it('rejects absent and explicit null peppers for a user with a current pepper', async () => {
     const absentPepper = await signEventServiceToken({ env: 'production' });
     const nullPepper = await signEventServiceToken({ pepper: null, env: 'production' });
 
-    await expect(authenticateTestToken(absentPepper.token)).resolves.toEqual({
-      userId: 'user-xyz-789',
-    });
+    await expect(authenticateTestToken(absentPepper.token)).resolves.toBeNull();
     await expect(authenticateTestToken(nullPepper.token)).resolves.toBeNull();
   });
 

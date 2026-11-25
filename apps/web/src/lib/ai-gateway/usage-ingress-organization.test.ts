@@ -132,7 +132,13 @@ async function authenticateThenPublish(
   extraHeaders: Record<string, string> = {}
 ) {
   const token = jwt.sign(
-    { ...extraClaims, kiloUserId: user.id, version: 3, organizationId: signedOrganization },
+    {
+      ...extraClaims,
+      kiloUserId: user.id,
+      version: 3,
+      apiTokenPepper: user.api_token_pepper,
+      organizationId: signedOrganization,
+    },
     validToken ? 'synthetic-auth-secret' : 'wrong-synthetic-secret',
     { algorithm: 'HS256', expiresIn: 60 }
   );

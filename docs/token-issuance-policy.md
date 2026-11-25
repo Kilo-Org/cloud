@@ -154,7 +154,7 @@ Before wiring a real credential-issuance route, use an application-owned authent
 
 `signModernKiloToken` signs the validated modern payload with explicit audience, purpose, exchange permission, and positive lifetime. It does not change `signKiloToken` or the web's existing human/organization/shared signers. Web's synchronous `generateBoundedInternalServiceToken` uses the same payload builder, fixes `internal-service` / `credentialExchange: false`, and permits only the enumerated bounded service audiences. It requires a positive explicit lifetime, capped at 3600 seconds for generic Session Ingest and 300 seconds for the other bounded operations, in both rollout modes.
 
-Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` enables modern payloads at 16 selected web mint sites. Unset, `false`, or any other value retains their existing legacy shape, TTL, and audience behavior. The flag is server configuration, not a request option. No tracked dotenv values or external deployments are changed by this implementation.
+Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` enables modern payloads at 17 selected web mint sites. Unset, `false`, or any other value retains their existing legacy shape, TTL, and audience behavior. The flag is server configuration, not a request option. No tracked dotenv values or external deployments are changed by this implementation.
 
 | Producer group | Raw mint sites | Lifetime | Audience behavior |
 |---|---:|---|---|
@@ -162,7 +162,7 @@ Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` en
 | GitLab credential broker and GitHub user access-token broker | 2 | 300 seconds | Existing exact operation audience in both modes |
 | GitHub user-authorization disconnect | 1 | 300 seconds | Legacy absent audience; enabled mode uses `git-token-service:github-user-authorizations:disconnect` |
 | User export client and deletion-queue leaf-session cleanup | 2 | 300 seconds | Existing `user-data-export` and `session-ingest:user-deletion` audiences in both modes |
-| Session Ingest client, active-session/ticket router, rename notification | 9 | 3600 seconds | Legacy absent audience; enabled mode uses `session-ingest` |
+| Session Ingest client, active-session/ticket router, active-session list, rename notification | 10 | 3600 seconds | Legacy absent audience; enabled mode uses `session-ingest` |
 
 These assertions continue to omit pepper and environment, preserving the exact receiver contracts. Organization identity is preserved where already supplied. This is trusted backend assertion issuance for existing authorized operations, not a user-returned token-exchange endpoint or a new general delegation grant. Generic Session Ingest assertions are resource-scoped, not single-session or single-route capabilities; incoming-request authorization and receiver ownership checks still matter. Returned Git provider credentials, opaque web/share tickets, and export responses remain separate credential families.
 
@@ -177,7 +177,7 @@ The disconnect reader accepts its dedicated operation audience or legacy audienc
 
 ### Explicit PR 5.2 allocation
 
-Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 16 web callsites; migrate it with that Worker's other token paths and rollout configuration in PR 5.2. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
+Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 17 web callsites; it is always the modern `session-ingest` assertion (see Current-pepper rule). That Worker's control and triage tokens remain PR 5.2 work. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
 
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
@@ -192,6 +192,22 @@ acting user, with the installation's organization scope and a one-hour lifetime.
 The shared Cloud Agent rollout flags select the credential format. Model calls retain
 their separate API credential; session preparation and initiation use the workflow
 credential and the shared model-eligibility policy.
+
+## Current-pepper rule
+
+A pepper rotation revokes every user credential in the web and in every Worker. `packages/worker-utils/src/kilo-token-pepper.ts` owns the decision:
+
+- A present `apiTokenPepper` claim, a string or `null`, must equal the account's current pepper. A claim that is `null` stops working when the pepper changes from `null` to a value.
+- `isKiloUserCredentialPepperCurrent` also refuses an absent claim. The web gateway, `auto-routing`, `ai-attribution`, KiloClaw and `verifyKiloBearerAgainstCurrentPepper` (cloud-agent-next, event-service, kilo-chat, notifications) use it. No claimless token is addressed to these receivers.
+- `isKiloTokenPepperCurrent` also accepts an absent claim on a short-lived internal assertion (`isKiloClaimlessInternalAssertion`, one hour). Only Session Ingest uses it, through `verifyKiloBearerOrInternalAssertionAgainstCurrentPepper`. The assertion needs `exp - iat` of at most 3600 seconds, `iat` at most 60 seconds ahead, at most 3600 seconds of remaining validity, and either `tokenPurpose: 'internal-service'` with an audience or no `tokenPurpose` (the legacy shape, with or without an audience).
+- The legacy shape is temporary. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` is off in production, so the 17 `generateBoundedInternalServiceToken` sites emit it. Remove the branch one hour after the flag is on in production. The one direct `generateInternalServiceToken` caller (Bitbucket workspace access-token release, 300 seconds) does not depend on it: git-token-service verifies that token with its exact operation audience, and the token reaches neither Session Ingest nor the disconnect route.
+- `internal-service` does not mean claimless. Workflow control tokens and the security-auto-analysis control and triage assertions carry the pepper claim. The triage assertion goes to the gateway.
+
+The git-token-service GitHub disconnect route accepts only the web's claimless assertion, through the same `isKiloClaimlessInternalAssertion` with a 300-second lifetime and the disconnect audience. A token with a pepper claim is refused. The assertion's `iat` must be at most 60 seconds ahead, and it must be `tokenPurpose: 'internal-service'` with the disconnect audience or, temporarily, have no `tokenPurpose` and either no audience or the disconnect audience. The other git-token-service routes require an exact operation audience, which no user credential carries.
+
+`generateInternalServiceToken` refuses a lifetime above 3600 seconds.
+
+Before this rule, the web accepted any token for an account without a pepper, including one with a stale string claim. Workers and `ai-attribution` skipped the comparison for an absent claim on every account. KiloClaw treated an absent claim as `null`, so it accepted a claimless token for an account without a pepper.
 
 ## Dedicated Home widget credential
 

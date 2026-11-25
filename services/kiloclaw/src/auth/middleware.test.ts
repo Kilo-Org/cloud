@@ -138,8 +138,21 @@ describe('authMiddleware', () => {
     expect(body.userId).toBe('user_cookie');
   });
 
+  it('refuses a legacy Session Ingest assertion for an account without a pepper', async () => {
+    const token = await signToken({ kiloUserId: 'pepperless_user', version: KILO_TOKEN_VERSION });
+
+    const res = await app.request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+
+    expect(res.status).toBe(401);
+    expect(await jsonBody(res)).toEqual({ error: 'Token revoked' });
+  });
+
   it.each([
-    { tokenPepper: 'absent', storedPepper: null, expectedStatus: 200 },
+    { tokenPepper: 'absent', storedPepper: null, expectedStatus: 401 },
     { tokenPepper: null, storedPepper: null, expectedStatus: 200 },
     { tokenPepper: 'absent', storedPepper: 'rotated_pepper', expectedStatus: 401 },
     { tokenPepper: null, storedPepper: 'rotated_pepper', expectedStatus: 401 },
@@ -167,7 +180,7 @@ describe('authMiddleware', () => {
 
       expect(res.status).toBe(expectedStatus);
       expect(lookup).toHaveBeenCalledOnce();
-      if (storedPepper === null) {
+      if (expectedStatus === 200) {
         expect(await jsonBody(res)).toEqual({ userId: 'pepperless_user', authToken: token });
       } else {
         expect(await jsonBody(res)).toEqual({ error: 'Token revoked' });

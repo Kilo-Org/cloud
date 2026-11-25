@@ -25,10 +25,8 @@ import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
-import {
-  isApiTokenPepperCurrent,
-  requestOrganizationId,
-} from '@kilocode/worker-utils/account-access';
+import { requestOrganizationId } from '@kilocode/worker-utils/account-access';
+import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -499,10 +497,7 @@ export async function getUserFromBearerForCredentialExchange(
   }
 
   const user = await findUserById(auth.userId, db);
-  if (
-    auth.claims.apiTokenPepper === undefined ||
-    auth.claims.apiTokenPepper !== user?.api_token_pepper
-  ) {
+  if (!user || !isKiloUserCredentialPepperCurrent(auth.claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', auth.userId);
   }
 
@@ -553,7 +548,7 @@ export async function getUserFromAccountBearer(requestHeaders: Headers): Promise
   }
 
   const user = await findUserById(userId, db);
-  if (!user || user.is_bot || claims.apiTokenPepper !== user.api_token_pepper) {
+  if (!user || user.is_bot || !isKiloUserCredentialPepperCurrent(claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', userId);
   }
   const result = await validateUserAuthorization({
@@ -648,12 +643,7 @@ async function resolveUserFromAuth(
 
     if (
       user &&
-      (scope
-        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
-        : !isApiTokenPepperCurrent(
-            user.api_token_pepper,
-            authorizationValidationResult.apiTokenPepper
-          ))
+      !isKiloUserCredentialPepperCurrent(authorizationValidationResult, user.api_token_pepper)
     ) {
       return authError(401, 'Invalid API token', user.id, {
         credentialsRejected: true,

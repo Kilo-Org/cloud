@@ -61,10 +61,16 @@
         "title": "Inaprubahan ang pag-sign in ng device"
       },
       "apiKeyReset": {
-        "title": "Na-reset ang API key"
+        "title": "Na-reset ang API token"
       },
       "browserSessionsRevoked": {
         "title": "Na-sign out sa lahat ng browser"
+      },
+      "deviceSessionRevoked": {
+        "title": "Na-sign out ang isang device sa iyong account"
+      },
+      "signInResetBySupport": {
+        "title": "Ni-reset ng suporta ng Kilo ang pag-sign in"
       },
       "newSignIn": {
         "title": "Bagong pag-sign in sa iyong account"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Mula sa {{device}} malapit sa {{location}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
         "device": "Mula sa {{device}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
         "location": "Malapit sa {{location}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
-        "unknown": "Hindi ikaw? Suriin ngayon ang seguridad ng iyong account."
+        "unknown": "Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
+        "support": "Ginawa ng suporta ng Kilo. Kung hindi mo ito hiniling, makipag-ugnayan sa suporta."
       }
     }
   },

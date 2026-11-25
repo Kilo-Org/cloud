@@ -61,10 +61,16 @@
         "title": "Cihazdan girişə icazə verildi"
       },
       "apiKeyReset": {
-        "title": "API açarı sıfırlandı"
+        "title": "API tokeni sıfırlandı"
       },
       "browserSessionsRevoked": {
         "title": "Bütün brauzerlərdən çıxış edildi"
+      },
+      "deviceSessionRevoked": {
+        "title": "Cihaz hesabınızdan çıxarıldı"
+      },
+      "signInResetBySupport": {
+        "title": "Giriş Kilo dəstəyi tərəfindən sıfırlandı"
       },
       "newSignIn": {
         "title": "Hesabınıza yeni giriş"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{location}} yaxınlığında {{device}} cihazından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
         "device": "{{device}} cihazından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
         "location": "{{location}} yaxınlığından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
-        "unknown": "Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın."
+        "unknown": "Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
+        "support": "Kilo dəstəyi tərəfindən edildi. Bunu istəməmisinizsə, dəstəklə əlaqə saxlayın."
       }
     }
   },

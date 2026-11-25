@@ -72,20 +72,24 @@ export const ACCOUNT_SECURITY_PUSH_TITLE_KEYS = {
   device_sign_in_approved: 'internal.accountSecurity.deviceSignInApproved.title',
   api_key_reset: 'internal.accountSecurity.apiKeyReset.title',
   browser_sessions_revoked: 'internal.accountSecurity.browserSessionsRevoked.title',
+  device_session_revoked: 'internal.accountSecurity.deviceSessionRevoked.title',
+  sign_in_reset_by_support: 'internal.accountSecurity.signInResetBySupport.title',
   new_sign_in: 'internal.accountSecurity.newSignIn.title',
 } as const satisfies Record<AccountSecurityEvent, PushCatalogKey>;
 
 /**
  * What an account-security notice can say about where the action came from.
- * The device label and the approximate location are each optional, so the
- * body has one sentence per combination rather than a template with an empty
- * hole in it.
+ * For the owner's own action the device label and the approximate location
+ * are each optional, so the body has one sentence per combination rather than
+ * a template with an empty hole in it. An action Kilo support took names
+ * support and nothing about the staff member's request.
  */
 export const ACCOUNT_SECURITY_PUSH_CONTEXTS = [
   'deviceAndLocation',
   'device',
   'location',
   'unknown',
+  'support',
 ] as const;
 export type AccountSecurityPushContext = (typeof ACCOUNT_SECURITY_PUSH_CONTEXTS)[number];
 
@@ -95,6 +99,7 @@ export const ACCOUNT_SECURITY_PUSH_BODY_KEYS = {
   device: 'internal.accountSecurity.body.device',
   location: 'internal.accountSecurity.body.location',
   unknown: 'internal.accountSecurity.body.unknown',
+  support: 'internal.accountSecurity.body.support',
 } as const satisfies Record<AccountSecurityPushContext, PushCatalogKey>;
 
 /**

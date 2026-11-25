@@ -61,10 +61,16 @@
         "title": "An amince da shiga daga na’ura"
       },
       "apiKeyReset": {
-        "title": "An sake saita maɓallin API"
+        "title": "An sake saita alamar API"
       },
       "browserSessionsRevoked": {
         "title": "An fita daga dukkan masu bincike"
+      },
+      "deviceSessionRevoked": {
+        "title": "An fitar da na’ura daga asusunka"
+      },
+      "signInResetBySupport": {
+        "title": "Tallafin Kilo ya sake saita shiga"
       },
       "newSignIn": {
         "title": "Sabon shiga a asusunka"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Daga {{device}} kusa da {{location}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
         "device": "Daga {{device}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
         "location": "Kusa da {{location}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
-        "unknown": "Ba kai ba ne? Duba tsaron asusunka yanzu."
+        "unknown": "Ba kai ba ne? Duba tsaron asusunka yanzu.",
+        "support": "Tallafin Kilo ne ya yi wannan. Idan ba kai ka nema ba, tuntuɓi tallafi."
       }
     }
   },

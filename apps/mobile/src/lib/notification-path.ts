@@ -60,7 +60,8 @@ export function notificationPathForData(data: PushData): string | null {
     case 'account_security': {
       // Each notice opens the screen where its credential can be reviewed and
       // removed: passkeys, sign-in methods, or the signed-in sessions, which
-      // include the device a sign-in or an approval created.
+      // include the device a sign-in or an approval created. A support reset
+      // removed every sign-in method, so it opens the sign-in methods.
       const { event } = data;
       switch (event) {
         case 'passkey_added':
@@ -68,13 +69,15 @@ export function notificationPathForData(data: PushData): string | null {
           return '/(app)/(tabs)/(3_profile)/passkeys?via=push';
         }
         case 'sign_in_method_linked':
-        case 'sign_in_method_unlinked': {
+        case 'sign_in_method_unlinked':
+        case 'sign_in_reset_by_support': {
           return '/(app)/(tabs)/(3_profile)/login-methods?via=push';
         }
         case 'device_sign_in_approved':
         case 'new_sign_in':
         case 'api_key_reset':
-        case 'browser_sessions_revoked': {
+        case 'browser_sessions_revoked':
+        case 'device_session_revoked': {
           return '/(app)/(tabs)/(3_profile)/device-sessions?via=push';
         }
         default: {

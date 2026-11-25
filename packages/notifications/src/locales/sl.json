@@ -61,10 +61,16 @@
         "title": "Prijava naprave je bila odobrena"
       },
       "apiKeyReset": {
-        "title": "Ključ API je bil ponastavljen"
+        "title": "Žeton API je bil ponastavljen"
       },
       "browserSessionsRevoked": {
         "title": "Odjavljeni ste iz vseh brskalnikov"
+      },
+      "deviceSessionRevoked": {
+        "title": "Naprava je bila odjavljena iz vašega računa"
+      },
+      "signInResetBySupport": {
+        "title": "Prijavo je ponastavila podpora Kilo"
       },
       "newSignIn": {
         "title": "Nova prijava v vaš račun"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Iz naprave {{device}} blizu {{location}}. To niste bili vi? Takoj preverite varnost svojega računa.",
         "device": "Iz naprave {{device}}. To niste bili vi? Takoj preverite varnost svojega računa.",
         "location": "Blizu {{location}}. To niste bili vi? Takoj preverite varnost svojega računa.",
-        "unknown": "To niste bili vi? Takoj preverite varnost svojega računa."
+        "unknown": "To niste bili vi? Takoj preverite varnost svojega računa.",
+        "support": "Izvedla podpora Kilo. Če tega niste zahtevali, se obrnite na podporo."
       }
     }
   },

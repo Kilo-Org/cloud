@@ -61,10 +61,16 @@
         "title": "Id-dħul minn apparat ġie approvat"
       },
       "apiKeyReset": {
-        "title": "Iċ-ċavetta tal-API ġiet issettjata mill-ġdid"
+        "title": "It-token tal-API ġie ssettjat mill-ġdid"
       },
       "browserSessionsRevoked": {
         "title": "Ħriġt minn kull browser"
+      },
+      "deviceSessionRevoked": {
+        "title": "Apparat ħareġ mill-kont tiegħek"
+      },
+      "signInResetBySupport": {
+        "title": "Is-servizz ta’ appoġġ ta’ Kilo ssettja d-dħul mill-ġdid"
       },
       "newSignIn": {
         "title": "Dħul ġdid fil-kont tiegħek"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Minn {{device}} qrib {{location}}. Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
         "device": "Minn {{device}}. Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
         "location": "Qrib {{location}}. Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
-        "unknown": "Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa."
+        "unknown": "Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
+        "support": "Sar mis-servizz ta’ appoġġ ta’ Kilo. Jekk ma tlabtx dan, ikkuntattja s-servizz ta’ appoġġ."
       }
     }
   },

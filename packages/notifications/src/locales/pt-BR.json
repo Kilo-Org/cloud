@@ -61,10 +61,16 @@
         "title": "Login de dispositivo aprovado"
       },
       "apiKeyReset": {
-        "title": "Chave de API redefinida"
+        "title": "Token de API redefinido"
       },
       "browserSessionsRevoked": {
         "title": "Sessão encerrada em todos os navegadores"
+      },
+      "deviceSessionRevoked": {
+        "title": "Um dispositivo foi desconectado da sua conta"
+      },
+      "signInResetBySupport": {
+        "title": "Login redefinido pelo suporte da Kilo"
       },
       "newSignIn": {
         "title": "Novo login na sua conta"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "De {{device}} perto de {{location}}. Não foi você? Revise agora a segurança da sua conta.",
         "device": "De {{device}}. Não foi você? Revise agora a segurança da sua conta.",
         "location": "Perto de {{location}}. Não foi você? Revise agora a segurança da sua conta.",
-        "unknown": "Não foi você? Revise agora a segurança da sua conta."
+        "unknown": "Não foi você? Revise agora a segurança da sua conta.",
+        "support": "Feito pelo suporte da Kilo. Se você não pediu isso, entre em contato com o suporte."
       }
     }
   },

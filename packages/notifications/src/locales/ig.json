@@ -61,10 +61,16 @@
         "title": "Akwadoro ịbanye site na ngwaọrụ"
       },
       "apiKeyReset": {
-        "title": "Edoghachiri igodo API"
+        "title": "Edoghachiri tokin API"
       },
       "browserSessionsRevoked": {
         "title": "Ọpụọla na ihe nchọgharị niile"
+      },
+      "deviceSessionRevoked": {
+        "title": "Ewepụrụ ngwaọrụ na akaụntụ gị"
+      },
+      "signInResetBySupport": {
+        "title": "Nkwado Kilo edoghachiri ịbanye"
       },
       "newSignIn": {
         "title": "Ịbanye ọhụrụ na akaụntụ gị"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Site na {{device}} nso {{location}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
         "device": "Site na {{device}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
         "location": "Nso {{location}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
-        "unknown": "Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a."
+        "unknown": "Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
+        "support": "Nkwado Kilo mere nke a. Ọ bụrụ na ịrịọghị ya, kpọtụrụ nkwado."
       }
     }
   },

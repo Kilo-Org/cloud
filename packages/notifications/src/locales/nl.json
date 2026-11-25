@@ -61,10 +61,16 @@
         "title": "Aanmelding vanaf apparaat goedgekeurd"
       },
       "apiKeyReset": {
-        "title": "API-sleutel opnieuw ingesteld"
+        "title": "API-token opnieuw ingesteld"
       },
       "browserSessionsRevoked": {
         "title": "Afgemeld bij alle browsers"
+      },
+      "deviceSessionRevoked": {
+        "title": "Apparaat afgemeld bij je account"
+      },
+      "signInResetBySupport": {
+        "title": "Aanmelding opnieuw ingesteld door Kilo-support"
       },
       "newSignIn": {
         "title": "Nieuwe aanmelding bij je account"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Vanaf {{device}} in de buurt van {{location}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
         "device": "Vanaf {{device}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
         "location": "In de buurt van {{location}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
-        "unknown": "Was jij dit niet? Controleer nu de beveiliging van je account."
+        "unknown": "Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "support": "Gedaan door Kilo-support. Heb je hier niet om gevraagd, neem dan contact op met support."
       }
     }
   },

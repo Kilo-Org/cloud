@@ -61,10 +61,16 @@
         "title": "Login fra enhed godkendt"
       },
       "apiKeyReset": {
-        "title": "API-nøgle nulstillet"
+        "title": "API-token nulstillet"
       },
       "browserSessionsRevoked": {
         "title": "Logget ud af alle browsere"
+      },
+      "deviceSessionRevoked": {
+        "title": "Enhed logget ud af din konto"
+      },
+      "signInResetBySupport": {
+        "title": "Login nulstillet af Kilo-support"
       },
       "newSignIn": {
         "title": "Nyt login på din konto"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Fra {{device}} nær {{location}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
         "device": "Fra {{device}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
         "location": "Nær {{location}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
-        "unknown": "Var det ikke dig? Gennemgå din kontosikkerhed nu."
+        "unknown": "Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "support": "Udført af Kilo-support. Har du ikke bedt om det, så kontakt support."
       }
     }
   },

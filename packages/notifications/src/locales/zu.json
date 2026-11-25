@@ -61,10 +61,16 @@
         "title": "Ukungena kwedivayisi kugunyaziwe"
       },
       "apiKeyReset": {
-        "title": "Ukhiye we-API usethwe kabusha"
+        "title": "Ithokheni ye-API isethwe kabusha"
       },
       "browserSessionsRevoked": {
         "title": "Uphume kuwo wonke amabhrawuza"
+      },
+      "deviceSessionRevoked": {
+        "title": "Idivayisi ikhishiwe ku-akhawunti yakho"
+      },
+      "signInResetBySupport": {
+        "title": "Ukungena kusethwe kabusha wusizo lwe-Kilo"
       },
       "newSignIn": {
         "title": "Ukungena okusha ku-akhawunti yakho"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Kusuka ku-{{device}} eduze kwe-{{location}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
         "device": "Kusuka ku-{{device}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
         "location": "Eduze kwe-{{location}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
-        "unknown": "Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje."
+        "unknown": "Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
+        "support": "Kwenziwe wusizo lwe-Kilo. Uma ungakucelanga lokhu, xhumana nosizo."
       }
     }
   },

@@ -61,10 +61,16 @@
         "title": "Masuk dari perangkat disetujui"
       },
       "apiKeyReset": {
-        "title": "Kunci API diatur ulang"
+        "title": "Token API diatur ulang"
       },
       "browserSessionsRevoked": {
         "title": "Keluar dari semua browser"
+      },
+      "deviceSessionRevoked": {
+        "title": "Perangkat dikeluarkan dari akun Anda"
+      },
+      "signInResetBySupport": {
+        "title": "Proses masuk diatur ulang oleh dukungan Kilo"
       },
       "newSignIn": {
         "title": "Proses masuk baru ke akun Anda"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Dari {{device}} di dekat {{location}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
         "device": "Dari {{device}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
         "location": "Di dekat {{location}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
-        "unknown": "Bukan Anda? Tinjau keamanan akun Anda sekarang."
+        "unknown": "Bukan Anda? Tinjau keamanan akun Anda sekarang.",
+        "support": "Dilakukan oleh dukungan Kilo. Jika Anda tidak memintanya, hubungi dukungan."
       }
     }
   },

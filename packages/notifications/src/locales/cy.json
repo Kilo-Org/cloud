@@ -61,10 +61,16 @@
         "title": "Cymeradwywyd mewngofnodi dyfais"
       },
       "apiKeyReset": {
-        "title": "Ailosodwyd yr allwedd API"
+        "title": "Ailosodwyd y tocyn API"
       },
       "browserSessionsRevoked": {
         "title": "Allgofnodwyd o bob porwr"
+      },
+      "deviceSessionRevoked": {
+        "title": "Allgofnodwyd dyfais o'ch cyfrif"
+      },
+      "signInResetBySupport": {
+        "title": "Ailosodwyd mewngofnodi gan gymorth Kilo"
       },
       "newSignIn": {
         "title": "Mewngofnodi newydd i'ch cyfrif"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "O {{device}} ger {{location}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
         "device": "O {{device}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
         "location": "Ger {{location}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
-        "unknown": "Nid chi? Adolygwch ddiogelwch eich cyfrif nawr."
+        "unknown": "Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "support": "Gwnaed gan gymorth Kilo. Os na wnaethoch ofyn am hyn, cysylltwch â chymorth."
       }
     }
   },

@@ -61,10 +61,16 @@
         "title": "Prisijungimas iš įrenginio patvirtintas"
       },
       "apiKeyReset": {
-        "title": "API raktas atkurtas"
+        "title": "API žetonas atkurtas"
       },
       "browserSessionsRevoked": {
         "title": "Atsijungta nuo visų naršyklių"
+      },
+      "deviceSessionRevoked": {
+        "title": "Įrenginys atjungtas nuo jūsų paskyros"
+      },
+      "signInResetBySupport": {
+        "title": "Prisijungimą atkūrė Kilo pagalba"
       },
       "newSignIn": {
         "title": "Naujas prisijungimas prie jūsų paskyros"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Iš {{device}} netoli {{location}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
         "device": "Iš {{device}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
         "location": "Netoli {{location}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
-        "unknown": "Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą."
+        "unknown": "Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "support": "Atliko Kilo pagalba. Jei to neprašėte, susisiekite su pagalba."
       }
     }
   },

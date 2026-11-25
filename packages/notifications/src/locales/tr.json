@@ -61,10 +61,16 @@
         "title": "Cihazdan oturum açma onaylandı"
       },
       "apiKeyReset": {
-        "title": "API anahtarı sıfırlandı"
+        "title": "API belirteci sıfırlandı"
       },
       "browserSessionsRevoked": {
         "title": "Tüm tarayıcılarda oturum kapatıldı"
+      },
+      "deviceSessionRevoked": {
+        "title": "Bir cihazın hesabınızdaki oturumu kapatıldı"
+      },
+      "signInResetBySupport": {
+        "title": "Oturum açma Kilo desteği tarafından sıfırlandı"
       },
       "newSignIn": {
         "title": "Hesabınızda yeni oturum açma"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{location}} yakınındaki {{device}} cihazından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
         "device": "{{device}} cihazından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
         "location": "{{location}} yakınından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
-        "unknown": "Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin."
+        "unknown": "Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
+        "support": "Kilo desteği tarafından yapıldı. Bunu siz istemediyseniz destekle iletişime geçin."
       }
     }
   },

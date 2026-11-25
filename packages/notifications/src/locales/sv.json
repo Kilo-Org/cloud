@@ -61,10 +61,16 @@
         "title": "Inloggning från enhet godkänd"
       },
       "apiKeyReset": {
-        "title": "API-nyckel återställd"
+        "title": "API-token återställd"
       },
       "browserSessionsRevoked": {
         "title": "Utloggad från alla webbläsare"
+      },
+      "deviceSessionRevoked": {
+        "title": "Enhet utloggad från ditt konto"
+      },
+      "signInResetBySupport": {
+        "title": "Inloggning återställd av Kilos support"
       },
       "newSignIn": {
         "title": "Ny inloggning på ditt konto"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Från {{device}} nära {{location}}. Var det inte du? Granska din kontosäkerhet nu.",
         "device": "Från {{device}}. Var det inte du? Granska din kontosäkerhet nu.",
         "location": "Nära {{location}}. Var det inte du? Granska din kontosäkerhet nu.",
-        "unknown": "Var det inte du? Granska din kontosäkerhet nu."
+        "unknown": "Var det inte du? Granska din kontosäkerhet nu.",
+        "support": "Utfört av Kilos support. Om du inte bad om detta, kontakta supporten."
       }
     }
   },

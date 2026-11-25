@@ -61,10 +61,16 @@
         "title": "Prijava s uređaja je odobrena"
       },
       "apiKeyReset": {
-        "title": "API ključ je resetovan"
+        "title": "API token je resetovan"
       },
       "browserSessionsRevoked": {
         "title": "Odjavljeni ste iz svih preglednika"
+      },
+      "deviceSessionRevoked": {
+        "title": "Uređaj je odjavljen s vašeg računa"
+      },
+      "signInResetBySupport": {
+        "title": "Prijavu je resetovala Kilo podrška"
       },
       "newSignIn": {
         "title": "Nova prijava na vaš račun"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Sa {{device}} u blizini {{location}}. Niste vi? Odmah provjerite sigurnost svog računa.",
         "device": "Sa {{device}}. Niste vi? Odmah provjerite sigurnost svog računa.",
         "location": "U blizini {{location}}. Niste vi? Odmah provjerite sigurnost svog računa.",
-        "unknown": "Niste vi? Odmah provjerite sigurnost svog računa."
+        "unknown": "Niste vi? Odmah provjerite sigurnost svog računa.",
+        "support": "Uradila Kilo podrška. Ako ovo niste tražili, kontaktirajte podršku."
       }
     }
   },

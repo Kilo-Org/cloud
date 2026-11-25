@@ -61,10 +61,16 @@
         "title": "S'ha aprovat l'inici de sessió d'un dispositiu"
       },
       "apiKeyReset": {
-        "title": "S'ha restablert la clau de l'API"
+        "title": "S'ha restablert el testimoni de l'API"
       },
       "browserSessionsRevoked": {
         "title": "S'ha tancat la sessió a tots els navegadors"
+      },
+      "deviceSessionRevoked": {
+        "title": "S'ha tancat la sessió d'un dispositiu al teu compte"
+      },
+      "signInResetBySupport": {
+        "title": "El suport de Kilo ha restablert l'inici de sessió"
       },
       "newSignIn": {
         "title": "Nou inici de sessió al teu compte"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Des de {{device}} a prop de {{location}}. No has estat tu? Revisa ara la seguretat del teu compte.",
         "device": "Des de {{device}}. No has estat tu? Revisa ara la seguretat del teu compte.",
         "location": "A prop de {{location}}. No has estat tu? Revisa ara la seguretat del teu compte.",
-        "unknown": "No has estat tu? Revisa ara la seguretat del teu compte."
+        "unknown": "No has estat tu? Revisa ara la seguretat del teu compte.",
+        "support": "Ho ha fet el suport de Kilo. Si no ho has demanat, contacta amb el suport."
       }
     }
   },

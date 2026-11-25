@@ -61,10 +61,16 @@
         "title": "Gelitaanka qalabka waa la ansixiyay"
       },
       "apiKeyReset": {
-        "title": "Furaha API dib ayaa loo dejiyay"
+        "title": "Calaamadda API dib ayaa loo dejiyay"
       },
       "browserSessionsRevoked": {
         "title": "Waa lagaa saaray dhammaan daalacayaasha"
+      },
+      "deviceSessionRevoked": {
+        "title": "Qalab ayaa laga saaray akoonkaaga"
+      },
+      "signInResetBySupport": {
+        "title": "Taageerada Kilo ayaa dib u dejisay gelitaanka"
       },
       "newSignIn": {
         "title": "Gelitaan cusub oo akoonkaaga ah"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Laga soo galay {{device}} meel u dhow {{location}}. Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
         "device": "Laga soo galay {{device}}. Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
         "location": "Meel u dhow {{location}}. Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
-        "unknown": "Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga."
+        "unknown": "Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
+        "support": "Waxaa sameeyay taageerada Kilo. Haddii aadan codsan, la xiriir taageerada."
       }
     }
   },

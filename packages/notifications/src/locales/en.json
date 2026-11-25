@@ -61,10 +61,16 @@
         "title": "Device sign-in approved"
       },
       "apiKeyReset": {
-        "title": "API key reset"
+        "title": "API token reset"
       },
       "browserSessionsRevoked": {
         "title": "Signed out of all browsers"
+      },
+      "deviceSessionRevoked": {
+        "title": "Device signed out of your account"
+      },
+      "signInResetBySupport": {
+        "title": "Sign-in reset by Kilo support"
       },
       "newSignIn": {
         "title": "New sign-in to your account"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "From {{device}} near {{location}}. Not you? Review your account security now.",
         "device": "From {{device}}. Not you? Review your account security now.",
         "location": "Near {{location}}. Not you? Review your account security now.",
-        "unknown": "Not you? Review your account security now."
+        "unknown": "Not you? Review your account security now.",
+        "support": "Done by Kilo support. If you did not ask for this, contact support."
       }
     }
   },

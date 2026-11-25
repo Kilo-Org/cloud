@@ -10,6 +10,7 @@ import {
   GENERIC_PUSH_TITLE_KEY,
   SECURITY_LIFECYCLE_BODY_LEAF,
 } from './push-i18n-keys';
+import { type AccountSecurityOrigin } from './rpc-schemas';
 
 type GenericBodyLeaf = keyof typeof en.generic.body;
 
@@ -81,34 +82,36 @@ export function genericPushContentForPushData(
   };
 }
 
-function accountSecurityPushContext(
-  device: string | null,
-  location: string | null
-): AccountSecurityPushContext {
-  if (device !== null && location !== null) return 'deviceAndLocation';
-  if (device !== null) return 'device';
-  if (location !== null) return 'location';
+function accountSecurityPushContext(origin: AccountSecurityOrigin): AccountSecurityPushContext {
+  if (origin.actor === 'support') return 'support';
+  if (origin.device !== null && origin.location !== null) return 'deviceAndLocation';
+  if (origin.device !== null) return 'device';
+  if (origin.location !== null) return 'location';
   return 'unknown';
+}
+
+function accountSecurityPushParams(origin: AccountSecurityOrigin): Record<string, string> {
+  if (origin.actor === 'support') return {};
+  return {
+    ...(origin.device !== null ? { device: origin.device } : {}),
+    ...(origin.location !== null ? { location: origin.location } : {}),
+  };
 }
 
 /**
  * The full-preview copy of an account-security notice: a title naming the
- * event and a body naming the device and approximate location when the request
- * carried them. `title` and `body` are the English rendering, which the
- * channel shows when a token's catalog cannot resolve `i18nKey`; the generic
- * product copy stands in if even English lost an entry, so the push is never
- * blank.
+ * event and a body naming who acted: the owner's device and approximate
+ * location when the request carried them, or Kilo support. `title` and `body`
+ * are the English rendering, which the channel shows when a token's catalog
+ * cannot resolve `i18nKey`; the generic product copy stands in if even
+ * English lost an entry, so the push is never blank.
  */
 export function accountSecurityPushCopy(input: {
   event: AccountSecurityEvent;
-  device: string | null;
-  location: string | null;
+  origin: AccountSecurityOrigin;
 }): { title: string; body: string; i18nKey: string; i18nParams: Record<string, string> } {
-  const context = accountSecurityPushContext(input.device, input.location);
-  const i18nParams: Record<string, string> = {
-    ...(input.device !== null ? { device: input.device } : {}),
-    ...(input.location !== null ? { location: input.location } : {}),
-  };
+  const context = accountSecurityPushContext(input.origin);
+  const i18nParams = accountSecurityPushParams(input.origin);
   return {
     title: translatePush(
       'en',

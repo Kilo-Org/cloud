@@ -61,10 +61,16 @@
         "title": "Log masuk peranti diluluskan"
       },
       "apiKeyReset": {
-        "title": "Kunci API ditetapkan semula"
+        "title": "Token API ditetapkan semula"
       },
       "browserSessionsRevoked": {
         "title": "Dilog keluar daripada semua pelayar"
+      },
+      "deviceSessionRevoked": {
+        "title": "Peranti dilog keluar daripada akaun anda"
+      },
+      "signInResetBySupport": {
+        "title": "Log masuk ditetapkan semula oleh sokongan Kilo"
       },
       "newSignIn": {
         "title": "Log masuk baharu ke akaun anda"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Daripada {{device}} berhampiran {{location}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
         "device": "Daripada {{device}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
         "location": "Berhampiran {{location}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
-        "unknown": "Bukan anda? Semak keselamatan akaun anda sekarang."
+        "unknown": "Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "support": "Dilakukan oleh sokongan Kilo. Jika anda tidak memintanya, hubungi sokongan."
       }
     }
   },

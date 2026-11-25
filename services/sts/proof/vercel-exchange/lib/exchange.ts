@@ -35,6 +35,11 @@ export type ClaimSample = {
   project_id: unknown;
   environment: unknown;
   custom_environment_id: unknown;
+  /** Whether it tells a build token from a function token decides if STS pins it (README, N5). */
+  scope: unknown;
+  plan: unknown;
+  /** Presence only: the value names the deployment, which the run does not need. */
+  deploymentIdPresent: boolean;
   /** `act` is an object whose `aud` is the team default `https://vercel.com/<owner>`. */
   actAudIsTeamDefault: boolean;
   /** `act` carries an `act` of its own: the token was exchanged from an exchanged token. */
@@ -153,6 +158,9 @@ export function claimSample(exchanged: string, baseToken: string): ClaimSample {
     project_id: claims.project_id,
     environment: claims.environment,
     custom_environment_id: claims.custom_environment_id,
+    scope: claims.scope,
+    plan: claims.plan,
+    deploymentIdPresent: 'deployment_id' in claims,
     actAudIsTeamDefault:
       actObject !== null &&
       typeof owner === 'string' &&

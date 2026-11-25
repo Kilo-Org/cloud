@@ -31,7 +31,9 @@ export async function POST(request: Request): Promise<Response> {
         errorBody: second.errorBody,
         claims: second.token === undefined ? null : claimSample(second.token, input.baseToken),
       },
-      vercelRefusedChain: second.token === undefined,
+      // A 429 is the budget, not a refusal: the evidence counts only for another status.
+      vercelRefusedChain: second.token === undefined && second.status !== 429,
+      chainedRateLimited: second.status === 429,
     },
     { headers: { 'cache-control': 'no-store' } }
   );

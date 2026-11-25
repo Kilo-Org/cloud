@@ -3,26 +3,27 @@
 //   node drive.ts --mode shared --url https://<deployment> [--invocations 2500] [--jitter-ms 500] [--no-claim] [--deadline-ms 20000]
 //   node drive.ts --mode warm   --url https://<deployment> [--interval-s 60] [--duration-s 9000]
 // Add --dry-run to print the plan and pass rule without calling anything.
+import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
+import {
+  BUDGET_EXCHANGES_PER_WAVE,
+  CLAIM_EXCHANGES_PER_REGION,
+  DESIGN_PEAK_INSTANCES,
+  MIN_DISTINCT_INSTANCES,
+  TIME_TO_TOKEN_MAX_MS,
+  TIME_TO_TOKEN_P99_MS,
+  sharedChecks,
+} from './lib/pass-rule.ts';
 
 type Mode = 'cold' | 'shared' | 'warm';
 type Json = Record<string, unknown>;
 type Invocation = { httpStatus: number | 'network_error'; ms: number; answer: Json | null };
 
-/** Design 3: the cold wave the exchange must survive, about 15 percent above 2,200 instances. */
-const BUDGET_EXCHANGES_PER_WAVE = 100;
-/**
- * Design 3 states the cold-start budget as one exchange per audience, then two parallel fetches,
- * with no millisecond figure. The harness holds time-to-token to p99 3 s and max 20 s (the longest
- * STS waits for a bundle) inside the function.
- */
-const TIME_TO_TOKEN_P99_MS = 3_000;
-const TIME_TO_TOKEN_MAX_MS = 20_000;
-/** Fewer distinct instances than this is not a cold wave: the run is inconclusive, not a pass. */
-const MIN_DISTINCT_INSTANCES = 200;
-/** D10 and design 4.4: re-exchange 10 minutes before `exp`. */
-const REFRESH_MARGIN_SECONDS = 600;
+/** The client fails at once on a base token with under 60 seconds left (lib/shared-token.ts). */
+const MIN_REMAINING_SECONDS = 60;
+/** Salts the shared-cache key so this run never reads an earlier run's entry (same audience). */
+const runId = randomUUID();
 
 const { values } = parseArgs({
   options: {
@@ -62,6 +63,7 @@ const deadlineMs = positiveInteger(values['deadline-ms'], 'deadline-ms');
 function targetFor(base: string): URL {
   const url = new URL(mode === 'shared' ? '/api/shared' : '/api/cold', base);
   if (mode === 'shared') {
+    url.searchParams.set('run', runId);
     if (jitterMs !== undefined) url.searchParams.set('jitterMs', String(jitterMs));
     if (deadlineMs !== undefined) url.searchParams.set('deadlineMs', String(deadlineMs));
     if (values['no-claim']) url.searchParams.set('claim', '0');
@@ -87,7 +89,7 @@ const PLANS: Record<Mode, Json> = {
       claim: !values['no-claim'],
       deadlineMs: deadlineMs ?? 'default 20000',
     },
-    passes: `every invocation got a token; no in-memory cache backend; exchange attempts (429s included) <= ${BUDGET_EXCHANGES_PER_WAVE} in total and per region; time-to-token p99 <= ${TIME_TO_TOKEN_P99_MS} ms and max <= ${TIME_TO_TOKEN_MAX_MS} ms (a 429 is allowed only within these); exchanged exp equals the base token exp; act.aud is the team default and not nested; at least ${MIN_DISTINCT_INSTANCES} distinct instances`,
+    passes: `every invocation got a token; no in-memory cache backend; exchange attempts (429s included) <= ${BUDGET_EXCHANGES_PER_WAVE} in total and per region (hard limit); claimHolds: exchange attempts per region (one audience) <= ${CLAIM_EXCHANGES_PER_REGION} and no 429; time-to-token p99 <= ${TIME_TO_TOKEN_P99_MS} ms and max <= ${TIME_TO_TOKEN_MAX_MS} ms; exchanged exp equals the base token exp; act.aud is the team default and not nested; at least ${MIN_DISTINCT_INSTANCES} distinct instances (reported next to the design peak of ${DESIGN_PEAK_INSTANCES})`,
   },
   warm: {
     perInvocation:
@@ -96,7 +98,7 @@ const PLANS: Record<Mode, Json> = {
     durationSeconds,
     samples: Math.floor(durationSeconds / intervalSeconds) + 1,
     passes:
-      'measurement only: reports the oldest header token, the least time left on it, and how many fresh exchanges expire within 10 minutes (the client keeps those until exp)',
+      'measurement only: reports the oldest header token, the least time left on it, and how many header tokens had under 60 seconds left (the client fails those at once, with no exchange)',
   },
 };
 
@@ -293,21 +295,26 @@ async function runShared(): Promise<Json> {
   const expMatchesBase = answers
     .filter(answer => answer.status === 'ok')
     .every(answer => answer.tokenExpMatchesBase === true);
-  const checks = {
-    allServed: served === invocations && summary.functionFailures === 0,
-    sharedBackend: backends['in-memory'] === undefined,
-    withinExchangeBudget:
-      exchangeAttempts <= BUDGET_EXCHANGES_PER_WAVE &&
-      Object.values(attemptsByRegion).every(value => value <= BUDGET_EXCHANGES_PER_WAVE),
-    withinTimeToTokenBudget:
-      (timeToToken.p99 ?? Infinity) <= TIME_TO_TOKEN_P99_MS &&
-      (timeToToken.max ?? Infinity) <= TIME_TO_TOKEN_MAX_MS,
+  const checks = sharedChecks({
+    invocations,
+    served,
+    functionFailures: summary.functionFailures,
+    inMemoryBackend: backends['in-memory'] !== undefined,
+    attemptsByRegion,
+    rateLimited: sum('rateLimited'),
+    timeToTokenP99: timeToToken.p99,
+    timeToTokenMax: timeToToken.max,
     expMatchesBase,
     actOk,
-    coldWave: summary.distinctInstances >= MIN_DISTINCT_INSTANCES,
-  };
+    distinctInstances: summary.distinctInstances,
+  });
   return {
     ...summary,
+    runId,
+    instancesVsDesignPeak: {
+      distinctInstances: summary.distinctInstances,
+      designPeak: DESIGN_PEAK_INSTANCES,
+    },
     served,
     exchanges: answers.filter(answer => answer.source === 'exchanged').length,
     exchangeAttempts,
@@ -360,14 +367,9 @@ async function runWarm(): Promise<Json> {
     const now = numberField(sample, 'nowSeconds');
     const iat = numberField(sample, 'baseIat');
     const exp = numberField(sample, 'baseExp');
-    const exchangedExp = numberField(sample, 'exchangedExp');
     if (now !== undefined && iat !== undefined) ages.push(now - iat);
     if (now !== undefined && exp !== undefined) remaining.push(exp - now);
-    if (
-      now !== undefined &&
-      exchangedExp !== undefined &&
-      exchangedExp - now < REFRESH_MARGIN_SECONDS
-    ) {
+    if (now !== undefined && exp !== undefined && exp - now < MIN_REMAINING_SECONDS) {
       nearExpiry += 1;
     }
     if (index > 0 && sample.instanceId !== samples[index - 1]?.instanceId) instanceSwitches += 1;
@@ -381,7 +383,7 @@ async function runWarm(): Promise<Json> {
     distinctBaseTokens: new Set(samples.map(sample => sample.baseIat)).size,
     headerTokenAgeSeconds: latency(ages),
     headerTokenRemainingSeconds: latency(remaining),
-    freshExchangesExpiringWithin10Min: nearExpiry,
+    headerTokensUnder60sLeft: nearExpiry,
     exchangedExpEqualsBaseExp: samples.every(
       sample => sample.exchangedExp === undefined || sample.exchangedExp === sample.baseExp
     ),

@@ -80,9 +80,11 @@ The body is read only after the token verified, through a 4 KB budget like `/v1/
   the policy does not list (`audience_not_allowed`), a scope the policy does not list
   (`scope_not_allowed`), and an attestation that leaves under 60 seconds (`attestation_expiring`).
   A denied token does not affect the others. A Worker binding whose policy names another identity
-  kind, or a verified provider token whose binding fails (a GitHub environment, ref or event), is
-  refused whole (`identity_rejected`); a verified token that no policy here names gets every token
-  denied `unknown_workload`.
+  kind is refused whole (`identity_rejected`). A verified provider token that the verifier refuses
+  is refused whole too (401 `identity_rejected`), and its denial row carries the verifier's own
+  reason: `identity_rejected` (a GitHub environment, ref or event failed), `environment_mismatch`
+  (its policy is for another environment) or `unknown_workload` (no policy here names it). Its
+  name never reaches the per-token policy check.
 - **Claims** (design 5.3, profile `ServiceTokenClaimsSchema`): `iss` = `STS_ISSUER`, `sub` =
   `service:<workload>`, `client_id` = `req` = the workload, `env`, one `aud`, one `scope`, a random
   `jti`, `iat`, and `exp = min(iat + 300, attestation exp)`. A Worker binding has no attestation,
@@ -102,11 +104,13 @@ The body is read only after the token verified, through a 4 KB budget like `/v1/
 
 ### Token-signing keys and rotation
 
-Four `TokenSignerDO` shards per environment (`eu` jurisdiction in production and staging; a
-workload always mints on the shard its name hashes to) each hold a key ring and the
-`sts:<environment>:tokens:<shard>` audit stream. One object has a soft limit of 1,000 requests a
-second; at 200,000 caller instances plus about 2,200 Vercel instances, each minting once per 4
-minutes, STS makes about 843 mint calls a second, so four shards keep each near 210. The key set
+Four `TokenSignerDO` shards per environment (`eu` jurisdiction in production and staging) each hold
+a key ring and the `sts:<environment>:tokens:<shard>` audit stream. STS picks a shard at random for
+each mint call, so any shard signs for any workload and one workload's calls spread over all four.
+One object has a soft limit of 1,000 requests a second; at 200,000 caller instances plus about
+2,200 Vercel instances, each minting once per 4 minutes, STS makes about 843 mint calls a second.
+The largest single workload may be the whole fleet: because the shard is chosen per call, not per
+workload, each shard still gets about 211 calls a second, about a fifth of the limit. The key set
 lists the keys of all four. Keys are Ed25519, generated inside the
 object with WebCrypto; the PKCS#8 bytes stay in its KV storage (`token-key-ring`) and signing uses a
 non-extractable import. The `kid` is the RFC 7638 thumbprint of the public key. The ring follows
@@ -123,22 +127,39 @@ call should the alarm be late:
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
 with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
-for 5 minutes; a request that finds no fresh copy calls the four shards itself, in parallel
-(each bounded at 5 s and retried like the manager key set), and stores the plain result only when
-all four answered; otherwise it answers 503 with `Retry-After: 30`.
+for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
+that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
+parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
+only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
+copy stale at the same moment each load it, because no promise is shared across requests: a few
+extra shard calls per isolate per 5 minutes, accepted.
 
 ### Cost per request
 
 - **Mint call:** one Worker request (or RPC call), one signer call when a token passed the policy
   (none when all are denied), one SQL row written for the audit row, at most one KV row written per
-  key per minute (the latest `exp`), at most one `setAlarm` per 5-second relay window, and one
-  denial-object call per distinct denial per isolate per minute. No row is read on the mint path
-  (the ring is held in memory). Relay: one queue message per shard per 5 seconds carries up to 500
-  rows, then one watermark row; rows are deleted 7 days later (a delete counts as a row written).
+  key per minute (the latest `exp`), at most one `setAlarm` per 5-second relay window (the object
+  keeps its alarm time in memory, so a mint reads no alarm), and one denial-object call per
+  distinct denial per isolate per minute. No row is read on the mint path (the ring is held in
+  memory).
+- **Relay and pruning:** each shard sends its unsent rows every 5 seconds, 500 rows per queue
+  message, then writes one watermark row. The audit queue is the record once a row is relayed, so a
+  token signer deletes relayed rows 1 hour after they were written (other objects keep 7 days),
+  checked every 5 minutes; an unrelayed row is never deleted. A delete counts as a row written.
 - **Per minute** (one mint call per caller instance per 4 minutes, plus about 2,200 Vercel
-  instances): 10,000 instances, about 3,050 calls and 3,050 audit rows; 50,000, about 13,050;
-  200,000, about 50,550 (843 a second, about 210 a second per shard). Queue messages stay at most
-  12 per shard per minute until a shard writes more than 500 rows in 5 seconds.
+  instances; shards share calls evenly because the shard is random per call):
+
+  | Caller instances | Calls (= audit rows) per second, total / per shard | Rows per shard per 5 s | Queue messages per minute, per shard / total | Rows kept per shard (1 h + 5 min) | Table size per shard (0.6–1 KB a row) |
+  |---|---|---|---|---|---|
+  | 10,000 | 51 / 13 | 64 | 12 / 48 | about 50,000 | about 30–50 MB |
+  | 50,000 | 218 / 54 | 272 | 12 / 48 | about 212,000 | about 130–210 MB |
+  | 200,000 | 843 / 211 | 1,053 | 36 / 144 | about 821,000 | about 0.5–0.8 GB |
+
+  A Durable Object holds 10 GB, so the busiest case uses under a tenth of it. Queue writes stay
+  under 2.5 messages a second in total. A batch of 500 rows is about 300–500 KB of JSON before
+  compression; the relay refuses to send a message over `AUDIT_BATCH_MAX_COMPRESSED_BYTES` (60 KB,
+  under the 128 KB queue message limit) or 1 MB decompressed and splits that batch in two, so at
+  worst the message counts above double (288 a minute in total at 200,000).
 - **Key set:** one request per isolate per 5 minutes reaches the four shards (four object calls,
   no row written); every other request is served from isolate memory.
 - **Rotation alarm:** each shard wakes for the next ring change (about 4 times per 30 days:
@@ -154,20 +175,27 @@ key out of service:
 2. Add it to `TOKEN_SIGNING_KIDS_REVOKED` in `wrangler.jsonc` for that environment (a comma list),
    merge, and deploy. A malformed kid fails the repo check (`stsVarProblems`).
 3. On the new version the token signer drops the kid from its ring at start: it never signs with it
-   again and leaves it out of the key set. If it was the current key, a freshly generated key
-   becomes current at once. The Worker also filters the listed kids out of every key-set answer,
-   so an isolate copy of the old set never serves them. One `ai.kilo.sts.token_key.revoked` event
-   records the kid, its state and the replacement kid.
+   again and leaves it out of the key set. If it was the current key, the shard's `next` key goes
+   too, because a leak of the shard's storage exposes both: a freshly generated key becomes current
+   at once and a fresh next key is published. If it was a next key, a fresh next key is published.
+   The Worker also filters the listed kids out of every key-set answer and rebuilds its isolate
+   copy when the list changes. One `ai.kilo.sts.token_key.revoked` event per dropped key records
+   the kid, its state, the cause (`listed`, or `same_ring` for the next key dropped with its
+   current key) and the replacement kid.
 4. Remove the policy grant too if the workload itself is the problem (design 6.1).
-5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid, and a new
-   token's header names another kid.
+5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid or its
+   shard's old next kid, and a new token's header names another kid.
 
-Worst case: a verifier keeps a removed kid until its key-set copy expires (max-age 300 s), and a
-token signed just before the removal lives up to 300 s, so the old key stops being accepted
-everywhere about 10 minutes after the deploy. A verifier fetches a new set on an unknown `kid` at
-most once per 5 minutes, so tokens under the fresh key can be refused for up to 5 minutes by a
-verifier that refreshed just before. Leave the kid in the list; a later cleanup may remove it once
-no ring holds it.
+Worst case for the removed key: a verifier keeps a removed kid until its key-set copy expires
+(max-age 300 s), and a token signed just before the removal lives up to 300 s, so the old key stops
+being accepted everywhere about 10 minutes after the deploy.
+
+Worst case for the fresh key: an isolate of the old version that is still serving during the
+rollout can answer with its copy of the old set for up to one isolate cache period (5 minutes);
+isolates of the new version rebuild at once. A verifier fetches a new set on an unknown `kid` at
+most once per 5 minutes. So a verifier that spent its refresh on such an old copy can refuse
+tokens under the fresh key for up to about 10 minutes (5 minutes isolate cache plus 5 minutes
+unknown-kid limit). Leave the kid in the list; a later cleanup may remove it once no ring holds it.
 
 ## The refresher
 
@@ -483,8 +511,9 @@ returns, even when the caller never disposes the result; that a fill outliving t
 deadline still completes and serves the next read; that a key-set, webhook or workload-token
 request still gets its answer from a call of its own when a request that was loading the same value
 is cancelled; that two cold key-set requests and two cold mint calls are each served without a
-promise of another request; and that the token signer keeps its key across a restart of the
-runtime with persisted storage. `typecheck` and `lint` are the usual package scripts.
+promise of another request; that a bound caller cannot reach the mint authority over RPC; and that
+the token signer keeps its key across a restart of the runtime with persisted storage. `typecheck`
+and `lint` are the usual package scripts.
 
 **Local end-to-end check of service tokens.** The shipped scope registry lists no scope yet, so a
 test build of STS in `test/fixtures/e2e/` (STS's own routes, broker and objects, checked against a

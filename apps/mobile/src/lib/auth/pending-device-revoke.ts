@@ -1,4 +1,5 @@
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
+import * as Sentry from '@sentry/react-native';
 import { z } from 'zod';
 
 import {
@@ -105,7 +106,7 @@ function parseStore(raw: string | null): PendingDeviceRevoke[] | null {
   if (raw === null) {
     return [];
   }
-  let value: unknown;
+  let value: unknown = undefined;
   try {
     value = JSON.parse(raw);
   } catch {
@@ -125,7 +126,7 @@ async function readStore(): Promise<StoreRead> {
 }
 
 /** Writes the list, deleting the key when nothing is owed. Total: never throws. */
-async function writeStore(revokes: readonly PendingDeviceRevoke[]): Promise<boolean> {
+function writeStore(revokes: readonly PendingDeviceRevoke[]): Promise<boolean> {
   const byToken = new Map<string, PendingDeviceRevoke>();
   for (const revoke of revokes) {
     byToken.set(revoke.refreshToken, revoke);
@@ -159,6 +160,23 @@ export async function recordPendingDeviceSessionRevoke(refreshToken: string): Pr
     kept.push({ refreshToken, retryUntilMs: now + RETRY_WINDOW_MS });
     await writeStore(kept);
   });
+}
+
+/**
+ * Record a sign-out whose device-session revoke did not settle, or report that
+ * it cannot be retried. A missing token — the keychain refused the read, or the
+ * pair was already deleted — leaves nothing to retry. Best effort, and never
+ * logs the token.
+ */
+export async function recordFailedDeviceSessionRevoke(refreshToken: string | null): Promise<void> {
+  if (refreshToken === null) {
+    Sentry.captureMessage('Device session revoke could not be retried', {
+      level: 'warning',
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'device_revoke_retry_unavailable' },
+    });
+    return;
+  }
+  await recordPendingDeviceSessionRevoke(refreshToken);
 }
 
 async function sendRevoke(refreshToken: string): Promise<AttemptResult> {

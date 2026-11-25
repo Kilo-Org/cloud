@@ -31,7 +31,6 @@ import {
 } from '@/lib/deep-link-launch';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
-import { clearHomeWidgetRefresh } from '@/lib/glanceable/home-widget-refresh';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { retryPendingDeviceSessionRevoke } from '@/lib/auth/pending-device-revoke';
@@ -74,8 +73,8 @@ import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import {
-  clearSessionScopedState,
   clearDeviceWideStateOnSignedOutLaunch,
+  clearSessionScopedState,
 } from '@/lib/auth/session-scoped-state';
 import { retireLoginAttempt } from '@/lib/login-draft';
 import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';

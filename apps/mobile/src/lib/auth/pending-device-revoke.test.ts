@@ -17,9 +17,18 @@ vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.test',
 }));
 
+// Sentry's React Native build pulls in the RN runtime, which the node project
+// cannot parse; the report path is spied here instead.
+const sentryMock = vi.hoisted(() => ({
+  captureMessage: vi.fn(),
+  captureException: vi.fn(),
+}));
+vi.mock('@sentry/react-native', () => sentryMock);
+
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 import {
+  recordFailedDeviceSessionRevoke,
   recordPendingDeviceSessionRevoke,
   resetPendingDeviceRevokeForTests,
   retryPendingDeviceSessionRevoke,
@@ -41,7 +50,7 @@ function storedRevokes(): { refreshToken: string; retryUntilMs: number }[] {
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  return Response.json(body, {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -50,10 +59,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 type CapturedRequest = { url: string; init: RequestInit };
 
 describe('pending device-session revoke retry', () => {
-  let requests: CapturedRequest[];
-  let fetchMock: Mock;
+  let requests: CapturedRequest[] = [];
+  let fetchMock: Mock = vi.fn();
   /** Answers the next request; each test sets the answer it needs. */
-  let answer: () => Promise<Response>;
+  let answer: () => Promise<Response> = () => Promise.resolve(jsonResponse({ outcome: 'revoked' }));
 
   beforeEach(() => {
     store.clear();
@@ -190,6 +199,18 @@ describe('pending device-session revoke retry', () => {
 
     await expect(pass).resolves.toEqual({ kind: 'revoked' });
     expect(storedRevokes().map(revoke => revoke.refreshToken)).toEqual(['second-refresh-token']);
+  });
+
+  it('reports a failed revoke it cannot retry instead of storing a record', async () => {
+    await recordFailedDeviceSessionRevoke(null);
+
+    expect(store.has(PENDING_DEVICE_REVOKE_KEY)).toBe(false);
+    expect(sentryMock.captureMessage).toHaveBeenCalledWith(
+      'Device session revoke could not be retried',
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'device_revoke_retry_unavailable' }),
+      })
+    );
   });
 
   it('never overwrites a payload it cannot decode', async () => {

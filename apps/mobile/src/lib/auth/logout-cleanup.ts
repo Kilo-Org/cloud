@@ -14,7 +14,7 @@ import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY, REFRESH_TOKEN_KEY } from '@/lib/storage-keys';
 import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
-import { recordPendingDeviceSessionRevoke } from '@/lib/auth/pending-device-revoke';
+import { recordFailedDeviceSessionRevoke } from '@/lib/auth/pending-device-revoke';
 import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
 /**
@@ -355,17 +355,7 @@ export async function runLogoutCleanup(): Promise<void> {
     // for the next launch or foreground to retry. The record is best effort and
     // never fails sign-out.
     if (unregister.revoke.status === 'retryable') {
-      if (refreshToken === null) {
-        Sentry.captureMessage('Device session revoke could not be retried', {
-          level: 'warning',
-          tags: {
-            'error.subsystem': 'auth',
-            'error.operation': 'device_revoke_retry_unavailable',
-          },
-        });
-      } else {
-        await recordPendingDeviceSessionRevoke(refreshToken);
-      }
+      await recordFailedDeviceSessionRevoke(refreshToken);
     }
 
     // A fulfilled unregister for a real token is a definitive outcome; emit

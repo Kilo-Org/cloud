@@ -251,9 +251,10 @@ Every key STS generates stays inside the Durable Object that made it, in its KV 
 values, while a storage get or put records only the key name
 (https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/). That covers
 the manager login key (`SignerDO`, `manager-signing-key`), each bundle object's seal and ETag keys
-(`bundle-keys`) and the refresher's folder seal key (`refresher-seal-key`). A row an earlier
-revision wrote to `signing_key`, `bundle_key` or `refresher_key` is moved to KV storage on the
-object's first use and deleted; those tables are no longer written. Traces are off in
+(`bundle-keys`) and the refresher's folder seal key (`refresher-seal-key`). The SQL tables an
+earlier revision used for them are dropped by the `0001` migrations; the one staging object that
+had a key row (`SignerDO`) had already moved it to KV storage. The webhook secret is the one value
+kept in SQL, for the Data Studio copy described above. Traces are off in
 `wrangler.jsonc` (`observability.traces.enabled: false`, inherited by every environment), so a
 dashboard toggle or a changed platform default cannot start recording statements.
 
@@ -269,8 +270,8 @@ residency) and the local queue `kilo-audit-local`. The manager login key set is 
 from `localhost`, so a local manager login needs a public tunnel and an identity configured with
 its URL; without one, a bundle read reports `manager_unreachable_no_copy`.
 
-Local Durable Object state from an earlier revision of this Worker must be wiped
-(`rm -rf services/sts/.wrangler/state`): the migrations were regenerated before the first deploy.
+Local Durable Object state from a revision before the KV key storage cannot move its keys (the
+`0001` migrations drop the old key tables), so wipe it once: `rm -rf services/sts/.wrangler/state`.
 
 ## Production prerequisites
 

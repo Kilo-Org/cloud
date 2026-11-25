@@ -27,14 +27,14 @@ async function resetObject(
 }
 
 export async function resetBundleObject(stub: DurableObjectStub): Promise<void> {
-  await resetObject(stub, ['bundle', 'bundle_key', 'delivery_counter'], ['bundle-keys']);
+  await resetObject(stub, ['bundle', 'delivery_counter'], ['bundle-keys']);
 }
 
 /** The webhook secret is kept: tests read it from storage when they sign a webhook. */
 export async function resetRefresherObject(stub: DurableObjectStub): Promise<void> {
   await resetObject(
     stub,
-    ['manager_folder', 'refresher_key', 'policy_state', 'refresher_state'],
+    ['manager_folder', 'policy_state', 'refresher_state'],
     ['refresher-seal-key']
   );
 }

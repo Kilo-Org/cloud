@@ -1,9 +1,10 @@
-# STS — the secrets broker
+# STS — the secrets broker and service-token service
 
-STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, and it records
-every delivery in an audit log that a queue relays to the audit pipeline. It is phase 1 of the
-secrets design: service-token minting, database leases, CI deploy tokens and the audit queue
-consumer are not part of this Worker.
+STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, and it mints
+short-lived service tokens (Ed25519 JWTs, one audience and one scope each) for the audiences a
+workload's policy grants. It records every delivery, mint and key change in audit logs that a queue
+relays to the audit pipeline. Database leases, CI deploy tokens and the audit queue consumer are not
+part of this Worker.
 
 ## How a read works
 
@@ -11,8 +12,8 @@ consumer are not part of this Worker.
   (`services: [{ binding, service: "sts", entrypoint: "SecretsBroker", props: { caller: "<own worker name>" } }]`)
   and STS authorizes on `props.caller` against `policy/*.yaml`. This is deploy-level trust: only a
   deploy right in this Cloudflare account can set `props`. The Durable Object classes
-  (`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`) are internal: no other Worker may bind them, and the repo
-  check in `test/repo/` fails a config that does.
+  (`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO`) are internal: no other
+  Worker may bind them, and the repo check in `test/repo/` fails a config that does.
 - A caller outside the account posts a provider OIDC token to `POST /v1/bundle`. STS verifies the
   token against the provider's published keys, maps the claims to the one policy that declares them,
   and answers with the bundle. A provider whose discovery document or key set cannot be fetched
@@ -56,9 +57,117 @@ consumer are not part of this Worker.
   Infisical request has an 8-second timeout, so a fill fits the secrets client's 25-second
   first-load window.
 
-Routes: `POST /v1/bundle`, `GET /manager-auth/.well-known/jwks.json` (the manager login key set),
+Routes: `POST /v1/bundle`, `POST /v1/token` (service tokens), `GET /.well-known/jwks.json` (the
+service-token key set), `GET /manager-auth/.well-known/jwks.json` (the manager login key set),
 `POST /manager-webhook` (Infisical `secrets.modified`). Production is `https://sts.kiloapps.io`,
 staging is `https://sts-staging.kiloapps.io`.
+
+## Service tokens
+
+A workload asks for up to 8 tokens in one call, one per audience, each with exactly one scope of
+that audience (`MintRequestSchema` in `@kilocode/sts-contracts`). A Worker in the account calls
+`SecretsBroker.mintTokens(request)` on its `props.caller` binding; a caller outside the account
+posts the same body to `POST /v1/token` with its provider OIDC token as `Authorization: Bearer`.
+The body is read only after the token verified, through a 4 KB budget like `/v1/bundle`.
+
+- **Answer.** `MintResultSchema`: `ok` with one entry per requested token, in request order, each
+  `issued` (token, `jti`, `expiresAt`) or `denied` with a closed reason; or a whole-call
+  `invalid_request` (400: not JSON, not the schema, more than 8 tokens, a repeated audience; 413
+  past the body budget, same body), `identity_rejected` (401) or `unavailable` (503 with
+  `Retry-After`). Every answer is `Cache-Control: no-store`.
+- **Per-token decision**, in this order: no policy for the caller in this environment
+  (`unknown_workload`), a scope `STS_SCOPE_REGISTRY` does not list (`unknown_scope`), an audience
+  the policy does not list (`audience_not_allowed`), a scope the policy does not list
+  (`scope_not_allowed`), and an attestation that leaves under 60 seconds (`attestation_expiring`).
+  A denied token does not affect the others. A Worker binding whose policy names another identity
+  kind, or a verified provider token whose binding fails (a GitHub environment, ref or event), is
+  refused whole (`identity_rejected`); a verified token that no policy here names gets every token
+  denied `unknown_workload`.
+- **Claims** (design 5.3, profile `ServiceTokenClaimsSchema`): `iss` = `STS_ISSUER`, `sub` =
+  `service:<workload>`, `client_id` = `req` = the workload, `env`, one `aud`, one `scope`, a random
+  `jti`, `iat`, and `exp = min(iat + 300, attestation exp)`. A Worker binding has no attestation,
+  so its tokens live 300 s. Header: `alg: EdDSA`, `typ: at+jwt`, `kid`.
+- **One signer hop.** A whole call makes at most one `TokenSignerDO` call, only when at least one
+  token passed the policy. The signer signs every allowed token and appends one
+  `ai.kilo.sts.token.issued` row listing each `jti`, audience and scope (parallel lists) in the same
+  call; a failed append returns no token (`unavailable`, retry after 10 s). STS waits at most 5 s
+  for the signer, then answers `unavailable`; the call is never retried, since a retry after a
+  committed append would audit tokens the caller never got.
+- **Denials.** Every refused token of an identified caller (valid `props.caller`, or a provider
+  token whose signature, issuer, audience and lifetime verified) goes to `DenialDO` as an
+  `ai.kilo.sts.token.denied` event with `reason`, `workload`, `audience` and `scope` (a whole-call
+  refusal names no audience or scope). They merge per minute like bundle denials, and all denials of
+  one call travel in one denial-object hop. A token that did not verify gets one log line and no
+  row.
+
+### Token-signing keys and rotation
+
+Four `TokenSignerDO` shards per environment (`eu` jurisdiction in production and staging; a
+workload always mints on the shard its name hashes to) each hold a key ring and the
+`sts:<environment>:tokens:<shard>` audit stream. One object has a soft limit of 1,000 requests a
+second; at 200,000 caller instances plus about 2,200 Vercel instances, each minting once per 4
+minutes, STS makes about 843 mint calls a second, so four shards keep each near 210. The key set
+lists the keys of all four. Keys are Ed25519, generated inside the
+object with WebCrypto; the PKCS#8 bytes stay in its KV storage (`token-key-ring`) and signing uses a
+non-extractable import. The `kid` is the RFC 7638 thumbprint of the public key. The ring follows
+design 5.7, driven by the object's alarm (no cron), with the same changes applied at the start of a
+call should the alarm be late:
+
+- the current key signs for 30 days;
+- the next key is generated and published 7 days before it becomes current (if the object slept
+  through that date, the next key still waits a full 7 days after it is published);
+- a retired key stays published until 10 minutes after the last token it signed expires. The
+  object keeps that latest `exp` per key, rounded up to a whole minute, so it writes it at most
+  once a minute.
+
+Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
+`activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
+with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
+for 5 minutes; a request that finds no fresh copy calls the four shards itself, in parallel
+(each bounded at 5 s and retried like the manager key set), and stores the plain result only when
+all four answered; otherwise it answers 503 with `Retry-After: 30`.
+
+### Cost per request
+
+- **Mint call:** one Worker request (or RPC call), one signer call when a token passed the policy
+  (none when all are denied), one SQL row written for the audit row, at most one KV row written per
+  key per minute (the latest `exp`), at most one `setAlarm` per 5-second relay window, and one
+  denial-object call per distinct denial per isolate per minute. No row is read on the mint path
+  (the ring is held in memory). Relay: one queue message per shard per 5 seconds carries up to 500
+  rows, then one watermark row; rows are deleted 7 days later (a delete counts as a row written).
+- **Per minute** (one mint call per caller instance per 4 minutes, plus about 2,200 Vercel
+  instances): 10,000 instances, about 3,050 calls and 3,050 audit rows; 50,000, about 13,050;
+  200,000, about 50,550 (843 a second, about 210 a second per shard). Queue messages stay at most
+  12 per shard per minute until a shard writes more than 500 rows in 5 seconds.
+- **Key set:** one request per isolate per 5 minutes reaches the four shards (four object calls,
+  no row written); every other request is served from isolate memory.
+- **Rotation alarm:** each shard wakes for the next ring change (about 4 times per 30 days:
+  publish, activate, remove) and for relays and prunes it already runs for its audit rows; each
+  change writes the ring (one KV row), one audit row and one `setAlarm`.
+
+### Emergency removal of a signing key (runbook)
+
+STS tokens are expiry-bound: verifiers do no revocation lookup for them (decision Q4). To take a
+key out of service:
+
+1. Read the exposed `kid` from the token header, or from `GET /.well-known/jwks.json`.
+2. Add it to `TOKEN_SIGNING_KIDS_REVOKED` in `wrangler.jsonc` for that environment (a comma list),
+   merge, and deploy. A malformed kid fails the repo check (`stsVarProblems`).
+3. On the new version the token signer drops the kid from its ring at start: it never signs with it
+   again and leaves it out of the key set. If it was the current key, a freshly generated key
+   becomes current at once. The Worker also filters the listed kids out of every key-set answer,
+   so an isolate copy of the old set never serves them. One `ai.kilo.sts.token_key.revoked` event
+   records the kid, its state and the replacement kid.
+4. Remove the policy grant too if the workload itself is the problem (design 6.1).
+5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid, and a new
+   token's header names another kid.
+
+Worst case: a verifier keeps a removed kid until its key-set copy expires (max-age 300 s), and a
+token signed just before the removal lives up to 300 s, so the old key stops being accepted
+everywhere about 10 minutes after the deploy. A verifier fetches a new set on an unknown `kid` at
+most once per 5 minutes, so tokens under the fresh key can be refused for up to 5 minutes by a
+verifier that refreshed just before. Leave the kid in the list; a later cleanup may remove it once
+no ring holds it.
 
 ## The refresher
 
@@ -93,11 +202,14 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
 ### Internal Durable Objects
 
-`BundleDO`, `RefresherDO`, `SignerDO` and `DenialDO` are internal. Their methods skip the policy
-check and the audit row that `SecretsBroker` performs, so no other Worker may reach them: a
+`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO` and `TokenSignerDO` are internal. Their methods
+skip the policy check and the audit row that `SecretsBroker` performs (the token signer signs what
+STS's policy check allowed), so no other Worker may reach them: a
 `durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
 `transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
-binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`.
+binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`. A
+config outside `services/sts/` that binds a class named `BundleDO`, `RefresherDO`, `DenialDO` or
+`TokenSignerDO` fails too (`SignerDO` is also the audit relay's own class name).
 
 ## Configuration
 
@@ -113,9 +225,15 @@ at the start of each entry.
 | `MANAGER_ENVIRONMENT_SLUG` | `development`, `staging` or `production`. |
 | `MANAGER_IDENTITY_ID` | The Infisical machine identity STS logs in as, one per environment. |
 | `DO_JURISDICTION` | `eu` in production and staging, `none` locally. |
+| `TOKEN_SIGNING_KIDS_REVOKED` | Comma list of service-token signing kids taken out of service; empty by default (runbook above). |
+
+Wrangler inherits no vars into an env block, so every block sets each var, and
+`test/repo/worker-configs.test.ts` checks that each STS block passes the same schema `readConfig`
+uses and that its `STS_ISSUER` equals `STS_ISSUERS` in `@kilocode/sts-contracts`.
 
 Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
-`STS_DENIAL_DO`. Trigger: cron `*/5 * * * *` in production and staging, `[]` in the local block.
+`STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`). Trigger: cron `*/5 * * * *` in production
+and staging, `[]` in the local block.
 
 ## Policy
 
@@ -148,6 +266,21 @@ which needs the per-audience token exchange and its proof run (design 4.4); it c
 Vercel workload. Until then a Vercel token is refused like any unlisted issuer. A default-audience
 Vercel token (`https://vercel.com/<team>`) is shared by every relying party of the team, which is
 why the exchange is a prerequisite.
+
+Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
+hold; both default to empty, so a policy without them mints nothing. Every scope must be in
+`STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`, empty until the first audience registers) and
+belong to a listed audience, every audience needs at least one scope, and no audience may be the
+workload itself. `dynamic` (database leases, CI deploy tokens) fixes the shape for later; its list
+of allowed values is empty, so any entry fails the load.
+
+```yaml
+audiences: [web]
+scopes: ['web:sts.canary']
+```
+
+The `ai.kilo.sts.policy.changed` event lists added and removed `workload:audience` and
+`workload:scope` grants next to the workload and secret changes.
 
 Adding a file also means adding it to `src/policy/registry.ts`; the typed import map in
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
@@ -269,7 +402,8 @@ Every key STS generates stays inside the Durable Object that made it, in its KV 
 values, while a storage get or put records only the key name
 (https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/). That covers
 the manager login key (`SignerDO`, `manager-signing-key`), each bundle object's seal and ETag keys
-(`bundle-keys`) and the refresher's folder seal key (`refresher-seal-key`). The SQL tables an
+(`bundle-keys`), the refresher's folder seal key (`refresher-seal-key`) and the service-token key
+ring (`TokenSignerDO`, `token-key-ring`). The SQL tables an
 earlier revision used for them are dropped by the `0001` migrations; the one staging object that
 had a key row (`SignerDO`) had already moved it to KV storage. The webhook secret is the one value
 kept in SQL, for the Data Studio copy described above. Traces are off in
@@ -337,15 +471,33 @@ Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, i
 ## Tests
 
 `pnpm --filter cloudflare-sts test` runs the Workers-pool suites in `test/worker/` (identity
-acceptance and outages per provider against locally generated key sets, policy schema, bundle
-delivery, ETags, policy narrowing, fills, relay and pruning, the refresher against a mocked
-Infisical: login, folder reads, resolution, references, backoff, webhooks) and then the Node suites:
-`test/repo/` (policy files, the Worker config checks, and a check that every `wrangler.jsonc` under
-`services/` other than a service's own sits under `test/fixtures/`, which the production deploy job
-skips) and `test/runtime/`. That suite starts the test-only Worker in `test/fixtures/runtime/` in
-local workerd and checks that a
-`SecretsBroker` call ends when it returns, even when the caller never disposes the result; that a
-fill outliving the bundle object deadline still completes and serves the next read; and that a
-key-set, webhook or workload-token request still gets its answer from a call of its own when a
-request that was loading the same value is cancelled. `typecheck` and `lint` are the usual package
-scripts.
+acceptance and outages per provider against locally generated key sets, policy schema and token
+grants, bundle delivery, ETags, policy narrowing, fills, relay and pruning, the refresher against a
+mocked Infisical: login, folder reads, resolution, references, backoff, webhooks; the key-ring
+timeline with an injected clock, the token signer, mint over both entry points and token denials)
+and then the Node suites: `test/repo/` (policy files, the Worker config checks, and a check that
+every `wrangler.jsonc` under `services/` other than a service's own sits under `test/fixtures/`,
+which the production deploy job skips) and `test/runtime/`. That suite starts the test-only Worker
+in `test/fixtures/runtime/` in local workerd and checks that a `SecretsBroker` call ends when it
+returns, even when the caller never disposes the result; that a fill outliving the bundle object
+deadline still completes and serves the next read; that a key-set, webhook or workload-token
+request still gets its answer from a call of its own when a request that was loading the same value
+is cancelled; that two cold key-set requests and two cold mint calls are each served without a
+promise of another request; and that the token signer keeps its key across a restart of the
+runtime with persisted storage. `typecheck` and `lint` are the usual package scripts.
+
+**Local end-to-end check of service tokens.** The shipped scope registry lists no scope yet, so a
+test build of STS in `test/fixtures/e2e/` (STS's own routes, broker and objects, checked against a
+test registry and a probe policy) runs next to a probe Worker that binds its broker with
+`props.caller` and consumes its audit queue:
+
+```sh
+cd services/sts
+npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
+# in another shell, once both are ready (about 7 minutes: it waits for a token to expire)
+../../node_modules/.bin/tsx test/fixtures/e2e/check.ts
+```
+
+The script mints two tokens, verifies each with `@kilocode/verify` against the served key set,
+checks that a forged token (same claims and kid, another key) and an expired token get 401 and a
+wrong-audience token 403, and waits for the issued and denied events on the queue.

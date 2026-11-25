@@ -16,6 +16,7 @@ export type VerifyFailureReason =
   | 'archive_read'
   | 'chain'
   | 'checkpoint_mismatch'
+  | 'checkpoint_stale'
   | 'head';
 
 export type StreamWalk =

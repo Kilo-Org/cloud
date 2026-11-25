@@ -2,8 +2,12 @@ import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { checkpointKey, createHourlyCheckpoint, readCheckpointFile } from '../src/checkpoint';
 import { getStreamDOStub } from '../src/dos/StreamDO';
-import { FULL_PASS_DEADLINE_MS, MAX_SLICE_ERRORS, getVerifierDOStub } from '../src/dos/VerifierDO';
-import type { VerifierStatus } from '../src/dos/VerifierDO';
+import {
+  CHECKPOINT_MAX_AGE_MS,
+  FULL_PASS_DEADLINE_MS,
+  MAX_SLICE_ERRORS,
+  getVerifierDOStub,
+} from '../src/dos/VerifierDO';
 import { archiveObjectKey, gzipJson } from '../src/relay/archive';
 import {
   auditBatch,
@@ -13,7 +17,11 @@ import {
   readArchived,
   recordingFetch,
   uniqueStream,
+  verifierStatus,
+  type VerifierState,
 } from './helpers';
+
+const HALF_HOUR = 30 * 60 * 1000;
 
 const hour = (h: number) => Date.UTC(2026, 10, 25, h, 0, 0);
 const hourKey = (h: number) => checkpointKey(new Date(hour(h)).toISOString());
@@ -51,10 +59,10 @@ async function tamper(stream: string, toSeq: number): Promise<() => Promise<void
 const verifier = () => getVerifierDOStub(env);
 
 /** Waits until the alarm-driven slices finish every running pass. */
-async function settled(): Promise<VerifierStatus> {
+async function settled(): Promise<VerifierState> {
   return vi.waitFor(
     async () => {
-      const status = await verifier().status();
+      const status = await verifierStatus(verifier());
       if (status.running.length > 0) throw new Error(`still running: ${status.running}`);
       return status;
     },
@@ -82,7 +90,7 @@ describe('VerifierDO', () => {
     await archive(alpha, 5, 5);
     await archive(beta, 1, 3);
     await createHourlyCheckpoint(env, hour(1));
-    expect(await verifier().startPass('daily')).toEqual({
+    expect(await verifier().startPass('daily', hour(1) + HALF_HOUR)).toEqual({
       kind: 'started',
       pass: 'daily',
       anchorKey: null,
@@ -98,7 +106,7 @@ describe('VerifierDO', () => {
     await archive(beta, 4, 4);
     await createHourlyCheckpoint(env, hour(2));
     const restoreAlpha2 = await tamper(alpha, 2);
-    expect(await verifier().startPass('daily')).toMatchObject({
+    expect(await verifier().startPass('daily', hour(2) + HALF_HOUR)).toMatchObject({
       kind: 'started',
       anchorKey: hourKey(1),
       targetKey: hourKey(2),
@@ -121,7 +129,7 @@ describe('VerifierDO', () => {
     // An object above the anchor fails the daily pass, and the anchor stays where it was.
     await archive(alpha, 8, 9);
     const restoreAlpha9 = await tamper(alpha, 9);
-    await verifier().startPass('daily');
+    await verifier().startPass('daily', hour(2) + HALF_HOUR);
     status = await settled();
     expect(status.daily).toMatchObject({ outcome: 'failed', reason: 'chain' });
     expect(status.lastVerifiedCheckpoint).toBe(hourKey(2));
@@ -135,18 +143,19 @@ describe('VerifierDO', () => {
       hourKey(3),
       JSON.stringify({ ...signed, streams: [{ stream: alpha, seq: 9, hash: 'a'.repeat(64) }] })
     );
-    expect(await verifier().startPass('daily')).toMatchObject({
+    expect(await verifier().startPass('daily', hour(3) + HALF_HOUR)).toMatchObject({
       kind: 'failed',
       reason: 'checkpoint_signature',
     });
-    expect((await verifier().status()).lastVerifiedCheckpoint).toBe(hourKey(2));
+    expect((await verifierStatus(verifier())).lastVerifiedCheckpoint).toBe(hourKey(2));
     expect(pageTexts(http.requests).at(-1)).toMatch(
       /^bot: audit-relay daily chain verification failed \(checkpoint_signature\)/
     );
 
     // The daily cron pages while no full pass has completed inside the deadline.
     const pagesBefore = pageTexts(http.requests).length;
-    await verifier().startPass('daily', Date.now() + FULL_PASS_DEADLINE_MS + 24 * 60 * 60 * 1000);
+    // The last full pass completed moments ago (real clock), so measure from now.
+    await verifier().startPass('daily', Date.now() + FULL_PASS_DEADLINE_MS + 86_400_000);
     expect(pageTexts(http.requests).slice(pagesBefore)).toContainEqual(
       expect.stringMatching(
         /^bot: audit-relay full chain verification has not completed for 36 days$/
@@ -182,7 +191,7 @@ describe('VerifierDO slices', () => {
     });
 
     expect(await runDurableObjectAlarm(stub)).toBe(true);
-    const status = await stub.status();
+    const status = await verifierStatus(stub);
     expect(status.running).toEqual([]);
     expect(status.full).toMatchObject({
       outcome: 'failed',
@@ -192,5 +201,22 @@ describe('VerifierDO slices', () => {
     expect(pageTexts(http.requests)).toEqual([
       `bot: audit-relay full chain verification failed (archive_read): ${MAX_SLICE_ERRORS} slices in a row ended without finishing`,
     ]);
+  });
+
+  it('fails and pages a daily pass whose newest checkpoint is too old', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    await createHourlyCheckpoint(env, hour(5));
+    const now = hour(5) + CHECKPOINT_MAX_AGE_MS + 60 * 60 * 1000;
+
+    expect(await verifier().startPass('daily', now)).toEqual({
+      kind: 'failed',
+      pass: 'daily',
+      reason: 'checkpoint_stale',
+      detail: `newest checkpoint ${hourKey(5)} is 3 h old`,
+    });
+    expect(pageTexts(http.requests)).toContain(
+      `bot: audit-relay daily chain verification failed (checkpoint_stale): newest checkpoint ${hourKey(5)} is 3 h old`
+    );
   });
 });

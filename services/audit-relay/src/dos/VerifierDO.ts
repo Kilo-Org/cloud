@@ -35,6 +35,8 @@ export const MAX_SLICE_ERRORS = 5;
 const SLICE_ERROR_RETRY_MS = 60_000;
 /** Design 8.1 runs the full pass monthly; it pages once one has not completed in this window. */
 export const FULL_PASS_DEADLINE_MS = 35 * 24 * 60 * 60 * 1000;
+/** A daily pass fails and pages when the newest signed checkpoint is older than this. */
+export const CHECKPOINT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 const VERIFIED_CHECKPOINT_KEY = 'verified_checkpoint';
 const FULL_COMPLETED_AT_KEY = 'full_completed_at';
@@ -127,6 +129,20 @@ export class VerifierDO extends DurableObject<Env> {
           : { reason: 'checkpoint_read' as const, detail: errorName(error) };
       await this.reportFailure(kind, failure.reason, failure.detail);
       return { kind: 'failed', pass: kind, ...failure };
+    }
+
+    // The hourly job signs a checkpoint every hour; a daily pass that finds none recent would
+    // only re-verify the old anchor and report success while checkpoints have stopped.
+    if (kind === 'daily') {
+      const newestAt = target ? Date.parse(target.time) : null;
+      if (newestAt === null || now - newestAt > CHECKPOINT_MAX_AGE_MS) {
+        const detail =
+          newestAt === null
+            ? 'no signed checkpoint exists'
+            : `newest checkpoint ${targetKey} is ${Math.floor((now - newestAt) / 3_600_000)} h old`;
+        await this.reportFailure(kind, 'checkpoint_stale', detail);
+        return { kind: 'failed', pass: kind, reason: 'checkpoint_stale', detail };
+      }
     }
 
     const pass: VerifyPass = {

@@ -7,13 +7,27 @@ import {
   type VerifyPassKind,
 } from './dos/VerifierDO';
 import type { Env } from './env';
+import { pageOperator } from './page';
+import { errorName } from './relay/error-name';
 import { CRONS } from './schedule';
 
 export async function handleScheduled(controller: ScheduledController, env: Env): Promise<void> {
   switch (controller.cron) {
     case CRONS.hourlyCheckpoint: {
-      const result = await createHourlyCheckpoint(env);
-      console.log(JSON.stringify({ event: 'audit_relay.checkpoint', ...result }));
+      try {
+        const result = await createHourlyCheckpoint(env, controller.scheduledTime);
+        console.log(JSON.stringify({ event: 'audit_relay.checkpoint', ...result }));
+      } catch (error) {
+        // A checkpoint that silently stops is the failure verification cannot see on its own.
+        console.error(
+          JSON.stringify({ event: 'audit_relay.checkpoint_failed', error: errorName(error) })
+        );
+        await pageOperator(
+          env,
+          `audit-relay could not write the hourly checkpoint (${errorName(error)}); the next hour retries`
+        );
+        throw error;
+      }
       return;
     }
     case CRONS.dailyVerification:

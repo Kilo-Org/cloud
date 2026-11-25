@@ -91,7 +91,7 @@ describe('audit batches', () => {
 
   it('stops inflating a gzip bomb past the decompressed limit', async () => {
     const zeros = new Uint8Array(4 * AUDIT_BATCH_MAX_DECOMPRESSED_BYTES);
-    const source = new ReadableStream<Uint8Array>({
+    const source = new ReadableStream<BufferSource>({
       start(controller) {
         controller.enqueue(zeros);
         controller.close();

@@ -21,10 +21,14 @@ const DevSignRequestSchema = z.strictObject({
   claims: z.unknown(),
 });
 
-export async function handleDevRequest(request: Request, env: Env): Promise<Response> {
+export async function handleDevRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
   const config = readConfig(env);
   if (new URL(request.url).pathname !== DEV_SIGN_PATH || config.environment !== 'development') {
-    return await handleRequest(request, env);
+    return await handleRequest(request, env, ctx);
   }
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
@@ -38,5 +42,6 @@ export async function handleDevRequest(request: Request, env: Env): Promise<Resp
     'uts.dev.sign'
   );
   if (result.status === 'refused') return jsonResponse({ error: result.reason }, 400);
+  if (result.status === 'misconfigured') return jsonResponse({ error: 'server_error' }, 500);
   return jsonResponse({ signer, kid: result.kid, token: result.token }, 200);
 }

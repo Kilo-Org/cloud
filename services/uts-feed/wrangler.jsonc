@@ -31,13 +31,13 @@
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
-  // The mint Worker's internal entrypoint; it answers only the caller named here, which must be
-  // this block's deployed name (services/uts/test/repo checks both).
+  // The mint Worker's default entrypoint: its placed fetch handler serves the internal signer-keys
+  // route only to the caller named here, which must be this block's deployed name
+  // (services/uts/test/repo checks both).
   "services": [
     {
-      "binding": "UTS_SIGNER_KEYS",
+      "binding": "UTS_MINT",
       "service": "uts",
-      "entrypoint": "SignerKeys",
       "props": { "caller": "uts-feed" },
     },
   ],
@@ -57,9 +57,8 @@
       },
       "services": [
         {
-          "binding": "UTS_SIGNER_KEYS",
+          "binding": "UTS_MINT",
           "service": "uts-staging",
-          "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-staging" },
         },
       ],
@@ -74,9 +73,8 @@
       },
       "services": [
         {
-          "binding": "UTS_SIGNER_KEYS",
+          "binding": "UTS_MINT",
           "service": "uts-local",
-          "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-local" },
         },
       ],

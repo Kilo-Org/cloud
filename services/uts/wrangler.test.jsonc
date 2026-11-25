@@ -17,24 +17,22 @@
     "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
-  // The internal entrypoint as the development feed Worker binds it, and as a caller it refuses.
+  // The mint Worker's default entrypoint as the development feed Worker binds it, and as two
+  // callers the signer-keys route refuses.
   "services": [
     {
-      "binding": "FEED_SIGNER_KEYS",
+      "binding": "FEED_MINT",
       "service": "uts-test",
-      "entrypoint": "SignerKeys",
       "props": { "caller": "uts-feed-local" },
     },
     {
-      "binding": "OTHER_SIGNER_KEYS",
+      "binding": "OTHER_MINT",
       "service": "uts-test",
-      "entrypoint": "SignerKeys",
       "props": { "caller": "o11y" },
     },
     {
-      "binding": "PROPLESS_SIGNER_KEYS",
+      "binding": "PROPLESS_MINT",
       "service": "uts-test",
-      "entrypoint": "SignerKeys",
     },
   ],
 }

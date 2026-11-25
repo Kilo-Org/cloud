@@ -1,8 +1,10 @@
+import { createExecutionContext } from 'cloudflare:test';
 import { AuthorizationServerMetadataSchema, UTS_ENDPOINTS } from '@kilocode/uts-contracts';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { handleDevRequest } from '../../src/dev';
+import type { Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { claims, keySet } from './support';
 import { config, env } from './test-env';
@@ -13,12 +15,16 @@ function request(path: string, init?: RequestInit): Request {
   return new Request(`${config.endpoints.issuer}${path}`, init);
 }
 
+/** An internet request: its execution context carries no binding props. */
+const fetchMint = (input: Request, target: Env = env) =>
+  handleRequest(input, target, createExecutionContext());
+
 /** The same Worker as configured for production; only plain vars differ. */
 const productionEnv = { ...env, UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'eu' };
 
 describe('authorization-server metadata', () => {
   it('names the issuer and the key set on the feed Worker, and no flow that does not answer', async () => {
-    const response = await handleRequest(request(METADATA_PATH), env);
+    const response = await fetchMint(request(METADATA_PATH));
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
     const metadata = AuthorizationServerMetadataSchema.parse(await response.json());
@@ -31,7 +37,7 @@ describe('authorization-server metadata', () => {
   });
 
   it('serves the production issuer and key set URL in production', async () => {
-    const response = await handleRequest(request(METADATA_PATH), productionEnv);
+    const response = await fetchMint(request(METADATA_PATH), productionEnv);
     expect(await response.json()).toMatchObject({
       issuer: UTS_ENDPOINTS.production.issuer,
       jwks_uri: 'https://uts-feed.kiloapps.io/.well-known/jwks.json',
@@ -39,15 +45,15 @@ describe('authorization-server metadata', () => {
   });
 
   it('answers 405 to other methods and 404 to other paths', async () => {
-    const post = await handleRequest(request(METADATA_PATH, { method: 'POST' }), env);
+    const post = await fetchMint(request(METADATA_PATH, { method: 'POST' }));
     expect(post.status).toBe(405);
     expect(post.headers.get('Allow')).toBe('GET');
-    expect((await handleRequest(request('/'), env)).status).toBe(404);
+    expect((await fetchMint(request('/'))).status).toBe(404);
   });
 
   it('refuses a configuration that leaves production objects unscoped', async () => {
     await expect(
-      handleRequest(request(METADATA_PATH), { ...env, UTS_ENVIRONMENT: 'production' })
+      fetchMint(request(METADATA_PATH), { ...env, UTS_ENVIRONMENT: 'production' })
     ).rejects.toThrow(/eu jurisdiction/);
   });
 });
@@ -59,7 +65,8 @@ describe('development signing route', () => {
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     });
-  const sign = (body: unknown, target = env) => handleDevRequest(signRequest(body), target);
+  const sign = (body: unknown, target: Env = env) =>
+    handleDevRequest(signRequest(body), target, createExecutionContext());
 
   it('signs with the signer the grant hash picks; the token verifies against the key set', async () => {
     const response = await sign({ grantId: 'grant-e2e', claims: claims({ sid: 'grant-e2e' }) });
@@ -89,11 +96,11 @@ describe('development signing route', () => {
   it('does not exist outside development or in the deployed entry', async () => {
     const body = { grantId: 'grant-e2e', claims: claims() };
     expect((await sign(body, productionEnv)).status).toBe(404);
-    expect((await handleRequest(signRequest(body), env)).status).toBe(404);
+    expect((await fetchMint(signRequest(body))).status).toBe(404);
   });
 
   it('serves the deployed routes through the development entry', async () => {
-    const response = await handleDevRequest(request(METADATA_PATH), env);
+    const response = await handleDevRequest(request(METADATA_PATH), env, createExecutionContext());
     expect(response.status).toBe(200);
   });
 });

@@ -2,6 +2,7 @@ import { runInDurableObject } from 'cloudflare:test';
 import {
   SignerKeysResultSchema,
   UTS_SIGNER_COUNT,
+  UTS_SIGNER_KEYS_PATH,
   UtsJwksSchema,
   type UtsJwks,
 } from '@kilocode/uts-contracts';
@@ -50,9 +51,14 @@ export async function resetAllSigners(): Promise<void> {
   for (let signer = 0; signer < UTS_SIGNER_COUNT; signer += 1) await resetSigner(signer);
 }
 
-/** The key set as the feed Worker builds it: every signer's keys over the internal entrypoint. */
+/** The internal signer-keys route, called through `binding` as a service-binding fetch. */
+export async function fetchSignerKeys(binding: Fetcher = env.FEED_MINT): Promise<Response> {
+  return await binding.fetch(`${config.endpoints.issuer}${UTS_SIGNER_KEYS_PATH}`);
+}
+
+/** The key set as the feed Worker builds it: every signer's keys over the internal route. */
 export async function keySet(): Promise<UtsJwks> {
-  const result = SignerKeysResultSchema.parse(await env.FEED_SIGNER_KEYS.publicKeys());
-  if (result.status !== 'ok') throw new Error('the feed caller was refused');
+  const result = SignerKeysResultSchema.parse(await (await fetchSignerKeys()).json());
+  if (result.status !== 'ok') throw new Error(`the signer-keys read answered ${result.status}`);
   return UtsJwksSchema.parse({ keys: result.signers.flatMap(entry => entry.keys) });
 }

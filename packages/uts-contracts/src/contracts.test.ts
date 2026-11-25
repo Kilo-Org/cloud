@@ -16,7 +16,12 @@ import {
   type UtsPublicJwk,
 } from './jwks';
 import { AuthorizationServerMetadataSchema } from './metadata';
-import { SignerKeysResultSchema, type SignerPublicKeys } from './signer-keys';
+import {
+  SIGNER_KEYS_HTTP_STATUS,
+  SignerKeysResultSchema,
+  UTS_SIGNER_KEYS_PATH,
+  type SignerPublicKeys,
+} from './signer-keys';
 
 const THUMBPRINT = 'A'.repeat(43);
 
@@ -102,9 +107,17 @@ describe('SignerKeysResultSchema', () => {
   const signers = (): SignerPublicKeys[] =>
     Array.from({ length: 16 }, (_, signer) => ({ signer, keys: [jwk(signer)] }));
 
-  it('accepts every signer exactly once, and a refusal', () => {
+  it('accepts every signer exactly once, and the two failure results', () => {
     expect(SignerKeysResultSchema.parse({ status: 'ok', signers: signers() }).status).toBe('ok');
-    expect(SignerKeysResultSchema.parse({ status: 'denied' })).toEqual({ status: 'denied' });
+    for (const status of ['misconfigured', 'unavailable'] as const) {
+      expect(SignerKeysResultSchema.parse({ status })).toEqual({ status });
+    }
+    expect(SignerKeysResultSchema.safeParse({ status: 'denied' }).success).toBe(false);
+  });
+
+  it('maps each result to its HTTP status on the internal path', () => {
+    expect(UTS_SIGNER_KEYS_PATH).toBe('/internal/signer-keys');
+    expect(SIGNER_KEYS_HTTP_STATUS).toEqual({ ok: 200, misconfigured: 500, unavailable: 503 });
   });
 
   it('rejects a missing or repeated signer and a kid of another signer', () => {

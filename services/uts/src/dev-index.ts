@@ -3,7 +3,6 @@
  * development signing route (`src/dev.ts`).
  */
 export { UtsSignerDO } from './dos/UtsSignerDO';
-export { SignerKeys } from './signer-keys';
 
 import { handleDevRequest } from './dev';
 import type { Env } from './env';

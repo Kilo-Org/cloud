@@ -7,10 +7,12 @@ import {
 } from './jwks';
 
 /**
- * The mint Worker's internal entrypoint. Only the feed Worker binds it, with
- * `props: { caller: '<feed deployment name>' }`; the mint Worker refuses every other caller.
+ * The mint Worker's internal signer-keys route. Only the feed Worker reaches it, over a service
+ * binding to the mint Worker's default entrypoint with `props: { caller: '<feed deployment name>' }`,
+ * so the read runs in the mint Worker's placed fetch handler. The mint Worker answers every other
+ * request on this path as an unknown path (404).
  */
-export const UTS_SIGNER_KEYS_ENTRYPOINT = 'SignerKeys';
+export const UTS_SIGNER_KEYS_PATH = '/internal/signer-keys';
 
 /** The public keys one signer object publishes: its current key, its next key, retired keys. */
 export const SignerPublicKeysSchema = z
@@ -24,7 +26,11 @@ export const SignerPublicKeysSchema = z
   );
 export type SignerPublicKeys = z.infer<typeof SignerPublicKeysSchema>;
 
-/** What `SignerKeys.publicKeys()` answers: every signer exactly once, or a refusal. */
+/**
+ * The body of the signer-keys route: every signer exactly once (200); `misconfigured` when a signer
+ * object refuses to load under its name or jurisdiction, a deploy error that retries cannot fix
+ * (500); `unavailable` when a signer call failed after its retries (503).
+ */
 export const SignerKeysResultSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('ok'),
@@ -36,11 +42,14 @@ export const SignerKeysResultSchema = z.discriminatedUnion('status', [
         'every signer exactly once'
       ),
   }),
-  z.strictObject({ status: z.literal('denied') }),
+  z.strictObject({ status: z.literal('misconfigured') }),
+  z.strictObject({ status: z.literal('unavailable') }),
 ]);
 export type SignerKeysResult = z.infer<typeof SignerKeysResultSchema>;
 
-/** The entrypoint as the feed Worker's service binding exposes it; the answer is parsed there. */
-export type SignerKeysBinding = {
-  publicKeys(): Promise<unknown>;
+/** The HTTP status the mint Worker sends with each result. */
+export const SIGNER_KEYS_HTTP_STATUS: Readonly<Record<SignerKeysResult['status'], number>> = {
+  ok: 200,
+  misconfigured: 500,
+  unavailable: 503,
 };

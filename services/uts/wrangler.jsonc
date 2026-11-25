@@ -13,7 +13,8 @@
     "local_protocol": "http",
   },
   // The fetch handler runs next to the identity store's primary in Frankfurt (AWS eu-central-1).
-  // Placement covers fetch handlers only; the internal SignerKeys entrypoint runs where it is called.
+  // Placement covers fetch handlers only, so the feed Worker reads signer keys through the default
+  // entrypoint's fetch handler (src/signer-keys.ts), not over RPC.
   "placement": { "region": "aws:eu-central-1" },
   // Traces stay off: a trace records Durable Object storage calls and outbound requests, and the
   // signer objects hold private keys. Every env block inherits this.

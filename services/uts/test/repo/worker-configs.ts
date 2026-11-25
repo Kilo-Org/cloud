@@ -2,11 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  UTS_ENDPOINTS,
-  UTS_SIGNER_KEYS_ENTRYPOINT,
-  type UtsEnvironment,
-} from '@kilocode/uts-contracts';
+import { UTS_ENDPOINTS, type UtsEnvironment } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
 
@@ -263,8 +259,9 @@ function durableObjectProblems(path: string, block: Block): string[] {
 }
 
 /**
- * The internal `SignerKeys` entrypoint answers one caller per environment: the feed Worker, whose
- * binding names the mint deployment of its own environment and carries its own deployed name as
+ * The internal signer-keys route answers one caller per environment: the feed Worker, whose
+ * binding names the mint deployment of its own environment, at its default entrypoint (placement
+ * covers only the default entrypoint's fetch handler), and carries its own deployed name as
  * `props.caller`. The mint Worker's test config binds itself. Nothing else binds the mint Worker.
  */
 function serviceBindingProblems(path: string, block: Block): string[] {
@@ -293,9 +290,9 @@ function serviceBindingProblems(path: string, block: Block): string[] {
         `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
       );
     }
-    if (binding.entrypoint !== UTS_SIGNER_KEYS_ENTRYPOINT) {
+    if (binding.entrypoint !== undefined) {
       problems.push(
-        `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; expected ${UTS_SIGNER_KEYS_ENTRYPOINT}`
+        `${where} binds entrypoint ${binding.entrypoint}; bind the default entrypoint, whose fetch handler placement covers`
       );
     }
     if (binding.environment !== undefined) {
@@ -331,9 +328,9 @@ function routeProblems(path: string, block: Block): string[] {
 
 /**
  * Problems with how the repository's Worker configs reach UTS (design 5.7): only the mint Worker
- * binds the signer objects, only the feed Worker binds the mint Worker's internal entrypoint, no
- * other config deploys under a UTS name or routes a UTS hostname, and no config reaches a UTS
- * class or handler by script name.
+ * binds the signer objects, only the feed Worker binds the mint Worker, no other config deploys
+ * under a UTS name or routes a UTS hostname, and no config reaches a UTS class or handler by
+ * script name.
  */
 export function workerConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];

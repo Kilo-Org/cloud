@@ -42,7 +42,7 @@ export const MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the internal
- * `SignerKeys` entrypoint answers, and the `props.caller` its binding carries.
+ * signer-keys route answers, and the `props.caller` its binding carries.
  */
 export const FEED_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
   production: 'uts-feed',

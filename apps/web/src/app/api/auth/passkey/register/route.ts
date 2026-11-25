@@ -19,6 +19,7 @@ import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import {
   createPasskeyEnrollmentCode,
   deletePasskeyEnrollmentCode,
+  expirePasskeyEnrollmentCode,
   PASSKEY_ENROLLMENT_CODE_EXPIRY_MINUTES,
   checkPasskeyEnrollmentCode,
   PasskeyEnrollmentCodeRefusedError,
@@ -72,8 +73,10 @@ function registrationRateLimitKey(userId: string): string {
  * - 401 `{ error }` with a stable `PasskeyVerificationError` code when the
  *   ceremony is refused.
  * - 422 `EMAIL_UNDELIVERABLE` when the account's address refuses email.
- * - 429 `EMAIL_CODE_COOLDOWN` or `EMAIL_CODE_LOCKED` with `retryAfterSeconds`,
- *   or `RATE_LIMITED` when the account exceeds the firewall rule.
+ * - 429 `EMAIL_CODE_COOLDOWN` (resend too soon), `EMAIL_CODE_HOURLY_LIMIT`
+ *   (the account has been sent the hourly limit of codes) or
+ *   `EMAIL_CODE_LOCKED`, each with `retryAfterSeconds` and `Retry-After`, or
+ *   `RATE_LIMITED` when the account exceeds the firewall rule.
  * - 502 `EMAIL_DELIVERY_FAILED` when the code email could not be sent; retry.
  * - 503 `RATE_LIMIT_UNAVAILABLE` or `STEP_UP_UNAVAILABLE` when the firewall or
  *   the freshness lookup cannot be evaluated.
@@ -423,8 +426,9 @@ function emailCodeRefused(refusal: PasskeyEnrollmentCodeRefusal): NextResponse {
 }
 
 /**
- * Emails a new code to the account's address. A code whose email was not sent
- * is deleted, so it can not hold the resend cooldown.
+ * Emails a new code to the account's address. A code whose email was
+ * definitely not sent is deleted. A code whose send threw is expired but kept,
+ * so it still counts toward the resend cooldown and the hourly limit.
  */
 async function sendEnrollmentCode(
   binding: PasskeyEnrollmentEmailCode['binding']
@@ -435,6 +439,9 @@ async function sendEnrollmentCode(
   }
   if (created.status === 'cooldown') {
     return tooManyRequests('EMAIL_CODE_COOLDOWN', created.retryAfterSeconds);
+  }
+  if (created.status === 'hourly_limit') {
+    return tooManyRequests('EMAIL_CODE_HOURLY_LIMIT', created.retryAfterSeconds);
   }
 
   const delivery = await sendPasskeyEnrollmentCodeEmail(binding.email, {
@@ -447,7 +454,11 @@ async function sendEnrollmentCode(
 
   if (!delivery.sent) {
     try {
-      await deletePasskeyEnrollmentCode(created.emailCodeId);
+      if (delivery.reason === 'send_threw') {
+        await expirePasskeyEnrollmentCode(created.emailCodeId);
+      } else {
+        await deletePasskeyEnrollmentCode(created.emailCodeId);
+      }
     } catch (error) {
       captureException(error, { tags: { source: 'passkey_enrollment_code_email' } });
     }

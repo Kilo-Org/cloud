@@ -37,6 +37,7 @@ export type EnrollmentRefusal =
   | { kind: 'code_expired' }
   | { kind: 'locked'; retryAt: number }
   | { kind: 'cooldown'; retryAt: number }
+  | { kind: 'hourly_limit'; retryAt: number }
   | { kind: 'undeliverable' }
   | { kind: 'delivery_failed' }
   | { kind: 'failed' };
@@ -101,6 +102,10 @@ async function refusalOf(response: Response): Promise<EnrollmentRefusal> {
       return retryAfterSeconds === undefined
         ? { kind: 'failed' }
         : { kind: 'cooldown', retryAt: Date.now() + retryAfterSeconds * 1000 };
+    case 'EMAIL_CODE_HOURLY_LIMIT':
+      return retryAfterSeconds === undefined
+        ? { kind: 'failed' }
+        : { kind: 'hourly_limit', retryAt: Date.now() + retryAfterSeconds * 1000 };
     case 'EMAIL_UNDELIVERABLE':
       return { kind: 'undeliverable' };
     case 'EMAIL_DELIVERY_FAILED':
@@ -238,9 +243,10 @@ export function usePasskeyEnrollment(onEnrolled: () => Promise<unknown> | void):
       setPhase({ step: 'sending', previous });
       const result = await sendPasskeyEnrollmentCode();
       // The server's codes changed whether or not this dialog is still open: a
-      // new code is in the inbox, and every refusal except the cooldown has
-      // already ended the previous code.
-      const keepsPrevious = !result.ok && result.refusal.kind === 'cooldown';
+      // new code is in the inbox, or a refusal that drops the code ended it. A
+      // cooldown or a failed request leaves the previous code as it was.
+      const keepsPrevious =
+        !result.ok && (result.refusal.kind === 'cooldown' || result.refusal.kind === 'failed');
       if (result.ok) lastSentRef.current = result.sent;
       else if (!keepsPrevious) lastSentRef.current = null;
       if (!owns()) return;
@@ -339,6 +345,11 @@ function waitText(retryAt: number, now: number): string {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
+function waitMinutesText(retryAt: number, now: number): string {
+  const minutes = Math.max(1, Math.ceil((retryAt - now) / 60_000));
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+}
+
 export const PASSKEY_ENROLLMENT_REAUTH_MESSAGE =
   'Sign in again before adding a passkey. Signing out signs you out of every browser.';
 
@@ -360,6 +371,10 @@ function refusalMessage(refusal: EnrollmentRefusal, now: number): string {
       return refusal.retryAt > now
         ? `A code was sent a moment ago. You can send a new code in ${waitText(refusal.retryAt, now)}.`
         : 'You can send a new code now.';
+    case 'hourly_limit':
+      return refusal.retryAt > now
+        ? `Too many codes were sent for this account in the last hour. Try again in ${waitMinutesText(refusal.retryAt, now)}.`
+        : 'You can send a new code now.';
     case 'undeliverable':
       return 'We cannot deliver email to your account address, so we cannot send a code.';
     case 'delivery_failed':
@@ -370,7 +385,11 @@ function refusalMessage(refusal: EnrollmentRefusal, now: number): string {
 }
 
 function waitingUntil(refusal: EnrollmentRefusal | null): number | null {
-  return refusal?.kind === 'locked' || refusal?.kind === 'cooldown' ? refusal.retryAt : null;
+  return refusal?.kind === 'locked' ||
+    refusal?.kind === 'cooldown' ||
+    refusal?.kind === 'hourly_limit'
+    ? refusal.retryAt
+    : null;
 }
 
 /**

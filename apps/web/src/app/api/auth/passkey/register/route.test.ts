@@ -948,20 +948,11 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
   });
 
-  it('deletes the code when its email is not sent', async () => {
+  it('deletes the code when its email is definitely not sent', async () => {
     mockSendCodeEmail.mockResolvedValueOnce({ sent: false, reason: 'provider_not_configured' });
     const notConfigured = await POST(createRequest({ action: 'send_code' }));
     expect(notConfigured.status).toBe(502);
     expect(await notConfigured.json()).toEqual({ error: 'EMAIL_DELIVERY_FAILED' });
-    expect(await codeRows()).toEqual([]);
-
-    mockSendCodeEmail.mockRejectedValueOnce(new Error('provider down'));
-    const threw = await POST(createRequest({ action: 'send_code' }));
-    expect(threw.status).toBe(502);
-    expect(await threw.json()).toEqual({ error: 'EMAIL_DELIVERY_FAILED' });
-    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
-      tags: { source: 'passkey_enrollment_code_email' },
-    });
     expect(await codeRows()).toEqual([]);
 
     mockSendCodeEmail.mockResolvedValueOnce({ sent: false, reason: 'neverbounce_rejected' });
@@ -969,6 +960,58 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(undeliverable.status).toBe(422);
     expect(await undeliverable.json()).toEqual({ error: 'EMAIL_UNDELIVERABLE' });
     expect(await codeRows()).toEqual([]);
+  });
+
+  it('keeps a code whose send threw counted for the cooldown, but not redeemable', async () => {
+    mockSendCodeEmail.mockRejectedValueOnce(new Error('provider down'));
+    const threw = await POST(createRequest({ action: 'send_code' }));
+    expect(threw.status).toBe(502);
+    expect(await threw.json()).toEqual({ error: 'EMAIL_DELIVERY_FAILED' });
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'passkey_enrollment_code_email' },
+    });
+
+    const rows = await codeRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.consumed_at).toBeNull();
+    const code = mockSendCodeEmail.mock.calls.at(-1)?.[1].code;
+    if (!code || !rows[0]?.challenge_id) throw new Error('no thrown code row');
+
+    const redeem = await POST(
+      createRequest({
+        action: 'options',
+        emailCode: { emailCodeId: rows[0].challenge_id, code },
+      })
+    );
+    expect(redeem.status).toBe(401);
+    expect(await redeem.json()).toEqual({ error: 'EMAIL_CODE_EXPIRED' });
+
+    const resend = await POST(createRequest({ action: 'send_code' }));
+    expect(resend.status).toBe(429);
+    expect(await resend.json()).toMatchObject({ error: 'EMAIL_CODE_COOLDOWN' });
+    expect(mockSendCodeEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts codes whose send threw toward the hourly limit', async () => {
+    for (let send = 0; send < 5; send += 1) {
+      mockSendCodeEmail.mockRejectedValueOnce(new Error('provider down'));
+      const threw = await POST(createRequest({ action: 'send_code' }));
+      expect(threw.status).toBe(502);
+      await db
+        .update(magic_link_tokens)
+        .set({ created_at: sql`${magic_link_tokens.created_at} - interval '2 minutes'` })
+        .where(passkeyEnrollmentRows(user.google_user_email));
+    }
+
+    const response = await POST(createRequest({ action: 'send_code' }));
+
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as { error: string; retryAfterSeconds: number };
+    expect(body.error).toBe('EMAIL_CODE_HOURLY_LIMIT');
+    expect(body.retryAfterSeconds).toBeGreaterThan(50 * 60 - 10);
+    expect(body.retryAfterSeconds).toBeLessThanOrEqual(50 * 60);
+    expect(response.headers.get('Retry-After')).toBe(String(body.retryAfterSeconds));
+    expect(mockSendCodeEmail).toHaveBeenCalledTimes(5);
   });
 
   it('holds a new code for the resend cooldown', async () => {

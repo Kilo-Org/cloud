@@ -53,6 +53,7 @@ export type PasskeyEnrollmentEmailCode = {
 export type CreatePasskeyEnrollmentCodeResult =
   | { status: 'created'; code: string; emailCodeId: string; expiresInSeconds: number }
   | { status: 'cooldown'; retryAfterSeconds: number }
+  | { status: 'hourly_limit'; retryAfterSeconds: number }
   | { status: 'locked'; retryAfterSeconds: number };
 
 export type PasskeyEnrollmentCodeRefusal =
@@ -183,7 +184,6 @@ export async function createPasskeyEnrollmentCode(
         and(
           accountFilter(binding.email),
           isNull(magic_link_tokens.consumed_at),
-          sql`${magic_link_tokens.expires_at} > NOW()`,
           sql`${magic_link_tokens.created_at} > NOW() - ${RESEND_COOLDOWN}`
         )
       )
@@ -208,7 +208,10 @@ export async function createPasskeyEnrollmentCode(
         )
       );
     if (sends && sends.count >= MAX_SENDS_PER_WINDOW) {
-      return { status: 'cooldown', retryAfterSeconds: Math.max(1, sends.retryAfterSeconds ?? 1) };
+      return {
+        status: 'hourly_limit',
+        retryAfterSeconds: Math.max(1, sends.retryAfterSeconds ?? 1),
+      };
     }
 
     await tx
@@ -309,7 +312,18 @@ export async function consumePasskeyEnrollmentCode(
   return checked;
 }
 
-/** Removes a new code whose email could not be sent. */
+/** Removes a new code whose email was definitely not sent. */
 export async function deletePasskeyEnrollmentCode(emailCodeId: string): Promise<void> {
   await db.delete(magic_link_tokens).where(codeFilter(emailCodeId));
+}
+
+/**
+ * Ends a new code whose send failed without a verdict. The row stays, so it
+ * still counts toward the resend cooldown and the hourly limit.
+ */
+export async function expirePasskeyEnrollmentCode(emailCodeId: string): Promise<void> {
+  await db
+    .update(magic_link_tokens)
+    .set({ expires_at: sql`NOW()` })
+    .where(codeFilter(emailCodeId));
 }

@@ -61,7 +61,11 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateInternalServiceToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -217,7 +221,7 @@ describe('getUserUUID', () => {
   });
 
   test('should generate a UUID for a legacy user id (oauth/google format)', () => {
-    const legacyId = 'oauth/google:114000741928328149731';
+    const legacyId = 'oauth/google:100000000000000000004';
     const user = { id: legacyId } as User;
 
     const result = getUserUUID(user);
@@ -228,7 +232,7 @@ describe('getUserUUID', () => {
   });
 
   test('should always return the SAME UUID for the same legacy user id', () => {
-    const legacyId = 'oauth/google:114000741928328149731';
+    const legacyId = 'oauth/google:100000000000000000004';
     const user = { id: legacyId } as User;
 
     const result1 = getUserUUID(user);
@@ -245,7 +249,7 @@ describe('getUserUUID', () => {
   });
 
   test('should generate different UUIDs for different legacy user ids', () => {
-    const legacyId1 = 'oauth/google:114000741928328149731';
+    const legacyId1 = 'oauth/google:100000000000000000004';
     const legacyId2 = 'oauth/google:987654321098765432109';
 
     const user1 = { id: legacyId1 } as User;
@@ -261,7 +265,7 @@ describe('getUserUUID', () => {
 
   test('should handle various legacy id formats consistently', () => {
     const legacyFormats = [
-      'oauth/google:114000741928328149731',
+      'oauth/google:100000000000000000004',
       'oauth/github:12345678',
       'oauth/gitlab:abcdef123',
       'some-other-legacy-format',
@@ -296,7 +300,7 @@ describe('getUserUUID', () => {
   test('CRITICAL: should always return a UUID string, never undefined or null', () => {
     const testCases = [
       { id: '550e8400-e29b-41d4-a716-446655440000' }, // Valid UUID
-      { id: 'oauth/google:114000741928328149731' }, // Legacy format
+      { id: 'oauth/google:100000000000000000004' }, // Legacy format
       { id: 'some-random-string' }, // Random string
       { id: '' }, // Empty string
     ];
@@ -314,7 +318,7 @@ describe('getUserUUID', () => {
 
   test('should be deterministic - same input always produces same output', () => {
     const testCases = [
-      'oauth/google:114000741928328149731',
+      'oauth/google:100000000000000000004',
       'oauth/github:12345',
       'random-legacy-id',
     ];
@@ -442,7 +446,9 @@ describe('getUserFromAuth', () => {
         api_token_pepper: 'bearer-scheme-pepper',
       });
       mockHeaders.mockResolvedValue(
-        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+        new Headers({
+          authorization: `${scheme} ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
       );
 
       const result = await getUserFromAuth({ adminOnly: false });
@@ -458,7 +464,9 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'bearer-extra-space-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+      new Headers({
+        authorization: `Bearer  ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -666,7 +674,7 @@ describe('getUserFromAuth', () => {
       user.id,
       0
     );
-    const token = generateApiToken(user);
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -688,7 +696,9 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     try {
@@ -717,7 +727,9 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     try {
@@ -745,7 +757,9 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'cleanup-blocked-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     const refused = await getUserFromAuth({ adminOnly: false });
@@ -778,7 +792,9 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     try {
@@ -808,7 +824,9 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'cleanup-blocked-at-pepper',
     });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     const refused = await getUserFromAuth({ adminOnly: false });
@@ -830,7 +848,9 @@ describe('getUserFromAuth', () => {
     });
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     try {
@@ -851,7 +871,7 @@ describe('getUserFromAuth', () => {
       0
     );
     await markOrganizationAsDeleted(organization.id);
-    const token = generateApiToken(user);
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -875,7 +895,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user)}`,
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -901,7 +921,7 @@ describe('getUserFromAuth', () => {
           .values({ organization_id: parent.id, kilo_user_id: user.id, role });
         mockHeaders.mockResolvedValue(
           new Headers({
-            Authorization: `Bearer ${generateApiToken(user)}`,
+            Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
             [ORGANIZATION_ID_HEADER]: child.id,
           })
         );
@@ -925,7 +945,7 @@ describe('getUserFromAuth', () => {
         .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user)}`,
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -954,7 +974,7 @@ describe('getUserFromAuth', () => {
       await markOrganizationAsDeleted(parent.id);
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user)}`,
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -979,7 +999,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user)}`,
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -1007,7 +1027,7 @@ describe('getUserFromAuth', () => {
       .set({ sso_domain: ssoDomain })
       .where(eq(organizations.id, organization.id));
 
-    const token = generateApiToken(user);
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1025,7 +1045,11 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = generateApiToken(
+      user,
+      { deviceSessionId: session!.id },
+      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+    );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1048,7 +1072,11 @@ describe('getUserFromAuth', () => {
         revoked_reason: 'logout',
       })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = generateApiToken(
+      user,
+      { deviceSessionId: session!.id },
+      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+    );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1067,7 +1095,11 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    const token = generateApiToken(
+      user,
+      { deviceSessionId: session!.id },
+      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+    );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     let clock = Date.now();
@@ -1112,13 +1144,58 @@ describe('getUserFromAuth', () => {
     expect(result.deviceSessionId).toBeUndefined();
   });
 
+  test('rejects a short-lived internal assertion without a pepper claim for an account with a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'claimless-peppered-pepper' });
+    const token = generateInternalServiceToken(user.id, { expiresIn: 300 });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('rejects an audience-less internal assertion without a pepper claim for an account without a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateInternalServiceToken(user.id);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('revokes a user token when the pepper rotates from null to a value', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'rotated-from-null-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {
     const user = await insertTestUser({
       google_user_email: `api-token-failure-${crypto.randomUUID()}@example.com`,
       api_token_pepper: 'pre-rotation-pepper',
     });
     const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(user, { deviceSessionId });
+    const token = generateApiToken(
+      user,
+      { deviceSessionId },
+      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+    );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     // Rotate the pepper so the bearer token passes JWT verification but fails
@@ -1157,6 +1234,74 @@ describe('getUserFromSession', () => {
     mockGetServerSession.mockRejectedValue(error);
 
     await expect(getUserFromSession()).rejects.toBe(error);
+  });
+});
+
+describe('browser sessions by deployment', () => {
+  const originalSetting = process.env.KILO_BROWSER_SESSIONS;
+
+  afterEach(() => {
+    if (originalSetting === undefined) delete process.env.KILO_BROWSER_SESSIONS;
+    else process.env.KILO_BROWSER_SESSIONS = originalSetting;
+  });
+
+  async function signedInCookieRequest() {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers({ Cookie: 'next-auth.session-token=session' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      isNewUser: false,
+    });
+    return user;
+  }
+
+  test('apps/web accepts a session cookie', async () => {
+    delete process.env.KILO_BROWSER_SESSIONS;
+    const user = await signedInCookieRequest();
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.credential).toBe('session');
+  });
+
+  describe('apps/ai-gateway', () => {
+    beforeEach(() => {
+      process.env.KILO_BROWSER_SESSIONS = 'disabled';
+    });
+
+    test('treats a session cookie without a bearer as anonymous', async () => {
+      await signedInCookieRequest();
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(result.credentialsRejected).toBe(false);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('never reads the session through the session-only entry points', async () => {
+      await signedInCookieRequest();
+
+      await expect(getUserFromSession()).resolves.toBeNull();
+      expect((await getUserFromSessionForCredentialIssuance()).user).toBeNull();
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('still authenticates a bearer token', async () => {
+      const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user?.id).toBe(user.id);
+    });
   });
 });
 
@@ -1212,7 +1357,9 @@ describe('credential issuance authentication guards', () => {
   test('a bearer credential carries no webSessionId', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1274,7 +1421,9 @@ describe('credential issuance authentication guards', () => {
   test('leaves generic bearer authentication available', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
-      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1385,16 +1534,18 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  test.each([157_680_000, 157_788_000])(
+  test.each([30 * 24 * 60 * 60, 157_680_000, 157_788_000])(
     'authorizes eligible legacy bearer tokens with a %i second lifetime',
     async expiresInSeconds => {
       const user = await insertTestUser({ api_token_pepper: `legacy-pepper-${expiresInSeconds}` });
-      const { token } = await signKiloToken({
-        userId: user.id,
-        pepper: user.api_token_pepper,
-        secret: NEXTAUTH_SECRET,
-        expiresInSeconds,
+      const now = Math.floor(Date.now() / 1000);
+      const token = signPolicyClaims({
+        version: 3,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
         env: process.env.NODE_ENV,
+        iat: now,
+        exp: now + expiresInSeconds,
       });
 
       const result = await getUserFromBearerForCredentialExchange(
@@ -1406,7 +1557,19 @@ describe('credential exchange bearer authentication guard', () => {
     }
   );
 
-  test.each([157_680_000, 157_788_000])(
+  test('authorizes a 30-day token minted by generateApiToken', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'thirty-day-api-pepper' });
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  test.each([30 * 24 * 60 * 60, 157_680_000, 157_788_000])(
     'authorizes a near-expiry legacy bearer token with a %i second lifetime',
     async lifetime => {
       const user = await insertTestUser({ api_token_pepper: `near-expiry-pepper-${lifetime}` });
@@ -1429,7 +1592,7 @@ describe('credential exchange bearer authentication guard', () => {
     }
   );
 
-  test.each([3600, 15 * 60, 24 * 60 * 60, 30 * 24 * 60 * 60])(
+  test.each([3600, 15 * 60, 24 * 60 * 60, 29 * 24 * 60 * 60])(
     'rejects a %i second legacy bearer token',
     async expiresInSeconds => {
       const user = await insertTestUser({
@@ -1454,12 +1617,14 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects a legacy bearer token when legacy exchange is disabled', async () => {
     const user = await insertTestUser({ api_token_pepper: 'legacy-denied-pepper' });
-    const { token } = await signKiloToken({
-      userId: user.id,
-      pepper: user.api_token_pepper,
-      secret: NEXTAUTH_SECRET,
-      expiresInSeconds: 157_680_000,
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
     });
 
     const result = await getUserFromBearerForCredentialExchange(
@@ -1900,7 +2065,7 @@ describe('binary step-up enforcement (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin)}`,
+        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
         'x-pathname': '/admin/api/private-users',
       })
     );
@@ -1977,7 +2142,7 @@ describe('step-up refusal telemetry (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin)}`,
+        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
         'x-pathname': pathname,
         'x-forwarded-for': '203.0.113.9, 10.0.0.1',
       })
@@ -2266,7 +2431,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_super_admin: true,
       api_token_pepper: 'rest-admin-pepper',
     });
-    const token = generateApiToken(admin);
+    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -2315,7 +2480,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
         api_token_pepper: `denied-${crypto.randomUUID()}`,
       });
       mockHeaders.mockResolvedValue(
-        new Headers({ Authorization: `Bearer ${generateApiToken(user, extra)}` })
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user, extra, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
       );
 
       const result = await getUserFromAuth({ adminOnly: true });
@@ -2335,7 +2502,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: false,
       api_token_pepper: 'rest-nonadmin-pepper',
     });
-    const token = generateApiToken(nonAdmin);
+    const token = generateApiToken(nonAdmin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: true });
@@ -2356,7 +2523,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: true,
       api_token_pepper: 'rest-admin-noemit-pepper',
     });
-    const token = generateApiToken(admin);
+    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });

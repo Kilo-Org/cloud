@@ -15,6 +15,7 @@ import { AccountLinkedSuccessHeader } from './AccountLinkedSuccessHeader';
 import { AuthProviderIdSchema, getProviderById } from '@/lib/auth/provider-metadata';
 import { CardLoadFailure } from '@/components/CardLoadFailure';
 import { DiscordGuildStatus } from './DiscordGuildStatus';
+import type { SignInMethodChallenge } from './SignInMethodCodeDialog';
 
 type LoginMethodsWrapperProps = {
   primaryEmail: string;
@@ -34,6 +35,9 @@ export function LoginMethodsWrapper({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [linkedProviderName, setLinkedProviderName] = useState<string | null>(null);
+  // The server keeps one live sign-in method code per account, so both cards
+  // read the same one: a code sent from one card ends the other's.
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
   const trpc = useTRPC();
   const searchParams = useSearchParams();
 
@@ -197,11 +201,17 @@ export function LoginMethodsWrapper({
           providers={providers}
           onError={setErrorMessage}
           callbackPath={callbackPath}
+          readOnly={shell}
+          codeChallenge={codeChallenge}
+          onCodeChallengeChange={setCodeChallenge}
         />
         <ConnectedAccountsCard
           providers={providers}
           onRefetch={refetchProviders}
           onError={setErrorMessage}
+          readOnly={shell}
+          codeChallenge={codeChallenge}
+          onCodeChallengeChange={setCodeChallenge}
         />
         {/* Passkeys are managed by the app's own Passkeys screen. Enrolling one
             needs the web session's step-up route, which the shell cookie cannot

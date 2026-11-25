@@ -39,4 +39,34 @@ describe('GET /admin/api/users', () => {
       [lookalike.id]: false,
     });
   });
+
+  it('omits credential and token columns from every returned user', async () => {
+    const admin = await insertTestUser({
+      google_user_email: 'admin@admin.example',
+      is_admin: true,
+    });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+    const appStoreAccountToken = crypto.randomUUID();
+    const target = await insertTestUser({
+      google_user_email: 'target@example.com',
+      api_token_pepper: 'route-test-api-pepper',
+      web_session_pepper: 'route-test-web-pepper',
+      app_store_account_token: appStoreAccountToken,
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000/admin/api/users?limit=100'));
+    const body = (await response.json()) as UsersApiResponse;
+
+    expect(response.status).toBe(200);
+    expect(body.users.map(user => user.id)).toContain(target.id);
+    for (const user of body.users) {
+      expect(user).not.toHaveProperty('api_token_pepper');
+      expect(user).not.toHaveProperty('web_session_pepper');
+      expect(user).not.toHaveProperty('app_store_account_token');
+    }
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('route-test-api-pepper');
+    expect(serialized).not.toContain('route-test-web-pepper');
+    expect(serialized).not.toContain(appStoreAccountToken);
+  });
 });

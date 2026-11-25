@@ -2,9 +2,11 @@ import { z } from 'zod';
 import {
   cloudAgentChildSessionLineageSchema,
   cloudAgentSessionIdSchema,
+} from './cloud-agent-session-scope';
+import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
-} from './cloud-agent-session-scope';
+} from './cloud-agent-worktree-scope';
 import {
   KILO_SESSION_ID_LENGTH,
   KILO_SESSION_ID_PREFIX,

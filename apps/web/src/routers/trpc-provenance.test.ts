@@ -5,7 +5,7 @@ import {
   createTRPCRouter,
   createTRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -37,7 +37,7 @@ beforeAll(async () => {
     api_token_pepper: `trpc-provenance-pepper-${crypto.randomUUID()}`,
     web_session_pepper: 'current-web-session-pepper',
   });
-  token = generateApiToken(user);
+  token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
 });
 
 function callProvenance(request: Request) {

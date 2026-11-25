@@ -2832,7 +2832,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it.each([
       'Too Many Requests: [BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
-      'Dispatch failed: Code Reviewer is disabled for owner user:fd16292d-e963-4838-bc62-21611f000ccd on github',
+      'Dispatch failed: Code Reviewer is disabled for owner user:44444444-4444-4444-8444-444444444444 on github',
     ])('does not retry deterministic retry-suppression-only failures: %s', async errorMessage => {
       mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
 

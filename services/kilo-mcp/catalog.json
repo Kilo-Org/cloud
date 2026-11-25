@@ -18738,6 +18738,8 @@
             "type": "string",
             "enum": [
               "organization.user.login",
+              "organization.user.link_sign_in_method",
+              "organization.user.unlink_sign_in_method",
               "organization.user.logout",
               "organization.user.accept_invite",
               "organization.user.send_invite",
@@ -39606,6 +39608,15 @@
         "chatGptScope": {
           "type": "string",
           "const": "shared_services"
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "challengeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -39617,9 +39628,11 @@
       "linkauthprovider",
       "provider",
       "organizationid",
-      "chatgptscope"
+      "chatgptscope",
+      "code",
+      "challengeid"
     ],
-    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider organizationid chatgptscope provider organizationId chatGptScope"
+    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider organizationid chatgptscope code challengeid provider organizationId chatGptScope code challengeId"
   },
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
@@ -39841,6 +39854,53 @@
     ],
     "searchBlob": "user.requestAccountDeletionChallenge Send a confirmation code by email to start deleting the account. user requestaccountdeletionchallenge"
   },
+  "user.requestSignInMethodChangeCode": {
+    "path": "user.requestSignInMethodChangeCode",
+    "kind": "mutation",
+    "summary": "Sends a verification code to the user's email so they can confirm adding or changing their account sign-in method (linked login provider). Use to start the email-verified flow for switching login method.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "change": {
+          "type": "string",
+          "enum": [
+            "link",
+            "unlink"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "anaconda",
+            "email",
+            "apple",
+            "google",
+            "github",
+            "gitlab",
+            "linkedin",
+            "discord",
+            "openai",
+            "claude",
+            "fake-login",
+            "workos",
+            "passkey"
+          ]
+        }
+      },
+      "required": [
+        "change",
+        "provider"
+      ]
+    },
+    "tags": [
+      "user",
+      "requestsigninmethodchangecode",
+      "change",
+      "provider"
+    ],
+    "searchBlob": "user.requestSignInMethodChangeCode Sends a verification code to the user's email so they can confirm adding or changing their account sign-in method (linked login provider). Use to start the email-verified flow for switching login method. user requestsigninmethodchangecode change provider change provider"
+  },
   "user.resetAPIKey": {
     "path": "user.resetAPIKey",
     "kind": "mutation",
@@ -40060,6 +40120,15 @@
             "workos",
             "passkey"
           ]
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "challengeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -40069,9 +40138,11 @@
     "tags": [
       "user",
       "unlinkauthprovider",
-      "provider"
+      "provider",
+      "code",
+      "challengeid"
     ],
-    "searchBlob": "user.unlinkAuthProvider Disconnect a linked social sign-in provider from the current account. user unlinkauthprovider provider provider"
+    "searchBlob": "user.unlinkAuthProvider Disconnect a linked social sign-in provider from the current account. user unlinkauthprovider provider code challengeid provider code challengeId"
   },
   "user.unregisterActivityToken": {
     "path": "user.unregisterActivityToken",

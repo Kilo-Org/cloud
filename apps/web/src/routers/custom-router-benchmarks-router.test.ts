@@ -24,7 +24,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, sql } from 'drizzle-orm';
 import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { customRouterBenchmarksRouter } from './custom-router-benchmarks-router';
 import { lockOwner } from '@/lib/auto-routing-custom-routers';
 
@@ -74,7 +74,9 @@ async function createBearerCallerForUser(userId: string) {
     authViaToken: true,
     credential: 'human_bearer',
     tokenSource: null,
-    headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
+    headersList: new Headers({
+      Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+    }),
   });
 }
 

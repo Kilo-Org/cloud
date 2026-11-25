@@ -277,7 +277,7 @@ describe('Hono Routes', () => {
   });
 
   describe('Webhook Ingestion - OAuth User ID (encoded)', () => {
-    const oauthUserId = 'oauth/google:101043560986948156510';
+    const oauthUserId = 'oauth/google:100000000000000000003';
     const encodedUserId = encodeUserIdForPath(oauthUserId);
     const testTriggerId = 'oauth-trigger';
     // The namespace uses the raw (decoded) userId internally

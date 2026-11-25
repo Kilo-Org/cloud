@@ -20,17 +20,35 @@ async function storedState(): Promise<SignerState> {
   );
 }
 
-/** Runs the object's alarm as if the clock read `at`. */
-async function alarmAt(at: number): Promise<number | null> {
-  return await runInDurableObject(signer(), async (instance: UtsSignerDO, state) => {
+async function storedAlarm(): Promise<number | null> {
+  return await runInDurableObject(signer(), (_instance, state) => state.storage.getAlarm());
+}
+
+/** The published keys over RPC, as the mint Worker's signer-keys route reads them. */
+async function published() {
+  const result = await signer().publicKeys();
+  if (result.status !== 'ok') throw new Error(`answered ${result.status}`);
+  return result;
+}
+
+const publishedKids = async () => (await published()).keys.map(key => key.kid);
+
+/** Runs `step` inside the object as if the clock read `at`. */
+async function inObjectAt<R>(at: number, step: (instance: UtsSignerDO) => Promise<R>): Promise<R> {
+  return await runInDurableObject(signer(), async (instance: UtsSignerDO) => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(at);
     try {
-      await instance.alarm();
+      return await step(instance);
     } finally {
       clock.mockRestore();
     }
-    return await state.storage.getAlarm();
   });
+}
+
+/** Runs the object's alarm as if the clock read `at`, and returns the alarm it stores next. */
+async function alarmAt(at: number): Promise<number | null> {
+  await inObjectAt(at, instance => instance.alarm());
+  return await storedAlarm();
 }
 
 async function verify(token: string) {
@@ -52,7 +70,7 @@ afterEach(() => {
 
 describe('signer keys', () => {
   it('publishes a current and a next key under kids of this signer, without private parts', async () => {
-    const { signer: index, keys } = await signer().publicKeys();
+    const { signer: index, keys } = await published();
     expect(index).toBe(SIGNER);
     expect(keys).toHaveLength(2);
     for (const key of keys) {
@@ -63,7 +81,7 @@ describe('signer keys', () => {
   });
 
   it('keeps keys in KV storage and no SQL table', async () => {
-    await signer().publicKeys();
+    await published();
     await runInDurableObject(signer(), async (_instance, state) => {
       const tables = state.storage.sql
         .exec<{ name: string }>(`SELECT name FROM sqlite_master WHERE type = 'table'`)
@@ -77,49 +95,73 @@ describe('signer keys', () => {
   });
 
   it('keeps its keys across a restart', async () => {
-    const before = await signer().publicKeys();
+    const before = await published();
     await restartSigner(SIGNER);
-    expect(await signer().publicKeys()).toEqual(before);
+    expect(await published()).toEqual(before);
   });
 
-  it('refuses to create keys under a name that is not its own signer name', async () => {
-    const refusal = (error: unknown) => (error instanceof Error ? error.message : String(error));
+  it('answers misconfigured, and creates no keys, under a name that is not its own signer name', async () => {
+    const reason = 'signer object was not created by its signer name';
     for (const name of ['staging:signer:01', 'development:feed:01']) {
       const stub = env.UTS_SIGNER_DO.getByName(name);
-      // Called inside the object, so each refusal is read as a value and never crosses RPC.
-      const result = await runInDurableObject(stub, async (instance: UtsSignerDO, state) => ({
-        publicKeys: await instance.publicKeys().then(() => 'answered', refusal),
-        sign: await instance.sign(claims()).then(() => 'signed', refusal),
-        stored: [...(await state.storage.list()).keys()],
+      expect(await stub.publicKeys()).toEqual({ status: 'misconfigured', reason });
+      expect(await stub.sign(claims())).toEqual({ status: 'misconfigured', reason });
+      expect(await stub.removeKid('uts-token-01-unknown')).toEqual({
+        status: 'misconfigured',
+        reason,
+      });
+      const stored = await runInDurableObject(stub, async (_instance, state) => ({
+        keys: [...(await state.storage.list()).keys()],
         alarm: await state.storage.getAlarm(),
       }));
-      expect(result).toEqual({
-        publicKeys: 'signer object was not created by its signer name',
-        sign: 'signer object was not created by its signer name',
-        stored: [],
-        alarm: null,
-      });
+      expect(stored).toEqual({ keys: [], alarm: null });
     }
   });
 
   it('creates its keys under its own signer name, unscoped in development', async () => {
-    const keys = await env.UTS_SIGNER_DO.getByName('development:signer:02').publicKeys();
-    expect(keys.signer).toBe(2);
+    const result = await env.UTS_SIGNER_DO.getByName('development:signer:02').publicKeys();
+    expect(result).toMatchObject({ status: 'ok', signer: 2 });
   });
 
   it('schedules its alarm for the next rotation', async () => {
     const state = await storedState();
-    const alarm = await runInDurableObject(signer(), (_instance, objectState) =>
-      objectState.storage.getAlarm()
-    );
-    expect(alarm).toBe(state.current.activatedAt + 30 * DAY);
+    expect(await storedAlarm()).toBe(state.current.activatedAt + 30 * DAY);
+  });
+});
+
+describe('RPC surface', () => {
+  it('serves only its RPC methods; every other member stays out of reach of a binding holder', async () => {
+    const stub = signer();
+    for (const name of [
+      'ready',
+      'load',
+      'advanceStored',
+      'bootstrap',
+      'commit',
+      'transition',
+      'current',
+      'settled',
+      'scheduleAlarm',
+      'refusalFor',
+      'config',
+      'phase',
+    ]) {
+      const member: unknown = Reflect.get(stub, name);
+      if (typeof member !== 'function') throw new Error(`the stub has no callable ${name}`);
+      await expect(
+        Promise.resolve().then(() => Reflect.apply(member, stub, [])),
+        name
+      ).rejects.toThrow(/does not implement/);
+    }
+    const stored = await storedState();
+    expect(await publishedKids()).toEqual([stored.current.kid, stored.next.kid]);
   });
 });
 
 describe('signing', () => {
   it('signs an at+jwt with EdDSA under the current kid that verifies against the key set', async () => {
     const result = await signer().sign(claims());
-    if (result.status !== 'signed') throw new Error(`refused: ${result.reason}`);
+    if (result.status !== 'signed') throw new Error(`not signed: ${result.status}`);
     expect(decodeProtectedHeader(result.token)).toEqual({
       alg: 'EdDSA',
       typ: 'at+jwt',
@@ -148,49 +190,84 @@ describe('signing', () => {
 });
 
 describe('rotation', () => {
-  it('rotates by alarm, publishes the next key 7 days ahead, and keeps the retired key 70 minutes', async () => {
+  it('rotates by alarm, publishes the new next key at once, and keeps the retired key 70 minutes', async () => {
     const start = await storedState();
     const firstKid = start.current.kid;
-    const secondKid = start.next?.kid;
+    const secondKid = start.next.kid;
     const t0 = start.current.activatedAt;
 
     expect(await alarmAt(t0 + 30 * DAY)).toBe(t0 + 30 * DAY + RETIRED_WINDOW);
-    const afterRotation = await signer().publicKeys();
-    expect(afterRotation.keys.map(key => key.kid)).toEqual([secondKid, firstKid]);
+    const rotated = await storedState();
+    expect(rotated.current.kid).toBe(secondKid);
+    expect(rotated.next.publishedAt).toBe(t0 + 30 * DAY);
+    expect(rotated.next.activatesAt).toBe(t0 + 60 * DAY);
+    const thirdKid = rotated.next.kid;
+    expect(await publishedKids()).toEqual([secondKid, thirdKid, firstKid]);
 
     const signed = await signer().sign(claims());
-    if (signed.status !== 'signed') throw new Error(`refused: ${signed.reason}`);
+    if (signed.status !== 'signed') throw new Error(`not signed: ${signed.status}`);
     expect(signed.kid).toBe(secondKid);
     await verify(signed.token);
 
-    expect(await alarmAt(t0 + 30 * DAY + RETIRED_WINDOW)).toBe(t0 + 53 * DAY);
-    expect((await signer().publicKeys()).keys.map(key => key.kid)).toEqual([secondKid]);
+    expect(await alarmAt(t0 + 30 * DAY + RETIRED_WINDOW)).toBe(t0 + 60 * DAY);
+    expect(await publishedKids()).toEqual([secondKid, thirdKid]);
+  });
 
-    expect(await alarmAt(t0 + 53 * DAY)).toBe(t0 + 60 * DAY);
-    const withNext = await storedState();
-    expect(withNext.next?.publishedAt).toBe(t0 + 53 * DAY);
-    expect(withNext.next?.activatesAt).toBe(t0 + 60 * DAY);
-    expect((await signer().publicKeys()).keys.map(key => key.kid)).toEqual([
-      secondKid,
-      withNext.next?.kid,
-    ]);
+  it('applies a change whose alarm never ran at the next call, and stores the following alarm', async () => {
+    const start = await storedState();
+    const overdue = start.current.activatedAt + 30 * DAY + 1;
+    const answered = await inObjectAt(overdue, async instance => await instance.publicKeys());
+    expect(answered).toMatchObject({ status: 'ok' });
+    const after = await storedState();
+    expect(after.current.kid).toBe(start.next.kid);
+    expect(await storedAlarm()).toBe(overdue + RETIRED_WINDOW);
+  });
+
+  it('signs under the next key when the rotation is overdue at signing time', async () => {
+    const start = await storedState();
+    const overdue = start.current.activatedAt + 30 * DAY + 1;
+    const signed = await inObjectAt(overdue, async instance => await instance.sign(claims()));
+    expect(signed).toMatchObject({ status: 'signed', kid: start.next.kid });
+  });
+
+  it('sets a lost alarm again on the next key read', async () => {
+    const state = await storedState();
+    await runInDurableObject(signer(), (_instance, objectState) =>
+      objectState.storage.deleteAlarm()
+    );
+    expect(await storedAlarm()).toBeNull();
+    await published();
+    expect(await storedAlarm()).toBe(state.next.activatesAt);
   });
 });
 
 describe('emergency removal', () => {
-  it('removes the current kid, signs under the next key, and returns the feed entry', async () => {
+  it('removes the current kid, signs under the published next key, and publishes a new next key', async () => {
     const start = await storedState();
     const result = await signer().removeKid(start.current.kid);
-    if (result.status !== 'removed') throw new Error('expected removal');
+    if (result.status !== 'removed') throw new Error(`answered ${result.status}`);
     expect(result.removal.kid).toBe(start.current.kid);
     expect(result.removal.signer).toBe(SIGNER);
     expect(result.removal.revokeUntil - result.removal.removedAt).toBe(RETIRED_WINDOW);
 
-    const kids = (await signer().publicKeys()).keys.map(key => key.kid);
-    expect(kids).toEqual([start.next?.kid]);
+    const after = await storedState();
+    expect(after.current.kid).toBe(start.next.kid);
+    expect(after.next.activatesAt).toBe(after.current.activatedAt + 30 * DAY);
+    expect(await publishedKids()).toEqual([start.next.kid, after.next.kid]);
     const signed = await signer().sign(claims());
-    if (signed.status !== 'signed') throw new Error(`refused: ${signed.reason}`);
-    expect(signed.kid).toBe(start.next?.kid);
+    if (signed.status !== 'signed') throw new Error(`not signed: ${signed.status}`);
+    expect(signed.kid).toBe(start.next.kid);
+  });
+
+  it('after a storage exposure, signs under a key created after it: next first, then current', async () => {
+    const exposed = await storedState();
+    await signer().removeKid(exposed.next.kid);
+    const fresh = (await storedState()).next.kid;
+    await signer().removeKid(exposed.current.kid);
+    const kids = await publishedKids();
+    expect(kids[0]).toBe(fresh);
+    expect(kids).not.toContain(exposed.current.kid);
+    expect(kids).not.toContain(exposed.next.kid);
   });
 
   it('answers unknown_kid for a kid it does not hold', async () => {
@@ -201,7 +278,6 @@ describe('emergency removal', () => {
     const start = await storedState();
     await signer().removeKid(start.current.kid);
     await restartSigner(SIGNER);
-    const kids = (await signer().publicKeys()).keys.map(key => key.kid);
-    expect(kids).not.toContain(start.current.kid);
+    expect(await publishedKids()).not.toContain(start.current.kid);
   });
 });

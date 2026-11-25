@@ -757,6 +757,7 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 
 const SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS: Record<SignInMethodChangeRefusal, TRPCError['code']> = {
   browserSessionRequired: 'FORBIDDEN',
+  sessionReauthRequired: 'FORBIDDEN',
   ssoLinkNotAllowed: 'FORBIDDEN',
   codeInvalid: 'BAD_REQUEST',
   codeLocked: 'TOO_MANY_REQUESTS',
@@ -786,8 +787,13 @@ async function signInMethodChangeBinding(
     throw signInMethodChangeRefused('browserSessionRequired');
   }
   const session = await getUserFromSessionForCredentialIssuance();
-  if (!session.user || session.user.id !== ctx.user.id || !session.webSessionId) {
+  if (!session.user || session.user.id !== ctx.user.id) {
     throw signInMethodChangeRefused('browserSessionRequired');
+  }
+  // A session signed in before browser sessions had ids can not bind a code;
+  // signing in again gives it one.
+  if (!session.webSessionId) {
+    throw signInMethodChangeRefused('sessionReauthRequired');
   }
   const refusal = await authorizeSignInMethodChange({ user: session.user, change });
   if (refusal) {

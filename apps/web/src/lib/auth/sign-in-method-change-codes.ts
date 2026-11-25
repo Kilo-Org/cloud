@@ -12,6 +12,11 @@ export const SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES = 15;
 export const SIGN_IN_METHOD_CHANGE_REFUSAL_CODES = {
   /** The request did not come from a browser session. */
   browserSessionRequired: 'sign_in_method_browser_session_required',
+  /**
+   * The browser session has no session id, because it signed in before the
+   * ids existed. Signing in again gives it one.
+   */
+  sessionReauthRequired: 'sign_in_method_session_reauth_required',
   /** The account's domain requires SSO and its organization does not allow other methods. */
   ssoLinkNotAllowed: 'sign_in_method_sso_link_not_allowed',
   /** The emailed code is wrong, expired, already used, or for another change. */
@@ -32,6 +37,7 @@ export const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Readonly<
 > = {
   browserSessionRequired:
     'To change your sign-in methods, use a browser that is signed in to app.kilo.ai.',
+  sessionReauthRequired: 'Sign in again to change your sign-in methods.',
   ssoLinkNotAllowed:
     'Your organization requires single sign-on, so you can not link other sign-in methods.',
   codeInvalid: 'The code is not correct or it expired. Try again, or send a new code.',
@@ -43,6 +49,8 @@ export const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Readonly<
 /** The page error code for a change that did not come from a browser session. */
 export const SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR =
   'SIGN-IN-METHOD-BROWSER-SESSION-REQUIRED';
+/** The page error code for a browser session that must sign in again first. */
+export const SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR = 'SIGN-IN-METHOD-REAUTH-REQUIRED';
 /** The page error code for a link that the account's SSO policy refuses. */
 export const SIGN_IN_METHOD_SSO_REQUIRED_ERROR = 'SIGN-IN-METHOD-SSO-REQUIRED';
 /** The page error code for a wrong or expired code. The person can try again. */
@@ -57,6 +65,8 @@ export const SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR = 'SIGN-IN-METHOD-CODE-SEND-F
 export const SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   [SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR]:
     SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.browserSessionRequired,
+  [SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR]:
+    SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.sessionReauthRequired,
   [SIGN_IN_METHOD_SSO_REQUIRED_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.ssoLinkNotAllowed,
   [SIGN_IN_METHOD_CODE_INVALID_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeInvalid,
   [SIGN_IN_METHOD_CODE_LOCKED_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeLocked,
@@ -67,6 +77,7 @@ export const SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES: Readonly<Record<string, strin
 const PAGE_ERROR_FOR_UPSTREAM_CODE: Readonly<Record<string, string>> = {
   [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.browserSessionRequired]:
     SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR,
+  [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.sessionReauthRequired]: SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR,
   [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.ssoLinkNotAllowed]: SIGN_IN_METHOD_SSO_REQUIRED_ERROR,
   [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid]: SIGN_IN_METHOD_CODE_INVALID_ERROR,
   [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked]: SIGN_IN_METHOD_CODE_LOCKED_ERROR,

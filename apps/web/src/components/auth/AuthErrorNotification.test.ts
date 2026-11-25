@@ -40,4 +40,26 @@ describe('AuthErrorNotification', () => {
     expect(html).not.toContain('<a');
     expect(html).not.toContain('href=');
   });
+
+  test('offers a new sign-in for a session that must sign in again', () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthErrorNotification, { error: 'SIGN-IN-METHOD-REAUTH-REQUIRED' })
+    );
+
+    expect(html).toContain('Sign In Again');
+    expect(html).toContain('Sign in again to change your sign-in methods.');
+    expect(html).toContain('<button');
+  });
+
+  test('names the new sign-in without an action inside the app shell', () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthErrorNotification, {
+        error: 'SIGN-IN-METHOD-REAUTH-REQUIRED',
+        shell: true,
+      })
+    );
+
+    expect(html).toContain('Sign in again to change your sign-in methods.');
+    expect(html).not.toContain('<button');
+  });
 });

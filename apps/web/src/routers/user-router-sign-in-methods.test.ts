@@ -281,6 +281,21 @@ describe('user.linkAuthProvider', () => {
     );
   });
 
+  it('asks a browser session that signed in before session ids to sign in again', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user, { webSessionId: undefined });
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.sessionReauthRequired));
+    await expect(caller.user.linkAuthProvider({ provider: 'github' })).rejects.toEqual(
+      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.sessionReauthRequired)
+    );
+    expect(mockSendCode).not.toHaveBeenCalled();
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
   it('refuses a fresh browser session that sends no code', async () => {
     const user = await insertUser();
     await setSessionCookie(user);

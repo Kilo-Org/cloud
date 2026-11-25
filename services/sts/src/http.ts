@@ -8,6 +8,7 @@ import {
   type BundleRequest,
   type BundleResult,
 } from '@kilocode/sts-contracts';
+import { recordDenial } from './audit/denials';
 import { serveBundle } from './broker';
 import { VERIFIER_RETRY_AFTER_SECONDS, WEBHOOK_MAX_BODY_BYTES } from './constants';
 import { getRefresherStub, getSignerStub } from './dos/stubs';
@@ -118,6 +119,23 @@ async function bundleRequest(
   }
 
   const outcome = await identityVerifier(config).verify(token);
+  if (outcome.status === 'denied') {
+    if (outcome.subject === undefined) {
+      console.warn('sts: bundle request refused: token not verified', {
+        environment: config.environment,
+        reason: outcome.reason,
+      });
+    } else {
+      ctx.waitUntil(
+        recordDenial(env, config, {
+          channel: 'http',
+          reason: outcome.reason,
+          actor: outcome.subject.actor,
+          claims: { provider: outcome.subject.provider, ...outcome.subject.claims },
+        })
+      );
+    }
+  }
   if (outcome.status === 'unavailable') {
     return bundleResponse({
       status: 'unavailable',

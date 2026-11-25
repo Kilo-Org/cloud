@@ -68,3 +68,6 @@ export const MANAGER_RETRY_AFTER_SECONDS = 60;
 
 /** A provider key set or discovery document is unreachable: the caller retries after this. */
 export const VERIFIER_RETRY_AFTER_SECONDS = 30;
+
+/** A bundle object call failed (an error or a reset): the caller retries after this. */
+export const BUNDLE_OBJECT_RETRY_AFTER_SECONDS = 30;

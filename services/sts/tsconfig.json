@@ -19,9 +19,11 @@
     "drizzle.bundle/migrations.d.ts",
     "drizzle.refresher/migrations.d.ts",
     "drizzle.signer/migrations.d.ts",
+    "drizzle.denial/migrations.d.ts",
     "drizzle.bundle.config.ts",
     "drizzle.refresher.config.ts",
     "drizzle.signer.config.ts",
+    "drizzle.denial.config.ts",
     "vitest.config.ts",
     "vitest.node.config.ts"
   ],

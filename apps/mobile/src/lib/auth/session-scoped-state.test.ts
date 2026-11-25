@@ -30,7 +30,16 @@ const mergeOperationKeyMock = vi.hoisted(() => ({
   clearMergeOperationKeys: vi.fn(),
 }));
 
+const homeWidgetRefreshMock = vi.hoisted(() => ({
+  clearHomeWidgetRefresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+// The Home widget's refresh credential, frame and timeline are cleared through
+// the widget module, which reaches the native bridge and the tRPC client; this
+// node suite pins the wiring, not that module's own behavior.
+vi.mock('@/lib/glanceable/home-widget-refresh', () => homeWidgetRefreshMock);
 
 // The staged share deliveries are the account-bound store this clear owns; its
 // own suites pin which entries survive the boundary and which do not.
@@ -78,7 +87,7 @@ import {
 import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
-  clearSystemSearchIndexOnSignedOutLaunch,
+  clearDeviceWideStateOnSignedOutLaunch,
   clearSessionScopedState,
 } from './session-scoped-state';
 /* eslint-enable import/first */
@@ -421,9 +430,9 @@ describe('clearSessionScopedState', () => {
   });
 });
 
-describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
+describe('clearDeviceWideStateOnSignedOutLaunch', () => {
   it('re-runs the idempotent OS search clear for the signed-out launch', () => {
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
@@ -431,7 +440,7 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     // The teardown fired its clear without awaiting it; a process killed before
     // it landed would otherwise leave the previous account's sessions named by
     // Siri for the whole signed-out window.
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
   });
 
@@ -440,11 +449,11 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     // device-wide and label themselves from the signed-in account's sessions, so
     // a sign-out whose clear never landed must not keep offering the previous
     // account's session for the whole signed-out window.
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
 
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
   });
@@ -466,21 +475,36 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     publisher.apply(launcherTargets, translate);
     expect(publish).toHaveBeenCalledTimes(1);
 
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     publisher.apply(launcherTargets, translate);
     expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the Home widget refresh credential for the signed-out launch', () => {
+    // The widget refreshes natively with its own 30-day credential, which the
+    // app's bearer teardown never touches. A sign-out whose clear never landed
+    // (or a launch after the keychain lost the pair) would otherwise leave the
+    // placed widget drawing the previous account's live sessions, and no
+    // signed-in mount runs here to clear it.
+    clearDeviceWideStateOnSignedOutLaunch();
+
+    expect(homeWidgetRefreshMock.clearHomeWidgetRefresh).toHaveBeenCalledTimes(1);
+
+    clearDeviceWideStateOnSignedOutLaunch();
+
+    expect(homeWidgetRefreshMock.clearHomeWidgetRefresh).toHaveBeenCalledTimes(2);
   });
 
   it('re-runs the stored PR recents delete for the signed-out launch', () => {
     // The recents key is device-global and the index collector folds it into the
     // search documents, so a sign-out whose delete never landed would let the
     // next account's first sync publish the previous account's pull requests.
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
 
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(2);
   });
@@ -491,7 +515,7 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
       mirrorWasGone = !fakeFs.state.rootExists;
     });
 
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
 
     expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
     expect(fakeFs.state.rootExists).toBe(false);
@@ -500,11 +524,11 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
   });
 
   it('stays idempotent and never throws when the mirror is already gone', () => {
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
     fakeFs.deleted.length = 0;
 
     expect(() => {
-      clearSystemSearchIndexOnSignedOutLaunch();
+      clearDeviceWideStateOnSignedOutLaunch();
     }).not.toThrow();
 
     expect(fakeFs.deleted).toEqual([]);
@@ -517,7 +541,7 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(failure);
 
     expect(() => {
-      clearSystemSearchIndexOnSignedOutLaunch();
+      clearDeviceWideStateOnSignedOutLaunch();
     }).not.toThrow();
 
     await vi.waitFor(() => {
@@ -543,7 +567,7 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     });
     nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(timeout);
 
-    clearSystemSearchIndexOnSignedOutLaunch();
+    clearDeviceWideStateOnSignedOutLaunch();
     await classified;
 
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);

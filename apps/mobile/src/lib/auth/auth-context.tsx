@@ -34,6 +34,7 @@ import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { clearHomeWidgetRefresh } from '@/lib/glanceable/home-widget-refresh';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
+import { retryPendingDeviceSessionRevoke } from '@/lib/auth/pending-device-revoke';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
@@ -369,7 +370,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       }
       if (lockedDuringRead) {
         await load();
+        return;
       }
+      // A sign-out whose device-session revoke failed keeps its refresh token
+      // (`lib/auth/pending-device-revoke`): the unrevoked session row keeps the
+      // Home widget's own credential valid, so the widget would go on drawing
+      // the signed-out account's sessions. This runs after the credential read
+      // has settled, so its own keychain read can never interleave with the
+      // restore. The retry needs no session of its own — signed in or out — and
+      // its single-flight and spacing window keep a retry-restore and a
+      // foreground from running it twice.
+      void retryPendingDeviceSessionRevoke();
     },
     []
   );
@@ -765,7 +776,15 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // expiring within the margin, rotate before the next request hits a 401.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState !== 'active' || !token) {
+      if (nextState !== 'active') {
+        return;
+      }
+      // The sign-out revoke may still be owed: the app can sit on the login
+      // screen for days, and the retry needs no session of its own, so it runs
+      // before the signed-in gate below. Its own spacing window absorbs the
+      // flaps.
+      void retryPendingDeviceSessionRevoke();
+      if (!token) {
         return;
       }
 

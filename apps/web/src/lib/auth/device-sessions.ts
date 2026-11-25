@@ -690,6 +690,61 @@ export async function revokeDeviceSession(
 }
 
 /**
+ * What a refresh-token revocation settled. Every member is a definitive answer:
+ * either the session is no longer live, or the token names no session this
+ * server knows, so a client retrying it can stop.
+ */
+export type RevokeByRefreshTokenOutcome =
+  | { readonly outcome: 'revoked' }
+  | { readonly outcome: 'already_revoked' }
+  | { readonly outcome: 'unknown_token' };
+
+/**
+ * Revoke the device session a refresh token belongs to, for a client that
+ * signed out but could not reach the authenticated revoke (offline, a deadline,
+ * a 5xx, or an access token that already expired). The token is the credential
+ * the client still holds: it already authorizes rotating that session, so
+ * revoking the session it names grants no new authority and only reduces
+ * access.
+ *
+ * Any row for the token counts — consumed, rotated away from, or expired —
+ * because every one of them names the same device session. That matters: the
+ * server's Home widget verifier keeps accepting the widget credential while the
+ * session is unrevoked and has a live refresh row, so a client that lost its
+ * pair must still be able to end it.
+ *
+ * The first revocation wins: the conditional update keeps the timestamp and
+ * reason of a revocation that already happened (reuse detection, a security
+ * incident), the same guarantee `revokeCurrentDeviceSession` gives.
+ */
+export async function revokeDeviceSessionByRefreshToken(
+  refreshToken: string
+): Promise<RevokeByRefreshTokenOutcome> {
+  const [row] = await db
+    .select({ sessionId: device_sessions.id, revokedAt: device_sessions.revoked_at })
+    .from(device_refresh_tokens)
+    .innerJoin(device_sessions, eq(device_sessions.id, device_refresh_tokens.device_session_id))
+    .where(eq(device_refresh_tokens.token_hash, hashToken(refreshToken)))
+    .limit(1);
+
+  if (!row) {
+    return { outcome: 'unknown_token' };
+  }
+  if (row.revokedAt) {
+    return { outcome: 'already_revoked' };
+  }
+
+  const revoked = await db
+    .update(device_sessions)
+    .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+    .where(and(eq(device_sessions.id, row.sessionId), isNull(device_sessions.revoked_at)))
+    .returning({ id: device_sessions.id });
+  invalidateDeviceSession(row.sessionId);
+
+  return revoked.length > 0 ? { outcome: 'revoked' } : { outcome: 'already_revoked' };
+}
+
+/**
  * Delete refresh tokens whose expiry has passed. Expired tokens are refused
  * before any other check, so removing them changes no rotation outcome.
  * @returns the number of deleted rows.

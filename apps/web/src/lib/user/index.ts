@@ -1464,11 +1464,17 @@ export async function anonymizeCloudUserData(
       )
     );
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
-  // Sign-in method change codes are stored under the normalized address.
+  await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  // Sign-in method change and data export download codes are stored under the
+  // normalized address. Only those purposes go: another account can own a
+  // different address with the same normalized form.
   await tx
     .delete(magic_link_tokens)
     .where(
-      inArray(magic_link_tokens.email, [...new Set([originalEmail, normalizeEmail(originalEmail)])])
+      and(
+        eq(magic_link_tokens.email, normalizeEmail(originalEmail)),
+        inArray(magic_link_tokens.purpose, ['sign_in_method_change', 'data_export_download'])
+      )
     );
   // Passkey credentials are PII: the credential id, public key and user-facing
   // label identify the user's device. Consumed sign-in tickets are removed too:

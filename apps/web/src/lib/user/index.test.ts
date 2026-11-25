@@ -7635,6 +7635,25 @@ describe('User', () => {
       expect((await db.select({ count: count() }).from(magic_link_tokens))[0].count).toBe(0);
     });
 
+    it('should keep sign-in links of another address with the same normalized email', async () => {
+      const user = await insertTestUser({ google_user_email: 'Jane.Doe+work@gmail.com' });
+
+      const futureDate = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+      await db.insert(magic_link_tokens).values({
+        token_hash: 'other-account-token-hash',
+        email: 'janedoe@gmail.com',
+        expires_at: futureDate,
+        purpose: 'magic_link',
+      });
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db
+        .select({ token_hash: magic_link_tokens.token_hash })
+        .from(magic_link_tokens);
+      expect(remaining).toEqual([{ token_hash: 'other-account-token-hash' }]);
+    });
+
     it('should retain kiloclaw_version_pins for the user', async () => {
       const user = await insertTestUser();
       const adminUser = await insertTestUser({ is_admin: true });

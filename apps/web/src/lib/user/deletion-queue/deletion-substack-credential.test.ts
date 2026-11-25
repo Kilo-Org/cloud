@@ -529,7 +529,9 @@ describe('Substack credential storage', () => {
     expect(meta).toMatchObject({
       configured: true,
       totpConfigured: true,
+      savedAt: expect.any(String),
       updatedByKiloUserId: actor.id,
+      savedByEmail: actor.google_user_email,
     });
     expect(parseSubstackCredential(await storedMaterial())).toEqual({
       ok: true,
@@ -641,6 +643,44 @@ describe('Substack credential storage', () => {
     });
   });
 
+  it('keeps the user save time when an automatic refresh changes the cookie', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    await replaceSubstackCredential({
+      material: 'connect.sid=old',
+      totpSecret: RFC_SECRET,
+      actorKiloUserId: actor.id,
+    });
+    const before = await getSubstackCredentialMeta();
+    expect(before.savedAt).toEqual(expect.any(String));
+    expect(before.updatedAt).toBe(before.savedAt);
+
+    const savedAt = '2025-01-01T00:00:00.000Z';
+    const [row] = await db
+      .update(user_deletion_provider_credentials)
+      .set({ updated_at: savedAt, saved_at: savedAt })
+      .where(
+        eq(user_deletion_provider_credentials.provider_scope, UserDeletionProviderScope.Substack)
+      )
+      .returning({ encrypted_material: user_deletion_provider_credentials.encrypted_material });
+
+    await expect(
+      persistRefreshedSubstackCookie({
+        originalEncryptedMaterial: row.encrypted_material,
+        cookie: 'connect.sid=old; session=rotated',
+        totpSecret: RFC_SECRET,
+      })
+    ).resolves.toEqual({ persisted: true });
+
+    const after = await getSubstackCredentialMeta();
+    expect(after.savedAt).toBe(savedAt);
+    expect(after.updatedByKiloUserId).toBe(actor.id);
+    expect(Date.parse(after.updatedAt ?? '')).toBeGreaterThan(Date.parse(savedAt));
+    expect(parseSubstackCredential(await storedMaterial())).toMatchObject({
+      ok: true,
+      credential: { cookie: 'connect.sid=old; session=rotated' },
+    });
+  });
+
   it('persists a refreshed cookie after a stored TOTP test', async () => {
     const actor = await insertTestUser({ is_admin: true });
     await replaceSubstackCredential({
@@ -746,7 +786,10 @@ describe('Substack credential storage', () => {
       configured: false,
       totpConfigured: false,
       updatedAt: null,
+      savedAt: null,
       updatedByKiloUserId: null,
+      savedByEmail: null,
+      savedByName: null,
     });
   });
 

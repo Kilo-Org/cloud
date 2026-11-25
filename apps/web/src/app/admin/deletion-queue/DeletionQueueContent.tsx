@@ -686,6 +686,10 @@ function SubstackCredentialDialog({
   const testResult = testMutation.data?.result;
   const busy = storeMutation.isPending || testMutation.isPending || deleteMutation.isPending;
   const totpWithoutCookie = Boolean(totpSecret.trim()) && !material.trim();
+  const sessionRefreshedAt =
+    meta?.savedAt && meta.updatedAt && Date.parse(meta.updatedAt) > Date.parse(meta.savedAt)
+      ? meta.updatedAt
+      : null;
 
   const invalidate = () =>
     queryClient.invalidateQueries(trpc.admin.userDeletionQueue.substackCredential.queryFilter());
@@ -730,9 +734,21 @@ function SubstackCredentialDialog({
         <div className="flex flex-col gap-3">
           <p className="text-sm">
             {meta?.configured
-              ? `Updated ${meta.updatedAt ? formatTimestamp(meta.updatedAt) : '—'}${meta.totpConfigured ? ' · TOTP configured' : ' · cookie only'}`
+              ? [
+                  meta.savedAt
+                    ? `Last updated by ${meta.savedByEmail ?? meta.savedByName ?? 'a user'} on ${formatTimestamp(meta.savedAt)}`
+                    : meta.savedByEmail || meta.savedByName
+                      ? `Last updated by ${meta.savedByEmail ?? meta.savedByName} · time not recorded`
+                      : 'Last user update time not recorded',
+                  meta.totpConfigured ? 'TOTP configured' : 'cookie only',
+                ].join(' · ')
               : 'No credential stored'}
           </p>
+          {sessionRefreshedAt ? (
+            <p className="text-muted-foreground text-xs">
+              Session cookie refreshed automatically {formatTimestamp(sessionRefreshedAt)}
+            </p>
+          ) : null}
           {testResult ? (
             <p className="text-sm">
               {testResult.status === 'healthy'
@@ -793,12 +809,12 @@ function SubstackCredentialDialog({
             disabled={busy || totpWithoutCookie || (!material.trim() && !meta?.configured)}
             onClick={async () => {
               const version = testVersionRef.current;
+              const cookie = material.trim();
               try {
                 const outcome = await testMutation.mutateAsync(
-                  material.trim()
-                    ? { material: material.trim(), totpSecret: totpSecret.trim() }
-                    : {}
+                  cookie ? { material: cookie, totpSecret: totpSecret.trim() } : {}
                 );
+                if (!cookie) await invalidate();
                 if (version !== testVersionRef.current) return;
                 if (outcome.refreshedCookie) setMaterial(outcome.refreshedCookie);
                 if (outcome.result.status === 'healthy') {

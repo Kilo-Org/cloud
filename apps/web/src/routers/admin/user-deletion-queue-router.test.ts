@@ -707,6 +707,8 @@ describe('adminUserDeletionQueueRouter', () => {
       await expect(caller.admin.userDeletionQueue.substackCredential()).resolves.toMatchObject({
         configured: true,
         totpConfigured: true,
+        savedAt: expect.any(String),
+        savedByEmail: admin.google_user_email,
       });
 
       await caller.admin.userDeletionQueue.replaceSubstackCredential({

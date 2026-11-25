@@ -1,6 +1,7 @@
-import type { BundleRequest } from '@kilocode/sts-contracts';
+import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { SecretsBroker } from '../../src/broker';
+import { BUNDLE_OBJECT_DEADLINE_MS, BUNDLE_OBJECT_RETRY_AFTER_SECONDS } from '../../src/constants';
 import type { BundleDO } from '../../src/dos/BundleDO';
 import { getBundleStub } from '../../src/dos/stubs';
 import { workloadPolicyHash } from '../../src/policy';
@@ -14,9 +15,30 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   stubOfflineNetwork();
   vi.restoreAllMocks();
 });
+
+/** Puts a stand-in for the o11y bundle object whose `getBundle` answers with `answer`. */
+function standInBundleObject(answer: () => Promise<BundleResult>): void {
+  const namespace = env.STS_BUNDLE_DO;
+  const get = namespace.get.bind(namespace);
+  vi.spyOn(namespace, 'get').mockImplementation(
+    id => ({ id: get(id).id, getBundle: answer }) as unknown as DurableObjectStub<BundleDO>
+  );
+}
+
+const OK_BUNDLE: BundleResult = {
+  status: 'ok',
+  workload: 'o11y',
+  environment: 'development',
+  etag: '"etag-for-the-stand-in"',
+  stale: false,
+  fetchedAt: new Date(0).toISOString(),
+  secrets: {},
+  missing: [],
+};
 
 /** The ExecutionContext a SecretsBroker binding with `props: { caller }` gives the entrypoint. */
 function bindingContext(caller: string): ExecutionContext {
@@ -68,5 +90,40 @@ describe('SecretsBroker', () => {
     expect(Symbol.dispose in result).toBe(false);
     expect(disposals).toHaveLength(1);
     expect(disposals[0]).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers unavailable at the deadline when the bundle object never answers', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const pending = Promise.withResolvers<BundleResult>();
+    standInBundleObject(() => pending.promise);
+    vi.useFakeTimers();
+
+    const answer = new SecretsBroker(bindingContext('o11y'), env).getBundle({});
+    let settled = false;
+    void answer.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(BUNDLE_OBJECT_DEADLINE_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
+    expect(await answer).toEqual({
+      status: 'unavailable',
+      reason: 'internal',
+      retryAfterSeconds: BUNDLE_OBJECT_RETRY_AFTER_SECONDS,
+    });
+
+    // A result that still arrives while the context lives is disposed.
+    const dispose = vi.fn();
+    pending.resolve(Object.defineProperty({ ...OK_BUNDLE }, Symbol.dispose, { value: dispose }));
+    await vi.waitFor(() => expect(dispose).toHaveBeenCalledTimes(1));
+  });
+
+  it('clears the deadline timer when the bundle object answers in time', async () => {
+    standInBundleObject(async () => OK_BUNDLE);
+    vi.useFakeTimers();
+    const answer = await new SecretsBroker(bindingContext('o11y'), env).getBundle({});
+    expect(answer).toEqual(OK_BUNDLE);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

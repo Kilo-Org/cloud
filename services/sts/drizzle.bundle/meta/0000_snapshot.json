@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d8865db3-090d-4509-b630-6b493a5b8ab9",
+  "id": "f5bc5fb3-1951-4bc1-ae3f-842b13ecfb83",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -23,6 +23,30 @@
         },
         "created_at": {
           "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "audit_prune": {
+      "name": "audit_prune",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pruned_at": {
+          "name": "pruned_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -149,8 +173,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "key": {
-          "name": "key",
+        "seal_key": {
+          "name": "seal_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "etag_key": {
+          "name": "etag_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

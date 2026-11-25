@@ -93,6 +93,9 @@ catalog:
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
+  # The STS policy parser. `overrides` pins the same version tree-wide, so the
+  # catalog pin is the one place both readers take it from.
+  yaml: 2.9.1
   zod: 4.6.7
 
 catalogs:

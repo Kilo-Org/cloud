@@ -16,6 +16,7 @@ import {
   type ContainerApplication,
   type ContainerListApp,
 } from './container-capacity';
+import { readO11ySecret } from '../secrets';
 
 type QueryEnv = {
   O11Y_CF_ACCOUNT_ID: string;
@@ -101,10 +102,7 @@ export async function queryContainerApplications(
   fetchFn: FetchFn = fetch
 ): Promise<ContainerApplication[]> {
   const accountId = env.O11Y_CF_ACCOUNT_ID;
-  const token = await env.O11Y_CF_CONTAINERS_API_TOKEN.get();
-  if (!token) {
-    throw new Error('O11Y_CF_CONTAINERS_API_TOKEN secret is not configured');
-  }
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN');
 
   // Collect all monitored app entries across all pages
   const monitoredEntries: ContainerListApp[] = [];

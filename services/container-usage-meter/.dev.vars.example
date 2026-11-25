@@ -4,7 +4,9 @@ KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 
 # Personal Cloud Agent payer list. Deployed as a Worker secret (see RUNBOOK.md).
 # An empty list is valid and enrolls nobody; without it the billing configuration is invalid.
-# `@override` writes the key into an existing .dev.vars too: env-sync skips an
-# unannotated empty value there.
+# `@override` writes the key into an existing .dev.vars too (env-sync skips an
+# unannotated empty value there), and it resets the local list to "" on every
+# env sync; .env.local cannot set it. To enrol a local payer, edit .dev.vars
+# after the sync, and again after the next one.
 # @override
 CONTAINER_BILLING_CLOUD_AGENT_USER_IDS=""

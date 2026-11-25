@@ -3,6 +3,7 @@ import type { EnvironmentBuild } from './environment-build/environment-build-do.
 import type { PreviewTunnel } from './preview-tunnel/preview-tunnel-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import type { ScopeReviewCapabilityParams } from '@kilocode/worker-utils/scm-capability-contract';
 import type {
   GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
@@ -436,9 +437,7 @@ export type GitTokenService = {
   getCloudAgentAuthForRepo?(
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
-  scopeCodeReviewCapability?(
-    params: import('@kilocode/worker-utils/scm-capability-contract').ScopeReviewCapabilityParams
-  ): Promise<string>;
+  scopeCodeReviewCapability?(params: ScopeReviewCapabilityParams): Promise<string>;
   forwardCodeReviewRequest?(
     provider: 'github' | 'gitlab' | 'bitbucket',
     capability: string,

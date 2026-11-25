@@ -7,13 +7,18 @@
     "test": "pnpm run test:node",
     "test:node": "vitest run --config vitest.node.config.ts",
     "typecheck": "tsgo --noEmit",
+    "db:up": "bash scripts/local-db.sh up",
+    "db:down": "bash scripts/local-db.sh down",
+    "db:migrate": "tsx scripts/migrate.ts",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts/src services/uts/test services/uts/scripts"
   },
   "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "pg": "8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",

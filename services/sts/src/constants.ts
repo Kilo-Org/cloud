@@ -121,10 +121,23 @@ export const TOKEN_KEY_RETIRED_GRACE_MS = 10 * 60 * 1000;
 export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;
 
 /**
- * Token signer objects per environment; a workload always mints on the same one (by a hash of its
- * name), and the key set lists the keys of all of them. One object has a soft limit of 1,000
- * requests per second (https://developers.cloudflare.com/durable-objects/platform/limits/). At
- * 200,000 caller instances plus about 2,200 Vercel instances, each minting once per 4 minutes, STS
- * makes about 843 mint calls per second: 4 objects keep each near 210, about a fifth of the limit.
+ * Token signer objects per environment. STS picks one at random per mint call, so the instances
+ * of one workload spread over all of them, and the key set lists the keys of all of them. One
+ * object has a soft limit of 1,000 requests per second
+ * (https://developers.cloudflare.com/durable-objects/platform/limits/). At 200,000 caller
+ * instances plus about 2,200 Vercel instances, each minting once per 4 minutes, STS makes about
+ * 843 mint calls per second. The largest single workload may be the whole fleet; because the shard
+ * is chosen per call, that still puts about 843 / 4 = 211 calls per second on each object, about
+ * a fifth of the limit, whatever the split between workloads.
  */
 export const TOKEN_SIGNER_SHARDS = 4;
+
+/**
+ * A token signer deletes a relayed audit row after this long. The audit queue is the record once
+ * the relay sent a row; the short window keeps a busy shard's table near 211 rows/s x 1 h, about
+ * 0.8 M rows, far below the 10 GB a Durable Object holds. An unrelayed row is never deleted.
+ */
+export const TOKEN_AUDIT_RETENTION_MS = 60 * 60 * 1000;
+
+/** How often a token signer prunes; a prune that hits its batch bound runs again next alarm. */
+export const TOKEN_AUDIT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;

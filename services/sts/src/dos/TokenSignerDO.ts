@@ -22,6 +22,8 @@ import {
   MIN_TOKEN_LIFETIME_SECONDS,
   RELAY_DELAY_MS,
   RELAY_RETRY_MS,
+  TOKEN_AUDIT_PRUNE_INTERVAL_MS,
+  TOKEN_AUDIT_RETENTION_MS,
   TOKEN_SIGNER_SHARDS,
 } from '../constants';
 import * as schema from '../db/token-signer-schema';
@@ -30,6 +32,7 @@ import {
   KeyRingSchema,
   advanceKeyRing,
   keyRingDueAt,
+  keepLatestSignedExp,
   publishedKeys,
   recordSignedExp,
   type GeneratedKey,
@@ -37,7 +40,7 @@ import {
   type TokenJwk,
   type TokenKey,
 } from '../tokens/key-ring';
-import { getTokenSignerStub, tokenSignerShard } from './stubs';
+import { getTokenSignerStub } from './stubs';
 
 /** KV storage key of the key ring (see `crypto/key-store.ts`). */
 const KEY_RING_NAME = 'token-key-ring';
@@ -101,20 +104,23 @@ function errorName(error: unknown): string {
 
 /**
  * One shard of the environment's token signers (`TOKEN_SIGNER_SHARDS`): its own service-token key
- * ring and its `sts:<environment>:tokens:<shard>` audit stream (design 5.7, 6.1). A mint signs
- * every token of the call and appends one audit row listing them before it returns; a failed
- * append returns no token. Rotation runs on this object's alarm and, should the alarm be late, at
- * the start of the next call, so no cron is involved. Callers do not retry a mint: a retry after a
- * committed append would audit tokens the caller never got.
+ * ring and its `sts:<environment>:tokens:<shard>` audit stream (design 5.7, 6.1). STS picks a shard
+ * per call, so any shard signs for any workload. A mint signs every token of the call and appends
+ * one audit row listing them before it returns; a failed append returns no token. Relayed rows
+ * are deleted after `TOKEN_AUDIT_RETENTION_MS`, so the table stays bounded at any call rate.
+ * Rotation runs on this object's alarm and, should the alarm be late, at the start of the next
+ * call, so no cron is involved. Callers do not retry a mint: a retry after a committed append
+ * would audit tokens the caller never got.
  */
 export class TokenSignerDO extends DurableObject<Env> {
   private readonly config: StsConfig;
   private readonly audit: AuditLog;
-  private readonly shard: number;
   private readonly stream: string;
   private ring: KeyRing = { keys: [] };
   /** Non-extractable signing keys by kid, imported once per instance. */
   private readonly signingKeys = new Map<string, CryptoKey>();
+  /** The alarm time this instance last read or set (null: none); undefined until first read. */
+  private alarmAt: number | null | undefined = undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -125,8 +131,10 @@ export class TokenSignerDO extends DurableObject<Env> {
     );
     // Addressed by a name that is no shard of this environment: every call fails.
     if (shard === undefined) throw new Error('token signer addressed by an unknown name');
-    this.shard = shard;
-    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
+    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE, {
+      retentionMs: TOKEN_AUDIT_RETENTION_MS,
+      pruneIntervalMs: TOKEN_AUDIT_PRUNE_INTERVAL_MS,
+    });
     this.stream = `sts:${config.environment}:tokens:${shard}`;
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(drizzle(ctx.storage, { schema }), migrations);
@@ -138,11 +146,8 @@ export class TokenSignerDO extends DurableObject<Env> {
 
   async mint(raw: TokenSignRequest): Promise<TokenSignResult> {
     const input = TokenSignRequestSchema.parse(raw);
-    if (
-      input.environment !== this.config.environment ||
-      tokenSignerShard(input.workload) !== this.shard
-    ) {
-      // Meant for another environment or another shard: refuse rather than sign for it.
+    if (input.environment !== this.config.environment) {
+      // Meant for another environment: refuse rather than sign for it.
       return { status: 'unavailable' };
     }
     await this.advanceIfDue(Date.now());
@@ -213,6 +218,8 @@ export class TokenSignerDO extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    // A fired alarm is no longer stored.
+    this.alarmAt = null;
     const now = Date.now();
     await this.advanceIfDue(now);
     let relayFailed = false;
@@ -273,6 +280,9 @@ export class TokenSignerDO extends DurableObject<Env> {
       for (const change of result.changes) {
         await this.audit.append(this.stream, tokenKeyRotatedEvent({ environment, change }));
       }
+      // A mint already past its key read may have raised a key's latest exp during the awaits
+      // above; keep that value, or the retired key could leave the key set before its last token.
+      keepLatestSignedExp(result.ring, this.ring);
       await this.ctx.storage.put(KEY_RING_NAME, result.ring);
       this.ring = result.ring;
       for (const kid of this.signingKeys.keys()) {
@@ -282,15 +292,27 @@ export class TokenSignerDO extends DurableObject<Env> {
     await this.scheduleAlarm(now, false);
   }
 
+  private async readAlarm(): Promise<number | null> {
+    if (this.alarmAt === undefined) this.alarmAt = await this.ctx.storage.getAlarm();
+    return this.alarmAt;
+  }
+
+  private async writeAlarm(at: number): Promise<void> {
+    await this.ctx.storage.setAlarm(at);
+    this.alarmAt = at;
+  }
+
+  /** Sets the relay alarm unless one is due soon; the kept alarm time spares a storage read. */
   private async scheduleRelay(): Promise<void> {
     try {
       const now = Date.now();
-      const alarm = await this.ctx.storage.getAlarm();
-      if (alarm === null || alarm > now + RELAY_DELAY_MS) {
-        await this.ctx.storage.setAlarm(now + RELAY_DELAY_MS);
+      const alarm = await this.readAlarm();
+      if (alarm === null || alarm > now + RELAY_DELAY_MS || alarm < now) {
+        await this.writeAlarm(now + RELAY_DELAY_MS);
       }
     } catch (error) {
       // The row is committed; the next mint or alarm relays it.
+      this.alarmAt = undefined;
       console.warn('sts: relay alarm could not be set', { reason: errorName(error) });
     }
   }
@@ -304,9 +326,9 @@ export class TokenSignerDO extends DurableObject<Env> {
       target = Math.min(target, Math.max(now + 1_000, this.audit.nextPruneAt()));
     }
     target = Math.max(target, now + 1_000);
-    const current = await this.ctx.storage.getAlarm();
+    const current = await this.readAlarm();
     if (current === null || current > target || current < now) {
-      await this.ctx.storage.setAlarm(target);
+      await this.writeAlarm(target);
     }
   }
 }

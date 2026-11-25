@@ -14,7 +14,7 @@ import {
   TOKEN_SIGNER_DEADLINE_MS,
   TOKEN_SIGNER_RETRY_AFTER_SECONDS,
 } from '../constants';
-import { getTokenSignerStub, tokenSignerShard } from '../dos/stubs';
+import { getTokenSignerStub, pickTokenSignerShard } from '../dos/stubs';
 import type { Env, StsConfig } from '../env';
 import { policyIndex } from '../policy';
 import type { PolicyIndex } from '../policy/load';
@@ -97,7 +97,7 @@ export async function serveMint(
   if (allowed.length > 0) {
     const outcome = await callWithDeadline(
       async () =>
-        await getTokenSignerStub(env, config, tokenSignerShard(caller.workload)).mint({
+        await getTokenSignerStub(env, config, pickTokenSignerShard()).mint({
           environment: config.environment,
           workload: caller.workload,
           identity: caller.identity,

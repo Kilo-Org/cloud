@@ -47,13 +47,13 @@ export function getDenialStub(env: Env, config: StsConfig): DurableObjectStub<De
   return namespace.get(namespace.idFromName(config.environment));
 }
 
-/** The token signer shard a workload mints on: FNV-1a of its name, modulo the shard count. */
-export function tokenSignerShard(workload: string): number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < workload.length; index += 1) {
-    hash = Math.imul(hash ^ workload.charCodeAt(index), 0x01000193) >>> 0;
-  }
-  return hash % TOKEN_SIGNER_SHARDS;
+/**
+ * The token signer shard one mint call uses: chosen at random per call, so the instances of one
+ * workload spread over every shard however large its fleet is. Any shard can sign for any
+ * workload; the key set lists the keys of every shard.
+ */
+export function pickTokenSignerShard(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] % TOKEN_SIGNER_SHARDS;
 }
 
 /**

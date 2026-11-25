@@ -1,4 +1,4 @@
-import { SELF, runInDurableObject } from 'cloudflare:test';
+import { SELF, createExecutionContext, runInDurableObject } from 'cloudflare:test';
 import {
   Ed25519PublicJwkSchema,
   JWKS_CACHE_CONTROL,
@@ -9,15 +9,18 @@ import {
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditLog } from '../../src/audit/log';
-import { getTokenSignerStub, tokenSignerShard } from '../../src/dos/stubs';
+import { TOKEN_AUDIT_RETENTION_MS } from '../../src/constants';
+import { getTokenSignerStub } from '../../src/dos/stubs';
 import { TokenSignerDO, type TokenSignRequest } from '../../src/dos/TokenSignerDO';
+import { handleRequest } from '../../src/http';
+import { recordSignedExp, type KeyRing } from '../../src/tokens/key-ring';
 import { stubOfflineNetwork } from './manager';
 import { resetTokenSignerObject } from './reset';
 import { config, env } from './test-env';
 
 type StoredEvent = { type: string; data: { attributes: Record<string, unknown> } };
 
-const signer = () => getTokenSignerStub(env, config, tokenSignerShard('probe'));
+const signer = () => getTokenSignerStub(env, config, 0);
 
 beforeEach(async () => {
   stubOfflineNetwork();
@@ -195,8 +198,62 @@ describe('token signer', () => {
     expect(removal[0].data.attributes).toMatchObject({
       kid: revoked.kid,
       state: 'current',
+      cause: 'listed',
       replacementKid: kid,
     });
+  });
+
+  it('prunes relayed rows past the token retention window and keeps unrelayed ones', async () => {
+    await signer().mint(signRequest());
+    await signer().mint(signRequest());
+    const old = Date.now() - TOKEN_AUDIT_RETENTION_MS - 60_000;
+    const kept = await runInDurableObject(signer(), (_instance, state) => {
+      const seqs = state.storage.sql
+        .exec<{ seq: number }>('SELECT seq FROM audit_event ORDER BY seq')
+        .toArray()
+        .map(row => row.seq);
+      // Every row is old; all but the last were relayed.
+      state.storage.sql.exec('UPDATE audit_event SET created_at = ?', old);
+      state.storage.sql.exec(
+        'INSERT OR REPLACE INTO audit_watermark (id, relayed_seq) VALUES (1, ?)',
+        seqs[seqs.length - 2]
+      );
+      state.storage.sql.exec('DELETE FROM audit_prune');
+      return seqs[seqs.length - 1];
+    });
+    // The relay fails, so the alarm only prunes.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(AuditLog.prototype, 'relay').mockRejectedValueOnce(new Error('queue down'));
+    await runInDurableObject(signer(), instance => instance.alarm());
+    const left = await runInDurableObject(signer(), (_instance, state) =>
+      state.storage.sql
+        .exec<{ seq: number }>('SELECT seq FROM audit_event ORDER BY seq')
+        .toArray()
+        .map(row => row.seq)
+    );
+    expect(left).toEqual([kept]);
+  });
+
+  it('keeps a latest exp a mint records while a rotation is writing its audit rows', async () => {
+    const [{ kid }] = (await signer().getJwks()).keys;
+    const exp = Math.floor(Date.now() / 1000) + 300;
+    const stored = await runInDurableObject(signer(), async (instance, state) => {
+      const inner = instance as unknown as { ring: KeyRing; advance(now: number): Promise<void> };
+      const append = AuditLog.prototype.append;
+      // A mint that read the current key before the rotation finishes in its first await.
+      vi.spyOn(AuditLog.prototype, 'append').mockImplementationOnce(async function (
+        this: AuditLog,
+        ...args
+      ) {
+        recordSignedExp(inner.ring, kid, exp);
+        return await append.apply(this, args);
+      });
+      // 24 days on, the rotation publishes the next key.
+      await inner.advance(Date.now() + 24 * 24 * 60 * 60 * 1000);
+      return (await state.storage.get<KeyRing>('token-key-ring'))?.keys;
+    });
+    expect(stored?.map(key => key.state)).toEqual(['current', 'next']);
+    expect(stored?.find(key => key.kid === kid)?.maxExp).toBe(Math.ceil(exp / 60) * 60);
   });
 });
 
@@ -219,5 +276,22 @@ describe('service-token key set route', () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=300');
     const body = await response.json<{ keys: Array<{ alg: string }> }>();
     expect(body.keys.map(key => key.alg)).toEqual(['ES256']);
+  });
+
+  it('rebuilds its isolate copy when the revoked-kid list changes', async () => {
+    const ctx = createExecutionContext();
+    const fetchKids = async (revoked: string) => {
+      const response = await handleRequest(
+        new Request(`${config.issuer}${JWKS_PATH}`),
+        { ...env, TOKEN_SIGNING_KIDS_REVOKED: revoked },
+        ctx
+      );
+      return (await response.json<{ keys: Array<{ kid: string }> }>()).keys.map(key => key.kid);
+    };
+    await fetchKids('A'.repeat(43));
+    // Shard 0 gets a fresh key (as after an emergency removal); a deploy changes the list.
+    await resetTokenSignerObject(signer());
+    const [{ kid: fresh }] = (await signer().getJwks()).keys;
+    expect(await fetchKids('B'.repeat(43))).toContain(fresh);
   });
 });

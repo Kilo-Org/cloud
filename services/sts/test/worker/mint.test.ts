@@ -1,6 +1,6 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import type { MintRequest, MintResult } from '@kilocode/sts-contracts';
-import { decodeJwt } from 'jose';
+import { decodeJwt, decodeProtectedHeader } from 'jose';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
 import { SecretsBroker, serveWorkerMint } from '../../src/broker';
@@ -55,6 +55,19 @@ identity:
   orgId: '1111'
   app: fly-minter
   appId: '2222'
+secrets: []
+audiences: [aud-1]
+scopes: ['aud-1:read']
+`,
+      'fly-prod.yaml': `
+workload: fly-prod
+environments: [production]
+identity:
+  kind: fly-oidc
+  org: acme
+  orgId: '1111'
+  app: fly-prod
+  appId: '3333'
 secrets: []
 audiences: [aud-1]
 scopes: ['aud-1:read']
@@ -163,6 +176,19 @@ describe('worker-binding mint', () => {
       jtis: result.tokens.map(token => (token.status === 'issued' ? token.jti : null)),
     });
     expect(pending).toHaveLength(0);
+  });
+
+  it('spreads the calls of one workload over every signer shard', async () => {
+    const kids = new Set<string>();
+    for (let call = 0; call < 40; call += 1) {
+      const result = await mint('probe', { tokens: entries(1) });
+      if (result.status !== 'ok' || result.tokens[0].status !== 'issued') {
+        throw new Error(`expected an issued token, got ${JSON.stringify(result)}`);
+      }
+      kids.add(String(decodeProtectedHeader(result.tokens[0].token).kid));
+    }
+    // Each shard signs with its own key; 40 random picks miss a shard with odds near 4 x 0.75^40.
+    expect(kids.size).toBe(TOKEN_SIGNER_SHARDS);
   });
 
   it('refuses 9 tokens and a duplicate audience as invalid requests, signing nothing', async () => {
@@ -363,6 +389,26 @@ describe('HTTP mint', () => {
     expect(await oversized.json()).toEqual({ status: 'invalid_request' });
   });
 
+  it('refuses a verified identity whose policy is for another environment, auditing the real reason', async () => {
+    const token = await signToken(provider, {
+      ...FLY_CLAIMS,
+      app_name: 'fly-prod',
+      app_id: '3333',
+    });
+    const response = await post(JSON.stringify({ tokens: entries(1) }), token);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ status: 'identity_rejected' });
+    expect(await issuedRows()).toEqual([]);
+    const denials = await flushedDenials();
+    expect(denials).toHaveLength(1);
+    expect(denials[0]).toMatchObject({ type: 'ai.kilo.sts.token.denied' });
+    expect(denials[0].data.attributes).toMatchObject({
+      channel: 'http',
+      reason: 'environment_mismatch',
+      workload: 'fly-prod',
+    });
+    expect(denials[0].data.attributes.audience).toBeUndefined();
+  });
   it('logs a token that did not verify and records no denial', async () => {
     const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const other = await createProvider(FLY_ISSUER, config.issuer);

@@ -457,6 +457,12 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     // the existing intent actually work.
     terminalReason === 'assistant_rate_limited_byok' ||
     terminalReason === 'assistant_invalid_request_byok' ||
+    // Deterministic for the same account and configuration: a fresh session
+    // reaches the same ChatGPT plan limit, the same organization the account
+    // cannot use, or the same variant the runtime does not support.
+    terminalReason === 'assistant_chatgpt_usage_limit' ||
+    terminalReason === 'organization_unavailable' ||
+    terminalReason === 'model_variant_unsupported' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }

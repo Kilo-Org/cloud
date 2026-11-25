@@ -1835,6 +1835,127 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it.each([
+      [
+        'chatgpt_usage_limit',
+        'unknown',
+        'The ChatGPT usage limit was reached; check usage in ChatGPT settings',
+        'assistant_chatgpt_usage_limit',
+      ],
+      [
+        'organization_unavailable',
+        'unknown',
+        'The organization for this session is not available to this account',
+        'organization_unavailable',
+      ],
+      [
+        'variant_unsupported',
+        'unknown',
+        'The selected model kilo/example-byok/example/model-1 does not support the variant thinking',
+        'model_variant_unsupported',
+      ],
+      [
+        'rate_limited',
+        'byok',
+        '[BYOK] Assistant request was rate limited',
+        'assistant_rate_limited_byok',
+      ],
+    ] as const)(
+      'does not fresh-retry the deterministic %s failure with %s ownership',
+      async (assistantReason, providerOwnership, errorMessage, terminalReason) => {
+        const retryFlow = mockCreatedInfraRetryFlow();
+        mockGetCodeReviewById.mockResolvedValue(
+          makeReview({ status: 'running', session_id: retryFlow.sessionId })
+        );
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            errorMessage,
+            failure: {
+              stage: 'agent_activity',
+              code: 'assistant_error',
+              assistantReason,
+              providerOwnership,
+              message: errorMessage,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+        expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+        expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+        expect(mockCreatePRComment).not.toHaveBeenCalled();
+        expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+          REVIEW_ID,
+          'failed',
+          expect.objectContaining({ errorMessage, terminalReason })
+        );
+      }
+    );
+
+    it.each([
+      ['rate_limited', 'unknown', 'Assistant request was rate limited', 'assistant_rate_limited'],
+      [
+        'rate_limited',
+        'managed',
+        'Assistant request was rate limited',
+        'assistant_rate_limited_managed',
+      ],
+      ['unknown', 'unknown', 'Assistant request failed', 'assistant_failed'],
+      [
+        'model_catalog_unavailable',
+        'unknown',
+        'The Kilo model catalog could not be loaded',
+        'assistant_failed',
+      ],
+      [
+        'provider_unavailable',
+        'unknown',
+        'Assistant service is unavailable',
+        'assistant_unavailable',
+      ],
+    ] as const)(
+      'still fresh-retries the transient %s failure with %s ownership',
+      async (assistantReason, providerOwnership, errorMessage, terminalReason) => {
+        const retryFlow = mockCreatedInfraRetryFlow();
+        mockGetCodeReviewById.mockResolvedValue(
+          makeReview({ status: 'running', session_id: retryFlow.sessionId })
+        );
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            errorMessage,
+            failure: {
+              stage: 'agent_activity',
+              code: 'assistant_error',
+              assistantReason,
+              providerOwnership,
+              message: errorMessage,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+        expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'failed', terminalReason })
+        );
+        expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+          sessionId: retryFlow.sessionId,
+          reason: errorMessage,
+          failedAttemptId: retryFlow.failedAttemptId,
+          retryAttemptId: retryFlow.retryAttemptId,
+        });
+      }
+    );
+
     it('does not retry assistant authorization failures as infra failures', async () => {
       const retryFlow = mockCreatedInfraRetryFlow({
         failedAttemptId: '00000000-0000-0000-0000-000000000207',

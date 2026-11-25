@@ -80,6 +80,9 @@
     {
       "binding": "AUDIT_ARCHIVE",
       "bucket_name": "kilo-audit-archive",
+      // The bucket is created with --jurisdiction eu; without this the binding names a
+      // default-jurisdiction bucket outside the EU and outside the lock rules.
+      "jurisdiction": "eu",
     },
   ],
   // Secrets arrive through STS: no `secrets_store_secrets` or `vars` hold them.
@@ -146,6 +149,7 @@
         {
           "binding": "AUDIT_ARCHIVE",
           "bucket_name": "kilo-audit-archive-staging",
+          "jurisdiction": "eu",
         },
       ],
       "services": [
@@ -200,6 +204,7 @@
       "r2_buckets": [
         {
           "binding": "AUDIT_ARCHIVE",
+          // Local only: miniflare's simulated bucket has no jurisdiction.
           "bucket_name": "kilo-audit-archive-local",
         },
       ],

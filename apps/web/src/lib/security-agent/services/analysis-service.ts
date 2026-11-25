@@ -310,7 +310,7 @@ export async function startSecurityAnalysis(params: {
     const cloudAgentToken = generateCloudAgentWorkflowToken(workflowUser, {
       organizationId: findingOrganizationId,
       tokenSource: 'security-agent',
-      expiresIn: TOKEN_EXPIRY.default,
+      expiresIn: TOKEN_EXPIRY.oneHour,
     });
     const gatewayToken = generateWorkflowGatewayToken(workflowUser, {
       organizationId: findingOrganizationId,

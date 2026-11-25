@@ -122,7 +122,6 @@ function makeRequest(params: {
   const env = {
     DIRECT_INGEST_PERCENT: '100',
     DIRECT_INGEST_MAX_BYTES: '4194304',
-    DIRECT_INGEST_USER_IDS: 'usr_agent',
     HYPERDRIVE: { connectionString: 'postgres://unused' },
     SESSION_INGEST_R2: { put: vi.fn(), delete: vi.fn() },
     NOTIFICATIONS: { sendAgentSessionNotification, sendCloudAgentSessionNotification },

@@ -15,17 +15,25 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 export function ResetAPITokenDialog() {
   const trpc = useTRPC();
-  const router = useRouter();
 
   const resetAPIKeyMutation = useMutation(
     trpc.user.resetAPIKey.mutationOptions({
-      onSuccess: () => {
-        toast.success('API token reset successfully. Refreshing token...');
-        router.refresh();
+      onSuccess: async () => {
+        toast.success(
+          'API token reset and all sessions signed out. Redirecting to sign-in page...'
+        );
+        await signOut({ callbackUrl: '/users/sign_in' });
+      },
+      onError: async error => {
+        // The session is already gone, typically because an earlier reset
+        // committed but its response never arrived.
+        if (error.data?.code === 'UNAUTHORIZED') {
+          await signOut({ callbackUrl: '/users/sign_in' });
+        }
       },
     })
   );
@@ -49,8 +57,15 @@ export function ResetAPITokenDialog() {
             <br />
             <br />
             Resetting your API token will invalidate all existing CLI, VS Code, JetBrains, and other
-            API tokens. Browser sessions will stay signed in.
+            API tokens. It also signs you out of every browser and the mobile app, including this
+            one, so you will need to sign in again.
           </DialogDescription>
+          {resetAPIKeyMutation.isError &&
+            resetAPIKeyMutation.error.data?.code !== 'UNAUTHORIZED' && (
+              <p className="text-destructive text-sm">
+                The reset may not have completed. Reload the page and try again.
+              </p>
+            )}
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>

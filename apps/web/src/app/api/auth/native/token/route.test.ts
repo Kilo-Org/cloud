@@ -312,9 +312,13 @@ describe('POST /api/auth/native/token', () => {
         userId: fakeUser.id,
         userAgent: undefined,
       });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'session-1',
-      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(
+        fakeUser,
+        {
+          deviceSessionId: 'session-1',
+        },
+        { expiresIn: 30 * 24 * 60 * 60 }
+      );
     });
 
     it('falls back to the email prefix as the name when fullName is not provided', async () => {
@@ -1102,9 +1106,13 @@ describe('POST /api/auth/native/token', () => {
       expect(retry.status).toBe(200);
       expect(await retry.json()).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'session-retry',
-      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(
+        fakeUser,
+        {
+          deviceSessionId: 'session-retry',
+        },
+        { expiresIn: 30 * 24 * 60 * 60 }
+      );
     });
 
     it('releases the reservation on an unexpected error', async () => {
@@ -2024,7 +2032,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_google_idtoken_legacy_count: 1');
     });
 
-    it('returns long-lived token when supportsRefresh is absent', async () => {
+    it('returns a 30-day token when supportsRefresh is absent', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
         email: 'googleuser@example.com',
@@ -2040,14 +2048,18 @@ describe('POST /api/auth/native/token', () => {
         userId: fakeUser.id,
         userAgent: undefined,
       });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'session-1',
-      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(
+        fakeUser,
+        {
+          deviceSessionId: 'session-1',
+        },
+        { expiresIn: 30 * 24 * 60 * 60 }
+      );
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
 
-    it('returns long-lived token when supportsRefresh is false', async () => {
+    it('returns a 30-day token when supportsRefresh is false', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
         email: 'googleuser@example.com',
@@ -2067,9 +2079,13 @@ describe('POST /api/auth/native/token', () => {
         userId: fakeUser.id,
         userAgent: undefined,
       });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'session-1',
-      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(
+        fakeUser,
+        {
+          deviceSessionId: 'session-1',
+        },
+        { expiresIn: 30 * 24 * 60 * 60 }
+      );
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
   });
@@ -2327,7 +2343,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
     });
 
-    it('mints a legacy long-lived token when the client does not support refresh', async () => {
+    it('mints a legacy 30-day token when the client does not support refresh', async () => {
       const response = await POST(createRequest(ticketBody));
 
       expect(response.status).toBe(200);
@@ -2339,9 +2355,13 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
       expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1', expect.anything());
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'legacy-session-1',
-      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(
+        fakeUser,
+        {
+          deviceSessionId: 'legacy-session-1',
+        },
+        { expiresIn: 30 * 24 * 60 * 60 }
+      );
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });
 

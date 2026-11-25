@@ -212,13 +212,14 @@ export async function GET(request: NextRequest) {
       ) {
         return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
       }
-      // The row names the user; the account gates the web session path applies
-      // still decide whether that id becomes a user.
-      const lookup = await loadAppShellUser(flow.userId);
+      // The row names the user; the account gates the web session path applies,
+      // and the session binding the flow cookie carries, still decide whether
+      // that id becomes a user.
+      const lookup = await loadAppShellUser(flow);
       if (lookup.status === 'restricted') {
         return NextResponse.redirect(new URL(APP_SHELL_ACCOUNT_UNAVAILABLE_PATH, APP_URL));
       }
-      if (lookup.status === 'gone') {
+      if (lookup.status !== 'active') {
         return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
       }
       user = lookup.user;

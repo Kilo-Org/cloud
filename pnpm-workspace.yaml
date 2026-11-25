@@ -264,7 +264,7 @@ overrides:
   'cmdk>@radix-ui/react-primitive': 2.2.0
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.7
-  yaml: 2.9.1
+  yaml: 'catalog:'
   undici@^7: 'catalog:'
   path-to-regexp: 8.4.2
   ip-address: 10.7.1

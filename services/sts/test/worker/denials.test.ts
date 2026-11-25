@@ -114,13 +114,15 @@ describe('denial stream', () => {
 
   it('counts distinct denials past the per-minute limit in one overflow event', async () => {
     const stub = getDenialStub(env, config);
+    // One minute for every record, so a run that crosses a minute boundary still fills one window.
+    const minute = now();
     for (let index = 0; index < MAX_DISTINCT_PER_MINUTE + 5; index += 1) {
       await stub.record([
         {
           denial: githubDenial(`refs/heads/branch-${index}`),
           count: 1,
           overflow: false,
-          minute: now(),
+          minute,
         },
       ]);
     }

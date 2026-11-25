@@ -1,5 +1,4 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { calculateJwkThumbprint, exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
@@ -100,19 +99,6 @@ export class SignerDO extends DurableObject<Env> {
       storage: this.ctx.storage,
       name: SIGNING_KEY_NAME,
       schema: StoredSigningKeySchema,
-      legacy: () => {
-        const row = this.db
-          .select()
-          .from(schema.signingKey)
-          .where(eq(schema.signingKey.id, 1))
-          .get();
-        return row === undefined
-          ? null
-          : { kid: row.kid, privateJwk: row.privateJwk, publicJwk: row.publicJwk };
-      },
-      dropLegacy: () => {
-        this.db.delete(schema.signingKey).where(eq(schema.signingKey.id, 1)).run();
-      },
       create: async () => {
         // Generated extractable only so the private JWK can be stored in this object's own
         // storage; the key used for signing is re-imported non-extractable.

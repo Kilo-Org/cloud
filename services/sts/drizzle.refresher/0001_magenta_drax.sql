@@ -1,0 +1,1 @@
+DROP TABLE `refresher_key`;

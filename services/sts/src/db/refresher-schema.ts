@@ -17,16 +17,6 @@ export const managerFolder = sqliteTable('manager_folder', {
 });
 
 /**
- * Legacy: an earlier revision kept the folder seal key here. `RefresherDO` moves a row it finds to
- * KV storage once and deletes it; nothing writes this table.
- */
-export const refresherKey = sqliteTable('refresher_key', {
-  id: integer('id').primaryKey(),
-  key: text('key').notNull(),
-  createdAt: integer('created_at').notNull(),
-});
-
-/**
  * One row, id 1: the secret Infisical signs this environment's `secrets.modified` webhook with.
  * STS generates it; the break-glass owner copies it from Data Studio once (README). It stays in SQL
  * because Data Studio reads only SQL data.

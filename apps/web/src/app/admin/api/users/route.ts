@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { emailDomainSuffixes, findBlacklistedDomains } from '@kilocode/worker-utils/account-access';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
+import { toClientUser } from '@/lib/admin/client-user';
 import {
   describePaymentMethods,
   getPaymentStatusByUserIds,
@@ -206,7 +207,7 @@ export async function GET(
     ]);
 
     const usersWithPaymentStatus: UserTableProps[] = users.map(user => ({
-      ...user,
+      ...toClientUser(user),
       paymentMethodStatus: describePaymentMethods(
         paymentMethodsByUserId[user.id] || [],
         user,

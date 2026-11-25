@@ -16,10 +16,13 @@ The meter does not initiate payments. The separate $1 model preflight, $3 capaci
 4. Deploy the reviewed billing fixes before enrolling general traffic. Confirm `billing_unavailable` bounds native admission failures.
 5. Create the native SKU catalog entries before starting local or production paid compute. Use the checked-in SKU mapping.
 6. Configure `CONTAINER_BILLING_SERVICES` to include `cloud-agent-next`. Set both Cloud Agent payer lists explicitly.
+   `CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS` is checked in; personal enrollment is set out of band:
+   `wrangler secret put CONTAINER_BILLING_CLOUD_AGENT_USER_IDS --name container-usage-meter`.
    An empty list enrolls nobody. Explicit IDs enroll only those payers. `*` enrolls every payer of that type.
    Wildcards apply only to the Cloud Agent payer lists. The service list must still enroll the service.
-   Personal and organization enrollment remain independent. Gastown retains its existing list semantics.
-   Leave the Gastown service and payer settings unchanged.
+   Both Cloud Agent payer lists are validated together, so a deployment without the personal list secret leaves every
+   Cloud Agent payer in shadow mode until the secret exists. Personal and organization enrollment remain independent.
+   Gastown retains its existing list semantics. Leave the Gastown service and payer settings unchanged.
 7. Read one `container_billing_configuration` event from a new isolate. Confirm service names, enrollment booleans and warning threshold.
    Investigate `container_billing_configuration_invalid` before activation. Its field names identify the invalid configuration; logs contain no payer IDs.
 8. Verify a paid start, a heartbeat and a controlled stop. Compare the interval, segments, charge rows and wallet delta.
@@ -67,7 +70,12 @@ Use the emergency procedure when existing charges must stop.
 
 An authorized operator performs this procedure. Do not change Gastown billing.
 
-1. Empty `CONTAINER_BILLING_CLOUD_AGENT_USER_IDS` and `CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS`, then deploy the meter.
+1. Delete the `CONTAINER_BILLING_CLOUD_AGENT_USER_IDS` secret and empty `CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS`, then deploy the meter:
+
+   ```sh
+   wrangler secret delete CONTAINER_BILLING_CLOUD_AGENT_USER_IDS --name container-usage-meter
+   ```
+
    New Cloud Agent intervals open in shadow mode after activation.
 2. Confirm the target database and the Cloud Agent service scope. Record the count before changing rows:
 

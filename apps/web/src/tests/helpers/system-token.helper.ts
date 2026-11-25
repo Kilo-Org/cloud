@@ -33,7 +33,7 @@ export async function expectNonExchangeableSystemToken(
   if (typeof claims.exp !== 'number' || typeof claims.iat !== 'number') {
     throw new Error('Expected numeric issued-at and expiration claims');
   }
-  expect(claims.exp - claims.iat).toBe(157_680_000);
+  expect(claims.exp - claims.iat).toBe(30 * 24 * 60 * 60);
   expect(Object.keys(claims).sort()).toEqual(
     ['apiTokenPepper', 'env', 'exp', 'iat', 'kiloUserId', 'tokenSource', 'version'].sort()
   );

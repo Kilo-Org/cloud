@@ -91,6 +91,7 @@ import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeUserSessions } from '@/lib/user/session-revocation';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -968,10 +969,26 @@ export const userRouter = createTRPCRouter({
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {
-    await db
-      .update(kilocode_users)
-      .set({ api_token_pepper: crypto.randomUUID() })
-      .where(eq(kilocode_users.id, ctx.user.id));
+    // A reset has to evict whoever may already hold a credential for the
+    // account, so it rotates both peppers and closes the device sessions in
+    // one transaction: a stolen token or browser session cannot survive it,
+    // and a failure part-way leaves the old credentials intact rather than
+    // half-evicted.
+    const revokedSessionIds = await db.transaction(async tx => {
+      await tx
+        .update(kilocode_users)
+        .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
+        .where(eq(kilocode_users.id, ctx.user.id));
+
+      return revokeUserSessions(tx, ctx.user.id, {
+        stepUp: 'api_key_reset',
+        deviceSession: 'api_key_reset',
+      });
+    });
+
+    for (const sessionId of revokedSessionIds) {
+      invalidateDeviceSession(sessionId);
+    }
 
     return successResult();
   }),

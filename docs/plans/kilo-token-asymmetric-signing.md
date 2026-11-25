@@ -21,17 +21,44 @@ purpose:
 
 Every existing token keeps working until a single planned cutover. After the
 cutover, HS256 Kilo tokens signed with `NEXTAUTH_SECRET` are refused everywhere,
-and clients must re-authenticate. That includes five-year CLI and editor tokens.
+and clients must re-authenticate. That includes five-year CLI and editor tokens
+issued before new tokens were capped at 30 days (#12866).
 
 apps/ai-gateway does not mint Kilo tokens today, and it must not after this
-work: it gets public keys only. It also stops accepting the NextAuth session
-cookie, so it authenticates callers by bearer token alone.
+work: it gets public keys only. Since #12877 it no longer accepts the NextAuth
+session cookie, so it authenticates callers by bearer token alone.
+
+## Status
+
+Merged on `main`:
+
+- ai-gateway authenticates by bearer token only (#12877); see
+  [ai-gateway: no browser sessions](#ai-gateway-no-browser-sessions).
+- Phase 0 dead-code removal: the wrapper dispatch ticket (#12861) and the
+  `html-deploy` delegable resource (#12862).
+- Related auth changes that this plan builds on, not part of it:
+  - New Kilo tokens are capped at 30 days, and in-process workflow tokens at one
+    hour (#12866). Five-year tokens issued earlier stay valid.
+  - One current-pepper rule (#12865): a missing pepper claim is accepted only on
+    short-lived internal assertions at session-ingest
+    (`verifyKiloBearerOrInternalAssertionAgainstCurrentPepper`); every other
+    verifier requires a present, current pepper. The git-token-service
+    disconnect route accepts only apps/web's internal assertion.
+  - New accounts get a pepper by default (#12870); existing null peppers are
+    rotated separately.
+  - A secret-rotation script revokes every live device session (#12876,
+    `apps/web/src/scripts/d2026-11-25_revoke-device-sessions-for-secret-rotation.ts`).
+
+In review: the issuer registry and dispatcher (#12864), the move of web signing
+into apps/web (#12863), the runtime-authorization secret split (#12860) and
+`deriveServiceKey` (#12859). The verification counters (Phase 0 item 5) start
+after #12864 lands.
 
 ## Non-goals
 
 - Changing token lifetimes, claims, the pepper model or `KILO_TOKEN_VERSION`
-  semantics, beyond what is listed here. Replacing the five-year user token
-  lifetime is planned separately.
+  semantics, beyond what is listed here. Lifetimes and the pepper rule changed
+  separately (#12866, #12865); this plan relies on them as they are on `main`.
 - Client changes. How the CLI, the extensions and the mobile app react to the
   cutover's 401 (refresh, or send the user back to sign-in) is handled outside
   this plan.
@@ -82,9 +109,11 @@ Under these rules, the following existing behaviour changes with ES256:
 - Non-web issuers must always set an explicit audience and an allowed
   `tokenPurpose`. security-auto-analysis and webhook-agent-ingest already do:
   `SHARED_RESOURCE_TOKENS_ENABLED` is `"true"` in both environments of their
-  `wrangler.jsonc`, so they mint the modern shape today. Their legacy-shape
-  branch behind that flag is unused; delete it when they switch to ES256
-  rather than keep it HS256-only.
+  `wrangler.jsonc`, so they mint the modern shape today. #12865 already removed
+  security-auto-analysis's legacy session-ingest assertion. The remaining
+  legacy-shape branches behind that flag (security-auto-analysis's control and
+  triage tokens, webhook-agent-ingest's token) are unused; delete them when
+  those issuers switch to ES256 rather than keep them HS256-only.
 
 security-auto-analysis runs no Kilo CLI itself. It is a cron- and queue-driven
 Worker that triages and extracts findings with direct LLM calls to the gateway
@@ -311,9 +340,8 @@ An ES256 token verifies only if:
 - **Rotation:** add the new public key to the JWKS everywhere, switch the
   issuer's private key, then remove the old public key after the longest
   lifetime that issuer mints. Key IDs carry a version so old and new keys can
-  coexist. While the `kilo-web` key still signs five-year tokens, retiring one
-  of its keys forces re-authentication like this cutover. The separate work to
-  replace the five-year lifetime removes that constraint.
+  coexist. New tokens last at most 30 days (#12866), so an old `kilo-web` key
+  can be retired 30 days after the switch without forcing re-authentication.
 
 ### Verification paths during the transition
 
@@ -345,7 +373,8 @@ apps/web verifies on two paths: synchronously with `jsonwebtoken`
 path imports the JWKS once into `KeyObject`s with
 `crypto.createPublicKey({ key, format: 'jwk' })`. The `jose` path uses
 `createLocalJWKSet`, as Workers do. `verifyKiloTokenSignature` and every helper
-built on it (`verifyKiloToken*`, `verifyKiloBearerAgainstCurrentPepper`) take a
+built on it (`verifyKiloToken*`, `verifyKiloBearerAgainstCurrentPepper`,
+`verifyKiloBearerOrInternalAssertionAgainstCurrentPepper`) take a
 key-material object (legacy secret plus JWKS) instead of `secret: string`, and
 a required `acceptedIssuers` list, so no call site can forget its allow-list.
 
@@ -435,29 +464,29 @@ the issuer table.
 
 ## ai-gateway: no browser sessions
 
-Today `getUserFromAuth` (`packages/web-shared/src/lib/user/server.ts`) falls back
-to the NextAuth session cookie (`resolveUserFromSession`) when no bearer is
-present. Browser requests to app.kilo.ai reach the gateway through the apps/web
-rewrites (`apps/web/ai-gateway-rewrites.mjs`), and the cookie travels with them.
-That fallback is the only reason the gateway needs `NEXTAUTH_SECRET` besides
-HS256 token verification.
+**Done in #12877.** Browser requests to app.kilo.ai reach the gateway through
+the apps/web rewrites (`apps/web/ai-gateway-rewrites.mjs`), and the NextAuth
+cookie travelled with them. `getUserFromAuth`
+(`packages/web-shared/src/lib/user/server.ts`) used to fall back to that cookie
+when no bearer was present, which was the only reason the gateway needed
+`NEXTAUTH_SECRET` besides HS256 token verification.
 
-**Change.** On the gateway, a request with no bearer token is anonymous. Do not
-let this depend on a request header or path. Make it a deployment-level
-setting: apps/ai-gateway sets it at build time in its `next.config` `env`, and
-`resolveUserFromAuth` returns the anonymous result instead of calling
-`resolveUserFromSession`. Also:
-
-- Move the boot-time `NEXTAUTH_SECRET` requirement out of
-  `packages/web-shared/src/lib/config.server.ts` into
-  `apps/web/src/lib/web-config.server.ts`.
-- Read the secret lazily in the session and HS256 verification code, so the
-  gateway still boots when it is unset.
+apps/ai-gateway now inlines `KILO_BROWSER_SESSIONS=disabled` at build time
+through its `next.config` `env`, so `readSession` in web-shared answers no
+session there and a request without a bearer is anonymous. The setting does
+not depend on any request input, and apps/web is unchanged. The boot-time
+`NEXTAUTH_SECRET` requirement moved from
+`packages/web-shared/src/lib/config.server.ts` into
+`apps/web/src/lib/web-config.server.ts`, so the gateway can boot without the
+secret. The gateway still reads it at runtime for HS256 bearer verification
+until Phase 5, which then removes it from the `kilocode-ai-gateway` project.
+The `web_session_pepper` replica exception in `packages/web-shared/AGENTS.md`
+was updated accordingly.
 
 **Behaviour change for browser callers.** The catalog routes answer cookie
 callers with the public catalog instead of the personal one:
 
-| Route (via rewrite) | Browser callers in apps/web | Today with a cookie | After |
+| Route (via rewrite) | Browser callers in apps/web | Before, with a cookie | Now |
 |---|---|---|---|
 | `/api/openrouter/models` | `useOpenRouterModels` in `lib/hooks/use-openrouter-models.ts`, used by the organization providers-and-models configuration (`useOrganizationConfiguration`); admin alerting model search (`app/admin/alerting/use-add-model-search.ts`) fetches the same route directly | Personal catalog: the caller's BYOK models, custom routers and BYOK availability tags | Public catalog for the request country |
 | `/api/openrouter/models-by-provider` | `useOpenRouterModelsAndProviders` | Public snapshot (filtering needs `organizationId`, which only bearer tokens carry) | Unchanged |
@@ -465,43 +494,42 @@ callers with the public catalog instead of the personal one:
 
 Model pickers already use the tRPC `models.selectorList` procedure in apps/web,
 not these routes, so they are unaffected. The organization configuration page
-and admin alerting search arguably should show the public catalog anyway,
-because the caller's personal BYOK models do not belong in an organization's
-configuration. Confirm both during implementation. If a page does need the
-personal list, give it a tRPC procedure in apps/web the way `selectorList`
-works.
+and admin alerting search show the public catalog, which suits them: the
+caller's personal BYOK models do not belong in an organization's
+configuration. If a page does need the personal list, give it a tRPC procedure
+in apps/web the way `selectorList` works.
 
 Other gateway routes (inference, FIM, edit, embeddings, transcription,
-organization model lists and validation) are called only with bearer tokens:
-by the CLI, the extensions, the mobile app and server-side apps/web code. A
-browser request to them with only a cookie becomes anonymous and is refused,
-where today it is accepted. Nothing records cookie-authenticated gateway
-requests today, so first ship a counter on the session fallback in
-`resolveUserFromAuth` (per route, no user data), and confirm only the catalog
-routes above use it before shipping the change.
-
-**Side effect.** The gateway no longer needs the primary-database
-`web_session_pepper` read that `resolveUserFromSession` does from `sfo1`. Remove
-that exception from `packages/web-shared/AGENTS.md`.
-
-This change does not depend on the token work and runs as its own track,
-alongside Phase 0. It must ship before the Phase 5 cutover.
+organization model lists and validation) are called with bearer tokens by the
+CLI, the extensions, the mobile app and server-side apps/web code. A browser
+request to them with only a cookie is now anonymous and refused. The planned
+`gateway.session-fallback` measurement was skipped; the change shipped
+directly.
 
 ## Rollout
 
 Phases 1 and 2 are independent. Phase 3 depends on Phase 1 being deployed
-everywhere. The ai-gateway session change
-([ai-gateway: no browser sessions](#ai-gateway-no-browser-sessions)) is a
-separate track that must finish before Phase 5.
+everywhere. The ai-gateway session change, a prerequisite for Phase 5, is done
+(#12877).
+
+`NEXTAUTH_SECRET` is still the HS256 key for every Kilo token. Rotating it
+before Phase 5 (using the secret-rotation tooling from #12876) therefore
+invalidates every HS256 Kilo token in every deployable at once, not only
+browser sessions: an unplanned cutover for anyone who still holds one. Schedule
+such a rotation after Phase 5, or treat it as the cutover. If it does happen
+earlier, every Worker binding and the Phase 2 fallbacks must move to the new
+value together.
 
 ### Phase 0: preparation (code only, no behaviour change)
 
 1. Add the issuer registry, the `KiloTokenSigner` interface, the dispatcher with
-   only the HS256 branch active, and `deriveServiceKey`.
-2. Move web signing into apps/web and add the ai-gateway guard.
+   only the HS256 branch active (#12864, in review), and `deriveServiceKey`
+   (#12859, in review).
+2. Move web signing into apps/web and add the ai-gateway guard (#12863, in
+   review).
 3. Split the runtime-authorization `secret` into a verifier, a seal secret and
-   a signer.
-4. Delete dead token code so it is not migrated:
+   a signer (#12860, in review).
+4. **Done (#12861, #12862).** Delete dead token code so it is not migrated:
    - `mintWrapperDispatchTicket` and `validateWrapperDispatchTicket` in
      cloud-agent-next.
    - The `html-deploy` delegable resource (`resource-delegation.ts`, the
@@ -571,8 +599,8 @@ after each step. Rollback is turning the flag off, since HS256 is still
 verified.
 
 1. `webhook-agent-ingest` and `security-auto-analysis`. Both already mint the
-   modern shape with explicit audiences; delete their unused legacy-shape
-   branch in the same change.
+   modern shape with explicit audiences; delete their remaining unused
+   legacy-shape branches in the same change.
 2. `kilo-web` short-lived cross-service tokens: stream tickets, transcript
    tokens, bounded internal-service tokens and git, export and deletion
    assertions.
@@ -584,19 +612,22 @@ verified.
 4. `kiloclaw` machine key, in the modern shape with the audience array above,
    together with the web-side machine-key mint. Re-mint the keys of running instances so no
    30-day HS256 keys remain at cutover.
-5. `kilo-web` user and automation tokens: `generateApiToken` (five-year
-   editor, CLI and device tokens), device-session access tokens, organization
+5. `kilo-web` user and automation tokens: `generateApiToken` (30-day editor,
+   CLI and device tokens since #12866), device-session access tokens, organization
    tokens, chat tokens, bot tokens, workflow tokens and delegated resource
    tokens.
 
 ### Phase 4: drain
 
-Watch the HS256 counters. Short-lived HS256 tokens disappear on their own. What
-remains is five-year user tokens and five-year automation tokens minted by web
-(`bot/agent-runner.ts`, `discord/auth.ts`, `code-reviews/review-memory/llm.ts`).
-Automation tokens are minted fresh per run, so after Phase 3 they are already
-ES256. Confirm this from the counters, broken down by verifier, lifetime bucket
-and the automation-marker booleans.
+Watch the HS256 counters. Since #12866 every new Kilo token lasts at most 30
+days, and in-process workflow tokens at most one hour, so HS256 tokens minted
+before Phase 3 step 5 expire on their own within 30 days of it. After that, the
+only HS256 tokens still accepted are five-year tokens minted before #12866:
+user tokens (editor, CLI, device auth, profile API keys) and automation tokens
+stored by a service, such as code-review-infra's `botId: 'reviewer'` token.
+Confirm this from the counters, broken down by verifier, lifetime bucket and
+the automation-marker booleans, and re-mint any stored automation token they
+reveal. The earliest sensible cutover is therefore 30 days after step 5.
 
 Before cutover, announce the date of the forced re-authentication.
 
@@ -621,13 +652,15 @@ After cutover, `NEXTAUTH_SECRET` exists only in `kilocode-app`, used only for
 NextAuth. Rotating it is then the separate log-everyone-out operation mentioned
 in the Goal.
 
-**Effect on users:** at cutover, every holder of a pre-Phase-3 HS256 user token
-is refused. A client that holds a native or device-session refresh token can
-refresh and receive an ES256 access token
-(`app/api/auth/native/refresh/route.ts`, `app/api/device-auth/token/route.ts`).
-Holders of five-year tokens, which have no refresh path, sign in again. Anyone who received a token
-after their issuer flipped in Phase 3 is unaffected. No token is refused before
-the cutover.
+**Effect on users:** at cutover, every holder of a still-valid HS256 user token
+is refused. If the cutover is at least 30 days after Phase 3 step 5, those are
+only five-year tokens minted before #12866. A client that holds a native or
+device-session refresh token can refresh and receive an ES256 access token
+(`app/api/auth/native/refresh/route.ts`, `app/api/device-auth/token/route.ts`);
+refresh tokens do not depend on `NEXTAUTH_SECRET`. Holders of five-year tokens,
+which have no refresh path, sign in again. Anyone who received a token after
+their issuer flipped in Phase 3 is unaffected. No token is refused before the
+cutover.
 
 ## Configuration and tooling changes
 
@@ -697,11 +730,9 @@ Other tests:
 
 - apps/web's synchronous verify and sign through `KeyObject`s, plus the guard
   test against signing imports in ai-gateway.
-- ai-gateway: a valid session cookie with no bearer is treated as anonymous on
-  every route; the gateway boots and serves bearer traffic with
-  `NEXTAUTH_SECRET` unset once HS256 is off. Update the existing gateway
-  integration tests that build session cookies (`audience-auth`,
-  `model-validation` and `model-validation-agreement`).
+- ai-gateway: the cookie-is-anonymous tests landed with #12877. At cutover, add
+  a test that the gateway boots and serves bearer traffic with
+  `NEXTAUTH_SECRET` unset once HS256 is off.
 - Dual-key verification and hash matching for each Phase 2 use. Specifically,
   stored sign-in and download codes created under `NEXTAUTH_SECRET` still
   redeem.

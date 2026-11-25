@@ -46,15 +46,16 @@
         "max_concurrency": 6,
         "dead_letter_queue": "kilo-audit-dlq",
       },
-      // Keeps each dead letter's raw bytes in R2 under dead-letter/, pages, then acks. A failed
-      // R2 write retries every 5 minutes for about 8 hours (the Queues maximum of 100 retries).
+      // Offers each dead letter to its stream again, and keeps its raw bytes in R2 under
+      // dead-letter/. One still behind a gap or an R2 failure retries every 15 minutes for about
+      // 25 hours (the Queues maximum of 100 retries); one that cannot recover is paged and acked.
       {
         "queue": "kilo-audit-dlq",
         "max_batch_size": 10,
         "max_batch_timeout": 30,
         "max_concurrency": 1,
         "max_retries": 100,
-        "retry_delay": 300,
+        "retry_delay": 900,
       },
     ],
   },
@@ -133,7 +134,7 @@
             "max_batch_timeout": 30,
             "max_concurrency": 1,
             "max_retries": 100,
-            "retry_delay": 300,
+            "retry_delay": 900,
           },
         ],
       },
@@ -189,7 +190,7 @@
             "max_batch_timeout": 30,
             "max_concurrency": 1,
             "max_retries": 100,
-            "retry_delay": 300,
+            "retry_delay": 900,
           },
         ],
       },

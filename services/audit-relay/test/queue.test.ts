@@ -9,6 +9,7 @@ import {
 } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src';
+import { archiveRetryDelaySeconds } from '../src/queue';
 import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
 import { archiveObjectKey, deadLetterKey } from '../src/relay/archive';
 import {
@@ -24,15 +25,15 @@ import {
 } from './helpers';
 
 const DLQ_PAGE_HEAD =
-  'bot: audit-relay kept undelivered message(s) from kilo-audit-dlq in R2 (at most one page per stream an hour; the rest are in the logs); each named stream stalls until its batch is re-sent:';
+  'bot: audit-relay gave up on message(s) from kilo-audit-dlq; their bytes are in R2 (at most one page per stream an hour; the rest are in the logs). A stream behind a lost batch stalls until it is re-sent:';
 
-async function runQueue(queue: string, bodies: unknown[]) {
+async function runQueue(queue: string, bodies: unknown[], attempts = 1) {
   const batch = createMessageBatch(
     queue,
     bodies.map(body => ({
       id: crypto.randomUUID(),
       timestamp: new Date(),
-      attempts: 1,
+      attempts,
       body,
     }))
   );
@@ -99,60 +100,97 @@ describe('queue handler', () => {
     expect(await storedBytes(key)).toEqual(payload);
     const pages = pageTexts(http.requests);
     expect(pages).toHaveLength(1);
-    expect(pages[0]).toContain(`\nunknown stream after 1 attempts at ${key}`);
+    expect(pages[0]).toContain(`\nunknown stream (undecodable) after 1 attempts at ${key}`);
   });
 
-  it('keeps each dead letter as raw bytes in R2, pages once per stream an hour, then acks', async () => {
+  it('archives dead-lettered batches once their cause is gone, with no manual step', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stream = uniqueStream('queue-dlq-resume');
+    const low = await encodeAuditBatch(auditBatch(1, 2, stream));
+    const high = await encodeAuditBatch(auditBatch(3, 4, stream));
+
+    // What an R2 outage leaves: both batches dead-lettered, in any order, none archived.
+    const { batch, result } = await runQueue('kilo-audit-dlq', [high.buffer, low.buffer]);
+
+    expect(result.explicitAcks).toHaveLength(2);
+    expect(result.retryMessages).toEqual([]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
+      archiveObjectKey(stream, 2),
+      archiveObjectKey(stream, 4),
+    ]);
+    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([]);
+    expect(batch.messages).toHaveLength(2);
+    expect(pageTexts(http.requests)).toEqual([]);
+
+    // A dead letter whose batch is already archived, byte for byte, is acked with nothing kept.
+    const again = await runQueue('kilo-audit-dlq', [low.buffer]);
+    expect(again.result.explicitAcks).toHaveLength(1);
+    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([]);
+    expect(pageTexts(http.requests)).toEqual([]);
+  });
+
+  it('keeps a batch still behind a gap, retries it, and pages its final delivery once an hour', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);
     const stream = uniqueStream('queue-dlq');
     const bytes = await encodeAuditBatch(auditBatch(3, 5, stream));
     const later = await encodeAuditBatch(auditBatch(6, 7, stream));
 
-    const { batch, result } = await runQueue('kilo-audit-dlq', [bytes.buffer, 'not bytes']);
-
-    expect(result.explicitAcks).toHaveLength(2);
-    expect(result.retryMessages).toEqual([]);
-    const [dead, odd] = batch.messages;
+    const waiting = await runQueue('kilo-audit-dlq', [bytes.buffer]);
+    expect(waiting.result.explicitAcks).toEqual([]);
+    expect(waiting.result.retryMessages).toEqual([
+      expect.objectContaining({ msgId: waiting.batch.messages[0].id }),
+    ]);
+    const [dead] = waiting.batch.messages;
     const deadKey = deadLetterKey(stream, dead.timestamp, dead.id);
-    const oddKey = deadLetterKey(null, odd.timestamp, odd.id);
     expect(deadKey).toBe(`dead-letter/${stream}/${dead.timestamp.toISOString()}-${dead.id}.gz`);
     expect(await storedBytes(deadKey)).toEqual(bytes);
-    expect(new TextDecoder().decode(await storedBytes(oddKey))).toBe('not bytes');
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
+    expect(pageTexts(http.requests)).toEqual([]);
 
+    const final = await runQueue('kilo-audit-dlq', [bytes.buffer, 'not bytes'], 101);
+    expect(final.result.explicitAcks).toHaveLength(2);
+    const [last, odd] = final.batch.messages;
+    expect(
+      new TextDecoder().decode(await storedBytes(deadLetterKey(null, odd.timestamp, odd.id)))
+    ).toBe('not bytes');
     const pages = pageTexts(http.requests);
     expect(pages).toHaveLength(1);
     expect(pages[0].startsWith(DLQ_PAGE_HEAD)).toBe(true);
-    expect(pages[0]).toContain(`\n${stream} seq 3..5 after 1 attempts at ${deadKey}`);
+    expect(pages[0]).toContain(
+      `\n${stream} seq 3..5 (gap) after 101 attempts at ${deadLetterKey(stream, last.timestamp, last.id)}`
+    );
     const { events } = await decodeAuditBatch(bytes);
     expect(events.some(event => pages[0].includes(event.id))).toBe(false);
     expect(axiomRequests(http.requests)).toEqual([]);
 
-    // A second dead letter of the same stream inside the hour is stored and acked, unpaged.
-    const second = await runQueue('kilo-audit-dlq', [later.buffer]);
+    // A second lost batch of the same stream inside the hour is stored and acked, unpaged.
+    const second = await runQueue('kilo-audit-dlq', [later.buffer], 101);
     expect(second.result.explicitAcks).toHaveLength(1);
-    const [secondMessage] = second.batch.messages;
-    expect(
-      await storedBytes(deadLetterKey(stream, secondMessage.timestamp, secondMessage.id))
-    ).toEqual(later);
     expect(pageTexts(http.requests)).toHaveLength(1);
   });
 
-  it('acks a dead letter its stream already archived as a no-op', async () => {
+  it('pages a dead letter that disagrees with the archived batch it duplicates', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);
-    const stream = uniqueStream('queue-dlq-archived');
+    const stream = uniqueStream('queue-dlq-forged');
     await runQueue('kilo-audit', [await encoded(stream)]);
 
     const { batch, result } = await runQueue('kilo-audit-dlq', [await encoded(stream)]);
 
     expect(result.explicitAcks).toHaveLength(1);
     const [message] = batch.messages;
-    expect(await env.AUDIT_ARCHIVE.head(deadLetterKey(stream, message.timestamp, message.id))).toBe(
-      null
-    );
-    expect(pageTexts(http.requests)).toEqual([]);
+    const key = deadLetterKey(stream, message.timestamp, message.id);
+    expect(await env.AUDIT_ARCHIVE.head(key)).not.toBe(null);
+    expect(pageTexts(http.requests)).toEqual([
+      `${DLQ_PAGE_HEAD}\n${stream} seq 1..2 (duplicate_content) after 1 attempts at ${key}`,
+    ]);
+  });
+
+  it('doubles the archive retry delay up to an hour', () => {
+    const delays = Array.from({ length: 10 }, (_, index) => archiveRetryDelaySeconds(index + 1));
+    expect(delays).toEqual([60, 120, 240, 480, 960, 1920, 3600, 3600, 3600, 3600]);
+    expect(delays.reduce((sum, delay) => sum + delay, 0)).toBeGreaterThanOrEqual(5 * 3600);
   });
 
   it('retries a dead letter whose R2 write fails and pages nothing for it', async () => {

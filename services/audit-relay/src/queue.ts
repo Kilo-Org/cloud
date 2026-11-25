@@ -9,10 +9,28 @@ import { deadLetterKey, putImmutable } from './relay/archive';
 import { errorName } from './relay/error-name';
 
 const DLQ_SUFFIX = '-dlq';
-/** A dead letter whose R2 write fails stays in the DLQ; its consumer retries it this often. */
-const DEAD_LETTER_RETRY_SECONDS = 300;
+/**
+ * A dead letter that can still recover (a batch behind a gap, or R2 down) is offered again this
+ * often. With the DLQ consumers' `max_retries: 100` that is about 25 hours.
+ */
+const DEAD_LETTER_RETRY_SECONDS = 900;
+/**
+ * The DLQ delivery after which Queues drops the message (`max_retries: 100`, so 101 deliveries);
+ * a batch still waiting then is paged as lost. It counts the deliveries the message reports.
+ */
+const DEAD_LETTER_FINAL_ATTEMPT = 101;
 /** The StreamDO that rate-limits pages for bodies with no readable stream (not a valid stream name). */
 const UNKNOWN_STREAM_OBJECT = '~unknown';
+/** An archive write that fails retries 60 s, 120 s, … capped at 1 hour: 10 retries cover ~5 h. */
+const ARCHIVE_RETRY_BASE_SECONDS = 60;
+const ARCHIVE_RETRY_CAP_SECONDS = 3600;
+
+export function archiveRetryDelaySeconds(attempts: number): number {
+  return Math.min(
+    ARCHIVE_RETRY_CAP_SECONDS,
+    ARCHIVE_RETRY_BASE_SECONDS * 2 ** Math.min(Math.max(attempts, 1) - 1, 16)
+  );
+}
 
 export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
   if (batch.queue.endsWith(DLQ_SUFFIX)) {
@@ -44,31 +62,53 @@ async function handleBatch(
   await applyOutcome(outcome, env, message);
 }
 
+type DeadLetterFate =
+  | { kind: 'recovered'; outcome: 'accepted' | 'duplicate' }
+  | { kind: 'waiting'; reason: string }
+  | { kind: 'lost'; reason: string };
+
 /**
  * Handles messages that will never be delivered normally: a DLQ message or an undecodable body.
  *
- * A batch at or below its stream's head is already archived (its hot copy, if owed, belongs to
- * the StreamDO alarm), so it is acked as a no-op. Every other message has its raw bytes stored
- * under `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (a lock rule keeps that prefix
- * as long as the archive) and is acked; a failed write retries it. Each stream (and the unknown
- * bucket) pages at most once an hour, with stream, range and key only.
+ * A decodable batch is offered to its stream again first, lowest sequence first within the
+ * consumer batch, so batches dead-lettered by an R2 outage or a gap archive themselves once the
+ * cause is gone: an `accepted` or (archive-checked) `duplicate` batch is acked with nothing kept.
+ * Every other message has its raw bytes stored under
+ * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
+ * nothing). A batch still behind a gap or an R2 failure is then retried every 15 minutes; one
+ * that cannot recover (a forged or conflicting copy, an undecodable body, or the final delivery)
+ * is acked and paged. Each stream (and the unknown bucket) pages at most once an hour.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
   queue: string,
   env: Env
 ): Promise<void> {
+  const entries = await Promise.all(
+    messages.map(async message => ({ message, auditBatch: await decodeMessage(message.body) }))
+  );
+  // Contiguous batches of one stream in one consumer batch archive in a single pass.
+  entries.sort((left, right) => {
+    const a = left.auditBatch;
+    const b = right.auditBatch;
+    if (!a || !b) return Number(!a) - Number(!b);
+    if (a.stream !== b.stream) return a.stream < b.stream ? -1 : 1;
+    return a.fromSeq - b.fromSeq;
+  });
+
   const lines: string[] = [];
-  for (const message of messages) {
-    const auditBatch = await decodeMessage(message.body);
-    const stub = getStreamDOStub(env, auditBatch?.stream ?? UNKNOWN_STREAM_OBJECT);
-    if (auditBatch && auditBatch.toSeq <= (await stub.headSeq())) {
+  for (const { message, auditBatch } of entries) {
+    const fate: DeadLetterFate = auditBatch
+      ? await offerAgain(auditBatch, env)
+      : { kind: 'lost', reason: 'undecodable' };
+    if (fate.kind === 'recovered') {
       console.log(
         JSON.stringify({
-          event: 'audit_relay.dead_letter_already_archived',
+          event: 'audit_relay.dead_letter_recovered',
           queue,
-          stream: auditBatch.stream,
-          toSeq: auditBatch.toSeq,
+          stream: auditBatch?.stream,
+          toSeq: auditBatch?.toSeq,
+          outcome: fate.outcome,
         })
       );
       message.ack();
@@ -95,6 +135,23 @@ async function keepDeadLetters(
       message.retry({ delaySeconds: DEAD_LETTER_RETRY_SECONDS });
       continue;
     }
+    if (fate.kind === 'waiting' && message.attempts < DEAD_LETTER_FINAL_ATTEMPT) {
+      console.log(
+        JSON.stringify({
+          event: 'audit_relay.dead_letter_waiting',
+          queue,
+          key,
+          stream: auditBatch?.stream,
+          fromSeq: auditBatch?.fromSeq,
+          reason: fate.reason,
+          attempts: message.attempts,
+        })
+      );
+      message.retry({ delaySeconds: DEAD_LETTER_RETRY_SECONDS });
+      continue;
+    }
+
+    const stub = getStreamDOStub(env, auditBatch?.stream ?? UNKNOWN_STREAM_OBJECT);
     const page = await stub.claimDeadLetterPage();
     console.error(
       JSON.stringify({
@@ -104,6 +161,7 @@ async function keepDeadLetters(
         stream: auditBatch?.stream ?? null,
         fromSeq: auditBatch?.fromSeq ?? null,
         toSeq: auditBatch?.toSeq ?? null,
+        reason: fate.reason,
         attempts: message.attempts,
         paged: page,
       })
@@ -112,7 +170,7 @@ async function keepDeadLetters(
     if (page) {
       const range = auditBatch ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
       lines.push(
-        `${auditBatch?.stream ?? 'unknown stream'}${range} after ${message.attempts} attempts at ${key}`
+        `${auditBatch?.stream ?? 'unknown stream'}${range} (${fate.reason}) after ${message.attempts} attempts at ${key}`
       );
     }
   }
@@ -120,8 +178,30 @@ async function keepDeadLetters(
 
   await pageOperator(
     env,
-    `audit-relay kept undelivered message(s) from ${queue} in R2 (at most one page per stream an hour; the rest are in the logs); each named stream stalls until its batch is re-sent:\n${lines.join('\n')}`
+    `audit-relay gave up on message(s) from ${queue}; their bytes are in R2 (at most one page per stream an hour; the rest are in the logs). A stream behind a lost batch stalls until it is re-sent:\n${lines.join('\n')}`
   );
+}
+
+/** Offers a dead-lettered batch to its stream again; the archive decides what it is now. */
+async function offerAgain(auditBatch: AuditBatch, env: Env): Promise<DeadLetterFate> {
+  const outcome = await withDORetry<DurableObjectStub<StreamDO>, StreamOutcome>(
+    () => getStreamDOStub(env, auditBatch.stream),
+    stub => stub.acceptBatch(auditBatch),
+    'acceptBatch'
+  );
+  switch (outcome.kind) {
+    case 'accepted':
+    case 'duplicate':
+      return { kind: 'recovered', outcome: outcome.kind };
+    case 'retry':
+      return { kind: 'waiting', reason: outcome.reason };
+    case 'gap_stalled':
+      return { kind: 'waiting', reason: 'gap' };
+    case 'dropped':
+      return { kind: 'lost', reason: outcome.reason };
+    case 'duplicate_mismatch':
+      return { kind: 'lost', reason: `duplicate_${outcome.reason}` };
+  }
 }
 
 async function decodeMessage(body: unknown): Promise<AuditBatch | null> {
@@ -176,18 +256,25 @@ async function applyOutcome(
       );
       message.ack();
       return;
-    case 'retry':
+    case 'retry': {
+      // An R2 failure can outlast ten one-minute retries; doubling keeps the batch in the main
+      // queue for about five hours before the DLQ offers it again for about a day.
+      const delaySeconds =
+        outcome.reason === 'archive'
+          ? archiveRetryDelaySeconds(message.attempts)
+          : outcome.delaySeconds;
       console.log(
         JSON.stringify({
           event: 'audit_relay.batch_retry',
           stream: outcome.stream,
           fromSeq: outcome.fromSeq,
           reason: outcome.reason,
-          delaySeconds: outcome.delaySeconds,
+          delaySeconds,
         })
       );
-      message.retry({ delaySeconds: outcome.delaySeconds });
+      message.retry({ delaySeconds });
       return;
+    }
     case 'gap_stalled':
       console.error(
         JSON.stringify({

@@ -36,7 +36,11 @@ import { hasModernRuntimeAuthorization } from '../../session/runtime-authorizati
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import { sessionWorkspace } from './workspace-roots.js';
-import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
+import {
+  getCommandGuardPolicy,
+  getCommandGuardPermissions,
+  scopedReviewPermissions,
+} from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import {
   CONTROL_PLANE_SANDBOX_PERMISSION,
@@ -323,9 +327,16 @@ export function buildControlPlaneSessionRegistration(
   // stricter, never wider, so the stored route spec never carries a wider agent
   // entry than the written `profile.json`. The spec's own `permission` field
   // stays the session policy alone.
+  // A profile entry can only narrow the active session policy at prepare time.
+  // Keep its own stricter settings and allow the scoped policy to apply when issued.
+  const reviewId = codeReviewIdFromCallbackTarget(metadata.callback?.target);
+  const scoped =
+    createdOnPlatform === 'code-review' && reviewId && payload.git?.platform
+      ? scopedReviewPermissions(payload.git.platform, payload.directory, reviewId)
+      : undefined;
   const enforcedPermission: PermissionMap = {
     ...CONTROL_PLANE_SANDBOX_PERMISSION,
-    ...permission,
+    ...(scoped ?? permission),
   };
   const reviewPublisherRules =
     commandGuard?.policyName === 'code-review-read-only' && payload.git?.platform === 'github';

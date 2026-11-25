@@ -1,5 +1,5 @@
 export const BITBUCKET_CLOUD_REVIEW_SKILL_NAME = 'bitbucket-cloud-review';
-export const BITBUCKET_CLOUD_REVIEW_SKILL_VERSION = '9';
+export const BITBUCKET_CLOUD_REVIEW_SKILL_VERSION = '10';
 
 const rawMarkdown = `---
 name: bitbucket-cloud-review
@@ -30,7 +30,7 @@ bb comments create-batch <PR> --input - < <SCRATCH_JSON_PATH>
 bb comments update <PR> <COMMENT_ID> --input - < <SCRATCH_JSON_PATH>
 \`\`\`
 
-Do not add workspace, repository, host, authorization, URL, raw-path, or target override arguments. Do not use a pull request ID other than the trusted value. Do not use pipes, command chaining, shell expansion, or any other redirection.
+Do not add workspace, repository, host, authorization, URL, raw-path, or target override arguments. Do not use a pull request ID other than the trusted value. Run bb commands directly. Use only the input redirection shown above with bb.
 
 ## Read Completely
 
@@ -53,7 +53,7 @@ Do not add workspace, repository, host, authorization, URL, raw-path, or target 
 
 ## JSON Stdin
 
-- Use the Write tool only to replace the exact scratch JSON path from the trusted cue.
+- For bb publication, write the JSON input to the exact scratch path from the trusted cue.
 - For inline findings, write exactly \`{"comments":[{"body":"...","inline":{"path":"...","to":123}}]}\`. Do not include top-level summary bodies in \`create-batch\`.
 - For a summary create or update, write exactly \`{"body":"..."}\`. When publishing the durable summary, start the body with \`## Code Review Summary\` and do not include HTML comment markers.
 - Put no comment body in argv. Do not read the scratch file with shell commands.

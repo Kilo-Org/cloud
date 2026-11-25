@@ -1,4 +1,4 @@
-import { relative } from 'node:path';
+import { dirname, relative } from 'node:path';
 
 import { matchesKiloPermissionPattern } from '../shared/profile-permission-policy.js';
 
@@ -104,7 +104,7 @@ const BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_DENIED_COMMANDS = [
   'bb pr diff * --name-only ?*',
 ];
 
-const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+const CODE_REVIEW_PROCESS_DENIES = [
   'bash',
   'sh',
   'zsh',
@@ -169,6 +169,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'ssh',
   'tmux',
   'screen',
+];
+const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  ...CODE_REVIEW_PROCESS_DENIES,
   'gh pr merge',
   'gh pr review',
   'gh pr create',
@@ -877,6 +880,91 @@ export function getCommandGuardPermissions(
     webfetch: 'deny',
     websearch: 'deny',
     codesearch: 'deny',
+    todowrite: 'allow',
+    todoread: 'allow',
+  };
+}
+
+/** The SCM proxy owns remote authorization for these sessions. The sandbox still
+ * limits local programs, credential paths, and access outside the checkout. */
+export function scopedReviewPermissions(
+  platform: 'github' | 'gitlab' | 'bitbucket',
+  workspace: string,
+  reviewId: string
+): Record<string, CommandGuardPermission> {
+  const allowed = CODE_REVIEW_ALLOWED_COMMANDS.filter(command => {
+    if (command.startsWith('gh ')) return platform === 'github';
+    if (command.startsWith('glab ')) return platform === 'gitlab';
+    return true;
+  });
+  const scratch = bitbucketReviewInputPath(reviewId);
+  const protectedPaths = [
+    '.git',
+    '.git/*',
+    '*/.git/*',
+    '*.env',
+    '*.env.*',
+    '*gitconfig*',
+    '*/.ssh/*',
+  ];
+  const edit: Record<string, 'allow' | 'deny'> = {
+    '*': 'allow',
+    '../*': 'deny',
+    '/*': 'deny',
+    [workspace + '/*']: 'allow',
+  };
+  for (const path of protectedPaths) edit[path] = 'deny';
+  if (platform === 'bitbucket') edit[relative(workspace, scratch)] = 'allow';
+  const bash = buildCommandGuardBashPermissions({
+    policyName: 'scoped-code-review',
+    defaultDeny: true,
+    allowed: [
+      ...allowed,
+      'printf',
+      ...[...CODE_REVIEW_GIT_READ_SUBCOMMANDS, 'add', 'commit', 'branch', 'switch', 'checkout'].map(
+        command => 'git ' + command
+      ),
+    ],
+    exactAllowed:
+      platform === 'bitbucket'
+        ? [
+            ...bitbucketCodeReviewAllowedCommands(reviewId).filter(
+              command => !command.startsWith('bb pr create')
+            ),
+            ...BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_ALLOWED_COMMANDS,
+          ]
+        : [],
+    denied: [
+      ...DEFAULT_DENIED_COMMAND_PATTERNS,
+      ...CODE_REVIEW_PROCESS_DENIES,
+      ...CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
+      'git commit *--exec*',
+      'git commit *--gpg-sign*',
+      'git commit *--amend*',
+      'git branch *--set-upstream*',
+      '*/proc/*',
+      '*~/.ssh*',
+      '*~/.config/*',
+      '*/.git/*',
+      '*git-credentials*',
+    ],
+  });
+  return {
+    bash,
+    edit,
+    question: 'deny',
+    webfetch: 'deny',
+    websearch: 'deny',
+    codesearch: 'deny',
+    external_directory:
+      platform === 'bitbucket'
+        ? {
+            '*': 'deny',
+            [scratch]: 'allow',
+            [dirname(scratch) + '/*']: 'allow',
+          }
+        : 'deny',
+    ...(platform === 'bitbucket' ? { task: 'deny', lsp: 'deny' } : {}),
     todowrite: 'allow',
     todoread: 'allow',
   };

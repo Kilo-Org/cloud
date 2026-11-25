@@ -71,7 +71,7 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('The repository text wins on conflict.');
     expect(prompt).not.toContain('# WHAT TO REVIEW');
     expect(prompt).toContain(
-      'They do not override read-only mode, security/tooling constraints, platform API instructions'
+      'They do not override sandbox permissions, security/tooling constraints, platform API instructions'
     );
   });
 
@@ -236,7 +236,7 @@ describe('generateReviewPrompt', () => {
     expect(prompt).not.toContain('# WHAT TO REVIEW');
     expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
 
-    expect(prompt).toContain('operating in READ-ONLY, NON-INTERACTIVE mode');
+    expect(prompt).toContain('operating in non-interactive mode');
     expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');
     expect(prompt).toContain('# WORKFLOW');
     expect(prompt).toContain('gh pr diff 1');
@@ -272,7 +272,7 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain("replace Kilo's default review guidance for sub-agent usage");
     expect(prompt).toContain('formatting/output requirements');
     expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
-    expect(prompt).toContain('operating in READ-ONLY, NON-INTERACTIVE mode');
+    expect(prompt).toContain('operating in non-interactive mode');
     expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');
     expect(prompt).toContain('glab mr diff 10');
     expect(prompt).toContain(

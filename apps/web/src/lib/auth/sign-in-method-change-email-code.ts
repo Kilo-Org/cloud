@@ -1,6 +1,6 @@
 import 'server-only';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { createHmac, randomInt, randomUUID } from 'crypto';
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -66,6 +66,13 @@ function hashCode(binding: SignInMethodChangeCodeBinding, code: string): string 
       ].join(':')
     )
     .digest('hex');
+}
+
+/** Compares two hex digests in constant time. */
+function codeHashesMatch(storedHash: string, candidateHash: string): boolean {
+  const stored = Buffer.from(storedHash, 'hex');
+  const candidate = Buffer.from(candidateHash, 'hex');
+  return stored.length === candidate.length && timingSafeEqual(stored, candidate);
 }
 
 function challengeFilter(challengeId: string) {
@@ -208,7 +215,7 @@ export async function consumeSignInMethodChangeCode(
     // A challenge of another account is not this account's to spend.
     if (!row || row.email !== normalizedEmail || row.consumed || row.expired) return 'invalid';
 
-    if (row.token_hash !== tokenHash) {
+    if (!codeHashesMatch(row.token_hash, tokenHash)) {
       await tx
         .update(magic_link_tokens)
         .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })

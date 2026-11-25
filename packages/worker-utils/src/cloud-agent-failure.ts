@@ -432,10 +432,10 @@ function classifyAdmissionFailure(
  * ownership does not change the responsibility for a provider outage, rate
  * limit, timeout or model-availability failure. Only a failure whose handling
  * the cloud agent platform itself controls stays `platform`, such as a model
- * catalog path that the runtime credential proxy does not allow, or a model
- * variant that the platform offered but the runtime does not support. The
- * account's own ChatGPT plan limit and an organization that the account cannot
- * use are the user's.
+ * catalog path that the runtime credential proxy does not allow, a model
+ * variant that the platform offered but the runtime does not support, or an
+ * organization that admission accepted but the runtime cannot use. The
+ * account's own ChatGPT plan limit is the user's.
  */
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
@@ -449,7 +449,7 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
     return classified('user', 'chatgpt_usage_limit');
   }
   if (input.assistantReason === 'organization_unavailable') {
-    return classified('user', 'organization_unavailable');
+    return classified('platform', 'organization_unavailable');
   }
   if (input.assistantReason === 'variant_unsupported') {
     return classified('platform', 'variant_unsupported');

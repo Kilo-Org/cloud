@@ -130,8 +130,8 @@ describe('classifyCloudAgentFailure', () => {
     ['model_catalog_unavailable', 'unknown', 'platform', 'model_catalog_unavailable'],
     ['chatgpt_usage_limit', 'unknown', 'user', 'chatgpt_usage_limit'],
     ['chatgpt_usage_limit', 'byok', 'user', 'chatgpt_usage_limit'],
-    ['organization_unavailable', 'unknown', 'user', 'organization_unavailable'],
-    ['organization_unavailable', 'managed', 'user', 'organization_unavailable'],
+    ['organization_unavailable', 'unknown', 'platform', 'organization_unavailable'],
+    ['organization_unavailable', 'managed', 'platform', 'organization_unavailable'],
     ['variant_unsupported', 'unknown', 'platform', 'variant_unsupported'],
     ['variant_unsupported', 'byok', 'platform', 'variant_unsupported'],
   ] as const)(
@@ -729,13 +729,14 @@ const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
     },
     expected: { responsibility: 'user', reason: 'chatgpt_usage_limit' },
   },
-  // The account cannot use the session's organization, whatever the code or ownership.
+  // Admission accepted an organization that the runtime cannot use, whatever the
+  // code or ownership.
   {
     match: {
       code: ['assistant_error', 'model_missing'],
       assistantReason: ['organization_unavailable'],
     },
-    expected: { responsibility: 'user', reason: 'organization_unavailable' },
+    expected: { responsibility: 'platform', reason: 'organization_unavailable' },
   },
   // The platform offered a variant that the runtime does not support for the model.
   {

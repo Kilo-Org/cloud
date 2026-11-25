@@ -4084,8 +4084,8 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // The customer's own ChatGPT plan allowance ran out. Like a BYOK quota, only
   // the customer can restore it. 'model_variant_unsupported' and
   // 'organization_unavailable' are deliberately NOT benign: the first is drift
-  // between the variants we offer and the runtime's list, and the cause of the
-  // second is not yet known.
+  // between the variants we offer and the runtime's list, and in the second
+  // admission accepted an organization that the runtime cannot use.
   'assistant_chatgpt_usage_limit',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work

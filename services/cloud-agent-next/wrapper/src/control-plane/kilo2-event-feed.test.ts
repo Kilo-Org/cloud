@@ -881,7 +881,7 @@ it.each([
 
 // Kilo v2 0.0.0-v2-141 reports each team catalog failure kind with a fixed text.
 // The organization kind means the account profile does not list the session's
-// organization. The other kinds are runtime credential or scope faults.
+// organization that admission accepted. All kinds are platform faults.
 const ORGANIZATION_MISSING_TEXT =
   'The selected Kilo team is no longer available. Select another team or clear the team selection.';
 const TEAM_CATALOG_TEXTS = [
@@ -891,11 +891,11 @@ const TEAM_CATALOG_TEXTS = [
 ];
 
 it.each([
-  [ORGANIZATION_MISSING_TEXT, 'organization_unavailable', 'user'],
+  [ORGANIZATION_MISSING_TEXT, 'organization_unavailable', 'platform'],
   [
     `SessionRunnerModel.ModelUnavailableError: ${ORGANIZATION_MISSING_TEXT}`,
     'organization_unavailable',
-    'user',
+    'platform',
   ],
   ...TEAM_CATALOG_TEXTS.flatMap(text => [
     [text, 'model_catalog_unavailable', 'platform'] as const,

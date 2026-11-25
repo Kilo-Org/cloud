@@ -453,9 +453,10 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   }
   // Kilo v2 reports each team catalog failure kind with a fixed text that holds
   // no identifiers. `organization_missing` means the account profile does not
-  // list the session's organization, so a fresh session fails the same way.
-  // `unauthenticated`, `scope_conflict` and `personal_unavailable` mean the
-  // runtime credential or team scope is wrong, which the platform owns.
+  // list the organization that admission accepted for the session, so a fresh
+  // session fails the same way. `unauthenticated`, `scope_conflict` and
+  // `personal_unavailable` mean the runtime credential or team scope is wrong.
+  // The platform owns all four kinds.
   if (
     /^(?:sessionrunnermodel\.modelunavailableerror: )?the selected kilo team is no longer available\./.test(
       canonicalMessage

@@ -183,7 +183,7 @@ describe('queue handler', () => {
     expect(pageTexts(http.requests)).toEqual([]);
   });
 
-  it('acks a batch archived without the hot copy and pages the failure once per stream', async () => {
+  it('acks batches archived without the hot copy and leaves the paging to the alarm', async () => {
     const stream = uniqueStream('queue-drop');
     const http = recordingFetch(request =>
       request.url === SLACK_WEBHOOK ? axiomOk() : new Response('unavailable', { status: 503 })
@@ -203,10 +203,10 @@ describe('queue handler', () => {
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 4),
     ]);
+    // One inline call, then the stream leaves its rows to the alarm; a failure no alarm run has
+    // confirmed yet pages nothing.
     expect(axiomRequests(http.requests)).toHaveLength(1);
-    expect(pageTexts(http.requests)).toEqual([
-      `bot: audit stream ${stream}: the Axiom hot copy is failing (axiom_unavailable); every batch is still archived and the stream retries the hot copy with backoff`,
-    ]);
+    expect(pageTexts(http.requests)).toEqual([]);
   });
 
   it('pages and acks a duplicate whose content differs from the archive', async () => {

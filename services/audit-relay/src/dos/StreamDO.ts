@@ -37,8 +37,19 @@ export const HOT_COPY_BACKOFF_BASE_MS = 30_000;
 export const HOT_COPY_BACKOFF_CAP_MS = 15 * 60 * 1000;
 /** The safety-net alarm a commit arms, for a pending row whose inline ingest never finished. */
 export const PENDING_ROW_ALARM_MS = 5 * 60 * 1000;
-/** A failure that still owes a row older than this pages a second time, once. */
+/**
+ * A stream-wide hot-copy failure pages only once it is real: two failed alarm runs in a row, or
+ * an owed row older than this. A blip that the next alarm run clears pages nothing.
+ */
+export const HOT_COPY_PAGE_AFTER_MS = 5 * 60 * 1000;
+export const HOT_COPY_PAGE_AFTER_RUNS = 2;
+/** A paged failure that still owes a row older than this pages a second time, once. */
 export const OWED_ROW_PAGE_AGE_MS = 6 * 60 * 60 * 1000;
+/**
+ * Hot-copy problem pages (start, age, parked row) of one stream go out at most once per this
+ * window; the recovery page of a paged failure always goes out and restarts the window.
+ */
+export const HOT_COPY_PAGE_INTERVAL_MS = 60 * 60 * 1000;
 /** Dead letters of one stream page at most once per this window. */
 export const DEAD_LETTER_PAGE_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -47,6 +58,7 @@ const GAP_KEY = 'gap';
 const HOT_STATE_KEY = 'hot_state';
 const DEAD_LETTER_PAGED_KEY = 'dead_letter_paged_at';
 const HOT_COPY_PREFIX = 'hot_copy:';
+const PARKED_PREFIX = 'hot_copy_parked:';
 
 /**
  * The sequence the stream is waiting for, since when, and how many batches it turned away. A
@@ -59,6 +71,11 @@ function hotCopyKey(toSeq: number): string {
   return `${HOT_COPY_PREFIX}${String(toSeq).padStart(12, '0')}`;
 }
 
+/** A row the alarm no longer retries, kept for an operator under its own prefix. */
+function parkedKey(toSeq: number): string {
+  return `${PARKED_PREFIX}${String(toSeq).padStart(12, '0')}`;
+}
+
 export type HotCopyFailureReason =
   | 'axiom_rejected'
   | 'axiom_unavailable'
@@ -69,8 +86,9 @@ export type HotCopyFailureReason =
 
 /**
  * A reason that belongs to one row (Axiom refused that payload, or its archive object does not
- * decode) rather than to the whole hot copy. Delivery continues past such a row; every other
- * reason stops the alarm and sends new batches straight to the alarm until it clears.
+ * decode) rather than to the whole hot copy. Such a row is parked: moved out of the alarm's queue
+ * to `hot_copy_parked:`, paged, and left for an operator, so it never blocks the rows after it.
+ * Every other reason is stream-wide: it stops the alarm run and backs off.
  */
 function rowSpecific(reason: HotCopyFailureReason): boolean {
   return reason === 'axiom_rejected' || reason === 'archive_unreadable';
@@ -80,7 +98,8 @@ function rowSpecific(reason: HotCopyFailureReason): boolean {
  * One archived range whose Axiom delivery is owed. `pending` is written in the same storage write
  * as the head advance, before the ingest is attempted; a failure replaces it with the concrete
  * reason. The StreamDO alarm delivers every row from the archive and deletes it. Rows are the
- * archived ranges themselves, so they never overlap.
+ * archived ranges themselves, so they never overlap. `recordedAt` is when the range was archived
+ * and stays fixed, so it measures how long the hot copy has owed it.
  */
 export type HotStoreGap = {
   stream: string;
@@ -91,13 +110,21 @@ export type HotStoreGap = {
 };
 
 /**
- * The hot copy's health for the stream. `alert` is the failure reason last paged, cleared (with a
- * recovery page) once the alarm has delivered every owed row; `attempts` drives the alarm backoff.
+ * The hot copy's health for the stream. `failing` is the current stream-wide failure (cleared,
+ * with a recovery page if it was paged, once the alarm has delivered every owed row); `attempts`
+ * counts failed alarm runs in a row and drives the backoff; `lastPageAt` enforces the page cap
+ * across failures.
  */
 type HotCopyState = {
   stream: string;
   attempts: number;
-  alert: { reason: HotCopyFailureReason; since: string; agePaged: boolean } | null;
+  failing: {
+    reason: HotCopyFailureReason;
+    since: string;
+    paged: boolean;
+    agePaged: boolean;
+  } | null;
+  lastPageAt: number | null;
 };
 
 /**
@@ -177,17 +204,21 @@ export class StreamDO extends DurableObject<Env> {
     await this.serialised(() => this.drainHotCopy());
   }
 
-  /** Owed hot-copy rows, oldest first, for an operator. */
+  /** Owed rows the alarm still retries, then parked rows, each oldest first, for an operator. */
   async hotStoreGaps(limit = 1000): Promise<HotStoreGap[]> {
-    const rows = await this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit });
-    return [...rows.values()];
+    const [owed, parked] = await Promise.all([
+      this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit }),
+      this.ctx.storage.list<HotStoreGap>({ prefix: PARKED_PREFIX, limit }),
+    ]);
+    return [...owed.values(), ...parked.values()].slice(0, limit);
   }
 
-  /** Drops an owed row an operator has replayed or written off (an `axiom_rejected` payload). */
+  /** Drops an owed or parked row an operator has replayed or written off. */
   async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
-    const key = hotCopyKey(toSeq);
-    const row = await this.ctx.storage.get<HotStoreGap>(key);
-    if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
+    for (const key of [hotCopyKey(toSeq), parkedKey(toSeq)]) {
+      const row = await this.ctx.storage.get<HotStoreGap>(key);
+      if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
+    }
   }
 
   /** The archived head sequence; the DLQ consumer treats a batch at or below it as a no-op. */
@@ -280,10 +311,11 @@ export class StreamDO extends DurableObject<Env> {
     // While the whole hot copy is failing, a batch leaves its row to the alarm's backoff instead
     // of adding one more doomed call per batch.
     let hotCopy: 'delivered' | 'owed' = 'owed';
-    if (!state.alert || rowSpecific(state.alert.reason)) {
+    if (!state.failing) {
       const delivery = await this.deliverRow(owed, trimmed.events);
       if (delivery.kind === 'delivered') hotCopy = 'delivered';
-      else await this.noteFailure(state, delivery.reason, [owed], false);
+      else if (rowSpecific(delivery.reason)) await this.park(state, owed, delivery.reason);
+      else await this.noteFailure(state, delivery.reason, false, owed);
     }
     return {
       kind: 'accepted',
@@ -397,9 +429,9 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * Delivers owed rows, oldest first, from their archive objects. A row-specific failure is
-   * stamped on the row and skipped; any other failure stops the run. Either re-arms the alarm
-   * with backoff; a clean run that emptied the rows clears the alert with a recovery page.
+   * Delivers owed rows, oldest first, from their archive objects. A row-specific failure parks
+   * the row and the run continues; a stream-wide failure stops the run and re-arms with backoff.
+   * A full page of rows re-arms at once; a run that empties the queue clears the failure.
    */
   private async drainHotCopy(): Promise<void> {
     const listed = await this.ctx.storage.list<HotStoreGap>({
@@ -407,27 +439,26 @@ export class StreamDO extends DurableObject<Env> {
       limit: HOT_COPY_ROWS_PER_ALARM,
     });
     const rows = [...listed.values()];
-    const oldest = rows[0];
-    if (!oldest) {
+    const first = rows[0];
+    if (!first) {
       const stored = await this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY);
-      if (stored) await this.recovered(stored);
+      if (stored?.failing) await this.recovered(stored);
       return;
     }
-    const state = await this.readHotState(oldest.stream);
+    let state = await this.readHotState(first.stream);
 
-    let failure: HotCopyFailureReason | null = null;
     for (const row of rows) {
       const delivery = await this.deliverFromArchive(row);
       if (delivery.kind === 'delivered') continue;
-      await this.stampRows([row], delivery.reason);
-      if (failure === null || !rowSpecific(delivery.reason)) failure = delivery.reason;
-      if (!rowSpecific(delivery.reason)) break;
-    }
-
-    if (failure !== null) {
-      await this.noteFailure(state, failure, [], true, oldest);
+      if (rowSpecific(delivery.reason)) {
+        state = await this.park(state, row, delivery.reason);
+        continue;
+      }
+      // Every row before this one was delivered or parked, so it is the oldest still owed.
+      await this.noteFailure(state, delivery.reason, true, row);
       return;
     }
+
     if (rows.length === HOT_COPY_ROWS_PER_ALARM) {
       await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts: 0 });
       await this.ctx.storage.setAlarm(Date.now());
@@ -479,37 +510,53 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * Records a failure: stamps `rows`, pages once per reason (and once more when a row has been
-   * owed past `OWED_ROW_PAGE_AGE_MS`), and makes sure an alarm is due. A failed alarm run
-   * (`fromAlarm`) advances the backoff and re-arms; a failed batch only arms an absent alarm.
+   * Records a stream-wide failure on `row`, the oldest row still owed, and makes sure an alarm is
+   * due within the backoff. A failed alarm run (`fromAlarm`) advances the backoff.
+   *
+   * Paging waits until the failure is real (`HOT_COPY_PAGE_AFTER_RUNS` failed runs in a row, or a
+   * row owed for `HOT_COPY_PAGE_AFTER_MS`), pages once per failure and once more past
+   * `OWED_ROW_PAGE_AGE_MS`, and never more than once per `HOT_COPY_PAGE_INTERVAL_MS`; a page the
+   * window holds back goes out at the next failed run after it. A change of reason is logged, not
+   * paged.
    */
   private async noteFailure(
     state: HotCopyState,
     reason: HotCopyFailureReason,
-    rows: HotStoreGap[],
     fromAlarm: boolean,
-    oldest?: HotStoreGap
+    row: HotStoreGap
   ): Promise<void> {
-    await this.stampRows(rows, reason);
+    await this.stampRow(row, reason);
     const now = Date.now();
     const attempts = fromAlarm ? state.attempts + 1 : state.attempts;
-    let alert = state.alert;
+    let failing = state.failing
+      ? { ...state.failing, reason }
+      : { reason, since: new Date(now).toISOString(), paged: false, agePaged: false };
+    let lastPageAt = state.lastPageAt;
+    const owedMs = now - Date.parse(row.recordedAt);
+    const windowOpen = lastPageAt === null || now - lastPageAt >= HOT_COPY_PAGE_INTERVAL_MS;
     let page: string | null = null;
-    if (alert?.reason !== reason) {
-      alert = { reason, since: new Date(now).toISOString(), agePaged: false };
-      page = `audit stream ${state.stream}: the Axiom hot copy is failing (${reason}); every batch is still archived and the stream retries the hot copy with backoff`;
-    } else if (
-      !alert.agePaged &&
-      oldest &&
-      now - Date.parse(oldest.recordedAt) >= OWED_ROW_PAGE_AGE_MS
+    if (
+      !failing.paged &&
+      windowOpen &&
+      (attempts >= HOT_COPY_PAGE_AFTER_RUNS || owedMs >= HOT_COPY_PAGE_AFTER_MS)
     ) {
-      alert = { ...alert, agePaged: true };
-      page = `audit stream ${state.stream}: the Axiom hot copy still owes seq ${oldest.fromSeq}.. since ${oldest.recordedAt} (${reason})`;
+      failing = { ...failing, paged: true };
+      lastPageAt = now;
+      page = `audit stream ${state.stream}: the Axiom hot copy is failing (${reason}) since ${failing.since}; every batch is still archived and the stream retries the hot copy with backoff`;
+    } else if (failing.paged && !failing.agePaged && windowOpen && owedMs >= OWED_ROW_PAGE_AGE_MS) {
+      failing = { ...failing, agePaged: true };
+      lastPageAt = now;
+      page = `audit stream ${state.stream}: the Axiom hot copy still owes seq ${row.fromSeq}.. since ${row.recordedAt} (${reason})`;
     }
-    await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts, alert });
-    if (fromAlarm || (await this.ctx.storage.getAlarm()) === null) {
-      await this.ctx.storage.setAlarm(now + backoffMs(Math.max(attempts, 1)));
-    }
+    await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, {
+      stream: state.stream,
+      attempts,
+      failing,
+      lastPageAt,
+    });
+    const due = now + backoffMs(Math.max(attempts, 1));
+    const scheduled = fromAlarm ? null : await this.ctx.storage.getAlarm();
+    if (scheduled === null || scheduled > due) await this.ctx.storage.setAlarm(due);
     console.error(
       JSON.stringify({
         event: 'audit_relay.hot_copy_failed',
@@ -522,32 +569,83 @@ export class StreamDO extends DurableObject<Env> {
     if (page) await pageOperator(this.env, page, this.ctx);
   }
 
+  /**
+   * Moves a row Axiom refuses (or whose archive object does not decode) to `hot_copy_parked:`,
+   * where the alarm never retries it, and pages it within the hourly window.
+   */
+  private async park(
+    state: HotCopyState,
+    row: HotStoreGap,
+    reason: HotCopyFailureReason
+  ): Promise<HotCopyState> {
+    const stored = await this.ctx.storage.get<HotStoreGap>(hotCopyKey(row.toSeq));
+    if (!stored) return state;
+    // No await between the two writes: the move is atomic.
+    const moves = [
+      this.ctx.storage.delete(hotCopyKey(row.toSeq)),
+      this.ctx.storage.put<HotStoreGap>(parkedKey(row.toSeq), { ...stored, reason }),
+    ];
+    await Promise.all(moves);
+
+    const now = Date.now();
+    const windowOpen =
+      state.lastPageAt === null || now - state.lastPageAt >= HOT_COPY_PAGE_INTERVAL_MS;
+    const next: HotCopyState = windowOpen ? { ...state, lastPageAt: now } : state;
+    if (windowOpen) await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, next);
+    console.error(
+      JSON.stringify({
+        event: 'audit_relay.hot_copy_parked',
+        stream: row.stream,
+        fromSeq: row.fromSeq,
+        toSeq: row.toSeq,
+        reason,
+        paged: windowOpen,
+      })
+    );
+    if (windowOpen) {
+      await pageOperator(
+        this.env,
+        `audit stream ${row.stream}: parked seq ${row.fromSeq}..${row.toSeq} (${reason}); the alarm no longer retries it, check the payload and clear it with clearHotStoreGap`,
+        this.ctx
+      );
+    }
+    return next;
+  }
+
+  /** Clears the failure; a failure that paged its start also pages its recovery, always. */
   private async recovered(state: HotCopyState): Promise<void> {
-    await this.ctx.storage.delete(HOT_STATE_KEY);
-    if (!state.alert) return;
+    if (!state.failing && state.attempts === 0) return;
+    const paged = state.failing?.paged === true;
+    const now = Date.now();
+    await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, {
+      stream: state.stream,
+      attempts: 0,
+      failing: null,
+      lastPageAt: paged ? now : state.lastPageAt,
+    });
+    if (!state.failing) return;
     console.log(
       JSON.stringify({
         event: 'audit_relay.hot_copy_recovered',
         stream: state.stream,
-        reason: state.alert.reason,
+        reason: state.failing.reason,
+        paged,
       })
     );
+    if (!paged) return;
     await pageOperator(
       this.env,
-      `audit stream ${state.stream}: the Axiom hot copy recovered from ${state.alert.reason} (failing since ${state.alert.since}); every owed row is delivered`,
+      `audit stream ${state.stream}: the Axiom hot copy recovered from ${state.failing.reason} (failing since ${state.failing.since}); every owed row is delivered`,
       this.ctx
     );
   }
 
   // Get-then-put with no other I/O between: storage awaits keep the input gate closed, so a row
-  // deleted by a delivery is never re-created here.
-  private async stampRows(rows: HotStoreGap[], reason: HotCopyFailureReason): Promise<void> {
-    const recordedAt = new Date().toISOString();
-    for (const row of rows) {
-      const key = hotCopyKey(row.toSeq);
-      const stored = await this.ctx.storage.get<HotStoreGap>(key);
-      if (stored) await this.ctx.storage.put<HotStoreGap>(key, { ...stored, reason, recordedAt });
-    }
+  // deleted by a delivery is never re-created here. `recordedAt` stays the archive time.
+  private async stampRow(row: HotStoreGap, reason: HotCopyFailureReason): Promise<void> {
+    const key = hotCopyKey(row.toSeq);
+    const stored = await this.ctx.storage.get<HotStoreGap>(key);
+    if (stored) await this.ctx.storage.put<HotStoreGap>(key, { ...stored, reason });
   }
 
   private async readHotState(stream: string): Promise<HotCopyState> {
@@ -555,7 +653,8 @@ export class StreamDO extends DurableObject<Env> {
       (await this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY)) ?? {
         stream,
         attempts: 0,
-        alert: null,
+        failing: null,
+        lastPageAt: null,
       }
     );
   }

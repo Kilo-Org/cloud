@@ -225,9 +225,12 @@ describe('StreamDO', () => {
       [3, 5, 'pending'],
     ]);
 
-    // Still down: one call, the run stops at the first row, and no second page.
+    // Still down for two alarm runs in a row: that is a real failure, so the second run pages.
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(axiomRequests(http.requests)).toHaveLength(2);
+    expect(pageTexts(http.requests)).toEqual([]);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(axiomRequests(http.requests)).toHaveLength(3);
     expect(await stub.hotStoreGaps()).toHaveLength(2);
 
     failing = false;
@@ -239,17 +242,51 @@ describe('StreamDO', () => {
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);
+    const failingPage = new RegExp(
+      `^bot: audit stream ${stream}: the Axiom hot copy is failing \\(axiom_unavailable\\) since `
+    );
+    const recoveredPage = new RegExp(
+      `^bot: audit stream ${stream}: the Axiom hot copy recovered from axiom_unavailable`
+    );
     expect(pageTexts(http.requests)).toEqual([
-      `bot: audit stream ${stream}: the Axiom hot copy is failing (axiom_unavailable); every batch is still archived and the stream retries the hot copy with backoff`,
-      expect.stringMatching(
-        new RegExp(
-          `^bot: audit stream ${stream}: the Axiom hot copy recovered from axiom_unavailable`
-        )
-      ),
+      expect.stringMatching(failingPage),
+      expect.stringMatching(recoveredPage),
     ]);
+
+    // A second real failure inside the hour is retried and logged, but pages nothing.
+    failing = true;
+    expect(await stub.acceptBatch(auditBatch(6, 7, stream))).toMatchObject({ hotCopy: 'owed' });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    failing = false;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(await stub.hotStoreGaps()).toEqual([]);
+    expect(pageTexts(http.requests)).toHaveLength(2);
   });
 
-  it('keeps a row Axiom rejects and still delivers the batches after it', async () => {
+  it('pages nothing for failures the next alarm run clears', async () => {
+    const stream = uniqueStream('axiom-sporadic');
+    let failing = false;
+    const http = recordingFetch(request => {
+      if (request.url === SLACK_WEBHOOK) return axiomOk();
+      return failing ? new Response('unavailable', { status: 503 }) : axiomOk();
+    });
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+
+    for (let round = 0; round < 3; round += 1) {
+      failing = true;
+      const batch = auditBatch(round * 2 + 1, round * 2 + 2, stream);
+      expect(await stub.acceptBatch(batch)).toMatchObject({ hotCopy: 'owed' });
+      failing = false;
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+      expect(await stub.hotStoreGaps()).toEqual([]);
+    }
+    expect(axiomRequests(http.requests)).toHaveLength(6);
+    expect(pageTexts(http.requests)).toEqual([]);
+  });
+
+  it('parks a row Axiom rejects and still delivers the batches after it', async () => {
     const stream = uniqueStream('axiom-reject');
     const http = recordingFetch(request => {
       if (request.url === SLACK_WEBHOOK) return axiomOk();
@@ -264,18 +301,67 @@ describe('StreamDO', () => {
     expect(await stub.acceptBatch(auditBatch(3, 5, stream))).toMatchObject({
       hotCopy: 'delivered',
     });
+    // The parked row is not the alarm's any more: the run finds nothing to deliver.
     expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(axiomRequests(http.requests)).toHaveLength(2);
     expect((await stub.hotStoreGaps()).map(row => [row.fromSeq, row.reason])).toEqual([
       [1, 'axiom_rejected'],
     ]);
-    expect(pageTexts(http.requests)).toHaveLength(1);
+    expect(pageTexts(http.requests)).toEqual([
+      `bot: audit stream ${stream}: parked seq 1..2 (axiom_rejected); the alarm no longer retries it, check the payload and clear it with clearHotStoreGap`,
+    ]);
 
     await stub.clearHotStoreGap(1, 2);
+    expect(await stub.hotStoreGaps()).toEqual([]);
+  });
+
+  it('parks 60 undeliverable rows without starving the row behind them', async () => {
+    const stream = uniqueStream('poison-rows');
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+
+    // Rows 1..60 name archive objects that do not exist (archive_unreadable); 61..62 is genuine.
+    const good = auditBatch(61, 62, stream);
+    await writeArchivedBatch(env.AUDIT_ARCHIVE, {
+      batch: good,
+      prevHash: GENESIS_HASH,
+      hash: await chainHash(GENESIS_HASH, good),
+    });
+    const recordedAt = new Date().toISOString();
+    await runInDurableObject(stub, async (_instance, state) => {
+      const rows: Record<string, unknown> = {};
+      for (let seq = 1; seq <= 60; seq += 1) {
+        rows[`hot_copy:${String(seq).padStart(12, '0')}`] = {
+          stream,
+          fromSeq: seq,
+          toSeq: seq,
+          reason: 'pending',
+          recordedAt,
+        };
+      }
+      rows['hot_copy:000000000062'] = {
+        stream,
+        fromSeq: 61,
+        toSeq: 62,
+        reason: 'pending',
+        recordedAt,
+      };
+      await state.storage.put(rows);
+      await state.storage.setAlarm(Date.now() + 60_000);
+    });
+
+    // The first run parks 50 rows and, having listed a full page, re-arms at once; the second
+    // parks the other 10 and delivers the genuine row.
     expect(await runDurableObjectAlarm(stub)).toBe(true);
-    expect(pageTexts(http.requests)).toEqual([
-      expect.stringContaining('the Axiom hot copy is failing (axiom_rejected)'),
-      expect.stringContaining('the Axiom hot copy recovered from axiom_rejected'),
-    ]);
+    await vi.waitFor(async () => {
+      await runDurableObjectAlarm(stub);
+      expect(axiomRequests(http.requests).map(eventIds)).toEqual([good.events.map(e => e.id)]);
+    });
+    const gaps = await stub.hotStoreGaps(100);
+    expect(gaps).toHaveLength(60);
+    expect(gaps.every(row => row.reason === 'archive_unreadable')).toBe(true);
+    expect(pageTexts(http.requests)).toHaveLength(1);
   });
 
   it('re-ingests an owed row from the archive, never from a redelivered message', async () => {

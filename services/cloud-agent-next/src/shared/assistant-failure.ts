@@ -143,6 +143,24 @@ export function missingAgentSlug(source: unknown): string | undefined {
   );
 }
 
+// Kilo v2 `SessionRunnerModel.VariantUnavailableError` text, and the safe message
+// built from it. The model and variant come from the session configuration.
+// Each capture is restricted to identifier characters; other text gets the
+// generic variant message.
+function unsupportedVariant(source: unknown): { model: string; variant: string } | undefined {
+  const message = assistantFailureText(source).replace(/^\[BYOK\] /, '');
+  const match =
+    /^(?:SessionRunnerModel\.VariantUnavailableError: )?Variant unavailable for ([A-Za-z0-9/._:-]{1,200}): ([A-Za-z0-9._-]{1,64})$/.exec(
+      message
+    ) ??
+    /^The selected model ([A-Za-z0-9/._:-]{1,200}) does not support the variant ([A-Za-z0-9._-]{1,64})$/.exec(
+      message
+    );
+  const model = match?.[1];
+  const variant = match?.[2];
+  return model === undefined || variant === undefined ? undefined : { model, variant };
+}
+
 export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
@@ -158,6 +176,14 @@ export function classifyAssistantFailure(
     return {
       reason: 'invalid_request',
       safeMessage: `Agent "${missingAgent}" was not found in the repository or profile`,
+      providerOwnership,
+    };
+  }
+  const variant = unsupportedVariant(source);
+  if (variant !== undefined) {
+    return {
+      reason: 'variant_unsupported',
+      safeMessage: `The selected model ${variant.model} does not support the variant ${variant.variant}`,
       providerOwnership,
     };
   }
@@ -454,7 +480,7 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
       canonicalMessage
     )
   ) {
-    return 'invalid_request';
+    return 'variant_unsupported';
   }
   // The ChatGPT subscription route reports the plan limit, the subscription
   // sharing limit and the workspace admin limit with these texts. Each limit

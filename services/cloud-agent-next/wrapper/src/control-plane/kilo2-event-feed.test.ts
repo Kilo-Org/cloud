@@ -842,10 +842,13 @@ it.each([
     'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
     'model_unavailable',
   ],
-  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant',
+    'variant_unsupported',
+  ],
   [
     'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
-    'invalid_request',
+    'variant_unsupported',
   ],
   ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
@@ -858,6 +861,21 @@ it.each([
   if (reason === 'model_catalog_unavailable') {
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();
+  }
+  if (reason === 'variant_unsupported') {
+    expect(failure.safeMessage).toMatch(
+      /^The selected model kilo\/\S+ does not support the variant instant$/
+    );
+    expect(failure.terminalCode).toBeUndefined();
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'variant_unsupported' });
   }
 });
 

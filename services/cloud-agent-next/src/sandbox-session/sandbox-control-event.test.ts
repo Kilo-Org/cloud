@@ -111,7 +111,7 @@ describe('session event public projection', () => {
     ],
     [
       'Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant',
-      'Assistant request was invalid',
+      'The selected model kilo/nvidia/nemotron-3.5-super-vl:free does not support the variant instant',
     ],
     [
       'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
@@ -119,7 +119,7 @@ describe('session event public projection', () => {
     ],
     [
       'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
-      'Assistant request was invalid',
+      'The selected model kilo/example does not support the variant instant',
     ],
     [
       'SessionRunnerModel.ModelUnavailableError: The selected Kilo team is no longer available. Select another team or clear the team selection.',

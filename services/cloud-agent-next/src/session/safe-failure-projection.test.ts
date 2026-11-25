@@ -273,6 +273,57 @@ describe('Kilo team catalog failures', () => {
   });
 });
 
+describe('Unsupported model variant', () => {
+  const GENERIC_VARIANT_MESSAGE = 'The selected model does not support the selected variant';
+
+  it.each([
+    ['Variant unavailable for kilo/example/model-1: thinking', 'kilo/example/model-1', 'thinking'],
+    [
+      'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example/model-2:free: instant',
+      'kilo/example/model-2:free',
+      'instant',
+    ],
+  ])('names the model and variant from %s', (text, model, variant) => {
+    const source = { name: 'UnknownError', data: { message: text } };
+    const failure = classifyAssistantFailure(source);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'unknown',
+      safeMessage: `The selected model ${model} does not support the variant ${variant}`,
+    });
+    const safeError = projectSafeAssistantError(source);
+    expect(safeError).toBe(failure.safeMessage);
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it('keeps BYOK ownership through the safe message round trip', () => {
+    const source = '[BYOK] Variant unavailable for kilo/example/model-1: thinking';
+    const failure = classifyAssistantFailure(source);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'byok',
+      safeMessage: 'The selected model kilo/example/model-1 does not support the variant thinking',
+    });
+    const safeError = projectSafeAssistantError(source);
+    expect(safeError).toBe(`[BYOK] ${failure.safeMessage}`);
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it.each([
+    'Variant unavailable for kilo/example model: thinking',
+    `Variant unavailable for kilo/example/model-1: ${'x'.repeat(65)}`,
+    'Variant unavailable for kilo/example/model-1: thinking. Private detail',
+  ])('uses the generic message when %s has an unsafe name', text => {
+    const failure = classifyAssistantFailure(text);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'unknown',
+      safeMessage: GENERIC_VARIANT_MESSAGE,
+    });
+    expect(classifyAssistantFailure(projectSafeAssistantError(text))).toEqual(failure);
+  });
+});
+
 describe('projectSafeAssistantError', () => {
   it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
     const error = {

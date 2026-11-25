@@ -2,117 +2,132 @@ import { DurableObject } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
+import { calculateJwkThumbprint, exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { z } from 'zod';
 import migrations from '../../drizzle.signer/migrations';
-import { sha256Base64Url } from '../crypto/hash';
 import * as schema from '../db/signer-schema';
-import { readConfig, type Env, type StsConfig } from '../env';
+import { readConfig, type Env, type ManagerLoginClaims } from '../env';
 
 type SignerDatabase = DrizzleSqliteDODatabase<typeof schema>;
 
 const PublicJwkSchema = z.object({
-  kty: z.literal('OKP'),
-  crv: z.literal('Ed25519'),
+  kty: z.literal('EC'),
+  crv: z.literal('P-256'),
   x: z.string().min(1),
+  y: z.string().min(1),
 });
 
 const PrivateJwkSchema = PublicJwkSchema.extend({ d: z.string().min(1) });
 
-export type ManagerJwks = {
-  keys: Array<{ kty: string; crv: string; x: string; kid: string; alg: string; use: string }>;
+export type ManagerJwk = {
+  kty: 'EC';
+  crv: 'P-256';
+  x: string;
+  y: string;
+  kid: string;
+  alg: 'ES256';
+  use: 'sig';
 };
 
-const MANAGER_AUDIENCE = 'infisical';
-const MANAGER_TOKEN_LIFETIME = '5m';
+export type ManagerJwks = { keys: ManagerJwk[] };
 
 /**
- * Holds the Ed25519 key STS authenticates to the manager with. The private key is
- * generated here, stored in this object's SQLite, and only its public half is served,
- * at a key set separate from any other STS signing material (design 4.4).
+ * ES256, because Infisical JWT Auth documents RSA and ECDSA keys
+ * (https://infisical.com/docs/documentation/platform/identities/jwt-auth).
+ */
+const ALGORITHM = 'ES256';
+
+/** Infisical checks the JWT once, at login; a short life limits a leaked login JWT. */
+const LOGIN_JWT_LIFETIME = '2m';
+
+type SigningState = { key: CryptoKey; kid: string; jwks: ManagerJwks };
+
+/**
+ * Holds the ECDSA P-256 key STS logs in to the manager with (design 4.2, 4.4). The key is generated
+ * here and its private half never leaves this object; only the public half is served, at a key-set
+ * URL of its own.
  */
 export class SignerDO extends DurableObject<Env> {
-  private readonly config: StsConfig;
+  private readonly login: ManagerLoginClaims;
   private readonly db: SignerDatabase;
-  private signingKey: CryptoKey | null = null;
-  private kid: string | null = null;
-  private jwks: ManagerJwks | null = null;
+  private signing: SigningState | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.config = readConfig(env);
+    this.login = readConfig(env).manager.login;
     this.db = drizzle(ctx.storage, { schema });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
-      await this.loadOrCreateKey();
+      this.signing = await this.loadOrCreateKey();
     });
   }
 
+  /** A login JWT with the exact issuer, audience and subject this environment's identity trusts. */
   async signManagerToken(): Promise<string> {
-    if (this.signingKey === null || this.kid === null) {
-      throw new Error('signing key is not initialised');
-    }
+    const signing = this.requireSigning();
     return await new SignJWT({})
-      .setProtectedHeader({ alg: 'EdDSA', kid: this.kid, typ: 'JWT' })
-      .setIssuer(`${this.config.issuer}/manager-auth`)
-      .setSubject(`sts:${this.config.environment}`)
-      .setAudience(MANAGER_AUDIENCE)
+      .setProtectedHeader({ alg: ALGORITHM, kid: signing.kid, typ: 'JWT' })
+      .setIssuer(this.login.issuer)
+      .setAudience(this.login.audience)
+      .setSubject(this.login.subject)
+      .setJti(crypto.randomUUID())
       .setIssuedAt()
-      .setExpirationTime(MANAGER_TOKEN_LIFETIME)
-      .sign(this.signingKey);
+      .setExpirationTime(LOGIN_JWT_LIFETIME)
+      .sign(signing.key);
   }
 
   async getJwks(): Promise<ManagerJwks> {
-    if (this.jwks === null) throw new Error('signing key is not initialised');
-    return this.jwks;
+    return this.requireSigning().jwks;
   }
 
-  private async loadOrCreateKey(): Promise<void> {
-    const row = this.db.select().from(schema.signingKey).where(eq(schema.signingKey.id, 1)).get();
-    if (row !== undefined) {
-      await this.adoptKey(row.kid, row.privateJwk, row.publicJwk);
-      return;
-    }
+  private requireSigning(): SigningState {
+    if (this.signing === null) throw new Error('signing key is not initialised');
+    return this.signing;
+  }
 
-    const pair = await generateKeyPair('EdDSA', { crv: 'Ed25519', extractable: true });
-    const privateJwk = await exportJWK(pair.privateKey);
+  private async loadOrCreateKey(): Promise<SigningState> {
+    const row = this.db.select().from(schema.signingKey).where(eq(schema.signingKey.id, 1)).get();
+    if (row !== undefined) return await this.adoptKey(row.kid, row.privateJwk, row.publicJwk);
+
+    // Generated extractable only so the private JWK can be stored in this object's own storage;
+    // the key used for signing is re-imported non-extractable.
+    const pair = await generateKeyPair(ALGORITHM, { extractable: true });
+    const privateJwk = JSON.stringify(await exportJWK(pair.privateKey));
     const publicJwk = await exportJWK(pair.publicKey);
-    const kid = (await sha256Base64Url(JSON.stringify(publicJwk))).slice(0, 16);
-    const privateJwkJson = JSON.stringify(privateJwk);
+    const kid = await calculateJwkThumbprint(publicJwk);
     const publicJwkJson = JSON.stringify(publicJwk);
     this.db
       .insert(schema.signingKey)
-      .values({
-        id: 1,
-        kid,
-        privateJwk: privateJwkJson,
-        publicJwk: publicJwkJson,
-        createdAt: Date.now(),
-      })
+      .values({ id: 1, kid, privateJwk, publicJwk: publicJwkJson, createdAt: Date.now() })
       .run();
-    await this.adoptKey(kid, privateJwkJson, publicJwkJson);
+    return await this.adoptKey(kid, privateJwk, publicJwkJson);
   }
 
   private async adoptKey(
     kid: string,
     privateJwkJson: string,
     publicJwkJson: string
-  ): Promise<void> {
+  ): Promise<SigningState> {
     const privateJwk = PrivateJwkSchema.parse(JSON.parse(privateJwkJson));
     const publicJwk = PublicJwkSchema.parse(JSON.parse(publicJwkJson));
-    this.signingKey = await importJWK(privateJwk, 'EdDSA');
-    this.kid = kid;
-    this.jwks = {
-      keys: [
-        {
-          kty: publicJwk.kty,
-          crv: publicJwk.crv,
-          x: publicJwk.x,
-          kid,
-          alg: 'EdDSA',
-          use: 'sig',
-        },
-      ],
+    const key = await importJWK(privateJwk, ALGORITHM, { extractable: false });
+    if (!(key instanceof CryptoKey)) throw new Error('signing key did not import as a CryptoKey');
+    return {
+      key,
+      kid,
+      jwks: {
+        keys: [
+          {
+            kty: publicJwk.kty,
+            crv: publicJwk.crv,
+            x: publicJwk.x,
+            y: publicJwk.y,
+            kid,
+            alg: ALGORITHM,
+            use: 'sig',
+          },
+        ],
+      },
     };
   }
 }

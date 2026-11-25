@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration for vitest-pool-workers. Every value is local and synthetic.
+  "name": "uts-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "UTS_ENVIRONMENT": "development",
+    "DO_JURISDICTION": "none",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  // The internal entrypoint as the development feed Worker binds it, and as a caller it refuses.
+  "services": [
+    {
+      "binding": "FEED_SIGNER_KEYS",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+      "props": { "caller": "uts-feed-local" },
+    },
+    {
+      "binding": "OTHER_SIGNER_KEYS",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+      "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "PROPLESS_SIGNER_KEYS",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+    },
+  ],
+}

@@ -561,7 +561,7 @@ describe('getConfig', () => {
 
     await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
       analysisModelSlug: 'analysis-model',
-      remediationModelSlug: 'kilo-auto/balanced',
+      remediationModelSlug: 'kilo-auto/efficient',
     });
   });
 });
@@ -966,7 +966,7 @@ describe('saveConfig', () => {
       expect.objectContaining({
         config: expect.objectContaining({
           analysis_model_slug: 'analysis-model',
-          remediation_model_slug: 'kilo-auto/balanced',
+          remediation_model_slug: 'kilo-auto/efficient',
         }),
       })
     );

@@ -155,8 +155,6 @@ export function isLocalCodeReviewDevelopmentEnabled(): boolean {
   );
 }
 
-if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
-
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
 );

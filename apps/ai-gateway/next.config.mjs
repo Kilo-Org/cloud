@@ -7,6 +7,13 @@ const monorepoRoot = resolve(import.meta.dirname, '../..');
 const nextConfig = {
   poweredByHeader: false,
 
+  // Inlined at build time, so no request or runtime variable can change it: the
+  // gateway authenticates by bearer token only and never reads the NextAuth
+  // session cookie (packages/web-shared/src/lib/user/server.ts).
+  env: {
+    KILO_BROWSER_SESSIONS: 'disabled',
+  },
+
   // Both values MUST be set to the monorepo root and kept in sync; see
   // apps/web/next.config.mjs. The routes are served from packages/web-shared.
   outputFileTracingRoot: monorepoRoot,

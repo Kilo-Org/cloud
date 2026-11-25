@@ -100,7 +100,6 @@ import {
   LINKEDIN_CLIENT_SECRET,
   WORKOS_API_KEY,
   WORKOS_CLIENT_ID,
-  NEXTAUTH_SECRET,
   NEXTAUTH_URL,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
@@ -111,6 +110,7 @@ import {
   APPLE_KEY_ID,
   APPLE_PRIVATE_KEY,
 } from '@kilocode/web-shared/lib/config.server';
+import { NEXTAUTH_SECRET } from '@/lib/web-config.server';
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';

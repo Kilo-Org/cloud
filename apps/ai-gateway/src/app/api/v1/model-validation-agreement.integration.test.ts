@@ -9,11 +9,6 @@ jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
   cookies: jest.fn(),
 }));
-jest.mock('next-auth', () => ({
-  __esModule: true,
-  ...jest.requireActual('next-auth'),
-  getServerSession: jest.fn(async () => null),
-}));
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual('@sentry/nextjs'),
   captureException: jest.fn(),

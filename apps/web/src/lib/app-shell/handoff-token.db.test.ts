@@ -1,8 +1,13 @@
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
+import { NextRequest } from 'next/server';
 import { app_shell_handoff_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { GET as handoffRoute } from '@/app/(app-shell)/app-shell/handoff/route';
+import { APP_SHELL_SESSION_COOKIE } from './session';
+import { APP_SHELL_EXPIRED_PATH } from './shell-paths';
 import {
   cleanupExpiredAppShellHandoffTokens,
   consumeAppShellHandoff,
@@ -11,11 +16,20 @@ import {
 
 const createdUserIds: string[] = [];
 
-async function mintHandoff(targetPath: string) {
-  const user = await insertTestUser();
+async function mintHandoff(targetPath: string, webSessionPepper: string | null = null) {
+  const user = await insertTestUser({ web_session_pepper: webSessionPepper });
   createdUserIds.push(user.id);
-  const token = await createAppShellHandoff({ userId: user.id, targetPath });
+  const token = await createAppShellHandoff({
+    userId: user.id,
+    targetPath,
+  });
   return { token, userId: user.id };
+}
+
+function handoffRequest(token: string): NextRequest {
+  const url = new URL('https://kilo.example/app-shell/handoff');
+  url.searchParams.set('token', token);
+  return new NextRequest(url);
 }
 
 describe('app shell hand-off tokens', () => {
@@ -31,7 +45,7 @@ describe('app shell hand-off tokens', () => {
     const { token, userId } = await mintHandoff('/app-shell/github-app');
 
     const first = await consumeAppShellHandoff(token);
-    expect(first).toEqual({ userId, targetPath: '/app-shell/github-app' });
+    expect(first).toEqual({ userId, targetPath: '/app-shell/github-app', webSessionPepper: null });
 
     // A replay — a second browser, or a refreshed tab — gets nothing.
     await expect(consumeAppShellHandoff(token)).resolves.toBeNull();
@@ -41,6 +55,58 @@ describe('app shell hand-off tokens', () => {
       .from(app_shell_handoff_tokens)
       .where(eq(app_shell_handoff_tokens.kilo_user_id, userId));
     expect(row?.consumed_at).not.toBeNull();
+  });
+
+  it('consumes a token while the account keeps the pepper it was minted under', async () => {
+    const { token, userId } = await mintHandoff('/app-shell/github-app', 'pepper-at-mint');
+
+    await expect(consumeAppShellHandoff(token)).resolves.toEqual({
+      userId,
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: 'pepper-at-mint',
+    });
+  });
+
+  it('refuses a token minted before a web-session revocation', async () => {
+    const { token, userId } = await mintHandoff('/app-shell/github-app', 'pepper-at-mint');
+
+    // Browser sign-out, admin sign-out and Apple notifications rotate the
+    // pepper without deleting the hand-off row.
+    await revokeWebSessions(userId);
+
+    await expect(consumeAppShellHandoff(token)).resolves.toBeNull();
+    const [row] = await db
+      .select({ consumedAt: app_shell_handoff_tokens.consumed_at })
+      .from(app_shell_handoff_tokens)
+      .where(eq(app_shell_handoff_tokens.kilo_user_id, userId));
+    expect(row).toEqual({ consumedAt: null });
+  });
+
+  it('refuses a token minted under no pepper once the account has one', async () => {
+    const { token, userId } = await mintHandoff('/app-shell/github-app');
+
+    await revokeWebSessions(userId);
+
+    await expect(consumeAppShellHandoff(token)).resolves.toBeNull();
+  });
+
+  it('sends a hand-off revoked by a browser sign-out to the expired page', async () => {
+    const { token, userId } = await mintHandoff('/app-shell/github-app', 'pepper-at-mint');
+    await revokeWebSessions(userId);
+
+    const response = await handoffRoute(handoffRequest(token));
+
+    expect(response.headers.get('location')).toBe(APP_SHELL_EXPIRED_PATH);
+    expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)).toBeUndefined();
+  });
+
+  it('opens the shell from a hand-off no revocation has touched', async () => {
+    const { token } = await mintHandoff('/app-shell/github-app', 'pepper-at-mint');
+
+    const response = await handoffRoute(handoffRequest(token));
+
+    expect(response.headers.get('location')).toBe('/app-shell/github-app');
+    expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)?.value).toEqual(expect.any(String));
   });
 
   it('refuses a token whose expiry has passed', async () => {

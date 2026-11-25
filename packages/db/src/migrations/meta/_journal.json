@@ -2661,6 +2661,13 @@
       "when": 1795635336986,
       "tag": "0379_sign_in_method_change_code_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 380,
+      "version": "7",
+      "when": 1795638118058,
+      "tag": "0380_app_shell_handoff_web_session_pepper",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,15 @@ const TokensSchema = z.object({
    * Required when the request carries a live pending link.
    */
   add_pending_link: z.boolean().optional(),
+  /**
+   * The code emailed for adding the pending link, and its challenge. Required
+   * to add a pending link to an existing account.
+   */
+  pending_link_code: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
+  pending_link_challenge_id: z.uuid().optional(),
 });
 
 /** The HTTP status each approval refusal answers with. A refusal missing here is a bug, not a 500. */
@@ -33,6 +42,9 @@ const APPROVAL_REFUSAL_STATUS: Partial<Record<DeviceAuthRefusalCode, number>> = 
   [DEVICE_AUTH_REFUSAL_CODES.requestNotPending]: 409,
   [DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch]: 409,
   [DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired]: 409,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid]: 400,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked]: 429,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired]: 403,
 };
 
 export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
@@ -41,7 +53,8 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
     return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
   }
 
-  const { user, authFailedResponse } = await getUserFromSessionForCredentialIssuance();
+  const session = await getUserFromSessionForCredentialIssuance();
+  const { user, authFailedResponse } = session;
 
   if (authFailedResponse) {
     return authFailedResponse;
@@ -60,12 +73,24 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
     code,
     confirmed_client_id: confirmedClientId,
     add_pending_link: addPendingLink,
+    pending_link_code: pendingLinkCode,
+    pending_link_challenge_id: pendingLinkChallengeId,
   } = validation.data;
 
   try {
     await approveDeviceAuthRequest(code, user.id, {
       ...(confirmedClientId ? { confirmedClientId } : {}),
       ...(addPendingLink !== undefined ? { addPendingLink } : {}),
+      ...(addPendingLink
+        ? {
+            pendingLinkProof: {
+              email: user.google_user_email,
+              webSessionId: session.webSessionId,
+              ...(pendingLinkCode ? { code: pendingLinkCode } : {}),
+              ...(pendingLinkChallengeId ? { challengeId: pendingLinkChallengeId } : {}),
+            },
+          }
+        : {}),
     });
   } catch (error) {
     if (error instanceof DeviceAuthRefusalError) {

@@ -78,7 +78,6 @@ type TestBindings = {
     newUniqueId: ReturnType<typeof vi.fn>;
   };
   DIRECT_INGEST_PERCENT: string;
-  DIRECT_INGEST_USER_IDS: string;
   DIRECT_INGEST_MAX_BYTES: string;
   SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_TOKEN_MIN_IAT: string;
@@ -101,7 +100,6 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
       newUniqueId: vi.fn(),
     },
     DIRECT_INGEST_PERCENT: '0',
-    DIRECT_INGEST_USER_IDS: '',
     DIRECT_INGEST_MAX_BYTES: '4194304',
     SESSION_SHARE_JWT_SECRET_PROD: {
       get: vi.fn(async () => 'session-share-secret-for-tests-32-bytes'),
@@ -126,7 +124,7 @@ function makeApiApp(options?: { deletionAudience?: boolean }) {
 }
 
 function directIngestEnv(overrides: Partial<TestBindings> = {}) {
-  return makeTestEnv({ DIRECT_INGEST_USER_IDS: 'usr_test', ...overrides });
+  return makeTestEnv({ DIRECT_INGEST_PERCENT: '100', ...overrides });
 }
 
 function ingestRequest(body: string, contentLength = new TextEncoder().encode(body).byteLength) {
@@ -1246,7 +1244,7 @@ describe('api routes', () => {
 
     it.each([
       ['invalid config', { DIRECT_INGEST_PERCENT: 'invalid' }, 'gate_config'],
-      ['percent miss', { DIRECT_INGEST_USER_IDS: '' }, 'gate_percent'],
+      ['percent miss', {}, 'gate_percent'],
     ] as const)('uses the legacy path for %s', async (_name, overrides, reason) => {
       const { app, ingest } = prepareIngestRoute();
       const env = makeTestEnv(overrides);

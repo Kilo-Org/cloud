@@ -23,21 +23,21 @@ The meter does not initiate payments. The separate $1 model preflight, $3 capaci
    Cloud Agent payer in shadow mode until the secret exists. Personal and organization enrollment remain independent.
    Gastown retains its existing list semantics. Leave the Gastown service and payer settings unchanged.
 
-   A merge to main deploys the meter automatically (`deploy-production.yml`). When the deployed Worker still has
-   `CONTAINER_BILLING_CLOUD_AGENT_USER_IDS` as a plain variable, move it to a secret in this order:
+   A merge to main deploys the meter automatically (`deploy-production.yml`). `CONTAINER_BILLING_CLOUD_AGENT_USER_IDS`
+   is already a secret in production. To move another checked-in variable to a secret, use this order:
 
    1. Before merging the change that removes the variable from `wrangler.jsonc`, open the Cloudflare dashboard:
-      Workers & Pages, `container-usage-meter`, Settings, Variables and Secrets. Change the type of
-      `CONTAINER_BILLING_CLOUD_AGENT_USER_IDS` to Secret and keep its value. Secrets survive later deploys.
+      Workers & Pages, `container-usage-meter`, Settings, Variables and Secrets. Change the variable's type to Secret
+      and keep its value. Secrets survive later deploys.
       `wrangler secret put` cannot do this step: it fails with error 10053 while a plain variable of the same name exists.
    2. Merge right after the conversion. Confirm no other meter deploy from main runs in between: main still declares
       the plain variable, which conflicts with the new secret.
-   3. Alternative: merge first and accept a short shadow gap. Copy the current value from the dashboard before merging.
+   3. Alternative: merge first and accept a short gap. Copy the current value from the dashboard before merging.
       After the automatic deploy removes the plain variable, run
-      `wrangler secret put CONTAINER_BILLING_CLOUD_AGENT_USER_IDS --name container-usage-meter` with that value.
-      Cloud Agent intervals opened during the gap stay in shadow mode.
-   4. Verify on a new isolate after the deploy: `container_billing_configuration` logs `enabled: true` with both
-      Cloud Agent enrollment booleans true, and no `container_billing_configuration_invalid` event follows.
+      `wrangler secret put <NAME> --name container-usage-meter` with that value.
+      For a Cloud Agent payer list, intervals opened during the gap stay in shadow mode.
+   4. Verify on a new isolate after the deploy: `container_billing_configuration` logs `enabled: true` with the
+      expected enrollment booleans, and no `container_billing_configuration_invalid` event follows.
 7. Read one `container_billing_configuration` event from a new isolate. Confirm service names, enrollment booleans and warning threshold.
    Investigate `container_billing_configuration_invalid` before activation. Its field names identify the invalid configuration; logs contain no payer IDs.
 8. Verify a paid start, a heartbeat and a controlled stop. Compare the interval, segments, charge rows and wallet delta.

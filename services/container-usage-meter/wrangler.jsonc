@@ -30,9 +30,9 @@
   // CONTAINER_BILLING_CLOUD_AGENT_USER_IDS (personal Cloud Agent payers) is a
   // Worker secret, not a checked-in var. Both Cloud Agent payer lists are
   // validated together: a deploy without the secret leaves every Cloud Agent
-  // payer in shadow mode. Merging to main deploys this Worker, so convert an
-  // existing plain var to a secret in the dashboard before merging; `wrangler
-  // secret put` fails while a plain var of the same name exists. See RUNBOOK.md.
+  // payer in shadow mode. Merging to main deploys this Worker, and `wrangler
+  // secret put` fails while a plain var of the same name exists, so moving
+  // another var to a secret follows the order in RUNBOOK.md.
   "triggers": {
     "crons": ["*/5 * * * *"],
   },

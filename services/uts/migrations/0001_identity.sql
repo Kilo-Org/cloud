@@ -275,7 +275,9 @@ CREATE INDEX device_sessions_account_idx ON uts.device_sessions (account_id)
 -- sign-in or a passkey check. A pass lasts at most 10 minutes and is consumed by one action.
 -- Each table that records a gated action carries that action as a constant `gate_pass_action`
 -- column, a foreign key on (pass, account, action) and a unique pass id, so a pass serves only
--- its own account, its own action and one row.
+-- its own account, its own action and one row. A pass is never swept while a credential refers to
+-- it: those foreign keys refuse the delete, and an org bot key lets go of its pass only once it is
+-- flagged, kept or revoked. Deleting the account deletes its passes with its credentials.
 CREATE TABLE uts.gate_passes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
@@ -673,18 +675,21 @@ CREATE TABLE uts.personal_access_tokens (
 );
 CREATE INDEX personal_access_tokens_account_idx ON uts.personal_access_tokens (account_id);
 
--- Org bot keys: `kilo_bot_` values owned by the organization. `created_by` names the member who
--- created the key. Member removal flags the member's keys; a flagged key stops working 7 days
--- after `flagged_at` unless an org admin keeps it (design section 5.8).
+-- Org bot keys: `kilo_bot_` values owned by the organization. `created_by` records the member who
+-- created the key, as history: it has no foreign key and outlives that account. Member removal, or
+-- deletion of the creator's account (`uts.flag_bot_keys_of_deleted_account`), flags the member's
+-- keys; a flagged key stops working 7 days after `flagged_at` unless an org admin keeps it (design
+-- section 5.8).
 --
--- The key outlives the creator's account: deleting the account deletes its gate passes, and the
--- foreign key then sets `created_by` and `gate_pass_id` to NULL together. `gate_pass_action` is a
--- constant with a CHECK rather than a generated column, because PostgreSQL refuses ON DELETE
--- SET NULL on a foreign key that contains a generated column.
+-- Every new key needs a tier B gate pass of its creator (`uts.require_bot_key_gate_pass`). The
+-- pass is deleted with the creator's account, and the foreign key then clears `gate_pass_id` only;
+-- `org_bot_keys_gate_pass_shape` refuses that for a key that is still active, so a pass is never
+-- swept from under a live key. `gate_pass_action` is a constant with a CHECK rather than a generated
+-- column, because PostgreSQL refuses ON DELETE SET NULL on a foreign key with a generated column.
 CREATE TABLE uts.org_bot_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id uuid NOT NULL,
-  created_by uts.account_id,
+  created_by uts.account_id NOT NULL,
   name text NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
   token_hash uts.sha256 NOT NULL,
   last_four text NOT NULL CHECK (last_four ~ '^[A-Za-z0-9_-]{4}$'),
@@ -707,9 +712,11 @@ CREATE TABLE uts.org_bot_keys (
   -- The pass belongs to the member who created the key.
   CONSTRAINT org_bot_keys_gate_pass_fkey FOREIGN KEY (gate_pass_id, created_by, gate_pass_action)
     REFERENCES uts.gate_passes (id, account_id, action)
-    ON DELETE SET NULL (gate_pass_id, created_by),
-  -- Both are NULL only once the creator's account is gone.
-  CONSTRAINT org_bot_keys_creator_shape CHECK ((created_by IS NULL) = (gate_pass_id IS NULL)),
+    ON DELETE SET NULL (gate_pass_id),
+  -- Only a flagged, kept or revoked key can lose its pass.
+  CONSTRAINT org_bot_keys_gate_pass_shape CHECK (
+    gate_pass_id IS NOT NULL OR flagged_at IS NOT NULL OR revoked_at IS NOT NULL
+  ),
   CONSTRAINT org_bot_keys_lifetime CHECK (
     expires_at > created_at AND expires_at <= created_at + interval '365 days'
   ),
@@ -727,6 +734,44 @@ CREATE TABLE uts.org_bot_keys (
 CREATE INDEX org_bot_keys_org_idx ON uts.org_bot_keys (org_id);
 CREATE INDEX org_bot_keys_creator_idx ON uts.org_bot_keys (org_id, created_by)
   WHERE status IN ('active', 'kept');
+
+-- No new key skips the tier B gate: a CHECK cannot tell an insert from the later loss of the pass,
+-- so this refuses the insert itself.
+CREATE FUNCTION uts.require_bot_key_gate_pass() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.gate_pass_id IS NULL THEN
+    RAISE EXCEPTION 'a new org bot key needs a gate pass'
+      USING ERRCODE = 'not_null_violation', TABLE = 'org_bot_keys', COLUMN = 'gate_pass_id';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER org_bot_keys_require_gate_pass
+  BEFORE INSERT ON uts.org_bot_keys
+  FOR EACH ROW EXECUTE FUNCTION uts.require_bot_key_gate_pass();
+
+-- Deleting an account flags the active bot keys it created, as member removal does (design
+-- section 5.8). It runs before the delete, so when the cascade removes the account's gate passes,
+-- every live key of that account is already flagged and may lose its pass.
+CREATE FUNCTION uts.flag_bot_keys_of_deleted_account() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  UPDATE uts.org_bot_keys
+  SET status = 'flagged', flagged_at = now()
+  WHERE created_by = OLD.id AND status = 'active';
+  RETURN OLD;
+END
+$$;
+CREATE INDEX org_bot_keys_active_creator_idx ON uts.org_bot_keys (created_by)
+  WHERE status = 'active';
+CREATE TRIGGER accounts_flag_bot_keys
+  BEFORE DELETE ON uts.accounts
+  FOR EACH ROW EXECUTE FUNCTION uts.flag_bot_keys_of_deleted_account();
 
 -- CI trust policies: a GitHub OIDC subject that UTS exchanges for 1-hour tokens (design section
 -- 5.3). Creation needs a tier B gate pass.

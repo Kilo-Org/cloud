@@ -3,7 +3,6 @@ import {
   isDelegatedBillingProvider,
   isPromotionalModelProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
-import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
@@ -18,6 +17,7 @@ import {
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import { z } from 'zod';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -174,7 +174,7 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
-    id: usageContext.usageId ?? randomUUID(),
+    id: usageContext.usageId ?? createUsageId(),
     kilo_user_id: usageContext.kiloUserId,
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,

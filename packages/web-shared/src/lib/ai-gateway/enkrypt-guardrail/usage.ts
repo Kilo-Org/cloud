@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { randomUUID } from 'crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { after } from 'next/server';
 import { eq, inArray } from 'drizzle-orm';
 import {
@@ -95,7 +95,7 @@ export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promi
     // them still accepts the write.
     ...(guardrail === 'output' ? { guardrail } : {}),
     ...(firstDetector ? { detectorsFired: [firstDetector, ...otherDetectors] } : {}),
-    id: randomUUID(),
+    id: createUsageId(),
     occurredAt: new Date().toISOString(),
   };
   const outcome = await enqueueWithinRequestLifetime(usageWrite);

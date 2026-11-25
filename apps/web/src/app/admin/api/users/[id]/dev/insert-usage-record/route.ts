@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -53,7 +53,7 @@ export const POST = auditedAdminRoute(
     addAdminAuditMetadata({ dollarAmount });
 
     const cost_mUsd = Math.ceil(dollarAmount * 1_000_000);
-    const id = randomUUID();
+    const id = createUsageId();
     const created_at = new Date().toISOString();
 
     const coreUsageFields: MicrodollarUsage = {

@@ -74,11 +74,21 @@ async function advance(seconds: number): Promise<void> {
   await vi.advanceTimersByTimeAsync(seconds * 1000);
 }
 
+/** Lets a cold read run through its first-load window and returns what it rejected with. */
+async function failureWithin(read: Promise<unknown>, seconds: number): Promise<unknown> {
+  const tracked = track(read);
+  await advance(seconds);
+  expect(tracked.state.settled).toBe(true);
+  return tracked.promise.catch((err: unknown) => err);
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ now: 1_700_000_000_000 });
+  vi.spyOn(Math, 'random').mockReturnValue(0);
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -169,11 +179,17 @@ describe('createSecrets', () => {
     expect(read.state.settled).toBe(true);
     expect(await read.promise).toBe('ae-token');
     expect((await secrets.snapshot()).stale).toBe(true);
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    await advance(4.9);
+    expect(await secrets.get(SECRET, ctx)).toBe('ae-token');
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    await advance(0.1);
+    expect(await secrets.get(SECRET, ctx)).toBe('ae-token');
+    expect(await secrets.get(SECRET, ctx)).toBe('ae-token');
     expect(transport).toHaveBeenCalledTimes(3);
     expect(transport.mock.calls[2][0]).toEqual({ ifNoneMatch: ETAG_1 });
-
-    expect(await secrets.get(SECRET)).toBe('ae-token');
-    expect(transport).toHaveBeenCalledTimes(3);
   });
 
   it('keeps a reader with no bundle waiting for 25 seconds while STS hangs, then fails retryable', async () => {
@@ -188,7 +204,94 @@ describe('createSecrets', () => {
     const error = await read.promise.catch((err: unknown) => err);
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
-    expect(transport).toHaveBeenCalledTimes(5);
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    const late = track(secrets.get(SECRET));
+    await advance(5);
+    expect(await late.promise.catch((err: unknown) => err)).toMatchObject({ retryable: true });
+    expect(transport).toHaveBeenCalledTimes(3);
+
+    const fast = track(secrets.get(SECRET));
+    await advance(0);
+    expect(fast.state.settled).toBe(true);
+    expect(transport).toHaveBeenCalledTimes(3);
+  });
+
+  it('widens the gap between attempts while STS keeps failing', async () => {
+    const calledAt: number[] = [];
+    const transport = vi.fn<Transport>(async () => {
+      calledAt.push(Date.now());
+      if (calledAt.length === 1) return ok();
+      throw new Error('STS down');
+    });
+    const secrets = createSecrets(transport);
+
+    for (let second = 0; second < 1100; second++) {
+      expect(await secrets.get(SECRET)).toBe('ae-token');
+      await advance(1);
+    }
+
+    const gaps = calledAt.slice(1).map((at, index) => (at - calledAt[index]) / 1000);
+    expect(gaps).toEqual([240, 5, 10, 20, 40, 80, 160, 240, 240]);
+  });
+
+  it('spreads retries by up to a quarter of the step', async () => {
+    vi.mocked(Math.random).mockReturnValue(1);
+    const transport = vi.fn<Transport>();
+    transport.mockResolvedValueOnce(ok()).mockRejectedValue(new Error('STS down'));
+    const secrets = createSecrets(transport);
+
+    await secrets.get(SECRET);
+    await advance(240);
+    await secrets.get(SECRET);
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    await advance(3.7);
+    await secrets.get(SECRET);
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    await advance(0.05);
+    await secrets.get(SECRET);
+    expect(transport).toHaveBeenCalledTimes(3);
+  });
+
+  it('bounds the calls of a cold isolate while STS hangs for 10 minutes', async () => {
+    const transport = vi.fn<Transport>(hung);
+    const secrets = createSecrets(transport);
+
+    const reads: { state: { settled: boolean } }[] = [];
+    for (let second = 0; second < 600; second++) {
+      reads.push(track(secrets.get(SECRET)));
+      await advance(1);
+    }
+
+    expect(transport).toHaveBeenCalledTimes(8);
+    expect(reads.slice(0, 595).every(read => read.state.settled)).toBe(true);
+  });
+
+  it('starts the backoff over after a success', async () => {
+    const calledAt: number[] = [];
+    const answers: (BundleResult | Error)[] = [
+      ok(),
+      new Error('STS down'),
+      new Error('STS down'),
+      ok(ETAG_2, 'recovered-token'),
+    ];
+    const transport = vi.fn<Transport>(async () => {
+      calledAt.push(Date.now());
+      const answer = answers.shift() ?? new Error('STS down');
+      if (answer instanceof Error) throw answer;
+      return answer;
+    });
+    const secrets = createSecrets(transport);
+
+    for (let second = 0; second <= 500; second++) {
+      await secrets.get(SECRET);
+      await advance(1);
+    }
+
+    const start = calledAt[0];
+    expect(calledAt.map(at => (at - start) / 1000)).toEqual([0, 240, 245, 255, 495, 500]);
   });
 
   it('lets a first load that takes 10 seconds succeed', async () => {
@@ -200,7 +303,7 @@ describe('createSecrets', () => {
     const read = track(secrets.get(SECRET));
     await advance(5);
     expect(read.state.settled).toBe(false);
-    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport).toHaveBeenCalledTimes(1);
 
     await advance(5);
     slow.resolve(ok(ETAG_1, 'slow-token'));
@@ -280,12 +383,17 @@ describe('createSecrets', () => {
     const error = await secrets.get(SECRET).catch((err: unknown) => err);
     expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
 
-    await advance(29);
+    await advance(20);
     expect(await secrets.get(SECRET).catch((err: unknown) => err)).toBe(error);
     expect(transport).toHaveBeenCalledTimes(1);
 
-    await advance(2);
+    await advance(9);
+    expect(await secrets.get(SECRET).catch((err: unknown) => err)).toBe(error);
+    expect(transport).toHaveBeenCalledTimes(1);
+
+    await advance(1);
     expect(await secrets.get(SECRET)).toBe('ae-token');
+    expect(transport).toHaveBeenCalledTimes(2);
   });
 
   it('honours retryAfterSeconds before calling STS again', async () => {
@@ -388,21 +496,26 @@ describe('createSecrets', () => {
     const read = track(secrets.get(SECRET, ctx));
     await advance(5);
     expect(await read.promise).toBe('new-token');
-    expect(transport).toHaveBeenCalledTimes(5);
+    expect(transport).toHaveBeenCalledTimes(4);
     lateConfirmation.resolve(denied());
     await advance(0);
     expect(await secrets.get(SECRET)).toBe('new-token');
   });
 
-  it('reports a rejected transport as a retryable failure', async () => {
+  it('retries a rejected transport inside the first-load window, then fails retryable', async () => {
     const transport = vi.fn<Transport>(async () => {
       throw new Error('binding threw');
     });
     const secrets = createSecrets(transport);
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const read = track(secrets.get(SECRET));
+    await advance(14.9);
+    expect(read.state.settled).toBe(false);
+    await advance(0.1);
+    const error = await read.promise.catch((err: unknown) => err);
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
+    expect(transport).toHaveBeenCalledTimes(3);
   });
 
   it('rejects a bundle that does not match the contract', async () => {
@@ -411,7 +524,7 @@ describe('createSecrets', () => {
     );
     const secrets = createSecrets(transport);
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const error = await failureWithin(secrets.get(SECRET), 25);
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ retryable: true });
   });

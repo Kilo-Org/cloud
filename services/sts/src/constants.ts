@@ -1,6 +1,9 @@
 /** Refresher cadence: one read of each manager folder every four minutes (design 4.4). */
 export const REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 
+/** A bundle older than two refresh intervals is served marked stale, whatever its flag says. */
+export const STALE_AFTER_MS = 2 * REFRESH_INTERVAL_MS;
+
 /**
  * A stored manager read this young fills an empty bundle object without a new read. One minute
  * above the cadence covers an alarm that runs a little late.
@@ -15,6 +18,13 @@ export const WEBHOOK_MAX_SKEW_MS = 5 * 60 * 1000;
 
 /** A webhook body above this size is refused before any signature work. */
 export const WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
+
+/**
+ * A Worker isolate reloads the webhook secret from the refresher at most this often, after a
+ * signature that fails or a load that failed, so a forged flood costs at most one refresher hop
+ * per isolate per minute.
+ */
+export const WEBHOOK_KEY_RELOAD_MS = 60 * 1000;
 
 /** First retry after a failed manager read; each further failure doubles it, up to the cap. */
 export const BACKOFF_BASE_MS = 15 * 1000;
@@ -58,3 +68,6 @@ export const MANAGER_RETRY_AFTER_SECONDS = 60;
 
 /** A provider key set or discovery document is unreachable: the caller retries after this. */
 export const VERIFIER_RETRY_AFTER_SECONDS = 30;
+
+/** A bundle object call failed (an error or a reset): the caller retries after this. */
+export const BUNDLE_OBJECT_RETRY_AFTER_SECONDS = 30;

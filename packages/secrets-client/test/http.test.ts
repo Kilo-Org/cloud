@@ -54,6 +54,13 @@ async function advance(seconds: number): Promise<void> {
   await vi.advanceTimersByTimeAsync(seconds * 1000);
 }
 
+/** Lets a cold read run through its first-load window and returns what it rejected with. */
+async function failureOf(read: Promise<unknown>): Promise<unknown> {
+  const settled = read.catch((err: unknown) => err);
+  await advance(25);
+  return settled;
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW });
 });
@@ -152,13 +159,13 @@ describe('createHttpSecrets', () => {
     expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
     expect(fetchFn).toHaveBeenCalledTimes(1);
 
-    await advance(29);
+    await advance(20);
     expect(await secrets.get(SECRET).catch((err: unknown) => err)).toBeInstanceOf(
       SecretUnavailableError
     );
     expect(fetchFn).toHaveBeenCalledTimes(1);
 
-    await advance(2);
+    await advance(11);
     expect(await secrets.get(SECRET)).toBe('recovered-token');
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
@@ -193,7 +200,7 @@ describe('createHttpSecrets', () => {
   it('rejects an empty identity token as retryable', async () => {
     const { fetchFn, secrets } = setup([], () => '');
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const error = await failureOf(secrets.get(SECRET));
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ retryable: true });
     expect(fetchFn).not.toHaveBeenCalled();
@@ -202,7 +209,7 @@ describe('createHttpSecrets', () => {
   it('rejects a body that does not match the contract', async () => {
     const { secrets } = withToken([json({ status: 'ok', workload: 'o11y' })]);
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const error = await failureOf(secrets.get(SECRET));
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ retryable: true });
   });
@@ -210,7 +217,7 @@ describe('createHttpSecrets', () => {
   it('rejects a status that does not match its body', async () => {
     const { secrets } = withToken([json(ok(), 500)]);
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const error = await failureOf(secrets.get(SECRET));
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ retryable: true });
   });
@@ -218,7 +225,7 @@ describe('createHttpSecrets', () => {
   it('rejects a 304 to a request that sent no ETag', async () => {
     const { secrets } = withToken([new Response(null, { status: 304 })]);
 
-    const error = await secrets.get(SECRET).catch((err: unknown) => err);
+    const error = await failureOf(secrets.get(SECRET));
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ retryable: true });
   });

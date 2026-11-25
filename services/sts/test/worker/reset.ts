@@ -29,3 +29,7 @@ export async function resetBundleObject(stub: DurableObjectStub): Promise<void> 
 export async function resetRefresherObject(stub: DurableObjectStub): Promise<void> {
   await resetObject(stub, ['manager_folder', 'refresher_key', 'policy_state', 'refresher_state']);
 }
+
+export async function resetDenialObject(stub: DurableObjectStub): Promise<void> {
+  await resetObject(stub, ['denial_window']);
+}

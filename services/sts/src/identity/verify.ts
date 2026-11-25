@@ -20,9 +20,20 @@ const DiscoverySchema = z.object({
 export type IdentityProvider = 'fly' | 'github';
 export type DeniedReason = 'identity_rejected' | 'unknown_workload' | 'environment_mismatch';
 
+/**
+ * Who a refused token came from, set only after its signature, issuer, audience and lifetime
+ * verified. `actor` is the policy's workload when the token named one, otherwise the provider's
+ * stable id; `claims` are the provider's stable ids, never the token.
+ */
+export type VerifiedSubject = {
+  provider: IdentityProvider;
+  actor: string;
+  claims: Record<string, string>;
+};
+
 export type VerifyOutcome =
   | { status: 'verified'; workload: WorkloadName; provider: IdentityProvider }
-  | { status: 'denied'; reason: DeniedReason }
+  | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
   | { status: 'unavailable' };
 
@@ -62,6 +73,35 @@ function isKnownProviderIssuer(issuer: string): boolean {
     issuer.startsWith(FLY_ISSUER_PREFIX) &&
     /^[a-z0-9][a-z0-9-]{0,62}$/.test(issuer.slice(FLY_ISSUER_PREFIX.length))
   );
+}
+
+const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
+  github: [
+    'repository_id',
+    'repository_owner_id',
+    'repository',
+    'environment',
+    'ref',
+    'event_name',
+  ],
+  fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
+};
+
+function verifiedSubject(
+  provider: IdentityProvider,
+  payload: JWTPayload,
+  workload: string | null
+): VerifiedSubject {
+  const claims: Record<string, string> = {};
+  for (const name of STABLE_CLAIMS[provider]) {
+    const value = claim(payload, name);
+    if (value !== null) claims[name] = value.slice(0, 200);
+  }
+  const providerId =
+    provider === 'github'
+      ? `github:${claims.repository_id ?? 'unknown'}`
+      : `fly:${claims.org_id ?? 'unknown'}/${claims.app_id ?? 'unknown'}`;
+  return { provider, actor: workload ?? providerId, claims };
 }
 
 function isPrivilegedEvent(event: string | null): boolean {
@@ -174,7 +214,13 @@ export class IdentityVerifier {
       return { status: 'denied', reason: 'identity_rejected' };
     }
 
-    let environmentMismatch = false;
+    const provider: IdentityProvider = issuer === GITHUB_ISSUER ? 'github' : 'fly';
+    const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
+      status: 'denied',
+      reason,
+      subject: verifiedSubject(provider, payload, workload),
+    });
+    let mismatchedWorkload: string | null = null;
     for (const policy of candidates) {
       const identity = policy.identity;
       switch (identity.kind) {
@@ -184,7 +230,7 @@ export class IdentityVerifier {
           if (claim(payload, 'org_name') !== identity.org) continue;
           if (claim(payload, 'app_name') !== identity.app) continue;
           if (!policy.environments.includes(this.options.environment)) {
-            environmentMismatch = true;
+            mismatchedWorkload = policy.workload;
             continue;
           }
           return { status: 'verified', workload: policy.workload, provider: 'fly' };
@@ -196,17 +242,17 @@ export class IdentityVerifier {
           // rejection, not an unknown workload.
           const environment = claim(payload, 'environment');
           if (identity.environments && !identity.environments.includes(environment ?? '')) {
-            return { status: 'denied', reason: 'identity_rejected' };
+            return rejected(policy.workload, 'identity_rejected');
           }
           if (identity.refs && !identity.refs.includes(claim(payload, 'ref') ?? '')) {
-            return { status: 'denied', reason: 'identity_rejected' };
+            return rejected(policy.workload, 'identity_rejected');
           }
           const event = claim(payload, 'event_name');
           if (isPrivilegedEvent(event) && !identity.allowedEvents?.some(name => name === event)) {
-            return { status: 'denied', reason: 'identity_rejected' };
+            return rejected(policy.workload, 'identity_rejected');
           }
           if (!policy.environments.includes(this.options.environment)) {
-            environmentMismatch = true;
+            mismatchedWorkload = policy.workload;
             continue;
           }
           return { status: 'verified', workload: policy.workload, provider: 'github' };
@@ -216,9 +262,8 @@ export class IdentityVerifier {
       }
     }
 
-    return {
-      status: 'denied',
-      reason: environmentMismatch ? 'environment_mismatch' : 'unknown_workload',
-    };
+    return mismatchedWorkload !== null
+      ? rejected(mismatchedWorkload, 'environment_mismatch')
+      : rejected(null, 'unknown_workload');
   }
 }

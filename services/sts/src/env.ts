@@ -1,6 +1,7 @@
 import { StsEnvironmentSchema, type StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 import type { BundleDO } from './dos/BundleDO';
+import type { DenialDO } from './dos/DenialDO';
 import type { RefresherDO } from './dos/RefresherDO';
 import type { SignerDO } from './dos/SignerDO';
 
@@ -51,6 +52,7 @@ export type Env = {
   STS_BUNDLE_DO: DurableObjectNamespace<BundleDO>;
   STS_REFRESHER_DO: DurableObjectNamespace<RefresherDO>;
   STS_SIGNER_DO: DurableObjectNamespace<SignerDO>;
+  STS_DENIAL_DO: DurableObjectNamespace<DenialDO>;
   AUDIT_QUEUE: Queue;
 };
 

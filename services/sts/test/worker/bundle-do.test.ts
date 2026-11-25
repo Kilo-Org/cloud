@@ -144,6 +144,25 @@ describe('bundle delivery', () => {
     expect(notModified).toMatchObject({ status: 'not_modified', stale: false });
   });
 
+  it('serves a copy older than two refresh intervals as stale, even when no read failed', async () => {
+    const stub = getBundleStub(env, config, 'o11y');
+    const bundle = await workloadBundle({ O11Y_CF_AE_API_TOKEN: { version: 1 } });
+    await stub.putBundle({
+      ...bundle,
+      fetchedAt: new Date(Date.now() - 9 * 60 * 1000).toISOString(),
+    });
+    const old = await read(stub);
+    if (old.status !== 'ok') throw new Error('expected ok');
+    expect(old.stale).toBe(true);
+    expect(await read(stub, old.etag)).toMatchObject({ status: 'not_modified', stale: true });
+
+    await stub.putBundle({
+      ...bundle,
+      fetchedAt: new Date(Date.now() - 7 * 60 * 1000).toISOString(),
+    });
+    expect(await read(stub, old.etag)).toMatchObject({ status: 'not_modified', stale: false });
+  });
+
   it('delivers a value replaced under the same version with a new ETag', async () => {
     const stub = getBundleStub(env, config, 'o11y');
     await stub.putBundle(

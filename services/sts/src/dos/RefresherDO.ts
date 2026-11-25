@@ -28,7 +28,6 @@ import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import * as schema from '../db/refresher-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { InfisicalClient, type ManagerFolder } from '../infisical/client';
-import { importWebhookKey, verifyWebhook, type WebhookOutcome } from '../infisical/webhook';
 import {
   currentPolicyHash,
   policiesFor,
@@ -98,7 +97,6 @@ export class RefresherDO extends DurableObject<Env> {
   private readonly client: InfisicalClient;
   private pendingRead: Promise<ReadOutcome> | null = null;
   private sealKey: string | null = null;
-  private webhookKey: CryptoKey | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -136,28 +134,19 @@ export class RefresherDO extends DurableObject<Env> {
     await this.scheduleAlarm(now, false);
   }
 
-  /** Verifies one Infisical webhook and, for this environment's `secrets.modified`, schedules a refresh. */
-  async receiveWebhook(body: string, signature: string | null): Promise<WebhookOutcome> {
+  /**
+   * The secret Infisical signs this environment's webhook with. The STS Worker verifies webhooks
+   * itself with it, so only a verified `secrets.modified` reaches this object.
+   */
+  async webhookSecret(): Promise<string> {
+    return this.ensureWebhookSecret();
+  }
+
+  /** Called by the Worker after it verified a `secrets.modified` webhook for this environment. */
+  async requestWebhookRefresh(): Promise<void> {
     const now = Date.now();
-    const outcome = await verifyWebhook({
-      body,
-      signature,
-      key: await this.webhookCryptoKey(),
-      now,
-      projectId: this.config.manager.projectId,
-      environmentSlug: this.config.manager.environmentSlug,
-    });
-    if (outcome.status === 'refresh') {
-      this.requestEarlyRefresh(now, WEBHOOK_MERGE_WINDOW_MS);
-      await this.scheduleAlarm(now, false);
-    } else {
-      console.warn('sts: manager webhook not acted on', {
-        environment: this.config.environment,
-        status: outcome.status,
-        reason: outcome.reason,
-      });
-    }
-    return outcome;
+    this.requestEarlyRefresh(now, WEBHOOK_MERGE_WINDOW_MS);
+    await this.scheduleAlarm(now, false);
   }
 
   /**
@@ -521,11 +510,6 @@ export class RefresherDO extends DurableObject<Env> {
     const key = createEncryptionKey();
     this.db.insert(schema.webhookKey).values({ id: 1, key, createdAt: Date.now() }).run();
     return key;
-  }
-
-  private async webhookCryptoKey(): Promise<CryptoKey> {
-    this.webhookKey ??= await importWebhookKey(this.ensureWebhookSecret());
-    return this.webhookKey;
   }
 
   /** The schedule row; a new object's first refresh is due at once. */

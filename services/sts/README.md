@@ -11,12 +11,22 @@ consumer are not part of this Worker.
   (`services: [{ binding, service: "sts", entrypoint: "SecretsBroker", props: { caller: "<own worker name>" } }]`)
   and STS authorizes on `props.caller` against `policy/*.yaml`. This is deploy-level trust: only a
   deploy right in this Cloudflare account can set `props`. The Durable Object classes
-  (`BundleDO`, `RefresherDO`, `SignerDO`) are internal: no other Worker may bind them, and the repo
+  (`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`) are internal: no other Worker may bind them, and the repo
   check in `test/repo/` fails a config that does.
 - A caller outside the account posts a provider OIDC token to `POST /v1/bundle`. STS verifies the
   token against the provider's published keys, maps the claims to the one policy that declares them,
   and answers with the bundle. A provider whose discovery document or key set cannot be fetched
-  gets `503` with `Retry-After: 30` (`unavailable`, reason `internal`), never a rejection.
+  gets `503` with `Retry-After: 30` (`unavailable`, reason `internal`), never a rejection. A
+  failed bundle object call answers the same way, over RPC and HTTP.
+- **Denials are audited** (design 4.3: STS refuses and audits any other read). A refusal of an
+  identified caller (a Worker with valid `props.caller`, or a token whose signature, issuer,
+  audience and lifetime verified) goes after the response to one `DenialDO` per environment, the
+  `sts:<environment>:denials` stream. Identical denials (same channel, reason, actor and stable
+  claims such as `repository_id`, `environment`, `ref`, `event_name`, or `org_id`, `app_id`) merge
+  per minute into one `ai.kilo.sts.bundle.denied` event with a `count`; at most 100 distinct
+  denials are kept per minute, the rest are counted in one overflow event per reason. The token
+  itself is never recorded. A token that did not verify gets one structured log line and no audit
+  row, since nothing in it can be trusted.
 - One Durable Object per environment and workload holds that workload's bundle, sealed with an
   AES-GCM key generated inside the object. A read whose ETag still matches returns `304` (with
   `X-STS-Stale` and `X-STS-Fetched-At`) and writes no audit row, only a per-minute counter; every
@@ -26,6 +36,8 @@ consumer are not part of this Worker.
 - The ETag is an HMAC-SHA256, under a second key that only the bundle object holds, over the
   workload's policy hash and every secret's manager id, version and value. A value replaced under
   the same version (a delete and recreate in Infisical) therefore reaches the workload.
+- A bundle whose `fetchedAt` is more than 8 minutes old (two refresh intervals) is served marked
+  stale, whatever its flag says, so a copy whose pushes keep failing is never served as fresh.
 - A copy built under an older policy (for example during a manager outage right after a deploy) is
   cut down to the current grants on read, with its ETag and `missing` list recomputed, so a removed
   grant is never served.
@@ -69,11 +81,11 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
 ### Internal Durable Objects
 
-`BundleDO`, `RefresherDO` and `SignerDO` are internal. Their methods skip the policy check and the
-audit row that `SecretsBroker` performs, so no other Worker may bind them: a
-`durable_objects.bindings[].script_name` of `sts`, `sts-staging` or `sts-local` in any config
-fails `test/repo/worker-configs.test.ts`, as does an STS service binding at any entrypoint other
-than `SecretsBroker`.
+`BundleDO`, `RefresherDO`, `SignerDO` and `DenialDO` are internal. Their methods skip the policy
+check and the audit row that `SecretsBroker` performs, so no other Worker may reach them: a
+`durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
+`transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
+binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`.
 
 ## Configuration
 
@@ -129,14 +141,23 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 checks the directory itself.
 
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
-`wrangler*.toml` in the repository (test fixtures excepted) with Wrangler's own parser, every env
-block included, and fails when:
+`wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
+(`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
+Ignored configs stay out: `wrangler.runtime-generated.json` and
+`.wrangler/wrangler.e2e-test.jsonc` are rendered at deploy time from a tracked `wrangler.jsonc` this
+check already reads. Each file is parsed with Wrangler's own parser, every env block and every
+`previews` block included. Every key Wrangler accepts is either modelled with a strict schema or
+listed as inert in `test/repo/worker-configs.ts`; a key in neither list fails the check, an unknown
+field inside a modelled binding fails the parse, and the suite fails when Wrangler's own schema
+gains a key nobody classified. The check fails when:
 
-- a Durable Object binding names `script_name` `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
+- any block has an `unsafe` key;
+- a Durable Object binding, workflow, tail consumer, dispatch outbound, migration transfer or export
+  transfer names `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
 - a service binding to `sts`/`sts-*` uses an entrypoint other than `SecretsBroker`, or any service
   binding targets `audit-relay`/`audit-relay-*`;
-- the top-level (production) block binds anything but `sts`, or an `<env>` block anything but
-  `sts-<env>`;
+- the top-level (production) block binds anything but `sts`, an `<env>` block anything but
+  `sts-<env>`, or a `previews` block binds STS at all (a preview runs unreviewed code);
 - `props.caller` is not the config's top-level `name`, in any block;
 - a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
   configs share a top-level `name`;
@@ -145,7 +166,14 @@ block included, and fails when:
   `kilo-audit-staging`, `sts-local` and the test config `sts-test` → `kilo-audit-local`) produces to
   a `kilo-audit*` queue, or anything but the matching `audit-relay*` deployment consumes one or
   dead-letters into one;
-- a config other than the STS, STS test or relay config deploys under one of their names.
+- anything but the matching relay deployment binds a `kilo-audit-archive*` bucket (`audit-relay` →
+  `kilo-audit-archive`, `audit-relay-staging` → `kilo-audit-archive-staging`, `audit-relay-local` →
+  `kilo-audit-archive-local`, the test config `audit-relay-test` → `kilo-audit-archive-test`), as
+  `bucket_name` or `preview_bucket_name`, or the production or staging binding lacks
+  `"jurisdiction": "eu"`;
+- a route outside the STS or relay config covers one of their hostnames;
+- a config other than the STS, STS test, relay or relay test config deploys under one of their
+  names.
 
 CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
 `wrangler*` file to this workspace).
@@ -180,9 +208,12 @@ environment in the `kilo` project, and no write.
 
 **Webhook.** One `secrets.modified` webhook per environment, scoped to that environment, of type
 General, to `https://sts.kiloapps.io/manager-webhook` (staging: `https://sts-staging.kiloapps.io/manager-webhook`),
-with a secret key (https://infisical.com/docs/documentation/platform/webhooks). STS checks
-`x-infisical-signature` (`t=<ms>;<hex HMAC-SHA256 of the body>`), refuses a timestamp more than
-5 minutes from now, and acts only on its own project and environment.
+with a secret key (https://infisical.com/docs/documentation/platform/webhooks). The STS Worker
+checks `x-infisical-signature` (`t=<ms>;<hex HMAC-SHA256 of the body>`) itself, refuses a timestamp
+more than 5 minutes from now, and acts only on its own project and environment; only a verified
+`secrets.modified` costs a refresher call. Each isolate loads the secret from the refresher once and
+reloads it at most once a minute (after a signature that fails or a load that failed), so a forged
+flood costs at most one refresher call per isolate per minute.
 
 The webhook secret is generated by STS, not stored anywhere else and not bound from the Secrets
 Store. The refresher object creates it on its first request. The break-glass owner copies it once:

@@ -1,5 +1,6 @@
 import type { Env, StsConfig } from '../env';
 import type { BundleDO } from './BundleDO';
+import type { DenialDO } from './DenialDO';
 import type { RefresherDO } from './RefresherDO';
 import type { SignerDO } from './SignerDO';
 
@@ -36,5 +37,10 @@ export function getRefresherStub(env: Env, config: StsConfig): DurableObjectStub
 
 export function getSignerStub(env: Env, config: StsConfig): DurableObjectStub<SignerDO> {
   const namespace = scoped(config, env.STS_SIGNER_DO);
+  return namespace.get(namespace.idFromName(config.environment));
+}
+
+export function getDenialStub(env: Env, config: StsConfig): DurableObjectStub<DenialDO> {
+  const namespace = scoped(config, env.STS_DENIAL_DO);
   return namespace.get(namespace.idFromName(config.environment));
 }

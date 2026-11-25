@@ -1,10 +1,18 @@
 import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError } from '../src/errors';
 import { createWorkerSecrets } from '../src/worker';
 
 const ETAG = '"0123456789abcdef"';
 const SECRET = 'O11Y_CF_AE_API_TOKEN';
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('createWorkerSecrets', () => {
   it('reads the bundle through the service binding', async () => {
@@ -32,9 +40,10 @@ describe('createWorkerSecrets', () => {
     );
     const secrets = createWorkerSecrets({ getBundle });
 
-    const error = await secrets.get(SECRET).catch(err => err);
+    const read = secrets.get(SECRET).catch((err: unknown) => err);
+    await vi.advanceTimersByTimeAsync(25_000);
+    const error = await read;
     expect(error).toBeInstanceOf(SecretUnavailableError);
-    expect(error.reason).toBe('unavailable');
-    expect(error.retryable).toBe(true);
+    expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
   });
 });

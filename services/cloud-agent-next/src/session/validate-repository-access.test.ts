@@ -500,40 +500,48 @@ describe('environment repository preflight', () => {
       environment,
     });
 
-  it('authorizes every member of each platform and skips a launch repository that the launch check covers', async () => {
-    const binding = services();
+  it.each([
+    ['pinned', pinnedLaunch],
+    ['unpinned', unpinnedLaunch],
+  ])(
+    'authorizes every member of each platform and skips the %s GitHub launch repository',
+    async (_case, launch) => {
+      const binding = services();
 
-    await expect(
-      check(binding, {
-        repositories: [github('acme/launch'), github('acme/api'), gitlab, bitbucket],
-      })
-    ).resolves.toBeUndefined();
+      await expect(
+        check(
+          binding,
+          { repositories: [github('acme/launch'), github('acme/api'), gitlab, bitbucket] },
+          launch
+        )
+      ).resolves.toBeUndefined();
 
-    // The pinned launch repository is not checked again. A member gets no pin, because it
-    // may belong to another installation than the launch repository.
-    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledTimes(1);
-    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
-      accessPurpose: 'workflow',
-      githubRepo: 'acme/api',
-      userId: 'user-1',
-      orgId,
-    });
-    expect(binding.getGitLabToken).toHaveBeenCalledWith(
-      expect.objectContaining({
+      // The launch check authorizes the launch repository. A member gets no pin, because it
+      // may belong to another installation than the launch repository.
+      expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledTimes(1);
+      expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+        accessPurpose: 'workflow',
+        githubRepo: 'acme/api',
         userId: 'user-1',
         orgId,
-        repositoryUrl: 'https://gitlab.com/group/sub/project.git',
-      })
-    );
-    expect(binding.getBitbucketToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orgId,
-        workspaceUuid: repository.workspaceUuid,
-        repositoryUuid: repository.repositoryUuid,
-        repositoryUrl: 'https://bitbucket.org/acme/repo.git',
-      })
-    );
-  });
+      });
+      expect(binding.getGitLabToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          orgId,
+          repositoryUrl: 'https://gitlab.com/group/sub/project.git',
+        })
+      );
+      expect(binding.getBitbucketToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId,
+          workspaceUuid: repository.workspaceUuid,
+          repositoryUuid: repository.repositoryUuid,
+          repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+        })
+      );
+    }
+  );
 
   it('authorizes a GitHub member with the purpose of the launch repository and no pin', async () => {
     const binding = services();
@@ -568,7 +576,7 @@ describe('environment repository preflight', () => {
     });
   });
 
-  it('authorizes an unpinned GitHub launch repository as a member, and names it when it fails', async () => {
+  it('does not authorize an unpinned GitHub launch repository again as a member', async () => {
     const binding = services();
     binding.authorizeCloudAgentGitHubRepo.mockImplementation(
       async ({ githubRepo }: { githubRepo: string }) =>
@@ -579,14 +587,14 @@ describe('environment repository preflight', () => {
 
     await expect(
       check(binding, { repositories: [github('acme/launch'), github('acme/api')] }, unpinnedLaunch)
-    ).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message:
-        'Repository acme/launch: GitHub repository authorization failed (no_installation_found)',
+    ).resolves.toBeUndefined();
+    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledTimes(1);
+    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
+      githubRepo: 'acme/api',
+      userId: 'user-1',
+      orgId,
     });
-    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith(
-      expect.objectContaining({ githubRepo: 'acme/launch' })
-    );
   });
 
   it('does not resolve a GitLab launch repository again as a member', async () => {

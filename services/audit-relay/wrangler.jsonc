@@ -41,19 +41,22 @@
         "queue": "kilo-audit",
         "max_batch_size": 10,
         "max_batch_timeout": 5,
-        "max_retries": 10,
+        // 24 retries: an archive failure backs off to 15 minutes and spans about 5.25 hours.
+        "max_retries": 24,
         "retry_delay": 60,
         "max_concurrency": 6,
         "dead_letter_queue": "kilo-audit-dlq",
       },
-      // Offers each dead letter to its stream again, and keeps its raw bytes in R2 under
-      // dead-letter/. One still behind a gap or an R2 failure retries every 15 minutes for about
-      // 25 hours (the Queues maximum of 100 retries); one that cannot recover is paged and acked.
+      // Offers each dead letter to its stream again (streams in parallel, each in sequence
+      // order), and keeps its raw bytes in R2 under dead-letter/. One still behind a gap or an R2
+      // failure retries every 15 minutes for about 25 hours (the Queues maximum of 100 retries);
+      // one that cannot recover is paged and acked. Order needs no single consumer: the StreamDO
+      // serialises each stream and a batch that arrives early waits behind its gap.
       {
         "queue": "kilo-audit-dlq",
-        "max_batch_size": 10,
+        "max_batch_size": 100,
         "max_batch_timeout": 30,
-        "max_concurrency": 1,
+        "max_concurrency": 5,
         "max_retries": 100,
         "retry_delay": 900,
       },
@@ -123,16 +126,16 @@
             "queue": "kilo-audit-staging",
             "max_batch_size": 10,
             "max_batch_timeout": 5,
-            "max_retries": 10,
+            "max_retries": 24,
             "retry_delay": 60,
             "max_concurrency": 6,
             "dead_letter_queue": "kilo-audit-staging-dlq",
           },
           {
             "queue": "kilo-audit-staging-dlq",
-            "max_batch_size": 10,
+            "max_batch_size": 100,
             "max_batch_timeout": 30,
-            "max_concurrency": 1,
+            "max_concurrency": 5,
             "max_retries": 100,
             "retry_delay": 900,
           },
@@ -186,9 +189,9 @@
           },
           {
             "queue": "kilo-audit-local-dlq",
-            "max_batch_size": 10,
+            "max_batch_size": 100,
             "max_batch_timeout": 30,
-            "max_concurrency": 1,
+            "max_concurrency": 5,
             "max_retries": 100,
             "retry_delay": 900,
           },

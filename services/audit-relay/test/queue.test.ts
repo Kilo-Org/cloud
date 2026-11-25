@@ -25,7 +25,7 @@ import {
 } from './helpers';
 
 const DLQ_PAGE_HEAD =
-  'bot: audit-relay gave up on message(s) from kilo-audit-dlq; their bytes are in R2 (at most one page per stream an hour; the rest are in the logs). A stream behind a lost batch stalls until it is re-sent:';
+  'bot: audit-relay gave up on message(s) from kilo-audit-dlq (at most one page per stream an hour; the rest are in the logs). A stream behind a lost batch stalls until it is re-sent:';
 
 async function runQueue(queue: string, bodies: unknown[], attempts = 1) {
   const batch = createMessageBatch(
@@ -103,31 +103,63 @@ describe('queue handler', () => {
     expect(pages[0]).toContain(`\nunknown stream (undecodable) after 1 attempts at ${key}`);
   });
 
-  it('archives dead-lettered batches once their cause is gone, with no manual step', async () => {
+  it('archives dead-lettered batches of several streams once their cause is gone', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);
-    const stream = uniqueStream('queue-dlq-resume');
-    const low = await encodeAuditBatch(auditBatch(1, 2, stream));
-    const high = await encodeAuditBatch(auditBatch(3, 4, stream));
+    const first = uniqueStream('queue-dlq-resume-a');
+    const second = uniqueStream('queue-dlq-resume-b');
+    const low = await encodeAuditBatch(auditBatch(1, 2, first));
+    const high = await encodeAuditBatch(auditBatch(3, 4, first));
+    const other = [1, 3, 5].map(from => encodeAuditBatch(auditBatch(from, from + 1, second)));
+    const [otherLow, otherMid, otherHigh] = await Promise.all(other);
 
-    // What an R2 outage leaves: both batches dead-lettered, in any order, none archived.
-    const { batch, result } = await runQueue('kilo-audit-dlq', [high.buffer, low.buffer]);
-
-    expect(result.explicitAcks).toHaveLength(2);
-    expect(result.retryMessages).toEqual([]);
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
-      archiveObjectKey(stream, 2),
-      archiveObjectKey(stream, 4),
+    // What an R2 outage leaves: batches of two streams dead-lettered, interleaved and out of order.
+    const { result } = await runQueue('kilo-audit-dlq', [
+      otherHigh.buffer,
+      high.buffer,
+      otherLow.buffer,
+      low.buffer,
+      otherMid.buffer,
     ]);
-    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([]);
-    expect(batch.messages).toHaveLength(2);
+
+    expect(result.explicitAcks).toHaveLength(5);
+    expect(result.retryMessages).toEqual([]);
+    expect(await listObjectKeys(`streams/${first}/`)).toEqual([
+      archiveObjectKey(first, 2),
+      archiveObjectKey(first, 4),
+    ]);
+    expect(await listObjectKeys(`streams/${second}/`)).toEqual([
+      archiveObjectKey(second, 2),
+      archiveObjectKey(second, 4),
+      archiveObjectKey(second, 6),
+    ]);
+    expect(await listObjectKeys(`dead-letter/${first}/`)).toEqual([]);
+    expect(await listObjectKeys(`dead-letter/${second}/`)).toEqual([]);
     expect(pageTexts(http.requests)).toEqual([]);
 
     // A dead letter whose batch is already archived, byte for byte, is acked with nothing kept.
     const again = await runQueue('kilo-audit-dlq', [low.buffer]);
     expect(again.result.explicitAcks).toHaveLength(1);
-    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([]);
+    expect(await listObjectKeys(`dead-letter/${first}/`)).toEqual([]);
     expect(pageTexts(http.requests)).toEqual([]);
+  });
+
+  it("offers only the first of a stream's batches behind a gap and keeps the rest waiting", async () => {
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stream = uniqueStream('queue-dlq-blocked');
+    const bodies = await Promise.all(
+      [3, 5, 7].map(
+        async from => (await encodeAuditBatch(auditBatch(from, from + 1, stream))).buffer
+      )
+    );
+
+    const { result } = await runQueue('kilo-audit-dlq', bodies);
+
+    expect(result.retryMessages).toHaveLength(3);
+    expect(await listObjectKeys(`dead-letter/${stream}/`)).toHaveLength(3);
+    await runInDurableObject(getStreamDOStub(env, stream), async (_instance, state) => {
+      expect(await state.storage.get('gap')).toMatchObject({ expectedSeq: 1, attempts: 1 });
+    });
   });
 
   it('keeps a batch still behind a gap, retries it, and pages its final delivery once an hour', async () => {
@@ -187,9 +219,10 @@ describe('queue handler', () => {
     ]);
   });
 
-  it('doubles the archive retry delay up to an hour', () => {
-    const delays = Array.from({ length: 10 }, (_, index) => archiveRetryDelaySeconds(index + 1));
-    expect(delays).toEqual([60, 120, 240, 480, 960, 1920, 3600, 3600, 3600, 3600]);
+  it('backs the archive retry off to 15 minutes, covering more than 5 hours in 24 retries', () => {
+    const delays = Array.from({ length: 24 }, (_, index) => archiveRetryDelaySeconds(index + 1));
+    expect(delays.slice(0, 5)).toEqual([60, 120, 240, 480, 900]);
+    expect(delays.slice(4).every(delay => delay === 900)).toBe(true);
     expect(delays.reduce((sum, delay) => sum + delay, 0)).toBeGreaterThanOrEqual(5 * 3600);
   });
 
@@ -219,6 +252,35 @@ describe('queue handler', () => {
       expect.objectContaining({ msgId: batch.messages[0].id }),
     ]);
     expect(pageTexts(http.requests)).toEqual([]);
+  });
+
+  it('pages a dead letter whose bytes still cannot be stored at its final delivery', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stream = uniqueStream('queue-dlq-store-failed');
+    const failingEnv = {
+      ...env,
+      AUDIT_ARCHIVE: {
+        ...env.AUDIT_ARCHIVE,
+        put: async () => {
+          throw new Error('r2 unavailable');
+        },
+        head: async () => null,
+      },
+    };
+    const body = (await encodeAuditBatch(auditBatch(3, 4, stream))).buffer;
+    const batch = createMessageBatch('kilo-audit-dlq', [
+      { id: crypto.randomUUID(), timestamp: new Date(), attempts: 101, body },
+    ]);
+    const ctx = createExecutionContext();
+    await worker.queue?.(batch, failingEnv);
+    await waitOnExecutionContext(ctx);
+    const result = await getQueueResult(batch, ctx);
+
+    expect(result.explicitAcks).toHaveLength(1);
+    expect(pageTexts(http.requests)).toEqual([
+      `${DLQ_PAGE_HEAD}\n${stream} seq 3..4 (gap, store_failed) after 101 attempts and its bytes could not be stored`,
+    ]);
   });
 
   it('acks batches archived without the hot copy and leaves the paging to the alarm', async () => {

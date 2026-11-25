@@ -25,7 +25,8 @@ const ARCHIVE_RETRY_SECONDS = 60;
  * A gap pages once it has turned away this many batches AND persisted this long. Both must hold:
  * consumer concurrency routinely delivers a burst of later batches before the next one, which
  * reaches the attempt count in seconds, while a single stuck batch retried every 30 s reaches
- * both thresholds together, around the time `max_retries: 10` sends it to the DLQ.
+ * both thresholds together after about 5 minutes, well before its 24 retries (about 12 minutes)
+ * send it to the DLQ.
  */
 export const GAP_PAGE_ATTEMPTS = 10;
 export const GAP_PAGE_AFTER_MS = 5 * 60 * 1000;

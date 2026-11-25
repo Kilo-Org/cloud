@@ -1,5 +1,5 @@
 import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
-import { createSecrets, type SecretsOptions } from './client';
+import { createSecrets } from './client';
 import type { Secrets } from './types';
 
 /**
@@ -11,6 +11,6 @@ export type BundleBinding = {
 };
 
 /** Reads the workload's whole bundle over the account-internal service binding. */
-export function createWorkerSecrets(binding: BundleBinding, options: SecretsOptions = {}): Secrets {
-  return createSecrets(request => binding.getBundle(request), options);
+export function createWorkerSecrets(binding: BundleBinding): Secrets {
+  return createSecrets(request => binding.getBundle(request));
 }

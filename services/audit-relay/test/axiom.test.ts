@@ -10,21 +10,25 @@ async function ingestAnswering(status: number) {
 }
 
 describe('ingestAuditEvents', () => {
-  it.each([401, 403, 408, 429, 500, 503])('retries HTTP %i', async status => {
+  it.each([401, 403, 408, 429, 500, 503])('treats HTTP %i as transient', async status => {
     expect(await ingestAnswering(status)).toEqual({
-      kind: 'retryable',
+      kind: 'unavailable',
       detail: `http_${status}`,
     });
   });
 
-  it.each([400, 413, 422])('rejects HTTP %i', async status => {
-    expect(await ingestAnswering(status)).toEqual({ kind: 'rejected', status });
+  it.each([400, 413, 422])('reports HTTP %i as a payload rejection', async status => {
+    expect(await ingestAnswering(status)).toEqual({ kind: 'payload_rejected', status });
   });
 
-  it('retries a network failure', async () => {
+  it.each([404, 405, 409, 410])('reports HTTP %i as a refused destination', async status => {
+    expect(await ingestAnswering(status)).toEqual({ kind: 'refused', status });
+  });
+
+  it('treats a network failure as transient', async () => {
     const result = await ingestAuditEvents(CONFIG, auditBatch(1, 1).events, async () => {
       throw new TypeError('network');
     });
-    expect(result).toEqual({ kind: 'retryable', detail: 'TypeError' });
+    expect(result).toEqual({ kind: 'unavailable', detail: 'TypeError' });
   });
 });

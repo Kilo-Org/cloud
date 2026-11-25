@@ -76,23 +76,28 @@ function parkedKey(toSeq: number): string {
   return `${PARKED_PREFIX}${String(toSeq).padStart(12, '0')}`;
 }
 
+/**
+ * Which failures can belong to one row rather than to the whole hot copy:
+ *
+ * - `archive_unreadable` (the row's archive object is missing, does not decode, or no longer
+ *   starts at the row's `fromSeq`) is always about that row: it is parked at once and paged
+ *   outside the hourly cap, because it means the archive changed under the relay.
+ * - `axiom_rejected` (Axiom refused the payload: 400, 413, 422) is about the row only once a
+ *   later row is delivered in the same alarm run; then the row is parked. A rejection with no
+ *   delivery after it, or two rejections in a row, is a stream-wide failure (a dataset or schema
+ *   problem), so the rows stay owed under backoff and paging.
+ *
+ * Every other reason, `axiom_refused` (any other 4xx, such as a missing dataset) included, is
+ * stream-wide.
+ */
 export type HotCopyFailureReason =
   | 'axiom_rejected'
+  | 'axiom_refused'
   | 'axiom_unavailable'
   | 'secrets_denied'
   | 'secrets_unavailable'
   | 'archive_unreadable'
   | 'archive_unavailable';
-
-/**
- * A reason that belongs to one row (Axiom refused that payload, or its archive object does not
- * decode) rather than to the whole hot copy. Such a row is parked: moved out of the alarm's queue
- * to `hot_copy_parked:`, paged, and left for an operator, so it never blocks the rows after it.
- * Every other reason is stream-wide: it stops the alarm run and backs off.
- */
-function rowSpecific(reason: HotCopyFailureReason): boolean {
-  return reason === 'axiom_rejected' || reason === 'archive_unreadable';
-}
 
 /**
  * One archived range whose Axiom delivery is owed. `pending` is written in the same storage write
@@ -314,7 +319,6 @@ export class StreamDO extends DurableObject<Env> {
     if (!state.failing) {
       const delivery = await this.deliverRow(owed, trimmed.events);
       if (delivery.kind === 'delivered') hotCopy = 'delivered';
-      else if (rowSpecific(delivery.reason)) await this.park(state, owed, delivery.reason);
       else await this.noteFailure(state, delivery.reason, false, owed);
     }
     return {
@@ -429,9 +433,10 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * Delivers owed rows, oldest first, from their archive objects. A row-specific failure parks
-   * the row and the run continues; a stream-wide failure stops the run and re-arms with backoff.
-   * A full page of rows re-arms at once; a run that empties the queue clears the failure.
+   * Delivers owed rows, oldest first, from their archive objects. An unreadable archive object
+   * parks its row; a payload rejection parks its row once a later row is delivered; any other
+   * failure, or a rejection nothing delivered after, stops the run and re-arms with backoff. A
+   * full page of rows re-arms at once; a run that empties the queue clears the failure.
    */
   private async drainHotCopy(): Promise<void> {
     const listed = await this.ctx.storage.list<HotStoreGap>({
@@ -446,25 +451,58 @@ export class StreamDO extends DurableObject<Env> {
       return;
     }
     let state = await this.readHotState(first.stream);
+    const unreadable: HotStoreGap[] = [];
+    // The oldest rejected row no delivery has followed yet in this run.
+    let suspect: HotStoreGap | null = null;
 
     for (const row of rows) {
       const delivery = await this.deliverFromArchive(row);
-      if (delivery.kind === 'delivered') continue;
-      if (rowSpecific(delivery.reason)) {
-        state = await this.park(state, row, delivery.reason);
+      if (delivery.kind === 'delivered') {
+        if (suspect) state = await this.park(state, suspect, 'axiom_rejected');
+        suspect = null;
         continue;
       }
-      // Every row before this one was delivered or parked, so it is the oldest still owed.
-      await this.noteFailure(state, delivery.reason, true, row);
+      if (delivery.reason === 'archive_unreadable') {
+        await this.park(state, row, 'archive_unreadable');
+        unreadable.push(row);
+        continue;
+      }
+      if (delivery.reason === 'axiom_rejected' && suspect === null) {
+        await this.stampRow(row, 'axiom_rejected');
+        suspect = row;
+        continue;
+      }
+      // Every row before this one was delivered or parked, except a suspect, which is older.
+      await this.pageUnreadable(first.stream, unreadable);
+      await this.noteFailure(state, delivery.reason, true, suspect ?? row);
       return;
     }
+    await this.pageUnreadable(first.stream, unreadable);
 
+    if (suspect) {
+      await this.noteFailure(state, 'axiom_rejected', true, suspect);
+      return;
+    }
     if (rows.length === HOT_COPY_ROWS_PER_ALARM) {
       await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts: 0 });
       await this.ctx.storage.setAlarm(Date.now());
       return;
     }
     await this.recovered(state);
+  }
+
+  /**
+   * An archive object that went missing or changed under the relay is evidence of tampering or
+   * loss, so its page never waits for the hourly cap: one page per alarm run lists the rows.
+   */
+  private async pageUnreadable(stream: string, rows: HotStoreGap[]): Promise<void> {
+    if (rows.length === 0) return;
+    const ranges = rows.map(row => `${row.fromSeq}..${row.toSeq}`).join(', ');
+    await pageOperator(
+      this.env,
+      `audit stream ${stream}: archive objects missing, undecodable or changed under the relay for seq ${ranges} (${rows.length} rows); their hot copy is parked, check the archive`,
+      this.ctx
+    );
   }
 
   private async deliverFromArchive(row: HotStoreGap): Promise<Delivery> {
@@ -502,9 +540,11 @@ export class StreamDO extends DurableObject<Env> {
       case 'ok':
         await this.ctx.storage.delete(hotCopyKey(row.toSeq));
         return { kind: 'delivered' };
-      case 'retryable':
+      case 'unavailable':
         return { kind: 'failed', reason: 'axiom_unavailable' };
-      case 'rejected':
+      case 'refused':
+        return { kind: 'failed', reason: 'axiom_refused' };
+      case 'payload_rejected':
         return { kind: 'failed', reason: 'axiom_rejected' };
     }
   }
@@ -570,13 +610,14 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * Moves a row Axiom refuses (or whose archive object does not decode) to `hot_copy_parked:`,
-   * where the alarm never retries it, and pages it within the hourly window.
+   * Moves a row to `hot_copy_parked:`, where the alarm never retries it. A confirmed payload
+   * rejection pages within the hourly window; an unreadable archive object is paged by the caller,
+   * outside it.
    */
   private async park(
     state: HotCopyState,
     row: HotStoreGap,
-    reason: HotCopyFailureReason
+    reason: 'axiom_rejected' | 'archive_unreadable'
   ): Promise<HotCopyState> {
     const stored = await this.ctx.storage.get<HotStoreGap>(hotCopyKey(row.toSeq));
     if (!stored) return state;
@@ -588,10 +629,11 @@ export class StreamDO extends DurableObject<Env> {
     await Promise.all(moves);
 
     const now = Date.now();
-    const windowOpen =
-      state.lastPageAt === null || now - state.lastPageAt >= HOT_COPY_PAGE_INTERVAL_MS;
-    const next: HotCopyState = windowOpen ? { ...state, lastPageAt: now } : state;
-    if (windowOpen) await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, next);
+    const page =
+      reason === 'axiom_rejected' &&
+      (state.lastPageAt === null || now - state.lastPageAt >= HOT_COPY_PAGE_INTERVAL_MS);
+    const next: HotCopyState = page ? { ...state, lastPageAt: now } : state;
+    if (page) await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, next);
     console.error(
       JSON.stringify({
         event: 'audit_relay.hot_copy_parked',
@@ -599,13 +641,13 @@ export class StreamDO extends DurableObject<Env> {
         fromSeq: row.fromSeq,
         toSeq: row.toSeq,
         reason,
-        paged: windowOpen,
+        paged: page,
       })
     );
-    if (windowOpen) {
+    if (page) {
       await pageOperator(
         this.env,
-        `audit stream ${row.stream}: parked seq ${row.fromSeq}..${row.toSeq} (${reason}); the alarm no longer retries it, check the payload and clear it with clearHotStoreGap`,
+        `audit stream ${row.stream}: parked seq ${row.fromSeq}..${row.toSeq} (${reason}); Axiom refused this payload while later rows were delivered, check it and clear it with clearHotStoreGap`,
         this.ctx
       );
     }

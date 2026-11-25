@@ -748,15 +748,11 @@ describe('WorkOS sign-in callback', () => {
       webSessionIdHash: hashWebSessionId('web-session-sso-link'),
       createdAt: Date.now(),
     });
-    jest
-      .mocked(userServer.getUserFromSessionForCredentialIssuance)
-      .mockResolvedValue({
-        user: owner,
-        authFailedResponse: null,
-        webSessionId: 'web-session-sso-link',
-      } as Awaited<
-        ReturnType<typeof userServer.getUserFromSessionForCredentialIssuance>
-      >);
+    jest.mocked(userServer.getUserFromSessionForCredentialIssuance).mockResolvedValue({
+      user: owner,
+      authFailedResponse: null,
+      webSessionId: 'web-session-sso-link',
+    } as Awaited<ReturnType<typeof userServer.getUserFromSessionForCredentialIssuance>>);
 
     await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(
       '/connected-accounts?error=LINKING-FAILED'

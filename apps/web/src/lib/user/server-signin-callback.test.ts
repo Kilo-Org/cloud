@@ -923,18 +923,16 @@ describe('Claude explicit linking persistence', () => {
         status: 'not_required',
         domain: 'example.net',
       });
-      mockGetAccountLinkingSession
-        .mockReset()
-        .mockResolvedValue(
-          intentState === 'different'
-            ? {
-                existingUserId: link.owner.id,
-                targetProvider: 'google',
-                webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
-                createdAt: Date.now(),
-              }
-            : null
-        );
+      mockGetAccountLinkingSession.mockReset().mockResolvedValue(
+        intentState === 'different'
+          ? {
+              existingUserId: link.owner.id,
+              targetProvider: 'google',
+              webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+              createdAt: Date.now(),
+            }
+          : null
+      );
       // Settlement finds the existing account that owns this email and another
       // provider's subject.
       mockCreateOrUpdateUser.mockResolvedValue({

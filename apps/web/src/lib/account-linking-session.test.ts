@@ -156,7 +156,10 @@ describe('account linking session', () => {
     ['a missing user', claimsWithout('existingUserId')],
     ['an empty user', { ...validClaims(), existingUserId: '' }],
     ['a missing browser session', claimsWithout('webSessionIdHash')],
-    ['a browser session that is not a hash', { ...validClaims(), webSessionIdHash: WEB_SESSION_ID }],
+    [
+      'a browser session that is not a hash',
+      { ...validClaims(), webSessionIdHash: WEB_SESSION_ID },
+    ],
     ['a missing provider', claimsWithout('targetProvider')],
     ['a non-string provider', { ...validClaims(), targetProvider: 7 }],
     ['an organization that is not a uuid', { ...validClaims(), organizationId: 'not-a-uuid' }],

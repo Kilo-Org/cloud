@@ -22,7 +22,10 @@ export default function PersonalBYOKPage() {
     <PageLayout title="Bring Your Own Key">
       <div className="space-y-4">
         {chatGptEnabled === true ? (
-          <OpenAiChatGptCard codeChallenge={codeChallenge} onCodeChallengeChange={setCodeChallenge} />
+          <OpenAiChatGptCard
+            codeChallenge={codeChallenge}
+            onCodeChallengeChange={setCodeChallenge}
+          />
         ) : chatGptEnabled === undefined ? (
           // Hold the card's reserved height until the flags resolve, so the key
           // list does not shift when the card appears.

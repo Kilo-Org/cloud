@@ -52,16 +52,23 @@ describe('secretsFor', () => {
     expect(error).toMatchObject({ reason: 'denied', retryable: false });
   });
 
-  it('reports an unavailable bundle as retryable', async () => {
-    const sts = binding({
-      status: 'unavailable',
-      reason: 'manager_unreachable_no_copy',
-      retryAfterSeconds: 5,
-    });
+  it('reports an unavailable bundle as retryable once the first-load window ends', async () => {
+    vi.useFakeTimers();
+    try {
+      const sts = binding({
+        status: 'unavailable',
+        reason: 'manager_unreachable_no_copy',
+        retryAfterSeconds: 5,
+      });
 
-    const error = await failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+      const read = failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+      await vi.advanceTimersByTimeAsync(25_000);
+      const error = await read;
 
-    expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
+      expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports a name the bundle lists as missing as non-retryable', async () => {

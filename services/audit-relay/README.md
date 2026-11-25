@@ -51,8 +51,9 @@ Axiom is the hot copy and cannot hold the stream hostage. Each owed row is
 rows are the archived ranges, so they never overlap, and `recordedAt` stays the archive time. A
 failure stamps the row with `axiom_unavailable` (network error, 401, 403, 408, 429 or 5xx; a 401
 or 403 follows a token rotation until the secrets client revalidates, at most 240 s),
-`axiom_rejected` (any other 4xx), `secrets_unavailable`, `secrets_denied`, `archive_unavailable`
-or `archive_unreadable`.
+`axiom_rejected` (400, 413 or 422, the statuses about the payload), `axiom_refused` (any other
+4xx, such as a missing or renamed dataset), `secrets_unavailable`, `secrets_denied`,
+`archive_unavailable` or `archive_unreadable`.
 
 The StreamDO alarm owns every owed row. It delivers up to 50 rows per run, oldest first, reading
 each row's events from its **archive object**, never from a queue message, so a forged redelivery
@@ -62,10 +63,20 @@ minutes, with jitter in [0.5, 1). While it is recorded, a new batch skips its ow
 leaves the row to the alarm, so an outage costs one Axiom call per stream per backoff step
 instead of one per batch.
 
-A row-specific failure (`axiom_rejected`, `archive_unreadable`) **parks** the row: it moves to
-`hot_copy_parked:<toSeq>`, which the alarm never lists, so any number of refused rows cannot
-block or slow the rows behind them. `hotStoreGaps(limit)` returns the owed rows, then the parked
-ones, oldest first; an operator checks a parked payload and clears it with
+Only two failures can belong to one row, and the row is then **parked**: moved to
+`hot_copy_parked:<toSeq>`, which the alarm never lists, so any number of them cannot block or
+slow the rows behind them.
+
+- `archive_unreadable` (the row's archive object is missing, does not decode, or no longer starts
+  at the row's `fromSeq`) parks at once: the archive changed under the relay.
+- `axiom_rejected` parks only once a later row is delivered in the same alarm run. A rejection
+  with no delivery after it, or two rejections in a row, is a stream-wide failure (a dataset or
+  schema problem): every row stays owed under backoff and paging, and all of them are delivered
+  once it is fixed. A batch whose inline ingest is rejected leaves its row to the alarm, which
+  makes that call.
+
+Every other reason, `axiom_refused` included, is stream-wide. `hotStoreGaps(limit)` returns the
+owed rows, then the parked ones, oldest first; an operator checks a parked row and clears it with
 `clearHotStoreGap(fromSeq, toSeq)`.
 
 Paging is per stream:
@@ -74,15 +85,17 @@ Paging is per stream:
   an owed row 5 minutes old. A blip that the next run clears pages nothing, and a change of
   reason is logged, not paged. A paged failure that still owes a row archived over 6 hours ago
   pages once more.
-- A parked row pages (`parked seq a..b (<reason>)`).
+- A parked `axiom_rejected` row pages (`parked seq a..b (axiom_rejected)`).
 - Those pages share a cap of one per stream per hour; a page the cap holds back goes out at the
   next failed run after the hour.
 - A failure whose start was paged always pages its recovery, from the run that delivers the last
   owed row, and the recovery restarts the hour. A failure that never paged its start pages no
   recovery.
+- `archive_unreadable` rows page outside the cap: one page per alarm run lists every such row the
+  run parked, because a changed archive must never wait an hour to be seen.
 
-A stream therefore pages at most twice an hour for its hot copy (a start, or an age or parked
-page, plus the recovery of a paged start).
+Apart from unreadable archive objects, a stream therefore pages at most twice an hour for its hot
+copy (a start, or an age or parked page, plus the recovery of a paged start).
 
 Owed rows are bounded by time, not by count: a row is about 200 bytes and each stream adds at
 most one per batch, so a stream sending one batch per 5 s grows by at most 17,280 rows
@@ -118,17 +131,22 @@ first turned a batch away for it, and how many batches it turned away. When the 
 turned away **10** batches **and** is **5 minutes** old, the next batch is retried as usual and also
 pages, once per gap. Both thresholds must hold: queue concurrency routinely delivers a burst of
 later batches first, which reaches the count in seconds, while one stuck batch retried every
-30 s reaches both together, around the time its `max_retries: 10` sends it to the DLQ. Closing the
+30 s reaches both together after about 5 minutes, well before its `max_retries: 24` (about 12
+minutes) send it to the DLQ. Closing the
 gap (the head advances) starts the next gap's count from zero.
 
 ### Dead letters
 
 Since an archived batch is always acked, a message reaches the DLQ only when it stayed behind a
-gap for its 10 retries (about 5 minutes) or its archive write kept failing (60 s doubling to a
-1-hour cap, about 5 hours). The DLQ consumer offers each decodable batch to its stream again,
-lowest sequence first within the consumer batch, so batches an R2 outage or a gap dead-lettered
-archive themselves once the cause is gone, with no manual step: an `accepted` batch, or a
-`duplicate` that matches the archive, is acked with nothing kept.
+gap for its 24 retries (about 12 minutes) or its archive write kept failing (60 s doubling to a
+15-minute cap, about 5.25 hours). The DLQ consumer (`max_batch_size: 100`,
+`max_concurrency: 5`) groups each batch of messages by stream, runs the streams in parallel and
+each stream in sequence order, and offers each decodable batch to its stream again, so batches
+an R2 outage or a gap dead-lettered archive themselves once the cause is gone, with no manual
+step: an `accepted` batch, or a `duplicate` that matches the archive, is acked with nothing kept.
+Once one batch of a stream is still waiting, its later batches in the same delivery are not
+offered (they would only gap). Several consumers can hold batches of one stream at once; the
+StreamDO serialises them, and one that arrives early waits behind its gap.
 
 Every other message has its raw bytes written to
 `dead-letter/<stream or unknown>/<enqueue time>-<message id>.gz` in the archive bucket
@@ -136,9 +154,10 @@ Every other message has its raw bytes written to
 every 15 minutes, for about 25 hours (the Queues maximum of 100 retries). A message that cannot
 recover is paged and acked: a duplicate that disagrees with the archive (`duplicate_content`,
 `duplicate_unaligned`, `duplicate_corrupt`), an archive conflict, an undecodable body (main
-queue or DLQ), or a batch still waiting at its final delivery. Pages carry the stream, sequence
-range, reason, attempt count and key (never the payload), and each stream pages at most once an
-hour (bodies with no readable stream share one budget); every message is still logged.
+queue or DLQ), or a batch still waiting at its final delivery, including one whose bytes could
+not be stored by then (`store_failed`). Pages carry the stream, sequence range, reason, attempt
+count and key (never the payload), and each stream pages at most once an hour (bodies with no
+readable stream share one budget); every message is still logged.
 
 A batch lost at its final delivery stalls its stream: every later batch gap-retries behind it.
 To recover, re-send the stored object's bytes to the main queue as a `bytes` message; the
@@ -198,9 +217,9 @@ StreamDO archives the missing batch and dedupes the rest.
 | `AXIOM_URL` | `https://api.axiom.co` |
 | `AUDIT_ENVIRONMENT` | `production` / `staging` / `local` |
 
-Retries are bounded: `max_retries: 10` with `retry_delay: 60`; a gap retry waits 30 s and an
-archive failure 60 s doubling to 1 hour, each consuming one retry. A message that exhausts them
-lands in the DLQ (above), whose consumer has `max_retries: 100` with `retry_delay: 900`.
+Retries are bounded: `max_retries: 24` with `retry_delay: 60`; a gap retry waits 30 s and an
+archive failure 60 s doubling to 15 minutes, each consuming one retry. A message that exhausts
+them lands in the DLQ (above), whose consumer has `max_retries: 100` with `retry_delay: 900`.
 
 ### Internal Durable Objects
 
@@ -282,8 +301,11 @@ The suite covers in-order delivery, duplicates (matching, a matching suffix, for
 unaligned range), gap-then-fill, a stalled gap that pages once, partial overlap, an Axiom outage
 that acks every archived batch and delivers it from the alarm (paging the start after two failed
 runs, the recovery once, and nothing for a second failure inside the hour), sporadic failures
-that page nothing, a refused row parked while the next batch is delivered, 60 undeliverable rows
-parked without starving the row behind them, an owed row re-ingested from the archive and never
+that page nothing, a rejected row parked once a later row is delivered, a missing dataset and a
+payload every row fails that keep all rows owed and deliver them once fixed, 60 unreadable rows
+parked without starving the row behind them and paged outside the cap, a stream's later dead
+letters not offered behind a gap, two streams' dead letters archived in one parallel pass, a dead
+letter that cannot be stored at its final delivery, an owed row re-ingested from the archive and never
 from a forged redelivery, Axiom status classification, create-only writes with the same, a
 different and an undecodable object, dead-lettered batches that archive themselves once the cause
 is gone, a batch still behind a gap retried and paged once an hour at its final delivery, a

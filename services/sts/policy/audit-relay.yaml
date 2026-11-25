@@ -1,0 +1,10 @@
+workload: audit-relay
+environments:
+  - development
+  - staging
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - AUDIT_RELAY_AXIOM_TOKEN
+  - AUDIT_RELAY_SLACK_WEBHOOK_PAGE

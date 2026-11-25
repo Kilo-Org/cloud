@@ -1,0 +1,122 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Top level is production; `wrangler dev --env local` uses the local block below.
+  "name": "sts",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8825,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+    {
+      "type": "Text",
+      "globs": ["**/*.yaml"],
+      "fallthrough": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "sts.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "STS_ENVIRONMENT": "production",
+    "STS_ISSUER": "https://sts.kiloapps.io",
+    "MANAGER_BASE_URL": "https://eu.infisical.com",
+    // Production prerequisites: README.md#production-prerequisites.
+    "MANAGER_PROJECT_ID": "REPLACE_WITH_INFISICAL_PROJECT_ID",
+    "MANAGER_ENVIRONMENT_SLUG": "prod",
+    "MANAGER_SECRET_PATH": "/runtime",
+    "MANAGER_IDENTITY_ID": "REPLACE_WITH_INFISICAL_IDENTITY_ID",
+    // Durable Objects hold secret material, so production and staging pin them to the EU.
+    "DO_JURISDICTION": "eu",
+  },
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+      { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+      { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] }],
+  "env": {
+    "staging": {
+      "name": "sts-staging",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "sts-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "STS_ENVIRONMENT": "staging",
+        "STS_ISSUER": "https://sts-staging.kiloapps.io",
+        "MANAGER_BASE_URL": "https://eu.infisical.com",
+        "MANAGER_PROJECT_ID": "REPLACE_WITH_INFISICAL_PROJECT_ID",
+        "MANAGER_ENVIRONMENT_SLUG": "staging",
+        "MANAGER_SECRET_PATH": "/runtime",
+        "MANAGER_IDENTITY_ID": "REPLACE_WITH_INFISICAL_IDENTITY_ID",
+        "DO_JURISDICTION": "eu",
+      },
+      "queues": {
+        "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+          { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+          { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+        ],
+      },
+    },
+    // Local development only; no deploy workflow targets this name.
+    "local": {
+      "name": "sts-local",
+      "workers_dev": false,
+      "routes": [],
+      "vars": {
+        "STS_ENVIRONMENT": "development",
+        "STS_ISSUER": "http://localhost:8825",
+        "MANAGER_BASE_URL": "https://eu.infisical.com",
+        "MANAGER_PROJECT_ID": "local-project-id",
+        "MANAGER_ENVIRONMENT_SLUG": "dev",
+        "MANAGER_SECRET_PATH": "/runtime",
+        "MANAGER_IDENTITY_ID": "local-identity-id",
+        // workerd enforces no data residency, so local development keeps objects unscoped.
+        "DO_JURISDICTION": "none",
+      },
+      "queues": {
+        "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+          { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+          { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+        ],
+      },
+    },
+  },
+}

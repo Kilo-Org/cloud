@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1795614585582,
+      "tag": "0000_faithful_lightspeed",
+      "breakpoints": true
+    }
+  ]
+}

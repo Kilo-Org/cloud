@@ -24,6 +24,14 @@ Routes: `POST /v1/bundle`, `GET /manager-auth/.well-known/openid-configuration`,
 `GET /manager-auth/.well-known/jwks.json`. Production is `https://sts.kiloapps.io`, staging is
 `https://sts-staging.kiloapps.io`.
 
+### Internal Durable Objects
+
+`BundleDO`, `RefresherDO` and `SignerDO` are internal. Their methods skip the policy check and the
+audit row that `SecretsBroker` performs, so no other Worker may bind them: a
+`durable_objects.bindings[].script_name` of `sts`, `sts-staging` or `sts-local` in any config
+fails `test/repo/worker-configs.test.ts`, as does an STS service binding at any entrypoint other
+than `SecretsBroker`.
+
 ## Configuration
 
 No secret is stored in this Worker. Everything is a plain var, validated with zod at the start of

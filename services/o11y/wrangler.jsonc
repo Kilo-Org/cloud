@@ -8,8 +8,12 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-02-01",
+  // Traces stay off: a fetch span records url.full, and the Slack webhook URL is the secret.
+  // https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/
   "observability": {
     "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "compatibility_flags": ["nodejs_compat"],
@@ -65,8 +69,8 @@
   /**
    * Service bindings
    * STS serves the runtime secret bundle over the account-internal binding; props.caller is
-   * what STS authorizes on and must equal this Worker's name. o11y deploys only to production,
-   * so it binds the production `sts`.
+   * what STS authorizes on and must equal this Worker's top-level name. o11y deploys only to
+   * production, so it binds the production `sts`; `env.local` binds `sts-local`.
    */
   "services": [
     {
@@ -129,4 +133,67 @@
       "secret_name": "O11Y_CF_CONTAINERS_API_TOKEN",
     },
   ],
+  "env": {
+    // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
+    // Bindings are not inherited, so the block repeats each one; the STS binding targets sts-local.
+    "local": {
+      "name": "o11y-local",
+      "workers_dev": false,
+      "routes": [],
+      "analytics_engine_datasets": [
+        { "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics" },
+        { "binding": "O11Y_SESSION_METRICS", "dataset": "o11y_session_metrics" },
+      ],
+      "pipelines": [
+        { "stream": "70379355c2d741fc8b4527e69b501f52", "binding": "API_METRICS_STREAM" },
+        { "stream": "82c1fc4073bb4830a6670e920b9823c2", "binding": "SESSION_METRICS_STREAM" },
+      ],
+      "kv_namespaces": [
+        { "binding": "O11Y_ALERT_STATE", "id": "aef43060c5334b9995450a780eea94fb" },
+      ],
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-local",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "o11y" },
+        },
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "ALERT_CONFIG_DO", "class_name": "AlertConfigDO" }],
+      },
+      "vars": {
+        "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+        "O11Y_API_BASE_URL": "https://api.kilo.ai",
+        "SECRETS_SOURCE": "secrets-store",
+      },
+      "secrets_store_secrets": [
+        {
+          "binding": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
+        },
+        {
+          "binding": "O11Y_CF_AE_API_TOKEN",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_CF_AE_API_TOKEN",
+        },
+        {
+          "binding": "O11Y_SLACK_WEBHOOK_PAGE",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_SLACK_WEBHOOK_PAGE",
+        },
+        {
+          "binding": "O11Y_SLACK_WEBHOOK_TICKET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_SLACK_WEBHOOK_TICKET",
+        },
+        {
+          "binding": "O11Y_CF_CONTAINERS_API_TOKEN",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_CF_CONTAINERS_API_TOKEN",
+        },
+      ],
+    },
+  },
 }

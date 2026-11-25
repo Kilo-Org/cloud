@@ -8,8 +8,12 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-02-01",
+  // Traces stay off: a fetch span records url.full, and the Slack webhook URL is the secret.
+  // https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/
   "observability": {
     "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "compatibility_flags": ["nodejs_compat"],

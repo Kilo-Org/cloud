@@ -1,26 +1,40 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { Event } from '@sentry/nextjs';
+import type { Breadcrumb, Event } from '@sentry/nextjs';
+import {
+  expectScrubbedServerEvent,
+  leakyServerEvent,
+} from '@kilocode/web-shared/tests/helpers/sentry-event.helper';
 
 type BeforeSend = (event: Event) => Event | null;
+type BeforeBreadcrumb = (breadcrumb: Breadcrumb) => Breadcrumb | null;
+type EdgeOptions = {
+  beforeSend: BeforeSend;
+  beforeBreadcrumb?: BeforeBreadcrumb;
+  integrations?: Array<{ name: string }>;
+};
 
 // The edge initializer calls `init` at module scope, so each test loads a fresh
 // copy of the real config module against a stubbed SDK and reads the options it
 // registered.
-async function loadEdgeBeforeSend(): Promise<BeforeSend> {
+async function loadEdgeOptions(): Promise<EdgeOptions> {
   const initMock = jest.fn();
   await jest.isolateModulesAsync(async () => {
     jest.doMock('@sentry/nextjs', () => ({
       init: initMock,
-      consoleLoggingIntegration: jest.fn(() => ({ name: 'ConsoleLogging' })),
+      consoleLoggingIntegration: jest.fn(() => ({ name: 'ConsoleLogs' })),
       httpIntegration: jest.fn(() => ({ name: 'Http' })),
     }));
     await import('../../../sentry.edge.config');
   });
 
   expect(initMock).toHaveBeenCalledTimes(1);
-  const options = initMock.mock.calls[0]?.[0] as { beforeSend?: unknown };
+  const options = initMock.mock.calls[0]?.[0] as Partial<EdgeOptions>;
   expect(typeof options.beforeSend).toBe('function');
-  return options.beforeSend as BeforeSend;
+  return options as EdgeOptions;
+}
+
+async function loadEdgeBeforeSend(): Promise<BeforeSend> {
+  return (await loadEdgeOptions()).beforeSend;
 }
 
 describe('edge Sentry initializer request data', () => {
@@ -91,7 +105,7 @@ describe('edge Sentry initializer request data', () => {
     expect(result?.request?.url).toBe('https://app.kilo.sh/s/:share_token?utm_source=copy');
   });
 
-  test('applies the query policy to the forwarded search header', async () => {
+  test('filters the forwarded search header', async () => {
     const beforeSend = await loadEdgeBeforeSend();
 
     const result = beforeSend({
@@ -103,7 +117,7 @@ describe('edge Sentry initializer request data', () => {
       },
     });
 
-    expect(result?.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
+    expect(result?.request?.headers?.['x-search']).toBe('[Filtered]');
     expect(result?.request?.headers?.['x-pathname']).toBe('/s/:share_token');
   });
 
@@ -122,5 +136,30 @@ describe('edge Sentry initializer request data', () => {
       'https://app.kilo.sh/github-app?organizationId=org_123&fromApp=1'
     );
     expect(result?.request?.query_string).toBe('organizationId=org_123&fromApp=1');
+  });
+
+  test('removes every credential from a realistic server event', async () => {
+    const beforeSend = await loadEdgeBeforeSend();
+
+    expectScrubbedServerEvent(beforeSend(leakyServerEvent()));
+  });
+});
+
+describe('edge Sentry initializer console output', () => {
+  test('sends no console output to Sentry', async () => {
+    const options = await loadEdgeOptions();
+
+    expect(options.integrations?.map(integration => integration.name) ?? []).not.toContain(
+      'ConsoleLogs'
+    );
+  });
+
+  test('drops console breadcrumbs and scrubs the others', async () => {
+    const { beforeBreadcrumb } = await loadEdgeOptions();
+
+    expect(beforeBreadcrumb?.({ category: 'console', message: 'x [object Object]' })).toBeNull();
+    expect(
+      beforeBreadcrumb?.({ category: 'fetch', data: { url: '/api/models', authorization: 'fake' } })
+    ).toEqual({ category: 'fetch', data: { url: '/api/models', authorization: '[Filtered]' } });
   });
 });

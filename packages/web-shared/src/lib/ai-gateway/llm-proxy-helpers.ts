@@ -13,6 +13,7 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { redactSecretValues } from '@kilocode/web-shared/lib/observability/sentry-secret-patterns';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
@@ -908,6 +909,29 @@ function describeRequestFields(request: unknown): Record<string, string> {
   return fields;
 }
 
+const ERROR_BODY_DIAGNOSTIC_LIMIT = 16 * 1024;
+
+// An upstream error body can be very large, so only the prefix the diagnostics
+// use is read and the rest of the stream is cancelled.
+async function readTextPrefix(response: Response, maxLength: number): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    while (text.length < maxLength) {
+      const { done, value } = await reader.read();
+      if (done) return text + decoder.decode();
+      text += decoder.decode(value, { stream: true });
+    }
+    return text;
+  } finally {
+    // Not awaited: the cancel of one branch of a cloned body settles only when
+    // the other branch, which the caller still owns, is consumed or cancelled.
+    void reader.cancel().catch(() => undefined);
+  }
+}
+
 export async function captureProxyError(params: {
   errorMessage: string;
   user: { id: string };
@@ -946,11 +970,10 @@ export async function captureProxyError(params: {
         ...describeRequestFields(request),
       };
 
-      const clonedReponse = response.clone();
       try {
-        const responseText = await clonedReponse.text();
-        extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
-        const parsed = parseJson(responseText.slice(0, 16 * 1024));
+        const responseText = await readTextPrefix(response.clone(), ERROR_BODY_DIAGNOSTIC_LIMIT);
+        extraErrorData.first4kOfResponse = redactSecretValues(responseText, 4096);
+        const parsed = parseJson(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT));
         if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
           const { param, code } = parsed.value.error;
           if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);

@@ -137,10 +137,17 @@ export function StepUpCeremonyContent({
     (statusKnown && statusQuery.data?.sessionBound === false);
 
   // An account without a passkey adds one first, with a code from its email,
-  // then verifies with it.
+  // then verifies with it. The dialog stays busy from the enrollment through
+  // the status refresh, so its button can not send a second code meanwhile.
   const enrollment = usePasskeyEnrollment(async () => {
-    await statusQuery.refetch();
-    await runCeremony();
+    setIsRunning(true);
+    setError(null);
+    try {
+      await statusQuery.refetch();
+      await verifyWithPasskey();
+    } finally {
+      setIsRunning(false);
+    }
   });
   const enrolling = enrollment.phase.step !== 'idle';
 
@@ -148,7 +155,14 @@ export function StepUpCeremonyContent({
     if (isRunning) return;
     setIsRunning(true);
     setError(null);
+    try {
+      await verifyWithPasskey();
+    } finally {
+      setIsRunning(false);
+    }
+  }
 
+  async function verifyWithPasskey() {
     try {
       const result = await runStepUpCeremony({
         requestOptions: () => requestOptions(requirement),
@@ -169,8 +183,6 @@ export function StepUpCeremonyContent({
       }
     } catch {
       setError('Passkey verification did not complete. Try again.');
-    } finally {
-      setIsRunning(false);
     }
   }
 

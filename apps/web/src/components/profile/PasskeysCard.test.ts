@@ -536,6 +536,50 @@ describe('PasskeysCard', () => {
     expect(button(dialog()!, 'Add passkey').disabled).toBe(true);
   });
 
+  it('stops offering the old code when sending a new one fails', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(refused(502, { error: 'EMAIL_DELIVERY_FAILED' }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('We could not send the code email. Try again.');
+    expect(dialog()!.querySelector('input')).toBeNull();
+    expect(hasButton(dialog()!, 'Try again')).toBe(true);
+
+    act(() => button(dialog()!, 'Cancel').click());
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(requestBody(2)).toEqual({ action: 'send_code' });
+  });
+
+  it('shows the code entry for a code sent while the dialog was closed', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    const delivery = Promise.withResolvers<typeof SENT>();
+    mockFetch.mockReturnValueOnce(delivery.promise);
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    act(() => button(dialog()!, 'Cancel').click());
+    expect(dialog()).toBeNull();
+
+    delivery.resolve(SENT);
+    await settle();
+    expect(dialog()).toBeNull();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+
+    expect(dialog()?.textContent).toContain('We sent a 6-digit code to person@example.com.');
+    expect(dialog()!.querySelector('input')).not.toBeNull();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('offers a retry when the code email could not be sent', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
     mockFetch

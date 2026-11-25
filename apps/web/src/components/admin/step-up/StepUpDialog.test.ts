@@ -273,6 +273,48 @@ describe('StepUpDialog', () => {
     expect(onVerified).toHaveBeenCalledTimes(1);
   });
 
+  it('stays busy while the status refreshes after the passkey is added', async () => {
+    mockStatus.enrolled = false;
+    const refreshed = Promise.withResolvers<object>();
+    mockRefetchStatus.mockReturnValueOnce(refreshed.promise);
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          emailCodeId: 'email-code-1',
+          expiresInSeconds: 600,
+          email: 'admin@example.com',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ challengeId: 'r', options: {} }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ credentialId: 'credential' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ challengeId: 's', options: {} }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ verified: true }) });
+    mockStartRegistration.mockResolvedValue({ id: 'new-credential' });
+    mockStartAuthentication.mockResolvedValue({ id: 'assertion' });
+    mount();
+
+    act(() => button('Add a passkey')?.click());
+    await flush();
+    typeCode('123456');
+    submitCodeForm();
+    await flush();
+
+    expect(mockRefetchStatus).toHaveBeenCalledTimes(1);
+    expect(button('Add a passkey')).toBeUndefined();
+    expect(button('Waiting for your passkey...')?.disabled).toBe(true);
+    act(() => button('Waiting for your passkey...')?.click());
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      refreshed.resolve({});
+    });
+    await flush();
+
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(onVerified).toHaveBeenCalledTimes(1);
+  });
+
   it('verifies once and reports success', async () => {
     mockFetch
       .mockResolvedValueOnce({ ok: true, json: async () => ({ challengeId: 'c', options: {} }) })

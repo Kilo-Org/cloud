@@ -237,17 +237,23 @@ export function usePasskeyEnrollment(onEnrolled: () => Promise<unknown> | void):
       const owns = takeOwnership();
       setPhase({ step: 'sending', previous });
       const result = await sendPasskeyEnrollmentCode();
+      // The server's codes changed whether or not this dialog is still open: a
+      // new code is in the inbox, and every refusal except the cooldown has
+      // already ended the previous code.
+      const keepsPrevious = !result.ok && result.refusal.kind === 'cooldown';
+      if (result.ok) lastSentRef.current = result.sent;
+      else if (!keepsPrevious) lastSentRef.current = null;
       if (!owns()) return;
       if (result.ok) {
-        lastSentRef.current = result.sent;
         setCode('');
         setPhase({ step: 'enter_code', sent: result.sent, problem: null });
         return;
       }
-      if (previous && previous.expiresAt > Date.now() && !endsEnrollment(result.refusal)) {
+      if (keepsPrevious && previous && previous.expiresAt > Date.now()) {
         setPhase({ step: 'enter_code', sent: previous, problem: result.refusal });
         return;
       }
+      setCode('');
       setPhase({ step: 'refused', refusal: result.refusal });
     },
     [setPhase, takeOwnership]
@@ -397,6 +403,11 @@ export function PasskeyEnrollmentSteps({
           <Loader2 className="size-4 animate-spin" />
           Sending a code to your email…
         </p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={cancel}>
+            Cancel
+          </Button>
+        </div>
       </div>
     );
   }

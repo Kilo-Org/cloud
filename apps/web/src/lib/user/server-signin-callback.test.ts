@@ -61,10 +61,16 @@ import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config'
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { user_auth_provider, type User } from '@kilocode/db/schema';
+import { auth_audit_logs, user_auth_provider, type User } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { eq } from 'drizzle-orm';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -1091,5 +1097,123 @@ describe('the NextAuth callback for an account link', () => {
       '/connected-accounts'
     );
     expect(cookieStore.get(SESSION_COOKIE)?.value).toBe(sessionBefore);
+  });
+});
+
+describe('sign-in audit rows', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    cookieStore.clear();
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+    mockCreateOrUpdateUser.mockReset().mockResolvedValue({
+      success: true,
+      user: { id: 'settled-user', blocked_reason: null } as never,
+      isNew: false,
+    });
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  async function rowsForEmail(email: string) {
+    return db
+      .select()
+      .from(auth_audit_logs)
+      .where(eq(auth_audit_logs.subject_email_hash, authAuditEmailHash(email)));
+  }
+
+  function googleSignIn(email: string) {
+    return signIn({
+      user: { id: 'x', email, name: 'Audit Google', image: '' },
+      account: { provider: 'google', providerAccountId: `sub-${randomUUID()}`, type: 'oauth' },
+      profile: { email_verified: true, email },
+    } as never);
+  }
+
+  it('records a successful sign-in with the settled user and only a hash of the email', async () => {
+    const email = `audit-success-${randomUUID()}@example.com`;
+    setValidTurnstileCookie();
+
+    await expect(googleSignIn(email)).resolves.toBe(true);
+
+    const rows = await rowsForEmail(email);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'success',
+        user_id: 'settled-user',
+        method: 'google',
+        failure_reason: null,
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'success',
+        userId: 'settled-user',
+        ip: '203.0.113.7',
+      }),
+    ]);
+    expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
+  });
+
+  it('records a refused sign-in with its refusal code and only a hash of the email', async () => {
+    const email = `audit-refused-${randomUUID()}@example.com`;
+
+    const result = await googleSignIn(email);
+
+    expect(result).toEqual(expect.stringContaining('TURNSTILE_REQUIRED'));
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    const rows = await rowsForEmail(email);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        user_id: null,
+        method: 'google',
+        failure_reason: 'turnstile_required',
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({ outcome: 'failure', failureReason: 'turnstile_required' }),
+    ]);
+    expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
+  });
+
+  it('records a magic link that authorize refuses', async () => {
+    // A Credentials provider keeps its configured id and authorize under
+    // `options`; next-auth's provider type does not expose that authorize.
+    const provider = authOptions.providers.find(
+      candidate =>
+        'options' in candidate &&
+        typeof candidate.options === 'object' &&
+        candidate.options !== null &&
+        'id' in candidate.options &&
+        candidate.options.id === 'email'
+    ) as unknown as {
+      options: { authorize: (credentials: { token: string }) => Promise<unknown> };
+    };
+
+    await expect(
+      provider.options.authorize({ token: `unknown-${randomUUID()}` })
+    ).resolves.toBeNull();
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        method: 'email',
+        failureReason: 'invalid_token',
+        persisted: true,
+      }),
+    ]);
   });
 });

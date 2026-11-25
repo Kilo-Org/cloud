@@ -60,6 +60,11 @@ import {
   setPendingLinkCookie,
 } from '@/lib/auth/pending-link';
 import { isSignInMethodLinkAllowed } from '@/lib/auth/sign-in-method-change';
+import {
+  authAuditCode,
+  authAuditRequestFromCurrentRequest,
+  recordAuthEvent,
+} from '@/lib/auth/auth-audit';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
 import type { AuthErrorType, SignupStepUpMethod } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -403,6 +408,69 @@ async function mayConnectOpenAiChatGptSharedServices(
 function openAiChatGptConnectFailureUrl(organizationId: string, error: AuthErrorType): string {
   const query = new URLSearchParams({ openai_error: error });
   return `/organizations/${organizationId}/byok?${query.toString()}`;
+}
+
+/**
+ * How one run of the signIn callback ended. A deferred run handed the
+ * identity to the pending-link completion route, which decides it there.
+ */
+type SignInDecision =
+  | { outcome: 'success' }
+  | { outcome: 'failure'; failureReason: string }
+  | { outcome: 'deferred' };
+
+/**
+ * Records the final decision of one signIn callback run: one `auth.sign_in`
+ * row per sign-in, or one `auth.sign_in_method.link` row for a refused link.
+ * A completed link writes no row here: `recordSignInMethodChange` records it.
+ */
+async function recordSignInDecision(
+  decision: SignInDecision | null,
+  subject: { linking: boolean; method: string | null; email: string | null; userId: string | null }
+): Promise<void> {
+  if (decision === null) {
+    captureException(new Error('signIn callback ended without an audit decision'), {
+      tags: { operation: 'auth_audit_sign_in' },
+    });
+    return;
+  }
+  if (decision.outcome === 'deferred') return;
+  if (subject.linking && decision.outcome === 'success') return;
+  const entry = {
+    action: subject.linking ? ('auth.sign_in_method.link' as const) : ('auth.sign_in' as const),
+    userId: subject.userId,
+    method: subject.method,
+    email: subject.email,
+  };
+  await recordAuthEvent(
+    await authAuditRequestFromCurrentRequest(),
+    decision.outcome === 'success'
+      ? { ...entry, outcome: 'success' }
+      : {
+          ...entry,
+          outcome: 'failure',
+          failureReason: authAuditCode(decision.failureReason) ?? decision.failureReason,
+        }
+  );
+}
+
+/**
+ * Records a magic link or passkey ticket that a Credentials `authorize`
+ * refused. NextAuth runs no signIn callback after a refusal, so this is the
+ * attempt's only row.
+ */
+async function recordCredentialsSignInFailure(
+  method: 'email' | 'passkey',
+  failureReason: string,
+  userId?: string
+): Promise<void> {
+  await recordAuthEvent(await authAuditRequestFromCurrentRequest(), {
+    action: 'auth.sign_in',
+    outcome: 'failure',
+    method,
+    failureReason,
+    userId: userId ?? null,
+  });
 }
 
 function createAppleAccountInfo(
@@ -1047,12 +1115,15 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.token) {
+          await recordCredentialsSignInFailure('email', 'missing_token');
           return null;
         }
 
         const tokenData = await verifyAndConsumeMagicLinkToken(credentials.token);
 
         if (!tokenData) {
+          // Unknown, expired, or already used.
+          await recordCredentialsSignInFailure('email', 'invalid_token');
           return null;
         }
 
@@ -1075,6 +1146,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.ticket) {
+          await recordCredentialsSignInFailure('passkey', 'missing_ticket');
           return null;
         }
 
@@ -1082,11 +1154,13 @@ export const authOptions: NextAuthOptions = {
         if (!ticket) {
           // Unknown, expired, or already redeemed: a replayed ticket yields no
           // user, so NextAuth mints no session for it.
+          await recordCredentialsSignInFailure('passkey', 'invalid_ticket');
           return null;
         }
 
         const user = await findUserById(ticket.kilo_user_id);
         if (!user) {
+          await recordCredentialsSignInFailure('passkey', 'user_not_found', ticket.kilo_user_id);
           return null;
         }
 
@@ -1156,11 +1230,18 @@ export const authOptions: NextAuthOptions = {
       let accountInfo: CreateOrUpdateUserArgs | undefined;
       let isAccountLinking: boolean | null = null;
       let linkingSession: AccountLinkingSession | null = null;
+      // Every return below sets the decision that the `finally` records.
+      let decision: SignInDecision | null = null;
+      let auditUserId: string | null = null;
+      const refuse = (failureReason: string) => {
+        decision = { outcome: 'failure', failureReason };
+      };
       const redirectContext = await getSignInRedirectContext();
       const redirectUrlForCode = (
         error: AuthErrorType,
         stepUpMethods?: readonly SignupStepUpMethod[]
       ): string => {
+        refuse(error);
         const redirectUrl = new URL(
           authFailureRedirectUrl(error, Boolean(isAccountLinking), stepUpMethods),
           'http://localhost'
@@ -1175,13 +1256,24 @@ export const authOptions: NextAuthOptions = {
         }
         return `${redirectUrl.pathname}?${redirectUrl.searchParams.toString()}`;
       };
+      // An organization-scoped OpenAI connect returns its refusal to the card
+      // that started it.
+      const openAiConnectRefusal = (organizationId: string, error: AuthErrorType): string => {
+        refuse(error);
+        return openAiChatGptConnectFailureUrl(organizationId, error);
+      };
       try {
-        if (!account) return `TRAP: No account found`;
+        if (!account) {
+          refuse('no_account');
+          return `TRAP: No account found`;
+        }
 
         // early return for fake auth
         const isFakeLogin = account.provider === 'fake-login';
-        if (isFakeLogin && !allow_fake_login)
+        if (isFakeLogin && !allow_fake_login) {
+          refuse('fake_login_disabled');
           return 'Fake login is not available in production mode';
+        }
 
         // early return for email auth (magic link)
         const isEmailAuth = account.provider === 'email';
@@ -1209,6 +1301,7 @@ export const authOptions: NextAuthOptions = {
         // linking failure. The read above consumed the cookie, so a refusal is
         // final.
         if (isAccountLinking && linkingSession) {
+          auditUserId = linkingSession.existingUserId;
           // The link start checked the domain's SSO policy; the callback checks
           // it again so a policy change in between, or a link started before
           // the policy applied, can not add a method SSO forbids.
@@ -1220,7 +1313,7 @@ export const authOptions: NextAuthOptions = {
               : 'SIGN-IN-METHOD-SSO-REQUIRED';
           if (linkRefusal) {
             if (account.provider === 'openai' && linkingSession.organizationId) {
-              return openAiChatGptConnectFailureUrl(linkingSession.organizationId, linkRefusal);
+              return openAiConnectRefusal(linkingSession.organizationId, linkRefusal);
             }
             return redirectUrlForCode(linkRefusal);
           }
@@ -1253,6 +1346,7 @@ export const authOptions: NextAuthOptions = {
                 emailCodeAllowed: false,
               });
               await setPendingLinkCookie(created.secret);
+              decision = { outcome: 'deferred' };
               return pendingLinkCompleteUrl;
             }
             warnInSentry('SECURITY: Account link refused: the session does not match the link', {
@@ -1262,10 +1356,7 @@ export const authOptions: NextAuthOptions = {
             // card, which reads `openai_error`; return the refusal there the
             // same way the shared-services re-check below does.
             if (account.provider === 'openai' && linkingSession.organizationId) {
-              return openAiChatGptConnectFailureUrl(
-                linkingSession.organizationId,
-                'LINKING-FAILED'
-              );
+              return openAiConnectRefusal(linkingSession.organizationId, 'LINKING-FAILED');
             }
             return redirectUrlForCode('LINKING-FAILED');
           }
@@ -1274,10 +1365,7 @@ export const authOptions: NextAuthOptions = {
               extra: { provider: accountInfo.provider },
             });
             if (account.provider === 'openai' && linkingSession.organizationId) {
-              return openAiChatGptConnectFailureUrl(
-                linkingSession.organizationId,
-                'LINKING-FAILED'
-              );
+              return openAiConnectRefusal(linkingSession.organizationId, 'LINKING-FAILED');
             }
             return redirectUrlForCode('LINKING-FAILED');
           }
@@ -1336,6 +1424,7 @@ export const authOptions: NextAuthOptions = {
 
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
+        if (!isAccountLinking) auditUserId = existingUser?.id ?? null;
 
         if (existingUser && isBlockedAccount(existingUser)) {
           return redirectUrlForCode('BLOCKED');
@@ -1371,6 +1460,7 @@ export const authOptions: NextAuthOptions = {
               return redirectUrlForCode('UNKNOWN-ERROR');
             }
             if (ssoAuthority.status === 'required') {
+              refuse('sso_required');
               return preserveSignInRedirectContext(
                 ssoSignInRedirectUrl(domainToCheck),
                 redirectContext
@@ -1400,6 +1490,7 @@ export const authOptions: NextAuthOptions = {
         // `user_auth_provider` row is written for a passkey: the jwt callback
         // resolves it by user id.
         if (accountInfo.provider === 'passkey') {
+          decision = { outcome: 'success' };
           return true;
         }
 
@@ -1426,9 +1517,12 @@ export const authOptions: NextAuthOptions = {
             trackingContext,
             getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
           );
-          return typeof result === 'string'
-            ? preserveSignInRedirectContext(result, redirectContext)
-            : result;
+          if (typeof result === 'string') {
+            refuse(new URL(result, 'http://localhost').searchParams.get('error') ?? 'sso_refused');
+            return preserveSignInRedirectContext(result, redirectContext);
+          }
+          decision = { outcome: 'success' };
+          return result;
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -1529,6 +1623,7 @@ export const authOptions: NextAuthOptions = {
             );
             if (created) {
               await setPendingLinkCookie(created.secret);
+              refuse('DIFFERENT-OAUTH');
               return pendingLinkPageUrl;
             }
           }
@@ -1560,6 +1655,7 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
+        auditUserId = result.user.id;
         if (isBlockedAccount(result.user)) {
           return redirectUrlForCode(`BLOCKED`);
         }
@@ -1576,7 +1672,9 @@ export const authOptions: NextAuthOptions = {
           linkingSession.organizationId &&
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
-          return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+          const refusal = openAiConnectRefusal(linkingSession.organizationId, 'LINKING-FAILED');
+          refuse('shared_services_not_allowed');
+          return refusal;
         }
         // A link keeps the session that started it. Returning a redirect makes
         // NextAuth stop before the jwt callback, so no new session token is
@@ -1588,6 +1686,7 @@ export const authOptions: NextAuthOptions = {
           if (account.provider === 'openai' && account.access_token) {
             await persistOpenAiChatGptConnection(result.user.id, account, profile);
           }
+          decision = { outcome: 'success' };
           return accountLinkCompletionPath(await readCallbackUrlCookie(), accountInfo.provider);
         }
 
@@ -1597,6 +1696,7 @@ export const authOptions: NextAuthOptions = {
           // mutate the profile to track if its new (only for new user registrations)
           extendedProfile.isNewUser = 'isNew' in result ? result.isNew : false; // Add isNewUser to the profile
         }
+        decision = { outcome: 'success' };
         return true;
       } catch (error) {
         const operation = isAccountLinking ? 'account_linking' : 'user_creation';
@@ -1626,7 +1726,16 @@ export const authOptions: NextAuthOptions = {
           });
 
         // Clear linking session if it was an account linking attempt
-        return redirectUrlForCode('UNKNOWN-ERROR');
+        const redirect = redirectUrlForCode('UNKNOWN-ERROR');
+        refuse('unexpected_error');
+        return redirect;
+      } finally {
+        await recordSignInDecision(decision, {
+          linking: Boolean(isAccountLinking),
+          method: account?.provider ?? null,
+          email: user.email ?? null,
+          userId: auditUserId,
+        });
       }
     },
     async jwt({ token, account, user, trigger, profile }) {

@@ -137,6 +137,7 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     jest.clearAllMocks();
     mockGetUserFromAuth.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false } as never);
+    mockDeny.mockResolvedValue({ requestId: 'device-auth-request-1' });
   });
 
   function createRequest(code: string, headers?: Record<string, string>) {
@@ -263,6 +264,7 @@ describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => 
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCancel.mockResolvedValue({ requestId: 'device-auth-request-1' });
   });
 
   function createRequest(code: string) {

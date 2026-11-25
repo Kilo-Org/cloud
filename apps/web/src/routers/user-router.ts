@@ -58,6 +58,7 @@ import {
   SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES,
   type SignInMethodChangeRefusal,
 } from '@/lib/auth/sign-in-method-change-codes';
+import { auditAuthProcedure, type AuthAuditAttempt } from '@/lib/auth/auth-audit';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
@@ -181,8 +182,8 @@ async function revokeOwnedDeviceSession(
   sessionId: string,
   userId: string,
   reason: 'user_revoked' | 'logout'
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const revoked = await db
     .update(device_sessions)
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where(
@@ -191,8 +192,33 @@ async function revokeOwnedDeviceSession(
         eq(device_sessions.kilo_user_id, userId),
         isNull(device_sessions.revoked_at)
       )
-    );
+    )
+    .returning({ id: device_sessions.id });
   invalidateDeviceSession(sessionId);
+  return revoked.length > 0;
+}
+
+/**
+ * Revokes a device session as one audited attempt. The caller is answered
+ * the same whether or not a session changed, but the audit row records a
+ * session that was missing, foreign, or already revoked as a failure.
+ */
+async function auditedRevokeOwnedDeviceSession(
+  ctx: TRPCContext & { user: { id: string } },
+  sessionId: string,
+  reason: 'user_revoked' | 'logout'
+): Promise<void> {
+  const attempt: AuthAuditAttempt = {
+    action: 'auth.device_session.revoke',
+    userId: ctx.user.id,
+    method: reason,
+    metadata: { deviceSessionId: sessionId },
+  };
+  await auditAuthProcedure(ctx, attempt, async () => {
+    if (!(await revokeOwnedDeviceSession(sessionId, ctx.user.id, reason))) {
+      attempt.failureReason = 'session_not_active';
+    }
+  });
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -990,24 +1016,40 @@ export const userRouter = createTRPCRouter({
         managementAuthorization: z.string().trim().min(1).max(512).optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
-      if (!credentialId) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
-      }
-
-      await runWithPasskeyManagement(
+    .mutation(async ({ ctx, input }) =>
+      auditAuthProcedure(
         ctx,
-        { operation: 'rename', authorization: input.managementAuthorization },
-        async fromDb => {
-          const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name, fromDb);
-          if (!renamed) {
+        {
+          action: 'auth.passkey.rename',
+          userId: ctx.user.id,
+          method: ctx.credential,
+          metadata: { passkeyId: input.id },
+        },
+        async () => {
+          const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+          if (!credentialId) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
           }
+
+          await runWithPasskeyManagement(
+            ctx,
+            { operation: 'rename', authorization: input.managementAuthorization },
+            async fromDb => {
+              const renamed = await renameOwnedPasskey(
+                ctx.user.id,
+                credentialId,
+                input.name,
+                fromDb
+              );
+              if (!renamed) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+              }
+            }
+          );
+          return successResult();
         }
-      );
-      return successResult();
-    }),
+      )
+    ),
 
   deletePasskey: baseProcedure
     .input(
@@ -1016,110 +1058,146 @@ export const userRouter = createTRPCRouter({
         managementAuthorization: z.string().trim().min(1).max(512).optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
-      if (!credentialId) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
-      }
-
-      await runWithPasskeyManagement(
+    .mutation(async ({ ctx, input }) =>
+      auditAuthProcedure(
         ctx,
-        { operation: 'remove', authorization: input.managementAuthorization },
-        async fromDb => {
-          const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
-          if (!deleted) {
+        {
+          action: 'auth.passkey.remove',
+          userId: ctx.user.id,
+          method: ctx.credential,
+          metadata: { passkeyId: input.id },
+        },
+        async () => {
+          const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+          if (!credentialId) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
           }
+
+          await runWithPasskeyManagement(
+            ctx,
+            { operation: 'remove', authorization: input.managementAuthorization },
+            async fromDb => {
+              const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
+              if (!deleted) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+              }
+            }
+          );
+          return successResult();
         }
-      );
-      return successResult();
-    }),
+      )
+    ),
 
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Account linking requires the web session that started it. A
-      // provider whose callback cannot carry that session (Apple) completes
-      // through the pending-link bounce instead. Refuse every provider the
-      // metadata does not offer for linking here instead of letting the
-      // round trip end in a failure on /connected-accounts.
-      if (!isAccountLinkingProvider(input.provider)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'This sign-in method cannot be added to an account.',
-        });
-      }
-      // An organization-scoped link records the organization on the linking
-      // session so the callback can store the BYOK connection for it. Only the
-      // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
-      // other provider must not carry the organization into its callback. The
-      // connection is the member's own, so membership is enough. The access
-      // denial must surface as-is, so it stays outside the try.
-      if (input.organizationId) {
-        if (input.provider !== 'openai') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Organization connections are only supported for OpenAI.',
-          });
+    .mutation(async ({ ctx, input }) =>
+      // Only a refusal is recorded here: the link itself happens in the
+      // provider callback, which records it through recordSignInMethodChange.
+      auditAuthProcedure(
+        ctx,
+        {
+          action: 'auth.sign_in_method.link',
+          userId: ctx.user.id,
+          method: input.provider,
+          skipSuccessRow: true,
+        },
+        async () => {
+          // Account linking requires the web session that started it. A
+          // provider whose callback cannot carry that session (Apple) completes
+          // through the pending-link bounce instead. Refuse every provider the
+          // metadata does not offer for linking here instead of letting the
+          // round trip end in a failure on /connected-accounts.
+          if (!isAccountLinkingProvider(input.provider)) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'This sign-in method cannot be added to an account.',
+            });
+          }
+          // An organization-scoped link records the organization on the linking
+          // session so the callback can store the BYOK connection for it. Only the
+          // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
+          // other provider must not carry the organization into its callback. The
+          // connection is the member's own, so membership is enough. The access
+          // denial must surface as-is, so it stays outside the try.
+          if (input.organizationId) {
+            if (input.provider !== 'openai') {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Organization connections are only supported for OpenAI.',
+              });
+            }
+            const role = await ensureOrganizationAccess(ctx, input.organizationId);
+            // The shared-services connection is an organization setting, so
+            // membership alone is not enough to connect it.
+            if (input.chatGptScope === 'shared_services' && role !== 'owner' && role !== 'admin') {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Only an organization owner or admin can connect shared services.',
+              });
+            }
+          } else if (input.chatGptScope === 'shared_services') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'A shared-services connection needs an organization.',
+            });
+          }
+
+          const binding = await signInMethodChangeBinding(ctx, 'link', input.provider);
+          await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
+
+          try {
+            // Create a secure linking session, bound to this browser session
+            await createAccountLinkingSession({
+              existingUserId: ctx.user.id,
+              webSessionId: binding.webSessionId,
+              targetProvider: input.provider,
+              organizationId: input.organizationId,
+              chatGptScope: input.chatGptScope,
+            });
+
+            return successResult();
+          } catch (error) {
+            console.error('Error initiating account link:', error);
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to initiate account linking',
+            });
+          }
         }
-        const role = await ensureOrganizationAccess(ctx, input.organizationId);
-        // The shared-services connection is an organization setting, so
-        // membership alone is not enough to connect it.
-        if (input.chatGptScope === 'shared_services' && role !== 'owner' && role !== 'admin') {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Only an organization owner or admin can connect shared services.',
-          });
-        }
-      } else if (input.chatGptScope === 'shared_services') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'A shared-services connection needs an organization.',
-        });
-      }
-
-      const binding = await signInMethodChangeBinding(ctx, 'link', input.provider);
-      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
-
-      try {
-        // Create a secure linking session, bound to this browser session
-        await createAccountLinkingSession({
-          existingUserId: ctx.user.id,
-          webSessionId: binding.webSessionId,
-          targetProvider: input.provider,
-          organizationId: input.organizationId,
-          chatGptScope: input.chatGptScope,
-        });
-
-        return successResult();
-      } catch (error) {
-        console.error('Error initiating account link:', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to initiate account linking',
-        });
-      }
-    }),
+      )
+    ),
 
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const binding = await signInMethodChangeBinding(ctx, 'unlink', input.provider);
-      // A refused unlink must not spend the code.
-      assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
-      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
-      const result = assertNoTrpcError(
-        await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
-      );
-      await recordSignInMethodChange({
-        user: ctx.user,
-        change: 'unlink',
-        provider: input.provider,
-        request: { ip: ctx.ip, route: ctx.trpcPath },
-      });
-      await sendSignInMethodRemovedNotice(ctx.user, input.provider);
-      return result;
-    }),
+    .mutation(async ({ ctx, input }) =>
+      // recordSignInMethodChange records the unlink; a refusal is recorded here.
+      auditAuthProcedure(
+        ctx,
+        {
+          action: 'auth.sign_in_method.unlink',
+          userId: ctx.user.id,
+          method: input.provider,
+          skipSuccessRow: true,
+        },
+        async () => {
+          const binding = await signInMethodChangeBinding(ctx, 'unlink', input.provider);
+          // A refused unlink must not spend the code.
+          assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
+          await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
+          const result = assertNoTrpcError(
+            await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
+          );
+          await recordSignInMethodChange({
+            user: ctx.user,
+            change: 'unlink',
+            provider: input.provider,
+            request: { ip: ctx.ip, route: ctx.trpcPath },
+          });
+          await sendSignInMethodRemovedNotice(ctx.user, input.provider);
+          return result;
+        }
+      )
+    ),
 
   // Emails a one-time code that authorizes one link or unlink from this
   // browser session. The code goes to the account's primary email address.
@@ -1170,35 +1248,49 @@ export const userRouter = createTRPCRouter({
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {
-    // A reset has to evict whoever may already hold a credential for the
-    // account, so it rotates both peppers and closes the device sessions in
-    // one transaction: a stolen token or browser session cannot survive it,
-    // and a failure part-way leaves the old credentials intact rather than
-    // half-evicted.
-    const revokedSessionIds = await db.transaction(async tx => {
-      await tx
-        .update(kilocode_users)
-        .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
-        .where(eq(kilocode_users.id, ctx.user.id));
+    const attempt: AuthAuditAttempt = {
+      action: 'auth.api_key.reset',
+      userId: ctx.user.id,
+      method: ctx.credential,
+    };
+    return auditAuthProcedure(ctx, attempt, async () => {
+      // A reset has to evict whoever may already hold a credential for the
+      // account, so it rotates both peppers and closes the device sessions in
+      // one transaction: a stolen token or browser session cannot survive it,
+      // and a failure part-way leaves the old credentials intact rather than
+      // half-evicted.
+      const revokedSessionIds = await db.transaction(async tx => {
+        await tx
+          .update(kilocode_users)
+          .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
+          .where(eq(kilocode_users.id, ctx.user.id));
 
-      return revokeUserSessions(tx, ctx.user.id, {
-        stepUp: 'api_key_reset',
-        deviceSession: 'api_key_reset',
+        return revokeUserSessions(tx, ctx.user.id, {
+          stepUp: 'api_key_reset',
+          deviceSession: 'api_key_reset',
+        });
       });
+
+      for (const sessionId of revokedSessionIds) {
+        invalidateDeviceSession(sessionId);
+      }
+      attempt.metadata = { revokedDeviceSessionCount: revokedSessionIds.length };
+
+      return successResult();
     });
-
-    for (const sessionId of revokedSessionIds) {
-      invalidateDeviceSession(sessionId);
-    }
-
-    return successResult();
   }),
 
-  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
-    await revokeWebSessions(ctx.user.id);
+  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) =>
+    auditAuthProcedure(
+      ctx,
+      { action: 'auth.sessions.revoke_all', userId: ctx.user.id, method: ctx.credential },
+      async () => {
+        await revokeWebSessions(ctx.user.id);
 
-    return successResult();
-  }),
+        return successResult();
+      }
+    )
+  ),
 
   // ─── Device Sessions ────────────────────────────────────────────────
 
@@ -1228,13 +1320,15 @@ export const userRouter = createTRPCRouter({
   revokeDeviceSessionById: baseProcedure
     .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
-      await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
+      await auditedRevokeOwnedDeviceSession(ctx, input.sessionId, 'user_revoked');
       return successResult();
     }),
 
   revokeCurrentDeviceSession: baseProcedure.mutation(async ({ ctx }) => {
+    // A browser session has no device session, so its call changes nothing
+    // and records nothing.
     if (ctx.deviceSessionId) {
-      await revokeOwnedDeviceSession(ctx.deviceSessionId, ctx.user.id, 'logout');
+      await auditedRevokeOwnedDeviceSession(ctx, ctx.deviceSessionId, 'logout');
     }
     return successResult();
   }),

@@ -2,6 +2,7 @@ import 'server-only';
 import { createHmac } from 'node:crypto';
 import { headers } from 'next/headers';
 import { captureException } from '@sentry/nextjs';
+import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { auth_audit_logs } from '@kilocode/db/schema';
 import type { AuthAuditAction, AuthAuditOutcome } from '@kilocode/db/schema-types';
@@ -12,6 +13,7 @@ import {
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
@@ -135,6 +137,47 @@ function auditCode(value: string | null | undefined, field: string): string | nu
   return INVALID_CODE;
 }
 
+/**
+ * A refusal code in audit form: lower case with `_` for `-`, so the
+ * `SIGNUP-STEP-UP` redirect code and the `INVALID_TOKEN` response code read
+ * as `signup_step_up` and `invalid_token`. Null when the value is not a code,
+ * such as a sentence meant for a person.
+ */
+export function authAuditCode(value: string): string | null {
+  const code = value.trim().toLowerCase().replaceAll('-', '_');
+  return AuditCode.safeParse(code).success ? code : null;
+}
+
+/**
+ * The failure code of a thrown error. A tRPC refusal names its client-facing
+ * code as its `UpstreamApiError` cause or, for a few refusals, as a message
+ * that is itself a code (`PASSKEY_MANAGEMENT_REQUIRED`); any other tRPC error
+ * records its tRPC code. Every other error is `internal_error`.
+ */
+export function authAuditErrorCode(error: unknown): string {
+  if (!(error instanceof TRPCError)) return 'internal_error';
+  if (error.cause instanceof UpstreamApiError) {
+    const upstream = authAuditCode(error.cause.upstreamCode);
+    if (upstream) return upstream;
+  }
+  if (/^[A-Z][A-Z0-9_]+$/.test(error.message)) return error.message.toLowerCase();
+  return error.code.toLowerCase();
+}
+
+/** The `error` code a refused JSON response carries, else `http_<status>`. */
+async function responseFailureCode(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.clone().json();
+    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') {
+      const code = authAuditCode(body.error);
+      if (code) return code;
+    }
+  } catch {
+    // A response without a JSON body names no code.
+  }
+  return `http_${response.status}`;
+}
+
 function subjectEmailHash(email: string | null | undefined): string | null {
   if (!email) return null;
   try {
@@ -143,6 +186,98 @@ function subjectEmailHash(email: string | null | undefined): string | null {
     captureException(error, { tags: { operation: 'auth_audit_email_hash' } });
     return null;
   }
+}
+
+/**
+ * One auth attempt that {@link auditAuthRoute} or {@link auditAuthProcedure}
+ * records when it ends. The handler fills in the subject as it learns it.
+ */
+export type AuthAuditAttempt = AuthAuditEntryFields & {
+  /**
+   * The attempt failed with this code, whatever the response or error says.
+   * Set it where the response carries no code, or where the attempt failed
+   * although the caller is answered as if it succeeded.
+   */
+  failureReason?: string;
+  /**
+   * The outcome is not a success this wrapper records: a pending poll, or a
+   * success another writer records (`recordSignInMethodChange`).
+   */
+  skipSuccessRow?: boolean;
+};
+
+function attemptFields(attempt: AuthAuditAttempt): AuthAuditEntryFields {
+  return {
+    action: attempt.action,
+    userId: attempt.userId,
+    method: attempt.method,
+    email: attempt.email,
+    metadata: attempt.metadata,
+  };
+}
+
+async function recordAttemptOutcome(
+  request: AuthAuditRequest,
+  attempt: AuthAuditAttempt,
+  failureReason: string | null
+): Promise<void> {
+  if (failureReason !== null) {
+    await recordAuthEvent(request, {
+      ...attemptFields(attempt),
+      outcome: 'failure',
+      failureReason,
+    });
+  } else if (!attempt.skipSuccessRow) {
+    await recordAuthEvent(request, { ...attemptFields(attempt), outcome: 'success' });
+  }
+}
+
+/**
+ * Runs a route handler as one auth attempt. A response below 400 is a success;
+ * a refused response records the code in its `error` field, or `http_<status>`
+ * when it carries none. A throw records `internal_error` and rethrows.
+ */
+export async function auditAuthRoute(
+  request: AuthAuditRequest,
+  attempt: AuthAuditAttempt,
+  run: () => Promise<Response>
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await run();
+  } catch (error) {
+    await recordAttemptOutcome(request, attempt, attempt.failureReason ?? 'internal_error');
+    throw error;
+  }
+  const failureReason =
+    attempt.failureReason ?? (response.status >= 400 ? await responseFailureCode(response) : null);
+  await recordAttemptOutcome(request, attempt, failureReason);
+  return response;
+}
+
+/**
+ * Runs a tRPC resolver body as one auth attempt. A throw records
+ * {@link authAuditErrorCode} of the error and rethrows it unchanged.
+ */
+export async function auditAuthProcedure<T>(
+  ctx: { ip?: string | null; trpcPath?: string },
+  attempt: AuthAuditAttempt,
+  run: () => Promise<T>
+): Promise<T> {
+  const request = authAuditRequestFromTrpc(ctx);
+  let result: T;
+  try {
+    result = await run();
+  } catch (error) {
+    await recordAttemptOutcome(
+      request,
+      attempt,
+      attempt.failureReason ?? authAuditErrorCode(error)
+    );
+    throw error;
+  }
+  await recordAttemptOutcome(request, attempt, attempt.failureReason ?? null);
+  return result;
 }
 
 export async function recordAuthEvent(

@@ -34,6 +34,7 @@ describe('POST /api/device-auth/tokens', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApprove.mockResolvedValue({ requestId: 'device-auth-request-1' });
   });
 
   it('approves a valid code for an authenticated same-origin session', async () => {

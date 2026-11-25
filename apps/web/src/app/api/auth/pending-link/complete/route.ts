@@ -20,6 +20,11 @@ import {
   type SignInMethodChangeRefusal,
 } from '@/lib/auth/sign-in-method-change-codes';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 const codeProofSchema = z.object({
   code: z.string().regex(new RegExp(`^\\d{${SIGN_IN_METHOD_CHANGE_CODE_LENGTH}}$`)),
@@ -117,6 +122,17 @@ export const GET = withRestTiming('/api/auth/pending-link/complete', async () =>
 });
 
 export const POST = withRestTiming('/api/auth/pending-link/complete', async (request: Request) => {
+  // A refusal is recorded here; the link itself is recorded by
+  // recordSignInMethodChange when completePendingLink attaches it.
+  const attempt: AuthAuditAttempt = { action: 'auth.sign_in_method.link' };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/pending-link/complete'),
+    attempt,
+    () => attachPendingLink(request, attempt)
+  );
+});
+
+async function attachPendingLink(request: Request, attempt: AuthAuditAttempt): Promise<Response> {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
   }
@@ -127,6 +143,8 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
     await clearPendingLinkCookie();
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
+  attempt.userId = row.kilo_user_id;
+  attempt.method = row.provider;
 
   const session = await getUserFromSessionForCredentialIssuance();
   const sessionUser = session.user;
@@ -156,7 +174,8 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
   }
 
   await clearPendingLinkCookie();
+  attempt.skipSuccessRow = true;
   return NextResponse.json({
     redirectTo: redirectTargetFor(row.kind, completed.provider, row.callback_path),
   });
-});
+}

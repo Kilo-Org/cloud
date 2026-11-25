@@ -1534,6 +1534,7 @@ describe('Device Auth', () => {
 
       await expect(consumeDeviceAuthByDeviceCode(device.deviceCode)).resolves.toEqual({
         status: 'expired',
+        requestId: expect.any(String),
       });
       const deviceRequest = await getDeviceAuthRequest(device.userCode);
       expect(deviceRequest?.status).toBe('expired');
@@ -1542,7 +1543,10 @@ describe('Device Auth', () => {
       await approveDeviceAuthRequest(legacy.userCode, testUserId);
       await setDeadline(legacy.code, deadline);
 
-      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({ status: 'expired' });
+      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({
+        status: 'expired',
+        requestId: expect.any(String),
+      });
       const legacyRequest = await getDeviceAuthRequest(legacy.userCode);
       expect(legacyRequest?.status).toBe('expired');
     });

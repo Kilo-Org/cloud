@@ -62,6 +62,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
+  captureException: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),

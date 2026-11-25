@@ -67,6 +67,11 @@ import {
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 const posthogClient = PostHogClient();
 
@@ -290,8 +295,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // any branch so an early refusal is counted too; every call is a no-op for
   // other clients. A thrown request is still recorded, as the 500 it surfaces.
   const telemetry = startNativeTokenTelemetry(request);
+  // One audit row per request, success or the refusal code the response carries.
+  const attempt: AuthAuditAttempt = { action: 'auth.sign_in', metadata: { client: 'native' } };
   try {
-    const response = await runNativeTokenExchange(request, telemetry);
+    const response = await auditAuthRoute(
+      authAuditRequestFromHeaders(request.headers, '/api/auth/native/token'),
+      attempt,
+      () => runNativeTokenExchange(request, telemetry, attempt)
+    );
     telemetry.emit(response.status);
     return response;
   } catch (error) {
@@ -302,7 +313,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
 async function runNativeTokenExchange(
   request: Request,
-  telemetry: NativeTokenTelemetry
+  telemetry: NativeTokenTelemetry,
+  attempt: AuthAuditAttempt
 ): Promise<Response> {
   // A body that did not parse is a transport error; a body that parsed but did
   // not match the schema is a request error. They stay separate so neither is
@@ -320,6 +332,7 @@ async function runNativeTokenExchange(
   }
 
   const data = validation.data;
+  attempt.method = data.provider;
 
   // ── Step 0: Client-address rate limit ────────────────────────────────────
   // Counted before the admission gate so one address cannot spend the provider
@@ -391,6 +404,8 @@ async function runNativeTokenExchange(
     }
 
     const user = await findUserById(ticket.kilo_user_id);
+    attempt.userId = ticket.kilo_user_id;
+    attempt.email = user?.google_user_email ?? null;
     if (!user) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -486,6 +501,7 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
@@ -533,6 +549,7 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
@@ -559,7 +576,9 @@ async function runNativeTokenExchange(
     // resolved for that same address. An alias of another account's address is
     // a different address: it settles the alias, and the signup rules refuse it
     // when the normalized address is already taken.
+    attempt.email = data.email;
     const existingUser = await findUserBySignInCodeEmail(data.email);
+    attempt.userId = existingUser?.id ?? null;
     const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
@@ -610,6 +629,7 @@ async function runNativeTokenExchange(
         true,
         verifyNewAccountAdmission
       );
+      if (result.success) attempt.userId = result.user.id;
       if (!result.success) {
         phase = 'release';
         return settlementFailureResponse(result, args);
@@ -767,6 +787,7 @@ async function runNativeTokenExchange(
     true,
     verifyNewAccountAdmission
   );
+  if (result.success) attempt.userId = result.user.id;
   if (!result.success) {
     return settlementFailureResponse(result, args);
   }

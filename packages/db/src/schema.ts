@@ -10248,7 +10248,6 @@ export const auth_audit_logs = pgTable(
   table => [
     index('IDX_auth_audit_logs_created_at').on(table.created_at),
     index('IDX_auth_audit_logs_user_id_created_at').on(table.user_id, table.created_at),
-    index('IDX_auth_audit_logs_action_created_at').on(table.action, table.created_at),
     index('IDX_auth_audit_logs_subject_email_hash_created_at')
       .on(table.subject_email_hash, table.created_at)
       .where(sql`${table.subject_email_hash} IS NOT NULL`),

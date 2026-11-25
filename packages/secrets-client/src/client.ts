@@ -27,6 +27,11 @@ export const ATTEMPT_TIMEOUT_MS = 5_000;
  * it, across failed attempts and backoff; it covers STS filling an empty bundle object.
  */
 export const FIRST_LOAD_DEADLINE_MS = 25_000;
+/**
+ * How long a request is kept alive for an unanswered call after its read returns: long enough
+ * for a slow STS answer to still land, short enough to bound the idle billing of a hung call.
+ */
+export const KEEP_ALIVE_MS = 30_000;
 const BACKOFF_BASE_MS = 5_000;
 const BACKOFF_CAP_MS = 240_000;
 
@@ -249,17 +254,26 @@ export function createSecrets(transport: BundleTransport): Secrets {
   }
 
   /**
-   * Every exit, return or throw, hands this read's unanswered attempts to its own `waitUntil`:
-   * a call whose request ends is cancelled, and STS may already have written the delivery it
-   * answers. Another request's attempt is never handed over.
+   * Every exit, return or throw, hands this read's unanswered attempts to its own `waitUntil`,
+   * each for at most `KEEP_ALIVE_MS`: a call whose request ends is cancelled, and STS may already
+   * have written the delivery it answers. Another request's attempt is never handed over.
    */
   async function currentBundle(ctx?: SecretsExecutionContext): Promise<CachedBundle> {
     const owned: Owned[] = [];
     try {
       return await readBundle(owned);
     } finally {
-      for (const own of owned) if (own.pending) ctx?.waitUntil(own.settled);
+      if (ctx !== undefined) {
+        for (const own of owned) if (own.pending) ctx.waitUntil(withinKeepAlive(own.settled));
+      }
     }
+  }
+
+  /** Settles with the call, or after `KEEP_ALIVE_MS` if it has not answered by then. */
+  function withinKeepAlive(settled: Promise<void>): Promise<void> {
+    const bound = Promise.withResolvers<void>();
+    const handle = setTimeout(bound.resolve, KEEP_ALIVE_MS);
+    return Promise.race([settled, bound.promise]).finally(() => clearTimeout(handle));
   }
 
   async function readBundle(owned: Owned[]): Promise<CachedBundle> {

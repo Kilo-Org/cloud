@@ -1,6 +1,6 @@
 import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSecrets } from '../src/client';
+import { KEEP_ALIVE_MS, createSecrets } from '../src/client';
 import { SecretUnavailableError } from '../src/errors';
 
 const ETAG_1 = '"0123456789abcdef"';
@@ -245,6 +245,21 @@ describe('createSecrets', () => {
     expect(transport).toHaveBeenCalledTimes(2);
     // The request ends with the read; without waitUntil its calls would be cancelled.
     expect(ctx.scheduled).toHaveLength(2);
+  });
+
+  it('keeps a never-answering call alive for at most the keep-alive bound', async () => {
+    const transport = vi.fn<Transport>(hung);
+    const secrets = createSecrets(transport);
+    const ctx = context();
+
+    await failureWithin(secrets.get(SECRET, ctx), 25);
+    const kept = ctx.scheduled.map(track);
+    expect(kept).toHaveLength(2);
+
+    await advance(KEEP_ALIVE_MS / 1000 - 0.1);
+    expect(kept.map(k => k.state.settled)).toEqual([false, false]);
+    await advance(0.1);
+    expect(kept.map(k => k.state.settled)).toEqual([true, true]);
   });
 
   it('widens the gap between attempts while STS keeps failing', async () => {

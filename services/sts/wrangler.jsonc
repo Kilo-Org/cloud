@@ -46,7 +46,7 @@
     "STS_ENVIRONMENT": "production",
     "STS_ISSUER": "https://sts.kiloapps.io",
     "MANAGER_BASE_URL": "https://eu.infisical.com",
-    // Production prerequisites: README.md#production-prerequisites.
+    // Merge gate and post-merge steps: README.md#merge-gate-the-merge-to-main-is-the-first-production-deploy.
     "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
     "MANAGER_ENVIRONMENT_SLUG": "production",
     "MANAGER_IDENTITY_ID": "c531ad9b-eec9-4f93-b173-e14d3d94f6ef",

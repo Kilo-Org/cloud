@@ -106,7 +106,8 @@ at the start of each entry.
 | `MANAGER_IDENTITY_ID` | The Infisical machine identity STS logs in as, one per environment. |
 | `DO_JURISDICTION` | `eu` in production and staging, `none` locally. |
 
-Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`.
+Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
+`STS_DENIAL_DO`. Trigger: cron `*/5 * * * *` in production and staging, `[]` in the local block.
 
 ## Policy
 
@@ -273,17 +274,43 @@ its URL; without one, a bundle read reports `manager_unreachable_no_copy`.
 Local Durable Object state from a revision before the KV key storage cannot move its keys (the
 `0001` migrations drop the old key tables), so wipe it once: `rm -rf services/sts/.wrangler/state`.
 
-## Production prerequisites
+## Merge gate: the merge to main is the first production deploy
 
-1. **DNS and route**: a custom domain `sts.kiloapps.io` on the `kiloapps.io` zone, and
-   `sts-staging.kiloapps.io` for staging. `workers_dev` stays false.
-2. **Queues**: `kilo-audit` (production) and `kilo-audit-staging`, both EU. The producer binding
-   exists here; the consumer is the separate audit-relay service.
-3. **Infisical**: per environment, the JWT Auth identity, its role, and the webhook described
-   above. `MANAGER_PROJECT_ID` and `MANAGER_IDENTITY_ID` are committed per environment.
-4. **Runtime secrets**: every name in a policy file exists in `/workloads/<workload>` or `/shared`
-   of that environment. A name the manager does not hold is reported in `missing` rather than
-   failing the read.
+The deploy workflow discovers `services/sts` on its own, so merging this Worker deploys `sts` to
+production. Complete and verify every item below before merging.
+
+1. **Zone and route.** The `kiloapps.io` zone is in account `e115e769bcdd4c3d66af59d3332cb394`,
+   and no DNS record named `sts.kiloapps.io` exists (the deploy creates the custom domain and fails
+   on a conflicting record). Verify: Cloudflare dashboard → `kiloapps.io` → DNS shows no
+   `sts` record.
+2. **Audit queue.** `kilo-audit` exists (a producer binding to a missing queue fails the deploy).
+   Verify: `wrangler queues info kilo-audit` prints the queue.
+3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
+   exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
+   `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine
+   Identities → that id → Projects shows `kilo` with the role.
+4. **Runtime secrets.** Each policy file's names exist in `production` under
+   `/workloads/<workload>` or `/shared`. Verify: Infisical → `kilo` → `production` lists them. A
+   missing name is reported in the bundle's `missing` list rather than failing the read, so this
+   item gates correct values, not the deploy.
+
+After the merge, in this order:
+
+1. **Key set.** `curl -sf https://sts.kiloapps.io/manager-auth/.well-known/jwks.json` answers 200
+   with one `ES256` key.
+2. **JWT Auth.** Add JWT Auth to the production identity with the values in "Infisical setup".
+   Infisical refuses to create JWT Auth until its JWKS URL resolves, which is why this step comes
+   after the deploy. Until it exists every manager login fails: the refresher backs off (15 s
+   doubling to 4 minutes) and logs `sts: manager read failed` at each attempt; no workload reads
+   production values from STS yet, so nothing waits on it.
+3. **A refresh.** Within 5 minutes (the cron, or the next backoff attempt) the refresher reads the
+   manager: the Infisical audit log shows a secrets read by the production identity, and the Worker
+   logs stop showing `sts: manager read failed`.
+4. **Webhook.** Copy the webhook secret from Data Studio and create the production webhook as
+   described in "Infisical setup".
+
+Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, identity
+`5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4`) follows the same list for its own environment.
 
 ## Tests
 

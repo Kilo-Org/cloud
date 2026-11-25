@@ -78,8 +78,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   stale, and an empty object is filled stale from the refresher's last copy.
 - **Token.** The Infisical access token is cached until 60 seconds before it expires; concurrent
   logins merge into one.
-- **Starting the loop.** Each bundle object asks the refresher, in the background and at most once
-  a minute, to confirm its alarm; the read never waits on it.
+- **Starting the loop.** A cron trigger (`*/5 * * * *` in production and staging, none locally)
+  calls the refresher's `ensureStarted`, so the first refresh and the deploy's policy-change event
+  happen within 5 minutes of a deploy, before any read. Each bundle object also asks the refresher,
+  in the background and at most once a minute, to confirm its alarm; the read never waits on it.
 
 ### Internal Durable Objects
 

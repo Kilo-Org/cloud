@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { recordAlertFired, shouldSuppress } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readO11ySecret } from '../secrets';
 
 export const NATIVE_CONTAINER_APP = 'cloud-agent-next-sandboxcontainers';
@@ -39,9 +40,10 @@ const InstancesSchema = z.object({
 
 export async function queryContainerAllocations(
   env: Pick<AllocationEnv, 'O11Y_CF_ACCOUNT_ID' | 'O11Y_CF_CONTAINERS_API_TOKEN'>,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<ContainerAllocations> {
-  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN');
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN', ctx);
 
   const base = `https://api.cloudflare.com/client/v4/accounts/${env.O11Y_CF_ACCOUNT_ID}/containers/applications`;
   const get = async (url: URL) => {

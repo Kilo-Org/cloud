@@ -72,8 +72,17 @@ type Attempt = {
   base: CachedBundle | null;
 };
 
-/** An attempt this read started, with the promise only this read may await or hand to `waitUntil`. */
-type Owned = { attempt: Attempt; settled: Promise<void> };
+/**
+ * An attempt this read started. Only this read awaits `settled` or hands it to `waitUntil`.
+ * `wake` is set while the read sleeps in `waitFor`, so an answer wakes it at once; the one
+ * continuation on the call is registered in `start`, never once per poll.
+ */
+type Owned = {
+  attempt: Attempt;
+  settled: Promise<void>;
+  pending: boolean;
+  wake: (() => void) | null;
+};
 
 /** The failures since the last success; `count` sets the backoff. */
 type Failure = { error: SecretUnavailableError; count: number; retryAt: number };
@@ -173,7 +182,9 @@ export function createSecrets(transport: BundleTransport): Secrets {
         return;
       }
       case 'denied':
-        if (running()?.attempt !== attempt) return;
+        // A denial newer than the held bundle wins even when that bundle came from an older
+        // attempt's late success; a denial older than the held bundle is dropped.
+        if (attempt.id <= appliedSuccessId) return;
         cache = { phase: 'denied', error: new SecretUnavailableError('denied') };
         return;
       case 'unavailable':
@@ -190,33 +201,42 @@ export function createSecrets(transport: BundleTransport): Secrets {
     }
   }
 
-  /** Starts an attempt in the calling request; the caller stores `owned.attempt` in the cache. */
-  function start(at: number): Owned {
+  /** Starts an attempt that the calling read owns and records it in `owned`. */
+  function start(at: number, owned: Owned[]): Attempt {
     const attempt: Attempt = {
       id: nextAttemptId++,
       startedAt: at,
       base: cache.phase === 'ready' ? cache.bundle : null,
     };
     inFlight++;
-    const settled = requestBundle(transport, attempt.base?.etag).then(outcome => {
-      inFlight--;
-      apply(attempt, outcome);
-    });
-    return { attempt, settled };
+    const own: Owned = {
+      attempt,
+      settled: requestBundle(transport, attempt.base?.etag).then(outcome => {
+        inFlight--;
+        own.pending = false;
+        apply(attempt, outcome);
+        own.wake?.();
+      }),
+      pending: true,
+      wake: null,
+    };
+    owned.push(own);
+    return attempt;
   }
 
   /**
-   * Waits one poll interval, or less when `deadline` comes first, so the caller looks at the
-   * shared cache again. A read that started `attempt` itself also wakes when its own promise
-   * settles; it never awaits another request's promise. The timer is cleared or has fired
-   * before this returns, so none outlives the read.
+   * Sleeps one poll interval, or less when `deadline` comes first, so the caller looks at the
+   * shared cache again; an answer to one of this read's own attempts wakes it sooner. It never
+   * waits on another request's promise, and its timer is cleared or has fired before it returns,
+   * so none outlives the read.
    */
-  async function waitFor(attempt: Attempt | null, own: Owned | null, deadline: number) {
+  async function waitFor(owned: Owned[], deadline: number): Promise<void> {
     const timer = Promise.withResolvers<void>();
     const handle = setTimeout(timer.resolve, Math.max(0, Math.min(POLL_MS, deadline - Date.now())));
-    const mine = attempt !== null && own?.attempt === attempt ? own : null;
-    await (mine ? Promise.race([mine.settled, timer.promise]) : timer.promise);
+    for (const own of owned) own.wake = timer.resolve;
+    await timer.promise;
     clearTimeout(handle);
+    for (const own of owned) own.wake = null;
   }
 
   function usableStale(bundle: CachedBundle, at: number): CachedBundle {
@@ -228,20 +248,32 @@ export function createSecrets(transport: BundleTransport): Secrets {
     return bundle;
   }
 
+  /**
+   * Every exit, return or throw, hands this read's unanswered attempts to its own `waitUntil`:
+   * a call whose request ends is cancelled, and STS may already have written the delivery it
+   * answers. Another request's attempt is never handed over.
+   */
   async function currentBundle(ctx?: SecretsExecutionContext): Promise<CachedBundle> {
+    const owned: Owned[] = [];
+    try {
+      return await readBundle(owned);
+    } finally {
+      for (const own of owned) if (own.pending) ctx?.waitUntil(own.settled);
+    }
+  }
+
+  async function readBundle(owned: Owned[]): Promise<CachedBundle> {
     const arrivedAt = Date.now();
-    let own: Owned | null = null;
     for (;;) {
       const at = Date.now();
       switch (cache.phase) {
         case 'denied':
           throw cache.error;
         case 'empty':
-          own = start(at);
           cache = {
             phase: 'cold',
             windowEndsAt: at + FIRST_LOAD_DEADLINE_MS,
-            fetch: { state: 'running', attempt: own.attempt, failure: null },
+            fetch: { state: 'running', attempt: start(at, owned), failure: null },
           };
           continue;
         case 'cold': {
@@ -260,23 +292,22 @@ export function createSecrets(transport: BundleTransport): Secrets {
                 cause: new Error('STS sent no bundle before this read gave up'),
               });
             }
-            await waitFor(fetch.attempt, own, Math.min(timesOutAt, giveUpAt));
+            await waitFor(owned, Math.min(timesOutAt, giveUpAt));
             continue;
           }
           const { failure } = fetch;
           if (at < failure.retryAt) {
             if (at >= cache.windowEndsAt) throw failure.error;
             if (failure.retryAt < cache.windowEndsAt) {
-              await waitFor(null, own, failure.retryAt);
+              await waitFor(owned, failure.retryAt);
               continue;
             }
             if (inFlight === 0) throw failure.error;
-            await waitFor(null, own, cache.windowEndsAt);
+            await waitFor(owned, cache.windowEndsAt);
             continue;
           }
           if (at >= giveUpAt) throw failure.error;
-          own = start(at);
-          cache = { ...cache, fetch: { state: 'running', attempt: own.attempt, failure } };
+          cache = { ...cache, fetch: { state: 'running', attempt: start(at, owned), failure } };
           continue;
         }
         case 'ready': {
@@ -286,18 +317,16 @@ export function createSecrets(transport: BundleTransport): Secrets {
           const fetch = cache.fetch;
           switch (fetch.state) {
             case 'idle':
-              own = start(at);
               cache = {
                 ...cache,
-                fetch: { state: 'running', attempt: own.attempt, failure: null },
+                fetch: { state: 'running', attempt: start(at, owned), failure: null },
               };
               continue;
             case 'backing_off':
               if (at < fetch.failure.retryAt) return usableStale(bundle, at);
-              own = start(at);
               cache = {
                 ...cache,
-                fetch: { state: 'running', attempt: own.attempt, failure: fetch.failure },
+                fetch: { state: 'running', attempt: start(at, owned), failure: fetch.failure },
               };
               continue;
             case 'running': {
@@ -307,12 +336,9 @@ export function createSecrets(transport: BundleTransport): Secrets {
                 continue;
               }
               if (fetch.failure === null && age >= CACHE_TTL_MS) {
-                await waitFor(fetch.attempt, own, timesOutAt);
+                await waitFor(owned, timesOutAt);
                 continue;
               }
-              // Only the request that started the revalidation keeps it alive; another
-              // request's promise is never handed to this request's waitUntil.
-              if (own?.attempt === fetch.attempt) ctx?.waitUntil(own.settled);
               return usableStale(bundle, at);
             }
           }

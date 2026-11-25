@@ -16,6 +16,7 @@ import {
   type ContainerApplication,
   type ContainerListApp,
 } from './container-capacity';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readO11ySecret } from '../secrets';
 
 type QueryEnv = {
@@ -96,13 +97,15 @@ async function fetchDetail(
  *
  * @param env - Environment bindings with account ID and API token
  * @param fetchFn - Injectable fetch function (defaults to global fetch); used for testing
+ * @param ctx - The cron run's context, which keeps a background bundle revalidation alive
  */
 export async function queryContainerApplications(
   env: QueryEnv,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<ContainerApplication[]> {
   const accountId = env.O11Y_CF_ACCOUNT_ID;
-  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN');
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN', ctx);
 
   // Collect all monitored app entries across all pages
   const monitoredEntries: ContainerListApp[] = [];

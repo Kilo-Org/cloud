@@ -202,16 +202,12 @@ export const organizationSsoRouter = createTRPCRouter({
     } satisfies OrganizationSsoConfigView;
   }),
   deleteConfig: adminProcedure
-    .meta({
-      adminAudit: {
-        kind: 'declarative',
-        action: 'organization.sso.config.delete',
-        target: inputFieldTarget('organization', 'organizationId'),
-      },
-    })
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.sso.config.delete'] } })
     .input(OrgIdSchema)
     .mutation(async opts => {
       const { organizationId } = opts.input;
+      const target = organizationActionTarget(organizationId);
+      setAdminAuditTarget(target);
       await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
       const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
       const organization = await getOrganizationById(organizationId);
@@ -230,13 +226,29 @@ export const organizationSsoRouter = createTRPCRouter({
       // the row lock.
       if (workOSOrg) {
         await workos.organizations.deleteOrganization(workOSOrg.id);
-        addAdminAuditMetadata({ workosOrganizationId: workOSOrg.id });
+        // The external deletion cannot be undone, so it is recorded before anything else can
+        // fail; a later failure row says the WorkOS organization is already gone.
+        await recordAdminAction(opts.ctx, {
+          action: 'organization.sso.config.delete',
+          target,
+          message: 'Deleted WorkOS SSO organization',
+          metadata: { workosOrganizationId: workOSOrg.id },
+        });
+        addAdminAuditMetadata({ workosOrganizationId: workOSOrg.id, externalDeleted: true });
       }
 
       // Release whatever domain the organization records, and audit it.
       await db.transaction(async tx => {
         await releaseSsoDomain(tx, organizationId, opts.ctx.user);
       });
+
+      if (!workOSOrg) {
+        await recordAdminAction(opts.ctx, {
+          action: 'organization.sso.config.delete',
+          target,
+          message: 'Deleted SSO configuration',
+        });
+      }
 
       return successResult({ message: 'SSO configuration deleted successfully' });
     }),

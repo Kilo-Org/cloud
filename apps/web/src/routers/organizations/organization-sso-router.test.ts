@@ -546,6 +546,56 @@ describe('organization SSO router', () => {
       await expect(readAdminActions(target.id)).resolves.toEqual([]);
     });
 
+    test('records the WorkOS deletion when a later step fails, and names it in the failure row', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const target = await createSsoOrganization('Partial Delete Organization', 'partial.test');
+      getOrganizationByExternalId.mockResolvedValue({
+        id: 'workos_org_partial',
+        externalId: target.id,
+        domains: [],
+      });
+      const transaction = jest
+        .spyOn(db, 'transaction')
+        .mockRejectedValueOnce(new Error('database unavailable'));
+
+      try {
+        await expect(
+          caller.organizations.sso.deleteConfig({ organizationId: target.id })
+        ).rejects.toThrow('database unavailable');
+      } finally {
+        transaction.mockRestore();
+      }
+
+      expect(deleteOrganization).toHaveBeenCalledWith('workos_org_partial');
+      await expect(readSsoDomain(target.id)).resolves.toBe('partial.test');
+      const rows = await db
+        .select({
+          outcome: admin_action_audit_logs.outcome,
+          metadata: admin_action_audit_logs.metadata,
+        })
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.action, 'organization.sso.config.delete'),
+            eq(admin_action_audit_logs.target_id, target.id)
+          )
+        );
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          { outcome: 'success', metadata: { workosOrganizationId: 'workos_org_partial' } },
+          {
+            outcome: 'failure',
+            metadata: {
+              workosOrganizationId: 'workos_org_partial',
+              externalDeleted: true,
+              errorCode: 'INTERNAL_SERVER_ERROR',
+            },
+          },
+        ])
+      );
+      expect(rows).toHaveLength(2);
+    });
+
     test('refuses to delete when the organization has no SSO configuration', async () => {
       const caller = await createCallerForUser(admin.id);
       const target = await createSsoOrganization('Unconfigured Organization', null);

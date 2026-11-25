@@ -154,10 +154,7 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import {
-  cancelAndRefundKiloPassForUser,
-  type CancelAndRefundKiloPassResult,
-} from '@/lib/kilo-pass/cancel-and-refund';
+import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -172,6 +169,7 @@ import {
   inputFieldTarget,
   recordAdminAction,
   redactEmailAddressesInAuditText,
+  setAdminAuditFailureAction,
   setAdminAuditTarget,
   userActionTarget,
   type AdminActionContext,
@@ -1043,6 +1041,7 @@ export const adminRouter = createTRPCRouter({
       .mutation(async ({ input, ctx }) => {
         const isBlocking = Boolean(input.blocked_reason);
         setAdminAuditTarget(userActionTarget(input.userId));
+        setAdminAuditFailureAction(isBlocking ? 'user.block' : 'user.unblock');
         addAdminAuditMetadata({ blocking: isBlocking });
         let didTransition = false;
 
@@ -2006,29 +2005,19 @@ export const adminRouter = createTRPCRouter({
         }
 
         // The helper writes the reason to the target user records (block reason,
-        // admin note and credit transaction description); the audit row repeats it.
+        // admin note and credit transaction description); the audit rows repeat it.
         const reason = redactEmailAddressesInAuditText(input.reason);
+        // The helper creates the Stripe refund before its local transaction, so a
+        // throw can leave a refund behind; the scope's failure row attributes it.
+        addAdminAuditMetadata({ reason });
 
-        let result: CancelAndRefundKiloPassResult;
-        try {
-          result = await cancelAndRefundKiloPassForUser({
-            db,
-            stripe: stripeClient,
-            userId: input.userId,
-            reason,
-            adminKiloUserId: ctx.user.id,
-          });
-        } catch (error) {
-          // The helper creates the Stripe refund before its local transaction, so
-          // a failure here can leave a refund with no other attribution.
-          await recordAdminAction(ctx, {
-            action: 'kilo_pass.cancel_refund',
-            target: userActionTarget(input.userId),
-            message: 'Kilo Pass cancel attempted with unknown outcome',
-            metadata: { reason },
-          });
-          throw error;
-        }
+        const result = await cancelAndRefundKiloPassForUser({
+          db,
+          stripe: stripeClient,
+          userId: input.userId,
+          reason,
+          adminKiloUserId: ctx.user.id,
+        });
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {

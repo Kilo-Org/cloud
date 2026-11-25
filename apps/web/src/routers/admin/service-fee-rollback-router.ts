@@ -76,6 +76,25 @@ function auditEntry(
   };
 }
 
+/** The audited rows of a run, or one summary row when it affected none. */
+function runEntries(
+  action: AdminActionEntry['action'],
+  entries: AdminActionEntry[],
+  summaryMessage: string,
+  processedCount: number
+): AdminActionEntry[] {
+  return entries.length > 0
+    ? entries
+    : [
+        {
+          action,
+          target: null,
+          message: `${summaryMessage}: no users affected`,
+          metadata: { processedCount },
+        },
+      ];
+}
+
 export const adminServiceFeeRollbackRouter = createTRPCRouter({
   overview: adminProcedure.query(() => getServiceFeeRollbackOverview(db)),
 
@@ -92,17 +111,22 @@ export const adminServiceFeeRollbackRouter = createTRPCRouter({
 
       await recordAdminActions(
         ctx,
-        results
-          .filter(row => AUDITED_BATCH_STATUSES.has(row.status))
-          .map(row =>
-            auditEntry(
-              'service_fee.rollback_refund',
-              row.status === 'outcome_unknown'
-                ? 'Service fee refund attempted with unknown outcome via service fee rollback'
-                : 'Refunded service fee via service fee rollback',
-              row
-            )
-          )
+        runEntries(
+          'service_fee.rollback_refund',
+          results
+            .filter(row => AUDITED_BATCH_STATUSES.has(row.status))
+            .map(row =>
+              auditEntry(
+                'service_fee.rollback_refund',
+                row.status === 'outcome_unknown'
+                  ? 'Service fee refund attempted with unknown outcome via service fee rollback'
+                  : 'Refunded service fee via service fee rollback',
+                row
+              )
+            ),
+          'Service fee rollback',
+          results.length
+        )
       );
 
       return results;
@@ -118,17 +142,22 @@ export const adminServiceFeeRollbackRouter = createTRPCRouter({
 
       await recordAdminActions(
         ctx,
-        results
-          .filter(row => AUDITED_RECONCILE_STATUSES.has(row.status))
-          .map(row =>
-            auditEntry(
-              'service_fee.rollback_reconcile',
-              row.status === 'succeeded'
-                ? 'Confirmed service fee refund via service fee rollback reconcile'
-                : 'Released service fee claim for retry via service fee rollback reconcile',
-              row
-            )
-          )
+        runEntries(
+          'service_fee.rollback_reconcile',
+          results
+            .filter(row => AUDITED_RECONCILE_STATUSES.has(row.status))
+            .map(row =>
+              auditEntry(
+                'service_fee.rollback_reconcile',
+                row.status === 'succeeded'
+                  ? 'Confirmed service fee refund via service fee rollback reconcile'
+                  : 'Released service fee claim for retry via service fee rollback reconcile',
+                row
+              )
+            ),
+          'Service fee rollback reconcile',
+          results.length
+        )
       );
 
       return results;

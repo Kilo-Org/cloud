@@ -118,12 +118,12 @@ function setupNoInvoiceStripe(stripe: StripeMock) {
   stripe.invoices.list.mockResolvedValue({ data: [] });
 }
 
-async function refundAuditRows() {
+async function refundAuditRows(outcome: 'success' | 'failure' = 'success') {
   const rows = await db
     .select()
     .from(admin_action_audit_logs)
     .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
-  return rows.filter(row => row.outcome === 'success');
+  return rows.filter(row => row.outcome === outcome);
 }
 
 describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
@@ -633,18 +633,19 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
 
     // Every account the batch touched is attributed to the actor exactly once,
     // including the one whose Stripe call failed after it may have created a
-    // refund.
+    // refund, which is recorded as a failure with the error's code.
     const audits = await refundAuditRows();
-    expect(audits).toHaveLength(3);
-    const auditTargets = audits.map(row => row.target_id);
-    expect(auditTargets.filter(id => id === u1.id)).toHaveLength(1);
-    expect(auditTargets.filter(id => id === u2.id)).toHaveLength(1);
-    expect(auditTargets.filter(id => id === u3.id)).toHaveLength(1);
-    const failedAudit = audits.find(row => row.target_id === u2.id);
-    expect(failedAudit?.message).toBe(
-      'Kilo Pass cancel attempted with unknown outcome via bulk admin cancel'
-    );
-    expect(audits.every(row => row.actor_id === adminUser.id)).toBe(true);
+    expect(audits.map(row => row.target_id).sort()).toEqual([u1.id, u3.id].sort());
+    const failures = await refundAuditRows('failure');
+    expect(failures).toEqual([
+      expect.objectContaining({
+        target_id: u2.id,
+        message: 'Kilo Pass cancel attempted with unknown outcome via bulk admin cancel',
+        metadata: expect.objectContaining({ status: 'error', errorCode: 'Error' }),
+      }),
+    ]);
+    expect(JSON.stringify(failures)).not.toContain('Stripe boom');
+    expect([...audits, ...failures].every(row => row.actor_id === adminUser.id)).toBe(true);
   });
 
   it('deduplicates emails case-insensitively before iterating', async () => {

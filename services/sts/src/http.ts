@@ -126,14 +126,13 @@ async function bundleRequest(
         reason: outcome.reason,
       });
     } else {
-      ctx.waitUntil(
-        recordDenial(env, config, {
-          channel: 'http',
-          reason: outcome.reason,
-          actor: outcome.subject.actor,
-          claims: { provider: outcome.subject.provider, ...outcome.subject.claims },
-        })
-      );
+      const hop = recordDenial(env, config, {
+        channel: 'http',
+        reason: outcome.reason,
+        actor: outcome.subject.actor,
+        claims: { provider: outcome.subject.provider, ...outcome.subject.claims },
+      });
+      if (hop !== null) ctx.waitUntil(hop);
     }
   }
   if (outcome.status === 'unavailable') {

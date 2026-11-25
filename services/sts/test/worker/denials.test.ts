@@ -40,17 +40,45 @@ function events(): Promise<
 }
 
 describe('denial stream', () => {
+  it('adds the counts an isolate merged and keeps overflow counts per reason', async () => {
+    const stub = getDenialStub(env, config);
+    await stub.record([
+      { denial: githubDenial('refs/heads/main'), count: 40, overflow: false },
+      {
+        denial: { channel: 'http', reason: 'unknown_workload', actor: 'overflow', claims: {} },
+        count: 7,
+        overflow: true,
+      },
+    ]);
+    await stub.record([{ denial: githubDenial('refs/heads/main'), count: 2, overflow: false }]);
+    await closeWindows();
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const written = await events();
+    expect(
+      written.map(event => [event.data.attributes.overflow, event.data.attributes.count]).sort()
+    ).toEqual([
+      [false, 42],
+      [true, 7],
+    ]);
+  });
+
   it('merges identical denials in a minute into one event with a count', async () => {
     const stub = getDenialStub(env, config);
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await stub.record(githubDenial('refs/heads/main'));
+      await stub.record([{ denial: githubDenial('refs/heads/main'), count: 1, overflow: false }]);
     }
-    await stub.record({
-      channel: 'worker-binding',
-      reason: 'unknown_workload',
-      actor: 'rogue',
-      claims: {},
-    });
+    await stub.record([
+      {
+        denial: {
+          channel: 'worker-binding',
+          reason: 'unknown_workload',
+          actor: 'rogue',
+          claims: {},
+        },
+        count: 1,
+        overflow: false,
+      },
+    ]);
     await closeWindows();
     expect(await runDurableObjectAlarm(stub)).toBe(true);
 
@@ -79,7 +107,9 @@ describe('denial stream', () => {
   it('counts distinct denials past the per-minute limit in one overflow event', async () => {
     const stub = getDenialStub(env, config);
     for (let index = 0; index < MAX_DISTINCT_PER_MINUTE + 5; index += 1) {
-      await stub.record(githubDenial(`refs/heads/branch-${index}`));
+      await stub.record([
+        { denial: githubDenial(`refs/heads/branch-${index}`), count: 1, overflow: false },
+      ]);
     }
     await closeWindows();
     expect(await runDurableObjectAlarm(stub)).toBe(true);
@@ -93,7 +123,7 @@ describe('denial stream', () => {
 
   it('keeps a window open until its minute ends', async () => {
     const stub = getDenialStub(env, config);
-    await stub.record(githubDenial('refs/heads/main'));
+    await stub.record([{ denial: githubDenial('refs/heads/main'), count: 1, overflow: false }]);
     const alarm = await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
     expect(alarm).not.toBeNull();
     expect(alarm).toBeGreaterThan(Date.now());

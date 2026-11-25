@@ -1,6 +1,7 @@
 import { SELF, runInDurableObject } from 'cloudflare:test';
 import { STS_FETCHED_AT_HEADER, STS_STALE_HEADER } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearDenialBuffers } from '../../src/audit/denials';
 import { serveBundle, serveWorkerCall } from '../../src/broker';
 import { getBundleStub, getDenialStub, getRefresherStub } from '../../src/dos/stubs';
 import { bundleResponse } from '../../src/http';
@@ -11,6 +12,7 @@ import { config, env } from './test-env';
 import { signWebhook, webhookBody } from './webhook';
 
 beforeEach(async () => {
+  clearDenialBuffers();
   stubOfflineNetwork();
   await resetBundleObject(getBundleStub(env, config, 'o11y'));
   await resetDenialObject(getDenialStub(env, config));
@@ -153,6 +155,12 @@ describe('worker-binding entry', () => {
     expect(await pendingDenials()).toEqual([
       { key: expect.stringContaining('unknown-worker'), count: 1 },
     ]);
+
+    // Repeats in the same minute are counted in the isolate and cost no denial-object hop.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await serveWorkerCall(env, config, 'unknown-worker', {}, promise => pending.push(promise));
+    }
+    expect(pending).toHaveLength(1);
   });
 
   it('answers unavailable with a retry when the bundle object call fails', async () => {

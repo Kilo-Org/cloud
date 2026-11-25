@@ -3,7 +3,7 @@ import { and, eq, lt, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle.denial/migrations';
-import { denialKey, DenialSchema, type Denial } from '../audit/denials';
+import { DenialCountsSchema, denialKey, type Denial, type DenialCount } from '../audit/denials';
 import { bundleDeniedEvent } from '../audit/events';
 import { AuditLog } from '../audit/log';
 import { RELAY_DELAY_MS, RELAY_RETRY_MS } from '../constants';
@@ -51,37 +51,49 @@ export class DenialDO extends DurableObject<Env> {
     });
   }
 
-  async record(raw: Denial): Promise<void> {
-    const denial = DenialSchema.parse(raw);
+  /** Adds counts merged in one isolate; identical denials merge again here per minute. */
+  async record(raw: DenialCount[]): Promise<void> {
+    const counts = DenialCountsSchema.parse(raw);
     const now = Date.now();
     const minute = utcMinute(now);
-    const key = denialKey(denial);
-    const existing = this.db
-      .select({ count: schema.denialWindow.count })
-      .from(schema.denialWindow)
-      .where(and(eq(schema.denialWindow.minute, minute), eq(schema.denialWindow.key, key)))
-      .get();
-    if (existing !== undefined) {
-      this.increment(minute, key);
-    } else if (this.distinctIn(minute) < MAX_DISTINCT_PER_MINUTE) {
-      this.db.insert(schema.denialWindow).values({ minute, key, count: 1, denial }).run();
-    } else {
-      const overflow: Denial = {
-        channel: denial.channel,
-        reason: denial.reason,
-        actor: 'overflow',
-        claims: {},
-      };
-      this.db
-        .insert(schema.denialWindow)
-        .values({ minute, key: `overflow:${denial.reason}`, count: 1, denial: overflow })
-        .onConflictDoUpdate({
-          target: [schema.denialWindow.minute, schema.denialWindow.key],
-          set: { count: sql`${schema.denialWindow.count} + 1` },
-        })
-        .run();
+    for (const { denial, count, overflow } of counts) {
+      const key = denialKey(denial);
+      if (!overflow && this.has(minute, key)) {
+        this.increment(minute, key, count);
+      } else if (!overflow && this.distinctIn(minute) < MAX_DISTINCT_PER_MINUTE) {
+        this.db.insert(schema.denialWindow).values({ minute, key, count, denial }).run();
+      } else {
+        this.addOverflow(minute, denial, count);
+      }
     }
     await this.scheduleAlarm(now, false);
+  }
+
+  private has(minute: string, key: string): boolean {
+    return (
+      this.db
+        .select({ count: schema.denialWindow.count })
+        .from(schema.denialWindow)
+        .where(and(eq(schema.denialWindow.minute, minute), eq(schema.denialWindow.key, key)))
+        .get() !== undefined
+    );
+  }
+
+  private addOverflow(minute: string, denial: Denial, count: number): void {
+    const overflow: Denial = {
+      channel: denial.channel,
+      reason: denial.reason,
+      actor: 'overflow',
+      claims: {},
+    };
+    this.db
+      .insert(schema.denialWindow)
+      .values({ minute, key: `overflow:${denial.reason}`, count, denial: overflow })
+      .onConflictDoUpdate({
+        target: [schema.denialWindow.minute, schema.denialWindow.key],
+        set: { count: sql`${schema.denialWindow.count} + ${count}` },
+      })
+      .run();
   }
 
   async alarm(): Promise<void> {
@@ -134,10 +146,10 @@ export class DenialDO extends DurableObject<Env> {
     }
   }
 
-  private increment(minute: string, key: string): void {
+  private increment(minute: string, key: string, count: number): void {
     this.db
       .update(schema.denialWindow)
-      .set({ count: sql`${schema.denialWindow.count} + 1` })
+      .set({ count: sql`${schema.denialWindow.count} + ${count}` })
       .where(and(eq(schema.denialWindow.minute, minute), eq(schema.denialWindow.key, key)))
       .run();
   }

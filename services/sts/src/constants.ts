@@ -1,6 +1,9 @@
 /** Refresher cadence: one read of each manager folder every four minutes (design 4.4). */
 export const REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 
+/** A bundle older than two refresh intervals is served marked stale, whatever its flag says. */
+export const STALE_AFTER_MS = 2 * REFRESH_INTERVAL_MS;
+
 /**
  * A stored manager read this young fills an empty bundle object without a new read. One minute
  * above the cadence covers an alarm that runs a little late.

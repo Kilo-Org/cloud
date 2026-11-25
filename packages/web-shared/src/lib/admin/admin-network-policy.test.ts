@@ -3,7 +3,6 @@ import {
   ADMIN_EDGE_PATH_PATTERNS,
   adminNetworkFirewallRule,
   isAdminEdgePath,
-  isAdminOnlyTrpcProcedure,
   normalizeClientAddress,
   parseAdminAllowedNetworks,
 } from '@kilocode/web-shared/lib/admin/admin-network-policy';
@@ -70,6 +69,28 @@ describe('parseAdminAllowedNetworks', () => {
     const parsed = parseAdminAllowedNetworks('203.0.113.999');
     expect(parsed.kind === 'invalid' && parsed.message).not.toContain('203.0.113.999');
   });
+
+  test.each([
+    ['192.0.2.10/24', 'entry 1: host bits set'],
+    ['203.0.113.0/24,2001:db8::1/64', 'entry 2: host bits set'],
+    ['198.51.100.128/24', 'entry 1: host bits set'],
+    ['2001:db8:0:1::/48', 'entry 1: host bits set'],
+    ['::ffff:192.0.2.1/120', 'entry 1: host bits set'],
+  ])('rejects %j because a range has host bits set', (value, message) => {
+    const parsed = parseAdminAllowedNetworks(value);
+    expect(parsed).toEqual({ kind: 'invalid', message });
+  });
+
+  test.each(['192.0.2.10/32', '198.51.100.128/25', '2001:db8::1/128', '2001:db8:0:1::/64'])(
+    'accepts the network address %j',
+    value => {
+      expect(parseAdminAllowedNetworks(value).kind).toBe('valid');
+    }
+  );
+
+  test('rejects an IPv6 zone index', () => {
+    expect(parseAdminAllowedNetworks('fe80::1%eth0').kind).toBe('invalid');
+  });
 });
 
 describe('normalizeClientAddress', () => {
@@ -103,6 +124,16 @@ describe('admin edge path patterns', () => {
     '/api/trpc/user.getMe,codeIndexing.admin.getSummaryStats',
     '/api/trpc/codingPlans.adminListSubscriptions',
     '/api/trpc/debug.unhandledError',
+    '/api/trpc/organizations.updatePlan',
+    '/api/trpc/organizations.list,organizations.seatPurchases',
+    '/api/trpc/organizations.seatPurchases?batch=1&input=%7B%7D',
+    '/api/trpc/organizations.sso.createConfig%2Corganizations.list',
+    '/api/trpc/organizations.sso.deleteConfig',
+    '/api/trpc/test.adminHello',
+    '/api/trpc/Admin.users.list',
+    '/api/trpc/organizations.updatePlan,user.getMe',
+    '/api/trpc/organizations.updatePlan%2Cuser.getMe',
+    '/api/trpc/user.getMe,organizations.sso.createConfig,organizations.list',
   ])('matches %s', pathname => {
     expect(isAdminEdgePath(pathname)).toBe(true);
   });
@@ -118,6 +149,15 @@ describe('admin edge path patterns', () => {
     '/api/trpc/codeIndexing.search',
     '/api/trpc/codingPlans.listPlans',
     '/api/trpc/stepUp.getStatus',
+    '/api/trpc/stepUp.getStatus,user.getMe',
+    '/api/trpc/organizations.sso.getConfig',
+    '/api/trpc/organizations.sso.generateAdminPortalLink',
+    '/api/trpc/organizations.updatePlanDraft',
+    '/api/trpc/organizations.updatePlanFoo',
+    '/api/trpc/organizations.sso.createConfigX',
+    '/api/trpc/user.getMe,organizations.sso.createConfigX',
+    '/api/trpc/organizations.seatPurchasesSummary,user.getMe',
+    '/api/trpc/user.getMe?input=organizations.updatePlan',
     '/api/trpc/user.admin',
     '/app-shell/api/trpc/admin.x',
     '/api/trpc-mobile/admin.users.list',
@@ -126,11 +166,6 @@ describe('admin edge path patterns', () => {
     '/api/trpc/user.getMe?batch=1&input=a%2Cadmin.b',
   ])('does not match %s', pathname => {
     expect(isAdminEdgePath(pathname)).toBe(false);
-  });
-
-  test('procedure matching is case-insensitive like the edge', () => {
-    expect(isAdminOnlyTrpcProcedure('Admin.users.list')).toBe(true);
-    expect(isAdminOnlyTrpcProcedure('organizations.list')).toBe(false);
   });
 });
 

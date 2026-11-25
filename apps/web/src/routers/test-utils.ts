@@ -8,7 +8,11 @@ const createCaller = createCallerFactory(rootRouter);
 /** Test-only caller bound to a real user row and an optional device session. */
 export async function createCallerForUser(
   userId: string,
-  opts?: { deviceSessionId?: string; controlPlaneStartedAt?: number }
+  opts?: {
+    deviceSessionId?: string;
+    controlPlaneStartedAt?: number;
+    headers?: Record<string, string>;
+  }
 ) {
   const user = await findUserById(userId);
   if (!user) {
@@ -21,6 +25,7 @@ export async function createCallerForUser(
     // tests set it to exercise the control-plane read budget.
     controlPlaneStartedAt: opts?.controlPlaneStartedAt,
     headersList: new Headers({
+      ...opts?.headers,
       Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
     }),
   });

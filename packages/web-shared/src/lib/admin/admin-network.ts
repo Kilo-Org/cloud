@@ -7,6 +7,12 @@ import {
   normalizeClientAddress,
   parseAdminAllowedNetworks,
 } from '@kilocode/web-shared/lib/admin/admin-network-policy';
+import {
+  ADMIN_NETWORK_DENIED_CODE,
+  ADMIN_NETWORK_DENIED_MESSAGE,
+  ADMIN_NETWORK_NOT_CONFIGURED_CODE,
+  ADMIN_NETWORK_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/web-shared/lib/admin/admin-network-messages';
 
 export type AdminNetworkDenialReason =
   | 'not-configured'
@@ -24,8 +30,19 @@ type AdminNetworkConfig =
   | { kind: 'not-configured' }
   | { kind: 'invalid-config'; message: string };
 
+type ConfigProblem = 'not-configured' | 'invalid-config' | 'all-addresses' | 'outside-vercel';
+
 let memoizedConfig: AdminNetworkConfig | undefined;
-const reportedConfigErrors = new Set<AdminNetworkDenialReason>();
+const reportedConfigProblems = new Set<ConfigProblem>();
+
+/** Error-level, once per problem per process: console for logs, Sentry for alerting. */
+function reportConfigProblem(problem: ConfigProblem, message: string): void {
+  if (reportedConfigProblems.has(problem)) return;
+  reportedConfigProblems.add(problem);
+  const text = `ADMIN_ALLOWED_NETWORKS ${problem}: ${message}`;
+  errorExceptInTest(text);
+  captureMessage(text, { level: 'error', tags: { source: 'admin_network' } });
+}
 
 function loadConfig(): AdminNetworkConfig {
   const parsed = parseAdminAllowedNetworks(process.env.ADMIN_ALLOWED_NETWORKS);
@@ -39,13 +56,19 @@ function loadConfig(): AdminNetworkConfig {
       allowlist.addSubnet(entry.address, entry.prefix, entry.family);
     }
   }
+  if (parsed.entries.some(entry => entry.prefix === 0)) {
+    reportConfigProblem(
+      'all-addresses',
+      'an all-addresses range is configured, so the admin network check admits every address'
+    );
+  }
   return { kind: 'configured', allowlist };
 }
 
 /** Test-only: forget the parsed list so the next call rereads the environment. */
 export function resetAdminNetworkConfigForTest(): void {
   memoizedConfig = undefined;
-  reportedConfigErrors.clear();
+  reportedConfigProblems.clear();
 }
 
 /**
@@ -59,13 +82,28 @@ function vercelClientAddress(headersList: Headers) {
 }
 
 /**
- * Whether the request may reach an admin surface from its network. Enforced
- * only on Vercel, the one place the client address header is trustworthy;
- * local development, tests and scripts are `skipped`. On Vercel a missing,
- * empty or invalid list denies every admin request.
+ * Whether the request may reach an admin surface from its network. Local
+ * development, tests and scripts are `skipped`: `VERCEL` unset, `NODE_ENV` not
+ * `production`, and `VERCEL_ENV` unset or `development` (the value `vercel env
+ * pull` and `.env.test` carry; a deployment is `production` or `preview`).
+ * Anything that looks deployed enforces. When enforced, a missing, empty or
+ * invalid list, or a request without `x-vercel-forwarded-for`, is denied.
  */
 export function adminNetworkDecision(headersList: Headers): AdminNetworkDecision {
-  if (!process.env.VERCEL) return { kind: 'skipped' };
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (
+    !process.env.VERCEL &&
+    (!vercelEnv || vercelEnv === 'development') &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    return { kind: 'skipped' };
+  }
+  if (!process.env.VERCEL) {
+    reportConfigProblem(
+      'outside-vercel',
+      'enforced without VERCEL set; only Vercel guarantees x-vercel-forwarded-for'
+    );
+  }
   memoizedConfig ??= loadConfig();
   if (memoizedConfig.kind !== 'configured') {
     return { kind: 'denied', reason: memoizedConfig.kind };
@@ -81,38 +119,47 @@ export type AdminNetworkRefusal = {
   reason: AdminNetworkDenialReason;
   /** True when connecting to the corporate network and retrying can succeed. */
   retryable: boolean;
+  /** Stable code for clients that branch on the refusal. */
+  code: typeof ADMIN_NETWORK_DENIED_CODE | typeof ADMIN_NETWORK_NOT_CONFIGURED_CODE;
   message: string;
 };
 
-const OFF_NETWORK_MESSAGE =
-  'Admin access is limited to the corporate network. Connect to Cloudflare WARP, then try again.';
-const NOT_CONFIGURED_MESSAGE =
-  'Admin access is unavailable because the admin network allowlist is not configured for this deployment.';
-
 export function adminNetworkRefusalFor(reason: AdminNetworkDenialReason): AdminNetworkRefusal {
-  const retryable = reason === 'no-client-address' || reason === 'outside-allowlist';
-  return { reason, retryable, message: retryable ? OFF_NETWORK_MESSAGE : NOT_CONFIGURED_MESSAGE };
+  return reason === 'no-client-address' || reason === 'outside-allowlist'
+    ? {
+        reason,
+        retryable: true,
+        code: ADMIN_NETWORK_DENIED_CODE,
+        message: ADMIN_NETWORK_DENIED_MESSAGE,
+      }
+    : {
+        reason,
+        retryable: false,
+        code: ADMIN_NETWORK_NOT_CONFIGURED_CODE,
+        message: ADMIN_NETWORK_NOT_CONFIGURED_MESSAGE,
+      };
 }
+
+export type AdminNetworkRequest = {
+  route: string | null;
+  kiloUserId: string;
+};
 
 function reportDenial(
   reason: AdminNetworkDenialReason,
   headersList: Headers,
-  route: string | null
+  request: AdminNetworkRequest
 ) {
   if (reason === 'not-configured' || reason === 'invalid-config') {
-    if (reportedConfigErrors.has(reason)) return;
-    reportedConfigErrors.add(reason);
-    const detail = memoizedConfig?.kind === 'invalid-config' ? `: ${memoizedConfig.message}` : '';
-    const message = `ADMIN_ALLOWED_NETWORKS ${reason}${detail}; every admin request is refused`;
-    errorExceptInTest(message);
-    captureMessage(message, { level: 'error', tags: { source: 'admin_network' } });
-    return;
+    const detail = memoizedConfig?.kind === 'invalid-config' ? `${memoizedConfig.message}; ` : '';
+    reportConfigProblem(reason, `${detail}every admin request is refused`);
   }
   warnExceptInTest(
     JSON.stringify({
       event: 'admin_network_denied',
       reason,
-      route,
+      route: request.route,
+      kiloUserId: request.kiloUserId,
       ip: vercelClientAddress(headersList)?.address ?? null,
     })
   );
@@ -125,10 +172,10 @@ function reportDenial(
  */
 export function adminNetworkRefusal(
   headersList: Headers,
-  route: string | null
+  request: AdminNetworkRequest
 ): AdminNetworkRefusal | null {
   const decision = adminNetworkDecision(headersList);
   if (decision.kind !== 'denied') return null;
-  reportDenial(decision.reason, headersList, route);
+  reportDenial(decision.reason, headersList, request);
   return adminNetworkRefusalFor(decision.reason);
 }

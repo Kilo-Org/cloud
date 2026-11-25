@@ -2215,17 +2215,31 @@ describe('admin network allowlist (REST)', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  it('exempts only the listed non-session credential', async () => {
+  it('exempts only the listed non-session credential on a read route', async () => {
     const admin = await bearerAdmin('198.51.100.1');
 
     const exempt = await getUserFromAuth({
       adminOnly: true,
+      requestMethod: 'GET',
       adminNetworkExemptCredentials: ['human_bearer'],
     });
     expect(exempt.user?.id).toBe(admin.id);
 
-    const notExempt = await getUserFromAuth({ adminOnly: true });
+    const notExempt = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
     expect(notExempt.adminNetworkDenial).toBe('outside-allowlist');
+  });
+
+  it('refuses an exempt credential off-network on a write route', async () => {
+    await bearerAdmin('198.51.100.1');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'POST',
+      adminNetworkExemptCredentials: ['human_bearer'],
+    });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
   });
 
   it('never exempts a browser session', async () => {
@@ -2233,10 +2247,52 @@ describe('admin network allowlist (REST)', () => {
 
     const result = await getUserFromAuth({
       adminOnly: true,
+      requestMethod: 'GET',
       adminNetworkExemptCredentials: ['human_bearer'],
     });
 
     expect(result.adminNetworkDenial).toBe('outside-allowlist');
+  });
+
+  describe('audit events', () => {
+    let events: AdminAccessEvent[];
+
+    beforeEach(() => {
+      events = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+    });
+
+    afterEach(() => {
+      setAdminAccessSinkForTest(null);
+    });
+
+    it('emits exactly one denied privileged_access event for a refused bearer admin', async () => {
+      const admin = await bearerAdmin('198.51.100.1');
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        surface: 'rest',
+        credential: 'human_bearer',
+        outcome: 'denied',
+        kiloUserId: admin.id,
+        route: '/api/private/users',
+        method: 'GET',
+        wouldBlock: true,
+      });
+    });
+
+    it('emits no admin_access event for a refused session admin', async () => {
+      await sessionUser(true, '198.51.100.1');
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toEqual([]);
+    });
   });
 });
 

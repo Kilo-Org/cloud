@@ -199,6 +199,22 @@ describe('StepUpDialog', () => {
     expect(onVerified).not.toHaveBeenCalled();
   });
 
+  it('tells an off-network admin to connect to WARP', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'ADMIN_NETWORK_DENIED' }),
+    });
+    mount();
+
+    act(() => button('Verify with passkey')?.click());
+    await flush();
+
+    const alert = mounted!.container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Connect to Cloudflare WARP');
+    expect(mockStartAuthentication).not.toHaveBeenCalled();
+    expect(onVerified).not.toHaveBeenCalled();
+  });
+
   it('verifies once and reports success', async () => {
     mockFetch
       .mockResolvedValueOnce({ ok: true, json: async () => ({ challengeId: 'c', options: {} }) })

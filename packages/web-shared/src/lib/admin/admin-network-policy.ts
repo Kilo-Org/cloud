@@ -55,36 +55,72 @@ export function normalizeClientAddress(
 
 const PREFIX_DIGITS = /^\d{1,3}$/;
 
-function parseEntry(entry: string): AdminNetworkEntry | null {
-  const slash = entry.indexOf('/');
-  const addressText = slash === -1 ? entry : entry.slice(0, slash);
-  const prefixText = slash === -1 ? null : entry.slice(slash + 1);
-  const address = normalizeClientAddress(addressText);
-  if (address === null) return null;
-  if (prefixText === null) return { ...address, prefix: null };
-  if (!PREFIX_DIGITS.test(prefixText)) return null;
+/** The address as 8-bit (IPv4) or 16-bit (IPv6) units, most significant first. */
+function addressUnits(family: AdminNetworkFamily, address: string): number[] {
+  if (family === 'ipv4') return address.split('.').map(Number);
+  const groups = (text: string | undefined) =>
+    text === undefined || text === ''
+      ? []
+      : text.split(':').flatMap(group => {
+          if (!group.includes('.')) return [Number.parseInt(group, 16)];
+          const [a = 0, b = 0, c = 0, d = 0] = group.split('.').map(Number);
+          return [(a << 8) | b, (c << 8) | d];
+        });
+  const [headText, tailText] = address.split('::');
+  const head = groups(headText);
+  const tail = groups(tailText);
+  return [...head, ...Array<number>(8 - head.length - tail.length).fill(0), ...tail];
+}
 
-  const prefix = Number(prefixText);
+function hasHostBits(family: AdminNetworkFamily, address: string, prefix: number): boolean {
+  const unitBits = family === 'ipv4' ? 8 : 16;
+  return addressUnits(family, address).some((unit, index) => {
+    const networkBits = Math.min(Math.max(prefix - index * unitBits, 0), unitBits);
+    return (unit & ((1 << (unitBits - networkBits)) - 1)) !== 0;
+  });
+}
+
+type EntryParse = { ok: true; entry: AdminNetworkEntry } | { ok: false; message: string };
+
+const NOT_AN_ADDRESS = 'not an IP address or CIDR range';
+
+function parseEntry(text: string): EntryParse {
+  const slash = text.indexOf('/');
+  const addressText = slash === -1 ? text : text.slice(0, slash);
+  const prefixText = slash === -1 ? null : text.slice(slash + 1);
+  // A zone index (`fe80::1%eth0`) names a local interface, never a client.
+  const address = addressText.includes('%') ? null : normalizeClientAddress(addressText);
+  if (address === null) return { ok: false, message: NOT_AN_ADDRESS };
+  if (prefixText === null) return { ok: true, entry: { ...address, prefix: null } };
+  if (!PREFIX_DIGITS.test(prefixText)) return { ok: false, message: NOT_AN_ADDRESS };
+
+  let prefix = Number(prefixText);
   if (address.family === 'ipv4' && isIP(addressText) === 6) {
     // A mapped IPv6 range covers IPv4 space only from /96 on.
-    return prefix >= 96 && prefix <= 128 ? { ...address, prefix: prefix - 96 } : null;
+    if (prefix < 96 || prefix > 128) return { ok: false, message: NOT_AN_ADDRESS };
+    prefix -= 96;
+  } else if (prefix > (address.family === 'ipv4' ? 32 : 128)) {
+    return { ok: false, message: NOT_AN_ADDRESS };
   }
-  const maxPrefix = address.family === 'ipv4' ? 32 : 128;
-  return prefix <= maxPrefix ? { ...address, prefix } : null;
+  // `192.0.2.10/24` usually means a typo in either half; refuse to guess.
+  if (hasHostBits(address.family, address.address, prefix)) {
+    return { ok: false, message: 'host bits set' };
+  }
+  return { ok: true, entry: { ...address, prefix } };
 }
 
 const adminNetworkEntrySchema = z
   .string()
   .trim()
-  .transform((entry, ctx) => {
-    const parsed = parseEntry(entry);
-    if (parsed === null) {
+  .transform((text, ctx) => {
+    const parsed = parseEntry(text);
+    if (!parsed.ok) {
       // The entry itself stays out of the message: the list is internal data
       // and this message reaches deployment logs.
-      ctx.addIssue({ code: 'custom', message: 'not an IP address or CIDR range' });
+      ctx.addIssue({ code: 'custom', message: parsed.message });
       return z.NEVER;
     }
-    return parsed;
+    return parsed.entry;
   });
 
 /**
@@ -120,11 +156,10 @@ export function formatAdminNetworkEntry(entry: AdminNetworkEntry): string {
 }
 
 /**
- * tRPC namespaces in which every procedure requires Kilo admin.
- * `privileged-inventory.test.ts` fails if a procedure matched here is not an
- * admin procedure, or if a namespace stops matching any procedure. A namespace
- * that mixes in organization-owner procedures must never be listed: the edge
- * would refuse org owners who are not on the corporate network.
+ * tRPC namespaces in which every procedure requires Kilo admin, matched by
+ * prefix. A namespace that mixes in organization-member or owner procedures
+ * must never be listed: the edge would refuse their batches off the corporate
+ * network.
  */
 export const ADMIN_ONLY_TRPC_NAMESPACES = [
   'admin.',
@@ -135,13 +170,20 @@ export const ADMIN_ONLY_TRPC_NAMESPACES = [
 ] as const;
 
 /**
- * Vercel Firewall operators are case-insensitive, so the in-app matchers use
- * the same semantics.
+ * Kilo-admin procedures inside mixed namespaces, matched by exact name. Each
+ * is called only from admin UI. `privileged-inventory.test.ts` checks both
+ * lists against the router in both directions.
  */
-export function isAdminOnlyTrpcProcedure(procedurePath: string): boolean {
-  const lowered = procedurePath.toLowerCase();
-  return ADMIN_ONLY_TRPC_NAMESPACES.some(namespace => lowered.startsWith(namespace.toLowerCase()));
-}
+export const ADMIN_ONLY_TRPC_PROCEDURES = [
+  'organizations.seatPurchases',
+  'organizations.sso.clearSsoDomain',
+  'organizations.sso.createConfig',
+  'organizations.sso.deleteConfig',
+  'organizations.sso.updateSsoDomain',
+  'organizations.updatePlan',
+  'organizations.updateSeatsRequired',
+  'test.adminHello',
+] as const;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -151,16 +193,21 @@ const ADMIN_PAGE_PATH_PATTERN = '^/admin(?:/|$)';
 
 // A tRPC batch joins procedure names with commas in one path segment
 // (`/api/trpc/user.getMe,admin.users.list`); a client may percent-encode them.
-// The match stops at `?` so a query string can never name a procedure.
-const ADMIN_TRPC_PATH_PATTERN = `^/api/trpc/(?:[^/?]*(?:,|%2[cC]))?(?:${ADMIN_ONLY_TRPC_NAMESPACES.map(
-  escapeRegExp
-).join('|')})`;
+// The batch prefix stops at `?` so a query string can never name a procedure,
+// and an exact name must end at a comma, the query string or the path end.
+const ADMIN_TRPC_PATH_PATTERN =
+  '^/api/trpc/(?:[^/?]*(?:,|%2[cC]))?' +
+  `(?:${ADMIN_ONLY_TRPC_NAMESPACES.map(escapeRegExp).join('|')}` +
+  `|(?:${ADMIN_ONLY_TRPC_PROCEDURES.map(escapeRegExp).join('|')})(?:,|%2[cC]|\\?|$))`;
 
 /** PCRE patterns for the Vercel Firewall `path` condition (op `re`). */
 export const ADMIN_EDGE_PATH_PATTERNS = [ADMIN_PAGE_PATH_PATTERN, ADMIN_TRPC_PATH_PATTERN] as const;
 
+// Vercel Firewall operators are case-insensitive; the in-app matcher agrees.
+const ADMIN_EDGE_PATH_REGEXES = ADMIN_EDGE_PATH_PATTERNS.map(pattern => new RegExp(pattern, 'i'));
+
 export function isAdminEdgePath(pathname: string): boolean {
-  return ADMIN_EDGE_PATH_PATTERNS.some(pattern => new RegExp(pattern, 'i').test(pathname));
+  return ADMIN_EDGE_PATH_REGEXES.some(regex => regex.test(pathname));
 }
 
 export const ADMIN_NETWORK_FIREWALL_RULE_NAME = 'Admin network allowlist';

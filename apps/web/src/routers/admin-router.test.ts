@@ -1,4 +1,4 @@
-import { afterEach, describe, test, expect, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, test, expect, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
@@ -17,6 +17,7 @@ import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -718,20 +719,33 @@ describe('admin.cancelAndRefundKiloPass', () => {
 });
 
 describe('admin.syncProviders manual sync', () => {
+  // Setting VERCEL_ENV makes the admin network check enforce, so these callers
+  // come from an allowed address.
   const originalVercelEnv = process.env.VERCEL_ENV;
+  const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+  const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
+
+  beforeEach(() => {
+    process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    resetAdminNetworkConfigForTest();
+  });
 
   afterEach(() => {
-    if (originalVercelEnv === undefined) {
-      delete process.env.VERCEL_ENV;
-    } else {
-      process.env.VERCEL_ENV = originalVercelEnv;
+    const env: Record<string, string | undefined> = process.env;
+    for (const [key, value] of [
+      ['VERCEL_ENV', originalVercelEnv],
+      ['ADMIN_ALLOWED_NETWORKS', originalNetworks],
+    ] as const) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
     }
+    resetAdminNetworkConfigForTest();
   });
 
   test('is disabled in production', async () => {
     process.env.VERCEL_ENV = 'production';
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(false);
     await expect(caller.admin.syncProviders.triggerSync()).rejects.toMatchObject({
@@ -748,7 +762,7 @@ describe('admin.syncProviders manual sync', () => {
   test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {
     process.env.VERCEL_ENV = vercelEnv;
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });

@@ -17,7 +17,8 @@ import {
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   ADMIN_ONLY_TRPC_NAMESPACES,
-  isAdminOnlyTrpcProcedure,
+  ADMIN_ONLY_TRPC_PROCEDURES,
+  isAdminEdgePath,
 } from '@kilocode/web-shared/lib/admin/admin-network-policy';
 import {
   SUPPORT_NEVER_KEYS,
@@ -290,19 +291,48 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
 
   test('every procedure the admin edge rule matches carries the admin guard', () => {
     const unguarded = discoveredProcedures
-      .filter(procedure => isAdminOnlyTrpcProcedure(procedure.path))
+      .filter(procedure => isAdminEdgePath(`/api/trpc/${procedure.path}`))
       .filter(procedure => !procedure.tiers.includes('admin'))
       .map(procedure => procedure.path);
 
     expect(unguarded).toEqual([]);
   });
 
-  test('every admin edge namespace still names mounted procedures', () => {
-    const unused = ADMIN_ONLY_TRPC_NAMESPACES.filter(
-      namespace => !discoveredProcedures.some(procedure => procedure.path.startsWith(namespace))
+  test('every admin procedure is refused at the edge off-network, except reviewed ones', () => {
+    // An admin procedure the edge does not match still meets the in-app
+    // network check; listing one here only gives up the edge layer for it.
+    const edgeExclusions: Record<string, string> = {
+      'stepUp.getStatus':
+        'StepUpProvider mounts app-wide for every admin session and polls it beside the ' +
+        "page's own procedures, so an edge match would refuse whole batches on normal pages",
+      'organizations.sso.generateAdminPortalLink':
+        'SSOSignupCard offers it to organization owners and managers, who are not Kilo admins',
+    };
+    const adminPaths = new Set(
+      discoveredProcedures
+        .filter(procedure => procedure.tiers.includes('admin'))
+        .map(procedure => procedure.path)
     );
 
-    expect(unused).toEqual([]);
+    const uncovered = [...adminPaths].filter(
+      path => !(path in edgeExclusions) && !isAdminEdgePath(`/api/trpc/${path}`)
+    );
+    const staleExclusions = Object.keys(edgeExclusions).filter(
+      path => !adminPaths.has(path) || isAdminEdgePath(`/api/trpc/${path}`)
+    );
+
+    expect(uncovered).toEqual([]);
+    expect(staleExclusions).toEqual([]);
+  });
+
+  test('every admin edge namespace and exact name still names mounted procedures', () => {
+    const unusedNamespaces = ADMIN_ONLY_TRPC_NAMESPACES.filter(
+      namespace => !discoveredProcedures.some(procedure => procedure.path.startsWith(namespace))
+    );
+    const unmountedProcedures = ADMIN_ONLY_TRPC_PROCEDURES.filter(name => !(name in procedures));
+
+    expect(unusedNamespaces).toEqual([]);
+    expect(unmountedProcedures).toEqual([]);
   });
 
   test('known non-admin elevation procedures are classified', () => {

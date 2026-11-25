@@ -18,6 +18,12 @@ import {
 } from './step-up-error';
 import { runStepUpCeremony, type StepUpOptions } from './step-up-ceremony';
 import { StepUpSignInAgainButton } from './StepUpSignInAgainButton';
+import {
+  ADMIN_NETWORK_DENIED_CODE,
+  ADMIN_NETWORK_DENIED_MESSAGE,
+  ADMIN_NETWORK_NOT_CONFIGURED_CODE,
+  ADMIN_NETWORK_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/web-shared/lib/admin/admin-network-messages';
 
 function requestBody(
   action: 'options' | 'verify',
@@ -83,6 +89,10 @@ function errorMessage(code?: string): string {
       return 'That verification was for a different action. Retry the action to verify again.';
     case 'STEP_UP_UNAVAILABLE':
       return 'Verification is temporarily unavailable. Try again shortly.';
+    case ADMIN_NETWORK_DENIED_CODE:
+      return ADMIN_NETWORK_DENIED_MESSAGE;
+    case ADMIN_NETWORK_NOT_CONFIGURED_CODE:
+      return ADMIN_NETWORK_NOT_CONFIGURED_MESSAGE;
     default:
       return 'Could not verify with a passkey. Try again.';
   }

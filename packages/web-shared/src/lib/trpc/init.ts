@@ -479,7 +479,10 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       message: 'Admin access required',
     });
   }
-  const networkRefusal = adminNetworkRefusal(ctx.headersList ?? new Headers(), path);
+  const networkRefusal = adminNetworkRefusal(ctx.headersList ?? new Headers(), {
+    route: path,
+    kiloUserId: ctx.user.id,
+  });
   if (networkRefusal) {
     if (isBearer) emitPrivileged('denied');
     throw new TRPCError({ code: 'FORBIDDEN', message: networkRefusal.message });

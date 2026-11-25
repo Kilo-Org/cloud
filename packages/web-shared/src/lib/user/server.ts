@@ -220,8 +220,10 @@ export type RequiredPermissions = {
   /**
    * Non-session credential kinds exempt from the admin network allowlist. Only
    * for a caller that is a third-party server, never a person: such a caller
-   * cannot be on the corporate network. `'session'` is excluded by the type.
-   * `privileged-inventory.test.ts` pins the routes allowed to set it.
+   * cannot be on the corporate network. `'session'` is excluded by the type,
+   * and like the step-up exemption it applies only to a `credentialExemptible`
+   * (read-grade) action class. `privileged-inventory.test.ts` pins the routes
+   * allowed to set it.
    */
   adminNetworkExemptCredentials?: readonly StepUpExemptibleCredential[];
 };
@@ -327,14 +329,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     delegatedWorkload: result.cloudAgentAuthority !== undefined,
   });
 
-  if (opts.adminOnly === true && result.user) {
-    const networkExempt =
-      credential !== 'session' &&
-      (opts.adminNetworkExemptCredentials?.some(kind => kind === credential) ?? false);
-    const networkFailure = networkExempt ? null : adminNetworkAuthFailure(headersList, result);
-    if (networkFailure) return networkFailure;
-  }
-
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
@@ -368,6 +362,37 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
 
     if (result.user) {
+      // The network exemption has the same two conditions as the step-up
+      // exemption, so a write handler added to an exempt route is not exempt.
+      const networkExempt =
+        credential !== 'session' &&
+        (opts.adminNetworkExemptCredentials?.some(kind => kind === credential) ?? false) &&
+        isCredentialExemptibleClass(routeAttribution().actionClass);
+      const networkFailure = networkExempt
+        ? null
+        : adminNetworkAuthFailure(headersList, result, route);
+      if (networkFailure) {
+        if (credential !== 'session') {
+          const { actionClass, inventoryId } = routeAttribution();
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome: 'denied',
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            ip: clientIpFromHeaders(headersList),
+          });
+        }
+        return networkFailure;
+      }
+
       emitAdminAccessEvent({
         surface,
         kind: 'admin_guard',
@@ -489,7 +514,8 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
   const result = await resolveSessionOnly({ adminOnly: true });
   if (!result.user) return result;
-  return adminNetworkAuthFailure(await headers(), result) ?? result;
+  const headersList = await headers();
+  return adminNetworkAuthFailure(headersList, result, routeFromHeaders(headersList)) ?? result;
 }
 
 /**
@@ -500,9 +526,10 @@ function adminNetworkAuthFailure(
   headersList: Headers,
   admin: Pick<GetAuthResponse, 'internalApiUse' | 'tokenSource' | 'cloudAgentAuthority'> & {
     user: User;
-  }
+  },
+  route: string | null
 ): GetAuthResponse | null {
-  const refusal = adminNetworkRefusal(headersList, routeFromHeaders(headersList));
+  const refusal = adminNetworkRefusal(headersList, { route, kiloUserId: admin.user.id });
   if (refusal === null) return null;
   return authError(403, refusal.message, admin.user.id, {
     authorizationRefused: true,

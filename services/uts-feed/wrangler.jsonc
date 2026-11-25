@@ -1,0 +1,85 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The UTS feed Worker: the UTS key set now, the revocation feed later. It runs without
+  // placement, so a reader far from Frankfurt is served near itself (design 5.2).
+  // Top level is production; `wrangler dev --env local` uses the local block below.
+  "name": "uts-feed",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8801,
+    "local_protocol": "http",
+  },
+  // Traces stay off, as in every UTS Worker. Every env block inherits this.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
+  },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "uts-feed.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "UTS_ENVIRONMENT": "production",
+  },
+  // The mint Worker's internal entrypoint; it answers only the caller named here, which must be
+  // this block's deployed name (services/uts/test/repo checks both).
+  "services": [
+    {
+      "binding": "UTS_SIGNER_KEYS",
+      "service": "uts",
+      "entrypoint": "SignerKeys",
+      "props": { "caller": "uts-feed" },
+    },
+  ],
+  "env": {
+    "staging": {
+      "name": "uts-feed-staging",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "uts-feed-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "UTS_ENVIRONMENT": "staging",
+      },
+      "services": [
+        {
+          "binding": "UTS_SIGNER_KEYS",
+          "service": "uts-staging",
+          "entrypoint": "SignerKeys",
+          "props": { "caller": "uts-feed-staging" },
+        },
+      ],
+    },
+    // Local development only; no deploy workflow targets this name.
+    "local": {
+      "name": "uts-feed-local",
+      "workers_dev": false,
+      "routes": [],
+      "vars": {
+        "UTS_ENVIRONMENT": "development",
+      },
+      "services": [
+        {
+          "binding": "UTS_SIGNER_KEYS",
+          "service": "uts-local",
+          "entrypoint": "SignerKeys",
+          "props": { "caller": "uts-feed-local" },
+        },
+      ],
+    },
+  },
+}

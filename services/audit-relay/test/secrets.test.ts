@@ -82,34 +82,32 @@ describe('secretsFor', () => {
   });
 
   it('reuses the isolate bundle, then revalidates with If-None-Match', async () => {
-    let now = Date.parse(FETCHED_AT);
-    const clock = () => now;
-    const sts = binding(request => {
-      if (request.ifNoneMatch === undefined) {
-        return okBundle({ AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3 } });
-      }
-      expect(request.ifNoneMatch).toBe(ETAG);
-      return { status: 'not_modified', etag: ETAG, stale: false, fetchedAt: FETCHED_AT };
-    });
-    const env = envWith(sts);
+    // Only Date is faked: the client's request deadlines keep real timers.
+    vi.useFakeTimers({ now: Date.parse(FETCHED_AT), toFake: ['Date'] });
+    try {
+      const sts = binding(request => {
+        if (request.ifNoneMatch === undefined) {
+          return okBundle({ AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3 } });
+        }
+        expect(request.ifNoneMatch).toBe(ETAG);
+        return { status: 'not_modified', etag: ETAG, stale: false, fetchedAt: FETCHED_AT };
+      });
+      const env = envWith(sts);
 
-    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
-      'axiom-token'
-    );
-    expect(sts.getBundle).toHaveBeenNthCalledWith(1, {});
+      await expect(secretsFor(env).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('axiom-token');
+      expect(sts.getBundle).toHaveBeenNthCalledWith(1, {});
 
-    now += 60_000;
-    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
-      'axiom-token'
-    );
-    expect(sts.getBundle).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(Date.parse(FETCHED_AT) + 60_000);
+      await expect(secretsFor(env).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('axiom-token');
+      expect(sts.getBundle).toHaveBeenCalledTimes(1);
 
-    now += 181_000;
-    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
-      'axiom-token'
-    );
-    expect(sts.getBundle).toHaveBeenCalledTimes(2);
-    expect(sts.getBundle).toHaveBeenNthCalledWith(2, { ifNoneMatch: ETAG });
+      vi.setSystemTime(Date.parse(FETCHED_AT) + 241_000);
+      await expect(secretsFor(env).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('axiom-token');
+      await vi.waitFor(() => expect(sts.getBundle).toHaveBeenCalledTimes(2));
+      expect(sts.getBundle).toHaveBeenNthCalledWith(2, { ifNoneMatch: ETAG });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

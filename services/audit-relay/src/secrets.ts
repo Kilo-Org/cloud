@@ -32,15 +32,13 @@ export type SecretsEnv = {
   STS: BundleBinding;
 };
 
-export type SecretsOptions = { clock?: () => number };
-
-export function secretsFor(env: SecretsEnv, options: SecretsOptions = {}): SecretReader {
+export function secretsFor(env: SecretsEnv): SecretReader {
   if (env.AUDIT_ENVIRONMENT === 'local' && env.AUDIT_RELAY_LOCAL_SECRETS) {
     return localSecrets(env.AUDIT_RELAY_LOCAL_SECRETS);
   }
   const held = clients.get(env.STS);
   if (held !== undefined) return held;
-  const client = createWorkerSecrets(env.STS, options);
+  const client = createWorkerSecrets(env.STS);
   clients.set(env.STS, client);
   return client;
 }

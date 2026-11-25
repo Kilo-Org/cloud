@@ -28,7 +28,11 @@ export const MANAGER_WEBHOOK_PATH = '/manager-webhook';
 /** The key set changes only when the signer key does, so an isolate serves it from memory. */
 const JWKS_CACHE_MS = 5 * 60 * 1000;
 
-let jwksCache: { environment: string; jwks: Promise<ManagerJwks>; expiresAt: number } | null = null;
+/**
+ * Plain data only, never a promise: workerd ties a promise to the request that created it, so a
+ * request awaiting another request's pending call stalls when that request ends first.
+ */
+let jwksCache: { environment: string; jwks: ManagerJwks; expiresAt: number } | null = null;
 
 let gateCache: { environment: string; gate: WebhookGate } | null = null;
 
@@ -128,26 +132,27 @@ async function readBundleRequest(request: Request): Promise<BodyRead> {
   return parsed.success ? { status: 'ok', value: parsed.data } : { status: 'invalid' };
 }
 
-/** Concurrent misses in one isolate share one SignerDO call; a failed call is not cached. */
+/**
+ * A request that finds no fresh copy makes its own SignerDO call and stores the key set when it
+ * lands; concurrent misses each make one call. A failed call is not cached.
+ */
 async function keySet(env: Env, config: StsConfig): Promise<Response> {
-  const now = Date.now();
   const cached = jwksCache;
-  let jwks: Promise<ManagerJwks>;
-  if (cached !== null && cached.environment === config.environment && cached.expiresAt > now) {
-    jwks = cached.jwks;
-  } else {
-    jwks = withDORetry(
-      () => getSignerStub(env, config),
-      stub => stub.getJwks(),
-      'sts.getJwks'
-    );
-    const entry = { environment: config.environment, jwks, expiresAt: now + JWKS_CACHE_MS };
-    jwksCache = entry;
-    jwks.catch(() => {
-      if (jwksCache === entry) jwksCache = null;
-    });
+  if (
+    cached !== null &&
+    cached.environment === config.environment &&
+    cached.expiresAt > Date.now()
+  ) {
+    return jsonResponse(cached.jwks, 200, 'public, max-age=300');
   }
-  return jsonResponse(await jwks, 200, 'public, max-age=300');
+  const fetched = await withDORetry(
+    () => getSignerStub(env, config),
+    stub => stub.getJwks(),
+    'sts.getJwks'
+  );
+  const jwks: ManagerJwks = { keys: fetched.keys };
+  jwksCache = { environment: config.environment, jwks, expiresAt: Date.now() + JWKS_CACHE_MS };
+  return jsonResponse(jwks, 200, 'public, max-age=300');
 }
 
 async function bundleRequest(
@@ -218,8 +223,9 @@ function webhookGate(env: Env, config: StsConfig): WebhookGate {
 
 /**
  * The Worker checks size and signature itself; only a verified `secrets.modified` for this
- * environment costs a refresher hop. A forged request costs at most one secret reload per isolate
- * per minute (WebhookGate).
+ * environment costs a refresher hop. Once the isolate holds the secret, a forged request costs at
+ * most one secret reload per isolate per minute; before that, each request that finds no secret
+ * loads it (WebhookGate).
  */
 async function managerWebhook(request: Request, env: Env, config: StsConfig): Promise<Response> {
   const signature = request.headers.get('x-infisical-signature');

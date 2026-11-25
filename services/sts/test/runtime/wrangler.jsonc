@@ -1,7 +1,8 @@
-// Test-only Worker that broker-rpc.test.ts starts in local workerd; never deployed. Every value is
+// Test-only Worker that runtime.test.ts starts in local workerd; never deployed. Every value is
 // local and synthetic. BROKER binds this Worker's own ProbeBroker entrypoint, as a consumer binds
-// SecretsBroker, so the bundle read is a real RPC call. The Worker and queue names stay outside
-// the `sts-*` and `kilo-audit-*` names test/repo/worker-configs.ts reserves for deployments.
+// SecretsBroker, so the bundle read is a real RPC call; SELF sends real requests to STS's own
+// HTTP routes. The Worker and queue names stay outside the `sts-*` and `kilo-audit-*` names
+// test/repo/worker-configs.ts reserves for deployments.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "secrets-broker-rpc-test",
@@ -37,6 +38,7 @@
       "entrypoint": "ProbeBroker",
       "props": { "caller": "o11y" },
     },
+    { "binding": "SELF", "service": "secrets-broker-rpc-test" },
   ],
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-rpc-test-audit" }],

@@ -122,9 +122,14 @@ function isDependencyFailure(error: unknown): boolean {
  * issuer and the claim bindings, so an unlisted identity can never match. The audience is always
  * this STS's issuer. Discovery and key sets are cached for the isolate; a fetch that fails is not
  * cached, and it makes the answer `unavailable`, never a rejection (design 7).
+ *
+ * Only a finished discovery is cached, never its promise: workerd ties a promise to the request
+ * that created it, so a request awaiting another request's pending discovery stalls when that
+ * request ends first. jose's key set holds plain data and, on Workers, makes each request that
+ * needs a reload fetch for itself rather than share a pending fetch.
  */
 export class IdentityVerifier {
-  private readonly jwks = new Map<string, Promise<RemoteJWKSet>>();
+  private readonly jwks = new Map<string, RemoteJWKSet>();
 
   constructor(
     private readonly options: {
@@ -159,24 +164,22 @@ export class IdentityVerifier {
     return new Response(text, { status: 200, headers: { 'content-type': 'application/json' } });
   }
 
-  private jwksFor(issuer: string): Promise<RemoteJWKSet> {
+  /** A request that finds no key set for the issuer discovers it itself and stores the result. */
+  private async jwksFor(issuer: string): Promise<RemoteJWKSet> {
     const existing = this.jwks.get(issuer);
     if (existing) return existing;
 
-    const created = (async () => {
-      const response = await this.providerFetch(`${issuer}/.well-known/openid-configuration`);
-      const document = DiscoverySchema.safeParse(await response.json());
-      if (!document.success) throw new ProviderUnavailableError('discovery document is invalid');
-      if (document.data.issuer !== issuer) {
-        throw new ProviderUnavailableError('discovery issuer does not match');
-      }
-      return createRemoteJWKSet(new URL(document.data.jwks_uri), {
-        timeoutDuration: PROVIDER_FETCH_TIMEOUT_MS,
-        [customFetch]: (url, init) => this.providerFetch(url, init),
-      });
-    })();
+    const response = await this.providerFetch(`${issuer}/.well-known/openid-configuration`);
+    const document = DiscoverySchema.safeParse(await response.json());
+    if (!document.success) throw new ProviderUnavailableError('discovery document is invalid');
+    if (document.data.issuer !== issuer) {
+      throw new ProviderUnavailableError('discovery issuer does not match');
+    }
+    const created = createRemoteJWKSet(new URL(document.data.jwks_uri), {
+      timeoutDuration: PROVIDER_FETCH_TIMEOUT_MS,
+      [customFetch]: (url, init) => this.providerFetch(url, init),
+    });
     this.jwks.set(issuer, created);
-    void created.catch(() => this.jwks.delete(issuer));
     return created;
   }
 

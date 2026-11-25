@@ -22,6 +22,7 @@ import {
   organizations,
   passkey_credentials,
   session_step_up_proofs,
+  transactional_email_log,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
@@ -31,16 +32,21 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
-import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
+  sendApiKeyResetEmail,
+  sendBrowserSessionsRevokedEmail,
+  sendSignInCodeEmail,
 } from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { consumeAppShellHandoff, createAppShellHandoff } from '@/lib/app-shell/handoff-token';
-import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
+import {
+  dispatchAccountSecurityPush,
+  refreshGlanceableScope,
+} from '@kilocode/web-shared/lib/notifications-worker-client';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -49,6 +55,10 @@ jest.mock('@kilocode/web-shared/lib/email', () => {
     sendSignInCodeEmail: jest.fn(),
     sendAccountDeletionConfirmationEmail: jest.fn(),
     sendAccountDeletionSupportNotification: jest.fn(),
+    sendApiKeyResetEmail: jest.fn(async () => ({ sent: true })),
+    sendBrowserSessionsRevokedEmail: jest.fn(async () => ({ sent: true })),
+    sendDeviceSessionRevokedEmail: jest.fn(async () => ({ sent: true })),
+    sendPasskeyRemovedEmail: jest.fn(async () => ({ sent: true })),
   };
 });
 
@@ -70,6 +80,7 @@ jest.mock('@/lib/user', () => {
 // network here.
 jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   refreshGlanceableScope: jest.fn(),
+  dispatchAccountSecurityPush: jest.fn(async () => true),
 }));
 
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
@@ -78,6 +89,38 @@ const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSuppo
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 const mockRefreshGlanceableScope = jest.mocked(refreshGlanceableScope);
+const mockDispatchSecurityPush = jest.mocked(dispatchAccountSecurityPush);
+const mockSendApiKeyReset = jest.mocked(sendApiKeyResetEmail);
+const mockSendBrowserSessionsRevoked = jest.mocked(sendBrowserSessionsRevokedEmail);
+
+// Users that receive a security notice in this suite. The notice leaves an
+// outbox row that references the user; a later suite in the same worker that
+// deletes every user would hit it, so the rows are cleared after each test,
+// while the database connection is still open.
+const noticeRecipientIds: string[] = [];
+
+async function insertNoticeRecipient(fields: Partial<User> = {}): Promise<User> {
+  const user = await insertTestUser(fields);
+  noticeRecipientIds.push(user.id);
+  return user;
+}
+
+afterEach(async () => {
+  if (noticeRecipientIds.length > 0) {
+    await db
+      .delete(transactional_email_log)
+      .where(inArray(transactional_email_log.user_id, noticeRecipientIds));
+  }
+});
+
+/** The security-notice pushes sent since the last clear, as (recipient, event, origin). */
+function securityPushes() {
+  return mockDispatchSecurityPush.mock.calls.map(([push]) => ({
+    recipientUserId: push.recipientUserId,
+    event: push.event,
+    origin: push.origin,
+  }));
+}
 
 const AVAILABLE_CAPABILITY = { available: true, unavailableReasonCode: null };
 const UNAVAILABLE_BALANCE_ALERTS = {
@@ -480,8 +523,14 @@ describe('session and API token reset mutations', () => {
     return user;
   }
 
+  beforeEach(() => {
+    mockDispatchSecurityPush.mockClear();
+    mockSendApiKeyReset.mockClear();
+    mockSendBrowserSessionsRevoked.mockClear();
+  });
+
   it('resets the current user API key and signs out browser and device sessions', async () => {
-    const user = await insertTestUser({
+    const user = await insertNoticeRecipient({
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
@@ -525,10 +574,23 @@ describe('session and API token reset mutations', () => {
       .from(app_shell_handoff_tokens)
       .where(eq(app_shell_handoff_tokens.kilo_user_id, user.id));
     expect(handoffTokens).toEqual([]);
+
+    // One notice to the owner, describing the owner's own request.
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: user.id,
+        event: 'api_key_reset',
+        origin: { actor: 'owner', device: null, location: null },
+      },
+    ]);
+    expect(mockSendApiKeyReset).toHaveBeenCalledWith(
+      user.google_user_email,
+      expect.objectContaining({ actor: 'owner' })
+    );
   });
 
   it('signs out current user browser sessions without resetting the API key', async () => {
-    const user = await insertTestUser({
+    const user = await insertNoticeRecipient({
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
@@ -546,11 +608,18 @@ describe('session and API token reset mutations', () => {
     expect(updated.api_token_pepper).toBe('api-pepper-before');
     // A hand-off minted before the sign-out cannot open a shell after it.
     await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: user.id,
+        event: 'browser_sessions_revoked',
+        origin: { actor: 'owner', device: null, location: null },
+      },
+    ]);
   });
 
   it('lets admins reset a user API key without signing out browser sessions', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const target = await insertTestUser({
+    const target = await insertNoticeRecipient({
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
@@ -562,11 +631,32 @@ describe('session and API token reset mutations', () => {
     expect(updated.api_token_pepper).toEqual(expect.any(String));
     expect(updated.api_token_pepper).not.toBe('api-pepper-before');
     expect(updated.web_session_pepper).toBe('web-session-pepper-before');
+
+    // Exactly one notice, to the account owner, naming Kilo support and the
+    // time only: nothing about the admin's request.
+    expect(securityPushes()).toEqual([
+      { recipientUserId: target.id, event: 'api_key_reset', origin: { actor: 'support' } },
+    ]);
+    expect(mockSendApiKeyReset).toHaveBeenCalledTimes(1);
+    expect(mockSendApiKeyReset).toHaveBeenCalledWith(target.google_user_email, {
+      actor: 'support',
+      occurredAt: expect.any(Date),
+    });
+  });
+
+  it('sends no notice when the admin resets the API key of a user that does not exist', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.resetAPIKey({ userId: `missing-${crypto.randomUUID()}` });
+
+    expect(securityPushes()).toEqual([]);
+    expect(mockSendApiKeyReset).not.toHaveBeenCalled();
   });
 
   it('lets admins sign out user browser sessions without resetting the API key', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const target = await insertTestUser({
+    const target = await insertNoticeRecipient({
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
@@ -583,6 +673,17 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
     await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: target.id,
+        event: 'browser_sessions_revoked',
+        origin: { actor: 'support' },
+      },
+    ]);
+    expect(mockSendBrowserSessionsRevoked).toHaveBeenCalledWith(target.google_user_email, {
+      actor: 'support',
+      occurredAt: expect.any(Date),
+    });
   });
 });
 
@@ -2381,6 +2482,11 @@ describe('user router - device sessions', () => {
     await db
       .delete(device_sessions)
       .where(inArray(device_sessions.kilo_user_id, [owner.id, otherUser.id]));
+    // Revoking a session sends the owner a notice, whose outbox row
+    // references the user.
+    await db
+      .delete(transactional_email_log)
+      .where(inArray(transactional_email_log.user_id, [owner.id, otherUser.id]));
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, [owner.id, otherUser.id]));
   });
 
@@ -2446,7 +2552,8 @@ describe('user router - device sessions', () => {
     expect(result.every(row => row.isCurrent === false)).toBe(true);
   });
 
-  it('revokes an owned active session with the user_revoked reason', async () => {
+  it('revokes an owned active session with the user_revoked reason and notifies the owner once', async () => {
+    mockDispatchSecurityPush.mockClear();
     const caller = await createCallerForUser(owner.id);
 
     await caller.user.revokeDeviceSessionById({ sessionId: revokeByIdSessionId });
@@ -2457,9 +2564,21 @@ describe('user router - device sessions', () => {
       .where(eq(device_sessions.id, revokeByIdSessionId));
     expect(row?.revoked_at).not.toBeNull();
     expect(row?.revoked_reason).toBe('user_revoked');
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: owner.id,
+        event: 'device_session_revoked',
+        origin: { actor: 'owner', device: null, location: null },
+      },
+    ]);
+
+    // Revoking the same session again changes nothing and sends nothing.
+    await caller.user.revokeDeviceSessionById({ sessionId: revokeByIdSessionId });
+    expect(securityPushes()).toHaveLength(1);
   });
 
-  it('refuses to revoke a session owned by another user', async () => {
+  it('refuses to revoke a session owned by another user, and sends no notice', async () => {
+    mockDispatchSecurityPush.mockClear();
     const caller = await createCallerForUser(otherUser.id);
 
     await caller.user.revokeDeviceSessionById({ sessionId: currentSessionId });
@@ -2470,6 +2589,7 @@ describe('user router - device sessions', () => {
       .from(device_sessions)
       .where(eq(device_sessions.id, currentSessionId));
     expect(row?.revoked_at).toBeNull();
+    expect(securityPushes()).toEqual([]);
   });
 
   it('rejects a non-UUID session id', async () => {
@@ -2976,8 +3096,12 @@ describe('user router - passkeys', () => {
   let other: User;
 
   beforeAll(async () => {
-    owner = await insertTestUser({ google_user_email: 'passkey-owner@example.com' });
-    other = await insertTestUser({ google_user_email: 'passkey-other@example.com' });
+    owner = await insertNoticeRecipient({ google_user_email: 'passkey-owner@example.com' });
+    other = await insertNoticeRecipient({ google_user_email: 'passkey-other@example.com' });
+  });
+
+  beforeEach(() => {
+    mockDispatchSecurityPush.mockClear();
   });
 
   afterEach(async () => {
@@ -3075,6 +3199,13 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(0);
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: owner.id,
+        event: 'passkey_removed',
+        origin: { actor: 'owner', device: null, location: null },
+      },
+    ]);
   });
 
   it('refuses to delete another user passkey and leaves it in place', async () => {
@@ -3090,6 +3221,7 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(1);
+    expect(securityPushes()).toEqual([]);
   });
 
   it('refuses an unknown passkey id', async () => {

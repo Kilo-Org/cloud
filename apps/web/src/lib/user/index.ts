@@ -639,19 +639,27 @@ export async function createOrUpdateUser(
     if (shouldLink) {
       let linkedUser = userByEmail;
       if (args.provider === 'workos') {
-        linkedUser = await db.transaction(async tx => {
+        // A sign-in that settles onto the WorkOS row it already has is a
+        // no-op re-link, which stays silent (.specs/account-linking.md).
+        const isNewWorkosLink = !existingProviders.some(
+          p => p.provider === 'workos' && p.provider_account_id === args.provider_account_id
+        );
+        const settled = await db.transaction(async tx => {
           await tx
             .delete(user_auth_provider)
             .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
-          await tx.insert(user_auth_provider).values({
-            kilo_user_id: userByEmail.id,
-            provider: args.provider,
-            provider_account_id: args.provider_account_id,
-            email: args.google_user_email,
-            avatar_url: args.google_user_image_url,
-            display_name: args.display_name ?? null,
-            hosted_domain: args.hosted_domain,
-          });
+          const [linked] = await tx
+            .insert(user_auth_provider)
+            .values({
+              kilo_user_id: userByEmail.id,
+              provider: args.provider,
+              provider_account_id: args.provider_account_id,
+              email: args.google_user_email,
+              avatar_url: args.google_user_image_url,
+              display_name: args.display_name ?? null,
+              hosted_domain: args.hosted_domain,
+            })
+            .returning({ created_at: user_auth_provider.created_at });
           const [updatedUser] = await tx
             .update(kilocode_users)
             .set({
@@ -659,9 +667,27 @@ export async function createOrUpdateUser(
             })
             .where(eq(kilocode_users.id, userByEmail.id))
             .returning();
-          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
-          return updatedUser;
+          if (!updatedUser || !linked) {
+            throw new Error('Failed to rotate web sessions for WorkOS user');
+          }
+          return { user: updatedUser, linkedAt: linked.created_at };
         });
+        linkedUser = settled.user;
+        if (isNewWorkosLink) {
+          await scheduleSecurityNotice(
+            settled.user,
+            {
+              type: 'sign_in_method_linked',
+              provider: 'workos',
+              linkedIdentity: {
+                email: args.google_user_email,
+                displayName: args.display_name ?? null,
+              },
+              linkedAt: new Date(settled.linkedAt),
+            },
+            await currentSecurityNoticeRequest()
+          );
+        }
       } else {
         const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
         if (!linkResult.success) {
@@ -1051,7 +1077,6 @@ export async function linkAccountToExistingUser(
         {
           type: 'sign_in_method_linked',
           provider: authProviderData.provider,
-          providerAccountId: authProviderData.provider_account_id,
           linkedIdentity: {
             email: authProviderData.google_user_email,
             displayName: authProviderData.display_name ?? null,

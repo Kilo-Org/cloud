@@ -128,6 +128,11 @@ import {
   resetAccountToMagicLink,
   type MagicLinkRecoveryResult,
 } from '@/lib/user/account-recovery';
+import {
+  actingSessionIdFromContext,
+  scheduleSecurityNotice,
+  supportSecurityNoticeRequest,
+} from '@/lib/security-notices';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -698,10 +703,20 @@ export const adminRouter = createTRPCRouter({
     }),
 
     resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input, ctx }) => {
-      await db
+      const [target] = await db
         .update(kilocode_users)
         .set({ api_token_pepper: crypto.randomUUID() })
-        .where(eq(kilocode_users.id, input.userId));
+        .where(eq(kilocode_users.id, input.userId))
+        .returning({ id: kilocode_users.id, google_user_email: kilocode_users.google_user_email });
+
+      // The owner learns that support reset the token, never from where.
+      if (target) {
+        await scheduleSecurityNotice(
+          target,
+          { type: 'api_key_reset', actingSessionId: actingSessionIdFromContext(ctx) },
+          supportSecurityNoticeRequest()
+        );
+      }
 
       await recordAdminAction(ctx, {
         action: 'user.api_key.reset',
@@ -716,6 +731,15 @@ export const adminRouter = createTRPCRouter({
       .input(ResetAPIKeySchema)
       .mutation(async ({ input, ctx }) => {
         await revokeWebSessions(input.userId);
+
+        const target = await findUserById(input.userId);
+        if (target) {
+          await scheduleSecurityNotice(
+            target,
+            { type: 'browser_sessions_revoked', actingSessionId: actingSessionIdFromContext(ctx) },
+            supportSecurityNoticeRequest()
+          );
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.browser_sessions.revoke',
@@ -815,6 +839,14 @@ export const adminRouter = createTRPCRouter({
         if (!recovery) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
+
+        // One notice for the whole reset, scheduled before the audit write so
+        // an audit failure cannot drop it.
+        await scheduleSecurityNotice(
+          user,
+          { type: 'sign_in_reset_by_support', actingSessionId: actingSessionIdFromContext(ctx) },
+          supportSecurityNoticeRequest()
+        );
 
         await recordAdminAction(ctx, {
           action: 'user.login.reset_to_magic_link',

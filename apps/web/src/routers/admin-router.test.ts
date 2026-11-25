@@ -5,6 +5,7 @@ import {
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  transactional_email_log,
   user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
@@ -243,6 +244,24 @@ describe('admin action audit logging', () => {
       'user.browser_sessions.revoke',
     ]);
     expect(audits.every(audit => audit.target_id === user.id)).toBe(true);
+
+    // Each action sent the account owner one notice, and the admin none.
+    const notices = await db
+      .select({
+        userId: transactional_email_log.user_id,
+        key: transactional_email_log.idempotency_key,
+      })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.email_type, 'security_notice'));
+    const forUser = notices.filter(notice => notice.userId === user.id);
+    expect(forUser.map(notice => notice.key?.split(':')[0]).sort()).toEqual([
+      'api_key_reset',
+      'browser_sessions_revoked',
+    ]);
+    expect(notices.some(notice => notice.userId === admin.id)).toBe(false);
+    // The outbox rows reference the user; a later suite in this worker that
+    // deletes every user would hit them.
+    await db.delete(transactional_email_log).where(eq(transactional_email_log.user_id, user.id));
   });
 });
 

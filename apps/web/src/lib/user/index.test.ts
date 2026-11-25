@@ -281,6 +281,20 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
   recordAffiliateAttributionAndQueueParentEvent
 );
 
+/** The sign-in-method-linked notices claimed for a user, by their outbox keys. */
+async function linkNoticeKeys(userId: string) {
+  const rows = await db
+    .select({ key: transactional_email_log.idempotency_key })
+    .from(transactional_email_log)
+    .where(
+      and(
+        eq(transactional_email_log.user_id, userId),
+        eq(transactional_email_log.email_type, 'security_notice')
+      )
+    );
+  return rows.map(row => row.key).filter(key => key?.startsWith('sign_in_method_linked:'));
+}
+
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   beforeEach(() => {
@@ -1781,6 +1795,22 @@ describe('User', () => {
       expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+
+      // Signing in again with the same WorkOS profile is not a new link.
+      await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
     });
 
     it('replaces a stale WorkOS profile ID for an existing user', async () => {
@@ -1824,6 +1854,8 @@ describe('User', () => {
         where: eq(kilocode_users.id, existingUser.id),
       });
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
+      // The replaced profile is a new link, so the owner hears of it.
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
     });
 
     it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {

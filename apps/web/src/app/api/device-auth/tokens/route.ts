@@ -7,9 +7,12 @@ import {
   type ApprovedDeviceAuthRequest,
   type DeviceAuthRefusalCode,
 } from '@/lib/device-auth/device-auth';
-import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
-import { describeUserAgent } from '@/lib/auth/sign-in-method-change-request';
-import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/security-notices';
+import {
+  recognisedClientLabel,
+  scheduleSecurityNotice,
+  securityNoticeRequestFromHeaders,
+} from '@/lib/security-notices';
+import type { DeviceSignInRequester } from '@kilocode/web-shared/lib/email';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import * as z from 'zod';
@@ -52,23 +55,19 @@ const APPROVAL_REFUSAL_STATUS: Partial<Record<DeviceAuthRefusalCode, number>> = 
 };
 
 /**
- * How the approval notice names the device that asked to sign in. The
- * requester chose its own user agent, so only a recognised client kind or a
- * parsed browser label is shown, never the raw header.
+ * How the approval notice names the device that asked to sign in. A
+ * requesting client name is chosen by the requesting device itself, before
+ * anyone signs in, so the notice shows it only quoted and attributed to that
+ * device ("named itself …") and cut short. Without one, the notice shows a
+ * recognised client kind or a parsed browser label from the stored user
+ * agent, never the raw header.
  */
-function requesterLabel(request: ApprovedDeviceAuthRequest): string | null {
-  if (request.requestingClientName) return request.requestingClientName;
-  const client = classifyDeviceSessionClient(request.userAgent);
-  switch (client.kind) {
-    case 'cli':
-      return 'Kilo CLI';
-    case 'app':
-      return client.platform === 'ios' ? 'Kilo app on iOS' : 'Kilo app on Android';
-    case 'browser':
-      return describeUserAgent(request.userAgent);
-    case 'other':
-      return null;
+function requesterFor(request: ApprovedDeviceAuthRequest): DeviceSignInRequester {
+  if (request.requestingClientName) {
+    return { kind: 'self_named', name: request.requestingClientName };
   }
+  const label = recognisedClientLabel(request.userAgent);
+  return label === null ? { kind: 'unidentified' } : { kind: 'recognised', label };
 }
 
 export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
@@ -135,7 +134,7 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
     {
       type: 'device_sign_in_approved',
       deviceAuthRequestId: approved.id,
-      clientLabel: requesterLabel(approved),
+      requester: requesterFor(approved),
       requestIp: approved.ipAddress,
     },
     securityNoticeRequestFromHeaders(request.headers)

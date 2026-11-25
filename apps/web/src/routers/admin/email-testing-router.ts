@@ -111,16 +111,28 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       return { ...securityNoticeFixtureVars, provider_name: 'GitHub' };
     case 'passkeyAdded':
     case 'passkeyRemoved':
-      return { ...securityNoticeFixtureVars, passkey_label: 'MacBook Pro' };
+      return { ...securityNoticeFixtureVars, passkey_name_note: ' (MacBook Pro)' };
     case 'deviceSignInApproved':
       return {
         ...securityNoticeFixtureVars,
         client_label: 'Kilo CLI',
+        requesting_device: 'Kilo CLI',
         request_ip: '198.51.100.24',
       };
     case 'apiKeyReset':
     case 'browserSessionsRevoked':
-      return securityNoticeFixtureVars;
+      return {
+        ...securityNoticeFixtureVars,
+        actor_note: 'If this was you, no action is needed.',
+        not_you_lead: 'If this was not you:',
+      };
+    case 'deviceSessionRevoked':
+      return { ...securityNoticeFixtureVars, revoked_device: 'Kilo CLI' };
+    case 'signInResetBySupport':
+      return {
+        ...securityNoticeFixtureVars,
+        change_details: new RawHtml('Time: 2026-01-01 12:00 UTC<br />Done by: Kilo support'),
+      };
     case 'newSignIn':
       return { ...securityNoticeFixtureVars, method_name: 'Google' };
     case 'signInMethodChangeCode':

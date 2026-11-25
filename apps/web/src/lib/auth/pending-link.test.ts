@@ -187,7 +187,7 @@ describe('pending auth link attach rule', () => {
       user.google_user_email,
       'GitHub',
       { email: user.google_user_email, displayName: 'octo-pending' },
-      expect.objectContaining({ changedAt: expect.any(Date) })
+      expect.objectContaining({ actor: 'owner', occurredAt: expect.any(Date) })
     );
   });
 

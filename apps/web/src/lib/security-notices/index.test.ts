@@ -11,6 +11,8 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendDeviceSignInApprovedEmail: jest.fn(async () => ({ sent: true })),
   sendApiKeyResetEmail: jest.fn(async () => ({ sent: true })),
   sendBrowserSessionsRevokedEmail: jest.fn(async () => ({ sent: true })),
+  sendDeviceSessionRevokedEmail: jest.fn(async () => ({ sent: true })),
+  sendSignInResetBySupportEmail: jest.fn(async () => ({ sent: true })),
   sendNewSignInEmail: jest.fn(async () => ({ sent: true })),
 }));
 jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
@@ -18,45 +20,58 @@ jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
 }));
 
 import { captureException } from '@sentry/nextjs';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { transactional_email_log, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import * as email from '@kilocode/web-shared/lib/email';
+import type { SecurityNoticeRequest } from '@kilocode/web-shared/lib/email';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   scheduleSecurityNotice,
   securityNoticeRequestFromHeaders,
+  supportSecurityNoticeRequest,
   type SecurityNoticeEvent,
-  type SecurityNoticeRequest,
 } from './index';
 
 const mockCaptureException = jest.mocked(captureException);
 const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
 const mockSendPasskeyAdded = jest.mocked(email.sendPasskeyAddedEmail);
 const mockSendApiKeyReset = jest.mocked(email.sendApiKeyResetEmail);
+const mockSendBrowserSessionsRevoked = jest.mocked(email.sendBrowserSessionsRevokedEmail);
+const mockSendRemoved = jest.mocked(email.sendSignInMethodRemovedEmail);
 const mockSendNewSignIn = jest.mocked(email.sendNewSignInEmail);
 
 const REQUEST: SecurityNoticeRequest = {
+  actor: 'owner',
   occurredAt: new Date('2026-03-04T05:06:07.000Z'),
   ip: '203.0.113.7',
   location: 'Berlin, DE',
   device: 'Firefox on Linux',
 };
 
-const EXPECTED_DETAILS = {
-  changedAt: REQUEST.occurredAt,
-  ip: REQUEST.ip,
-  location: REQUEST.location,
-  device: REQUEST.device,
-};
+const OWNER_ORIGIN = { actor: 'owner', device: 'Firefox on Linux', location: 'Berlin, DE' };
 
+const createdUserIds: string[] = [];
 let user: User;
 
 beforeEach(async () => {
   jest.clearAllMocks();
   user = await insertTestUser();
+  createdUserIds.push(user.id);
+});
+
+// The notices this suite sends leave outbox rows that reference its users; a
+// later suite in the same worker that deletes every user would hit them. The
+// rows go after each test, while the database connection is still open.
+afterEach(async () => {
+  const userIds = createdUserIds.splice(0);
+  if (userIds.length > 0) {
+    await db
+      .delete(transactional_email_log)
+      .where(inArray(transactional_email_log.user_id, userIds));
+  }
 });
 
 async function noticeRows(userId: string) {
@@ -71,58 +86,59 @@ async function noticeRows(userId: string) {
     );
 }
 
+function at(iso: string): SecurityNoticeRequest {
+  return { ...REQUEST, occurredAt: new Date(iso) };
+}
+
 const EVENTS: Array<[SecurityNoticeEvent, unknown, unknown[]]> = [
   [
     { type: 'passkey_added', passkeyId: 'pk-1', passkeyName: 'Laptop' },
     jest.mocked(email.sendPasskeyAddedEmail),
-    ['Laptop', EXPECTED_DETAILS],
+    ['Laptop', REQUEST],
   ],
   [
     { type: 'passkey_removed', passkeyId: 'pk-1', passkeyName: null },
     jest.mocked(email.sendPasskeyRemovedEmail),
-    [null, EXPECTED_DETAILS],
+    [null, REQUEST],
   ],
   [
     {
       type: 'sign_in_method_linked',
       provider: 'github',
-      providerAccountId: 'gh-1',
       linkedIdentity: { email: 'octo@example.net', displayName: null },
       linkedAt: new Date('2026-03-04T05:06:07.000Z'),
     },
     jest.mocked(email.sendNewSignInMethodEmail),
-    ['GitHub', { email: 'octo@example.net', displayName: null }, EXPECTED_DETAILS],
+    ['GitHub', { email: 'octo@example.net', displayName: null }, REQUEST],
   ],
   [
-    { type: 'sign_in_method_unlinked', provider: 'github' },
+    { type: 'sign_in_method_unlinked', provider: 'github', actingSessionId: 'web-session-1' },
     jest.mocked(email.sendSignInMethodRemovedEmail),
-    ['GitHub', EXPECTED_DETAILS],
+    ['GitHub', REQUEST],
   ],
   [
-    {
-      type: 'device_sign_in_approved',
-      deviceAuthRequestId: 'request-1',
-      clientLabel: 'Kilo CLI',
-      requestIp: '198.51.100.24',
-    },
-    jest.mocked(email.sendDeviceSignInApprovedEmail),
-    [{ clientLabel: 'Kilo CLI', requestIp: '198.51.100.24' }, EXPECTED_DETAILS],
+    { type: 'api_key_reset', actingSessionId: 'web-session-1' },
+    jest.mocked(email.sendApiKeyResetEmail),
+    [REQUEST],
   ],
-  [{ type: 'api_key_reset' }, jest.mocked(email.sendApiKeyResetEmail), [EXPECTED_DETAILS]],
   [
-    { type: 'browser_sessions_revoked' },
+    { type: 'browser_sessions_revoked', actingSessionId: 'web-session-1' },
     jest.mocked(email.sendBrowserSessionsRevokedEmail),
-    [EXPECTED_DETAILS],
+    [REQUEST],
   ],
   [
     {
-      type: 'new_sign_in',
-      method: 'google',
-      deviceKeyHash: 'd'.repeat(64),
-      networkKeyHash: 'n'.repeat(64),
+      type: 'device_session_revoked',
+      deviceSessionId: 'device-session-1',
+      revokedDevice: 'Kilo CLI',
     },
+    jest.mocked(email.sendDeviceSessionRevokedEmail),
+    ['Kilo CLI', REQUEST],
+  ],
+  [
+    { type: 'new_sign_in', method: 'google' },
     jest.mocked(email.sendNewSignInEmail),
-    ['Google', EXPECTED_DETAILS],
+    ['Google', REQUEST],
   ],
 ];
 
@@ -137,28 +153,87 @@ describe('scheduleSecurityNotice', () => {
       recipientUserId: user.id,
       event: event.type,
       idempotencyKey: expect.stringMatching(new RegExp(`^${event.type}:[0-9a-f]{64}$`)),
-      device: 'Firefox on Linux',
-      location: 'Berlin, DE',
+      origin: OWNER_ORIGIN,
     });
     expect(await noticeRows(user.id)).toHaveLength(1);
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
-  it('keeps account and device identifiers out of the idempotency key', async () => {
+  it('describes the signed-in device in a device approval push, never the approving browser', async () => {
+    await scheduleSecurityNotice(
+      user,
+      {
+        type: 'device_sign_in_approved',
+        deviceAuthRequestId: 'request-1',
+        requester: { kind: 'recognised', label: 'Kilo CLI' },
+        requestIp: '198.51.100.24',
+      },
+      REQUEST
+    );
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ origin: { actor: 'owner', device: 'Kilo CLI', location: null } })
+    );
+    // The email keeps the requesting device apart from where it was approved.
+    expect(jest.mocked(email.sendDeviceSignInApprovedEmail)).toHaveBeenCalledWith(
+      user.google_user_email,
+      { client: { kind: 'recognised', label: 'Kilo CLI' }, ip: '198.51.100.24' },
+      REQUEST
+    );
+  });
+
+  it('quotes a name the requesting device chose in the approval push, cut short', async () => {
+    await scheduleSecurityNotice(
+      user,
+      {
+        type: 'device_sign_in_approved',
+        deviceAuthRequestId: 'request-2',
+        requester: { kind: 'self_named', name: `Kilo security check ${'x'.repeat(100)}` },
+        requestIp: null,
+      },
+      REQUEST
+    );
+
+    const [[push]] = mockDispatchPush.mock.calls;
+    expect(push?.origin).toEqual({
+      actor: 'owner',
+      device: `"Kilo security check ${'x'.repeat(20)}…"`,
+      location: null,
+    });
+  });
+
+  it('names Kilo support and nothing about the staff member for a support action', async () => {
+    const supportRequest = supportSecurityNoticeRequest(new Date('2026-03-04T05:06:07.000Z'));
+
+    await scheduleSecurityNotice(
+      user,
+      { type: 'sign_in_reset_by_support', actingSessionId: 'admin-session-1' },
+      supportRequest
+    );
+
+    expect(jest.mocked(email.sendSignInResetBySupportEmail)).toHaveBeenCalledWith(
+      user.google_user_email,
+      { actor: 'support', occurredAt: new Date('2026-03-04T05:06:07.000Z') }
+    );
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'sign_in_reset_by_support', origin: { actor: 'support' } })
+    );
+  });
+
+  it('keeps the linked identity out of the idempotency key', async () => {
     await scheduleSecurityNotice(
       user,
       {
         type: 'sign_in_method_linked',
-        provider: 'github',
-        providerAccountId: 'gh-secret-id',
-        linkedIdentity: { email: 'octo@example.net' },
+        provider: 'email',
+        linkedIdentity: { email: 'linked-secret@example.net' },
         linkedAt: new Date(),
       },
       REQUEST
     );
 
     const [row] = await noticeRows(user.id);
-    expect(row?.key).not.toContain('gh-secret-id');
+    expect(row?.key).not.toContain('linked-secret');
     expect(row?.key).not.toContain(user.id);
   });
 
@@ -175,14 +250,76 @@ describe('scheduleSecurityNotice', () => {
     expect(mockDispatchPush).toHaveBeenCalledTimes(1);
   });
 
-  it('treats repeated resets inside one ten-minute window as one notice, and a later one as new', async () => {
-    const at = (iso: string) => ({ ...REQUEST, occurredAt: new Date(iso) });
-    await scheduleSecurityNotice(user, { type: 'api_key_reset' }, at('2026-03-04T05:01:00.000Z'));
-    await scheduleSecurityNotice(user, { type: 'api_key_reset' }, at('2026-03-04T05:09:00.000Z'));
-    await scheduleSecurityNotice(user, { type: 'api_key_reset' }, at('2026-03-04T05:11:00.000Z'));
+  it('treats repeated resets by one session inside ten minutes as one notice, and a later one as new', async () => {
+    const reset: SecurityNoticeEvent = { type: 'api_key_reset', actingSessionId: 'web-session-a' };
+    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:01:00.000Z'));
+    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:09:00.000Z'));
+    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:11:00.000Z'));
 
     expect(mockSendApiKeyReset).toHaveBeenCalledTimes(2);
     expect(mockDispatchPush).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [{ type: 'api_key_reset' } as const, mockSendApiKeyReset],
+    [{ type: 'browser_sessions_revoked' } as const, mockSendBrowserSessionsRevoked],
+  ])(
+    'sends a second %o notice for another session inside the same window',
+    async (event, sender) => {
+      await scheduleSecurityNotice(
+        user,
+        { ...event, actingSessionId: 'web-session-owner' },
+        at('2026-03-04T05:01:00.000Z')
+      );
+      await scheduleSecurityNotice(
+        user,
+        { ...event, actingSessionId: 'web-session-other' },
+        at('2026-03-04T05:02:00.000Z')
+      );
+
+      expect(sender).toHaveBeenCalledTimes(2);
+      expect(await noticeRows(user.id)).toHaveLength(2);
+    }
+  );
+
+  it('keys an unlink on the session: a repeat is one notice, another session is a new one', async () => {
+    const unlink = (actingSessionId: string): SecurityNoticeEvent => ({
+      type: 'sign_in_method_unlinked',
+      provider: 'github',
+      actingSessionId,
+    });
+    await scheduleSecurityNotice(user, unlink('web-session-a'), at('2026-03-04T05:01:10.000Z'));
+    await scheduleSecurityNotice(user, unlink('web-session-a'), at('2026-03-04T05:01:20.000Z'));
+    await scheduleSecurityNotice(user, unlink('web-session-b'), at('2026-03-04T05:01:30.000Z'));
+
+    expect(mockSendRemoved).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats each reset from a request with no session as its own notice', async () => {
+    await scheduleSecurityNotice(
+      user,
+      { type: 'api_key_reset', actingSessionId: null },
+      at('2026-03-04T05:01:00.000Z')
+    );
+    await scheduleSecurityNotice(
+      user,
+      { type: 'api_key_reset', actingSessionId: null },
+      at('2026-03-04T05:02:00.000Z')
+    );
+
+    expect(mockSendApiKeyReset).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows one new-sign-in notice per hour bucket, and a later one an hour after the cap claim', async () => {
+    const newSignIn: SecurityNoticeEvent = { type: 'new_sign_in', method: 'google' };
+    await scheduleSecurityNotice(user, newSignIn, at('2026-03-04T05:30:00.000Z'));
+    await scheduleSecurityNotice(user, newSignIn, at('2026-03-04T05:59:00.000Z'));
+    // The sign-in check's cap allows the next notice an hour after the last
+    // one; that time is always in the next bucket.
+    await scheduleSecurityNotice(user, newSignIn, at('2026-03-04T06:30:00.000Z'));
+
+    expect(mockSendNewSignIn).toHaveBeenCalledTimes(2);
+    expect(await noticeRows(user.id)).toHaveLength(2);
   });
 
   it('never throws when the email transport fails, and frees the claim for a retry', async () => {
@@ -195,21 +332,36 @@ describe('scheduleSecurityNotice', () => {
 
     await expect(scheduleSecurityNotice(user, event, REQUEST)).resolves.toBeUndefined();
     expect(mockDispatchPush).toHaveBeenCalledTimes(1);
-    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
-      tags: { security_notice: 'passkey_added' },
-    });
     expect(await noticeRows(user.id)).toHaveLength(0);
 
     await scheduleSecurityNotice(user, event, REQUEST);
     expect(mockSendPasskeyAdded).toHaveBeenCalledTimes(2);
   });
 
+  it('reports a failure to Sentry as a fixed error with only the event type, never the error itself', async () => {
+    mockSendPasskeyAdded.mockRejectedValueOnce(
+      new Error(`Failed query: insert params: ${user.id},security_notice`)
+    );
+
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: 'pk-4', passkeyName: null },
+      REQUEST
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [[reported, context]] = mockCaptureException.mock.calls;
+    expect(reported).toEqual(new Error('security_notice_failed'));
+    expect(context).toEqual({ tags: { security_notice: 'passkey_added' } });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(user.id);
+  });
+
   it('keeps the claim when the email will not send on a retry either', async () => {
     mockSendApiKeyReset.mockResolvedValueOnce({ sent: false, reason: 'neverbounce_rejected' });
 
-    await scheduleSecurityNotice(user, { type: 'api_key_reset' }, REQUEST);
+    await scheduleSecurityNotice(user, { type: 'api_key_reset', actingSessionId: 's' }, REQUEST);
 
-    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+    expect(mockCaptureException).toHaveBeenCalledWith(new Error('security_notice_email_not_sent'), {
       tags: { security_notice: 'api_key_reset' },
       extra: { reason: 'neverbounce_rejected' },
     });
@@ -220,35 +372,30 @@ describe('scheduleSecurityNotice', () => {
     mockDispatchPush.mockRejectedValueOnce(new Error('worker down'));
 
     await expect(
-      scheduleSecurityNotice(user, { type: 'browser_sessions_revoked' }, REQUEST)
+      scheduleSecurityNotice(
+        user,
+        { type: 'browser_sessions_revoked', actingSessionId: 's' },
+        REQUEST
+      )
     ).resolves.toBeUndefined();
-    expect(jest.mocked(email.sendBrowserSessionsRevokedEmail)).toHaveBeenCalledTimes(1);
+    expect(mockSendBrowserSessionsRevoked).toHaveBeenCalledTimes(1);
   });
 
   it('names an unknown sign-in method generically', async () => {
-    await scheduleSecurityNotice(
-      user,
-      { type: 'new_sign_in', method: 'carrier-pigeon', deviceKeyHash: 'a', networkKeyHash: 'b' },
-      REQUEST
-    );
+    await scheduleSecurityNotice(user, { type: 'new_sign_in', method: 'carrier-pigeon' }, REQUEST);
 
-    expect(mockSendNewSignIn).toHaveBeenCalledWith(user.google_user_email, null, EXPECTED_DETAILS);
+    expect(mockSendNewSignIn).toHaveBeenCalledWith(user.google_user_email, null, REQUEST);
   });
 
   it('sends the push without a device or location the request did not carry', async () => {
     await scheduleSecurityNotice(
       user,
-      { type: 'api_key_reset' },
-      {
-        occurredAt: new Date(),
-        ip: null,
-        location: null,
-        device: '   ',
-      }
+      { type: 'api_key_reset', actingSessionId: 's' },
+      { actor: 'owner', occurredAt: new Date(), ip: null, location: null, device: '   ' }
     );
 
     expect(mockDispatchPush).toHaveBeenCalledWith(
-      expect.objectContaining({ device: null, location: null })
+      expect.objectContaining({ origin: { actor: 'owner', device: null, location: null } })
     );
   });
 });
@@ -265,6 +412,7 @@ describe('securityNoticeRequestFromHeaders', () => {
     });
 
     expect(securityNoticeRequestFromHeaders(headers, occurredAt)).toEqual({
+      actor: 'owner',
       occurredAt,
       ip: '203.0.113.7',
       location: 'San Francisco, US',

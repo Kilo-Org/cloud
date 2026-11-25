@@ -14,9 +14,14 @@ import {
   renderTemplate,
   sendAccountDeletionCompletedEmail,
   sendAccountDeletionSupportNotification,
+  sendApiKeyResetEmail,
+  sendDeviceSignInApprovedEmail,
   sendKiloPassDuplicateCardCanceledEmail,
+  sendPasskeyAddedEmail,
+  sendSignInResetBySupportEmail,
   sendSpendAlertEmail,
   subjects,
+  type SecurityNoticeRequest,
   sendCreditsTopUpEmail,
   buildCreditsSection,
   buildCreditsTopUpCreditsRowSection,
@@ -478,5 +483,114 @@ describe('spend alert email', () => {
       retryable: ['billing@example.com'],
       undeliverable: [],
     });
+  });
+});
+
+describe('security notice emails', () => {
+  const ownerRequest: SecurityNoticeRequest = {
+    actor: 'owner',
+    occurredAt: new Date('2026-03-04T05:06:07.000Z'),
+    ip: '203.0.113.7',
+    location: 'Berlin, DE',
+    device: 'Firefox on Linux',
+  };
+  const supportRequest: SecurityNoticeRequest = {
+    actor: 'support',
+    occurredAt: new Date('2026-03-04T05:06:07.000Z'),
+  };
+
+  /** The rendered email as a reader sees it: tags dropped, whitespace collapsed. */
+  function sentText(): string {
+    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
+    return html
+      .replace(/<style[\s\S]*?<\/style>/g, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('names Kilo support and the time for a support action, and nothing about the staff member', async () => {
+    await sendApiKeyResetEmail('owner@example.com', supportRequest);
+
+    const text = sentText();
+    expect(text).toContain('Time: 2026-03-04 05:06 UTC');
+    expect(text).toContain('Done by: Kilo support');
+    expect(text).toContain('Kilo support made this change.');
+    expect(text).toContain('If you did not ask for this:');
+    expect(text).not.toContain('IP address');
+    expect(text).not.toContain('Browser:');
+    expect(text).not.toContain('If this was you');
+  });
+
+  it('describes the owner’s own reset by its address, location and browser', async () => {
+    await sendApiKeyResetEmail('owner@example.com', ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain('IP address: 203.0.113.7');
+    expect(text).toContain('Approximate location: Berlin, DE');
+    expect(text).toContain('Browser: Firefox on Linux');
+    expect(text).toContain('If this was you, no action is needed.');
+    expect(text).not.toContain('Kilo support made this change');
+  });
+
+  it('tells the owner how to get back in after a support reset', async () => {
+    await sendSignInResetBySupportEmail('owner@example.com', supportRequest);
+
+    expect(sendViaMailgun).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: subjects.signInResetBySupport })
+    );
+    const text = sentText();
+    expect(text).toContain('removed every sign-in method and passkey');
+    expect(text).toContain('use the sign-in link we email you');
+    expect(text).toContain('Done by: Kilo support');
+    expect(text).not.toContain('IP address');
+  });
+
+  it('quotes and attributes a name the requesting device chose, cut short', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      {
+        client: {
+          kind: 'self_named',
+          name: 'Kilo security check no action needed everything is fine',
+        },
+        ip: '198.51.100.24',
+      },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'A sign-in request from a device that named itself &quot;Kilo security check no action needed eve…&quot; was approved'
+    );
+    expect(text).toContain(
+      'Requesting device: named itself &quot;Kilo security check no action needed eve…&quot;'
+    );
+    expect(text).not.toContain('everything');
+  });
+
+  it('names a recognised requesting client plainly, with a space after the article', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      { client: { kind: 'recognised', label: 'Kilo CLI' }, ip: null },
+      ownerRequest
+    );
+
+    expect(sentText()).toContain('A sign-in request from Kilo CLI was approved');
+  });
+
+  it.each([
+    [null, 'A passkey was added to your Kilo Code account'],
+    ['  ', 'A passkey was added to your Kilo Code account'],
+    ['Laptop', 'A passkey (Laptop) was added to your Kilo Code account'],
+  ])('names the passkey %p only when it has a name', async (name, sentence) => {
+    await sendPasskeyAddedEmail('owner@example.com', name, ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain(sentence);
+    expect(text).not.toContain('unnamed');
   });
 });

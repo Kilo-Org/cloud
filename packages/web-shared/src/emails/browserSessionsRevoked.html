@@ -54,8 +54,7 @@
                   "
                   class="kc-text"
                 >
-                  Every browser signed in to your Kilo Code account was signed out. If this was you,
-                  no action is needed.
+                  Every browser signed in to your Kilo Code account was signed out. {{ actor_note }}
                 </p>
                 <p
                   style="
@@ -98,7 +97,7 @@
                     "
                     class="kc-muted"
                   >
-                    <strong class="kc-strong" style="color: #1a1a1a">If this was not you:</strong>
+                    <strong class="kc-strong" style="color: #1a1a1a">{{ not_you_lead }}</strong>
                     someone may have access to your account. Review your sign-in methods and
                     passkeys at {{ connected_accounts_link }} and remove any you do not recognize,
                     reset your API token at {{ profile_link }}, which signs out every browser, the

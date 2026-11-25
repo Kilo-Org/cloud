@@ -142,7 +142,7 @@
           "binding": "STS",
           "service": "sts-staging",
           "entrypoint": "SecretsBroker",
-          "props": { "caller": "audit-relay-staging" },
+          "props": { "caller": "audit-relay" },
         },
       ],
       "triggers": {
@@ -194,7 +194,7 @@
           "binding": "STS",
           "service": "sts-local",
           "entrypoint": "SecretsBroker",
-          "props": { "caller": "audit-relay-local" },
+          "props": { "caller": "audit-relay" },
         },
       ],
       "triggers": {

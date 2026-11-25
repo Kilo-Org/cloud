@@ -70,7 +70,7 @@ chain hash and the checkpoint signature. Changing it is a chain migration, not a
 | `AUDIT_REGISTRY` | `RegistryDO`, the stream index the checkpoint and verify jobs read |
 | `AUDIT_SIGNER` | `SignerDO`, holder of the checkpoint signing key |
 | `AUDIT_ARCHIVE` | R2 `kilo-audit-archive` (staging `kilo-audit-archive-staging`), EU jurisdiction |
-| `STS` | service `sts` (`sts-staging`), entrypoint `SecretsBroker`, `props.caller` = this Worker's own name |
+| `STS` | service `sts` (`sts-staging`), entrypoint `SecretsBroker`, `props.caller` = `audit-relay` in every environment (each STS deployment serves one environment) |
 | Queue consumer | `kilo-audit` → DLQ `kilo-audit-dlq` (staging `kilo-audit-staging` / `kilo-audit-staging-dlq`) |
 | `AXIOM_DATASET` | `kilo-audit` (staging `kilo-audit-staging`, local `kilo-audit-local`) |
 | `AXIOM_URL` | `https://api.axiom.co` |
@@ -121,8 +121,9 @@ Run these once per environment before the first deploy. `wrangler` is the worksp
 4. **Slack paging webhook**: store it in the same Infisical path as
    `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`.
 
-5. **STS policy**: add `audit-relay` (and `audit-relay-staging`) to the STS policy files with exactly
-   these two secrets, and deploy STS before this Worker. The STS environment it serves must match
+5. **STS policy**: add the workload `audit-relay` to the policy file of each STS environment with
+   exactly these two secrets, and deploy STS before this Worker. `props.caller` is `audit-relay` in
+   every environment block, so the serving STS deployment's environment must match
    `AUDIT_ENVIRONMENT`.
 
 6. **DNS**: the `custom_domain` route creates `audit-relay.kiloapps.io`

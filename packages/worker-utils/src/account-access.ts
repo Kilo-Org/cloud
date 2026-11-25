@@ -28,14 +28,6 @@ export function requestOrganizationId(
   return tokenOrganizationId ?? headerOrganizationId ?? undefined;
 }
 
-// An account without a pepper accepts its tokens; otherwise a token must carry the current one.
-export function isApiTokenPepperCurrent(
-  accountPepper: string | null | undefined,
-  tokenPepper: string | null | undefined
-): boolean {
-  return !accountPepper || accountPepper === tokenPepper;
-}
-
 // A membership resolves only for a live organization: the join excludes a soft-deleted
 // organization, so the caller sees no role (and therefore no membership).
 export async function findOrganizationMemberRole(

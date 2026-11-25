@@ -96,6 +96,9 @@ export const TOKEN_EXPIRY = {
  * (e.g. session-ingest). Carries the minimal fields the workers require: kiloUserId and
  * version, plus an organizationId claim when the caller supplies one. Defaults to a
  * 1-hour expiry.
+ *
+ * The token has no pepper claim, so Session Ingest accepts it only while it lives at most one
+ * hour (`isKiloTokenPepperCurrent`); a longer lifetime would survive a pepper rotation.
  */
 export function generateInternalServiceToken(
   userId: string,
@@ -103,6 +106,9 @@ export function generateInternalServiceToken(
 ): string {
   const expiresIn = options?.expiresIn ?? ONE_HOUR_IN_SECONDS;
   assertKiloTokenLifetimeWithinCap(expiresIn);
+  if (expiresIn > ONE_HOUR_IN_SECONDS) {
+    throw new Error('Internal service token lifetime exceeds one hour');
+  }
   return jwt.sign(
     {
       kiloUserId: userId,

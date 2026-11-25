@@ -8,6 +8,13 @@ export const SESSION_SYNC_WORKER_URL =
     ? 'https://session-sync.kiloapps.io'
     : '');
 
+/**
+ * Required here rather than in `@kilocode/web-shared/lib/config.server`, so
+ * apps/ai-gateway, which does not read browser sessions, can boot without it.
+ * NextAuth (`lib/user/next-auth-options`) loads this module.
+ */
+export const NEXTAUTH_SECRET = requireEnv('NEXTAUTH_SECRET', getEnvVariable('NEXTAUTH_SECRET'));
+
 export const TURNSTILE_SECRET_KEY = requireEnv(
   'TURNSTILE_SECRET_KEY',
   getEnvVariable('TURNSTILE_SECRET_KEY')

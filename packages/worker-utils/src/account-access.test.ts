@@ -7,7 +7,6 @@ import {
   createEmailDomainBlacklistCache,
   emailDomainSuffixes,
   findBlacklistedDomains,
-  isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
   requestOrganizationId,
@@ -20,13 +19,6 @@ describe('account access rules', () => {
     expect(requestOrganizationId('signed-org', 'header-org')).toBe('signed-org');
     expect(requestOrganizationId(undefined, 'header-org')).toBe('header-org');
     expect(requestOrganizationId(undefined, null)).toBeUndefined();
-  });
-
-  it('accepts any token for an account without a pepper and otherwise requires the current one', () => {
-    expect(isApiTokenPepperCurrent(null, undefined)).toBe(true);
-    expect(isApiTokenPepperCurrent('current', 'current')).toBe(true);
-    expect(isApiTokenPepperCurrent('current', 'rotated')).toBe(false);
-    expect(isApiTokenPepperCurrent('current', undefined)).toBe(false);
   });
 
   it('ignores member limits for seat-based organizations and unlimited members', () => {

@@ -3,26 +3,21 @@ import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
 export type DirectIngestConfigInput = {
   DIRECT_INGEST_PERCENT: string | undefined;
   DIRECT_INGEST_MAX_BYTES: string | undefined;
-  DIRECT_INGEST_USER_IDS: string | undefined;
 };
 
 export type DirectIngestConfig = {
   percent: number;
   maxBytes: number;
-  userIds: ReadonlySet<string>;
 };
 
-export type DirectIngestConfigErrorReason =
-  | 'invalid_percent'
-  | 'invalid_max_bytes'
-  | 'invalid_user_ids';
+export type DirectIngestConfigErrorReason = 'invalid_percent' | 'invalid_max_bytes';
 
 export type DirectIngestConfigResult =
   | { ok: true; config: DirectIngestConfig }
   | { ok: false; reason: DirectIngestConfigErrorReason };
 
 export type DirectIngestSelectionResult =
-  | { selected: true; reason: 'allowlist' | 'percentage'; bucket: number | null }
+  | { selected: true; reason: 'percentage'; bucket: number | null }
   | { selected: false; reason: 'not_selected'; bucket: number | null };
 
 const unsignedIntegerPattern = /^(0|[1-9]\d*)$/;
@@ -38,27 +33,13 @@ export function parseDirectIngestConfig(input: DirectIngestConfigInput): DirectI
     return { ok: false, reason: 'invalid_max_bytes' };
   }
 
-  if (input.DIRECT_INGEST_USER_IDS === undefined) {
-    return { ok: false, reason: 'invalid_user_ids' };
-  }
-
-  const userIds = new Set(
-    input.DIRECT_INGEST_USER_IDS.split(',')
-      .map(userId => userId.trim())
-      .filter(userId => userId.length > 0)
-  );
-
-  return { ok: true, config: { percent, maxBytes, userIds } };
+  return { ok: true, config: { percent, maxBytes } };
 }
 
 export async function selectDirectIngestUser(
   config: DirectIngestConfig,
   kiloUserId: string
 ): Promise<DirectIngestSelectionResult> {
-  if (config.userIds.has(kiloUserId)) {
-    return { selected: true, reason: 'allowlist', bucket: null };
-  }
-
   if (config.percent === 0) {
     return { selected: false, reason: 'not_selected', bucket: null };
   }

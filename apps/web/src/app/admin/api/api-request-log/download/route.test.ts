@@ -263,7 +263,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     await response.arrayBuffer();
   });
 
-  it.each(['oauth/google:114000741928328149731', 'oauth/github|owner'])(
+  it.each(['oauth/google:100000000000000000004', 'oauth/github|owner'])(
     'retains user attribution for OAuth ID %s and email filters',
     async userId => {
       const owner = await insertTestUser({ id: userId });

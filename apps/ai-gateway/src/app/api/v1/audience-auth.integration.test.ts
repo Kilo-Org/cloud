@@ -13,7 +13,10 @@ jest.mock('next-auth', () => ({
   getServerSession: (...args: unknown[]) => mockGetServerSession(...args),
 }));
 
-jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
@@ -38,6 +41,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { GET as models } from './models/route';
+import { GET as organizationModels } from './organizations/[id]/models/route';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -159,5 +163,44 @@ describe('gateway models audience authentication', () => {
     expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
     expect(getUserByokProviderIds).not.toHaveBeenCalled();
     expect(getAvailableModelsForOrganization).not.toHaveBeenCalled();
+  });
+
+  describe('session cookie without a bearer', () => {
+    async function signedInCookieHeaders() {
+      const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+      mockGetServerSession.mockResolvedValue({
+        kiloUserId: user.id,
+        webSessionPepper: user.web_session_pepper,
+      });
+      currentHeaders = new Headers({ Cookie: 'next-auth.session-token=valid-cookie' });
+      return currentHeaders;
+    }
+
+    test('gets the public catalog', async () => {
+      const headers = await signedInCookieHeaders();
+
+      const response = await models(new NextRequest('http://localhost/api/v1/models', { headers }));
+
+      expect(await response.json()).toEqual(publicCatalog);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+      expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
+      expect(getUserByokProviderIds).not.toHaveBeenCalled();
+    });
+
+    test('is refused by an authenticated-only route', async () => {
+      const headers = await signedInCookieHeaders();
+      const organizationId = crypto.randomUUID();
+
+      const response = await organizationModels(
+        new NextRequest(`http://localhost/api/v1/organizations/${organizationId}/models`, {
+          headers,
+        }),
+        { params: Promise.resolve({ id: organizationId }) }
+      );
+
+      expect(response.status).toBe(401);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+      expect(getAvailableModelsForOrganization).not.toHaveBeenCalled();
+    });
   });
 });

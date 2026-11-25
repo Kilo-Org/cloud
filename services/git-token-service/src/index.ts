@@ -54,6 +54,7 @@ import {
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
+import { isGitHubDisconnectAssertion } from './github-disconnect-assertion.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
@@ -1471,6 +1472,15 @@ export default {
             })
           : await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
+      return Response.json(
+        { error: 'unauthorized' },
+        { status: 401, headers: privateNoStoreHeaders }
+      );
+    }
+    if (
+      url.pathname === DISCONNECT_PATH &&
+      !isGitHubDisconnectAssertion(token, Math.floor(Date.now() / 1000))
+    ) {
       return Response.json(
         { error: 'unauthorized' },
         { status: 401, headers: privateNoStoreHeaders }

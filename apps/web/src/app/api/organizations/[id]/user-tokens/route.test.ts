@@ -18,7 +18,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () =
 }));
 jest.mock('@/lib/auth/resource-delegation', () => ({
   isDelegableResource: (value: string) =>
-    ['api', 'gateway', 'attribution', 'html-deploy', 'pages', 'pages-dev'].includes(value),
+    ['api', 'gateway', 'attribution', 'pages', 'pages-dev'].includes(value),
   isPagesResource: (value: string) => value === 'pages' || value === 'pages-dev',
   canIssueLegacyOrganizationToken: jest.fn(async () => true),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
@@ -32,7 +32,7 @@ beforeEach(() => {
   jest.mocked(isResourceTokenIssuanceEnabled).mockReturnValue(false);
 });
 
-it.each(['api', 'gateway', 'attribution', 'html-deploy'])(
+it.each(['api', 'gateway', 'attribution'])(
   'requires the delegated-resource family for explicit %s issuance',
   async resource => {
     const request = () =>

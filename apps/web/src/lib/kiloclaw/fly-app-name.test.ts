@@ -15,7 +15,7 @@ describe('flyAppNameFromUserId', () => {
     const userIds = [
       '',
       'user-123',
-      'cf667948-86c8-4e0f-a374-708ec21cd5c4',
+      '33333333-3333-4333-8333-333333333333',
       'user-e\u0301',
       'user-\u00e9\u00e8\u00ea',
       'User-ABC',

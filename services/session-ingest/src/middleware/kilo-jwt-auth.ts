@@ -4,7 +4,7 @@ import {
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { verifyKiloBearerOrInternalAssertionAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -62,7 +62,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   let auth;
   let deletionAudience = false;
   try {
-    const deletionAuth = await verifyKiloBearerAgainstCurrentPepper({
+    const deletionAuth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
       token,
       nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
       connectionString: c.env.HYPERDRIVE.connectionString,
@@ -79,7 +79,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
       auth = deletionAuth;
       deletionAudience = true;
     } else {
-      auth = await verifyKiloBearerAgainstCurrentPepper({
+      auth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
         token,
         nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
         connectionString: c.env.HYPERDRIVE.connectionString,

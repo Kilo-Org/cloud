@@ -9,7 +9,7 @@
  * (injected via `vercel env run`).
  *
  * NOTE: This script intentionally avoids importing from promoCreditEncryption or
- * config.server to prevent top-level env var validation (e.g. NEXTAUTH_SECRET)
+ * config.server to prevent top-level env var validation (e.g. BYOK_ENCRYPTION_KEY)
  * from failing in a CLI context.
  */
 

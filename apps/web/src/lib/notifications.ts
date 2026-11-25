@@ -50,6 +50,18 @@ export function passesLegacyExtensionGate(
   return isLegacyExtension;
 }
 
+// Returned instead of a 401 so clients holding a revoked or expired credential
+// tell the user to sign in again rather than silently showing nothing. Clients
+// persist dismissed and read ids indefinitely, so the id rotates daily to keep
+// the notice from being suppressed for good after one dismissal.
+export function reauthenticateNotification(now = new Date()): KiloNotification {
+  return {
+    id: `reauthenticate-${now.toISOString().slice(0, 10)}`,
+    title: 'Authentication failed',
+    message: 'Please reauthenticate to Kilo.',
+  };
+}
+
 export const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.

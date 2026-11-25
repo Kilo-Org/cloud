@@ -202,7 +202,9 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     config.secrets_store_secrets.unshift({
       binding: 'NEXTAUTH_SECRET',
       store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
-      secret_name: 'NEXTAUTH_SECRET',
+      // The e2e Workers are non-production, so they bind the development
+      // signing key rather than the production one.
+      secret_name: 'NEXTAUTH_SECRET_DEV',
     });
   }
 

@@ -482,6 +482,10 @@ export type NewCreditCampaign = typeof credit_campaigns.$inferInsert;
  * When adding or removing PII/account-linked columns, update
  * softDeleteUser() in apps/web/src/lib/user/index.ts (and its index.test.ts) to
  * delete, anonymize, or reset the field.
+ *
+ * When adding a secret column (a pepper, token, or key), add it to the omit
+ * list of `toClientUser()` in apps/web/src/lib/user/client-user.ts so it never
+ * reaches a browser.
  */
 export const kilocode_users = pgTable(
   'kilocode_users',

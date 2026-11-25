@@ -15,18 +15,31 @@ function replayed(ref: string): Denial {
   };
 }
 
+const FIRST = '2026-11-25T12:00';
+const SECOND = '2026-11-25T12:01';
+
 function buffer() {
   let clock = Date.parse('2026-11-25T12:00:10.000Z');
+  let failing = false;
   const sent: DenialCount[][] = [];
+  const failed: DenialCount[][] = [];
   const instance = new DenialBuffer(
     async counts => {
-      sent.push(counts);
+      if (failing) {
+        failed.push(counts.map(count => ({ ...count })));
+        throw new Error('denial object unavailable');
+      }
+      sent.push(counts.map(count => ({ ...count })));
     },
     () => clock
   );
   return {
     add: (denial: Denial) => instance.add(denial),
     sent,
+    failed,
+    fail: (value: boolean) => {
+      failing = value;
+    },
     advance: (ms: number) => {
       clock += ms;
     },
@@ -41,14 +54,14 @@ describe('isolate denial buffer', () => {
     expect(sentHops).toHaveLength(1);
     await Promise.all(sentHops);
     expect(subject.sent).toEqual([
-      [{ denial: replayed('refs/heads/main'), count: 1, overflow: false }],
+      [{ denial: replayed('refs/heads/main'), count: 1, overflow: false, minute: FIRST }],
     ]);
 
     subject.advance(60_000);
     await subject.add(replayed('refs/heads/other'));
     expect(subject.sent[1]).toEqual([
-      { denial: replayed('refs/heads/main'), count: 49, overflow: false },
-      { denial: replayed('refs/heads/other'), count: 1, overflow: false },
+      { denial: replayed('refs/heads/main'), count: 49, overflow: false, minute: FIRST },
+      { denial: replayed('refs/heads/other'), count: 1, overflow: false, minute: SECOND },
     ]);
   });
 
@@ -59,8 +72,8 @@ describe('isolate denial buffer', () => {
     subject.advance(60_000);
     await subject.add(replayed('refs/heads/main'));
     expect(subject.sent[1]).toEqual([
-      { denial: replayed('refs/heads/main'), count: 1, overflow: false },
-      { denial: replayed('refs/heads/main'), count: 1, overflow: false },
+      { denial: replayed('refs/heads/main'), count: 1, overflow: false, minute: FIRST },
+      { denial: replayed('refs/heads/main'), count: 1, overflow: false, minute: SECOND },
     ]);
   });
 
@@ -75,11 +88,46 @@ describe('isolate denial buffer', () => {
         denial: { channel: 'http', reason: 'unknown_workload', actor: 'overflow', claims: {} },
         count: 1,
         overflow: true,
+        minute: FIRST,
       },
     ]);
     subject.advance(60_000);
     await subject.add(replayed('refs/heads/next'));
     const ended = subject.sent.at(-1)?.find(entry => entry.overflow);
     expect(ended?.count).toBe(9);
+  });
+
+  it('sends again on the next occurrence after a failed first send, with the lost count', async () => {
+    const subject = buffer();
+    subject.fail(true);
+    await subject.add(replayed('refs/heads/main'));
+    expect(subject.failed).toHaveLength(1);
+    subject.fail(false);
+
+    const retried = subject.add(replayed('refs/heads/main'));
+    expect(retried).not.toBeNull();
+    await retried;
+    expect(subject.sent).toEqual([
+      [{ denial: replayed('refs/heads/main'), count: 2, overflow: false, minute: FIRST }],
+    ]);
+    expect(subject.add(replayed('refs/heads/main'))).toBeNull();
+  });
+
+  it('keeps ended counts from a failed send for the next hop, with their own minute', async () => {
+    const subject = buffer();
+    await subject.add(replayed('refs/heads/main'));
+    expect(subject.add(replayed('refs/heads/main'))).toBeNull();
+    expect(subject.add(replayed('refs/heads/main'))).toBeNull();
+    subject.advance(60_000);
+    subject.fail(true);
+    await subject.add(replayed('refs/heads/other'));
+    subject.fail(false);
+
+    await subject.add(replayed('refs/heads/third'));
+    expect(subject.sent.at(-1)).toEqual([
+      { denial: replayed('refs/heads/main'), count: 2, overflow: false, minute: FIRST },
+      { denial: replayed('refs/heads/other'), count: 1, overflow: false, minute: SECOND },
+      { denial: replayed('refs/heads/third'), count: 1, overflow: false, minute: SECOND },
+    ]);
   });
 });

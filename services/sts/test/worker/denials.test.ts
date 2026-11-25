@@ -1,6 +1,6 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Denial } from '../../src/audit/denials';
+import { utcMinute, type Denial } from '../../src/audit/denials';
 import { MAX_DISTINCT_PER_MINUTE } from '../../src/dos/DenialDO';
 import { getDenialStub } from '../../src/dos/stubs';
 import { stubOfflineNetwork } from './manager';
@@ -11,6 +11,8 @@ beforeEach(async () => {
   stubOfflineNetwork();
   await resetDenialObject(getDenialStub(env, config));
 });
+
+const now = (): string => utcMinute(Date.now());
 
 function githubDenial(ref: string): Denial {
   return {
@@ -43,14 +45,17 @@ describe('denial stream', () => {
   it('adds the counts an isolate merged and keeps overflow counts per reason', async () => {
     const stub = getDenialStub(env, config);
     await stub.record([
-      { denial: githubDenial('refs/heads/main'), count: 40, overflow: false },
+      { denial: githubDenial('refs/heads/main'), count: 40, overflow: false, minute: now() },
       {
         denial: { channel: 'http', reason: 'unknown_workload', actor: 'overflow', claims: {} },
         count: 7,
         overflow: true,
+        minute: now(),
       },
     ]);
-    await stub.record([{ denial: githubDenial('refs/heads/main'), count: 2, overflow: false }]);
+    await stub.record([
+      { denial: githubDenial('refs/heads/main'), count: 2, overflow: false, minute: now() },
+    ]);
     await closeWindows();
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     const written = await events();
@@ -65,7 +70,9 @@ describe('denial stream', () => {
   it('merges identical denials in a minute into one event with a count', async () => {
     const stub = getDenialStub(env, config);
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await stub.record([{ denial: githubDenial('refs/heads/main'), count: 1, overflow: false }]);
+      await stub.record([
+        { denial: githubDenial('refs/heads/main'), count: 1, overflow: false, minute: now() },
+      ]);
     }
     await stub.record([
       {
@@ -77,6 +84,7 @@ describe('denial stream', () => {
         },
         count: 1,
         overflow: false,
+        minute: now(),
       },
     ]);
     await closeWindows();
@@ -108,7 +116,12 @@ describe('denial stream', () => {
     const stub = getDenialStub(env, config);
     for (let index = 0; index < MAX_DISTINCT_PER_MINUTE + 5; index += 1) {
       await stub.record([
-        { denial: githubDenial(`refs/heads/branch-${index}`), count: 1, overflow: false },
+        {
+          denial: githubDenial(`refs/heads/branch-${index}`),
+          count: 1,
+          overflow: false,
+          minute: now(),
+        },
       ]);
     }
     await closeWindows();
@@ -121,9 +134,50 @@ describe('denial stream', () => {
     expect(overflow[0].data.attributes).toMatchObject({ count: 5, claims: [] });
   });
 
+  it('files each count under the minute the isolate saw it in', async () => {
+    const stub = getDenialStub(env, config);
+    const threeMinutesAgo = utcMinute(Date.now() - 3 * 60 * 1000);
+    await stub.record([
+      {
+        denial: githubDenial('refs/heads/main'),
+        count: 4,
+        overflow: false,
+        minute: threeMinutesAgo,
+      },
+    ]);
+    const alarm = await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
+    expect(alarm).toBeLessThanOrEqual(Date.now() + 2_000);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const written = await events();
+    expect(written).toHaveLength(1);
+    expect(written[0].data.attributes).toMatchObject({
+      count: 4,
+      windowStart: `${threeMinutesAgo}:00.000Z`,
+    });
+  });
+
+  it('files a future or hours-old minute under the current one', async () => {
+    const stub = getDenialStub(env, config);
+    const future = utcMinute(Date.now() + 10 * 60 * 1000);
+    const old = utcMinute(Date.now() - 2 * 60 * 60 * 1000);
+    await stub.record([
+      { denial: githubDenial('refs/heads/a'), count: 1, overflow: false, minute: future },
+      { denial: githubDenial('refs/heads/b'), count: 1, overflow: false, minute: old },
+    ]);
+    const minutes = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.sql
+        .exec<{ minute: string }>('SELECT DISTINCT minute FROM denial_window')
+        .toArray()
+        .map(row => row.minute)
+    );
+    expect(minutes).toEqual([utcMinute(Date.now())]);
+  });
+
   it('keeps a window open until its minute ends', async () => {
     const stub = getDenialStub(env, config);
-    await stub.record([{ denial: githubDenial('refs/heads/main'), count: 1, overflow: false }]);
+    await stub.record([
+      { denial: githubDenial('refs/heads/main'), count: 1, overflow: false, minute: now() },
+    ]);
     const alarm = await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
     expect(alarm).not.toBeNull();
     expect(alarm).toBeGreaterThan(Date.now());

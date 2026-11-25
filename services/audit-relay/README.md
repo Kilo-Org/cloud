@@ -151,6 +151,10 @@ Retries are bounded: `max_retries: 10` with `retry_delay: 60`, and a gap retry c
 them. A message that exhausts them lands in the DLQ, whose consumer keeps it in R2 and pages
 (above); the DLQ consumer itself has `max_retries: 100` with `retry_delay: 300`.
 
+### Internal Durable Objects
+
+`StreamDO`, `RegistryDO`, `SignerDO` and `VerifierDO` are internal, and so is the Worker itself: no other Worker may bind `audit-relay`, `audit-relay-staging` or `audit-relay-local`, either as a service binding or through `durable_objects.bindings[].script_name`. Their methods (`SignerDO.sign`, stream appends) skip the queue path that checks batch contiguity and archives every batch, so a direct binding could sign or append without a record. `services/sts/test/repo/worker-configs.test.ts` scans every Wrangler config in the repository and fails on either kind of binding; it also requires this Worker to deploy exactly those three names, and it refuses any queue producer on the audit queues except this Worker and STS.
+
 ## Production prerequisites
 
 Run these once per environment before the first deploy. `wrangler` is the workspace pin

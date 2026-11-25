@@ -1,5 +1,5 @@
 import pg from 'pg';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 /**
  * Identity-store access for the UTS Workers, through Hyperdrive with `pg`, the driver that
@@ -55,17 +55,20 @@ const TRANSACTION_CONTROL =
  */
 export type IdentityStoreFailure = 'retryable' | 'permanent';
 
-/** What the server said about a refused statement, without the row values it may quote. */
+/** What the server or the driver said about a failure, without the row values it may quote. */
 export type IdentityStoreErrorDetails = {
   sqlState: string | undefined;
   constraint: string | undefined;
   table: string | undefined;
+  /** The Node or TLS error code of a failed connection, such as `ECONNREFUSED` or `ETIMEDOUT`. */
+  systemCode: string | undefined;
 };
 
 /**
- * Keeps only the SQLSTATE, the constraint name and the table name. The server's error detail
- * ("Failing row contains ...") can hold an email address, a client address or a hash, so neither
- * it nor the raw driver error travels with this error into a log or an error report.
+ * Keeps only the SQLSTATE, the constraint name, the table name and a connection failure's system
+ * code. The server's error detail ("Failing row contains ...") can hold an email address, a client
+ * address or a hash, so neither it nor the raw driver error travels with this error into a log or
+ * an error report.
  */
 export class IdentityStoreError extends Error {
   override name = 'IdentityStoreError';
@@ -74,14 +77,16 @@ export class IdentityStoreError extends Error {
   readonly sqlState: string | undefined;
   readonly constraint: string | undefined;
   readonly table: string | undefined;
+  readonly systemCode: string | undefined;
 
   constructor(failure: IdentityStoreFailure, details: IdentityStoreErrorDetails) {
-    const { sqlState } = details;
-    super(`identity store ${failure} failure${sqlState === undefined ? '' : ` (${sqlState})`}`);
+    const code = details.sqlState ?? details.systemCode;
+    super(`identity store ${failure} failure${code === undefined ? '' : ` (${code})`}`);
     this.failure = failure;
-    this.sqlState = sqlState;
+    this.sqlState = details.sqlState;
     this.constraint = details.constraint;
     this.table = details.table;
+    this.systemCode = details.systemCode;
   }
 }
 
@@ -94,6 +99,9 @@ export class TransactionStatementError extends Error {
 
 const RETRYABLE_SQLSTATE = /^(08|53|57P0)|^(40001|40P01|55P03|57014|25P03)$/;
 
+/** A Node system or TLS error code: upper-case letters, digits and underscores only. */
+const SystemErrorSchema = z.object({ code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/) });
+
 function toIdentityStoreError(error: unknown): IdentityStoreError {
   if (error instanceof pg.DatabaseError) {
     const sqlState = error.code;
@@ -103,6 +111,7 @@ function toIdentityStoreError(error: unknown): IdentityStoreError {
       sqlState,
       constraint: error.constraint,
       table: error.table,
+      systemCode: undefined,
     });
   }
   // No SQLSTATE: the connection failed before or during the statement.
@@ -110,6 +119,7 @@ function toIdentityStoreError(error: unknown): IdentityStoreError {
     sqlState: undefined,
     constraint: undefined,
     table: undefined,
+    systemCode: SystemErrorSchema.safeParse(error).data?.code,
   });
 }
 

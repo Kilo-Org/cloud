@@ -168,14 +168,18 @@ describe('identity-store client', () => {
     }
   });
 
-  it('reports an unreachable database as retryable', async () => {
+  it('reports an unreachable database as retryable, with the system error code', async () => {
     const unreachable = new URL(db.url('uts_app_a'));
     unreachable.port = '55449';
     const failure = await failureOf(() =>
       withIdentityStore(unreachable.toString(), { waitUntil: () => undefined }, async () => null)
     );
-    expect(failure.failure).toBe('retryable');
-    expect(failure.sqlState).toBeUndefined();
+    expect(failure).toMatchObject({
+      failure: 'retryable',
+      sqlState: undefined,
+      systemCode: 'ECONNREFUSED',
+      message: 'identity store retryable failure (ECONNREFUSED)',
+    });
   });
 
   it('decodes enum arrays, domain arrays, bytea, xid8 and int8 into the row schemas', async () => {

@@ -1248,7 +1248,9 @@ describe('browser sessions by deployment', () => {
     test('still authenticates a bearer token', async () => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
       mockHeaders.mockResolvedValue(
-        new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
       );
 
       const result = await getUserFromAuth({ adminOnly: false });

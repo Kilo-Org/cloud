@@ -18,6 +18,8 @@ export type ControlPlaneTimers = {
     transportRecoveryMs: number;
     /** How long recovery passes may stay unanswered before queued work fails. */
     transportRecoveryWindowMs: number;
+    /** Passive status check while work is queued and no recovery pass is due. */
+    queuedStatusCheckMs: number;
     /** Total bound on serving one scope handle through a surviving member. */
     scopeResolutionMs: number;
   };
@@ -213,6 +215,9 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
       // within about 90 s.
       transportRecoveryMs: ms(15_000),
       transportRecoveryWindowMs: ms(90_000),
+      // A lost route notification must not leave queued work waiting for the
+      // queued backstop: one passive status read per minute finds the outcome.
+      queuedStatusCheckMs: ms(60_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
       acceptedBackstopMs: wrapper.turnHardCapMs + ACCEPTED_BACKSTOP_MARGIN_MS,

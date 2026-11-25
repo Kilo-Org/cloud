@@ -3,19 +3,20 @@ import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 
 type RecoveryTimers = Pick<
   ControlPlaneTimers['session'],
-  'transportRecoveryMs' | 'transportRecoveryWindowMs'
+  'transportRecoveryMs' | 'transportRecoveryWindowMs' | 'queuedStatusCheckMs'
 >;
 
 /**
  * The one durable queued transport recovery obligation (spec "Queued transport
  * recovery"). `since` is when the current window of unanswered passes started;
  * it bounds the retries, so the window does not restart with every pass.
+ * Without `since`, the obligation is the slow status check of queued work.
  */
-export type TransportRecovery = { dueAt: number; since: number };
+export type TransportRecovery = { dueAt: number; since?: number };
 
 const timestampSchema = z.number().int().nonnegative();
 const storedTransportRecoverySchema = z.union([
-  z.object({ dueAt: timestampSchema, since: timestampSchema }).strict(),
+  z.object({ dueAt: timestampSchema, since: timestampSchema.optional() }).strict(),
   // A deploy before the window stored only the due time of its single pass.
   timestampSchema,
 ]);
@@ -43,6 +44,11 @@ export function nextTransportRecovery(
   const unansweredMs = now - since;
   if (unansweredMs >= timers.transportRecoveryWindowMs) return null;
   return { since, dueAt: now + recoveryDelayMs(unansweredMs, timers.transportRecoveryMs) };
+}
+
+/** The slow passive status check while work stays queued. */
+export function queuedStatusCheck(now: number, timers: RecoveryTimers): TransportRecovery {
+  return { dueAt: now + timers.queuedStatusCheckMs };
 }
 
 function recoveryDelayMs(unansweredMs: number, firstDelayMs: number): number {

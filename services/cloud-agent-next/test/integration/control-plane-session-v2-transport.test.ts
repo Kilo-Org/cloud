@@ -7,6 +7,7 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { controlPlaneMessages, events } from '../../src/control-plane/session/sqlite-schema.js';
 import type { HostedGitHubRepositories } from '../../src/persistence/hosted-github-repositories.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { readPreparationAttempt } from '../../src/session/preparation-history.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { worktreeChangesContext } from '../../src/sandbox-session/worktree-changes.js';
 import {
@@ -93,7 +94,7 @@ async function rows(stub: DurableObjectStub<SandboxSessionV2>) {
   );
 }
 
-type StoredRecovery = { dueAt: number; since: number };
+type StoredRecovery = { dueAt: number; since?: number };
 
 async function storedRecovery(
   stub: DurableObjectStub<SandboxSessionV2>
@@ -127,6 +128,19 @@ async function alarmAt(stub: DurableObjectStub<SandboxSessionV2>) {
   return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
 
+/** Expects only the slow status check of queued work, armed between two clock reads. */
+async function expectStatusCheck(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  before: number,
+  after = Date.now()
+) {
+  const check = await storedRecovery(stub);
+  expect(check).toEqual({ dueAt: expect.any(Number) });
+  expect(check!.dueAt).toBeGreaterThanOrEqual(before + 60_000);
+  expect(check!.dueAt).toBeLessThanOrEqual(after + 60_000);
+  expect(await alarmAt(stub)).toBe(check!.dueAt);
+}
+
 /**
  * Moves the stored recovery deadline, and its window start by the same amount,
  * to now and runs the alarm. Returns the moved obligation.
@@ -140,7 +154,10 @@ async function recover(
     const armed = await state.storage.get<StoredRecovery>(RECOVERY_KEY);
     if (armed === undefined) throw new Error('No transport recovery is armed');
     const shift = armed.dueAt - Date.now() + 1;
-    const due = { dueAt: armed.dueAt - shift, since: armed.since - shift };
+    const due =
+      armed.since === undefined
+        ? { dueAt: armed.dueAt - shift }
+        : { dueAt: armed.dueAt - shift, since: armed.since - shift };
     await state.storage.put(RECOVERY_KEY, due);
     Object.assign(instance, { transportRecovery: due });
     await instance.alarm();
@@ -395,13 +412,12 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       peer.prepareCalls.push(input);
       return peer.view('preparing');
     };
+    const before = Date.now();
     await recover(stub, peer);
     expect(peer.statusCalls).toHaveLength(1);
     expect((await rows(stub))[0]?.state).toBe('queued');
-    expect(await recoveryAt(stub)).toBeUndefined();
-    expect(await alarmAt(stub)).toBe(
-      (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
-    );
+    // The window ends; queued work keeps only the slow status check.
+    await expectStatusCheck(stub, before);
   });
 
   it('retires accepted work when not_ready returns a new ready owner, without recursive delivery or replay', async () => {
@@ -655,18 +671,16 @@ describe('SandboxSessionV2 queued transport recovery', () => {
   });
 
   it.each(['preparing', 'reconnecting'] as const)(
-    'cancels the recovery obligation when the owner establishes %s',
+    'ends the recovery window and keeps a slow status check when the owner establishes %s',
     async state => {
       const { stub, peer } = await setup();
       peer.prepareError = new Error('unreachable');
       await stub.send(prompt('m1'));
-      expect(await recoveryAt(stub)).toEqual(expect.any(Number));
+      expect((await storedRecovery(stub))?.since).toEqual(expect.any(Number));
       peer.prepareView = peer.view(state);
+      const before = Date.now();
       await stub.onRoute(peer.view(state));
-      expect(await recoveryAt(stub)).toBeUndefined();
-      expect(await alarmAt(stub)).toBe(
-        (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
-      );
+      await expectStatusCheck(stub, before);
       expect(peer.deliverCalls).toHaveLength(0);
       expect(peer.statusCalls).toHaveLength(1);
     }
@@ -745,7 +759,10 @@ describe('SandboxSessionV2 queued transport recovery', () => {
         await expect(stub.getSession()).resolves.toMatchObject({
           route: { state, attemptId: 'a-new-B' },
         });
-        expect(await recoveryAt(stub)).toBeUndefined();
+        // No recovery window stays open; queued work keeps only the slow status check.
+        expect(await storedRecovery(stub)).toEqual(
+          state === 'preparing' ? { dueAt: expect.any(Number) } : undefined
+        );
       } finally {
         response.resolve(peer.view('preparing'));
       }
@@ -1159,5 +1176,169 @@ describe('SandboxSessionV2 bounded transport recovery', () => {
       since: legacyDueAt - 15_000,
     });
     expect((await rows(revived))[0]?.state).toBe('queued');
+  });
+});
+
+describe('SandboxSessionV2 queued status check', () => {
+  const unreachable = () =>
+    Object.assign(new Error('Durable Object storage operation exceeded timeout'), {
+      retryable: false,
+    });
+
+  async function rollBackAcceptance(
+    stub: DurableObjectStub<SandboxSessionV2>,
+    sessionId: string,
+    peer: FakeSandboxPeer
+  ) {
+    // A Session DO reset rolls the accepted write back: the message is queued again.
+    await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .update(controlPlaneMessages)
+        .set({ state: 'queued', accepted_at: null })
+        .run()
+    );
+    await evictAllDurableObjects();
+    const revived = sessions.getByName(sessionId);
+    await installPeer(revived, peer);
+    return revived;
+  }
+
+  it('settles queued work with the sandbox reason at the next check after a lost failed notification', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    const before = Date.now();
+    await stub.send(prompt('m1'));
+    await expectStatusCheck(stub, before);
+
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+      subtype: 'git_authentication_failed',
+    };
+    await recover(stub, peer);
+    expect((await rows(stub))[0]).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+    expect(await stub.getMessageResult('m1')).toMatchObject({
+      type: 'found',
+      result: {
+        status: 'failed',
+        failure: { code: 'workspace_setup_failed', subtype: 'git_authentication_failed' },
+      },
+    });
+    expect(await recoveryAt(stub)).toBeUndefined();
+    expect(peer.prepareCalls).toHaveLength(1);
+  });
+
+  it('only re-arms when the check reads the same preparing attempt', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(prompt('m1'));
+    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId, step: 'clone' });
+    const status = await latestCloudStatus(stub);
+    const before = Date.now();
+    await recover(stub, peer);
+    expect(peer.statusCalls).toHaveLength(1);
+    await expectStatusCheck(stub, before);
+    expect(await latestCloudStatus(stub)).toEqual(status);
+    await expect(stub.getSession()).resolves.toMatchObject({
+      route: { state: 'preparing', attemptId: peer.attemptId, step: 'clone' },
+    });
+    expect((await rows(stub))[0]).toMatchObject({ state: 'queued', reason: null });
+  });
+
+  it('delivers a rolled-back acceptance at the next check', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send(prompt('m1'));
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+    const revived = await rollBackAcceptance(stub, sessionId, peer);
+    // Any wake of the object arms the check for its queued work.
+    const before = Date.now();
+    await runInDurableObject(revived, instance => instance.alarm());
+    await expectStatusCheck(revived, before);
+
+    await recover(revived, peer);
+    expect((await rows(revived))[0]?.state).toBe('accepted');
+    expect(peer.deliverCalls.map(call => call.messages.map(m => m.messageId))).toEqual([
+      ['m1'],
+      ['m1'],
+    ]);
+    expect(await recoveryAt(revived)).toBeUndefined();
+  });
+
+  it('prepares again after an unknown notification for queued work on a ready route', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send(prompt('m1'));
+    const revived = await rollBackAcceptance(stub, sessionId, peer);
+    const before = Date.now();
+    await revived.onRoute({ state: 'unknown' });
+    await expectStatusCheck(revived, before);
+
+    peer.prepareView = { state: 'unknown' };
+    peer.prepare = async input => {
+      peer.prepareCalls.push(input);
+      return peer.view('preparing');
+    };
+    await recover(revived, peer);
+    expect(peer.prepareCalls).toHaveLength(2);
+    expect((await rows(revived))[0]).toMatchObject({ state: 'queued', reason: null });
+    await expect(revived.getSession()).resolves.toMatchObject({
+      route: { state: 'preparing', attemptId: peer.attemptId },
+    });
+  });
+
+  it('opens a recovery window when a check is unanswered and fails a preparing route at its end', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(prompt('m1'));
+    peer.statusError = unreachable();
+    const check = await recover(stub, peer);
+    const window = await storedRecovery(stub);
+    expect(window!.since).toBeGreaterThanOrEqual(check.dueAt);
+    expect(window!.dueAt - window!.since).toBe(15_000);
+
+    await recover(stub, peer);
+    await recover(stub, peer);
+    expect((await rows(stub))[0]?.state).toBe('queued');
+    await recover(stub, peer);
+    expect((await rows(stub))[0]).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_unreachable',
+    });
+    expect(peer.statusCalls).toHaveLength(4);
+    expect(await recoveryAt(stub)).toBeUndefined();
+    expect(await latestCloudStatus(stub)).toEqual({
+      type: 'error',
+      message: 'sandbox_unreachable',
+    });
+
+    const attemptId = peer.attemptId;
+    const preparationAttempt = () =>
+      runInDurableObject(stub, instance =>
+        readPreparationAttempt(
+          (instance as unknown as { eventQueries: Parameters<typeof readPreparationAttempt>[0] })
+            .eventQueries,
+          attemptId
+        )
+      );
+    const closed = await preparationAttempt();
+    expect(closed).toMatchObject({ status: 'failed', safeError: 'sandbox_unreachable' });
+
+    // Late notifications for the same attempt apply without queued work to act on.
+    peer.statusError = null;
+    await stub.onRoute({ state: 'preparing', attemptId, step: 'clone' });
+    expect(await preparationAttempt()).toEqual(closed);
+    expect(await recoveryAt(stub)).toBeUndefined();
+    expect(peer.prepareCalls).toHaveLength(1);
+    await stub.onRoute(peer.view('ready'));
+    await expect(stub.getSession()).resolves.toMatchObject({
+      route: { state: 'ready', attemptId: peer.attemptId },
+    });
+    expect(peer.deliverCalls).toHaveLength(0);
+    expect(await recoveryAt(stub)).toBeUndefined();
   });
 });

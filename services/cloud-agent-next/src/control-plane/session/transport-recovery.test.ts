@@ -3,7 +3,11 @@ import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
 } from '../../shared/control-plane-timers.js';
-import { nextTransportRecovery, parseTransportRecovery } from './transport-recovery.js';
+import {
+  nextTransportRecovery,
+  parseTransportRecovery,
+  queuedStatusCheck,
+} from './transport-recovery.js';
 
 const timers = CONTROL_PLANE_TIMERS.session;
 const since = 1_000_000;
@@ -37,12 +41,24 @@ describe('nextTransportRecovery', () => {
   });
 });
 
+describe('queuedStatusCheck', () => {
+  it('checks queued work once a minute, scaled by the development divisor', () => {
+    expect(queuedStatusCheck(since, timers)).toEqual({ dueAt: since + 60 * SECOND });
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' }).session;
+    expect(queuedStatusCheck(since, scaled)).toEqual({ dueAt: since + 6 * SECOND });
+  });
+});
+
 describe('parseTransportRecovery', () => {
   it('reads the stored due time and window start', () => {
     expect(parseTransportRecovery({ dueAt: 20, since: 5 }, timers)).toEqual({
       dueAt: 20,
       since: 5,
     });
+  });
+
+  it('reads a slow status check without a window start', () => {
+    expect(parseTransportRecovery({ dueAt: 20 }, timers)).toEqual({ dueAt: 20 });
   });
 
   it('reads a bare due time from a deploy before the window as one consumed delay', () => {
@@ -52,7 +68,7 @@ describe('parseTransportRecovery', () => {
     });
   });
 
-  it.each([undefined, null, 'soon', -1, 1.5, { dueAt: 20 }, { dueAt: 20, since: 5, extra: 1 }])(
+  it.each([undefined, null, 'soon', -1, 1.5, { since: 5 }, { dueAt: 20, since: 5, extra: 1 }])(
     'treats %j as no obligation',
     raw => {
       expect(parseTransportRecovery(raw, timers)).toBeNull();

@@ -226,6 +226,7 @@ import { setupCommandLabel } from './setup-command-label.js';
 import {
   nextTransportRecovery,
   parseTransportRecovery,
+  queuedStatusCheck,
   type TransportRecovery,
 } from './transport-recovery.js';
 import {
@@ -2577,13 +2578,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
-          this.transportRecovery !== null ||
+          this.transportRecovery?.since !== undefined ||
           (this.route.state === 'preparing' &&
             parsed.state !== 'unknown' &&
             (parsed.attemptId !== this.route.attemptId || parsed.state !== 'preparing')))
       ) {
         const pass = this.transportPass();
-        pass.scheduleRecovery = this.transportRecovery !== null;
+        pass.scheduleRecovery = this.transportRecovery?.since !== undefined;
         await this.recoverQueued(pass, parsed);
         await this.armAlarm();
         return;
@@ -2591,6 +2592,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const pass = this.transportPass();
       if (parsed.state === 'unknown') {
         await this.applyView(parsed, pass);
+        await this.armAlarm();
         return;
       }
       // A notification names its route attempt. Ignore one for an older or
@@ -2845,7 +2847,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.clearTransportRecovery();
         const pass: TransportPass = { ...this.transportPass(), unansweredSince: recovery.since };
         await this.recoverQueued(pass);
-        if (!pass.unanswered) {
+        if (recovery.since !== undefined && !pass.unanswered) {
           logControlDiagnostic('session_transport_recovery', {
             sessionId: this.sessionId,
             outcome: 'answered',
@@ -2918,6 +2920,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
+    } else if (this.transportRecovery === null) {
+      // Queued work always has a check: a lost notification is found within a minute.
+      const check = queuedStatusCheck(Date.now(), this.sessionTimers());
+      await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, check);
+      this.transportRecovery = check;
     }
     const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
@@ -4275,6 +4282,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) return;
     let view = await this.readSandboxView(pass);
     if (view === null) return;
+    // Without a hint, the same preparing or reconnecting attempt changes nothing.
+    // Applying it again would repeat its status and could lose the step detail.
+    if (
+      ownerHint === undefined &&
+      (view.state === 'preparing' || view.state === 'reconnecting') &&
+      this.route.state === view.state &&
+      this.route.attemptId === view.attemptId
+    ) {
+      return;
+    }
     if (
       ownerHint?.state === 'lost' &&
       ownerHint.attemptId === this.currentAttemptId() &&
@@ -4377,7 +4394,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     pass.unanswered = true;
     if (
       !pass.scheduleRecovery ||
-      this.transportRecovery !== null ||
+      this.transportRecovery?.since !== undefined ||
       !this.messages.some(message => message.state === 'queued')
     )
       return;

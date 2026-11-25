@@ -263,12 +263,17 @@ work fails as `sandbox_unreachable` and an open preparation row closes with that
 work keeps its own backstop. With the 2 s pass deadline, a window that opens at the first failure
 ends about 111 s later; the queued backstop stays the last resort. A consumed pass that is answered
 and does not arm another pass ends the window, so the next failure opens a new one. Delivered or
-terminal queued work and normal preparing/reconnecting owner views cancel the obligation.
+terminal queued work cancels the obligation; normal preparing/reconnecting owner views end the
+window. While work stays queued and no pass is due, the obligation is a slow status check 60 s
+later, stored without `since`. It reads the passive view and acts on it like a recovery pass, so
+a lost route notification or a rolled-back acceptance is found within a minute. A check that reads
+the same preparing or reconnecting attempt only arms the next check; an unanswered check opens a
+window.
 Reconstruction honors the stored deadline and window without moving message or Sandbox-owned
 deadlines. A stored bare due time from an earlier deploy reads as a window opened one delay
 earlier.
 
-When queued work still names a failed attempt, transport recovery is unresolved, or a preparing
+When queued work still names a failed attempt, an unanswered recovery window is open, or a preparing
 route receives terminal/readiness or different-attempt hints, notifications first confirm the
 Sandbox's current passive view. That authority, never UUID ordering,
 rebinds the attempt fence. New-attempt progress/ready is adopted; genuinely failed new attempts settle
@@ -286,8 +291,9 @@ preparing work before adding a new message, so a known retired attempt's queued 
 explicitly without failing that new message. A queued message has no per-attempt ledger: when
 confirmation is unavailable, or replacement already occurred without a known failure boundary,
 old and new queued intent cannot safely be split retroactively. Keep that queued intent for the
-authoritative owner rather than guess membership from IDs or timestamps. These are bounded
-user/notification-triggered reads, not periodic preparation polling; original backstops remain.
+authoritative owner rather than guess membership from IDs or timestamps. These reads are bounded.
+Apart from user and notification triggers, the only periodic read is the slow status check of
+queued work, one per minute; original backstops remain.
 
 ### Route view
 
@@ -1535,6 +1541,7 @@ them through one development-only override.
 | Session DO | Accepted backstop | 12 h 5 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s, 30 s, then 60 s apart inside one 90 s window of unanswered passes; development-only scaling | Passive status then bounded prepare/deliver; an unanswered pass arms the next one, and the first unanswered pass at least 90 s into the window fails queued work (`sandbox_unreachable`) |
+| Session DO | Queued status check | 60 s while work is queued and no recovery pass is due; development-only scaling | Passive status; act on a changed view, arm the next check for the same preparing/reconnecting attempt, open a recovery window if unanswered |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
 | Sandbox DO | Native billing admission | 1 min across meter retries, durable per route attempt | Route `failed` (`billing_unavailable`) |
 | Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
@@ -1596,7 +1603,7 @@ them through one development-only override.
 | Native execution over 12 h | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
+| Notification lost | Session DO queued status check; backstops | Status read every 60 s while work is queued | Queued: act on the Sandbox view at the next check; accepted: fail at the accepted backstop |
 | Sandbox DO does not answer (RPC error, reset or timeout) | Session DO transport recovery | Passes 15 s, 30 s and 60 s apart | Queued fail (`sandbox_unreachable`) about 111 s after the first failure; accepted work keeps its backstop |
 | User Stop while preparing | Session DO + Sandbox DO | Cancel every chat in the workspace and stop the allocation; a ready route aborts the Kilo session only | Queued and accepted `cancelled`; preparation closes as `preparation_cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |

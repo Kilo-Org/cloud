@@ -2613,6 +2613,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async readScmAdmissionContext() {
     const allocation = await this.readAllocation();
+    const live = (await listRoutes(this.db)).filter(route => route.state !== 'failed');
+    const reviews = live.filter(
+      route =>
+        route.credentialSource?.createdOnPlatform === 'code-review' ||
+        route.credentialSource?.billingOrigin === 'code-review'
+    );
     return {
       sandboxId: this.sandboxId,
       ownerId: await this.requireOwner(),
@@ -2626,10 +2632,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       physicalName: this.providerPin?.allocationName ?? this.sandboxId,
       byoc: this.providerPin?.byoc,
       locator: this.providerPin?.locator ?? null,
-      grants: listScopeGrants(this.db),
-      liveSessionIds: (await listRoutes(this.db))
-        .filter(route => route.state !== 'failed')
-        .map(route => route.sessionId),
+      // Older durable rows can hold broad grants until their next renewal.
+      // Every outbound transport must reject those grants during the upgrade.
+      grants: listScopeGrants(this.db).filter(grant =>
+        reviews.every(
+          route =>
+            grant.review?.sessionId === route.sessionId &&
+            grant.review.reviewId === route.credentialSource?.reviewId
+        )
+      ),
+      liveSessionIds: live.map(route => route.sessionId),
     };
   }
 
@@ -3930,6 +3942,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     for (const otherGrant of scopes) {
       if (scopeGrantId(otherGrant) === scopeGrantId(grant)) continue;
+      if (grant.review || otherGrant.review)
+        throw new Error('Code review requires a dedicated sandbox');
       if (
         runtimeContract === 'legacy' &&
         canShareLegacyRepositoryCredentials(otherGrant, grant, {
@@ -3967,7 +3981,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private publishRouteGrant(route: RouteRecord): void {
     this.db.transaction(tx => {
-      if (route.grant !== null) writeScopeGrant(tx, route.grant);
+      const candidate = route.grant;
+      if (candidate !== null) {
+        // Issuance awaits the broker. Check the committed occupants again before publishing.
+        for (const current of listScopeGrants(tx)) {
+          if (!candidate.review && !current.review) continue;
+          if (
+            scopeGrantId(candidate) !== scopeGrantId(current) ||
+            !candidate.review ||
+            current.members.some(member => member.sessionId !== candidate.review?.sessionId)
+          )
+            throw new Error('Code review requires a dedicated sandbox');
+        }
+        writeScopeGrant(tx, candidate);
+      }
       writeRoute(tx, route);
     });
   }
@@ -4182,7 +4209,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * caller stops instead of delivering on the grant the route already holds.
    */
   private async renewRouteGrant(route: RouteRecord, state: AllocationState): Promise<RouteRenewal> {
-    if (route.grant === null || !this.grantNeedsReissue(route.grant)) {
+    const pendingReviewScope =
+      !route.grant?.review &&
+      (route.credentialSource?.createdOnPlatform === 'code-review' ||
+        route.credentialSource?.billingOrigin === 'code-review');
+    if (route.grant === null || (!pendingReviewScope && !this.grantNeedsReissue(route.grant))) {
       return { kind: 'ready', route };
     }
     const { scopeId, expiresAt } = route.grant;
@@ -5538,7 +5569,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /** The workspace whose MCP credential this route carries, or null when it has none. */
   private workspaceMcpBinding(route: RouteRecord): WorkspaceMcpBinding | null {
     const source = route.credentialSource;
-    if (source === null) return null;
+    if (
+      source === null ||
+      source.createdOnPlatform === 'code-review' ||
+      source.billingOrigin === 'code-review'
+    )
+      return null;
     const workspaceSessionId = workspaceSessionIdForScope(source.scopeId, route.sessionId);
     if (workspaceSessionId === undefined) return null;
     return {

@@ -1,3 +1,4 @@
+import { reviewCapabilityPrefix } from '@kilocode/worker-utils/scm-capability-contract';
 import { readBoundedRequestBodyBytes } from '../bounded-request-body.js';
 import {
   GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
@@ -423,6 +424,16 @@ export function forwardResolvedScmCapability(
   capability: ResolvedScmCapability,
   outboundContainerId: string
 ): Promise<Response> {
+  if (capability.capability.startsWith(reviewCapabilityPrefix(capability.provider))) {
+    if (!supportsReviewForwarding(tokenService))
+      return Promise.resolve(new Response('Review authorization unavailable', { status: 502 }));
+    return tokenService.forwardCodeReviewRequest(
+      capability.provider,
+      capability.capability,
+      outboundContainerId,
+      request
+    );
+  }
   const headers = new Headers(request.headers);
   headers.set('Host', new URL(request.url).host);
   request = new Request(request, { headers });
@@ -433,4 +444,15 @@ export function forwardResolvedScmCapability(
     return handleManagedBitbucketOutbound(request, tokenService, capability, outboundContainerId);
   }
   return handleManagedGitLabOutbound(request, tokenService, capability, outboundContainerId);
+}
+
+function supportsReviewForwarding(service: unknown): service is {
+  forwardCodeReviewRequest: NonNullable<GitTokenService['forwardCodeReviewRequest']>;
+} {
+  return (
+    typeof service === 'object' &&
+    service !== null &&
+    'forwardCodeReviewRequest' in service &&
+    typeof service.forwardCodeReviewRequest === 'function'
+  );
 }

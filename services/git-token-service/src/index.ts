@@ -1,3 +1,10 @@
+import type {
+  CapabilityPurpose,
+  ScopeReviewCapabilityParams,
+} from '@kilocode/worker-utils/scm-capability-contract';
+import { openReviewCapability, scopeReviewCapability } from './review-capability.js';
+import { forwardReviewRequest } from './review-forwarding.js';
+import { bitbucketReviewAuthor } from './bitbucket-review-author.js';
 import { parseGitHubCapabilityRequest, decodePathnameIteratively } from './github-legacy-policy.js';
 import { redeemLegacyGitHubCapability } from './github-legacy-authorization.js';
 import {
@@ -823,6 +830,66 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       gitAuthor: selection.gitAuthor,
       commitCoAuthor: installationAuthor,
     };
+  }
+
+  async scopeCodeReviewCapability(params: ScopeReviewCapabilityParams): Promise<string> {
+    return scopeReviewCapability(
+      this.env,
+      params,
+      await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY)
+    );
+  }
+
+  async forwardCodeReviewRequest(
+    provider: CapabilityPurpose,
+    capability: string,
+    outboundContainerId: string,
+    request: Request
+  ): Promise<Response> {
+    try {
+      const key = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const scope = openReviewCapability(provider, capability, key);
+      const params = {
+        capability: scope.capability,
+        outboundContainerId,
+        requestMethod: request.method,
+        requestUrl: request.url,
+      };
+      const bb =
+        provider === 'bitbucket'
+          ? new BitbucketSessionCapabilityCodec(key).decode(scope.capability)
+          : null;
+      return forwardReviewRequest(scope, request, {
+        ...(bb
+          ? {
+              bitbucketAuthor: bitbucketReviewAuthor(
+                this.env.TOKEN_CACHE,
+                bb.integrationId,
+                bb.tokenDigest
+              ),
+            }
+          : {}),
+        redeem: async () => {
+          if (provider === 'github') {
+            const result = await this.redeemGitHubSessionCapability(params);
+            return result.success && result.authorization
+              ? new Headers({ Authorization: result.authorization })
+              : null;
+          }
+          const result =
+            provider === 'gitlab'
+              ? await this.redeemGitLabSessionCapability(params)
+              : await this.redeemBitbucketSessionCapability(params);
+          if (!result.success) return null;
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(result.headers))
+            if (typeof value === 'string') headers.set(name, value);
+          return headers;
+        },
+      });
+    } catch {
+      return new Response('Review authorization unavailable', { status: 403 });
+    }
   }
 
   async issueGitHubSessionCapability(

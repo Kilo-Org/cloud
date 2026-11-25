@@ -1,3 +1,7 @@
+import {
+  reviewCapabilityPrefix,
+  type ScopeReviewCapabilityParams,
+} from '@kilocode/worker-utils/scm-capability-contract';
 import { FAKE_DOWNLOADED_RUNTIME_ENV } from './fake-runtime-env.js';
 export { FAKE_DOWNLOADED_RUNTIME_ENV } from './fake-runtime-env.js';
 
@@ -17,6 +21,7 @@ import type { SandboxControlV2 } from '../../../src/control-plane/sandbox/sandbo
  * namespace-shaped stand-in that only implements `idFromName` is used.
  */
 export type FakeCredentialBroker = {
+  scopeCodeReviewCapability?: (params: ScopeReviewCapabilityParams) => Promise<string>;
   githubIssued: () => number;
   /** The repository each GitHub capability was issued for, by capability. */
   githubCapabilityRepositories: () => ReadonlyMap<string, string>;
@@ -36,6 +41,8 @@ export function createFakeCredentialBroker(
   let githubIssued = 0;
   const repositories = new Map<string, string>();
   return {
+    scopeCodeReviewCapability: async params =>
+      reviewCapabilityPrefix(params.provider) + githubIssued,
     githubIssued: () => githubIssued,
     githubCapabilityRepositories: () => repositories,
     async issueGitHubSessionCapability(params) {

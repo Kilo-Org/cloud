@@ -25,7 +25,9 @@ environments: [production]
 identity:
   kind: fly-oidc
   org: acme
+  orgId: '10'
   app: app-one
+  appId: '20'
   machine: m1
 secrets: [APP_ONE_SECRET]
 `,
@@ -61,7 +63,24 @@ secrets: [APP_ONE_SECRET]
     );
   });
 
-  it('rejects a GitHub identity that binds both refs and environments', () => {
+  it('rejects a GitHub identity that binds neither environments nor refs', () => {
+    expectThrow(
+      {
+        'gh.yaml': `
+workload: gh
+environments: [staging]
+identity:
+  kind: github-oidc
+  repositoryId: '1'
+  repositoryOwnerId: '2'
+secrets: [APP_ONE_SECRET]
+`,
+      },
+      'binds environments, refs, or both'
+    );
+  });
+
+  it('requires a GitHub environment binding for a policy that grants production', () => {
     expectThrow(
       {
         'gh.yaml': `
@@ -72,38 +91,45 @@ identity:
   repositoryId: '1'
   repositoryOwnerId: '2'
   refs: [refs/heads/main]
-  environments: [production]
 secrets: [APP_ONE_SECRET]
 `,
       },
-      'exactly one of refs or environments'
+      'must bind identity.environments'
+    );
+  });
+
+  it('rejects the Vercel identity kind, which needs the audience exchange first', () => {
+    expectThrow(
+      {
+        'web.yaml': `
+workload: web
+environments: [production]
+identity:
+  kind: vercel-oidc
+  teamSlug: acme
+  projectId: prj_web
+  vercelEnvironments: [production]
+secrets: [APP_ONE_SECRET]
+`,
+      },
+      'does not match the policy schema'
     );
   });
 
   it('rejects two workloads that declare the same identity', () => {
+    const fly = (workload: string, app: string) => `
+workload: ${workload}
+environments: [production]
+identity:
+  kind: fly-oidc
+  org: acme
+  orgId: '10'
+  app: ${app}
+  appId: '20'
+secrets: [APP_ONE_SECRET]
+`;
     expectThrow(
-      {
-        'one.yaml': `
-workload: one
-environments: [production]
-identity:
-  kind: vercel-oidc
-  teamSlug: acme
-  projectId: prj_same
-  vercelEnvironments: [production]
-secrets: [APP_ONE_SECRET]
-`,
-        'two.yaml': `
-workload: two
-environments: [production]
-identity:
-  kind: vercel-oidc
-  teamSlug: acme
-  projectId: prj_same
-  vercelEnvironments: [production]
-secrets: [APP_ONE_SECRET]
-`,
-      },
+      { 'one.yaml': fly('one', 'one'), 'two.yaml': fly('two', 'renamed') },
       'declare the same identity'
     );
   });

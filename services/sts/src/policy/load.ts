@@ -17,19 +17,23 @@ export type PolicyIndex = {
   get(environment: StsEnvironment, workload: string): Policy | null;
   snapshot(): PolicySnapshotEntry[];
   hash(): Promise<string>;
+  /** Hash of one workload's secret grants; a bundle built under another hash is out of date. */
+  workloadHash(workload: string): Promise<string>;
 };
+
+function sortedList(values: readonly string[] | undefined): string {
+  return [...(values ?? [])].sort().join(',');
+}
 
 function canonicalIdentity(policy: Policy): string {
   const identity = policy.identity;
   switch (identity.kind) {
     case 'worker-binding':
       return 'worker-binding';
-    case 'vercel-oidc':
-      return `vercel-oidc|${identity.teamSlug}|${identity.projectId}|${[...identity.vercelEnvironments].sort().join(',')}`;
     case 'fly-oidc':
-      return `fly-oidc|${identity.org}|${identity.app}`;
+      return `fly-oidc|${identity.org}|${identity.orgId}|${identity.app}|${identity.appId}`;
     case 'github-oidc':
-      return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${[...(identity.refs ?? [])].sort().join(',')}|${[...(identity.environments ?? [])].sort().join(',')}`;
+      return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${sortedList(identity.environments)}|${sortedList(identity.refs)}|${sortedList(identity.allowedEvents)}`;
   }
 }
 
@@ -38,10 +42,8 @@ function bindingKey(policy: Policy): string | null {
   switch (identity.kind) {
     case 'worker-binding':
       return null;
-    case 'vercel-oidc':
-      return `vercel-oidc|${identity.teamSlug}|${identity.projectId}`;
     case 'fly-oidc':
-      return `fly-oidc|${identity.org}|${identity.app}`;
+      return `fly-oidc|${identity.orgId}|${identity.appId}`;
     case 'github-oidc':
       return `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}`;
   }
@@ -98,6 +100,7 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 
   let hashPromise: Promise<string> | null = null;
+  const workloadHashes = new Map<string, Promise<string>>();
   return {
     all: () => policies,
     forEnvironment: environment =>
@@ -112,6 +115,15 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
     hash: () => {
       hashPromise ??= sha256Base64Url(JSON.stringify(entries));
       return hashPromise;
+    },
+    workloadHash: workload => {
+      let pending = workloadHashes.get(workload);
+      if (pending === undefined) {
+        const secrets = [...(byWorkload.get(workload)?.secrets ?? [])].sort();
+        pending = sha256Base64Url(JSON.stringify({ workload, secrets }));
+        workloadHashes.set(workload, pending);
+      }
+      return pending;
     },
   };
 }

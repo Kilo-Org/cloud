@@ -1,35 +1,43 @@
-import { SELF } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { currentPolicyHash } from '../../src/policy';
+import { SELF, runInDurableObject } from 'cloudflare:test';
+import { STS_FETCHED_AT_HEADER, STS_STALE_HEADER } from '@kilocode/sts-contracts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { serveWorkerCall } from '../../src/broker';
-import { getBundleStub } from '../../src/dos/stubs';
+import { getBundleStub, getRefresherStub } from '../../src/dos/stubs';
+import { bundleResponse } from '../../src/http';
+import { workloadPolicyHash } from '../../src/policy';
+import { installManager, stubOfflineNetwork } from './manager';
 import { resetBundleObject } from './reset';
 import { config, env } from './test-env';
+import { signWebhook, webhookBody } from './webhook';
 
 beforeEach(async () => {
+  stubOfflineNetwork();
   await resetBundleObject(getBundleStub(env, config, 'o11y'));
 });
 
-describe('manager OIDC discovery', () => {
-  it('serves the discovery document Infisical reads for the OIDC identity', async () => {
+afterEach(() => {
+  stubOfflineNetwork();
+  vi.restoreAllMocks();
+});
+
+const ETAG = `"${'e'.repeat(43)}"`;
+
+describe('manager login key set', () => {
+  it('serves one public ES256 key and no private material', async () => {
+    const response = await SELF.fetch(`${config.issuer}/manager-auth/.well-known/jwks.json`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('public, max-age=300');
+    const jwks = await response.json<{ keys: Array<Record<string, unknown>> }>();
+    expect(jwks.keys).toHaveLength(1);
+    expect(jwks.keys[0]).toMatchObject({ kty: 'EC', crv: 'P-256', alg: 'ES256', use: 'sig' });
+    expect(jwks.keys[0].d).toBeUndefined();
+  });
+
+  it('no longer serves an OIDC discovery document', async () => {
     const response = await SELF.fetch(
       `${config.issuer}/manager-auth/.well-known/openid-configuration`
     );
-    expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('public, max-age=300');
-    const document = await response.json<Record<string, unknown>>();
-    expect(document.issuer).toBe(`${config.issuer}/manager-auth`);
-    expect(document.jwks_uri).toBe(`${config.issuer}/manager-auth/.well-known/jwks.json`);
-    expect(document.id_token_signing_alg_values_supported).toEqual(['EdDSA']);
-  });
-
-  it('serves the key set the discovery document names', async () => {
-    const response = await SELF.fetch(`${config.issuer}/manager-auth/.well-known/jwks.json`);
-    expect(response.status).toBe(200);
-    const jwks = await response.json<{ keys: Array<Record<string, unknown>> }>();
-    expect(jwks.keys).toHaveLength(1);
-    expect(jwks.keys[0]).toMatchObject({ kty: 'OKP', crv: 'Ed25519', alg: 'EdDSA' });
-    expect(jwks.keys[0].d).toBeUndefined();
+    expect(response.status).toBe(404);
   });
 });
 
@@ -52,9 +60,71 @@ describe('bundle HTTP route', () => {
     expect(await response.json()).toEqual({ status: 'denied', reason: 'unknown_workload' });
   });
 
-  it('returns 404 outside the three routes', async () => {
+  it('sends the stale flag and fetchedAt as headers on a 304', async () => {
+    const fetchedAt = new Date().toISOString();
+    const response = bundleResponse({ status: 'not_modified', etag: ETAG, stale: true, fetchedAt });
+    expect(response.status).toBe(304);
+    expect(response.headers.get('etag')).toBe(ETAG);
+    expect(response.headers.get(STS_STALE_HEADER)).toBe('true');
+    expect(response.headers.get(STS_FETCHED_AT_HEADER)).toBe(fetchedAt);
+    expect(await response.text()).toBe('');
+
+    const fresh = bundleResponse({ status: 'not_modified', etag: ETAG, stale: false, fetchedAt });
+    expect(fresh.headers.get(STS_STALE_HEADER)).toBe('false');
+  });
+
+  it('maps a verifier outage to 503 with Retry-After', async () => {
+    const response = bundleResponse({
+      status: 'unavailable',
+      reason: 'internal',
+      retryAfterSeconds: 30,
+    });
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('30');
+  });
+
+  it('returns 404 outside the routes', async () => {
     const response = await SELF.fetch(`${config.issuer}/not-a-route`);
     expect(response.status).toBe(404);
+  });
+});
+
+describe('manager webhook route', () => {
+  it('passes a signed webhook to the refresher and refuses an unsigned one', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    installManager({ secrets: [] });
+    const refresher = getRefresherStub(env, config);
+    await refresher.receiveWebhook('{}', null);
+    const key = await runInDurableObject(
+      refresher,
+      (_instance, state) =>
+        state.storage.sql.exec<{ key: string }>('SELECT key FROM webhook_key').one().key
+    );
+
+    const body = webhookBody({ timestamp: Date.now() });
+    const signed = await SELF.fetch(`${config.issuer}/manager-webhook`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-infisical-signature': await signWebhook(key, body),
+      },
+      body,
+    });
+    expect(signed.status).toBe(200);
+    expect(await signed.json()).toEqual({ status: 'refresh' });
+
+    const unsigned = await SELF.fetch(`${config.issuer}/manager-webhook`, {
+      method: 'POST',
+      body,
+    });
+    expect(unsigned.status).toBe(401);
+
+    const forged = await SELF.fetch(`${config.issuer}/manager-webhook`, {
+      method: 'POST',
+      headers: { 'x-infisical-signature': await signWebhook('guessed', body) },
+      body,
+    });
+    expect(forged.status).toBe(401);
   });
 });
 
@@ -63,16 +133,17 @@ describe('worker-binding entry', () => {
     const stub = getBundleStub(env, config, 'o11y');
     await stub.putBundle({
       workload: 'o11y',
-      secrets: { O11Y_CF_AE_API_TOKEN: { value: 'ae-token', version: 7 } },
+      secrets: { O11Y_CF_AE_API_TOKEN: { value: 'ae-token', version: 7, id: 'id-ae' } },
       missing: [],
       fetchedAt: new Date().toISOString(),
-      policyHash: await currentPolicyHash(),
+      policyHash: await workloadPolicyHash('o11y'),
+      stale: false,
     });
 
     const result = await serveWorkerCall(env, config, 'o11y', {});
     if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
     expect(result.workload).toBe('o11y');
-    expect(result.secrets.O11Y_CF_AE_API_TOKEN?.version).toBe(7);
+    expect(result.secrets.O11Y_CF_AE_API_TOKEN).toEqual({ value: 'ae-token', version: 7 });
   });
 
   it('denies a caller with no policy', async () => {

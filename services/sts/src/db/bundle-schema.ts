@@ -1,8 +1,9 @@
 import type { SecretName, StsEnvironment, WorkloadName } from '@kilocode/sts-contracts';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { createAuditTables } from './audit-tables';
 
-/** One row, id 1: the workload's current bundle, sealed with the key in `bundle_key`. */
+export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
+
+/** One row, id 1: the workload's current bundle, sealed with `bundle_key.seal_key`. */
 export const bundle = sqliteTable('bundle', {
   id: integer('id').primaryKey(),
   workload: text('workload').$type<WorkloadName>().notNull(),
@@ -16,20 +17,19 @@ export const bundle = sqliteTable('bundle', {
   ciphertext: text('ciphertext').notNull(),
 });
 
-/** One row, id 1: the AES-GCM key that seals this object's bundle. */
+/**
+ * One row, id 1: the AES-GCM key that seals the bundle and the HMAC key its ETag is computed
+ * under. Both are generated in this object and never leave it.
+ */
 export const bundleKey = sqliteTable('bundle_key', {
   id: integer('id').primaryKey(),
-  key: text('key').notNull(),
+  sealKey: text('seal_key').notNull(),
+  etagKey: text('etag_key').notNull(),
   createdAt: integer('created_at').notNull(),
 });
 
-/** Revalidations that returned 304, counted per UTC minute. */
+/** Revalidations that returned 304, counted per UTC minute (`YYYY-MM-DDTHH:MM`). */
 export const deliveryCounter = sqliteTable('delivery_counter', {
   minute: text('minute').primaryKey(),
   count: integer('count').notNull(),
 });
-
-const auditTables = createAuditTables();
-
-export const auditEvent = auditTables.auditEvent;
-export const auditWatermark = auditTables.auditWatermark;

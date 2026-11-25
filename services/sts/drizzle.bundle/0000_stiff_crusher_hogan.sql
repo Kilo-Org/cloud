@@ -4,32 +4,37 @@ CREATE TABLE `audit_event` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE `audit_prune` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`pruned_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `audit_watermark` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`relayed_seq` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `manager_snapshot` (
+CREATE TABLE `bundle` (
 	`id` integer PRIMARY KEY NOT NULL,
-	`etag` text,
+	`workload` text NOT NULL,
+	`environment` text NOT NULL,
+	`etag` text NOT NULL,
+	`policy_hash` text NOT NULL,
 	`fetched_at` text NOT NULL,
+	`stale` integer NOT NULL,
+	`missing` text NOT NULL,
 	`iv` text NOT NULL,
 	`ciphertext` text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `policy_state` (
+CREATE TABLE `bundle_key` (
 	`id` integer PRIMARY KEY NOT NULL,
-	`hash` text NOT NULL,
-	`snapshot` text NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `refresher_key` (
-	`id` integer PRIMARY KEY NOT NULL,
-	`key` text NOT NULL,
+	`seal_key` text NOT NULL,
+	`etag_key` text NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `refresher_state` (
-	`id` integer PRIMARY KEY NOT NULL,
-	`next_refresh_at` integer NOT NULL
+CREATE TABLE `delivery_counter` (
+	`minute` text PRIMARY KEY NOT NULL,
+	`count` integer NOT NULL
 );

@@ -1,6 +1,7 @@
 import {
   AUDIT_BATCH_MAX_EVENTS,
   AuditBatchTooLargeError,
+  encodeAuditBatch,
   type AuditBatch,
   type AuditEvent,
 } from '@kilocode/sts-contracts';
@@ -12,81 +13,94 @@ export type AuditRelayStore = {
   nextRows(afterSeq: number, limit: number): AuditRow[];
   watermark(): number;
   advanceWatermark(toSeq: number): void;
-  prune(olderThanMs: number): void;
 };
 
-export type AuditRelayResult = {
-  sent: number;
-  skipped: number[];
-  remaining: boolean;
-};
-
-export const AUDIT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** An event that cannot travel in a queue message even alone. Appends refuse it. */
+export class AuditEventTooLargeError extends Error {
+  constructor() {
+    super('audit event does not fit one queue message on its own');
+    this.name = 'AuditEventTooLargeError';
+  }
+}
 
 /** Bounds one alarm's work; a larger backlog is picked up by the next alarm. */
 const MAX_BATCHES_PER_RUN = 20;
 
+/**
+ * Below this many UTF-8 bytes of event JSON, a one-event batch is certain to fit: the batch
+ * envelope adds well under 1 KB and gzip adds well under 1 KB to incompressible input, against a
+ * 60,000-byte compressed and a 1 MiB uncompressed limit.
+ */
+const ALWAYS_FITS_BYTES = 50_000;
+
+/**
+ * Throws `AuditEventTooLargeError` when `event` could not be relayed even as a batch of one.
+ * Called before every append, so the relay never meets an event it would have to skip.
+ */
+export async function assertRelayable(stream: string, event: AuditEvent): Promise<void> {
+  if (new TextEncoder().encode(JSON.stringify(event)).byteLength < ALWAYS_FITS_BYTES) return;
+  try {
+    await encodeAuditBatch({
+      schemaVersion: 1,
+      stream,
+      fromSeq: Number.MAX_SAFE_INTEGER,
+      toSeq: Number.MAX_SAFE_INTEGER,
+      events: [event],
+    });
+  } catch (error) {
+    if (error instanceof AuditBatchTooLargeError) throw new AuditEventTooLargeError();
+    throw error;
+  }
+}
+
 async function sendRows(
+  store: AuditRelayStore,
   stream: string,
   rows: AuditRow[],
   send: (batch: AuditBatch) => Promise<void>
-): Promise<{ sent: number; skipped: number[] }> {
+): Promise<void> {
+  const toSeq = rows[rows.length - 1].seq;
   try {
     await send({
       schemaVersion: 1,
       stream,
       fromSeq: rows[0].seq,
-      toSeq: rows[rows.length - 1].seq,
+      toSeq,
       events: rows.map(row => row.event),
     });
-    return { sent: rows.length, skipped: [] };
+    store.advanceWatermark(toSeq);
   } catch (error) {
     if (!(error instanceof AuditBatchTooLargeError)) throw error;
-    if (rows.length === 1) {
-      // A single event above the message limit cannot be split further. Skip it
-      // rather than stall the stream, and report the sequence so the caller logs it.
-      return { sent: 0, skipped: [rows[0].seq] };
-    }
+    // Appends refuse an event that does not fit alone, so a single row here is a broken
+    // invariant: stop with the watermark where it is rather than leave a gap in the stream.
+    if (rows.length === 1) throw new AuditEventTooLargeError();
     const middle = Math.ceil(rows.length / 2);
-    const first = await sendRows(stream, rows.slice(0, middle), send);
-    const second = await sendRows(stream, rows.slice(middle), send);
-    return { sent: first.sent + second.sent, skipped: [...first.skipped, ...second.skipped] };
+    await sendRows(store, stream, rows.slice(0, middle), send);
+    await sendRows(store, stream, rows.slice(middle), send);
   }
 }
 
 /**
- * Sends every committed row above the watermark, oldest first, in contiguous
- * batches of at most `AUDIT_BATCH_MAX_EVENTS`. The watermark advances only after a
- * batch reached the queue, so a failure leaves the rows for the next alarm.
+ * Sends every committed row above the watermark, oldest first, in contiguous batches of at most
+ * `AUDIT_BATCH_MAX_EVENTS`, splitting a batch the encoder refuses. The watermark advances after
+ * each batch the queue accepted, so a failure leaves only unsent rows for the next alarm. Returns
+ * the number of events sent.
  */
 export async function relayAudit(input: {
   store: AuditRelayStore;
   stream: string;
   send: (batch: AuditBatch) => Promise<void>;
-  now: number;
-}): Promise<AuditRelayResult> {
-  const { store, stream, send, now } = input;
+}): Promise<number> {
+  const { store, stream, send } = input;
   let sent = 0;
-  const skipped: number[] = [];
-  let remaining = false;
-  store.prune(now - AUDIT_RETENTION_MS);
-
   let cursor = store.watermark();
   for (let run = 0; run < MAX_BATCHES_PER_RUN; run += 1) {
     const rows = store.nextRows(cursor, AUDIT_BATCH_MAX_EVENTS);
-    if (rows.length === 0) {
-      remaining = false;
-      break;
-    }
-    const result = await sendRows(stream, rows, send);
-    sent += result.sent;
-    skipped.push(...result.skipped);
-    const last = rows[rows.length - 1];
-    store.advanceWatermark(last.seq);
-    cursor = last.seq;
-    remaining = rows.length === AUDIT_BATCH_MAX_EVENTS;
-    if (!remaining) break;
+    if (rows.length === 0) break;
+    await sendRows(store, stream, rows, send);
+    sent += rows.length;
+    cursor = rows[rows.length - 1].seq;
+    if (rows.length < AUDIT_BATCH_MAX_EVENTS) break;
   }
-
-  return { sent, skipped, remaining };
+  return sent;
 }

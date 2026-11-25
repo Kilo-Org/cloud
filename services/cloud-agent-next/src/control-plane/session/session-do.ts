@@ -4017,7 +4017,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     if (route.state === 'preparing' || route.state === 'reconnecting') {
-      await this.clearTransportRecovery();
+      await this.endTransportWindow();
     }
     switch (route.state) {
       case 'unknown':
@@ -4184,6 +4184,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (view.state === 'ready') {
       await this.persistRoute(view);
       await this.endTransportWindow();
+      await this.armAlarm();
       return;
     }
     await this.applyView(view, pass);
@@ -4334,6 +4335,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         prepared.attemptId === this.route.attemptId
       ) {
         await this.endTransportWindow();
+        await this.armAlarm();
         return;
       }
       view = prepared;
@@ -4453,12 +4455,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * The Sandbox answered, but the pass could not make progress. An answer ends
-   * the window of unanswered passes; queued work keeps the slow status check.
+   * An answer from the Sandbox ends the window of unanswered passes. A stored
+   * status check keeps its due time, so progress notifications do not rewrite it.
    */
   private async endTransportWindow(): Promise<void> {
     if (this.transportRecovery?.since !== undefined) await this.clearTransportRecovery();
-    await this.armAlarm();
   }
 
   private async clearTransportRecovery(): Promise<void> {

@@ -577,9 +577,9 @@ const NON_PRODUCTION_SECRET = /_(DEV|DEVELOPMENT|LOCAL|STAGING|TEST)$/;
  * Settings that keep a secret-holding Worker's material out of places STS does not control: the
  * Worker that holds secrets (STS, the relay, or any config that binds STS) records no traces,
  * since a trace keeps outbound URLs (a Slack webhook URL is a secret) and Durable Object SQL
- * bindings (STS keeps keys in SQL). A non-production block of a config that binds STS reads no
- * production secret from the shared Secrets Store and runs no production schedule, so an accidental
- * `wrangler deploy --env local` cannot act as production.
+ * bindings (STS writes its webhook secret through one). A non-production block of a config that
+ * binds STS reads no production secret from the shared Secrets Store and runs no production
+ * schedule, so an accidental `wrangler deploy --env local` cannot act as production.
  */
 function secretHolderProblems(
   blocks: readonly Block[],

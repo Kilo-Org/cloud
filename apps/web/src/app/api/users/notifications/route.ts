@@ -1,5 +1,5 @@
 import type { KiloNotification } from '@/lib/notifications';
-import { generateUserNotifications } from '@/lib/notifications';
+import { generateUserNotifications, reauthenticateNotification } from '@/lib/notifications';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { isLegacyKiloExtensionNotificationsUserAgent } from '@kilocode/web-shared/lib/userAgent';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -11,7 +11,12 @@ export async function GET(
     adminOnly: false,
   });
 
-  if (authFailedResponse) return authFailedResponse;
+  if (authFailedResponse) {
+    if (authFailedResponse.status === 401) {
+      return NextResponse.json({ notifications: [reauthenticateNotification()] });
+    }
+    return authFailedResponse;
+  }
 
   // The legacy extension calls this endpoint with axios (User-Agent: axios/<version>),
   // while the current extension/CLI use the shared Kilo gateway headers. Detecting the

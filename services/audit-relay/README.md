@@ -75,9 +75,10 @@ slow the rows behind them.
   once it is fixed. A batch whose inline ingest is rejected leaves its row to the alarm, which
   makes that call.
 
-Every other reason, `axiom_refused` included, is stream-wide. `hotStoreGaps(limit)` returns the
-owed rows, then the parked ones, oldest first; an operator checks a parked row and clears it with
-`clearHotStoreGap(fromSeq, toSeq)`.
+Every other reason, `axiom_refused` included, is stream-wide. A parked row stays in the
+StreamDO's storage as a record of a range the archive holds and the hot copy will not; it blocks
+nothing, and nothing outside the Worker can read or clear it (the Durable Objects are internal,
+below).
 
 Paging is per stream:
 
@@ -117,14 +118,19 @@ chain hash and the checkpoint signature. Changing it is a chain migration, not a
 
 ### Duplicates
 
-A redelivered batch is byte-identical to the one archived, so the StreamDO reads the archived
-object that ends at the duplicate's `toSeq` before acting on it. A duplicate that covers the whole
-object must re-hash, trimmed to the object's range, to the stored chain hash; one that covers only
-a suffix of the object (the producer split differently) must serialise like the archived events.
-A mismatch (`content`), a `toSeq` no object ends at (`unaligned`) or an object that does not decode
+A redelivered batch is byte-identical to the one archived, so the StreamDO compares a duplicate
+with the archive before acting on it. When an object ends at the duplicate's `toSeq`, a duplicate
+that covers the whole object must re-hash, trimmed to the object's range, to the stored chain
+hash, and one that covers only a suffix of the object (the producer split differently) must
+serialise like the archived events. When no object ends at `toSeq`, the duplicate is a shorter
+redelivery of a range a longer batch archived first (the producer's send threw after the queue
+took the message, and it later sent the range again in a longer batch): the StreamDO lists the
+first object after `toSeq - 1`, which covers `toSeq`, and the events both share must match. A
+mismatch (`content`), no object covering `toSeq` (`unaligned`) or an object that does not decode
 (`corrupt`) pages and acks the message. A duplicate never ingests anything: an owed row in its
 range is the alarm's, delivered from the archive. An R2 failure during the comparison retries the
-message. Each duplicate therefore costs one R2 read.
+message. A duplicate costs one R2 read, plus one list and one read when no object ends at its
+`toSeq`.
 
 ### Stalled gaps
 
@@ -176,7 +182,8 @@ StreamDO archives the missing batch and dedupes the rest.
   The private key is generated in the Durable Object, kept in its storage as PKCS#8, and never
   returned by an RPC method. The checkpoint is written create-only; a repeated run in the same hour
   finds the existing file and accepts it only when its signature equals the new one (Ed25519 is
-  deterministic, so unchanged heads sign identically).
+  deterministic, so unchanged heads sign identically). A run that cannot write its checkpoint
+  pages (`could not write the hourly checkpoint`) and fails, and the next hour retries.
 - The public key set is served at `GET /.well-known/audit-checkpoint-keys.json`
   (`https://audit-relay.kiloapps.io/.well-known/audit-checkpoint-keys.json`). `kid` is the RFC 7638
   thumbprint of the JWK.
@@ -188,7 +195,10 @@ StreamDO archives the missing batch and dedupes the rest.
   once. Each slice reads the registry heads and walks a stream only up to its head, so objects
   archived during a pass belong to the next one. A cron that finds its pass still running re-arms
   a missing alarm.
-- Daily (`30 3 * * *`): the pass anchors on the last checkpoint a daily pass verified (the genesis
+- Daily (`30 3 * * *`): the pass first requires a signed checkpoint no older than 2 hours; a
+  newer-than-anchor checkpoint missing because the hourly job stopped would otherwise let the pass
+  re-verify the old anchor and report success, so it fails with `checkpoint_stale` and pages. It
+  then anchors on the last checkpoint a daily pass verified (the genesis
   hash before the first one) and lists each stream with `startAfter` that checkpoint's position, so
   it reads only what was archived since. Both the anchor and the newest checkpoint must carry a
   valid signature under the published key, and every stream's chain must land on the newest
@@ -204,8 +214,8 @@ StreamDO archives the missing batch and dedupes the rest.
   consecutive unfinished slice ends the pass with `archive_read`. A mismatch, a failed signature, an unreadable or
   missing object, a stream in the checkpoint but not the registry, or an archive that ends short of
   the registry head ends the pass and pages `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`. The text begins with
-  `bot: ` and carries only the reason, stream name, sequence and key. `VerifierDO.status()` returns
-  the running passes, the anchor, and each kind's last result.
+  `bot: ` and carries only the reason, stream name, sequence and key. Each kind's last result is
+  kept in the verifier's storage as its record.
 
 ## Bindings and configuration
 
@@ -237,10 +247,20 @@ them lands in the DLQ (above), whose consumer has `max_retries: 100` with `retry
 
 `StreamDO`, `RegistryDO`, `SignerDO` and `VerifierDO` are internal, and so is the Worker itself: no other Worker may bind `audit-relay`, `audit-relay-staging` or `audit-relay-local` as a service, a Durable Object `script_name`, a workflow, a tail consumer, a dispatch outbound or a migration/export transfer source. No other Worker may consume or dead-letter into the `kilo-audit*` queues, or bind a `kilo-audit-archive*` bucket. Their methods (`SignerDO.sign`, stream appends) skip the queue path that checks batch contiguity and archives every batch. A foreign archive writer could pre-write a key that the 400-day lock then keeps. `services/sts/test/repo/worker-configs.test.ts` scans every Wrangler config in the repository and fails on any of these. It requires `"jurisdiction": "eu"` on the production and staging archive bindings, and requires this Worker to deploy exactly those three names.
 
-## Production prerequisites
+## Merge gate: production prerequisites
 
-Run these once per environment before the first deploy. `wrangler` is the workspace pin
+**Complete and verify these before merging.** The merge to `main` is the first production deploy:
+a green main CI run starts Deploy to Production, which deploys every changed Worker, this one
+included. Do each step for production and for staging. `wrangler` is the workspace pin
 (`pnpm exec wrangler` from this directory).
+
+Steps 1 and 2 are required for the Worker to work at all: without the queues the deploy fails, and
+without the EU bucket and its lock rules the archive is missing or not immutable. Steps 3, 4 and 5
+are required for full function. Without the Axiom dataset and token, or while STS does not serve
+the policy (step 5), every batch is still archived and checkpointed, but each stream records a
+stream-wide hot-copy failure and owes its rows to Axiom until the token can be read (about 3.5 MB
+of owed rows per stream per day). Without the Slack webhook, every page fails and only the
+`audit_relay.page_failed` log line remains.
 
 1. **Queues and the DLQ** (the consumer attachment comes from `wrangler.jsonc`):
 
@@ -251,43 +271,61 @@ Run these once per environment before the first deploy. `wrangler` is the worksp
    pnpm exec wrangler queues create kilo-audit-staging-dlq
    ```
 
+   Verify: `pnpm exec wrangler queues info kilo-audit` (and the other three) prints the queue.
+
 2. **R2 bucket in the EU jurisdiction with 400-day lock rules** on the archive, the checkpoints and
    the dead letters:
 
    ```sh
-   pnpm exec wrangler r2 bucket create kilo-audit-archive --jurisdiction eu
-   pnpm exec wrangler r2 bucket create kilo-audit-archive-staging --jurisdiction eu
-
    for bucket in kilo-audit-archive kilo-audit-archive-staging; do
-     pnpm exec wrangler r2 bucket lock add "$bucket" \
-       --name archive-400-days --prefix streams/ --retention-days 400
-     pnpm exec wrangler r2 bucket lock add "$bucket" \
-       --name checkpoints-400-days --prefix checkpoints/ --retention-days 400
-     pnpm exec wrangler r2 bucket lock add "$bucket" \
-       --name dead-letter-400-days --prefix dead-letter/ --retention-days 400
+     pnpm exec wrangler r2 bucket create "$bucket" -J eu
+     pnpm exec wrangler r2 bucket lock add "$bucket" archive-400-days streams/ \
+       --retention-days 400 -J eu
+     pnpm exec wrangler r2 bucket lock add "$bucket" checkpoints-400-days checkpoints/ \
+       --retention-days 400 -J eu
+     pnpm exec wrangler r2 bucket lock add "$bucket" dead-letter-400-days dead-letter/ \
+       --retention-days 400 -J eu
    done
    ```
 
+   Verify: `pnpm exec wrangler r2 bucket info kilo-audit-archive -J eu` shows the bucket,
+   `pnpm exec wrangler r2 bucket lock list kilo-audit-archive -J eu` lists exactly the three rules
+   at 400 days, and `wrangler deploy --dry-run` shows `kilo-audit-archive (eu)` for the binding.
    The copy of each checkpoint outside the Cloudflare account, which keeps the proof past the lock
    rule, is a separate task owned by Anaconda security.
 
-3. **Axiom dataset and ingest token**: create the dataset `kilo-audit` (staging `kilo-audit-staging`)
-   with 90-day retention, and an Axiom API token with ingest-only access to it. Store the token in
-   Infisical project `kilo`, environment `production` (resp. `staging`), folder
-   `/workloads/audit-relay`, as `AUDIT_RELAY_AXIOM_TOKEN` (design 4.2).
+3. **Axiom dataset and ingest token** (full function): create the dataset `kilo-audit` (staging
+   `kilo-audit-staging`) with 90-day retention, and an Axiom API token with ingest-only access to
+   it. Store the token in Infisical project `kilo`, environment `production` (resp. `staging`),
+   folder `/workloads/audit-relay`, as `AUDIT_RELAY_AXIOM_TOKEN` (design 4.2).
 
-4. **Slack paging webhook**: store it in the same folder as `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`.
+   Verify: in Axiom the token's permissions list only ingest on that one dataset; in Infisical the
+   folder lists the secret name (never print the value). After the deploy, the first batch logs
+   `audit_relay.batch_archived` with `hotCopy: "delivered"` and its events appear in the dataset.
 
-5. **STS policy**: add the workload `audit-relay` to the policy file of each STS environment with
-   exactly these two secrets, and deploy STS before this Worker. `props.caller` is `audit-relay` in
-   every environment block, so the serving STS deployment's environment must match
-   `AUDIT_ENVIRONMENT`.
+4. **Slack paging webhook** (full function): an incoming webhook for the channel `#kilo-on-call`,
+   stored in the same Infisical folder as `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`.
+
+   Verify: Infisical lists the name, and one test message starting with `bot: ` posted to the
+   webhook from a trusted shell arrives in `#kilo-on-call`.
+
+5. **STS policy**: `services/sts/policy/audit-relay.yaml`, shipped with the STS broker, grants the
+   workload `audit-relay` exactly these two secrets in every environment. `props.caller` is
+   `audit-relay` in every environment block, so the serving STS deployment's environment must
+   match `AUDIT_ENVIRONMENT`. Until STS serves that policy, secret reads are denied: batches are
+   still archived, and the hot copy is owed as in step 3.
+
+   Verify: the policy file names `audit-relay`, its three environments and the two secrets, and
+   the STS deployment that the merge produces includes it.
 
 6. **DNS**: the `custom_domain` route creates `audit-relay.kiloapps.io`
-   (`audit-relay-staging.kiloapps.io` for staging). If the published key set has to live at a
-   different origin, change the route and update the recorded key-set URL.
+   (`audit-relay-staging.kiloapps.io` for staging) on deploy.
 
-Deploy prerequisites are what make the sinks immutable: without the lock rules, a rewritten archive
+   Verify after the deploy: `curl https://audit-relay.kiloapps.io/.well-known/audit-checkpoint-keys.json`
+   returns one Ed25519 key. If the key set has to live at a different origin, change the route and
+   update the recorded key-set URL.
+
+These prerequisites are what make the sinks immutable: without the lock rules, a rewritten archive
 object would pass verification, and without an ingest-only Axiom token, a compromised Worker could
 read the hot copy.
 

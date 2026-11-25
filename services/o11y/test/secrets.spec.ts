@@ -1,23 +1,41 @@
-import { SecretUnavailableError } from '@kilocode/secrets-client';
+import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
 import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
-import { describe, expect, it } from 'vitest';
+import { Hono } from 'hono';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { requireAdmin } from '../src/admin-middleware';
+import { queryContainerAllocations } from '../src/alerting/container-allocations';
+import { queryContainerApplications } from '../src/alerting/container-capacity-query';
+import { sendAlertNotification, type SloAlertPayload } from '../src/alerting/notify';
+import { queryErrorRates } from '../src/alerting/query';
+import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
 import { resolveQueueId } from '../src/alerting/queue-lookup';
-import { readO11ySecret, secretsSource } from '../src/secrets';
+import { readO11ySecret, secretsSource, type O11ySecretName } from '../src/secrets';
 
 const ETAG = '"0123456789abcdef"';
 const CONTAINERS_TOKEN = 'O11Y_CF_CONTAINERS_API_TOKEN';
-const QUEUE_ID = 'ab'.repeat(16);
+const SECRET_NAMES: readonly O11ySecretName[] = [
+  'O11Y_KILO_GATEWAY_CLIENT_SECRET',
+  'O11Y_CF_AE_API_TOKEN',
+  'O11Y_SLACK_WEBHOOK_PAGE',
+  'O11Y_SLACK_WEBHOOK_TICKET',
+  'O11Y_CF_CONTAINERS_API_TOKEN',
+];
 
-function storeEnv(values: Record<string, string>) {
+function storeSecret(value: string, reads: string[], name: string): SecretsStoreSecret {
+  return {
+    async get() {
+      reads.push(name);
+      return value;
+    },
+  } as SecretsStoreSecret;
+}
+
+function storeEnv(values: Partial<Record<O11ySecretName, string>>) {
   const reads: string[] = [];
-  const env: Record<string, SecretsStoreSecret> = {};
-  for (const [name, value] of Object.entries(values)) {
-    env[name] = {
-      async get() {
-        reads.push(name);
-        return value;
-      },
-    } as SecretsStoreSecret;
+  const env: Partial<Record<O11ySecretName, SecretsStoreSecret>> = {};
+  for (const name of SECRET_NAMES) {
+    const value = values[name];
+    if (value !== undefined) env[name] = storeSecret(value, reads, name);
   }
   return { env, reads };
 }
@@ -39,13 +57,13 @@ function bundle(secrets: Record<string, string>, missing: string[] = []): Bundle
 
 function stsBinding(result: BundleResult) {
   const requests: BundleRequest[] = [];
-  return {
-    requests,
-    async getBundle(request: BundleRequest) {
+  const binding: BundleBinding = {
+    async getBundle(request) {
       requests.push(request);
       return result;
     },
   };
+  return { requests, binding };
 }
 
 describe('secretsSource', () => {
@@ -75,7 +93,7 @@ describe('readO11ySecret', () => {
 
   it('reads the STS bundle when the source is sts', async () => {
     const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
-    const binding = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
+    const { binding, requests } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
 
     const resolved = await readO11ySecret(
       { ...env, SECRETS_SOURCE: 'sts', STS: binding },
@@ -84,30 +102,48 @@ describe('readO11ySecret', () => {
 
     expect(resolved).toBe('bundle-token');
     expect(reads).toEqual([]);
-    expect(binding.requests).toEqual([{}]);
+    expect(requests).toEqual([{}]);
   });
 
-  it('reuses one bundle across reads in an isolate', async () => {
-    const binding = stsBinding(
+  it('rolls back to the Secrets Store when the source flips back', async () => {
+    const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
+    const { binding } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
+
+    expect(
+      await readO11ySecret({ ...env, SECRETS_SOURCE: 'sts', STS: binding }, CONTAINERS_TOKEN)
+    ).toBe('bundle-token');
+    expect(
+      await readO11ySecret(
+        { ...env, SECRETS_SOURCE: 'secrets-store', STS: binding },
+        CONTAINERS_TOKEN
+      )
+    ).toBe('store-token');
+    expect(reads).toEqual([CONTAINERS_TOKEN]);
+  });
+
+  it('reuses one bundle across reads and env objects in an isolate', async () => {
+    const { binding, requests } = stsBinding(
       bundle({ [CONTAINERS_TOKEN]: 'bundle-token', O11Y_CF_AE_API_TOKEN: 'bundle-ae' })
     );
-    const env = { SECRETS_SOURCE: 'sts', STS: binding };
 
-    expect(await readO11ySecret(env, CONTAINERS_TOKEN)).toBe('bundle-token');
-    expect(await readO11ySecret(env, 'O11Y_CF_AE_API_TOKEN')).toBe('bundle-ae');
-    expect(binding.requests).toHaveLength(1);
+    expect(await readO11ySecret({ SECRETS_SOURCE: 'sts', STS: binding }, CONTAINERS_TOKEN)).toBe(
+      'bundle-token'
+    );
+    expect(
+      await readO11ySecret({ SECRETS_SOURCE: 'sts', STS: binding }, 'O11Y_CF_AE_API_TOKEN')
+    ).toBe('bundle-ae');
+    expect(requests).toHaveLength(1);
   });
 
-  it('surfaces a non-retryable failure for a name the policy does not grant', async () => {
-    const binding = stsBinding(bundle({}, [CONTAINERS_TOKEN]));
+  it('surfaces a non-retryable failure for a granted name the manager does not hold', async () => {
+    const { binding } = stsBinding(bundle({}, [CONTAINERS_TOKEN]));
     const error = await readO11ySecret(
       { SECRETS_SOURCE: 'sts', STS: binding },
       CONTAINERS_TOKEN
-    ).catch(err => err);
+    ).catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(SecretUnavailableError);
-    expect(error.reason).toBe('missing');
-    expect(error.retryable).toBe(false);
+    expect(error).toMatchObject({ reason: 'missing', retryable: false });
   });
 
   it('requires the STS binding when the source is sts', async () => {
@@ -117,10 +153,14 @@ describe('readO11ySecret', () => {
   });
 
   it('refuses to read from an unknown source', async () => {
-    const { env } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
+    const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
+    const { binding, requests } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
+
     await expect(
-      readO11ySecret({ ...env, SECRETS_SOURCE: 'vault' }, CONTAINERS_TOKEN)
+      readO11ySecret({ ...env, SECRETS_SOURCE: 'vault', STS: binding }, CONTAINERS_TOKEN)
     ).rejects.toThrow(/SECRETS_SOURCE/);
+    expect(reads).toEqual([]);
+    expect(requests).toEqual([]);
   });
 
   it('reports an unconfigured Secrets Store value with the secret name', async () => {
@@ -131,47 +171,129 @@ describe('readO11ySecret', () => {
   });
 });
 
-describe('a read site over both sources', () => {
-  async function queueIdWith(
-    env: Omit<Parameters<typeof resolveQueueId>[0], 'O11Y_CF_ACCOUNT_ID'> & {
-      SECRETS_SOURCE?: string;
-      STS?: unknown;
-    },
-    authorization: string[]
-  ) {
-    const fetchFn = async (_url: string, init?: RequestInit) => {
-      authorization.push(new Headers(init?.headers).get('Authorization') ?? '');
-      return new Response(
-        JSON.stringify({
-          success: true,
-          result: [{ queue_name: 'kilo-alerts', queue_id: QUEUE_ID }],
-          result_info: { total_pages: 1 },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    };
-    const queryEnv: Parameters<typeof resolveQueueId>[0] = {
+describe('every o11y secret read site over the STS source', () => {
+  const stop = new Error('request captured');
+
+  function stsOnlyEnv() {
+    const { env: store, reads } = storeEnv(
+      Object.fromEntries(SECRET_NAMES.map(name => [name, `store-${name}`]))
+    );
+    const { binding } = stsBinding(
+      bundle(
+        Object.fromEntries(
+          SECRET_NAMES.map(name => [
+            name,
+            name.startsWith('O11Y_SLACK_WEBHOOK')
+              ? `https://hooks.slack.com/${name}`
+              : `bundle-${name}`,
+          ])
+        )
+      )
+    );
+    const env = {
+      ...store,
+      SECRETS_SOURCE: 'sts',
+      STS: binding,
       O11Y_CF_ACCOUNT_ID: 'account',
-      ...env,
-    };
-    return resolveQueueId(queryEnv, fetchFn, 'kilo-alerts');
+    } as unknown as Env;
+    return { env, reads };
   }
 
-  it('authorizes with the Secrets Store token', async () => {
-    const authorization: string[] = [];
-    const { env } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
+  function capturingFetch() {
+    const requests: { url: string; authorization: string | null }[] = [];
+    const fetchFn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      requests.push({
+        url: input instanceof Request ? input.url : String(input),
+        authorization: new Headers(init?.headers).get('Authorization'),
+      });
+      throw stop;
+    };
+    return { requests, fetchFn };
+  }
 
-    expect(await queueIdWith(env, authorization)).toBe(QUEUE_ID);
-    expect(authorization).toEqual(['Bearer store-token']);
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('authorizes with the STS bundle token', async () => {
-    const authorization: string[] = [];
-    const binding = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
+  it('checks the admin token against the bundle value', async () => {
+    const { env, reads } = stsOnlyEnv();
+    const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin, c => c.text('ok'));
+    const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
 
-    expect(await queueIdWith({ SECRETS_SOURCE: 'sts', STS: binding }, authorization)).toBe(
-      QUEUE_ID
+    const allowed = await app.request(
+      '/admin',
+      { headers: { 'X-O11Y-ADMIN-TOKEN': 'bundle-O11Y_KILO_GATEWAY_CLIENT_SECRET' } },
+      env,
+      executionCtx
     );
-    expect(authorization).toEqual(['Bearer bundle-token']);
+    const refused = await app.request(
+      '/admin',
+      { headers: { 'X-O11Y-ADMIN-TOKEN': 'store-O11Y_KILO_GATEWAY_CLIENT_SECRET' } },
+      env,
+      executionCtx
+    );
+
+    expect(allowed.status).toBe(200);
+    expect(refused.status).toBe(401);
+    expect(reads).toEqual([]);
+  });
+
+  it('queries Analytics Engine with the bundle token', async () => {
+    const { env, reads } = stsOnlyEnv();
+    const { requests, fetchFn } = capturingFetch();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchFn);
+
+    await expect(queryErrorRates(5, 1, env)).rejects.toBe(stop);
+    expect(requests[0]?.authorization).toBe(['Bearer', 'bundle-O11Y_CF_AE_API_TOKEN'].join(' '));
+    expect(reads).toEqual([]);
+  });
+
+  it.each([
+    ['page', 'O11Y_SLACK_WEBHOOK_PAGE'],
+    ['ticket', 'O11Y_SLACK_WEBHOOK_TICKET'],
+  ] as const)('posts a %s alert to the bundle webhook', async (severity, name) => {
+    const { env, reads } = stsOnlyEnv();
+    const { requests, fetchFn } = capturingFetch();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchFn);
+    const alert: SloAlertPayload = {
+      alertType: 'error_rate',
+      severity,
+      provider: 'openai',
+      model: 'gpt-4',
+      clientName: 'kilo-gateway',
+      burnRate: 14.5,
+      burnRateThreshold: 14.4,
+      windowMinutes: 5,
+      totalRequests: 10000,
+      slo: 0.999,
+      currentRate: 0.0145,
+    };
+
+    await expect(sendAlertNotification(alert, env)).rejects.toBe(stop);
+    expect(requests[0]?.url).toBe(`https://hooks.slack.com/${name}`);
+    expect(reads).toEqual([]);
+  });
+
+  it.each([
+    [
+      'container capacity',
+      (env: Env, fetchFn: typeof fetch) => queryContainerApplications(env, fetchFn),
+    ],
+    [
+      'container allocations',
+      (env: Env, fetchFn: typeof fetch) => queryContainerAllocations(env, fetchFn),
+    ],
+    ['queue backlog', (env: Env, fetchFn: typeof fetch) => queryQueueBacklog(env, fetchFn)],
+    [
+      'queue lookup',
+      (env: Env, fetchFn: typeof fetch) => resolveQueueId(env, fetchFn, 'kilo-alerts'),
+    ],
+  ] as const)('calls the %s API with the bundle token', async (_site, query) => {
+    const { env, reads } = stsOnlyEnv();
+    const { requests, fetchFn } = capturingFetch();
+
+    await expect(query(env, fetchFn)).rejects.toBe(stop);
+    expect(requests[0]?.authorization).toBe(['Bearer', `bundle-${CONTAINERS_TOKEN}`].join(' '));
+    expect(reads).toEqual([]);
   });
 });

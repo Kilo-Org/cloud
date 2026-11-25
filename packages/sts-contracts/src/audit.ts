@@ -57,6 +57,8 @@ export type AuditEvent = z.infer<typeof AuditEventSchema>;
 
 export const AUDIT_BATCH_MAX_EVENTS = 500;
 export const AUDIT_BATCH_MAX_COMPRESSED_BYTES = 60_000;
+/** A consumer stops inflating a message past this size, so a gzip bomb cannot exhaust its memory. */
+export const AUDIT_BATCH_MAX_DECOMPRESSED_BYTES = 1024 * 1024;
 
 /**
  * One relay batch from one audit stream. A stream is one ordered producer log, for example one
@@ -75,12 +77,24 @@ export const AuditBatchSchema = z
   });
 export type AuditBatch = z.infer<typeof AuditBatchSchema>;
 
+/** The producer splits a batch that throws this: it is above the compressed or the decompressed limit. */
 export class AuditBatchTooLargeError extends Error {
-  constructor(readonly compressedBytes: number) {
+  constructor(
+    readonly compressedBytes: number,
+    readonly decompressedBytes: number
+  ) {
     super(
-      `audit batch compresses to ${compressedBytes} bytes, above ${AUDIT_BATCH_MAX_COMPRESSED_BYTES}`
+      `audit batch is ${decompressedBytes} bytes (limit ${AUDIT_BATCH_MAX_DECOMPRESSED_BYTES}) and compresses to ${compressedBytes} bytes (limit ${AUDIT_BATCH_MAX_COMPRESSED_BYTES})`
     );
     this.name = 'AuditBatchTooLargeError';
+  }
+}
+
+/** A queue message that inflates past `AUDIT_BATCH_MAX_DECOMPRESSED_BYTES`. */
+export class AuditBatchDecompressionLimitError extends Error {
+  constructor() {
+    super(`audit batch inflates past ${AUDIT_BATCH_MAX_DECOMPRESSED_BYTES} bytes`);
+    this.name = 'AuditBatchDecompressionLimitError';
   }
 }
 
@@ -94,34 +108,73 @@ function arrayBufferView(bytes: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBu
   return copy;
 }
 
-async function pipeThrough(
+function transformed(
   bytes: Uint8Array<ArrayBuffer>,
   transform: CompressionStream | DecompressionStream
-) {
+): ReadableStream<Uint8Array> {
   const source = new ReadableStream<BufferSource>({
     start(controller) {
       controller.enqueue(bytes);
       controller.close();
     },
   });
-  return new Uint8Array(await new Response(source.pipeThrough(transform)).arrayBuffer());
+  return source.pipeThrough(transform);
 }
 
-/** Gzips a validated batch for a queue message. Throws `AuditBatchTooLargeError`; the producer then splits the batch. */
+/** Reads a stream to the end, or throws once it has produced more than `limit` bytes. */
+async function readAtMost(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw new AuditBatchDecompressionLimitError();
+    }
+    chunks.push(value);
+  }
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return joined;
+}
+
+/**
+ * Gzips a validated batch for a queue message. Throws `AuditBatchTooLargeError` when the batch is
+ * above either size limit; the producer then splits it. A batch this accepts always decodes.
+ */
 export async function encodeAuditBatch(batch: AuditBatch): Promise<Uint8Array> {
   const json = arrayBufferView(
     new TextEncoder().encode(JSON.stringify(AuditBatchSchema.parse(batch)))
   );
-  const compressed = await pipeThrough(json, new CompressionStream('gzip'));
-  if (compressed.byteLength > AUDIT_BATCH_MAX_COMPRESSED_BYTES) {
-    throw new AuditBatchTooLargeError(compressed.byteLength);
+  const compressed = new Uint8Array(
+    await new Response(transformed(json, new CompressionStream('gzip'))).arrayBuffer()
+  );
+  if (
+    compressed.byteLength > AUDIT_BATCH_MAX_COMPRESSED_BYTES ||
+    json.byteLength > AUDIT_BATCH_MAX_DECOMPRESSED_BYTES
+  ) {
+    throw new AuditBatchTooLargeError(compressed.byteLength, json.byteLength);
   }
   return compressed;
 }
 
-/** Decodes and validates a queue message body produced by `encodeAuditBatch`. */
+/**
+ * Decodes and validates a queue message body produced by `encodeAuditBatch`. Throws
+ * `AuditBatchDecompressionLimitError` without reading further once the body inflates past
+ * `AUDIT_BATCH_MAX_DECOMPRESSED_BYTES`.
+ */
 export async function decodeAuditBatch(body: ArrayBuffer | Uint8Array): Promise<AuditBatch> {
   const bytes = arrayBufferView(body instanceof Uint8Array ? body : new Uint8Array(body));
-  const json = await pipeThrough(bytes, new DecompressionStream('gzip'));
+  const json = await readAtMost(
+    transformed(bytes, new DecompressionStream('gzip')),
+    AUDIT_BATCH_MAX_DECOMPRESSED_BYTES
+  );
   return AuditBatchSchema.parse(JSON.parse(new TextDecoder().decode(json)));
 }

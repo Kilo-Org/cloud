@@ -1,6 +1,3 @@
-/** Milliseconds since the epoch; injectable so tests drive the cache without sleeping. */
-export type SecretsClock = () => number;
-
 /**
  * The part of a Worker `ExecutionContext` the client uses. A background revalidation is
  * passed to `waitUntil` so the runtime keeps the isolate alive until it settles.

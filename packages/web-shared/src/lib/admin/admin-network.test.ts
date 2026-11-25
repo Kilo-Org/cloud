@@ -219,13 +219,12 @@ describe('adminNetworkRefusal', () => {
 
     expect(adminNetworkRefusal(fromAddress('198.51.100.1'), request)).toEqual({
       reason: 'outside-allowlist',
-      retryable: true,
       code: 'ADMIN_NETWORK_DENIED',
       message: expect.stringContaining('Cloudflare WARP'),
     });
   });
 
-  test('reports a missing list as not configured, not retryable, once per process', () => {
+  test('reports a missing list as not configured, once per process', () => {
     onVercel(undefined);
 
     const first = adminNetworkRefusal(fromAddress('203.0.113.7'), request);
@@ -233,7 +232,6 @@ describe('adminNetworkRefusal', () => {
 
     expect(first).toEqual({
       reason: 'not-configured',
-      retryable: false,
       code: 'ADMIN_NETWORK_NOT_CONFIGURED',
       message: expect.stringContaining('allowlist is not configured'),
     });

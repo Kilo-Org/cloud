@@ -43,6 +43,7 @@ import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
+  getUserFromSessionForStepUp,
 } from './server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -2186,6 +2187,15 @@ describe('admin network allowlist (REST)', () => {
       success: false,
       error: expect.stringContaining('Cloudflare WARP'),
     });
+  });
+
+  it('refuses an off-network admin session on the step-up route', async () => {
+    await sessionUser(true, '198.51.100.1');
+
+    const result = await getUserFromSessionForStepUp();
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
   });
 
   it('admits an admin inside the allowlist', async () => {

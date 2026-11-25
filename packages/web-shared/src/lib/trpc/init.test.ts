@@ -227,6 +227,21 @@ describe('adminProcedure admin network allowlist', () => {
     await expect(caller.ping()).resolves.toBe('ok');
   });
 
+  test('emits one denied privileged_access event for a bearer admin refused by the network', async () => {
+    const caller = createCaller(
+      ctxFor({
+        user: defineTestUser({ is_admin: true }),
+        authViaToken: true,
+        headersList: new Headers({ 'x-vercel-forwarded-for': '198.51.100.1' }),
+      })
+    );
+
+    await expect(caller.ping()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'privileged_access', outcome: 'denied' });
+  });
+
   test('keeps the non-admin refusal for a non-admin outside the allowlist', async () => {
     const caller = createCaller(
       ctxFor({

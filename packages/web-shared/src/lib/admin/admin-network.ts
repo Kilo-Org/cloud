@@ -124,9 +124,7 @@ export function adminNetworkDecision(headersList: Headers): AdminNetworkDecision
 
 export type AdminNetworkRefusal = {
   reason: AdminNetworkDenialReason;
-  /** True when connecting to the corporate network and retrying can succeed. */
-  retryable: boolean;
-  /** Stable code for clients that branch on the refusal. */
+  /** Stable error code the step-up route returns for the refusal. */
   code: typeof ADMIN_NETWORK_DENIED_CODE | typeof ADMIN_NETWORK_NOT_CONFIGURED_CODE;
   message: string;
 };
@@ -135,13 +133,11 @@ export function adminNetworkRefusalFor(reason: AdminNetworkDenialReason): AdminN
   return reason === 'no-client-address' || reason === 'outside-allowlist'
     ? {
         reason,
-        retryable: true,
         code: ADMIN_NETWORK_DENIED_CODE,
         message: ADMIN_NETWORK_DENIED_MESSAGE,
       }
     : {
         reason,
-        retryable: false,
         code: ADMIN_NETWORK_NOT_CONFIGURED_CODE,
         message: ADMIN_NETWORK_NOT_CONFIGURED_MESSAGE,
       };

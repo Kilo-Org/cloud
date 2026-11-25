@@ -258,9 +258,11 @@ function bulkAuditEntry(
 
 export const adminKiloPassRouter = createTRPCRouter({
   cancelAndRefundKiloPassBulk: superadminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['kilo_pass.cancel_refund'] } })
     .input(BulkCancelSchema)
     .mutation(async ({ input, ctx }) => {
       const batchId = crypto.randomUUID();
+      let recordedCount = 0;
       // The helper writes the reason to the target user records (block reason,
       // admin note and credit transaction description); the audit rows repeat it.
       const reason = redactEmailAddressesInAuditText(input.reason);
@@ -276,9 +278,24 @@ export const adminKiloPassRouter = createTRPCRouter({
             reason,
             refundLatestPayment: input.refundLatestPayment,
           });
-          if (entry) await recordAdminAction(ctx, entry);
+          if (entry) {
+            await recordAdminAction(ctx, entry);
+            recordedCount += 1;
+          }
         },
       });
+      if (recordedCount === 0) {
+        await recordAdminAction(ctx, {
+          action: 'kilo_pass.cancel_refund',
+          target: null,
+          message: 'Bulk Kilo Pass cancel changed no users',
+          metadata: {
+            batchId,
+            total: outcome.summary.total,
+            skipped: outcome.summary.skipped,
+          },
+        });
+      }
 
       console.log(
         `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} batch=${batchId} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`

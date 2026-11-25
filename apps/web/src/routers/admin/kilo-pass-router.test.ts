@@ -119,10 +119,11 @@ function setupNoInvoiceStripe(stripe: StripeMock) {
 }
 
 async function refundAuditRows() {
-  return db
+  const rows = await db
     .select()
     .from(admin_action_audit_logs)
     .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
+  return rows.filter(row => row.outcome === 'success');
 }
 
 describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {

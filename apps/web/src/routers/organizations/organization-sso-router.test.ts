@@ -431,7 +431,8 @@ describe('organization SSO router', () => {
         .where(
           and(
             eq(admin_action_audit_logs.action, 'organization.sso.config.delete'),
-            eq(admin_action_audit_logs.target_id, organizationId)
+            eq(admin_action_audit_logs.target_id, organizationId),
+            eq(admin_action_audit_logs.outcome, 'success')
           )
         );
     }
@@ -575,7 +576,9 @@ describe('organization SSO router', () => {
           message: 'Cleared SSO domain leftover.test',
         },
       ]);
-      await expect(readAdminActions(target.id)).resolves.toEqual([]);
+      await expect(readAdminActions(target.id)).resolves.toEqual([
+        { action: 'organization.sso.config.delete', metadata: null },
+      ]);
       await expect(resolveSsoAuthorityForDomain('leftover.test')).resolves.toEqual({
         status: 'not_required',
         domain: 'leftover.test',

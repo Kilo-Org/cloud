@@ -395,6 +395,7 @@ export const emailTestingRouter = createTRPCRouter({
     }),
 
   sendTest: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['email_test.send'] } })
     .input(
       z.object({
         template: TemplateNameSchema,

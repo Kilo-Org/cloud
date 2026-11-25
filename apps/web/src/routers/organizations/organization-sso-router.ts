@@ -24,8 +24,11 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
   organizationActionTarget,
   recordAdminAction,
+  setAdminAuditTarget,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
@@ -106,46 +109,50 @@ async function releaseSsoDomain(
 }
 
 export const organizationSsoRouter = createTRPCRouter({
-  createConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
-    const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
-    const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    if (workOSOrg) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'SSO is already configured for this organization',
+  createConfig: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.sso.config.create'] } })
+    .input(OrgIdSchema)
+    .mutation(async opts => {
+      const { organizationId } = opts.input;
+      setAdminAuditTarget(organizationActionTarget(organizationId));
+      await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+      const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
+      if (workOSOrg) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'SSO is already configured for this organization',
+        });
+      }
+      const org = await getOrganizationById(organizationId);
+      if (!org) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (org.parent_organization_id) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Child organizations inherit SSO from their parent',
+        });
+      }
+      const createdOrg = await workos.organizations.createOrganization({
+        name: org.name,
+        metadata: {
+          createdById: opts.ctx.user.id,
+          createdByEmail: opts.ctx.user.google_user_email,
+        },
+        externalId: org.id,
       });
-    }
-    const org = await getOrganizationById(organizationId);
-    if (!org) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    if (org.parent_organization_id) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: 'Child organizations inherit SSO from their parent',
+      await recordAdminAction(opts.ctx, {
+        action: 'organization.sso.config.create',
+        target: organizationActionTarget(organizationId),
+        message: 'Created WorkOS SSO organization',
+        metadata: { workosOrganizationId: createdOrg.id },
       });
-    }
-    const createdOrg = await workos.organizations.createOrganization({
-      name: org.name,
-      metadata: {
-        createdById: opts.ctx.user.id,
-        createdByEmail: opts.ctx.user.google_user_email,
-      },
-      externalId: org.id,
-    });
-    await recordAdminAction(opts.ctx, {
-      action: 'organization.sso.config.create',
-      target: organizationActionTarget(organizationId),
-      message: 'Created WorkOS SSO organization',
-      metadata: { workosOrganizationId: createdOrg.id },
-    });
-    // Only the identifier, never the WorkOS object. Its timestamps are `Date`
-    // instances, which plain tRPC JSON carries as ISO strings, so returning it
-    // would hand the client a type the wire does not match. The caller
-    // invalidates its config query and reads nothing else.
-    return { id: createdOrg.id };
-  }),
+      // Only the identifier, never the WorkOS object. Its timestamps are `Date`
+      // instances, which plain tRPC JSON carries as ISO strings, so returning it
+      // would hand the client a type the wire does not match. The caller
+      // invalidates its config query and reads nothing else.
+      return { id: createdOrg.id };
+    }),
   getConfig: organizationMemberProcedure.input(OrgIdSchema).query(async opts => {
     const { organizationId } = opts.input;
     const result = await getWorkOsOrganizationByExternalId(organizationId);
@@ -194,128 +201,159 @@ export const organizationSsoRouter = createTRPCRouter({
       },
     } satisfies OrganizationSsoConfigView;
   }),
-  deleteConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
-    const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
-    const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    const organization = await getOrganizationById(organizationId);
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    // A configuration is the WorkOS organization, the recorded domain, or both; the procedure
-    // removes whatever the organization holds.
-    const releasedDomain = organization.sso_domain;
-    if (!workOSOrg && !releasedDomain) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
-    }
-
-    // Remove the WorkOS organization before the recorded domain, and record the platform admin
-    // action together with that deletion. The released domain is recorded by the
-    // organization.sso.remove_domain entry below, which reads the value under the row lock.
-    if (workOSOrg) {
-      await workos.organizations.deleteOrganization(workOSOrg.id);
-      await recordAdminAction(opts.ctx, {
+  deleteConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
         action: 'organization.sso.config.delete',
-        target: organizationActionTarget(organizationId),
-        message: 'Deleted WorkOS SSO organization',
-        metadata: { workosOrganizationId: workOSOrg.id },
-      });
-    }
-
-    // Release whatever domain the organization records, and audit it.
-    await db.transaction(async tx => {
-      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
-    });
-
-    return successResult({ message: 'SSO configuration deleted successfully' });
-  }),
-  generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {
-    const { organizationId, linkType } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
-    const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    if (!workOSOrg) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
-    }
-
-    const intent =
-      linkType === 'sso' ? GenerateLinkIntent.SSO : GenerateLinkIntent.DomainVerification;
-
-    const link = await workos.adminPortal.generateLink({
-      organization: workOSOrg.id,
-      intent,
-    });
-    // The link grants WorkOS admin-portal access; record that one was issued,
-    // never the link itself.
-    await recordAdminAction(opts.ctx, {
-      action: 'organization.sso.admin_portal_link.generate',
-      target: organizationActionTarget(organizationId),
-      message: `Generated WorkOS admin portal link (${linkType})`,
-      metadata: { workosOrganizationId: workOSOrg.id, linkType },
-    });
-    return { link: link.link };
-  }),
-  updateSsoDomain: adminProcedure.input(UpdateSSODomainSchema).mutation(async opts => {
-    const { organizationId, ssoDomain } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
-
-    await db.transaction(async tx => {
-      const [organization] = await tx
-        .select()
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .for('update');
-      if (!organization || organization.deleted_at) {
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
+    .input(OrgIdSchema)
+    .mutation(async opts => {
+      const { organizationId } = opts.input;
+      await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+      const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
-      if (organization.parent_organization_id) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Child organizations inherit SSO from their parent',
-        });
+      // A configuration is the WorkOS organization, the recorded domain, or both; the procedure
+      // removes whatever the organization holds.
+      const releasedDomain = organization.sso_domain;
+      if (!workOSOrg && !releasedDomain) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
       }
 
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${ssoDomain}, 0))`
-      );
-      const existingAuthority = await resolveSsoAuthorityForDomain(ssoDomain, tx);
-      if (
-        existingAuthority.status === 'misconfigured' ||
-        (existingAuthority.status === 'required' &&
-          existingAuthority.sourceOrganizationId !== organizationId)
-      ) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This SSO domain is already assigned to another organization',
-        });
+      // Remove the WorkOS organization before the recorded domain. The released domain is
+      // recorded by the organization.sso.remove_domain entry below, which reads the value under
+      // the row lock.
+      if (workOSOrg) {
+        await workos.organizations.deleteOrganization(workOSOrg.id);
+        addAdminAuditMetadata({ workosOrganizationId: workOSOrg.id });
       }
 
-      await tx
-        .update(organizations)
-        .set({ sso_domain: ssoDomain })
-        .where(eq(organizations.id, organizationId));
-
-      await createAuditLog({
-        action: 'organization.sso.set_domain',
-        actor_email: opts.ctx.user.google_user_email,
-        actor_id: opts.ctx.user.id,
-        actor_name: opts.ctx.user.google_user_name,
-        details: { id: 'sso.domainSet', domain: ssoDomain },
-        message: `Set SSO domain to ${ssoDomain}`,
-        organization_id: organizationId,
-        tx,
+      // Release whatever domain the organization records, and audit it.
+      await db.transaction(async tx => {
+        await releaseSsoDomain(tx, organizationId, opts.ctx.user);
       });
-    });
 
-    return successResult({ message: 'SSO domain updated successfully' });
-  }),
-  clearSsoDomain: adminProcedure.input(OrgIdSchema).mutation(async opts => {
-    const { organizationId } = opts.input;
-    await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+      return successResult({ message: 'SSO configuration deleted successfully' });
+    }),
+  generateAdminPortalLink: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'handler',
+        actions: ['organization.sso.admin_portal_link.generate'],
+      },
+    })
+    .input(AdminPortalSchema)
+    .mutation(async opts => {
+      const { organizationId, linkType } = opts.input;
+      setAdminAuditTarget(organizationActionTarget(organizationId));
+      await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+      const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
+      if (!workOSOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
+      }
 
-    await db.transaction(async tx => {
-      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
-    });
+      const intent =
+        linkType === 'sso' ? GenerateLinkIntent.SSO : GenerateLinkIntent.DomainVerification;
 
-    return successResult({ message: 'SSO domain cleared successfully' });
-  }),
+      const link = await workos.adminPortal.generateLink({
+        organization: workOSOrg.id,
+        intent,
+      });
+      // The link grants WorkOS admin-portal access; record that one was issued,
+      // never the link itself.
+      await recordAdminAction(opts.ctx, {
+        action: 'organization.sso.admin_portal_link.generate',
+        target: organizationActionTarget(organizationId),
+        message: `Generated WorkOS admin portal link (${linkType})`,
+        metadata: { workosOrganizationId: workOSOrg.id, linkType },
+      });
+      return { link: link.link };
+    }),
+  updateSsoDomain: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.sso.domain.set',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
+    .input(UpdateSSODomainSchema)
+    .mutation(async opts => {
+      const { organizationId, ssoDomain } = opts.input;
+      await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+
+      await db.transaction(async tx => {
+        const [organization] = await tx
+          .select()
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .for('update');
+        if (!organization || organization.deleted_at) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+        }
+        if (organization.parent_organization_id) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Child organizations inherit SSO from their parent',
+          });
+        }
+
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${ssoDomain}, 0))`
+        );
+        const existingAuthority = await resolveSsoAuthorityForDomain(ssoDomain, tx);
+        if (
+          existingAuthority.status === 'misconfigured' ||
+          (existingAuthority.status === 'required' &&
+            existingAuthority.sourceOrganizationId !== organizationId)
+        ) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This SSO domain is already assigned to another organization',
+          });
+        }
+
+        await tx
+          .update(organizations)
+          .set({ sso_domain: ssoDomain })
+          .where(eq(organizations.id, organizationId));
+
+        await createAuditLog({
+          action: 'organization.sso.set_domain',
+          actor_email: opts.ctx.user.google_user_email,
+          actor_id: opts.ctx.user.id,
+          actor_name: opts.ctx.user.google_user_name,
+          details: { id: 'sso.domainSet', domain: ssoDomain },
+          message: `Set SSO domain to ${ssoDomain}`,
+          organization_id: organizationId,
+          tx,
+        });
+      });
+
+      return successResult({ message: 'SSO domain updated successfully' });
+    }),
+  clearSsoDomain: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.sso.domain.clear',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
+    .input(OrgIdSchema)
+    .mutation(async opts => {
+      const { organizationId } = opts.input;
+      await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+
+      await db.transaction(async tx => {
+        await releaseSsoDomain(tx, organizationId, opts.ctx.user);
+      });
+
+      return successResult({ message: 'SSO domain cleared successfully' });
+    }),
 });

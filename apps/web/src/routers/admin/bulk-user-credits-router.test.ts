@@ -1,7 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { credit_transactions } from '@kilocode/db/schema';
+import { admin_action_audit_logs, credit_transactions } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 describe('bulk user credits router', () => {
@@ -69,6 +69,44 @@ describe('bulk user credits router', () => {
           created_by_kilo_user_id: admin.id,
           credit_category: 'admin-bulk-grant',
           description: 'Support adjustment',
+        }))
+      )
+    );
+  });
+
+  it('records one admin audit row per credited user', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.bulkUserCredits.grantBulkCredits({
+      emails: [
+        ...recipients.map(user => user.google_user_email),
+        `missing-${crypto.randomUUID()}@example.com`,
+      ],
+      amountUsd: 3,
+    });
+
+    const rows = await db
+      .select({
+        action: admin_action_audit_logs.action,
+        outcome: admin_action_audit_logs.outcome,
+        target_type: admin_action_audit_logs.target_type,
+        target_id: admin_action_audit_logs.target_id,
+        metadata: admin_action_audit_logs.metadata,
+      })
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining(
+        recipients.map(user => ({
+          action: 'credits.bulk_grant',
+          outcome: 'success',
+          target_type: 'user',
+          target_id: user.id,
+          metadata: { amountUsd: 3, expirationDate: null },
         }))
       )
     );

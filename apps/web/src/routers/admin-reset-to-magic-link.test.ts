@@ -590,7 +590,14 @@ describe('admin.users.resetToMagicLinkLogin', () => {
 
       const after = await accountState(user.id);
       expect(after).toEqual(before);
-      expect(await adminAudits(admin.id)).toEqual([]);
+      expect(await adminAudits(admin.id)).toEqual([
+        expect.objectContaining({
+          action: 'user.login.reset_to_magic_link',
+          outcome: 'failure',
+          target_id: user.id,
+          metadata: { errorCode: code },
+        }),
+      ]);
     }
   );
 

@@ -26,7 +26,7 @@ async function kiloPassAuditRows(targetUserId: string) {
     .select()
     .from(admin_action_audit_logs)
     .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
-  return rows.filter(row => row.target_id === targetUserId);
+  return rows.filter(row => row.target_id === targetUserId && row.outcome === 'success');
 }
 
 async function getBlockState(id: string) {
@@ -192,7 +192,7 @@ describe('admin action audit logging', () => {
     expect(audits[0]?.metadata?.previousBlockedAt).toEqual(expect.any(String));
   });
 
-  test('blocking and no-op unblocks do not write unblock audits', async () => {
+  test('blocking and no-op unblocks record whether they changed the user', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
@@ -200,7 +200,22 @@ describe('admin action audit logging', () => {
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: 'abuse' });
 
-    expect(await getAdminActionAudits(admin.id)).toHaveLength(0);
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(2);
+    expect(audits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'user.unblock',
+          target_id: user.id,
+          metadata: expect.objectContaining({ changed: false }),
+        }),
+        expect.objectContaining({
+          action: 'user.block',
+          target_id: user.id,
+          metadata: { changed: true },
+        }),
+      ])
+    );
   });
 
   test('bulk unblock records one audit row per unblocked user', async () => {
@@ -243,6 +258,26 @@ describe('admin action audit logging', () => {
       'user.browser_sessions.revoke',
     ]);
     expect(audits.every(audit => audit.target_id === user.id)).toBe(true);
+  });
+
+  test('balance recompute is recorded against the target user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.recomputeBalances({ userId: user.id, dryRun: false });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'user.balance.recompute',
+      outcome: 'success',
+      actor_id: admin.id,
+      target_type: 'user',
+      target_id: user.id,
+      message: 'admin.users.recomputeBalances',
+      metadata: { dryRun: false },
+    });
   });
 });
 

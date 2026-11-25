@@ -173,7 +173,7 @@ export function relevantChangesIsEmpty(changes: RelevantChanges): boolean {
  */
 export function buildAutoChangeMessage(
   changes: RelevantChanges,
-  { addedModelsDisabled = false }: { addedModelsDisabled?: boolean } = {}
+  { addedModelsDisabled }: { addedModelsDisabled: boolean }
 ): string {
   const segments: string[] = [];
 
@@ -326,7 +326,7 @@ export async function logAutoModelChangesForAllOrgs(
     const changes = computeRelevantChangesForOrg(organization, diff);
     if (relevantChangesIsEmpty(changes)) continue;
 
-    const message = buildAutoChangeMessage(changes);
+    const message = buildAutoChangeMessage(changes, { addedModelsDisabled: false });
     try {
       if (organization.settings.disable_new_models && changes.addedByReasonProvider.size > 0) {
         await disableAddedModelsAndLog(organization.id, changes);

@@ -24,7 +24,7 @@ export function ModelsTab({
   onOpenModelDetails,
   scope = 'organization',
   showDetails = true,
-  newModelsDisabledByDefault = false,
+  newModelsDisabledByDefault,
 }: {
   isLoading: boolean;
   canEdit: boolean;
@@ -42,7 +42,7 @@ export function ModelsTab({
   onOpenModelDetails: (modelId: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
-  newModelsDisabledByDefault?: boolean;
+  newModelsDisabledByDefault: boolean;
 }) {
   const modelsToEnable = filteredModelRows
     .filter(row => !row.unavailableReason && !allowedModelIds.has(row.modelId))

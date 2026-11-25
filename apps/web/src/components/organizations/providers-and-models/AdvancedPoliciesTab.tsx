@@ -116,10 +116,9 @@ function GatewayPoliciesCard({
   id: string;
   settings: GatewaySettings;
   disabled: boolean;
-  onChange: (input: {
-    disable_openrouter?: boolean;
-    data_region?: OrganizationDataRegion | null;
-  }) => void;
+  onChange: (
+    input: { disable_openrouter: boolean } | { data_region: OrganizationDataRegion | null }
+  ) => void;
 }) {
   const regionName = settings.data_region
     ? ORGANIZATION_DATA_REGION_NAMES[settings.data_region]

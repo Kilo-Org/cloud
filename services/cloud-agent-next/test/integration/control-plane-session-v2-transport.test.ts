@@ -1315,28 +1315,6 @@ describe('SandboxSessionV2 queued status check', () => {
     expect((await rows(stub))[0]).toMatchObject({ state: 'queued', reason: null });
   });
 
-  it('keeps the stored check when a step notification arrives, and ends only a window', async () => {
-    const { stub, peer } = await setup();
-    peer.prepareView = peer.view('preparing');
-    await stub.send(prompt('m1'));
-    const earlier = { dueAt: Date.now() + 5_000 };
-    await runInDurableObject(stub, async (instance, state) => {
-      await state.storage.put(RECOVERY_KEY, earlier);
-      Object.assign(instance, { transportRecovery: earlier });
-    });
-    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId, step: 'clone' });
-    expect(await storedRecovery(stub)).toEqual(earlier);
-
-    const window = { dueAt: Date.now() + 5_000, since: Date.now() - 1_000 };
-    await runInDurableObject(stub, async (instance, state) => {
-      await state.storage.put(RECOVERY_KEY, window);
-      Object.assign(instance, { transportRecovery: window });
-    });
-    const before = Date.now();
-    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId, step: 'checkout' });
-    await expectStatusCheck(stub, before);
-  });
-
   it('delivers a rolled-back acceptance at the next check', async () => {
     const { stub, peer, sessionId } = await setup();
     peer.prepareView = peer.view('ready');

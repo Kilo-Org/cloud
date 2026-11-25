@@ -16,7 +16,7 @@ import type { SendUpstreamAttemptResult } from '@kilocode/web-shared/lib/ai-gate
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -185,7 +185,7 @@ export async function handleLlmProxyRequest(
     ? resolveBenchmarkCaller(benchmark.assignment)
     : getUserFromAuth({
         adminOnly: false,
-        expectedAudience: KILO_GATEWAY_AUDIENCE,
+        expectedAudience: KILO_INFERENCE_AUDIENCE,
       }).then(auth =>
         resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: rawIpAddress })
       );

@@ -60,14 +60,15 @@ import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-dom
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { generateApiToken, generateKiloClawInferenceToken } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import {
   KILO_API_AUDIENCE,
+  KILO_INFERENCE_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
@@ -574,6 +575,36 @@ describe('getUserFromAuth', () => {
     expect(gatewayResult.authFailedResponse?.status).toBe(401);
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+
+  test('rejects the VM inference bearer at the account API boundary before loading an account', async () => {
+    const { token } = await generateKiloClawInferenceToken(defineTestUser(), null);
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+    const result = await getUserFromAuth({ adminOnly: false });
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test.each([null, '11111111-1111-4111-8111-111111111111'])(
+    'does not let a VM with signed organization %s switch its payer via a header',
+    async organizationId => {
+      const user = await insertTestUser();
+      const { token } = await generateKiloClawInferenceToken(user, organizationId);
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          authorization: `Bearer ${token}`,
+          [ORGANIZATION_ID_HEADER]: '22222222-2222-4222-8222-222222222222',
+        })
+      );
+      const result = await getUserFromAuth({
+        adminOnly: false,
+        expectedAudience: KILO_INFERENCE_AUDIENCE,
+      });
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+    }
+  );
 
   test('accepts a gateway audience only for a gateway operation', async () => {
     const user = await insertTestUser({ api_token_pepper: 'gateway-audience-pepper' });

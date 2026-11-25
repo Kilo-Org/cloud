@@ -3,7 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getDirectByokCatalogModelIds,
   getDirectByokModelsForUser,
@@ -49,7 +49,7 @@ async function tryGetUserFromAuth() {
   try {
     return await getUserFromAuth({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
   } catch (e) {
     console.error('[tryGetUserFromAuth] failed to get user from auth', e);

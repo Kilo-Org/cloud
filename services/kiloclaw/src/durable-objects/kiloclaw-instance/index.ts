@@ -1144,7 +1144,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
                 model,
                 remote: {
                   baseUrl,
-                  apiKey: this.s.kilocodeApiKey ?? '',
+                  apiKey: '${KILOCODE_API_KEY}',
                   headers,
                 },
               },

@@ -1,5 +1,14 @@
 export const KILO_API_AUDIENCE = 'kilo-api';
 export const KILO_GATEWAY_AUDIENCE = 'kilo-gateway';
+export const KILO_INFERENCE_AUDIENCE = 'kilo-gateway:inference';
+export const KILO_EXA_SEARCH_AUDIENCE = 'kilo-gateway:exa-search';
+
+/** Broad gateway credentials also authorize these two explicitly selected operations. */
+export function gatewayParentAudience(expected: string): string {
+  return expected === KILO_INFERENCE_AUDIENCE || expected === KILO_EXA_SEARCH_AUDIENCE
+    ? KILO_GATEWAY_AUDIENCE
+    : expected;
+}
 export const KILO_CHAT_AUDIENCE = 'kilo-chat';
 export const EVENT_SERVICE_AUDIENCE = 'event-service';
 export const NOTIFICATIONS_AUDIENCE = 'notifications';

@@ -5,7 +5,7 @@ import { migrateKilocodeAuthProfilesToKeyRef } from '../auth-profiles-migration'
 import type { AuthProfilesMigrationReport } from '../auth-profiles-migration';
 import { getBearerToken } from './gateway';
 
-const PATCHABLE_KEYS = new Set(['KILOCODE_API_KEY']);
+const PATCHABLE_KEYS = new Set(['KILOCODE_API_KEY', 'KILOCLAW_EXA_SEARCH_KEY']);
 const OPENCLAW_STATE_DIR = '/root/.openclaw';
 
 export type EnvRoutesDeps = {
@@ -82,6 +82,9 @@ export function registerEnvRoutes(
 
     for (const [key, value] of Object.entries(validated)) {
       process.env[key] = value;
+    }
+    if (process.env.KILOCLAW_KILO_CLI === 'true' && validated.KILOCODE_API_KEY) {
+      process.env.KILO_API_KEY = validated.KILOCODE_API_KEY;
     }
 
     const migrationReport = deps.migrate(OPENCLAW_STATE_DIR);

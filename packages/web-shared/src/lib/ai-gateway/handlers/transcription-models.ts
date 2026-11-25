@@ -5,7 +5,7 @@ import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-ga
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -25,7 +25,7 @@ export async function handleTranscriptionModelsRequest(): Promise<
     // model access; `gateway-admission.ts` covers the inference admission rule.
     const auth = await getUserFromAuth({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     }).catch(() => null);
     if (auth?.organizationId && auth.user && Array.isArray(data.data)) {
       // Resolve the member's policy once, then evaluate each catalog model.

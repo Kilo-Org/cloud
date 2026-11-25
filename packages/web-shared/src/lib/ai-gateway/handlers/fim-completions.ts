@@ -9,7 +9,7 @@ import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   countAndStoreFimUsage,
   extractFimPromptInfo,
@@ -104,7 +104,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const caller = resolveGatewayCaller(
-    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_INFERENCE_AUDIENCE }),
     { allowAnonymous: false, passThroughAuthFailure: true }
   );
   authSpan.end();

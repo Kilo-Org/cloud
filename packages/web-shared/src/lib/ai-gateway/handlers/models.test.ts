@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { handleModelsRequest } from './models';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -203,7 +203,7 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
   });
 

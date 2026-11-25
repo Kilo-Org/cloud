@@ -9,11 +9,13 @@ import {
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
+  gatewayParentAudience,
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
+import { signKiloClawInferenceToken } from '@kilocode/worker-utils/kiloclaw-vm-token';
 import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
@@ -177,6 +179,16 @@ export function generateApiToken(
   );
 }
 
+export function generateKiloClawInferenceToken(user: User, organizationId: string | null) {
+  return signKiloClawInferenceToken({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    organizationId,
+    env: process.env.NODE_ENV,
+    secret: NEXTAUTH_SECRET,
+  });
+}
+
 export function generateOrganizationApiToken(
   user: User,
   organizationId: string,
@@ -314,9 +326,14 @@ export function validateAuthorizationHeader(
     };
   }
 
+  const expectedAudience = options?.expectedAudience ?? KILO_API_AUDIENCE;
+  const parentAudience = gatewayParentAudience(expectedAudience);
+  const scopedGatewayCredential =
+    parentAudience !== expectedAudience && payload.aud === expectedAudience;
   if (
+    !scopedGatewayCredential &&
     !isKiloResourceAudienceAllowed(payload.aud, {
-      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
+      audience: parentAudience,
       mode: 'allow-legacy',
     })
   ) {
@@ -382,6 +399,7 @@ export function validateAuthorizationHeader(
 
   return {
     kiloUserId: payload.kiloUserId,
+    scopedGatewayCredential,
     apiTokenPepper: payload.apiTokenPepper,
     organizationId: payload.organizationId,
     organizationRole: payload.organizationRole,

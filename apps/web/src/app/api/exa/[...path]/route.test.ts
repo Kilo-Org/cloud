@@ -11,7 +11,7 @@ import {
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_EXA_SEARCH_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_TYPE_MAX_LENGTH,
@@ -126,7 +126,7 @@ describe('POST /api/exa/[...path]', () => {
       expect(mockedFetch).not.toHaveBeenCalled();
       expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
         adminOnly: false,
-        expectedAudience: KILO_GATEWAY_AUDIENCE,
+        expectedAudience: KILO_EXA_SEARCH_AUDIENCE,
       });
     });
   });

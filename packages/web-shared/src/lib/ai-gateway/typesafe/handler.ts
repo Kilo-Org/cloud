@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -154,7 +154,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
   if (accountRateLimited) return accountRateLimited;
   const caller = resolveGatewayCaller(
-    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_INFERENCE_AUDIENCE }),
     { allowAnonymous: false, passThroughAuthFailure: true }
   );
   if (caller.kind === 'rejected') return caller.response;

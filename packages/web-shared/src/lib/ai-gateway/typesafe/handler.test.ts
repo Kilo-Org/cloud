@@ -6,7 +6,7 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -477,7 +477,7 @@ describe('handleSystemOneRequest', () => {
     });
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
     expect(resolveOrganizationMemberModelDecision).not.toHaveBeenCalled();
   });
@@ -766,7 +766,7 @@ describe('handleSystemOneRequest', () => {
     expect(await handleSystemOneRequest(makeRequest())).toBe(authFailedResponse);
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();

@@ -2,7 +2,7 @@ import { connection, NextResponse } from 'next/server';
 import { MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
@@ -30,7 +30,7 @@ export async function handleModelsByProviderRequest() {
   // model access; `gateway-admission.ts` covers the inference admission rule.
   const auth = await getUserFromAuth({
     adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
+    expectedAudience: KILO_INFERENCE_AUDIENCE,
   }).catch(() => null);
   if (auth?.organizationId && auth.user) {
     // Filter to the caller's own member-effective access so the catalog agrees

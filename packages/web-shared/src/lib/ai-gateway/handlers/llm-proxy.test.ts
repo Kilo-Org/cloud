@@ -23,6 +23,7 @@ import {
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
+  KILO_INFERENCE_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
@@ -699,7 +700,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(response.status).toBe(401);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
     await expect(response.json()).resolves.toMatchObject({
       error: { code: INVALID_TOKEN_CODE },
@@ -790,62 +791,65 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     });
   });
 
-  it('retains verified gateway-token identity through the provider path', async () => {
-    const authenticatedUser = {
-      id: 'user-123',
-      google_user_email: 'test@example.com',
-      microdollars_used: 99,
-    } as User;
-    setSignedTokenAuth(signedToken(KILO_GATEWAY_AUDIENCE), {
-      user: authenticatedUser,
-      authFailedResponse: null,
-      organizationId: 'org-123',
-      botId: 'bot-123',
-      tokenSource: 'gateway-token',
-    });
-    mockedGetProvider.mockResolvedValue(
-      providerResult({
-        provider,
-        userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
-        isFree: false,
-        bypassAccessCheck: false,
-      })
-    );
-
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(), {
-        authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
-      }) as never
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
-      adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
-    });
-    expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
-    const balanceCall = mockedGetBalanceAndOrgSettings.mock.calls[0];
-    expect(balanceCall?.[0]).toBe('org-123');
-    expect(balanceCall?.[1]).toBe(authenticatedUser);
-    expect(balanceCall?.[2]).toBe(readDb);
-    expect(mockedGetProvider).toHaveBeenCalledWith(
-      expect.objectContaining({
+  it.each([KILO_GATEWAY_AUDIENCE, KILO_INFERENCE_AUDIENCE])(
+    'retains verified %s identity through the provider path',
+    async audience => {
+      const authenticatedUser = {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User;
+      setSignedTokenAuth(signedToken(audience), {
         user: authenticatedUser,
+        authFailedResponse: null,
         organizationId: 'org-123',
         botId: 'bot-123',
-      })
-    );
-    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        user_byok: true,
-        is_free: false,
-      }),
-      expect.anything(),
-      expect.objectContaining({ type: provider.type, apiKey: provider.apiKey })
-    );
-  });
+        tokenSource: 'gateway-token',
+      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), {
+          authorization: `Bearer ${signedToken(audience)}`,
+        }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+        adminOnly: false,
+        expectedAudience: KILO_INFERENCE_AUDIENCE,
+      });
+      expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
+      const balanceCall = mockedGetBalanceAndOrgSettings.mock.calls[0];
+      expect(balanceCall?.[0]).toBe('org-123');
+      expect(balanceCall?.[1]).toBe(authenticatedUser);
+      expect(balanceCall?.[2]).toBe(readDb);
+      expect(mockedGetProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: authenticatedUser,
+          organizationId: 'org-123',
+          botId: 'bot-123',
+        })
+      );
+      expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          user_byok: true,
+          is_free: false,
+        }),
+        expect.anything(),
+        expect.objectContaining({ type: provider.type, apiKey: provider.apiKey })
+      );
+    }
+  );
 
   it('rejects an API-only token for a paid model before upstream', async () => {
     setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
@@ -868,7 +872,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(response.status).toBe(401);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();

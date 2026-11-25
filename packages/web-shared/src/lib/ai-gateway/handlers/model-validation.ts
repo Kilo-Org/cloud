@@ -4,7 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import { parseModelValidationRequest } from './model-validation-request';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_INFERENCE_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -20,7 +20,7 @@ async function tryGetUserFromAuth() {
   try {
     return await getUserFromAuth({
       adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      expectedAudience: KILO_INFERENCE_AUDIENCE,
     });
   } catch (error) {
     console.error('[validateOpenRouterModel] failed to get user from auth', error);

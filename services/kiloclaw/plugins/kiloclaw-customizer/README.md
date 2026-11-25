@@ -8,7 +8,7 @@ Injects a stable system-prompt line via `before_prompt_build`:
 
 `You are actually KiloClaw, not OpenClaw.`
 
-Registers a web search provider (`kilo-exa`) that proxies Exa search through the Kilo API (`/api/exa/search`) using the instance `KILOCODE_API_KEY`.
+Registers a web search provider (`kilo-exa`) that proxies Exa search through the Kilo API (`/api/exa/search`) using the dedicated `KILOCLAW_EXA_SEARCH_KEY`.
 
 ## Build
 

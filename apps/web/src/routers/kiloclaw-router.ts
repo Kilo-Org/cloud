@@ -9,7 +9,11 @@ import {
   createTRPCRouter,
   UpstreamApiError,
 } from '@kilocode/web-shared/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateKiloClawInferenceToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   AgentIdSchema,
@@ -1194,11 +1198,8 @@ async function provisionInstance(
 ) {
   const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
-  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-  const kilocodeApiKey = generateApiToken(user, undefined, {
-    expiresIn: expiresInSeconds,
-  });
-  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+  const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+    await generateKiloClawInferenceToken(user, null);
 
   const pinnedImageTag = params.instanceId
     ? (
@@ -1243,11 +1244,8 @@ async function patchConfig(
 ): Promise<KiloCodeConfigPublicResponse> {
   const instance = await getActiveInstance(user.id);
   const client = new KiloClawInternalClient();
-  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-  const kilocodeApiKey = generateApiToken(user, undefined, {
-    expiresIn: expiresInSeconds,
-  });
-  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+  const { token: kilocodeApiKey, expiresAt: kilocodeApiKeyExpiresAt } =
+    await generateKiloClawInferenceToken(user, null);
 
   const response = await client.patchKiloCodeConfig(
     user.id,

@@ -251,7 +251,7 @@ function resolveKiloExaSearchEndpoint(): string {
 }
 
 function resolveKiloCodeApiKey(): string | undefined {
-  return readProviderEnvValue(['KILOCODE_API_KEY']);
+  return readProviderEnvValue(['KILOCLAW_EXA_SEARCH_KEY']);
 }
 
 function resolveKiloOrganizationId(): string | undefined {
@@ -499,7 +499,7 @@ function createExaSchema(): Record<string, unknown> {
 function missingKiloApiKeyPayload(): ErrorPayload {
   return errorPayload(
     'missing_kilocode_api_key',
-    'web_search (kilo-exa) needs KILOCODE_API_KEY in the Gateway environment.'
+    'web_search (kilo-exa) needs KILOCLAW_EXA_SEARCH_KEY in the Gateway environment.'
   );
 }
 
@@ -698,7 +698,7 @@ export function createKiloExaWebSearchProvider(): WebSearchProviderPlugin {
     onboardingScopes: ['text-inference'],
     requiresCredential: false,
     credentialLabel: 'Kilo API key',
-    envVars: ['KILOCODE_API_KEY'],
+    envVars: ['KILOCLAW_EXA_SEARCH_KEY'],
     placeholder: '(managed by KiloClaw)',
     signupUrl: 'https://kilo.ai/',
     docsUrl: 'https://docs.openclaw.ai/tools/web',

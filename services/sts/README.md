@@ -283,8 +283,13 @@ production. Complete and verify every item below before merging.
    and no DNS record named `sts.kiloapps.io` exists (the deploy creates the custom domain and fails
    on a conflicting record). Verify: Cloudflare dashboard → `kiloapps.io` → DNS shows no
    `sts` record.
-2. **Audit queue.** `kilo-audit` exists (a producer binding to a missing queue fails the deploy).
-   Verify: `wrangler queues info kilo-audit` prints the queue.
+2. **Audit queue.** `kilo-audit` exists (a producer binding to a missing queue fails the deploy),
+   with a message retention of 14 days. The `*/5` cron starts the refresher within 5 minutes of
+   the deploy, and its first audit events wait in `kilo-audit` until the audit relay (PR stack
+   part 3) deploys and consumes them. A message older than the retention is dropped and its stream
+   then stalls behind a gap, so merge the relay within the retention, which is why it is 14 days
+   and not the 4-day default. Verify: `wrangler queues info kilo-audit` prints the queue, and the
+   Queues API shows `message_retention_period: 1209600`.
 3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
    exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
    `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine

@@ -378,24 +378,19 @@ export class BundleDO extends DurableObject<Env> {
   }
 
   private bundleKeys(): Promise<BundleKeys> {
-    this.keys ??= loadOrCreateKey({
-      storage: this.ctx.storage,
-      name: BUNDLE_KEYS_NAME,
-      schema: BundleKeysSchema,
-      legacy: () => {
-        const row = this.db.select().from(schema.bundleKey).where(eq(schema.bundleKey.id, 1)).get();
-        return row === undefined ? null : { sealKey: row.sealKey, etagKey: row.etagKey };
-      },
-      dropLegacy: () => {
-        this.db.delete(schema.bundleKey).where(eq(schema.bundleKey.id, 1)).run();
-      },
-      create: () => ({ sealKey: createEncryptionKey(), etagKey: createEncryptionKey() }),
-    });
-    const pending = this.keys;
-    pending.catch(() => {
-      if (this.keys === pending) this.keys = null;
-    });
-    return pending;
+    if (this.keys === null) {
+      const pending = loadOrCreateKey({
+        storage: this.ctx.storage,
+        name: BUNDLE_KEYS_NAME,
+        schema: BundleKeysSchema,
+        create: () => ({ sealKey: createEncryptionKey(), etagKey: createEncryptionKey() }),
+      });
+      this.keys = pending;
+      pending.catch(() => {
+        if (this.keys === pending) this.keys = null;
+      });
+    }
+    return this.keys;
   }
 
   private stream(workload: string): string {

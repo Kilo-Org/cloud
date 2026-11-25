@@ -11,12 +11,11 @@ function validInput() {
   return {
     DIRECT_INGEST_PERCENT: '25',
     DIRECT_INGEST_MAX_BYTES: '4194304',
-    DIRECT_INGEST_USER_IDS: '',
   };
 }
 
 function config(overrides: Partial<DirectIngestConfig> = {}): DirectIngestConfig {
-  return { percent: 25, maxBytes: 4_194_304, userIds: new Set(), ...overrides };
+  return { percent: 25, maxBytes: 4_194_304, ...overrides };
 }
 
 describe('parseDirectIngestConfig', () => {
@@ -52,21 +51,6 @@ describe('parseDirectIngestConfig', () => {
       parseDirectIngestConfig({ ...validInput(), DIRECT_INGEST_PERCENT: '100' })
     ).toMatchObject({ ok: true, config: { percent: 100 } });
   });
-
-  it('trims comma-separated user IDs and removes empty and duplicate values', () => {
-    const result = parseDirectIngestConfig({
-      ...validInput(),
-      DIRECT_INGEST_USER_IDS: ' user-a, user-b ,,user-a, ',
-    });
-
-    expect(result.ok && [...result.config.userIds]).toEqual(['user-a', 'user-b']);
-  });
-
-  it('fails closed when the user ID setting is missing', () => {
-    expect(parseDirectIngestConfig({ ...validInput(), DIRECT_INGEST_USER_IDS: undefined })).toEqual(
-      { ok: false, reason: 'invalid_user_ids' }
-    );
-  });
 });
 
 describe('selectDirectIngestUser', () => {
@@ -84,12 +68,6 @@ describe('selectDirectIngestUser', () => {
       reason: 'percentage',
       bucket: null,
     });
-  });
-
-  it('allows an allowlisted user at zero percent', async () => {
-    await expect(
-      selectDirectIngestUser(config({ percent: 0, userIds: new Set(['user-a']) }), 'user-a')
-    ).resolves.toEqual({ selected: true, reason: 'allowlist', bucket: null });
   });
 
   it('deterministically selects from the SHA-256 user bucket', async () => {

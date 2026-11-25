@@ -491,15 +491,18 @@ export class RefresherDO extends DurableObject<Env> {
   }
 
   private snapshotKey(): Promise<string> {
-    this.sealKey ??= this.storedKey(
-      SEAL_KEY_NAME,
-      () =>
-        this.db.select().from(schema.refresherKey).where(eq(schema.refresherKey.id, 1)).get()
-          ?.key ?? null,
-      () => {
-        this.db.delete(schema.refresherKey).where(eq(schema.refresherKey.id, 1)).run();
-      }
-    );
+    if (this.sealKey === null) {
+      const pending = loadOrCreateKey({
+        storage: this.ctx.storage,
+        name: SEAL_KEY_NAME,
+        schema: z.string().min(1),
+        create: createEncryptionKey,
+      });
+      this.sealKey = pending;
+      pending.catch(() => {
+        if (this.sealKey === pending) this.sealKey = null;
+      });
+    }
     return this.sealKey;
   }
 
@@ -518,26 +521,6 @@ export class RefresherDO extends DurableObject<Env> {
     const key = createEncryptionKey();
     this.db.insert(schema.webhookKey).values({ id: 1, key, createdAt: Date.now() }).run();
     return key;
-  }
-
-  /** One generated secret in KV storage; a failed load is not cached. */
-  private storedKey(
-    name: string,
-    legacy: () => string | null,
-    dropLegacy: () => void
-  ): Promise<string> {
-    const pending = loadOrCreateKey({
-      storage: this.ctx.storage,
-      name,
-      schema: z.string().min(1),
-      legacy,
-      dropLegacy,
-      create: createEncryptionKey,
-    });
-    pending.catch(() => {
-      if (this.sealKey === pending) this.sealKey = null;
-    });
-    return pending;
   }
 
   /** The schedule row; a new object's first refresh is due at once. */

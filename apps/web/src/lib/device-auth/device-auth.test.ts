@@ -8,6 +8,12 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
+import {
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+} from '@kilocode/worker-utils/kilo-token-policy';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   generateUserCode,
   generateDeviceCode,
@@ -50,6 +56,17 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
 });
 
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
+
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
+
+function tokenLifetimeSeconds(token: string | undefined): number {
+  const claims = token === undefined ? null : jwt.decode(token);
+  if (!claims || typeof claims === 'string') throw new Error('Expected JWT claims');
+  if (typeof claims.exp !== 'number' || typeof claims.iat !== 'number') {
+    throw new Error('Expected numeric issued-at and expiration claims');
+  }
+  return claims.exp - claims.iat;
+}
 
 /**
  * Remaining life of the oldest pending row in the retry-advisory test. Well
@@ -856,7 +873,7 @@ describe('Device Auth', () => {
       expect(result.userId).toBe(testUserId);
     });
 
-    test('supportsRefresh: false returns long-lived token only', async () => {
+    test('supportsRefresh: false returns a 30-day token only', async () => {
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
@@ -868,6 +885,17 @@ describe('Device Auth', () => {
       expect(result.token).toBeDefined();
       expect(result.refreshToken).toBeUndefined();
       expect(result.expiresIn).toBeUndefined();
+      expect(tokenLifetimeSeconds(result.token)).toBe(THIRTY_DAYS_SECONDS);
+    });
+
+    test('mints a 30-day token when the client does not state refresh support', async () => {
+      const { userCode, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode);
+
+      expect(result.refreshToken).toBeUndefined();
+      expect(tokenLifetimeSeconds(result.token)).toBe(THIRTY_DAYS_SECONDS);
     });
 
     test('returns denied for a blocked user (new path)', async () => {
@@ -1120,6 +1148,26 @@ describe('Device Auth', () => {
       expect(result.token).toBeDefined();
       expect(result.userId).toBe(testUserId);
       expect(result.userEmail).toBe(testUserEmail);
+    });
+
+    test('mints a 30-day token that remains eligible for credential exchange', async () => {
+      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      const result = await pollDeviceAuthRequest(pollSecret);
+      if (!result.token) throw new Error('Expected the poll to return a token');
+
+      expect(tokenLifetimeSeconds(result.token)).toBe(THIRTY_DAYS_SECONDS);
+      expect(mockedGenerateApiToken).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: testUserId }),
+        { deviceAuthRequestCode: pollSecret },
+        { expiresIn: THIRTY_DAYS_SECONDS }
+      );
+      const auth = await verifyKiloTokenForPolicy(result.token, NEXTAUTH_SECRET, {
+        audience: 'kilo-api',
+        mode: 'allow-legacy',
+      });
+      expect(isKiloCredentialExchangeEligible(auth, { legacy: 'five-year-api' })).toBe(true);
     });
 
     test('returns denied status for denied request', async () => {

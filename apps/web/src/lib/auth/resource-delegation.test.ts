@@ -108,6 +108,35 @@ test.each(['owner', 'member', 'admin', 'billing_manager'] as const)(
   }
 );
 
+test('rejects the retired html-deploy resource on both issuance routes', async () => {
+  const current = await user();
+  const organization = await organizationFor(current.id);
+  jest.mocked(getAuthorizedOrgContext).mockResolvedValue({
+    success: true,
+    data: {
+      user: { ...current, role: 'owner' },
+      organization,
+      access: { kind: 'member', role: 'owner' },
+    },
+  });
+  const request = () =>
+    new NextRequest('https://example.test/api/auth/resource-token', {
+      method: 'POST',
+      headers: { origin: 'https://example.test' },
+      body: JSON.stringify({ resource: 'html-deploy' }),
+    });
+  const responses = [
+    await personalResourcePost(request()),
+    await organizationResourcePost(request(), {
+      params: Promise.resolve({ id: organization.id }),
+    }),
+  ];
+  for (const response of responses) {
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Unsupported resource' });
+  }
+});
+
 afterEach(async () => {
   if (cleanups.length) {
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, cleanups));
@@ -341,6 +370,70 @@ describe('resource delegation authority', () => {
       isModern: false,
       deviceSessionId: session.id,
     });
+  });
+
+  test('accepts a device credential with the 30-day lifetime', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'thirty-day-lifetime-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 30 * 24 * 60 * 60 }
+    );
+
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      isModern: false,
+      deviceSessionId: session.id,
+    });
+  });
+
+  test.each([30 * 24 * 60 * 60, 157_680_000])(
+    'accepts a legacy API credential with a %i second lifetime',
+    async expiresIn => {
+      const current = await user();
+      const token = jwt.sign(
+        {
+          version: 3,
+          kiloUserId: current.id,
+          apiTokenPepper: current.api_token_pepper,
+          env: process.env.NODE_ENV,
+          deviceAuthRequestCode: 'ABC123',
+        },
+        secret,
+        { algorithm: 'HS256', expiresIn }
+      );
+
+      const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+
+      expect(authority).toMatchObject({ credentialKind: 'human-api', isModern: false });
+    }
+  );
+
+  test('mints a 30-day legacy control token by default when modern issuance is disabled', async () => {
+    shared.enabled = false;
+    const current = await user();
+    jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+      user: current,
+      authFailedResponse: null,
+    });
+    const result = await createControlTokenForRequest(current, 'cloud-agent-next', {
+      headers: new Headers(),
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims.aud).toBeUndefined();
+    expect(claims.exp! - claims.iat!).toBe(30 * 24 * 60 * 60);
   });
 
   test('rejects a device credential with an unapproved lifetime', async () => {

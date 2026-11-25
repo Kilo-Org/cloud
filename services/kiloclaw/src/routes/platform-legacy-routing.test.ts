@@ -20,8 +20,8 @@ import { platform, resolveInstanceDoKey } from './platform';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { getActivePersonalInstance, getInstanceByIdIncludingDestroyed } from '../db';
 
-const currentUserId = '199e2b19-aa40-488d-9442-9a18a620ba68';
-const legacyDoKey = 'oauth/google:117453785559478190551';
+const currentUserId = '22222222-2222-4222-8222-222222222222';
+const legacyDoKey = 'oauth/google:100000000000000000005';
 const legacySandboxId = sandboxIdFromUserId(legacyDoKey);
 
 function makeEnv() {

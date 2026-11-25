@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, randomBytes } from 'node:crypto';
 import { createDeviceSessionWithCredentials } from '@/lib/auth/device-sessions';
 import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
@@ -654,7 +654,11 @@ export async function consumeDeviceAuthByDeviceCode(
     mint: async ({ user, request }) => {
       if (!options?.supportsRefresh) {
         return {
-          token: generateApiToken(user, { deviceAuthRequestCode: request.code }),
+          token: generateApiToken(
+            user,
+            { deviceAuthRequestCode: request.code },
+            { expiresIn: TOKEN_EXPIRY.thirtyDays }
+          ),
           userId: user.id,
           userEmail: user.google_user_email,
         };
@@ -720,7 +724,11 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
     identity: eq(device_auth_requests.code, code),
     consumeGuard: isNotNull(device_auth_requests.kilo_user_id),
     mint: async ({ user, request }) => ({
-      token: generateApiToken(user, { deviceAuthRequestCode: request.code }),
+      token: generateApiToken(
+        user,
+        { deviceAuthRequestCode: request.code },
+        { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      ),
       userId: user.id,
       userEmail: user.google_user_email,
     }),

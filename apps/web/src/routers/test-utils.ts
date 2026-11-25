@@ -1,7 +1,7 @@
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { rootRouter } from '@/routers/root-router';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 
 const createCaller = createCallerFactory(rootRouter);
 
@@ -20,7 +20,9 @@ export async function createCallerForUser(
     // Presence of this clock is what marks a caller as mobile in production;
     // tests set it to exercise the control-plane read budget.
     controlPlaneStartedAt: opts?.controlPlaneStartedAt,
-    headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
+    headersList: new Headers({
+      Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+    }),
   });
 }
 
@@ -53,7 +55,9 @@ export async function createBearerCallerForUser(userId: string) {
     user,
     credential: 'human_bearer',
     authViaToken: true,
-    headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
+    headersList: new Headers({
+      Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+    }),
   });
 }
 
@@ -69,7 +73,7 @@ export async function createNativeCallerForUser(userId: string, deviceSessionId:
     credential: 'human_bearer',
     authViaToken: true,
     headersList: new Headers({
-      Authorization: `Bearer ${generateApiToken(user, { deviceSessionId })}`,
+      Authorization: `Bearer ${generateApiToken(user, { deviceSessionId }, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
     }),
   });
 }

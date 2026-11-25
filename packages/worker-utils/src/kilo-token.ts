@@ -12,6 +12,19 @@ import {
 } from './kilo-token-verification';
 
 export { KILO_TOKEN_VERSION };
+
+/** The longest lifetime any Kilo token may be minted with: 30 days. */
+export const KILO_TOKEN_MAX_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * Refuses to mint a token that would outlive the cap. Verification is not
+ * affected: tokens issued with a longer lifetime before the cap stay valid.
+ */
+export function assertKiloTokenLifetimeWithinCap(expiresInSeconds: number): void {
+  if (!(expiresInSeconds <= KILO_TOKEN_MAX_LIFETIME_SECONDS)) {
+    throw new Error('Kilo token lifetime exceeds the 30-day limit');
+  }
+}
 const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
@@ -92,6 +105,7 @@ export async function signKiloToken(params: {
   env?: string;
   extra?: SignKiloTokenExtra;
 }): Promise<{ token: string; expiresAt: string }> {
+  assertKiloTokenLifetimeWithinCap(params.expiresInSeconds);
   const now = Math.floor(Date.now() / 1000);
   const exp = now + params.expiresInSeconds;
 

@@ -572,7 +572,7 @@ describe('trigger environment selection routes', () => {
 
 describe('scheduled trigger invocation routes', () => {
   it('uses the decoded OAuth namespace and invokes without accepting configuration', async () => {
-    const oauthUserId = 'oauth/google:101043560986948156510';
+    const oauthUserId = 'oauth/google:100000000000000000003';
     const { env, idFromName, invokeScheduled } = createRouteHarness(null);
 
     const response = await api.request(

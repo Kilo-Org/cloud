@@ -17,17 +17,6 @@ export const bundle = sqliteTable('bundle', {
   ciphertext: text('ciphertext').notNull(),
 });
 
-/**
- * Legacy: an earlier revision kept the seal and ETag keys here. `BundleDO` moves a row it finds to
- * KV storage once and deletes it; nothing writes this table, so no SQL statement binds a key.
- */
-export const bundleKey = sqliteTable('bundle_key', {
-  id: integer('id').primaryKey(),
-  sealKey: text('seal_key').notNull(),
-  etagKey: text('etag_key').notNull(),
-  createdAt: integer('created_at').notNull(),
-});
-
 /** Revalidations that returned 304, counted per UTC minute (`YYYY-MM-DDTHH:MM`). */
 export const deliveryCounter = sqliteTable('delivery_counter', {
   minute: text('minute').primaryKey(),

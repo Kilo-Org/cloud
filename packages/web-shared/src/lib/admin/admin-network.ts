@@ -30,7 +30,10 @@ type AdminNetworkConfig =
   | { kind: 'not-configured' }
   | { kind: 'invalid-config'; message: string };
 
-type ConfigProblem = 'not-configured' | 'invalid-config' | 'all-addresses' | 'outside-vercel';
+type ConfigProblem = 'not-configured' | 'invalid-config' | 'broad-range' | 'outside-vercel';
+
+/** Any configured range broader than these prefixes is reported as an error. */
+const BROAD_RANGE_MAX_PREFIX = { ipv4: 8, ipv6: 32 } as const;
 
 let memoizedConfig: AdminNetworkConfig | undefined;
 const reportedConfigProblems = new Set<ConfigProblem>();
@@ -56,10 +59,14 @@ function loadConfig(): AdminNetworkConfig {
       allowlist.addSubnet(entry.address, entry.prefix, entry.family);
     }
   }
-  if (parsed.entries.some(entry => entry.prefix === 0)) {
+  if (
+    parsed.entries.some(
+      entry => entry.prefix !== null && entry.prefix < BROAD_RANGE_MAX_PREFIX[entry.family]
+    )
+  ) {
     reportConfigProblem(
-      'all-addresses',
-      'an all-addresses range is configured, so the admin network check admits every address'
+      'broad-range',
+      'a range broader than /8 (IPv4) or /32 (IPv6) is configured, so the admin network check admits a very large address space'
     );
   }
   return { kind: 'configured', allowlist };

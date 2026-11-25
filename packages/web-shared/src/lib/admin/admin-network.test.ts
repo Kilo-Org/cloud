@@ -171,34 +171,39 @@ describe('adminNetworkDecision', () => {
     ['0.0.0.0/0', 'denied'],
     ['::/0', 'allowed'],
     ['203.0.113.7,0.0.0.0/0,::/0', 'allowed'],
-  ] as const)(
-    'reports an all-addresses list %j once without echoing it',
-    (networks, ipv6Outcome) => {
+    ['0.0.0.0/1', 'denied'],
+    ['::/1', 'allowed'],
+    ['10.0.0.0/7', 'denied'],
+  ] as const)('reports a broad list %j once without echoing it', (networks, ipv6Outcome) => {
+    onVercel(networks);
+
+    expect(adminNetworkDecision(fromAddress('2001:db8::1'))).toMatchObject({
+      kind: ipv6Outcome,
+    });
+    adminNetworkDecision(fromAddress('198.51.100.1'));
+
+    const messages = reportedMessages();
+    expect(messages).toEqual([expect.stringContaining('broad-range')]);
+    expect(messages[0]).not.toContain('0.0.0.0');
+    expect(messages[0]).not.toContain('10.0.0.0');
+    expect(messages[0]).not.toContain('::/');
+    expect(messages[0]).not.toContain('203.0.113.7');
+    expect(mockCaptureMessage).toHaveBeenCalledWith(expect.any(String), {
+      level: 'error',
+      tags: { source: 'admin_network' },
+    });
+  });
+
+  test.each(['203.0.113.0/24,2001:db8::/32', '192.0.2.0/24', '2001:db8::/32', '10.0.0.0/8'])(
+    'does not report %j, which is no broader than /8 or /32',
+    networks => {
       onVercel(networks);
 
-      expect(adminNetworkDecision(fromAddress('2001:db8::1'))).toMatchObject({
-        kind: ipv6Outcome,
-      });
-      adminNetworkDecision(fromAddress('198.51.100.1'));
+      adminNetworkDecision(fromAddress('203.0.113.7'));
 
-      const messages = reportedMessages();
-      expect(messages).toEqual([expect.stringContaining('all-addresses range is configured')]);
-      expect(messages[0]).not.toContain('0.0.0.0');
-      expect(messages[0]).not.toContain('203.0.113.7');
-      expect(mockCaptureMessage).toHaveBeenCalledWith(expect.any(String), {
-        level: 'error',
-        tags: { source: 'admin_network' },
-      });
+      expect(reportedMessages()).toEqual([]);
     }
   );
-
-  test('does not report a list without an all-addresses range', () => {
-    onVercel('203.0.113.0/24,2001:db8::/32');
-
-    adminNetworkDecision(fromAddress('203.0.113.7'));
-
-    expect(reportedMessages()).toEqual([]);
-  });
 });
 
 describe('adminNetworkRefusal', () => {

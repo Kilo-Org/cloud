@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { rootRouter } from './root-router';
+import { appShellProceduresRouter } from './app-shell-procedures-router';
 import {
   ADMIN_AREA_POLICIES,
   ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
@@ -322,6 +323,27 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
 
     expect(uncovered).toEqual([]);
     expect(staleExclusions).toEqual([]);
+  });
+
+  test('the app-shell router mounts only reviewed admin procedures', () => {
+    // `/app-shell/api/trpc` is outside the admin edge rule, which must not
+    // match it: the shell batches org owners' calls, so an edge match would
+    // refuse whole batches for non-admins. Admin procedures mounted there rely
+    // on the in-app network check alone.
+    const appShellAdminExceptions: Record<string, string> = {
+      'organizations.sso.generateAdminPortalLink':
+        'the app-shell mount is outside the edge rule; adminGuardFn still refuses ' +
+        'off-network admins in the app',
+    };
+    const appShellProcedures = appShellProceduresRouter._def.procedures as Record<
+      string,
+      ProcedureDef
+    >;
+    const appShellAdminPaths = Object.entries(appShellProcedures)
+      .filter(([, def]) => privilegedGuardTiers(def?._def?.middlewares ?? []).includes('admin'))
+      .map(([procedurePath]) => procedurePath);
+
+    expect(appShellAdminPaths.sort()).toEqual(Object.keys(appShellAdminExceptions).sort());
   });
 
   test('every admin edge namespace and exact name still names mounted procedures', () => {

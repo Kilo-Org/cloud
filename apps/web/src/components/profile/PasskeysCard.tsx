@@ -1,9 +1,8 @@
 'use client';
 
 import { KeyRound, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
-import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
-import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
+import React, { useEffect, useState } from 'react';
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 
@@ -20,99 +19,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
-import { StepUpSignInAgainButton } from '@/components/admin/step-up/StepUpSignInAgainButton';
-
-/** The one route that mints registration options and verifies the attestation. */
-const REGISTER_ROUTE = '/api/auth/passkey/register';
-
-/** What a refused enrollment asks the user to do: sign in again on this browser. */
-const REAUTH_REQUIRED_MESSAGE =
-  'Sign in again before adding a passkey. Signing out signs you out of every browser.';
-
-/**
- * Why a passkey creation attempt did not add a row.
- *
- * - `cancelled`: the user dismissed the creation sheet. Nothing was stored, and
- *   a fresh attempt is a new ceremony rather than a retry of this one.
- * - `failed`: the request or the verification failed. Nothing was stored, and
- *   the "Add a passkey" control is a working retry.
- * - `reauth_required`: the enrollment needs a fresh sign-in or a live step-up
- *   proof. Retrying the same session cannot succeed.
- */
-export type PasskeyRegistrationFailure = 'cancelled' | 'failed' | 'reauth_required';
-
-export class PasskeyRegistrationError extends Error {
-  readonly failure: PasskeyRegistrationFailure;
-
-  constructor(failure: PasskeyRegistrationFailure) {
-    super(failure);
-    this.name = 'PasskeyRegistrationError';
-    this.failure = failure;
-  }
-}
-
-/**
- * Register a passkey for the signed-in user: mint options server-side, run the
- * browser ceremony, then let the server verify the attestation against the
- * challenge it stored. The row only exists once the server has accepted it.
- *
- * Exported without React state so the sequence, and every refusal it can map,
- * is unit-testable outside a browser.
- */
-export async function registerNewPasskey(): Promise<void> {
-  try {
-    const optionsResponse = await fetch(REGISTER_ROUTE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'options' }),
-    });
-    if (!optionsResponse.ok) {
-      const body = (await optionsResponse.json().catch(() => ({}))) as { error?: unknown };
-      if (optionsResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
-        throw new PasskeyRegistrationError('reauth_required');
-      }
-      throw new PasskeyRegistrationError('failed');
-    }
-
-    const body = (await optionsResponse.json()) as { challengeId?: unknown; options?: unknown };
-    if (typeof body.challengeId !== 'string' || !body.options) {
-      throw new PasskeyRegistrationError('failed');
-    }
-
-    let attestation: Awaited<ReturnType<typeof startRegistration>>;
-    try {
-      attestation = await startRegistration({
-        optionsJSON: body.options as PublicKeyCredentialCreationOptionsJSON,
-      });
-    } catch {
-      // The sheet was dismissed, timed out, or the platform refused. No row was
-      // written, so there is no half-added passkey to clean up.
-      throw new PasskeyRegistrationError('cancelled');
-    }
-
-    const verifyResponse = await fetch(REGISTER_ROUTE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'verify',
-        challengeId: body.challengeId,
-        response: attestation,
-      }),
-    });
-    if (!verifyResponse.ok) {
-      const body = (await verifyResponse.json().catch(() => ({}))) as { error?: unknown };
-      if (verifyResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
-        throw new PasskeyRegistrationError('reauth_required');
-      }
-      throw new PasskeyRegistrationError('failed');
-    }
-  } catch (error) {
-    if (error instanceof PasskeyRegistrationError) {
-      throw error;
-    }
-    throw new PasskeyRegistrationError('failed');
-  }
-}
+import {
+  PasskeyEnrollmentSteps,
+  usePasskeyEnrollment,
+} from '@/components/profile/PasskeyEnrollment';
 
 export type PasskeySummary = {
   id: string;
@@ -154,8 +64,7 @@ export function PasskeysCard() {
     setCanCreatePasskeys(browserSupportsWebAuthn());
   }, []);
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [addFailure, setAddFailure] = useState<PasskeyRegistrationFailure | null>(null);
+  const enrollment = usePasskeyEnrollment(() => passkeysQuery.refetch());
   const [removeFailure, setRemoveFailure] = useState<string | null>(null);
   const [renameFailure, setRenameFailure] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<PasskeySummary | null>(null);
@@ -193,35 +102,16 @@ export function PasskeysCard() {
     })
   );
 
-  const handleAddPasskey = useCallback(async () => {
-    if (isAdding) return;
-    setIsAdding(true);
-    setAddFailure(null);
-    try {
-      await registerNewPasskey();
-      await passkeysQuery.refetch();
-    } catch (error) {
-      setAddFailure(error instanceof PasskeyRegistrationError ? error.failure : 'failed');
-    } finally {
-      setIsAdding(false);
-    }
-  }, [isAdding, passkeysQuery]);
-
   const addControl = canCreatePasskeys ? (
-    <Button variant="outline" onClick={() => void handleAddPasskey()} disabled={isAdding}>
+    <Button
+      variant="outline"
+      onClick={enrollment.start}
+      disabled={enrollment.phase.step !== 'idle'}
+    >
       <Plus className="mr-2 h-4 w-4" />
-      {isAdding ? 'Waiting for your passkey…' : 'Add a passkey'}
+      Add a passkey
     </Button>
   ) : null;
-
-  const addFailureMessage =
-    addFailure === 'failed'
-      ? 'Could not add a passkey. Try again.'
-      : addFailure === 'cancelled'
-        ? 'Passkey creation was cancelled. No passkey was added.'
-        : addFailure === 'reauth_required'
-          ? REAUTH_REQUIRED_MESSAGE
-          : null;
 
   return (
     <Card className="h-full w-full rounded-xl shadow-sm">
@@ -335,14 +225,6 @@ export function PasskeysCard() {
             </p>
           )}
 
-          {addFailureMessage && (
-            <p role="alert" className="text-muted-foreground text-sm leading-relaxed">
-              {addFailureMessage}
-            </p>
-          )}
-
-          {addFailure === 'reauth_required' ? <StepUpSignInAgainButton /> : null}
-
           {removeFailure && (
             <p role="alert" className="text-muted-foreground text-sm leading-relaxed">
               {removeFailure}
@@ -418,6 +300,18 @@ export function PasskeysCard() {
               {removeMutation.isPending ? 'Removing…' : 'Yes, remove passkey'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={enrollment.phase.step !== 'idle'}
+        onOpenChange={open => !open && enrollment.cancel()}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a passkey</DialogTitle>
+          </DialogHeader>
+          <PasskeyEnrollmentSteps enrollment={enrollment} Description={DialogDescription} />
         </DialogContent>
       </Dialog>
     </Card>

@@ -229,7 +229,7 @@ describe('worker config rules', () => {
     const fly = PolicySchema.parse({
       workload: 'consumer',
       environments: ALL_ENVIRONMENTS,
-      identity: { kind: 'fly-oidc', org: 'kilo', app: 'consumer' },
+      identity: { kind: 'fly-oidc', org: 'kilo', orgId: '10', app: 'consumer', appId: '20' },
       secrets: [],
     });
     expect(workerConfigProblems([config], [])).toEqual([

@@ -3,6 +3,7 @@ import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
 import { SecretUnavailableError } from '@kilocode/secrets-client';
 import { withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
+import { pageOperator } from '../page';
 import {
   ArchiveConflictError,
   archiveObjectKey,
@@ -19,7 +20,7 @@ import { getRegistryDOStub } from './RegistryDO';
 export type StreamHead = { seq: number; hash: string };
 
 const GAP_RETRY_SECONDS = 30;
-const FAILURE_RETRY_SECONDS = 60;
+const ARCHIVE_RETRY_SECONDS = 60;
 /**
  * A gap pages once it has turned away this many batches AND persisted this long. Both must hold:
  * consumer concurrency routinely delivers a burst of later batches before the next one, which
@@ -29,8 +30,22 @@ const FAILURE_RETRY_SECONDS = 60;
 export const GAP_PAGE_ATTEMPTS = 10;
 export const GAP_PAGE_AFTER_MS = 5 * 60 * 1000;
 
+/** Owed hot-copy rows one alarm delivers before it re-arms; each is one R2 GET and one POST. */
+export const HOT_COPY_ROWS_PER_ALARM = 50;
+/** Alarm backoff after a failed delivery: 30 s doubling, with jitter, capped at 15 minutes. */
+export const HOT_COPY_BACKOFF_BASE_MS = 30_000;
+export const HOT_COPY_BACKOFF_CAP_MS = 15 * 60 * 1000;
+/** The safety-net alarm a commit arms, for a pending row whose inline ingest never finished. */
+export const PENDING_ROW_ALARM_MS = 5 * 60 * 1000;
+/** A failure that still owes a row older than this pages a second time, once. */
+export const OWED_ROW_PAGE_AGE_MS = 6 * 60 * 60 * 1000;
+/** Dead letters of one stream page at most once per this window. */
+export const DEAD_LETTER_PAGE_INTERVAL_MS = 60 * 60 * 1000;
+
 const HEAD_KEY = 'head';
 const GAP_KEY = 'gap';
+const HOT_STATE_KEY = 'hot_state';
+const DEAD_LETTER_PAGED_KEY = 'dead_letter_paged_at';
 const HOT_COPY_PREFIX = 'hot_copy:';
 
 /**
@@ -44,19 +59,28 @@ function hotCopyKey(toSeq: number): string {
   return `${HOT_COPY_PREFIX}${String(toSeq).padStart(12, '0')}`;
 }
 
-export type StreamRetryReason = 'gap' | 'archive' | 'axiom' | 'secrets';
-
 export type HotCopyFailureReason =
   | 'axiom_rejected'
   | 'axiom_unavailable'
   | 'secrets_denied'
-  | 'secrets_unavailable';
+  | 'secrets_unavailable'
+  | 'archive_unreadable'
+  | 'archive_unavailable';
+
+/**
+ * A reason that belongs to one row (Axiom refused that payload, or its archive object does not
+ * decode) rather than to the whole hot copy. Delivery continues past such a row; every other
+ * reason stops the alarm and sends new batches straight to the alarm until it clears.
+ */
+function rowSpecific(reason: HotCopyFailureReason): boolean {
+  return reason === 'axiom_rejected' || reason === 'archive_unreadable';
+}
 
 /**
  * One archived range whose Axiom delivery is owed. `pending` is written in the same storage write
- * as the head advance, before the ingest is attempted; a failure replaces it with a concrete
- * reason. Either state means the replay job (or a redelivered batch) re-ingests the range from the
- * archive. Rows are the archived ranges themselves, so they never overlap.
+ * as the head advance, before the ingest is attempted; a failure replaces it with the concrete
+ * reason. The StreamDO alarm delivers every row from the archive and deletes it. Rows are the
+ * archived ranges themselves, so they never overlap.
  */
 export type HotStoreGap = {
   stream: string;
@@ -67,12 +91,22 @@ export type HotStoreGap = {
 };
 
 /**
- * One batch's fate. `accepted` means archived and delivered to Axiom; `duplicate` means the batch
- * was already archived (`replayed` says an owed hot-copy range was re-ingested); `retry` asks the
- * queue for another attempt; `gap_stalled` is a gap retry that also pages, once per gap;
- * `hot_gap` means archived but the hot copy is deferred to a replay job; `dropped` is a
- * non-retryable failure that lost the batch entirely; `duplicate_mismatch` is a batch at or below
- * the head that disagrees with the archive and is paged and acked unused.
+ * The hot copy's health for the stream. `alert` is the failure reason last paged, cleared (with a
+ * recovery page) once the alarm has delivered every owed row; `attempts` drives the alarm backoff.
+ */
+type HotCopyState = {
+  stream: string;
+  attempts: number;
+  alert: { reason: HotCopyFailureReason; since: string; agePaged: boolean } | null;
+};
+
+/**
+ * One batch's fate. `accepted` means archived; `hotCopy` says whether Axiom has it yet or the
+ * alarm owes it. `duplicate` means the batch was already archived and agrees with the archive;
+ * `retry` asks the queue for another attempt (a gap, or an archive write that failed);
+ * `gap_stalled` is a gap retry that also pages, once per gap; `dropped` is an archive conflict
+ * that lost the batch entirely; `duplicate_mismatch` is a batch at or below the head that
+ * disagrees with the archive and is paged and acked unused.
  */
 export type StreamOutcome =
   | {
@@ -82,21 +116,15 @@ export type StreamOutcome =
       toSeq: number;
       hash: string;
       archive: 'written' | 'existing';
+      hotCopy: 'delivered' | 'owed';
     }
-  | { kind: 'duplicate'; stream: string; toSeq: number; headSeq: number; replayed: boolean }
+  | { kind: 'duplicate'; stream: string; toSeq: number; headSeq: number }
   | {
       kind: 'retry';
       stream: string;
       fromSeq: number;
-      reason: StreamRetryReason;
+      reason: 'gap' | 'archive';
       delaySeconds: number;
-    }
-  | {
-      kind: 'hot_gap';
-      stream: string;
-      fromSeq: number;
-      toSeq: number;
-      reason: HotCopyFailureReason;
     }
   | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' }
   | {
@@ -123,30 +151,60 @@ export type StreamOutcome =
  */
 export type DuplicateMismatchReason = 'content' | 'unaligned' | 'corrupt';
 
-type HotCopyResult =
-  | { kind: 'delivered' }
-  | Extract<StreamOutcome, { kind: 'retry' } | { kind: 'hot_gap' }>;
+type Delivery = { kind: 'delivered' } | { kind: 'failed'; reason: HotCopyFailureReason };
 
 /**
  * The single writer for one audit stream: it owns the chain head, the archive object for the
  * batch, and the Axiom ingest, in that order. Queues deliver at least once and in no fixed order,
  * so every step is idempotent by chain hash and replayable by sequence range.
  *
- * The archive is the evidence store, so the head advances as soon as the object is stored. Axiom
- * is the hot copy: the head advance and the intent to deliver that range land in one storage
- * write, so an eviction can never leave an advanced head with a range nobody recorded as owed.
+ * The archive is the evidence store: the head advances, and the message is acked, as soon as the
+ * object is stored. Axiom is the hot copy and never holds a message: the head and the row that
+ * owes the range to Axiom land in one storage write, the batch tries the ingest once, and a
+ * failure leaves the row to the alarm, which retries with backoff and pages once per failure.
  */
 export class StreamDO extends DurableObject<Env> {
-  // Serialises the batches addressed to this stream inside the instance: R2 and fetch awaits open
-  // the input gate, so without it two batches could both read the same head. The head in storage
-  // is what a fresh instance reads, so eviction only ever replays an idempotent attempt.
+  // Serialises batches and alarm runs inside the instance: R2 and fetch awaits open the input
+  // gate, so without it two batches could read the same head, or the alarm could re-create a row
+  // a batch just delivered. A fresh instance reads storage, so eviction only replays idempotent work.
   private tail: Promise<unknown> = Promise.resolve();
 
   acceptBatch(batch: AuditBatch): Promise<StreamOutcome> {
-    const run = this.tail.then(
-      () => this.applyBatch(batch),
-      () => this.applyBatch(batch)
-    );
+    return this.serialised(() => this.applyBatch(batch));
+  }
+
+  async alarm(): Promise<void> {
+    await this.serialised(() => this.drainHotCopy());
+  }
+
+  /** Owed hot-copy rows, oldest first, for an operator. */
+  async hotStoreGaps(limit = 1000): Promise<HotStoreGap[]> {
+    const rows = await this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit });
+    return [...rows.values()];
+  }
+
+  /** Drops an owed row an operator has replayed or written off (an `axiom_rejected` payload). */
+  async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
+    const key = hotCopyKey(toSeq);
+    const row = await this.ctx.storage.get<HotStoreGap>(key);
+    if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
+  }
+
+  /** The archived head sequence; the DLQ consumer treats a batch at or below it as a no-op. */
+  async headSeq(): Promise<number> {
+    return (await this.readHead()).seq;
+  }
+
+  /** True at most once per `DEAD_LETTER_PAGE_INTERVAL_MS` for this stream. */
+  async claimDeadLetterPage(now: number = Date.now()): Promise<boolean> {
+    const last = await this.ctx.storage.get<number>(DEAD_LETTER_PAGED_KEY);
+    if (last !== undefined && now - last < DEAD_LETTER_PAGE_INTERVAL_MS) return false;
+    await this.ctx.storage.put(DEAD_LETTER_PAGED_KEY, now);
+    return true;
+  }
+
+  private serialised<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(work, work);
     this.tail = run.then(
       () => undefined,
       () => undefined
@@ -154,22 +212,9 @@ export class StreamDO extends DurableObject<Env> {
     return run;
   }
 
-  /** Ranges a replay job must re-ingest from the archive into Axiom, oldest first. */
-  async hotStoreGaps(limit = 1000): Promise<HotStoreGap[]> {
-    const rows = await this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit });
-    return [...rows.values()];
-  }
-
-  /** Marks a replayed range done; a later duplicate batch covering it also clears it. */
-  async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
-    const key = hotCopyKey(toSeq);
-    const row = await this.ctx.storage.get<HotStoreGap>(key);
-    if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
-  }
-
   private async applyBatch(batch: AuditBatch): Promise<StreamOutcome> {
     const head = await this.readHead();
-    if (batch.toSeq <= head.seq) return this.replayIfOwed(batch, head);
+    if (batch.toSeq <= head.seq) return this.checkDuplicate(batch, head);
     if (batch.fromSeq > head.seq + 1) return this.gapRetry(batch, head);
 
     const fromSeq = Math.max(batch.fromSeq, head.seq + 1);
@@ -203,7 +248,7 @@ export class StreamDO extends DurableObject<Env> {
         stream: trimmed.stream,
         fromSeq,
         reason: 'archive',
-        delaySeconds: FAILURE_RETRY_SECONDS,
+        delaySeconds: ARCHIVE_RETRY_SECONDS,
       };
     }
 
@@ -216,15 +261,30 @@ export class StreamDO extends DurableObject<Env> {
       reason: 'pending',
       recordedAt: new Date().toISOString(),
     };
-    // One write for the whole commit: the head and the promise to deliver this range to Axiom
-    // land together, so an eviction here is replayed instead of silently losing the range.
-    await this.ctx.storage.put<StreamHead | HotStoreGap>({
-      [HEAD_KEY]: { seq: trimmed.toSeq, hash },
-      [hotCopyKey(trimmed.toSeq)]: owed,
-    });
+    const [alarm, state] = await Promise.all([
+      this.ctx.storage.getAlarm(),
+      this.readHotState(trimmed.stream),
+    ]);
+    // One atomic write (no await between the calls): the head, the row that owes the range to
+    // Axiom, and, when nothing is scheduled, the alarm that delivers the row if this instance
+    // dies before the ingest below finishes.
+    const commit: Promise<unknown>[] = [
+      this.ctx.storage.put<StreamHead | HotStoreGap>({
+        [HEAD_KEY]: { seq: trimmed.toSeq, hash },
+        [hotCopyKey(trimmed.toSeq)]: owed,
+      }),
+    ];
+    if (alarm === null) commit.push(this.ctx.storage.setAlarm(Date.now() + PENDING_ROW_ALARM_MS));
+    await Promise.all(commit);
 
-    const hotCopy = await this.deliverHotCopy(trimmed, trimmed.events, [owed], [owed]);
-    if (hotCopy.kind !== 'delivered') return hotCopy;
+    // While the whole hot copy is failing, a batch leaves its row to the alarm's backoff instead
+    // of adding one more doomed call per batch.
+    let hotCopy: 'delivered' | 'owed' = 'owed';
+    if (!state.alert || rowSpecific(state.alert.reason)) {
+      const delivery = await this.deliverRow(owed, trimmed.events);
+      if (delivery.kind === 'delivered') hotCopy = 'delivered';
+      else await this.noteFailure(state, delivery.reason, [owed], false);
+    }
     return {
       kind: 'accepted',
       stream: trimmed.stream,
@@ -232,6 +292,7 @@ export class StreamDO extends DurableObject<Env> {
       toSeq: trimmed.toSeq,
       hash,
       archive,
+      hotCopy,
     };
   }
 
@@ -269,13 +330,11 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * A batch at or below the head was already archived. It must agree with the archive before
-   * anything else: a redelivery is byte-identical, so a difference is a forged or corrupted
-   * message and is paged, never replayed. If owed hot-copy rows overlap an agreeing batch, the
-   * redelivery is the second chance: ingest the events of those rows the message carries
-   * (at-least-once, deduped by event id) and clear the rows it fully covers.
+   * A batch at or below the head was already archived, and its hot copy, if still owed, belongs
+   * to the alarm. It must agree with the archive: a redelivery is byte-identical, so a difference
+   * is a forged or corrupted message and is paged.
    */
-  private async replayIfOwed(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
+  private async checkDuplicate(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
     let agreement: 'match' | DuplicateMismatchReason;
     try {
       agreement = await this.compareWithArchive(batch);
@@ -293,7 +352,7 @@ export class StreamDO extends DurableObject<Env> {
         stream: batch.stream,
         fromSeq: batch.fromSeq,
         reason: 'archive',
-        delaySeconds: FAILURE_RETRY_SECONDS,
+        delaySeconds: ARCHIVE_RETRY_SECONDS,
       };
     }
     if (agreement !== 'match') {
@@ -305,34 +364,7 @@ export class StreamDO extends DurableObject<Env> {
         reason: agreement,
       };
     }
-
-    const owed = await this.owedRowsWithin(batch);
-    if (owed.length === 0) {
-      return {
-        kind: 'duplicate',
-        stream: batch.stream,
-        toSeq: batch.toSeq,
-        headSeq: head.seq,
-        replayed: false,
-      };
-    }
-
-    const events = owed.flatMap(row =>
-      batch.events.slice(
-        Math.max(row.fromSeq, batch.fromSeq) - batch.fromSeq,
-        Math.min(row.toSeq, batch.toSeq) - batch.fromSeq + 1
-      )
-    );
-    const covered = owed.filter(row => row.fromSeq >= batch.fromSeq && row.toSeq <= batch.toSeq);
-    const hotCopy = await this.deliverHotCopy(batch, events, owed, covered);
-    if (hotCopy.kind !== 'delivered') return hotCopy;
-    return {
-      kind: 'duplicate',
-      stream: batch.stream,
-      toSeq: batch.toSeq,
-      headSeq: head.seq,
-      replayed: true,
-    };
+    return { kind: 'duplicate', stream: batch.stream, toSeq: batch.toSeq, headSeq: head.seq };
   }
 
   /**
@@ -364,46 +396,72 @@ export class StreamDO extends DurableObject<Env> {
     return canonicalJson(overlap) === canonicalJson(batch.events) ? 'match' : 'content';
   }
 
-  // Rows are disjoint archived ranges keyed by toSeq, so the ones overlapping the batch are the
-  // run that starts at the first key at or above `batch.fromSeq`.
-  private async owedRowsWithin(batch: AuditBatch): Promise<HotStoreGap[]> {
-    const rows = await this.ctx.storage.list<HotStoreGap>({
+  /**
+   * Delivers owed rows, oldest first, from their archive objects. A row-specific failure is
+   * stamped on the row and skipped; any other failure stops the run. Either re-arms the alarm
+   * with backoff; a clean run that emptied the rows clears the alert with a recovery page.
+   */
+  private async drainHotCopy(): Promise<void> {
+    const listed = await this.ctx.storage.list<HotStoreGap>({
       prefix: HOT_COPY_PREFIX,
-      start: hotCopyKey(batch.fromSeq),
-      limit: batch.events.length + 1,
+      limit: HOT_COPY_ROWS_PER_ALARM,
     });
-    return [...rows.values()].filter(row => row.fromSeq <= batch.toSeq);
+    const rows = [...listed.values()];
+    const oldest = rows[0];
+    if (!oldest) {
+      const stored = await this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY);
+      if (stored) await this.recovered(stored);
+      return;
+    }
+    const state = await this.readHotState(oldest.stream);
+
+    let failure: HotCopyFailureReason | null = null;
+    for (const row of rows) {
+      const delivery = await this.deliverFromArchive(row);
+      if (delivery.kind === 'delivered') continue;
+      await this.stampRows([row], delivery.reason);
+      if (failure === null || !rowSpecific(delivery.reason)) failure = delivery.reason;
+      if (!rowSpecific(delivery.reason)) break;
+    }
+
+    if (failure !== null) {
+      await this.noteFailure(state, failure, [], true, oldest);
+      return;
+    }
+    if (rows.length === HOT_COPY_ROWS_PER_ALARM) {
+      await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts: 0 });
+      await this.ctx.storage.setAlarm(Date.now());
+      return;
+    }
+    await this.recovered(state);
   }
 
-  /**
-   * Ingests `events` and settles the owed rows they belong to: success deletes `cleared`, a
-   * failure stamps every row in `owed` with the concrete reason so the replay job knows why.
-   */
-  private async deliverHotCopy(
-    batch: AuditBatch,
-    events: AuditEvent[],
-    owed: HotStoreGap[],
-    cleared: HotStoreGap[]
-  ): Promise<HotCopyResult> {
-    const range = { stream: batch.stream, fromSeq: batch.fromSeq, toSeq: batch.toSeq };
+  private async deliverFromArchive(row: HotStoreGap): Promise<Delivery> {
+    let events: AuditEvent[];
+    try {
+      const read = await readArchivedObject(
+        this.env.AUDIT_ARCHIVE,
+        archiveObjectKey(row.stream, row.toSeq)
+      );
+      if (read.kind !== 'ok' || read.object.batch.fromSeq !== row.fromSeq) {
+        return { kind: 'failed', reason: 'archive_unreadable' };
+      }
+      events = read.object.batch.events;
+    } catch {
+      return { kind: 'failed', reason: 'archive_unavailable' };
+    }
+    return this.deliverRow(row, events);
+  }
 
+  /** One Axiom ingest of a row's events; success deletes the row. */
+  private async deliverRow(row: HotStoreGap, events: AuditEvent[]): Promise<Delivery> {
     let token: string;
     try {
       token = await secretsFor(this.env).get('AUDIT_RELAY_AXIOM_TOKEN', this.ctx);
     } catch (error) {
       const denied = error instanceof SecretUnavailableError && !error.retryable;
-      const reason: HotCopyFailureReason = denied ? 'secrets_denied' : 'secrets_unavailable';
-      await this.stampHotCopyRows(owed, reason);
-      if (denied) return { kind: 'hot_gap', ...range, reason };
-      return {
-        kind: 'retry',
-        stream: batch.stream,
-        fromSeq: batch.fromSeq,
-        reason: 'secrets',
-        delaySeconds: FAILURE_RETRY_SECONDS,
-      };
+      return { kind: 'failed', reason: denied ? 'secrets_denied' : 'secrets_unavailable' };
     }
-
     const ingest = await ingestAuditEvents(
       { url: this.env.AXIOM_URL, dataset: this.env.AXIOM_DATASET, token },
       events,
@@ -411,30 +469,95 @@ export class StreamDO extends DurableObject<Env> {
     );
     switch (ingest.kind) {
       case 'ok':
-        if (cleared.length > 0) {
-          await this.ctx.storage.delete(cleared.map(row => hotCopyKey(row.toSeq)));
-        }
+        await this.ctx.storage.delete(hotCopyKey(row.toSeq));
         return { kind: 'delivered' };
       case 'retryable':
-        await this.stampHotCopyRows(owed, 'axiom_unavailable');
-        return {
-          kind: 'retry',
-          stream: batch.stream,
-          fromSeq: batch.fromSeq,
-          reason: 'axiom',
-          delaySeconds: FAILURE_RETRY_SECONDS,
-        };
+        return { kind: 'failed', reason: 'axiom_unavailable' };
       case 'rejected':
-        await this.stampHotCopyRows(owed, 'axiom_rejected');
-        return { kind: 'hot_gap', ...range, reason: 'axiom_rejected' };
+        return { kind: 'failed', reason: 'axiom_rejected' };
     }
   }
 
-  private async stampHotCopyRows(rows: HotStoreGap[], reason: HotCopyFailureReason): Promise<void> {
+  /**
+   * Records a failure: stamps `rows`, pages once per reason (and once more when a row has been
+   * owed past `OWED_ROW_PAGE_AGE_MS`), and makes sure an alarm is due. A failed alarm run
+   * (`fromAlarm`) advances the backoff and re-arms; a failed batch only arms an absent alarm.
+   */
+  private async noteFailure(
+    state: HotCopyState,
+    reason: HotCopyFailureReason,
+    rows: HotStoreGap[],
+    fromAlarm: boolean,
+    oldest?: HotStoreGap
+  ): Promise<void> {
+    await this.stampRows(rows, reason);
+    const now = Date.now();
+    const attempts = fromAlarm ? state.attempts + 1 : state.attempts;
+    let alert = state.alert;
+    let page: string | null = null;
+    if (alert?.reason !== reason) {
+      alert = { reason, since: new Date(now).toISOString(), agePaged: false };
+      page = `audit stream ${state.stream}: the Axiom hot copy is failing (${reason}); every batch is still archived and the stream retries the hot copy with backoff`;
+    } else if (
+      !alert.agePaged &&
+      oldest &&
+      now - Date.parse(oldest.recordedAt) >= OWED_ROW_PAGE_AGE_MS
+    ) {
+      alert = { ...alert, agePaged: true };
+      page = `audit stream ${state.stream}: the Axiom hot copy still owes seq ${oldest.fromSeq}.. since ${oldest.recordedAt} (${reason})`;
+    }
+    await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts, alert });
+    if (fromAlarm || (await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(now + backoffMs(Math.max(attempts, 1)));
+    }
+    console.error(
+      JSON.stringify({
+        event: 'audit_relay.hot_copy_failed',
+        stream: state.stream,
+        reason,
+        attempts,
+        paged: page !== null,
+      })
+    );
+    if (page) await pageOperator(this.env, page, this.ctx);
+  }
+
+  private async recovered(state: HotCopyState): Promise<void> {
+    await this.ctx.storage.delete(HOT_STATE_KEY);
+    if (!state.alert) return;
+    console.log(
+      JSON.stringify({
+        event: 'audit_relay.hot_copy_recovered',
+        stream: state.stream,
+        reason: state.alert.reason,
+      })
+    );
+    await pageOperator(
+      this.env,
+      `audit stream ${state.stream}: the Axiom hot copy recovered from ${state.alert.reason} (failing since ${state.alert.since}); every owed row is delivered`,
+      this.ctx
+    );
+  }
+
+  // Get-then-put with no other I/O between: storage awaits keep the input gate closed, so a row
+  // deleted by a delivery is never re-created here.
+  private async stampRows(rows: HotStoreGap[], reason: HotCopyFailureReason): Promise<void> {
     const recordedAt = new Date().toISOString();
-    const entries: Record<string, HotStoreGap> = {};
-    for (const row of rows) entries[hotCopyKey(row.toSeq)] = { ...row, reason, recordedAt };
-    await this.ctx.storage.put(entries);
+    for (const row of rows) {
+      const key = hotCopyKey(row.toSeq);
+      const stored = await this.ctx.storage.get<HotStoreGap>(key);
+      if (stored) await this.ctx.storage.put<HotStoreGap>(key, { ...stored, reason, recordedAt });
+    }
+  }
+
+  private async readHotState(stream: string): Promise<HotCopyState> {
+    return (
+      (await this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY)) ?? {
+        stream,
+        attempts: 0,
+        alert: null,
+      }
+    );
   }
 
   private async readHead(): Promise<StreamHead> {
@@ -462,6 +585,12 @@ export class StreamDO extends DurableObject<Env> {
       );
     }
   }
+}
+
+/** 30 s, 60 s, 120 s … capped at 15 minutes, each scaled by a jitter in [0.5, 1). */
+export function backoffMs(attempts: number): number {
+  const exponential = HOT_COPY_BACKOFF_BASE_MS * 2 ** Math.min(attempts - 1, 20);
+  return Math.round(Math.min(HOT_COPY_BACKOFF_CAP_MS, exponential) * (0.5 + Math.random() * 0.5));
 }
 
 export function getStreamDOStub(

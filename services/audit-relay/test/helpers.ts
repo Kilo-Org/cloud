@@ -1,5 +1,6 @@
 import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
 import { env as bindings } from 'cloudflare:workers';
+import { z } from 'zod';
 import type { Env } from '../src/env';
 import { archiveObjectKey, readArchivedObject, type ArchivedBatch } from '../src/relay/archive';
 
@@ -83,4 +84,26 @@ export async function listObjectKeys(prefix: string): Promise<string[]> {
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
   return keys;
+}
+
+/** The paging webhook the test config's local secrets name. */
+export const SLACK_WEBHOOK = 'https://hooks.slack.test/audit-relay';
+
+const PageSchema = z.object({ text: z.string() });
+const IngestSchema = z.array(z.object({ id: z.string() }));
+
+/** The text of every page posted, in order. */
+export function pageTexts(requests: CapturedRequest[]): string[] {
+  return requests
+    .filter(request => request.url === SLACK_WEBHOOK)
+    .map(request => PageSchema.parse(JSON.parse(request.body ?? '{}')).text);
+}
+
+export function axiomRequests(requests: CapturedRequest[]): CapturedRequest[] {
+  return requests.filter(request => request.url.startsWith('https://api.axiom.co/'));
+}
+
+/** The event ids one Axiom ingest request carried. */
+export function eventIds(request: CapturedRequest): string[] {
+  return IngestSchema.parse(JSON.parse(request.body ?? '[]')).map(event => event.id);
 }

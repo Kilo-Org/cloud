@@ -1,14 +1,18 @@
-import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
+import { abortAllDurableObjects, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
 import { archiveObjectKey, writeArchivedBatch } from '../src/relay/archive';
 import { GENESIS_HASH, chainHash } from '../src/relay/chain';
 import {
+  SLACK_WEBHOOK,
   auditBatch,
   axiomOk,
+  axiomRequests,
   env,
+  eventIds,
   listObjectKeys,
+  pageTexts,
   readArchived,
   recordingFetch,
   requestBodyOf,
@@ -81,13 +85,13 @@ describe('StreamDO', () => {
   it('reports a duplicate whose content differs from the archive and never replays it', async () => {
     const stream = uniqueStream('duplicate-forged');
     let reject = true;
-    const http = recordingFetch(() =>
-      reject ? new Response('invalid', { status: 400 }) : axiomOk()
+    const http = recordingFetch(request =>
+      reject && request.url !== SLACK_WEBHOOK ? new Response('invalid', { status: 400 }) : axiomOk()
     );
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
     const batch = auditBatch(1, 2, stream);
-    expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'hot_gap' });
+    expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'accepted', hotCopy: 'owed' });
     reject = false;
 
     const forged = auditBatch(1, 2, stream);
@@ -103,7 +107,7 @@ describe('StreamDO', () => {
       kind: 'duplicate_mismatch',
       reason: 'content',
     });
-    expect(http.requests).toHaveLength(1);
+    expect(axiomRequests(http.requests)).toHaveLength(1);
     expect(await stub.hotStoreGaps()).toHaveLength(1);
   });
 
@@ -196,106 +200,106 @@ describe('StreamDO', () => {
     expect(requestBodyOf(http.requests[1])).toHaveLength(2);
   });
 
-  it('retries an Axiom failure without writing the archive object twice', async () => {
-    const stream = uniqueStream('axiom-retry');
+  it('acks an archived batch during an Axiom outage and delivers it from the alarm', async () => {
+    const stream = uniqueStream('axiom-outage');
     let failing = true;
-    const http = recordingFetch(() =>
-      failing ? new Response('unavailable', { status: 503 }) : axiomOk()
-    );
+    const http = recordingFetch(request => {
+      if (request.url === SLACK_WEBHOOK) return axiomOk();
+      return failing ? new Response('unavailable', { status: 503 }) : axiomOk();
+    });
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
+    const first = auditBatch(1, 2, stream);
+    const second = auditBatch(3, 5, stream);
 
-    const batch = auditBatch(1, 2, stream);
-    const failed = await stub.acceptBatch(batch);
-    expect(failed).toMatchObject({ kind: 'retry', reason: 'axiom', delaySeconds: 60 });
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
-
-    failing = false;
-    // The head advanced with the archive write, so the retry is a duplicate that re-ingests the
-    // recorded hot-store gap instead of writing the archive object again.
-    expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'duplicate', replayed: true });
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
-    expect(http.requests).toHaveLength(2);
-    expect(await stub.hotStoreGaps()).toEqual([]);
-    expect(await readArchived(stream, 2)).toMatchObject({
-      prevHash: GENESIS_HASH,
-      batch: { fromSeq: 1, toSeq: 2 },
+    expect(await stub.acceptBatch(first)).toMatchObject({
+      kind: 'accepted',
+      archive: 'written',
+      hotCopy: 'owed',
     });
-  });
-
-  it('records a durable hot-store gap when Axiom rejects a batch', async () => {
-    const stream = uniqueStream('axiom-reject');
-    const http = recordingFetch(() => new Response('invalid', { status: 400 }));
-    vi.stubGlobal('fetch', http.impl);
-    const stub = getStreamDOStub(env, stream);
-
-    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
-      kind: 'hot_gap',
-      fromSeq: 1,
-      toSeq: 2,
-      reason: 'axiom_rejected',
-    });
-    expect(await stub.hotStoreGaps()).toEqual([
-      {
-        stream,
-        fromSeq: 1,
-        toSeq: 2,
-        reason: 'axiom_rejected',
-        recordedAt: expect.any(String),
-      },
+    // The whole hot copy is failing, so the next batch is archived without its own Axiom call.
+    expect(await stub.acceptBatch(second)).toMatchObject({ kind: 'accepted', hotCopy: 'owed' });
+    expect(axiomRequests(http.requests)).toHaveLength(1);
+    expect((await stub.hotStoreGaps()).map(row => [row.fromSeq, row.toSeq, row.reason])).toEqual([
+      [1, 2, 'axiom_unavailable'],
+      [3, 5, 'pending'],
     ]);
 
-    await stub.clearHotStoreGap(1, 2);
+    // Still down: one call, the run stops at the first row, and no second page.
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(axiomRequests(http.requests)).toHaveLength(2);
+    expect(await stub.hotStoreGaps()).toHaveLength(2);
+
+    failing = false;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(await stub.hotStoreGaps()).toEqual([]);
-  });
-
-  it('accepts and archives the next batch after a hot-store gap', async () => {
-    const stream = uniqueStream('axiom-reject-continue');
-    let rejectFirst = true;
-    const http = recordingFetch(() => {
-      if (!rejectFirst) return axiomOk();
-      rejectFirst = false;
-      return new Response('invalid', { status: 400 });
-    });
-    vi.stubGlobal('fetch', http.impl);
-    const stub = getStreamDOStub(env, stream);
-
-    const first = auditBatch(1, 2, stream);
-    expect(await stub.acceptBatch(first)).toMatchObject({
-      kind: 'hot_gap',
-    });
-    expect(await stub.acceptBatch(auditBatch(3, 5, stream))).toMatchObject({
-      kind: 'accepted',
-      fromSeq: 3,
-      toSeq: 5,
-    });
+    const delivered = axiomRequests(http.requests).slice(-2).map(eventIds);
+    expect(delivered).toEqual([first.events.map(e => e.id), second.events.map(e => e.id)]);
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);
-    expect((await stub.hotStoreGaps()).map(gap => [gap.fromSeq, gap.toSeq])).toEqual([[1, 2]]);
-
-    expect(await stub.acceptBatch(first)).toMatchObject({
-      kind: 'duplicate',
-      replayed: true,
-    });
-    expect(await stub.hotStoreGaps()).toEqual([]);
+    expect(pageTexts(http.requests)).toEqual([
+      `bot: audit stream ${stream}: the Axiom hot copy is failing (axiom_unavailable); every batch is still archived and the stream retries the hot copy with backoff`,
+      expect.stringMatching(
+        new RegExp(
+          `^bot: audit stream ${stream}: the Axiom hot copy recovered from axiom_unavailable`
+        )
+      ),
+    ]);
   });
 
-  it('replays an owed hot-copy range left by a crash before delivery', async () => {
+  it('keeps a row Axiom rejects and still delivers the batches after it', async () => {
+    const stream = uniqueStream('axiom-reject');
+    const http = recordingFetch(request => {
+      if (request.url === SLACK_WEBHOOK) return axiomOk();
+      return requestBodyOf(request).length === 2
+        ? new Response('invalid', { status: 400 })
+        : axiomOk();
+    });
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({ hotCopy: 'owed' });
+    expect(await stub.acceptBatch(auditBatch(3, 5, stream))).toMatchObject({
+      hotCopy: 'delivered',
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect((await stub.hotStoreGaps()).map(row => [row.fromSeq, row.reason])).toEqual([
+      [1, 'axiom_rejected'],
+    ]);
+    expect(pageTexts(http.requests)).toHaveLength(1);
+
+    await stub.clearHotStoreGap(1, 2);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(pageTexts(http.requests)).toEqual([
+      expect.stringContaining('the Axiom hot copy is failing (axiom_rejected)'),
+      expect.stringContaining('the Axiom hot copy recovered from axiom_rejected'),
+    ]);
+  });
+
+  it('re-ingests an owed row from the archive, never from a redelivered message', async () => {
     const stream = uniqueStream('hot-pending');
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);
     const stub = getStreamDOStub(env, stream);
 
-    // Exactly what the commit write leaves if the instance dies before the ingest: the archive
-    // object, the head and the pending row for the archived range, and nothing delivered.
-    const batch = auditBatch(1, 2, stream);
-    const hash = await chainHash(GENESIS_HASH, batch);
-    await writeArchivedBatch(env.AUDIT_ARCHIVE, { batch, prevHash: GENESIS_HASH, hash });
+    // What the commit write leaves if the instance dies before the ingest: archive objects for
+    // 1..2 and 3..4, the head, the pending row for 1..2 and the safety-net alarm.
+    const genuine = auditBatch(1, 4, stream);
+    const low = { ...genuine, toSeq: 2, events: genuine.events.slice(0, 2) };
+    const high = { ...genuine, fromSeq: 3, events: genuine.events.slice(2) };
+    const lowHash = await chainHash(GENESIS_HASH, low);
+    const highHash = await chainHash(lowHash, high);
+    await writeArchivedBatch(env.AUDIT_ARCHIVE, {
+      batch: low,
+      prevHash: GENESIS_HASH,
+      hash: lowHash,
+    });
+    await writeArchivedBatch(env.AUDIT_ARCHIVE, { batch: high, prevHash: lowHash, hash: highHash });
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.put({
-        head: { seq: 2, hash },
+        head: { seq: 4, hash: highHash },
         'hot_copy:000000000002': {
           stream,
           fromSeq: 1,
@@ -304,14 +308,17 @@ describe('StreamDO', () => {
           recordedAt: new Date().toISOString(),
         },
       });
+      await state.storage.setAlarm(Date.now() + 60_000);
     });
 
-    expect(await stub.acceptBatch(batch)).toMatchObject({
-      kind: 'duplicate',
-      replayed: true,
-    });
-    expect(http.requests).toHaveLength(1);
-    expect(requestBodyOf(http.requests[0])).toHaveLength(2);
+    // A redelivery whose prefix is forged ends in the genuine object 3..4, so it compares equal
+    // there; its events for the owed row 1..2 are never sent to Axiom.
+    const forged = { ...genuine, events: [...auditBatch(1, 2, stream).events, ...high.events] };
+    expect(await stub.acceptBatch(forged)).toMatchObject({ kind: 'duplicate', toSeq: 4 });
+    expect(http.requests).toEqual([]);
+
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(axiomRequests(http.requests).map(eventIds)).toEqual([low.events.map(e => e.id)]);
     expect(http.requests[0].url).toBe('https://api.axiom.co/v1/datasets/kilo-audit-test/ingest');
     expect(await stub.hotStoreGaps()).toEqual([]);
   });

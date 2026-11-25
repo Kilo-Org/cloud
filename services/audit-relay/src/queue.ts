@@ -11,6 +11,8 @@ import { errorName } from './relay/error-name';
 const DLQ_SUFFIX = '-dlq';
 /** A dead letter whose R2 write fails stays in the DLQ; its consumer retries it this often. */
 const DEAD_LETTER_RETRY_SECONDS = 300;
+/** The StreamDO that rate-limits pages for bodies with no readable stream (not a valid stream name). */
+const UNKNOWN_STREAM_OBJECT = '~unknown';
 
 export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
   if (batch.queue.endsWith(DLQ_SUFFIX)) {
@@ -43,23 +45,44 @@ async function handleBatch(
 }
 
 /**
- * Stores each message's raw bytes under `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz`
- * (a lock rule keeps that prefix as long as the archive), pages once for the stored set with
- * stream, range and key only, then acks what it stored. A message whose write fails is retried.
- * The stream stays stalled behind a lost batch until an operator re-sends the stored bytes.
+ * Handles messages that will never be delivered normally: a DLQ message or an undecodable body.
+ *
+ * A batch at or below its stream's head is already archived (its hot copy, if owed, belongs to
+ * the StreamDO alarm), so it is acked as a no-op. Every other message has its raw bytes stored
+ * under `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (a lock rule keeps that prefix
+ * as long as the archive) and is acked; a failed write retries it. Each stream (and the unknown
+ * bucket) pages at most once an hour, with stream, range and key only.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
   queue: string,
   env: Env
 ): Promise<void> {
-  const stored: { message: Message<unknown>; line: string }[] = [];
+  const lines: string[] = [];
   for (const message of messages) {
-    const bytes = rawBytes(message.body);
     const auditBatch = await decodeMessage(message.body);
+    const stub = getStreamDOStub(env, auditBatch?.stream ?? UNKNOWN_STREAM_OBJECT);
+    if (auditBatch && auditBatch.toSeq <= (await stub.headSeq())) {
+      console.log(
+        JSON.stringify({
+          event: 'audit_relay.dead_letter_already_archived',
+          queue,
+          stream: auditBatch.stream,
+          toSeq: auditBatch.toSeq,
+        })
+      );
+      message.ack();
+      continue;
+    }
+
     const key = deadLetterKey(auditBatch?.stream ?? null, message.timestamp, message.id);
     try {
-      await putImmutable(env.AUDIT_ARCHIVE, key, bytes, 'application/octet-stream');
+      await putImmutable(
+        env.AUDIT_ARCHIVE,
+        key,
+        rawBytes(message.body),
+        'application/octet-stream'
+      );
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -72,7 +95,7 @@ async function keepDeadLetters(
       message.retry({ delaySeconds: DEAD_LETTER_RETRY_SECONDS });
       continue;
     }
-    const range = auditBatch ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
+    const page = await stub.claimDeadLetterPage();
     console.error(
       JSON.stringify({
         event: 'audit_relay.dead_letter_stored',
@@ -82,20 +105,23 @@ async function keepDeadLetters(
         fromSeq: auditBatch?.fromSeq ?? null,
         toSeq: auditBatch?.toSeq ?? null,
         attempts: message.attempts,
+        paged: page,
       })
     );
-    stored.push({
-      message,
-      line: `${auditBatch?.stream ?? 'unknown stream'}${range} after ${message.attempts} attempts at ${key}`,
-    });
+    message.ack();
+    if (page) {
+      const range = auditBatch ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
+      lines.push(
+        `${auditBatch?.stream ?? 'unknown stream'}${range} after ${message.attempts} attempts at ${key}`
+      );
+    }
   }
-  if (stored.length === 0) return;
+  if (lines.length === 0) return;
 
   await pageOperator(
     env,
-    `audit-relay kept ${stored.length} undelivered message(s) from ${queue} in R2; each named stream stalls until its batch is re-sent:\n${stored.map(entry => entry.line).join('\n')}`
+    `audit-relay kept undelivered message(s) from ${queue} in R2 (at most one page per stream an hour; the rest are in the logs); each named stream stalls until its batch is re-sent:\n${lines.join('\n')}`
   );
-  for (const entry of stored) entry.message.ack();
 }
 
 async function decodeMessage(body: unknown): Promise<AuditBatch | null> {
@@ -134,6 +160,7 @@ async function applyOutcome(
           fromSeq: outcome.fromSeq,
           toSeq: outcome.toSeq,
           archive: outcome.archive,
+          hotCopy: outcome.hotCopy,
         })
       );
       message.ack();
@@ -145,7 +172,6 @@ async function applyOutcome(
           stream: outcome.stream,
           toSeq: outcome.toSeq,
           headSeq: outcome.headSeq,
-          replayed: outcome.replayed,
         })
       );
       message.ack();
@@ -177,22 +203,6 @@ async function applyOutcome(
         `audit stream ${outcome.stream} has waited ${Math.round(outcome.stalledMs / 1000)} s for seq ${outcome.expectedSeq} and turned away ${outcome.attempts} later batches`
       );
       message.retry({ delaySeconds: outcome.delaySeconds });
-      return;
-    case 'hot_gap':
-      console.error(
-        JSON.stringify({
-          event: 'audit_relay.hot_store_gap',
-          stream: outcome.stream,
-          fromSeq: outcome.fromSeq,
-          toSeq: outcome.toSeq,
-          reason: outcome.reason,
-        })
-      );
-      await pageOperator(
-        env,
-        `audit stream ${outcome.stream} archived seq ${outcome.fromSeq}..${outcome.toSeq} without the hot copy: ${outcome.reason}`
-      );
-      message.ack();
       return;
     case 'dropped':
       console.error(

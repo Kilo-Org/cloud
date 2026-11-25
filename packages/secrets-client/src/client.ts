@@ -28,8 +28,10 @@ export const ATTEMPT_TIMEOUT_MS = 5_000;
  */
 export const FIRST_LOAD_DEADLINE_MS = 25_000;
 /**
- * How long a request is kept alive for an unanswered call after its read returns: long enough
- * for a slow STS answer to still land, short enough to bound the idle billing of a hung call.
+ * How long a non-Durable-Object invocation (fetch, queue, scheduled) is kept alive through
+ * `waitUntil` for an unanswered call after its read returns: long enough for a slow STS answer to
+ * still land, short enough to bound a hung call. In a Durable Object the pending call itself
+ * holds the object in memory until STS answers, and STS bounds that with its answer deadline.
  */
 export const KEEP_ALIVE_MS = 30_000;
 const BACKOFF_BASE_MS = 5_000;

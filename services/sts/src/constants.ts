@@ -43,10 +43,13 @@ export const MANAGER_FETCH_TIMEOUT_MS = 8_000;
 
 /**
  * STS stops waiting for a bundle object after this long and answers `unavailable`. 20 s covers a
- * fill attempt's 16 s (MANAGER_FETCH_TIMEOUT_MS) plus the object hops, and stays under the client's
- * 25-second request bound, so the client gets this answer rather than its own timeout. A fill that
- * needs a second attempt (`withDORetry` in BundleDO reruns it after a Durable Object error) can run
- * past it; that fill still finishes inside the bundle object and serves the next read.
+ * fill attempt's 16 s (MANAGER_FETCH_TIMEOUT_MS) plus the object hops. The secrets client counts an
+ * attempt as failed after 5 s, but the attempt keeps running while the request that started it
+ * lives and readers wait inside the client's 25-second first-load window, so a fill that succeeds
+ * within this deadline still lands; an `unavailable` answer to an attempt the client already
+ * counted as failed changes nothing. A fill that needs a second attempt (`withDORetry` in BundleDO
+ * reruns it after a Durable Object error) can run past the deadline; that fill still finishes
+ * inside the bundle object and serves the next read.
  */
 export const BUNDLE_OBJECT_DEADLINE_MS = 20_000;
 

@@ -20,6 +20,9 @@ type ConnectedAccountsCardProps = {
   onError: (error: string) => void;
   /** Lists the accounts without the unlink action; see `LoginMethodsCard`. */
   readOnly?: boolean;
+  /** The page's last requested code; see `LoginMethodsCard`. */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
 };
 
 export function ConnectedAccountsCard({
@@ -27,11 +30,12 @@ export function ConnectedAccountsCard({
   onRefetch,
   onError,
   readOnly = false,
+  codeChallenge,
+  onCodeChallengeChange,
 }: ConnectedAccountsCardProps) {
   const [unlinkingProvider, setUnlinkingProvider] = useState<AuthProviderId | null>(null);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState<AuthProviderId | null>(null);
   const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
-  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
   const trpc = useTRPC();
 
   const unlinkMutation = useMutation(
@@ -67,7 +71,7 @@ export function ConnectedAccountsCard({
           change="unlink"
           provider={codeProvider}
           challenge={codeChallenge}
-          onChallengeChange={setCodeChallenge}
+          onChallengeChange={onCodeChallengeChange}
           onOpenChange={open => {
             if (!open) setCodeProvider(null);
           }}

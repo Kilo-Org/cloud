@@ -61,9 +61,12 @@ function codeStepError(errorCode: string | null): CodeStepError | null {
 }
 
 /**
- * The last code the card requested. The card keeps it while the dialog is
- * closed, so reopening the dialog before the code expires lets the person
- * enter the code that is already in their mailbox.
+ * The last code the page requested. The server keeps one live code per
+ * account, and a new code ends the previous one, so the page holds one
+ * challenge for every card that asks for a code. It keeps it while the dialog
+ * is closed, so reopening the dialog before the code expires lets the person
+ * enter the code that is already in their mailbox. A dialog for another change
+ * or provider does not use it and sends a new code instead.
  */
 export type SignInMethodChallenge = {
   change: 'link' | 'unlink';
@@ -77,7 +80,7 @@ export type SignInMethodCodeDialogProps = {
   open: boolean;
   change: 'link' | 'unlink';
   provider: AuthProviderId;
-  /** The card's last requested code, or null. */
+  /** The page's last requested code, or null. */
   challenge: SignInMethodChallenge | null;
   onChallengeChange: (challenge: SignInMethodChallenge | null) => void;
   onOpenChange: (open: boolean) => void;
@@ -96,8 +99,8 @@ export type SignInMethodCodeDialogProps = {
 
 /**
  * The one-time code step for a sign-in method change. The code is emailed to the
- * account's primary address when the dialog opens, unless the card still holds
- * an unexpired code for the same change. The change itself is confirmed by
+ * account's primary address when the dialog opens, unless the page still holds
+ * an unexpired code for the same change and provider. The change itself is confirmed by
  * `onVerified`, so a wrong code keeps the person in the dialog.
  */
 export function SignInMethodCodeDialog({
@@ -143,7 +146,7 @@ export function SignInMethodCodeDialog({
   );
 
   // One code per open: a new provider, change or open sends at most one email,
-  // and none while the card holds an unexpired code for this change. The ref
+  // and none while the page holds an unexpired code for this change. The ref
   // keeps a repeated effect run (a strict-mode double mount) from sending a
   // second code, which the server would refuse as a cooldown.
   useEffect(() => {

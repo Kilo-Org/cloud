@@ -35,6 +35,12 @@ type LoginMethodsCardProps = {
    * session is not a browser sign-in, so the server refuses a link from it.
    */
   readOnly?: boolean;
+  /**
+   * The page's last requested code. The server keeps one live code per
+   * account, so the cards on one page share it; see `SignInMethodChallenge`.
+   */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
 };
 
 export function LoginMethodsCard({
@@ -43,10 +49,11 @@ export function LoginMethodsCard({
   onError,
   callbackPath = '/connected-accounts',
   readOnly = false,
+  codeChallenge,
+  onCodeChallengeChange,
 }: LoginMethodsCardProps) {
   const trpc = useTRPC();
   const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
-  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
   const alreadyLinkedProviders = new Set(providers.map(o => o.provider));
   const claudeConfigured = useClaudeSignInConfigured();
   const availableProviders = AccountLinkingProviders.filter(
@@ -114,7 +121,7 @@ export function LoginMethodsCard({
           change="link"
           provider={codeProvider}
           challenge={codeChallenge}
-          onChallengeChange={setCodeChallenge}
+          onChallengeChange={onCodeChallengeChange}
           onOpenChange={open => {
             if (!open) setCodeProvider(null);
           }}

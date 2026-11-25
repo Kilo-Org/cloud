@@ -243,7 +243,18 @@ export function ChatGptSharedServicesCardView(props: ChatGptSharedServicesCardVi
 
 const AUTH_ERROR_PARAM = 'openai_error';
 
-function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId: string }) {
+type ChatGptSharedServicesCardProps = {
+  organizationId: string;
+  /** The page's last requested sign-in method code; see `OpenAiChatGptCard`. */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
+};
+
+function ChatGptSharedServicesCardConnected({
+  organizationId,
+  codeChallenge,
+  onCodeChallengeChange,
+}: ChatGptSharedServicesCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -282,7 +293,6 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
   );
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
-  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const handleConnect = () => {
     setAuthErrorCode(null);
@@ -341,7 +351,7 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
         change="link"
         provider="openai"
         challenge={codeChallenge}
-        onChallengeChange={setCodeChallenge}
+        onChallengeChange={onCodeChallengeChange}
         onOpenChange={setIsCodeDialogOpen}
         onError={error => setAuthErrorCode(error)}
         onVerified={handleCodeVerified}
@@ -354,10 +364,10 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
  * The card on the organization BYOK page. `useSearchParams` needs a Suspense
  * boundary; the fallback is the card's own loading state.
  */
-export function ChatGptSharedServicesCard({ organizationId }: { organizationId: string }) {
+export function ChatGptSharedServicesCard(props: ChatGptSharedServicesCardProps) {
   return (
     <Suspense fallback={<ChatGptSharedServicesCardView status={undefined} />}>
-      <ChatGptSharedServicesCardConnected organizationId={organizationId} />
+      <ChatGptSharedServicesCardConnected {...props} />
     </Suspense>
   );
 }

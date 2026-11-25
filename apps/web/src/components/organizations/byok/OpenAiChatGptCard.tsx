@@ -391,7 +391,11 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
   );
 }
 
-function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: string }) {
+function OpenAiChatGptCardConnected({
+  organizationId,
+  codeChallenge,
+  onCodeChallengeChange,
+}: OpenAiChatGptCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -438,7 +442,6 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
 
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
-  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const handleConnect = () => {
     // A retry starts from a clean state so the failure copy never overlaps the
@@ -502,7 +505,7 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
         change="link"
         provider="openai"
         challenge={codeChallenge}
-        onChallengeChange={setCodeChallenge}
+        onChallengeChange={onCodeChallengeChange}
         onOpenChange={setIsCodeDialogOpen}
         onError={error => setAuthErrorCode(error)}
         onVerified={handleCodeVerified}
@@ -511,16 +514,26 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   );
 }
 
-export function OpenAiChatGptCard({ organizationId }: { organizationId?: string }) {
+type OpenAiChatGptCardProps = {
+  organizationId?: string;
+  /**
+   * The page's last requested sign-in method code. The server keeps one live
+   * code per account, so every card on a page that asks for one shares it.
+   */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
+};
+
+export function OpenAiChatGptCard(props: OpenAiChatGptCardProps) {
   // `useSearchParams` needs a Suspense boundary; the fallback is the card's own
   // loading state, so the reserved height covers it too.
   return (
     <Suspense
       fallback={
-        <OpenAiChatGptCardView status={undefined} isOrganization={Boolean(organizationId)} />
+        <OpenAiChatGptCardView status={undefined} isOrganization={Boolean(props.organizationId)} />
       }
     >
-      <OpenAiChatGptCardConnected organizationId={organizationId} />
+      <OpenAiChatGptCardConnected {...props} />
     </Suspense>
   );
 }

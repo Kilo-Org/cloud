@@ -94,7 +94,10 @@ function hotCopyKey(toSeq: number): string {
   return `${HOT_COPY_PREFIX}${String(toSeq).padStart(12, '0')}`;
 }
 
-/** A row the alarm no longer retries, kept for an operator under its own prefix. */
+/**
+ * A row the alarm no longer retries, kept as a record under its own prefix: the archive holds the
+ * range, the hot copy never will, and the row blocks nothing.
+ */
 function parkedKey(toSeq: number): string {
   return `${PARKED_PREFIX}${String(toSeq).padStart(12, '0')}`;
 }
@@ -233,28 +236,6 @@ export class StreamDO extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.serialised(() => this.drainHotCopy());
-  }
-
-  /** Owed rows the alarm still retries, then parked rows, each oldest first, for an operator. */
-  async hotStoreGaps(limit = 1000): Promise<HotStoreGap[]> {
-    const [owed, parked] = await Promise.all([
-      this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit }),
-      this.ctx.storage.list<HotStoreGap>({ prefix: PARKED_PREFIX, limit }),
-    ]);
-    return [...owed.values(), ...parked.values()].slice(0, limit);
-  }
-
-  /** Drops an owed or parked row an operator has replayed or written off. */
-  async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
-    for (const key of [hotCopyKey(toSeq), parkedKey(toSeq)]) {
-      const row = await this.ctx.storage.get<HotStoreGap>(key);
-      if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
-    }
-  }
-
-  /** The archived head sequence; the DLQ consumer treats a batch at or below it as a no-op. */
-  async headSeq(): Promise<number> {
-    return (await this.readHead()).seq;
   }
 
   /** True at most once per `DEAD_LETTER_PAGE_INTERVAL_MS` for this stream. */
@@ -739,7 +720,7 @@ export class StreamDO extends DurableObject<Env> {
     if (page) {
       await pageOperator(
         this.env,
-        `audit stream ${row.stream}: parked seq ${row.fromSeq}..${row.toSeq} (${reason}); Axiom refused this payload while later rows were delivered, check it and clear it with clearHotStoreGap`,
+        `audit stream ${row.stream}: parked seq ${row.fromSeq}..${row.toSeq} (${reason}); Axiom refused this payload while later rows were delivered, so the archive keeps it and the hot copy will not have it`,
         this.ctx
       );
     }

@@ -253,7 +253,7 @@ describe('StreamDO', () => {
     // The whole hot copy is failing, so the next batch is archived without its own Axiom call.
     expect(await stub.acceptBatch(second)).toMatchObject({ kind: 'accepted', hotCopy: 'owed' });
     expect(axiomRequests(http.requests)).toHaveLength(1);
-    expect((await stub.hotStoreGaps()).map(row => [row.fromSeq, row.toSeq, row.reason])).toEqual([
+    expect((await hotRows(stub)).map(row => [row.fromSeq, row.toSeq, row.reason])).toEqual([
       [1, 2, 'axiom_unavailable'],
       [3, 5, 'pending'],
     ]);
@@ -264,11 +264,11 @@ describe('StreamDO', () => {
     expect(pageTexts(http.requests)).toEqual([]);
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(axiomRequests(http.requests)).toHaveLength(3);
-    expect(await stub.hotStoreGaps()).toHaveLength(2);
+    expect(await hotRows(stub)).toHaveLength(2);
 
     failing = false;
     expect(await runDurableObjectAlarm(stub)).toBe(true);
-    expect(await stub.hotStoreGaps()).toEqual([]);
+    expect(await hotRows(stub)).toEqual([]);
     const delivered = axiomRequests(http.requests).slice(-2).map(eventIds);
     expect(delivered).toEqual([first.events.map(e => e.id), second.events.map(e => e.id)]);
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
@@ -293,7 +293,7 @@ describe('StreamDO', () => {
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     failing = false;
     expect(await runDurableObjectAlarm(stub)).toBe(true);
-    expect(await stub.hotStoreGaps()).toEqual([]);
+    expect(await hotRows(stub)).toEqual([]);
     expect(pageTexts(http.requests)).toHaveLength(2);
   });
 
@@ -313,7 +313,7 @@ describe('StreamDO', () => {
       expect(await stub.acceptBatch(batch)).toMatchObject({ hotCopy: 'owed' });
       failing = false;
       expect(await runDurableObjectAlarm(stub)).toBe(true);
-      expect(await stub.hotStoreGaps()).toEqual([]);
+      expect(await hotRows(stub)).toEqual([]);
     }
     expect(axiomRequests(http.requests)).toHaveLength(6);
     expect(pageTexts(http.requests)).toEqual([]);
@@ -338,19 +338,17 @@ describe('StreamDO', () => {
     // The run rejects 1..2 again, delivers 3..5 after it, and only then parks 1..2.
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(axiomRequests(http.requests)).toHaveLength(3);
-    expect((await stub.hotStoreGaps()).map(row => [row.fromSeq, row.reason])).toEqual([
+    expect((await hotRows(stub)).map(row => [row.fromSeq, row.reason])).toEqual([
       [1, 'axiom_rejected'],
     ]);
     expect(pageTexts(http.requests)).toEqual([
-      `bot: audit stream ${stream}: parked seq 1..2 (axiom_rejected); Axiom refused this payload while later rows were delivered, check it and clear it with clearHotStoreGap`,
+      `bot: audit stream ${stream}: parked seq 1..2 (axiom_rejected); Axiom refused this payload while later rows were delivered, so the archive keeps it and the hot copy will not have it`,
     ]);
 
     // The stream is healthy again, so the next batch is ingested inline.
     expect(await stub.acceptBatch(auditBatch(6, 8, stream))).toMatchObject({
       hotCopy: 'delivered',
     });
-    await stub.clearHotStoreGap(1, 2);
-    expect(await stub.hotStoreGaps()).toEqual([]);
   });
 
   it.each([
@@ -378,14 +376,14 @@ describe('StreamDO', () => {
       }
       expect(await runDurableObjectAlarm(stub)).toBe(true);
       expect(await runDurableObjectAlarm(stub)).toBe(true);
-      expect((await stub.hotStoreGaps()).map(row => row.fromSeq)).toEqual([1, 3, 5]);
+      expect((await hotRows(stub)).map(row => row.fromSeq)).toEqual([1, 3, 5]);
       expect(pageTexts(http.requests)).toEqual([
         expect.stringContaining('the Axiom hot copy is failing'),
       ]);
 
       broken = false;
       expect(await runDurableObjectAlarm(stub)).toBe(true);
-      expect(await stub.hotStoreGaps()).toEqual([]);
+      expect(await hotRows(stub)).toEqual([]);
       expect(axiomRequests(http.requests).slice(-3).map(eventIds)).toEqual(
         batches.map(batch => batch.events.map(event => event.id))
       );
@@ -439,7 +437,7 @@ describe('StreamDO', () => {
       await runDurableObjectAlarm(stub);
       expect(axiomRequests(http.requests).map(eventIds)).toEqual([good.events.map(e => e.id)]);
     });
-    const gaps = await stub.hotStoreGaps(100);
+    const gaps = await hotRows(stub, 100);
     expect(gaps).toHaveLength(60);
     expect(gaps.every(row => row.reason === 'archive_unreadable')).toBe(true);
     // An archive that changed under the relay pages outside the hourly cap: at once for the first
@@ -505,6 +503,6 @@ describe('StreamDO', () => {
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(axiomRequests(http.requests).map(eventIds)).toEqual([low.events.map(e => e.id)]);
     expect(http.requests[0].url).toBe('https://api.axiom.co/v1/datasets/kilo-audit-test/ingest');
-    expect(await stub.hotStoreGaps()).toEqual([]);
+    expect(await hotRows(stub)).toEqual([]);
   });
 });

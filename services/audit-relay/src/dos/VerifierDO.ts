@@ -80,7 +80,7 @@ type SliceResult =
   | { kind: 'completed'; pass: VerifyPassKind; objects: number; targetKey: string | null }
   | { kind: 'failed'; pass: VerifyPassKind; reason: VerifyFailureReason; detail: string };
 
-/** The outcome of the last finished pass of a kind, kept for operators and tests. */
+/** The outcome of the last finished pass of a kind, kept in storage as its record. */
 export type PassResult =
   | {
       outcome: 'completed';
@@ -90,13 +90,6 @@ export type PassResult =
       targetKey: string | null;
     }
   | { outcome: 'failed'; at: number; reason: VerifyFailureReason; detail: string };
-
-export type VerifierStatus = {
-  running: VerifyPassKind[];
-  lastVerifiedCheckpoint: string | null;
-  daily: PassResult | null;
-  full: PassResult | null;
-};
 
 /**
  * Owns archive verification (design 8.1). A cron starts a pass; the pass then walks the archive
@@ -159,26 +152,6 @@ export class VerifierDO extends DurableObject<Env> {
     await this.ctx.storage.put(passKey(kind), pass);
     await this.ctx.storage.setAlarm(Date.now());
     return { kind: 'started', pass: kind, anchorKey, targetKey };
-  }
-
-  async status(): Promise<VerifierStatus> {
-    const storage = this.ctx.storage;
-    const [verified, daily, full, dailyResult, fullResult] = await Promise.all([
-      storage.get<string>(VERIFIED_CHECKPOINT_KEY),
-      storage.get<VerifyPass>(passKey('daily')),
-      storage.get<VerifyPass>(passKey('full')),
-      storage.get<PassResult>(lastResultKey('daily')),
-      storage.get<PassResult>(lastResultKey('full')),
-    ]);
-    const running: VerifyPassKind[] = [];
-    if (daily) running.push('daily');
-    if (full) running.push('full');
-    return {
-      running,
-      lastVerifiedCheckpoint: verified ?? null,
-      daily: dailyResult ?? null,
-      full: fullResult ?? null,
-    };
   }
 
   async alarm(): Promise<void> {

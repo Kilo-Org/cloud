@@ -16,6 +16,10 @@ import {
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
+  ADMIN_ONLY_TRPC_NAMESPACES,
+  isAdminOnlyTrpcProcedure,
+} from '@kilocode/web-shared/lib/admin/admin-network-policy';
+import {
   SUPPORT_NEVER_KEYS,
   SUPPORT_READ_ALLOWLIST,
   SUPPORT_WRITE_ALLOWLIST,
@@ -284,6 +288,23 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
     expect(covered).toMatchSnapshot('guarded-trpc-procedures');
   });
 
+  test('every procedure the admin edge rule matches carries the admin guard', () => {
+    const unguarded = discoveredProcedures
+      .filter(procedure => isAdminOnlyTrpcProcedure(procedure.path))
+      .filter(procedure => !procedure.tiers.includes('admin'))
+      .map(procedure => procedure.path);
+
+    expect(unguarded).toEqual([]);
+  });
+
+  test('every admin edge namespace still names mounted procedures', () => {
+    const unused = ADMIN_ONLY_TRPC_NAMESPACES.filter(
+      namespace => !discoveredProcedures.some(procedure => procedure.path.startsWith(namespace))
+    );
+
+    expect(unused).toEqual([]);
+  });
+
   test('known non-admin elevation procedures are classified', () => {
     const routes = [
       'cliSessionsV2.list',
@@ -384,6 +405,12 @@ describe('privileged inventory covers discovered route handlers', () => {
       'packages/web-shared/src/lib/user/server.ts',
     ]);
     expect(sitesUsing('stepUpExemptCredentials')).toEqual([
+      'apps/web/src/app/api/private/users/route.ts',
+      'packages/web-shared/src/lib/user/server.ts',
+    ]);
+    // An exemption lets a credential reach an admin route from any network.
+    // Only a third-party server lookup may need one, after a security review.
+    expect(sitesUsing('adminNetworkExemptCredentials')).toEqual([
       'apps/web/src/app/api/private/users/route.ts',
       'packages/web-shared/src/lib/user/server.ts',
     ]);

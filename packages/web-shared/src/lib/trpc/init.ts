@@ -36,6 +36,7 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { adminNetworkRefusal } from '@kilocode/web-shared/lib/admin/admin-network';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
@@ -477,6 +478,11 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       code: 'FORBIDDEN',
       message: 'Admin access required',
     });
+  }
+  const networkRefusal = adminNetworkRefusal(ctx.headersList ?? new Headers(), path);
+  if (networkRefusal) {
+    if (isBearer) emitPrivileged('denied');
+    throw new TRPCError({ code: 'FORBIDDEN', message: networkRefusal.message });
   }
   emitAdminAccessEvent({
     surface: 'trpc',

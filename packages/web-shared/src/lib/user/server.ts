@@ -58,6 +58,10 @@ import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-i
 import { runStepUpGuard, stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import {
+  adminNetworkRefusal,
+  type AdminNetworkDenialReason,
+} from '@kilocode/web-shared/lib/admin/admin-network';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import {
@@ -213,6 +217,13 @@ export type RequiredPermissions = {
    * from a missing header.
    */
   stepUpExemptCredentials?: readonly StepUpExemptibleCredential[];
+  /**
+   * Non-session credential kinds exempt from the admin network allowlist. Only
+   * for a caller that is a third-party server, never a person: such a caller
+   * cannot be on the corporate network. `'session'` is excluded by the type.
+   * `privileged-inventory.test.ts` pins the routes allowed to set it.
+   */
+  adminNetworkExemptCredentials?: readonly StepUpExemptibleCredential[];
 };
 
 export type StepUpExemptibleCredential = Exclude<PrivilegedCredentialKind, 'session'>;
@@ -252,6 +263,8 @@ type GetAuthResponse =
        */
       refusalReason?: AccountBlockedRefusalReason;
       rejectionReason?: 'empty_organization_context';
+      /** Set when the admin network allowlist refused an admin. */
+      adminNetworkDenial?: AdminNetworkDenialReason;
       isNewUser?: undefined;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -273,6 +286,7 @@ type GetAuthResponse =
       authorizationRefused?: undefined;
       refusalReason?: undefined;
       rejectionReason?: undefined;
+      adminNetworkDenial?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -312,6 +326,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     internalApiUse: result.internalApiUse,
     delegatedWorkload: result.cloudAgentAuthority !== undefined,
   });
+
+  if (opts.adminOnly === true && result.user) {
+    const networkExempt =
+      credential !== 'session' &&
+      (opts.adminNetworkExemptCredentials?.some(kind => kind === credential) ?? false);
+    const networkFailure = networkExempt ? null : adminNetworkAuthFailure(headersList, result);
+    if (networkFailure) return networkFailure;
+  }
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
@@ -465,7 +487,30 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
  * caller still enforces the route's Origin check before trusting the session.
  */
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
-  return resolveSessionOnly({ adminOnly: true });
+  const result = await resolveSessionOnly({ adminOnly: true });
+  if (!result.user) return result;
+  return adminNetworkAuthFailure(await headers(), result) ?? result;
+}
+
+/**
+ * The 403 for an admin whose request came from outside the admin network
+ * allowlist, or null when the network check passes.
+ */
+function adminNetworkAuthFailure(
+  headersList: Headers,
+  admin: Pick<GetAuthResponse, 'internalApiUse' | 'tokenSource' | 'cloudAgentAuthority'> & {
+    user: User;
+  }
+): GetAuthResponse | null {
+  const refusal = adminNetworkRefusal(headersList, routeFromHeaders(headersList));
+  if (refusal === null) return null;
+  return authError(403, refusal.message, admin.user.id, {
+    authorizationRefused: true,
+    adminNetworkDenial: refusal.reason,
+    internalApiUse: admin.internalApiUse,
+    tokenSource: admin.tokenSource,
+    cloudAgentAuthority: admin.cloudAgentAuthority,
+  });
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -802,6 +847,7 @@ function authError(
     tokenSource?: string;
     cloudAgentAuthority?: CloudAgentAuthority;
     stepUp?: StepUpRequirementPayload;
+    adminNetworkDenial?: AdminNetworkDenialReason;
   }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
@@ -818,6 +864,7 @@ function authError(
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
     ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
+    ...(options?.adminNetworkDenial && { adminNetworkDenial: options.adminNetworkDenial }),
   };
 }
 

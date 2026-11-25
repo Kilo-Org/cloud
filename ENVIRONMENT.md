@@ -22,6 +22,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. the literal string `true` enforces step-up (any other value, including `TRUE`, is off) on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
 
+### Admin network allowlist
+
+- `ADMIN_ALLOWED_NETWORKS` - Comma-separated IPv4/IPv6 addresses and CIDR ranges allowed to reach admin surfaces (`/admin`, `/admin/api`, admin tRPC procedures, `adminOnly` REST routes, admin step-up). One invalid entry rejects the whole value. On Vercel (`VERCEL` set) the client address is the first hop of `x-vercel-forwarded-for`, and an unset, empty or invalid value refuses every admin request (fail closed); off Vercel (local dev, tests, scripts) the check is skipped. Only the Pylon lookup `GET /api/private/users` exempts a personal admin API key. The value is parsed once per process and a Vercel env change needs a redeploy, so the break-glass value `0.0.0.0/0,::/0` takes effect only after a redeploy; the instant lever for the edge layer is disabling the firewall rule. The real list lives on the Confluence page "IP Address Permit List / Allow List"; never commit it. Set it per environment (Production, Preview, staging) before deploying. `pnpm --filter web -s script src/scripts/admin-network-firewall-rule.ts` prints the matching Vercel Firewall rule for `vercel firewall rules add --json`. [SERVER]
+
 ### Code review health monitor
 
 `CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`

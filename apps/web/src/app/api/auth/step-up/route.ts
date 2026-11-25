@@ -55,7 +55,8 @@ function rateLimitKey(action: 'options' | 'verify', userId: string): string {
  *
  * Error contract: 400 invalid request, 401 `{ error }` with a stable
  * `StepUpVerificationError` code (including `SESSION_UNBOUND`), 403 missing or
- * foreign Origin, 429 rate limited, 503 rate limiter unavailable.
+ * foreign Origin or a request from outside the admin network allowlist, 429
+ * rate limited, 503 rate limiter unavailable.
  */
 export async function POST(request: NextRequest) {
   if (request.headers.has('authorization')) {

@@ -38,6 +38,8 @@ export async function GET(
       adminOnly: true,
       requestMethod: request.method,
       stepUpExemptCredentials: ['human_bearer'],
+      // Pylon looks users up from its own servers with an admin bearer token, off the corporate network.
+      adminNetworkExemptCredentials: ['human_bearer'],
     });
     if (authFailedResponse) {
       return authFailedResponse;

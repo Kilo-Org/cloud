@@ -15,6 +15,7 @@ import {
   UNSCOPED_TARGET,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({
@@ -183,6 +184,58 @@ describe('adminProcedure admin_access telemetry', () => {
     await expect(caller.ping()).rejects.toThrow();
 
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('adminProcedure admin network allowlist', () => {
+  const originalVercel = process.env.VERCEL;
+  const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+
+  beforeEach(() => {
+    process.env.VERCEL = '1';
+    process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    resetAdminNetworkConfigForTest();
+  });
+
+  afterEach(() => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+    if (originalNetworks === undefined) delete process.env.ADMIN_ALLOWED_NETWORKS;
+    else process.env.ADMIN_ALLOWED_NETWORKS = originalNetworks;
+    resetAdminNetworkConfigForTest();
+  });
+
+  function adminCallerFrom(headersList: Headers) {
+    return createCaller(ctxFor({ user: defineTestUser({ is_admin: true }), headersList }));
+  }
+
+  test('refuses an admin outside the allowlist on Vercel with FORBIDDEN', async () => {
+    const caller = adminCallerFrom(
+      new Headers({ 'x-vercel-forwarded-for': '198.51.100.1', 'x-forwarded-for': '203.0.113.7' })
+    );
+
+    const error = await caller.ping().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({ code: 'FORBIDDEN', message: expect.stringContaining('WARP') });
+    expect(events).toHaveLength(0);
+  });
+
+  test('lets an admin inside the allowlist through', async () => {
+    const caller = adminCallerFrom(new Headers({ 'x-vercel-forwarded-for': '203.0.113.7' }));
+
+    await expect(caller.ping()).resolves.toBe('ok');
+  });
+
+  test('keeps the non-admin refusal for a non-admin outside the allowlist', async () => {
+    const caller = createCaller(
+      ctxFor({
+        user: defineTestUser({ is_admin: false }),
+        headersList: new Headers({ 'x-vercel-forwarded-for': '198.51.100.1' }),
+      })
+    );
+
+    await expect(caller.ping()).rejects.toMatchObject({ message: 'Admin access required' });
   });
 });
 

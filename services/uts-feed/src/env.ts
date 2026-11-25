@@ -1,14 +1,13 @@
-import {
-  UtsEnvironmentSchema,
-  type SignerKeysBinding,
-  type UtsEnvironment,
-} from '@kilocode/uts-contracts';
+import { UtsEnvironmentSchema, type UtsEnvironment } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 
 export type Env = {
   UTS_ENVIRONMENT: string;
-  /** The mint Worker's `SignerKeys` entrypoint, bound with this Worker's name as `props.caller`. */
-  UTS_SIGNER_KEYS: SignerKeysBinding;
+  /**
+   * The mint Worker's default entrypoint, bound with this Worker's deployed name as
+   * `props.caller`. A fetch to it runs in the mint Worker's placed fetch handler.
+   */
+  UTS_MINT: Fetcher;
 };
 
 export type FeedConfig = { environment: UtsEnvironment };

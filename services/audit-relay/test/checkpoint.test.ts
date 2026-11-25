@@ -7,7 +7,7 @@ import {
   verifyArchivedChains,
 } from '../src/checkpoint';
 import { getStreamDOStub } from '../src/dos/StreamDO';
-import { archiveObjectKey, gzipJson, readArchivedObject } from '../src/relay/archive';
+import { archiveObjectKey, gzipJson } from '../src/relay/archive';
 import { canonicalJson } from '../src/relay/canonical';
 import { verifyEd25519 } from '../src/relay/signing';
 import type { CheckpointPublicKey } from '../src/relay/signing';
@@ -15,6 +15,7 @@ import {
   auditBatch,
   axiomOk,
   env,
+  readArchived,
   recordingFetch,
   uniqueStream,
   type CapturedRequest,
@@ -48,8 +49,7 @@ async function readRaw(key: string): Promise<Uint8Array> {
 /** Rewrites one archived event's optional field, keeping the batch schema-valid. */
 async function tamperArchiveObject(stream: string, toSeq: number): Promise<void> {
   const key = archiveObjectKey(stream, toSeq);
-  const stored = await readArchivedObject(env.AUDIT_ARCHIVE, key);
-  if (!stored) throw new Error(`archive object ${key} missing`);
+  const stored = await readArchived(stream, toSeq);
   const [first, ...rest] = stored.batch.events;
   await env.AUDIT_ARCHIVE.put(
     key,

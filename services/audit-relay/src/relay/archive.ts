@@ -1,11 +1,13 @@
 import { AuditBatchSchema } from '@kilocode/sts-contracts';
 import { z } from 'zod';
+import { errorName } from './error-name';
 
-/** The slice of the R2 bucket binding the archive and checkpoint code needs. */
+/** The slice of the R2 bucket binding the archive, checkpoint and verify code needs. */
 export type ArchiveBucket = Pick<R2Bucket, 'put' | 'get' | 'head' | 'list'>;
 
 export const ARCHIVE_PREFIX = 'streams/';
 export const CHECKPOINT_PREFIX = 'checkpoints/';
+export const DEAD_LETTER_PREFIX = 'dead-letter/';
 
 const HashSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
@@ -15,6 +17,15 @@ export const ArchivedBatchSchema = z.strictObject({
   hash: HashSchema,
 });
 export type ArchivedBatch = z.infer<typeof ArchivedBatchSchema>;
+
+/**
+ * What an archive key holds. `corrupt` is an object that exists but does not decode to an
+ * `ArchivedBatch`; an R2 I/O failure is thrown instead, because a retry can fix it.
+ */
+export type ArchivedRead =
+  | { kind: 'ok'; object: ArchivedBatch }
+  | { kind: 'missing' }
+  | { kind: 'corrupt'; detail: string };
 
 /** The key already holds a different chain hash: a second writer, or a rewritten object. */
 export class ArchiveConflictError extends Error {
@@ -28,13 +39,23 @@ export class ArchiveConflictError extends Error {
   }
 }
 
+export function archiveStreamPrefix(stream: string): string {
+  return `${ARCHIVE_PREFIX}${stream}/`;
+}
+
+/** Zero-padded so R2's lexicographic listing is sequence order. */
 export function archiveObjectKey(stream: string, toSeq: number): string {
-  return `${ARCHIVE_PREFIX}${stream}/${String(toSeq).padStart(12, '0')}.json.gz`;
+  return `${archiveStreamPrefix(stream)}${String(toSeq).padStart(12, '0')}.json.gz`;
 }
 
 export function archiveSequenceOf(key: string): number | null {
   const match = /\/(\d{12})\.json\.gz$/.exec(key);
   return match ? Number(match[1]) : null;
+}
+
+/** `dead-letter/<stream or unknown>/<enqueue time>-<message id>.gz`. */
+export function deadLetterKey(stream: string | null, enqueuedAt: Date, messageId: string): string {
+  return `${DEAD_LETTER_PREFIX}${stream ?? 'unknown'}/${enqueuedAt.toISOString()}-${messageId}.gz`;
 }
 
 async function pipeThrough(
@@ -84,22 +105,31 @@ export async function writeArchivedBatch(
   if (outcome === 'written') return outcome;
 
   const stored = await readArchivedObject(bucket, key);
-  if (!stored) throw new Error(`archive object ${key} disappeared between write and read`);
-  if (stored.hash !== object.hash) {
-    throw new ArchiveConflictError(key, stored.hash, object.hash);
+  if (stored.kind === 'missing') {
+    throw new Error(`archive object ${key} disappeared between write and read`);
   }
+  const storedHash = stored.kind === 'ok' ? stored.object.hash : 'unreadable';
+  if (storedHash !== object.hash) throw new ArchiveConflictError(key, storedHash, object.hash);
   return 'existing';
 }
 
 export async function readArchivedObject(
   bucket: ArchiveBucket,
   key: string
-): Promise<ArchivedBatch | null> {
+): Promise<ArchivedRead> {
   const object = await bucket.get(key);
-  if (!object) return null;
+  if (!object) return { kind: 'missing' };
   const compressed = new Uint8Array(await object.arrayBuffer());
-  const json = await pipeThrough(compressed, new DecompressionStream('gzip'));
-  return ArchivedBatchSchema.parse(JSON.parse(new TextDecoder().decode(json)) as unknown);
+  try {
+    const json = await pipeThrough(compressed, new DecompressionStream('gzip'));
+    const parsed = ArchivedBatchSchema.safeParse(
+      JSON.parse(new TextDecoder().decode(json)) as unknown
+    );
+    if (!parsed.success) return { kind: 'corrupt', detail: 'schema' };
+    return { kind: 'ok', object: parsed.data };
+  } catch (error) {
+    return { kind: 'corrupt', detail: errorName(error) };
+  }
 }
 
 /** Every key under `prefix`, following R2's cursor until the listing is complete. */

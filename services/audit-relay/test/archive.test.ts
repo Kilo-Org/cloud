@@ -6,7 +6,7 @@ import {
   writeArchivedBatch,
 } from '../src/relay/archive';
 import { GENESIS_HASH, chainHash } from '../src/relay/chain';
-import { auditBatch, env, uniqueStream } from './helpers';
+import { auditBatch, env, readArchived, uniqueStream } from './helpers';
 
 /** A bucket that refuses every write, like the live bucket under a lock rule. */
 function lockedBucket(base: R2Bucket) {
@@ -32,9 +32,7 @@ describe('writeArchivedBatch', () => {
 
     expect(await writeArchivedBatch(env.AUDIT_ARCHIVE, object)).toBe('written');
     expect(await writeArchivedBatch(lockedBucket(env.AUDIT_ARCHIVE), object)).toBe('existing');
-    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toEqual(
-      object
-    );
+    expect(await readArchived(stream, 2)).toEqual(object);
   });
 
   it('fails when the locked key holds a different hash', async () => {
@@ -47,10 +45,20 @@ describe('writeArchivedBatch', () => {
     await expect(writeArchivedBatch(lockedBucket(env.AUDIT_ARCHIVE), different)).rejects.toThrow(
       ArchiveConflictError
     );
-    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toEqual({
-      batch,
-      prevHash: GENESIS_HASH,
-      hash,
-    });
+    expect(await readArchived(stream, 2)).toEqual({ batch, prevHash: GENESIS_HASH, hash });
+  });
+
+  it('fails when the locked key holds an object that does not decode', async () => {
+    const stream = uniqueStream('archive-corrupt');
+    const batch = auditBatch(1, 2, stream);
+    await env.AUDIT_ARCHIVE.put(archiveObjectKey(stream, 2), 'not a gzip frame');
+
+    const object = { batch, prevHash: GENESIS_HASH, hash: await chainHash(GENESIS_HASH, batch) };
+    await expect(writeArchivedBatch(lockedBucket(env.AUDIT_ARCHIVE), object)).rejects.toThrow(
+      ArchiveConflictError
+    );
+    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject(
+      { kind: 'corrupt' }
+    );
   });
 });

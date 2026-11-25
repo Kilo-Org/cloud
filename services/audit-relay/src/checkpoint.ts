@@ -223,10 +223,11 @@ async function verifyStream(
     }
     if (objectSeq <= start.seq) continue;
 
-    const archived = await readArchivedObject(bucket, key);
-    if (!archived) {
-      return { ok: false, reason: 'archive_read', detail: `missing object ${key}` };
+    const read = await readArchivedObject(bucket, key);
+    if (read.kind !== 'ok') {
+      return { ok: false, reason: 'archive_read', detail: `${read.kind} object ${key}` };
     }
+    const archived = read.object;
     const { batch } = archived;
     if (batch.stream !== head.stream) {
       return { ok: false, reason: 'chain', detail: `${key} names stream ${batch.stream}` };

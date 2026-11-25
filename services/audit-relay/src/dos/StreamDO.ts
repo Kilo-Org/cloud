@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { AuditBatch } from '@kilocode/sts-contracts';
+import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
 import { SecretUnavailableError } from '@kilocode/secrets-client';
 import { withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
@@ -14,7 +14,14 @@ export type StreamHead = { seq: number; hash: string };
 
 const GAP_RETRY_SECONDS = 30;
 const FAILURE_RETRY_SECONDS = 60;
-const HOT_GAPS_KEY = 'hot_gaps';
+
+const HEAD_KEY = 'head';
+const HOT_COPY_PREFIX = 'hot_copy:';
+
+/** One row per archived range, keyed by its `toSeq` so a listing is sequence order. */
+function hotCopyKey(toSeq: number): string {
+  return `${HOT_COPY_PREFIX}${String(toSeq).padStart(12, '0')}`;
+}
 
 export type StreamRetryReason = 'gap' | 'archive' | 'axiom' | 'secrets';
 
@@ -28,7 +35,7 @@ export type HotCopyFailureReason =
  * One archived range whose Axiom delivery is owed. `pending` is written in the same storage write
  * as the head advance, before the ingest is attempted; a failure replaces it with a concrete
  * reason. Either state means the replay job (or a redelivered batch) re-ingests the range from the
- * archive, and `recordedAt` is the wall clock of the row.
+ * archive. Rows are the archived ranges themselves, so they never overlap.
  */
 export type HotStoreGap = {
   stream: string;
@@ -70,12 +77,9 @@ export type StreamOutcome =
     }
   | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' };
 
-function sameRange(
-  row: { fromSeq: number; toSeq: number },
-  range: { fromSeq: number; toSeq: number }
-): boolean {
-  return row.fromSeq === range.fromSeq && row.toSeq === range.toSeq;
-}
+type HotCopyResult =
+  | { kind: 'delivered' }
+  | Extract<StreamOutcome, { kind: 'retry' } | { kind: 'hot_gap' }>;
 
 /**
  * The single writer for one audit stream: it owns the chain head, the archive object for the
@@ -87,8 +91,9 @@ function sameRange(
  * write, so an eviction can never leave an advanced head with a range nobody recorded as owed.
  */
 export class StreamDO extends DurableObject<Env> {
-  // Serialises the batches addressed to this stream inside the instance; the head in storage is
-  // what a fresh instance reads, so eviction only ever replays an idempotent attempt.
+  // Serialises the batches addressed to this stream inside the instance: R2 and fetch awaits open
+  // the input gate, so without it two batches could both read the same head. The head in storage
+  // is what a fresh instance reads, so eviction only ever replays an idempotent attempt.
   private tail: Promise<unknown> = Promise.resolve();
 
   acceptBatch(batch: AuditBatch): Promise<StreamOutcome> {
@@ -103,22 +108,22 @@ export class StreamDO extends DurableObject<Env> {
     return run;
   }
 
-  /** Ranges a replay job must re-ingest from the archive into Axiom, pending ones included. */
-  async hotStoreGaps(): Promise<HotStoreGap[]> {
-    return this.readHotStoreGaps();
+  /** Ranges a replay job must re-ingest from the archive into Axiom, oldest first. */
+  async hotStoreGaps(limit = 1000): Promise<HotStoreGap[]> {
+    const rows = await this.ctx.storage.list<HotStoreGap>({ prefix: HOT_COPY_PREFIX, limit });
+    return [...rows.values()];
   }
 
   /** Marks a replayed range done; a later duplicate batch covering it also clears it. */
   async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
-    const gaps = await this.readHotStoreGaps();
-    await this.writeHotStoreGaps(
-      gaps.filter(gap => gap.fromSeq !== fromSeq || gap.toSeq !== toSeq)
-    );
+    const key = hotCopyKey(toSeq);
+    const row = await this.ctx.storage.get<HotStoreGap>(key);
+    if (row?.fromSeq === fromSeq) await this.ctx.storage.delete(key);
   }
 
   private async applyBatch(batch: AuditBatch): Promise<StreamOutcome> {
     const head = await this.readHead();
-    if (batch.toSeq <= head.seq) return this.replayIfGapped(batch, head);
+    if (batch.toSeq <= head.seq) return this.replayIfOwed(batch, head);
     if (batch.fromSeq > head.seq + 1) {
       return {
         kind: 'retry',
@@ -173,16 +178,14 @@ export class StreamDO extends DurableObject<Env> {
       reason: 'pending',
       recordedAt: new Date().toISOString(),
     };
-    const gaps = await this.readHotStoreGaps();
     // One write for the whole commit: the head and the promise to deliver this range to Axiom
     // land together, so an eviction here is replayed instead of silently losing the range.
-    await this.ctx.storage.put({
-      stream: trimmed.stream,
-      head: { seq: trimmed.toSeq, hash },
-      [HOT_GAPS_KEY]: [...gaps.filter(gap => !sameRange(gap, owed)), owed],
+    await this.ctx.storage.put<StreamHead | HotStoreGap>({
+      [HEAD_KEY]: { seq: trimmed.toSeq, hash },
+      [hotCopyKey(trimmed.toSeq)]: owed,
     });
 
-    const hotCopy = await this.deliverHotCopy(trimmed);
+    const hotCopy = await this.deliverHotCopy(trimmed, trimmed.events, [owed], [owed]);
     if (hotCopy.kind !== 'delivered') return hotCopy;
     return {
       kind: 'accepted',
@@ -195,14 +198,13 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * A batch at or below the head was already archived. If an owed hot-copy range overlaps it, the
-   * redelivery is the second chance: re-ingest the events the message still carries (at-least-once,
-   * deduped by event id) and clear the rows it fully covers.
+   * A batch at or below the head was already archived. If owed hot-copy rows overlap it, the
+   * redelivery is the second chance: ingest the events of those rows the message carries
+   * (at-least-once, deduped by event id) and clear the rows it fully covers.
    */
-  private async replayIfGapped(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
-    const gaps = await this.readHotStoreGaps();
-    const overlapping = gaps.some(gap => gap.toSeq >= batch.fromSeq && gap.fromSeq <= batch.toSeq);
-    if (!overlapping) {
+  private async replayIfOwed(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
+    const owed = await this.owedRowsWithin(batch);
+    if (owed.length === 0) {
       return {
         kind: 'duplicate',
         stream: batch.stream,
@@ -212,11 +214,15 @@ export class StreamDO extends DurableObject<Env> {
       };
     }
 
-    const hotCopy = await this.deliverHotCopy(batch);
+    const events = owed.flatMap(row =>
+      batch.events.slice(
+        Math.max(row.fromSeq, batch.fromSeq) - batch.fromSeq,
+        Math.min(row.toSeq, batch.toSeq) - batch.fromSeq + 1
+      )
+    );
+    const covered = owed.filter(row => row.fromSeq >= batch.fromSeq && row.toSeq <= batch.toSeq);
+    const hotCopy = await this.deliverHotCopy(batch, events, owed, covered);
     if (hotCopy.kind !== 'delivered') return hotCopy;
-
-    const covered = (gap: HotStoreGap) => gap.fromSeq >= batch.fromSeq && gap.toSeq <= batch.toSeq;
-    await this.writeHotStoreGaps(gaps.filter(gap => !covered(gap)));
     return {
       kind: 'duplicate',
       stream: batch.stream,
@@ -226,11 +232,27 @@ export class StreamDO extends DurableObject<Env> {
     };
   }
 
+  // Rows are disjoint archived ranges keyed by toSeq, so the ones overlapping the batch are the
+  // run that starts at the first key at or above `batch.fromSeq`.
+  private async owedRowsWithin(batch: AuditBatch): Promise<HotStoreGap[]> {
+    const rows = await this.ctx.storage.list<HotStoreGap>({
+      prefix: HOT_COPY_PREFIX,
+      start: hotCopyKey(batch.fromSeq),
+      limit: batch.events.length + 1,
+    });
+    return [...rows.values()].filter(row => row.fromSeq <= batch.toSeq);
+  }
+
+  /**
+   * Ingests `events` and settles the owed rows they belong to: success deletes `cleared`, a
+   * failure stamps every row in `owed` with the concrete reason so the replay job knows why.
+   */
   private async deliverHotCopy(
-    batch: AuditBatch
-  ): Promise<
-    { kind: 'delivered' } | Extract<StreamOutcome, { kind: 'retry' } | { kind: 'hot_gap' }>
-  > {
+    batch: AuditBatch,
+    events: AuditEvent[],
+    owed: HotStoreGap[],
+    cleared: HotStoreGap[]
+  ): Promise<HotCopyResult> {
     const range = { stream: batch.stream, fromSeq: batch.fromSeq, toSeq: batch.toSeq };
 
     let token: string;
@@ -239,11 +261,12 @@ export class StreamDO extends DurableObject<Env> {
     } catch (error) {
       const denied = error instanceof SecretUnavailableError && !error.retryable;
       const reason: HotCopyFailureReason = denied ? 'secrets_denied' : 'secrets_unavailable';
-      await this.recordHotStoreGap({ ...range, reason });
+      await this.stampHotCopyRows(owed, reason);
       if (denied) return { kind: 'hot_gap', ...range, reason };
       return {
         kind: 'retry',
-        ...range,
+        stream: batch.stream,
+        fromSeq: batch.fromSeq,
         reason: 'secrets',
         delaySeconds: FAILURE_RETRY_SECONDS,
       };
@@ -251,51 +274,44 @@ export class StreamDO extends DurableObject<Env> {
 
     const ingest = await ingestAuditEvents(
       { url: this.env.AXIOM_URL, dataset: this.env.AXIOM_DATASET, token },
-      batch.events,
+      events,
       fetch
     );
     switch (ingest.kind) {
       case 'ok':
-        await this.clearHotStoreGap(batch.fromSeq, batch.toSeq);
+        if (cleared.length > 0) {
+          await this.ctx.storage.delete(cleared.map(row => hotCopyKey(row.toSeq)));
+        }
         return { kind: 'delivered' };
       case 'retryable':
-        await this.recordHotStoreGap({ ...range, reason: 'axiom_unavailable' });
+        await this.stampHotCopyRows(owed, 'axiom_unavailable');
         return {
           kind: 'retry',
-          ...range,
+          stream: batch.stream,
+          fromSeq: batch.fromSeq,
           reason: 'axiom',
           delaySeconds: FAILURE_RETRY_SECONDS,
         };
       case 'rejected':
-        await this.recordHotStoreGap({ ...range, reason: 'axiom_rejected' });
+        await this.stampHotCopyRows(owed, 'axiom_rejected');
         return { kind: 'hot_gap', ...range, reason: 'axiom_rejected' };
     }
   }
 
+  private async stampHotCopyRows(rows: HotStoreGap[], reason: HotCopyFailureReason): Promise<void> {
+    const recordedAt = new Date().toISOString();
+    const entries: Record<string, HotStoreGap> = {};
+    for (const row of rows) entries[hotCopyKey(row.toSeq)] = { ...row, reason, recordedAt };
+    await this.ctx.storage.put(entries);
+  }
+
   private async readHead(): Promise<StreamHead> {
-    const stored = await this.ctx.storage.get<StreamHead>('head');
-    return stored ?? { seq: 0, hash: GENESIS_HASH };
-  }
-
-  private async readHotStoreGaps(): Promise<HotStoreGap[]> {
-    return (await this.ctx.storage.get<HotStoreGap[]>(HOT_GAPS_KEY)) ?? [];
-  }
-
-  private async writeHotStoreGaps(gaps: HotStoreGap[]): Promise<void> {
-    await this.ctx.storage.put(HOT_GAPS_KEY, gaps);
-  }
-
-  // Replaces the pending row for the range with the concrete failure, keeping one row per range.
-  private async recordHotStoreGap(gap: Omit<HotStoreGap, 'recordedAt'>): Promise<void> {
-    const gaps = await this.readHotStoreGaps();
-    const entry: HotStoreGap = { ...gap, recordedAt: new Date().toISOString() };
-    const others = gaps.filter(existing => !sameRange(existing, gap));
-    // Read-modify-write without an I/O boundary: the input gate keeps it atomic.
-    await this.writeHotStoreGaps([...others, entry]);
+    return (await this.ctx.storage.get<StreamHead>(HEAD_KEY)) ?? { seq: 0, hash: GENESIS_HASH };
   }
 
   // The registry only indexes heads for the checkpoint and verify jobs. A failure there must not
-  // stall the stream, so the head still advances and the gap is logged for an operator.
+  // stall the stream, so the head still advances and the miss is logged; the next batch of the
+  // stream records the newer head.
   private async recordHead(stream: string, seq: number, hash: string): Promise<void> {
     try {
       await withDORetry(

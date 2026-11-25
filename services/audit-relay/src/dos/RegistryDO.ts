@@ -4,30 +4,32 @@ import type { StreamHead } from './StreamDO';
 
 export type StreamHeadRecord = StreamHead & { stream: string };
 
-const STREAMS_KEY = 'streams';
+const HEAD_PREFIX = 'head:';
 const VERIFIED_CHECKPOINT_KEY = 'verified_checkpoint';
 
 /**
- * One index object for every audit stream. The hourly checkpoint reads it, and the daily and
- * monthly verify jobs start from it; the per-stream objects stay the chain authority.
+ * One index object for every audit stream: one key per stream holding its newest archived head.
+ * The hourly checkpoint reads it, and the verify passes plan from it; the per-stream objects stay
+ * the chain authority.
  */
 export class RegistryDO extends DurableObject<Env> {
   async recordHead(stream: string, seq: number, hash: string): Promise<void> {
-    const streams = await this.readStreams();
-    const current = streams[stream];
+    const key = `${HEAD_PREFIX}${stream}`;
+    const current = await this.ctx.storage.get<StreamHead>(key);
     if (current && current.seq >= seq) return;
-    // Read-modify-write with no I/O boundary between the read and the write: the Durable Object
-    // input gate keeps this sequence atomic against a concurrent recordHead.
-    await this.ctx.storage.put(STREAMS_KEY, { ...streams, [stream]: { seq, hash } });
+    // No I/O boundary between this read and write, so the input gate keeps it atomic against a
+    // concurrent recordHead for the same stream.
+    await this.ctx.storage.put<StreamHead>(key, { seq, hash });
   }
 
+  /** Every stream's head, ordered by stream name. */
   async listStreams(): Promise<StreamHeadRecord[]> {
-    const streams = await this.readStreams();
-    return Object.entries(streams)
-      .map(([stream, head]) => ({ stream, seq: head.seq, hash: head.hash }))
-      .sort((left, right) =>
-        left.stream < right.stream ? -1 : left.stream > right.stream ? 1 : 0
-      );
+    const heads = await this.ctx.storage.list<StreamHead>({ prefix: HEAD_PREFIX });
+    return [...heads].map(([key, head]) => ({
+      stream: key.slice(HEAD_PREFIX.length),
+      seq: head.seq,
+      hash: head.hash,
+    }));
   }
 
   async recordVerifiedCheckpoint(key: string): Promise<void> {
@@ -36,10 +38,6 @@ export class RegistryDO extends DurableObject<Env> {
 
   async lastVerifiedCheckpoint(): Promise<string | null> {
     return (await this.ctx.storage.get<string>(VERIFIED_CHECKPOINT_KEY)) ?? null;
-  }
-
-  private async readStreams(): Promise<Record<string, StreamHead>> {
-    return (await this.ctx.storage.get<Record<string, StreamHead>>(STREAMS_KEY)) ?? {};
   }
 }
 

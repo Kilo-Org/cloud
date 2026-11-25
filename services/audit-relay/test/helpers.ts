@@ -1,6 +1,7 @@
 import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
 import { env as bindings } from 'cloudflare:workers';
 import type { Env } from '../src/env';
+import { archiveObjectKey, readArchivedObject, type ArchivedBatch } from '../src/relay/archive';
 
 export const env = bindings as unknown as Env;
 
@@ -63,4 +64,11 @@ export function axiomOk(): Response {
 export function requestBodyOf(request: CapturedRequest | undefined): unknown[] {
   if (!request?.body) return [];
   return JSON.parse(request.body) as unknown[];
+}
+
+/** The archived object for `stream` at `toSeq`; fails the test when it is absent or corrupt. */
+export async function readArchived(stream: string, toSeq: number): Promise<ArchivedBatch> {
+  const read = await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, toSeq));
+  if (read.kind !== 'ok') throw new Error(`archive object ${stream}@${toSeq} is ${read.kind}`);
+  return read.object;
 }

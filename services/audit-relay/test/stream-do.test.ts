@@ -2,9 +2,17 @@ import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
-import { archiveObjectKey, listObjectKeys, readArchivedObject } from '../src/relay/archive';
+import { archiveObjectKey, listObjectKeys } from '../src/relay/archive';
 import { GENESIS_HASH } from '../src/relay/chain';
-import { auditBatch, axiomOk, env, recordingFetch, requestBodyOf, uniqueStream } from './helpers';
+import {
+  auditBatch,
+  axiomOk,
+  env,
+  readArchived,
+  recordingFetch,
+  requestBodyOf,
+  uniqueStream,
+} from './helpers';
 
 function accepted(outcome: StreamOutcome): Extract<StreamOutcome, { kind: 'accepted' }> {
   if (outcome.kind !== 'accepted') throw new Error(`expected accepted, got ${outcome.kind}`);
@@ -33,9 +41,9 @@ describe('StreamDO', () => {
       archiveObjectKey(stream, 5),
     ]);
 
-    const stored = await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 5));
-    expect(stored?.prevHash).toBe(first.hash);
-    expect(stored?.hash).toBe(second.hash);
+    const stored = await readArchived(stream, 5);
+    expect(stored.prevHash).toBe(first.hash);
+    expect(stored.hash).toBe(second.hash);
 
     expect(http.requests).toHaveLength(2);
     expect(requestBodyOf(http.requests[0])).toHaveLength(2);
@@ -88,10 +96,10 @@ describe('StreamDO', () => {
     const overlap = accepted(await stub.acceptBatch(auditBatch(2, 5, stream)));
 
     expect(overlap).toMatchObject({ fromSeq: 4, toSeq: 5 });
-    const stored = await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 5));
-    expect(stored?.prevHash).toBe(head.hash);
-    expect(stored?.batch.fromSeq).toBe(4);
-    expect(stored?.batch.events.map(event => event.data.attributes.seq)).toEqual([4, 5]);
+    const stored = await readArchived(stream, 5);
+    expect(stored.prevHash).toBe(head.hash);
+    expect(stored.batch.fromSeq).toBe(4);
+    expect(stored.batch.events.map(event => event.data.attributes.seq)).toEqual([4, 5]);
     expect(requestBodyOf(http.requests[1])).toHaveLength(2);
   });
 
@@ -120,7 +128,7 @@ describe('StreamDO', () => {
     ]);
     expect(http.requests).toHaveLength(2);
     expect(await stub.hotStoreGaps()).toEqual([]);
-    expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject({
+    expect(await readArchived(stream, 2)).toMatchObject({
       prevHash: GENESIS_HASH,
       batch: { fromSeq: 1, toSeq: 2 },
     });
@@ -194,17 +202,14 @@ describe('StreamDO', () => {
     // the pending row for the archived range, and nothing delivered.
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.put({
-        stream,
         head: { seq: 2, hash: 'a'.repeat(64) },
-        hot_gaps: [
-          {
-            stream,
-            fromSeq: 1,
-            toSeq: 2,
-            reason: 'pending',
-            recordedAt: new Date().toISOString(),
-          },
-        ],
+        'hot_copy:000000000002': {
+          stream,
+          fromSeq: 1,
+          toSeq: 2,
+          reason: 'pending',
+          recordedAt: new Date().toISOString(),
+        },
       });
     });
 

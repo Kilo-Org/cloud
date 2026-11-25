@@ -3,6 +3,7 @@ import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDa
 import type { UserDetailProps } from '@/types/admin';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
+import { toClientUser } from '@/lib/admin/client-user';
 import {
   getPaymentStatusByUserIds,
   describePaymentMethods,
@@ -47,7 +48,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
         })
       : [];
 
-  const adminsById = new Map(admins.map(admin => [admin.id, admin]));
+  const adminsById = new Map(admins.map(admin => [admin.id, toClientUser(admin)]));
 
   const notesWithAdmin = notes.map(note => ({
     ...note,
@@ -100,7 +101,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   );
 
   return {
-    ...user,
+    ...toClientUser(user),
     paymentMethodStatus: describePaymentMethods(
       (paymentMethodsByUserId[user.id] as PaymentMethod[]) || [],
       user,

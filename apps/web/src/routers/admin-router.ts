@@ -13,6 +13,7 @@ import {
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
+import { toClientUser } from '@/lib/admin/client-user';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
@@ -684,7 +685,7 @@ export const adminRouter = createTRPCRouter({
 
       return {
         ...insertResult[0],
-        admin_kilo_user: ctx.user,
+        admin_kilo_user: toClientUser(ctx.user),
       };
     }),
 

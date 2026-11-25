@@ -2,7 +2,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { JWTTokenExtraPayload } from '@kilocode/web-shared/lib/tokens';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 
 /**
  * Fetches the first user in the organization and generates an auth token
@@ -40,6 +40,6 @@ export async function getAuthToken(
   const user = users[0];
 
   // Generate API token
-  const token = generateApiToken(user, extraPayload);
+  const token = generateApiToken(user, extraPayload, { expiresIn: TOKEN_EXPIRY.oneHour });
   return token;
 }

@@ -8,7 +8,6 @@ export const RUNTIME_CREDENTIAL_PROXY_AUDIENCE = 'cloud-agent-next:runtime-crede
 export const KILOCLAW_AUDIENCE = 'kiloclaw';
 export const SESSION_INGEST_AUDIENCE = 'session-ingest';
 export const AI_ATTRIBUTION_AUDIENCE = 'ai-attribution';
-export const HTML_DEPLOY_AUDIENCE = 'deploy-builder:html-deploy';
 export const PAGES_AUDIENCE = 'pages';
 export const PAGES_DEV_AUDIENCE = 'pages-dev';
 

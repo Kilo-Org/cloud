@@ -195,6 +195,10 @@ describe('Vercel function identity', () => {
     expect(await production.verify(await signToken(production.slug, STAGING_CLAIMS))).toMatchObject(
       { status: 'denied', reason: 'environment_mismatch' }
     );
+    const development = await fixture('development');
+    expect(
+      await development.verify(await signToken(development.slug, STAGING_CLAIMS))
+    ).toMatchObject({ status: 'denied', reason: 'environment_mismatch' });
   });
 
   it('refuses a subject that disagrees with the token claims', async () => {

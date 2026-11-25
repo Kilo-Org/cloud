@@ -214,7 +214,7 @@ secrets: [APP_ONE_SECRET]
       );
     });
 
-    it('maps preview only to development, custom environments to staging or development', () => {
+    it('maps preview only to development, custom environments only to staging', () => {
       expectThrow(
         {
           'web.yaml': vercel({
@@ -232,6 +232,15 @@ secrets: [APP_ONE_SECRET]
           }),
         },
         'Vercel environment production may only read production'
+      );
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[development]',
+            vercelEnvironments: '[{ customEnvironmentId: env_S1 }]',
+          }),
+        },
+        'Vercel environment custom:env_S1 may only read staging, which the policy does not grant'
       );
       expect(() =>
         loadPolicies({

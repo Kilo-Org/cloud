@@ -92,10 +92,10 @@ export const VercelIdentitySchema = z.strictObject({
 /**
  * The STS environments a Vercel environment may read (design 6.2): only `production` reaches
  * production values; a preview runs code from any branch, so it reads development values; a custom
- * environment reads staging or development values.
+ * environment reads staging values only.
  */
 export function vercelStsEnvironments(environment: VercelEnvironment): readonly StsEnvironment[] {
-  if (typeof environment !== 'string') return ['staging', 'development'];
+  if (typeof environment !== 'string') return ['staging'];
   return environment === 'production' ? ['production'] : ['development'];
 }
 

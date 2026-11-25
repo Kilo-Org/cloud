@@ -14,6 +14,7 @@ import { getRefresherStub, getSignerStub } from './dos/stubs';
 import type { ManagerJwks } from './dos/SignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
 import { IdentityVerifier } from './identity/verify';
+import { WebhookGate, type WebhookOutcome } from './infisical/webhook';
 import { policyIndex } from './policy';
 
 /** Infisical posts `secrets.modified` for this environment here (README). */
@@ -22,7 +23,9 @@ export const MANAGER_WEBHOOK_PATH = '/manager-webhook';
 /** The key set changes only when the signer key does, so an isolate serves it from memory. */
 const JWKS_CACHE_MS = 5 * 60 * 1000;
 
-let jwksCache: { environment: string; jwks: ManagerJwks; expiresAt: number } | null = null;
+let jwksCache: { environment: string; jwks: Promise<ManagerJwks>; expiresAt: number } | null = null;
+
+let gateCache: { environment: string; gate: WebhookGate } | null = null;
 
 /** Provider discovery and key sets are cached in the verifier, so one instance serves the isolate. */
 let verifierCache: { key: string; instance: IdentityVerifier } | null = null;
@@ -78,24 +81,34 @@ async function readBundleRequest(request: Request): Promise<BundleRequest | null
   return parsed.success ? parsed.data : null;
 }
 
+/** Concurrent misses in one isolate share one SignerDO call; a failed call is not cached. */
 async function keySet(env: Env, config: StsConfig): Promise<Response> {
   const now = Date.now();
   const cached = jwksCache;
-  let jwks: ManagerJwks;
+  let jwks: Promise<ManagerJwks>;
   if (cached !== null && cached.environment === config.environment && cached.expiresAt > now) {
     jwks = cached.jwks;
   } else {
-    jwks = await withDORetry(
+    jwks = withDORetry(
       () => getSignerStub(env, config),
       stub => stub.getJwks(),
       'sts.getJwks'
     );
-    jwksCache = { environment: config.environment, jwks, expiresAt: now + JWKS_CACHE_MS };
+    const entry = { environment: config.environment, jwks, expiresAt: now + JWKS_CACHE_MS };
+    jwksCache = entry;
+    jwks.catch(() => {
+      if (jwksCache === entry) jwksCache = null;
+    });
   }
-  return jsonResponse(jwks, 200, 'public, max-age=300');
+  return jsonResponse(await jwks, 200, 'public, max-age=300');
 }
 
-async function bundleRequest(request: Request, env: Env, config: StsConfig): Promise<Response> {
+async function bundleRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: StsConfig
+): Promise<Response> {
   const authorization = request.headers.get('authorization');
   const token = authorization?.startsWith('Bearer ')
     ? authorization.slice('Bearer '.length).trim()
@@ -121,9 +134,28 @@ async function bundleRequest(request: Request, env: Env, config: StsConfig): Pro
   return bundleResponse(await serveBundle(env, config, outcome.workload, body));
 }
 
+function webhookGate(env: Env, config: StsConfig): WebhookGate {
+  const cached = gateCache;
+  if (cached !== null && cached.environment === config.environment) return cached.gate;
+  const gate = new WebhookGate({
+    loadSecret: () =>
+      withDORetry(
+        () => getRefresherStub(env, config),
+        stub => stub.webhookSecret(),
+        'sts.webhookSecret'
+      ),
+    projectId: config.manager.projectId,
+    environmentSlug: config.manager.environmentSlug,
+    now: () => Date.now(),
+  });
+  gateCache = { environment: config.environment, gate };
+  return gate;
+}
+
 /**
- * Only a signed body reaches the refresher. The size and header shape are checked here, so an
- * unsigned flood costs no Durable Object hop.
+ * The Worker checks size and signature itself; only a verified `secrets.modified` for this
+ * environment costs a refresher hop. A forged request costs at most one secret reload per isolate
+ * per minute (WebhookGate).
  */
 async function managerWebhook(request: Request, env: Env, config: StsConfig): Promise<Response> {
   const signature = request.headers.get('x-infisical-signature');
@@ -138,18 +170,51 @@ async function managerWebhook(request: Request, env: Env, config: StsConfig): Pr
   if (new TextEncoder().encode(body).byteLength > WEBHOOK_MAX_BODY_BYTES) {
     return jsonResponse({ error: 'too_large' }, 413, 'no-store');
   }
-  const outcome = await withDORetry(
-    () => getRefresherStub(env, config),
-    async stub => await stub.receiveWebhook(body, signature),
-    'sts.receiveWebhook'
-  );
+  let outcome: WebhookOutcome;
+  try {
+    outcome = await webhookGate(env, config).verify(body, signature);
+  } catch (error) {
+    console.warn('sts: manager webhook secret could not be loaded', {
+      reason: error instanceof Error ? error.name : 'unknown',
+    });
+    return unavailableResponse();
+  }
   if (outcome.status === 'rejected') {
     return jsonResponse({ error: 'invalid_signature' }, 401, 'no-store');
+  }
+  if (outcome.status === 'refresh') {
+    try {
+      await withDORetry(
+        () => getRefresherStub(env, config),
+        stub => stub.requestWebhookRefresh(),
+        'sts.requestWebhookRefresh'
+      );
+    } catch (error) {
+      console.warn('sts: manager webhook refresh request failed', {
+        reason: error instanceof Error ? error.name : 'unknown',
+      });
+      return unavailableResponse();
+    }
   }
   return jsonResponse({ status: outcome.status }, 200, 'no-store');
 }
 
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
+function unavailableResponse(): Response {
+  return new Response(JSON.stringify({ error: 'temporarily_unavailable' }), {
+    status: 503,
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      'retry-after': String(VERIFIER_RETRY_AFTER_SECONDS),
+    },
+  });
+}
+
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
 
@@ -157,7 +222,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return await keySet(env, config);
   }
   if (request.method === 'POST' && pathname === STS_BUNDLE_HTTP_PATH) {
-    return await bundleRequest(request, env, config);
+    return await bundleRequest(request, env, ctx, config);
   }
   if (request.method === 'POST' && pathname === MANAGER_WEBHOOK_PATH) {
     return await managerWebhook(request, env, config);

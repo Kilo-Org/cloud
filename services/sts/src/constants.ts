@@ -16,6 +16,13 @@ export const WEBHOOK_MAX_SKEW_MS = 5 * 60 * 1000;
 /** A webhook body above this size is refused before any signature work. */
 export const WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
 
+/**
+ * A Worker isolate reloads the webhook secret from the refresher at most this often, after a
+ * signature that fails or a load that failed, so a forged flood costs at most one refresher hop
+ * per isolate per minute.
+ */
+export const WEBHOOK_KEY_RELOAD_MS = 60 * 1000;
+
 /** First retry after a failed manager read; each further failure doubles it, up to the cap. */
 export const BACKOFF_BASE_MS = 15 * 1000;
 export const BACKOFF_CAP_MS = REFRESH_INTERVAL_MS;

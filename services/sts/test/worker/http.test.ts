@@ -94,12 +94,7 @@ describe('manager webhook route', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     installManager({ secrets: [] });
     const refresher = getRefresherStub(env, config);
-    await refresher.receiveWebhook('{}', null);
-    const key = await runInDurableObject(
-      refresher,
-      (_instance, state) =>
-        state.storage.sql.exec<{ key: string }>('SELECT key FROM webhook_key').one().key
-    );
+    const key = await refresher.webhookSecret();
 
     const body = webhookBody({ timestamp: Date.now() });
     const signed = await SELF.fetch(`${config.issuer}/manager-webhook`, {

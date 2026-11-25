@@ -179,6 +179,7 @@ export const ADMIN_ONLY_TRPC_PROCEDURES = [
   'organizations.sso.clearSsoDomain',
   'organizations.sso.createConfig',
   'organizations.sso.deleteConfig',
+  'organizations.sso.generateAdminPortalLink',
   'organizations.sso.updateSsoDomain',
   'organizations.updatePlan',
   'organizations.updateSeatsRequired',

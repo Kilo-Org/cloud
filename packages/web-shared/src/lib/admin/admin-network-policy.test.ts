@@ -134,6 +134,10 @@ describe('admin edge path patterns', () => {
     '/api/trpc/organizations.updatePlan,user.getMe',
     '/api/trpc/organizations.updatePlan%2Cuser.getMe',
     '/api/trpc/user.getMe,organizations.sso.createConfig,organizations.list',
+    '/api/trpc/organizations.sso.generateAdminPortalLink',
+    '/api/trpc/organizations.sso.generateAdminPortalLink?batch=1&input=%7B%7D',
+    '/api/trpc/organizations.sso.generateAdminPortalLink,user.getMe',
+    '/api/trpc/organizations.sso.generateAdminPortalLink%2Cuser.getMe',
   ])('matches %s', pathname => {
     expect(isAdminEdgePath(pathname)).toBe(true);
   });
@@ -151,7 +155,7 @@ describe('admin edge path patterns', () => {
     '/api/trpc/stepUp.getStatus',
     '/api/trpc/stepUp.getStatus,user.getMe',
     '/api/trpc/organizations.sso.getConfig',
-    '/api/trpc/organizations.sso.generateAdminPortalLink',
+    '/api/trpc/organizations.sso.generateAdminPortalLinkX',
     '/api/trpc/organizations.updatePlanDraft',
     '/api/trpc/organizations.updatePlanFoo',
     '/api/trpc/organizations.sso.createConfigX',

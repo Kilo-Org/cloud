@@ -303,10 +303,9 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
     // network check; listing one here only gives up the edge layer for it.
     const edgeExclusions: Record<string, string> = {
       'stepUp.getStatus':
-        'StepUpProvider mounts app-wide for every admin session and polls it beside the ' +
-        "page's own procedures, so an edge match would refuse whole batches on normal pages",
-      'organizations.sso.generateAdminPortalLink':
-        'SSOSignupCard offers it to organization owners and managers, who are not Kilo admins',
+        'StepUpProvider mounts app-wide and, for a signed-in admin with step-up enabled, polls it ' +
+        "on every page beside the page's own procedures, so an edge match would refuse whole " +
+        'batches on normal pages',
     };
     const adminPaths = new Set(
       discoveredProcedures

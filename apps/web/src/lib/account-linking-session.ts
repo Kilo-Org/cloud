@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 const LINKING_COOKIE_NAME = 'account-linking-session';
 const LINKING_COOKIE_MAX_AGE = 60 * 15; // 15 minutes
@@ -12,9 +13,14 @@ const jwtSigningAlgorithm = 'HS256';
 // The linking cookie is signed with the shared NextAuth secret, so the claims
 // must carry their own purpose and pass a strict shape check before a callback
 // may act on them.
+//
+// The link belongs to the browser session that started it: the cookie carries
+// a hash of that session's id (the id itself never reaches the browser), and
+// the callback completes the link only for the same session.
 const claimsSchema = z
   .object({
     existingUserId: z.string().min(1),
+    webSessionIdHash: z.string().regex(/^[0-9a-f]{64}$/),
     targetProvider: z.string().min(1),
     organizationId: z.uuid().optional(),
     chatGptScope: z.literal('shared_services').optional(),
@@ -29,17 +35,26 @@ type LinkingClaims = z.infer<typeof claimsSchema>;
 
 export type AccountLinkingSession = Pick<
   LinkingClaims,
-  'existingUserId' | 'targetProvider' | 'organizationId' | 'chatGptScope' | 'createdAt'
+  | 'existingUserId'
+  | 'webSessionIdHash'
+  | 'targetProvider'
+  | 'organizationId'
+  | 'chatGptScope'
+  | 'createdAt'
 >;
 
-export async function createAccountLinkingSession(
-  existingUserId: string,
-  targetProvider: string,
-  organizationId?: string,
-  chatGptScope?: 'shared_services'
-): Promise<void> {
+export async function createAccountLinkingSession(params: {
+  existingUserId: string;
+  /** The browser session that starts the link. */
+  webSessionId: string;
+  targetProvider: string;
+  organizationId?: string;
+  chatGptScope?: 'shared_services';
+}): Promise<void> {
+  const { existingUserId, targetProvider, organizationId, chatGptScope } = params;
   const session: AccountLinkingSession = {
     existingUserId,
+    webSessionIdHash: hashWebSessionId(params.webSessionId),
     targetProvider,
     ...(organizationId ? { organizationId } : {}),
     ...(chatGptScope ? { chatGptScope } : {}),
@@ -102,11 +117,20 @@ export async function getAccountLinkingSession(): Promise<AccountLinkingSession 
 
   return {
     existingUserId: claims.data.existingUserId,
+    webSessionIdHash: claims.data.webSessionIdHash,
     targetProvider: claims.data.targetProvider,
     ...(claims.data.organizationId ? { organizationId: claims.data.organizationId } : {}),
     ...(claims.data.chatGptScope ? { chatGptScope: claims.data.chatGptScope } : {}),
     createdAt: claims.data.createdAt,
   };
+}
+
+/** Whether the browser session is the one that started the link. */
+export function isLinkingWebSession(
+  session: Pick<AccountLinkingSession, 'webSessionIdHash'>,
+  webSessionId: string | undefined
+): boolean {
+  return webSessionId !== undefined && hashWebSessionId(webSessionId) === session.webSessionIdHash;
 }
 
 async function clearAccountLinkingSession(): Promise<void> {

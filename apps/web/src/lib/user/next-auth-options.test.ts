@@ -70,6 +70,7 @@ import {
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 /**
  * This test verifies the LinkedIn profile name parsing logic
@@ -744,11 +745,16 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(getAccountLinkingSession).mockResolvedValue({
       existingUserId: owner.id,
       targetProvider: 'workos',
+      webSessionIdHash: hashWebSessionId('web-session-sso-link'),
       createdAt: Date.now(),
     });
     jest
       .mocked(userServer.getUserFromSessionForCredentialIssuance)
-      .mockResolvedValue({ user: owner, authFailedResponse: null } as Awaited<
+      .mockResolvedValue({
+        user: owner,
+        authFailedResponse: null,
+        webSessionId: 'web-session-sso-link',
+      } as Awaited<
         ReturnType<typeof userServer.getUserFromSessionForCredentialIssuance>
       >);
 

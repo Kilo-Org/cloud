@@ -46,7 +46,7 @@ import {
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
-import { getAccountLinkingSession } from '@/lib/account-linking-session';
+import { getAccountLinkingSession, isLinkingWebSession } from '@/lib/account-linking-session';
 import {
   findUserIdByAuthProvider,
   getUserAuthProviders,
@@ -1202,11 +1202,12 @@ export const authOptions: NextAuthOptions = {
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
         // Account linking requires the person who started it: the pending link
-        // names a user, and the request must carry that user's live web
-        // session (not a revoked one, and never a bearer credential). A
-        // request whose session does not name the same user is refused with
-        // the ordinary linking failure. The read above consumed the cookie, so
-        // a refusal is final.
+        // names a user and the browser session that started it, and the
+        // request must carry that same live web session (not a revoked one, a
+        // different session of the same user, or a bearer credential). A
+        // request whose session does not match is refused with the ordinary
+        // linking failure. The read above consumed the cookie, so a refusal is
+        // final.
         if (isAccountLinking && linkingSession) {
           // The link start checked the domain's SSO policy; the callback checks
           // it again so a policy change in between, or a link started before
@@ -1223,7 +1224,8 @@ export const authOptions: NextAuthOptions = {
             }
             return redirectUrlForCode(linkRefusal);
           }
-          const linkingPrincipal = (await getUserFromSessionForCredentialIssuance()).user;
+          const linkingSessionRead = await getUserFromSessionForCredentialIssuance();
+          const linkingPrincipal = linkingSessionRead.user;
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             // Apple answers with a cross-site form POST that cannot carry the
             // Lax session cookie. Park the identity as an explicit pending
@@ -1259,6 +1261,18 @@ export const authOptions: NextAuthOptions = {
             // An organization-scoped connect starts on the organization's BYOK
             // card, which reads `openai_error`; return the refusal there the
             // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (!isLinkingWebSession(linkingSession, linkingSessionRead.webSessionId)) {
+            warnInSentry('SECURITY: Account link refused: another browser session finished it', {
+              extra: { provider: accountInfo.provider },
+            });
             if (account.provider === 'openai' && linkingSession.organizationId) {
               return openAiChatGptConnectFailureUrl(
                 linkingSession.organizationId,

@@ -1076,13 +1076,14 @@ export const userRouter = createTRPCRouter({
       await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
 
       try {
-        // Create a secure linking session
-        await createAccountLinkingSession(
-          ctx.user.id,
-          input.provider,
-          input.organizationId,
-          input.chatGptScope
-        );
+        // Create a secure linking session, bound to this browser session
+        await createAccountLinkingSession({
+          existingUserId: ctx.user.id,
+          webSessionId: binding.webSessionId,
+          targetProvider: input.provider,
+          organizationId: input.organizationId,
+          chatGptScope: input.chatGptScope,
+        });
 
         return successResult();
       } catch (error) {

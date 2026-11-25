@@ -463,9 +463,9 @@ describe('user.linkAuthProvider', () => {
     });
   });
 
-  it('starts a link for every offered provider with its code', async () => {
+  it('starts a link for every offered provider with its code, bound to this browser session', async () => {
     const user = await insertUser();
-    await setSessionCookie(user);
+    await setSessionCookie(user, { webSessionId: 'web-session-link-start' });
     const caller = await createSessionCallerForUser(user.id);
 
     for (const { id } of AccountLinkingProviders) {
@@ -474,7 +474,13 @@ describe('user.linkAuthProvider', () => {
       await expect(
         caller.user.linkAuthProvider({ provider: id, code, challengeId })
       ).resolves.toEqual({ success: true });
-      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith({
+        existingUserId: user.id,
+        webSessionId: 'web-session-link-start',
+        targetProvider: id,
+        organizationId: undefined,
+        chatGptScope: undefined,
+      });
     }
 
     // A method the card does not offer must not get a code or a linking session.

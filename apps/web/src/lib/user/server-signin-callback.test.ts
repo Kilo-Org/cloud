@@ -21,6 +21,7 @@ jest.mock('@/lib/user', () => ({
   linkAccountToExistingUser: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
+  ...(jest.requireActual('@/lib/account-linking-session') as object),
   getAccountLinkingSession: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
@@ -63,6 +64,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_auth_provider, type User } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -105,8 +107,16 @@ async function insertLinkOwner() {
   });
 }
 
+/** The browser session that starts the link in these suites. */
+const OWNER_WEB_SESSION_ID = 'web-session-link-owner';
+const OWNER_WEB_SESSION_ID_HASH = hashWebSessionId(OWNER_WEB_SESSION_ID);
+
 async function setOwnerSessionCookie(owner: User, claims: Partial<JWT> = {}) {
-  await setSessionCookie(owner.id, { webSessionPepper: owner.web_session_pepper, ...claims });
+  await setSessionCookie(owner.id, {
+    webSessionPepper: owner.web_session_pepper,
+    webSessionId: OWNER_WEB_SESSION_ID,
+    ...claims,
+  });
 }
 
 /** An organization whose SSO policy the mocked domain authority names. */
@@ -242,6 +252,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -269,6 +280,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -295,6 +307,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -457,6 +470,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     await setOwnerSessionCookie(owner);
 
@@ -478,6 +492,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
     await setOwnerSessionCookie(owner);
@@ -488,6 +503,39 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(result).toBe('/connected-accounts?linked=openai');
     expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link that another browser session of the same user finishes', async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setOwnerSessionCookie(owner, { webSessionId: 'web-session-other-browser' });
+
+    const result = await signIn(openAiLinkCallback('other-session@example.net', 'openai-other'));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link from a session that has no browser session id', async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setSessionCookie(owner.id, { webSessionPepper: owner.web_session_pepper });
+
+    const result = await signIn(openAiLinkCallback('no-session-id@example.net', 'openai-no-id'));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
   });
 
   it('requires the web session to name the same user as the pending link', async () => {
@@ -577,6 +625,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       existingUserId: owner.id,
       targetProvider: 'openai',
       organizationId: '00000000-0000-4000-8000-000000000001',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
     await setOwnerSessionCookie(owner);
@@ -606,6 +655,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
     await setOwnerSessionCookie(owner);
@@ -629,6 +679,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       targetProvider: 'openai',
       organizationId: SHARED_SERVICES_ORGANIZATION_ID,
       chatGptScope: 'shared_services',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
     await setOwnerSessionCookie(owner);
@@ -795,6 +846,7 @@ describe('Claude explicit linking persistence', () => {
     });
     async function start() {
       await setSessionCookie(owner.id, {
+        webSessionId: OWNER_WEB_SESSION_ID,
         authProvider: 'workos',
         webSessionPepper: owner.web_session_pepper,
         ssoSourceOrganizationId: ssoOrganizationId,
@@ -802,6 +854,7 @@ describe('Claude explicit linking persistence', () => {
       mockGetAccountLinkingSession.mockResolvedValueOnce({
         existingUserId: owner.id,
         targetProvider: 'claude',
+        webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
         createdAt: Date.now(),
       });
     }
@@ -845,6 +898,7 @@ describe('Claude explicit linking persistence', () => {
       } else {
         const sessionUser = sessionState === 'different' ? await insertTestUser() : link.owner;
         await setSessionCookie(sessionUser.id, {
+          webSessionId: OWNER_WEB_SESSION_ID,
           webSessionPepper:
             sessionState === 'revoked' ? randomUUID() : sessionUser.web_session_pepper,
         });
@@ -873,7 +927,12 @@ describe('Claude explicit linking persistence', () => {
         .mockReset()
         .mockResolvedValue(
           intentState === 'different'
-            ? { existingUserId: link.owner.id, targetProvider: 'google', createdAt: Date.now() }
+            ? {
+                existingUserId: link.owner.id,
+                targetProvider: 'google',
+                webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+                createdAt: Date.now(),
+              }
             : null
         );
       // Settlement finds the existing account that owns this email and another
@@ -924,6 +983,7 @@ describe('Claude explicit linking persistence', () => {
     mockGetAccountLinkingSession.mockReset().mockResolvedValueOnce({
       existingUserId: original.owner.id,
       targetProvider: 'claude',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
     await original.start();
@@ -1017,6 +1077,7 @@ describe('the NextAuth callback for an account link', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'fake-login',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
     mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);

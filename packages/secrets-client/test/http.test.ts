@@ -1,3 +1,4 @@
+import { STS_FETCHED_AT_HEADER, STS_STALE_HEADER } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError } from '../src/errors';
 import { createHttpSecrets } from '../src/http';
@@ -74,8 +75,14 @@ describe('createHttpSecrets', () => {
     expect(init?.body).toBe('{}');
   });
 
-  it('sends If-None-Match and keeps values on 304', async () => {
-    const { fetchFn, secrets } = withToken([json(ok()), notModified(ETAG_1)]);
+  it('sends If-None-Match and reads the stale flag and fetch time of a 304', async () => {
+    const { fetchFn, secrets } = withToken([
+      json(ok()),
+      notModified(ETAG_1, {
+        [STS_STALE_HEADER]: 'true',
+        [STS_FETCHED_AT_HEADER]: '2026-11-25T00:04:00.000Z',
+      }),
+    ]);
 
     await secrets.get(SECRET);
     await advance(301);
@@ -84,6 +91,11 @@ describe('createHttpSecrets', () => {
     const init = fetchFn.mock.calls[1][1];
     expect(headersOf(init).get('If-None-Match')).toBe(ETAG_1);
     expect(init?.body).toBe(JSON.stringify({ ifNoneMatch: ETAG_1 }));
+    expect(await secrets.snapshot()).toEqual({
+      stale: true,
+      fetchedAt: '2026-11-25T00:04:00.000Z',
+      etag: ETAG_1,
+    });
   });
 
   it('treats a 304 without the stale header as fresh', async () => {
@@ -97,6 +109,19 @@ describe('createHttpSecrets', () => {
       stale: false,
       fetchedAt: new Date(NOW + 301_000).toISOString(),
       etag: ETAG_1,
+    });
+  });
+
+  it('keeps the held bundle when a 304 carries an invalid stale header', async () => {
+    const { secrets } = withToken([json(ok()), notModified(ETAG_1, { [STS_STALE_HEADER]: 'yes' })]);
+
+    await secrets.get(SECRET);
+    await advance(301);
+
+    expect(await secrets.get(SECRET)).toBe('ae-token');
+    expect(await secrets.snapshot()).toMatchObject({
+      stale: true,
+      fetchedAt: '2026-11-25T00:00:00.000Z',
     });
   });
 

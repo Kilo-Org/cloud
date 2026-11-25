@@ -24,6 +24,47 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
   'audit-relay-local',
 ];
 
+/** [deployed Worker name, queue]: one right on an audit queue. */
+type QueueGrant = readonly [worker: string, queue: string];
+
+/** Each STS deployment produces only to its own environment's audit queue. */
+export const AUDIT_QUEUE_PRODUCERS: readonly QueueGrant[] = [
+  ['sts', 'kilo-audit'],
+  ['sts-staging', 'kilo-audit-staging'],
+  ['sts-local', 'kilo-audit-local'],
+  // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
+  ['sts-test', 'kilo-audit-local'],
+];
+
+/**
+ * Each relay deployment consumes its own environment's audit queue and dead-letter queue. Nothing
+ * produces to a dead-letter queue: only the relay's own consumer moves messages there.
+ */
+export const AUDIT_QUEUE_CONSUMERS: readonly QueueGrant[] = [
+  ['audit-relay', 'kilo-audit'],
+  ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay-staging', 'kilo-audit-staging'],
+  ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-local'],
+  ['audit-relay-local', 'kilo-audit-local-dlq'],
+];
+
+export const AUDIT_QUEUE_DEAD_LETTERS: readonly QueueGrant[] = [
+  ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-local-dlq'],
+];
+
+/**
+ * The config (by top-level name) that alone may deploy each name the lists above grant rights to;
+ * any other config deploying under one of these names would replace that Worker.
+ */
+const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
+  ...[...STS_DEPLOYMENTS.keys()].map((name): [string, string] => [name, 'sts']),
+  ...AUDIT_RELAY_DEPLOYMENTS.map((name): [string, string] => [name, 'audit-relay']),
+  ['sts-test', 'sts-test'],
+]);
+
 const STS_ENTRYPOINT = 'SecretsBroker';
 
 // Prefix matches, wider than the deployment lists on purpose: a binding to a name that only looks
@@ -31,6 +72,7 @@ const STS_ENTRYPOINT = 'SecretsBroker';
 const isStsName = (name: string) => name === 'sts' || name.startsWith('sts-');
 const isAuditRelayName = (name: string) =>
   name === 'audit-relay' || name.startsWith('audit-relay-');
+const isAuditQueue = (queue: string) => queue === 'kilo-audit' || queue.startsWith('kilo-audit-');
 
 // A Wrangler config under one of these path segments is a test fixture no deploy reads.
 const FIXTURE_SEGMENTS = new Set(['node_modules', 'test', 'tests', '__tests__', 'fixtures']);
@@ -49,6 +91,13 @@ const DurableObjectBindingSchema = z.object({
   script_name: z.string().optional(),
 });
 
+const QueuesSchema = z.object({
+  producers: z.array(z.object({ binding: z.string(), queue: z.string() })).optional(),
+  consumers: z
+    .array(z.object({ queue: z.string(), dead_letter_queue: z.string().optional() }))
+    .optional(),
+});
+
 const BlockSchema = z.object({
   name: z.string().optional(),
   vars: z.record(z.string(), z.unknown()).optional(),
@@ -56,6 +105,7 @@ const BlockSchema = z.object({
   durable_objects: z
     .object({ bindings: z.array(DurableObjectBindingSchema).optional() })
     .optional(),
+  queues: QueuesSchema.optional(),
 });
 
 const WorkerConfigSchema = BlockSchema.extend({
@@ -77,6 +127,7 @@ type Block = {
   vars: Record<string, unknown>;
   services: ServiceBinding[];
   durableObjects: Array<z.infer<typeof DurableObjectBindingSchema>>;
+  queues: z.infer<typeof QueuesSchema>;
 };
 
 export function parseWorkerConfig(path: string, raw: unknown): WorkerConfig {
@@ -120,6 +171,7 @@ function blocksOf({ path, config }: WorkerConfig): Block[] {
     vars: config.vars ?? {},
     services: config.services ?? [],
     durableObjects: config.durable_objects?.bindings ?? [],
+    queues: config.queues ?? {},
   };
   // Wrangler inherits neither bindings nor vars into a named environment, so each block stands on
   // its own; an absent `name` deploys as `<top-level name>-<env>`.
@@ -131,6 +183,7 @@ function blocksOf({ path, config }: WorkerConfig): Block[] {
     vars: block.vars ?? {},
     services: block.services ?? [],
     durableObjects: block.durable_objects?.bindings ?? [],
+    queues: block.queues ?? {},
   }));
   return [top, ...named];
 }
@@ -183,12 +236,63 @@ function stsBindingProblems(
   return problems;
 }
 
+function grantProblem(
+  grants: readonly QueueGrant[],
+  worker: string | undefined,
+  queue: string,
+  what: string
+): string[] {
+  if (grants.some(([granted, grantedQueue]) => granted === worker && grantedQueue === queue)) {
+    return [];
+  }
+  const allowed = grants.filter(([, grantedQueue]) => grantedQueue === queue).map(([w]) => w);
+  return [`${what}; ${allowed.length > 0 ? `only ${allowed.join(', ')} may` : 'no Worker may'}`];
+}
+
+/**
+ * An audit batch is trusted as the producing STS deployment's own stream, so a foreign producer
+ * could forge one, and a foreign consumer (or dead-letter target) would take batches from the relay.
+ */
+function auditQueueProblems(block: Block): string[] {
+  const worker = block.deployedName;
+  const problems: string[] = [];
+  for (const { binding, queue } of block.queues.producers ?? []) {
+    if (!isAuditQueue(queue)) continue;
+    problems.push(
+      ...grantProblem(
+        AUDIT_QUEUE_PRODUCERS,
+        worker,
+        queue,
+        `${block.where}: ${binding} produces to ${queue}`
+      )
+    );
+  }
+  for (const { queue, dead_letter_queue: deadLetter } of block.queues.consumers ?? []) {
+    if (isAuditQueue(queue)) {
+      problems.push(
+        ...grantProblem(AUDIT_QUEUE_CONSUMERS, worker, queue, `${block.where} consumes ${queue}`)
+      );
+    }
+    if (deadLetter !== undefined && isAuditQueue(deadLetter)) {
+      problems.push(
+        ...grantProblem(
+          AUDIT_QUEUE_DEAD_LETTERS,
+          worker,
+          deadLetter,
+          `${block.where} dead-letters ${queue} into ${deadLetter}`
+        )
+      );
+    }
+  }
+  return problems;
+}
+
 /**
  * Problems with how the repository's Worker configs reach STS and the audit relay. The only way in
  * is a `SecretsBroker` service binding whose `props.caller` names the binding Worker. STS trusts
  * `props` because only a deploy in the account can set them (design 6.4), so these rules keep one
  * config from claiming another Worker's caller name, from reaching another environment's STS, and
- * from reaching an internal Durable Object class directly.
+ * from reaching an internal Durable Object class or audit queue directly.
  */
 export function workerConfigProblems(
   configs: readonly WorkerConfig[],
@@ -215,6 +319,14 @@ export function workerConfigProblems(
     const blocks = blocksOf(worker);
     let bindsSts = false;
     for (const block of blocks) {
+      const deployed = block.deployedName ?? '';
+      const owner = DEPLOYMENT_OWNERS.get(deployed);
+      if (owner !== undefined && caller !== owner) {
+        problems.push(
+          `${block.where} deploys as ${deployed}, which only the ${owner} config deploys`
+        );
+      }
+      problems.push(...auditQueueProblems(block));
       for (const object of block.durableObjects) {
         const script = object.script_name;
         if (script !== undefined && (isStsName(script) || isAuditRelayName(script))) {

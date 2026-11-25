@@ -247,7 +247,7 @@ describe('worker config rules', () => {
     ]);
   });
 
-  it('accepts the audit relay as it binds STS in every environment', () => {
+  it('accepts the audit relay as it binds STS and consumes its queues in every environment', () => {
     const relayBinding = (service: string) => ({
       binding: 'STS',
       service,
@@ -260,19 +260,25 @@ describe('worker config rules', () => {
         { name: 'AUDIT_SIGNER', class_name: 'SignerDO' },
       ],
     };
+    const relayQueues = (queue: string) => ({
+      consumers: [{ queue, dead_letter_queue: `${queue}-dlq` }, { queue: `${queue}-dlq` }],
+    });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
       durable_objects: ownObjects,
+      queues: relayQueues('kilo-audit'),
       services: [relayBinding('sts')],
       env: {
         staging: {
           name: 'audit-relay-staging',
           durable_objects: ownObjects,
+          queues: relayQueues('kilo-audit-staging'),
           services: [relayBinding('sts-staging')],
         },
         local: {
           name: 'audit-relay-local',
           durable_objects: ownObjects,
+          queues: relayQueues('kilo-audit-local'),
           services: [relayBinding('sts-local')],
         },
       },
@@ -280,6 +286,73 @@ describe('worker config rules', () => {
     const configs = [readWorkerConfig(repoRoot, 'services/sts/wrangler.jsonc'), relay];
     expect(workerConfigProblems(configs, shippedPolicies())).toEqual([]);
     expect(internalWorkerProblems(configs)).toEqual([]);
+  });
+
+  it('refuses a producer on an audit queue outside the STS deployment of that environment', () => {
+    const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT', queue }] });
+    const foreign = consumer({
+      queues: {
+        producers: [
+          { binding: 'AUDIT', queue: 'kilo-audit' },
+          { binding: 'JOBS', queue: 'jobs' },
+        ],
+      },
+      env: {
+        staging: { queues: audit('kilo-audit-staging') },
+        local: { queues: audit('kilo-audit-local-dlq') },
+      },
+    });
+    const crossed = parseWorkerConfig('services/sts/wrangler.jsonc', {
+      name: 'sts',
+      queues: audit('kilo-audit-staging'),
+      env: { local: { name: 'sts-local', queues: audit('kilo-audit-local') } },
+    });
+    const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
+      name: 'audit-relay',
+      queues: audit('kilo-audit'),
+    });
+    expect(problemsOf(foreign, crossed, relay)).toEqual([
+      `${PATH} (top level): AUDIT produces to kilo-audit; only sts may`,
+      `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging may`,
+      `${PATH} (env.local): AUDIT produces to kilo-audit-local-dlq; no Worker may`,
+      'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging may',
+      'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
+    ]);
+  });
+
+  it('refuses a consumer or dead-letter target on an audit queue outside the relay', () => {
+    const foreign = consumer({
+      queues: {
+        consumers: [{ queue: 'kilo-audit' }, { queue: 'jobs', dead_letter_queue: 'kilo-audit' }],
+      },
+    });
+    const crossed = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
+      name: 'audit-relay',
+      queues: {
+        consumers: [{ queue: 'kilo-audit-staging', dead_letter_queue: 'kilo-audit-staging-dlq' }],
+      },
+    });
+    expect(problemsOf(foreign, crossed)).toEqual([
+      `${PATH} (top level) consumes kilo-audit; only audit-relay may`,
+      `${PATH} (top level) dead-letters jobs into kilo-audit; no Worker may`,
+      'services/audit-relay/wrangler.jsonc (top level) consumes kilo-audit-staging; only audit-relay-staging may',
+      'services/audit-relay/wrangler.jsonc (top level) dead-letters kilo-audit-staging into kilo-audit-staging-dlq; only audit-relay-staging may',
+    ]);
+  });
+
+  it('refuses another config deploying under an STS or relay name', () => {
+    const config = consumer({
+      env: {
+        x: { name: 'sts', queues: { producers: [{ binding: 'AUDIT', queue: 'kilo-audit' }] } },
+        y: { name: 'audit-relay-local' },
+        z: { name: 'sts-test' },
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (env.x) deploys as sts, which only the sts config deploys`,
+      `${PATH} (env.y) deploys as audit-relay-local, which only the audit-relay config deploys`,
+      `${PATH} (env.z) deploys as sts-test, which only the sts-test config deploys`,
+    ]);
   });
 });
 

@@ -8,7 +8,9 @@ import {
   adminMutationsMissingAuditSpec,
   inputFieldTarget,
   recordAdminAction,
+  recordAdminActions,
   setAdminActionSinkForTest,
+  setAdminAuditFailureAction,
   setAdminAuditTarget,
   userActionTarget,
   type DiscoveredProcedure,
@@ -56,6 +58,30 @@ const testRouter = createTRPCRouter({
         message: 'someone@customer.test is already blocked',
       });
     }),
+  blockById: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user.unblock',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(({ input }) => input.userId),
+  setBlock: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['user.block', 'user.unblock'] } })
+    .input(z.object({ userId: z.string(), blocked: z.boolean() }))
+    .mutation(({ input }) => {
+      setAdminAuditTarget(userActionTarget(input.userId));
+      setAdminAuditFailureAction(input.blocked ? 'user.block' : 'user.unblock');
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'User is being deleted' });
+    }),
+  bulkUnblock: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['user.unblock'] } })
+    .mutation(async ({ ctx }) => {
+      await recordAdminActions(ctx, []);
+      return 'ok';
+    }),
   resetKey: adminProcedure
     .meta({ adminAudit: { kind: 'handler', actions: ['user.api_key.reset'] } })
     .input(userInput)
@@ -84,8 +110,14 @@ const createCaller = createCallerFactory(testRouter);
 
 const admin = defineTestUser({ is_admin: true, is_super_admin: false });
 
-function adminCaller() {
-  const ctx: TRPCContext = { user: admin, authViaToken: false, tokenSource: null, ip: '192.0.2.9' };
+function adminCaller(overrides: Partial<TRPCContext> = {}) {
+  const ctx: TRPCContext = {
+    user: admin,
+    authViaToken: false,
+    tokenSource: null,
+    ip: '192.0.2.9',
+    ...overrides,
+  };
   return createCaller(ctx);
 }
 
@@ -164,6 +196,81 @@ describe('admin audit middleware', () => {
     await expect(adminCaller().undeclared()).rejects.toThrow(
       'Admin audit gap: undeclared declares no adminAudit meta'
     );
+  });
+
+  test('reports a handler mutation that recorded an empty list', async () => {
+    await expect(adminCaller().bulkUnblock()).rejects.toThrow(
+      'Admin audit gap: bulkUnblock succeeded without recording user.unblock'
+    );
+  });
+
+  test('records the failure under the action the handler named', async () => {
+    await expect(adminCaller().setBlock({ userId: 'user-1', blocked: false })).rejects.toThrow(
+      'User is being deleted'
+    );
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_id: 'user-1',
+        metadata: { errorCode: 'FORBIDDEN' },
+      }),
+    ]);
+  });
+
+  test('records input that never parsed as a failure with no target', async () => {
+    await expect(adminCaller().blockById({ userId: 'not-a-uuid' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_type: null,
+        target_id: null,
+        metadata: { errorCode: 'BAD_REQUEST' },
+      }),
+    ]);
+  });
+
+  describe('with step-up enforced', () => {
+    const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+    beforeEach(() => {
+      process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    });
+    afterEach(() => {
+      process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    });
+
+    test('records a step-up refusal as a failure row', async () => {
+      // A bearer credential can never complete step-up, so the guard refuses it.
+      const result = adminCaller({ authViaToken: true }).block({ userId: 'user-1' });
+      await expect(result).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      const rows = await db.select().from(admin_action_audit_logs);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.unblock',
+          outcome: 'failure',
+          actor_id: admin.id,
+          target_id: 'user-1',
+          metadata: { errorCode: 'FORBIDDEN' },
+        }),
+      ]);
+    });
+
+    test('records nothing when the admin guard refuses a non-admin', async () => {
+      const nonAdmin = defineTestUser({ is_admin: false, is_super_admin: false });
+      await expect(adminCaller({ user: nonAdmin }).block({ userId: 'user-1' })).rejects.toThrow(
+        'Admin access required'
+      );
+
+      expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+    });
   });
 });
 

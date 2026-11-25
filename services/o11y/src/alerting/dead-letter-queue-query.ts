@@ -1,3 +1,4 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { DEAD_LETTER_QUEUE_NAME } from './dead-letter-queue';
 import type { QueueBacklogMetrics } from './queue-backlog';
 import { queryQueueBacklog } from './queue-backlog-query';
@@ -10,7 +11,9 @@ type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 export async function queryDeadLetterQueue(
   env: QueryEnv,
   fetchFn: FetchFn = fetch,
-  queueName: string = DEAD_LETTER_QUEUE_NAME
+  queueName: string = DEAD_LETTER_QUEUE_NAME,
+  ctx?: SecretsExecutionContext
 ): Promise<QueueBacklogMetrics> {
-  return queryQueueBacklog(env, fetchFn, await resolveQueueId(env, fetchFn, queueName));
+  const queueId = await resolveQueueId(env, fetchFn, queueName, ctx);
+  return queryQueueBacklog(env, fetchFn, queueId, ctx);
 }

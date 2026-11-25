@@ -6,6 +6,7 @@
  * both the long and short windows (multiwindow approach).
  */
 
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { BURN_RATE_WINDOWS, type BurnRateWindow } from './slo-config';
 import {
   queryErrorRates,
@@ -18,10 +19,13 @@ import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
-import { evaluateContainerAllocations } from './container-allocations';
+import { queryContainerApplications } from './container-capacity-query';
+import { evaluateContainerAllocations, queryContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
+import { queryQueueBacklog } from './queue-backlog-query';
 import { queryUsageQueueBacklog } from './usage-queue-backlog-query';
 import { evaluateDeadLetterQueueAlert } from './dead-letter-queue-evaluate';
+import { queryDeadLetterQueue } from './dead-letter-queue-query';
 import { ENKRYPT_DEAD_LETTER_QUEUE_NAME } from './dead-letter-queue';
 
 /**
@@ -55,12 +59,13 @@ type ConfigByModel = Map<string, AlertingConfig>;
 async function evaluateErrorRateWindow(
   window: BurnRateWindow,
   configByModel: ConfigByModel,
-  env: Env
+  env: Env,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (configByModel.size === 0) return;
 
   // Query the long window first
-  const longRows = await queryErrorRates(window.longWindowMinutes, 1, env);
+  const longRows = await queryErrorRates(window.longWindowMinutes, 1, env, ctx);
   if (longRows.length === 0) return;
 
   // For each dimension that trips the long window, check the short window
@@ -80,7 +85,7 @@ async function evaluateErrorRateWindow(
   if (trippedDimensions.length === 0) return;
 
   // Query the short window
-  const shortRows = await queryErrorRates(window.shortWindowMinutes, 1, env);
+  const shortRows = await queryErrorRates(window.shortWindowMinutes, 1, env, ctx);
   const shortMap = rowsToMap(shortRows);
 
   for (const { row: longRow, config } of trippedDimensions) {
@@ -158,7 +163,8 @@ export function groupByThreshold(configs: TtfbConfigByModel): Map<number, Set<st
 async function evaluateTtfbWindow(
   window: BurnRateWindow,
   configByModel: TtfbConfigByModel,
-  env: Env
+  env: Env,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (configByModel.size === 0) return;
 
@@ -172,7 +178,7 @@ async function evaluateTtfbWindow(
   }> = [];
 
   for (const [thresholdMs, modelSet] of thresholdGroups) {
-    const longRows = await queryTtfbExceedRates(window.longWindowMinutes, 1, thresholdMs, env);
+    const longRows = await queryTtfbExceedRates(window.longWindowMinutes, 1, thresholdMs, env, ctx);
     if (longRows.length === 0) continue;
 
     for (const row of longRows) {
@@ -208,7 +214,13 @@ async function evaluateTtfbWindow(
   }
 
   for (const [thresholdMs, trippedGroup] of trippedByThreshold) {
-    const shortRows = await queryTtfbExceedRates(window.shortWindowMinutes, 1, thresholdMs, env);
+    const shortRows = await queryTtfbExceedRates(
+      window.shortWindowMinutes,
+      1,
+      thresholdMs,
+      env,
+      ctx
+    );
     const shortMap = rowsToMap(shortRows);
 
     for (const { row: longRow, config, slowFraction: longSlowFraction } of trippedGroup) {
@@ -269,7 +281,7 @@ async function evaluateTtfbWindow(
  * Higher-severity windows are checked first so that their dedup markers
  * can suppress lower-severity alerts for the same dimension.
  */
-export async function evaluateAlerts(env: Env): Promise<void> {
+export async function evaluateAlerts(env: Env, ctx?: SecretsExecutionContext): Promise<void> {
   const errors: unknown[] = [];
   let configByModel: ConfigByModel = new Map();
   let ttfbConfigByModel: TtfbConfigByModel = new Map();
@@ -299,51 +311,61 @@ export async function evaluateAlerts(env: Env): Promise<void> {
 
   for (const window of sortedWindows) {
     try {
-      await evaluateErrorRateWindow(window, configByModel, env);
+      await evaluateErrorRateWindow(window, configByModel, env, ctx);
     } catch (err) {
       errors.push(new Error(`error_rate window (${window.longWindowMinutes}m)`, { cause: err }));
     }
 
     try {
-      await evaluateTtfbWindow(window, ttfbConfigByModel, env);
+      await evaluateTtfbWindow(window, ttfbConfigByModel, env, ctx);
     } catch (err) {
       errors.push(new Error(`ttfb window (${window.longWindowMinutes}m)`, { cause: err }));
     }
   }
 
-  // Infrastructure evaluations run once per cron tick, independent of burn-rate windows.
+  // Infrastructure evaluations run once per cron tick, independent of burn-rate windows. Each
+  // query gets the cron run's ctx, which keeps a bundle revalidation it starts alive.
   try {
-    await evaluateContainerCapacity(env);
+    await evaluateContainerCapacity(env, e => queryContainerApplications(e, fetch, ctx));
   } catch (err) {
     errors.push(new Error('container_capacity evaluation', { cause: err }));
   }
 
   try {
-    await evaluateContainerAllocations(env);
+    await evaluateContainerAllocations(env, e => queryContainerAllocations(e, fetch, ctx));
   } catch (err) {
     errors.push(new Error('container_allocations evaluation', { cause: err }));
   }
 
   try {
-    await evaluateQueueBacklogAlert(env);
+    await evaluateQueueBacklogAlert(env, e => queryQueueBacklog(e, fetch, undefined, ctx));
   } catch (err) {
     errors.push(new Error('queue_backlog evaluation', { cause: err }));
   }
 
   try {
-    await evaluateQueueBacklogAlert(env, queryUsageQueueBacklog, undefined, 'once-until-resolved');
+    await evaluateQueueBacklogAlert(
+      env,
+      e => queryUsageQueueBacklog(e, ctx),
+      undefined,
+      'once-until-resolved'
+    );
   } catch (err) {
     errors.push(new Error('usage_queue_backlog evaluation', { cause: err }));
   }
 
   try {
-    await evaluateDeadLetterQueueAlert(env);
+    await evaluateDeadLetterQueueAlert(env, undefined, (e, queueName) =>
+      queryDeadLetterQueue(e, fetch, queueName, ctx)
+    );
   } catch (err) {
     errors.push(new Error('dead_letter_queue evaluation', { cause: err }));
   }
 
   try {
-    await evaluateDeadLetterQueueAlert(env, ENKRYPT_DEAD_LETTER_QUEUE_NAME);
+    await evaluateDeadLetterQueueAlert(env, ENKRYPT_DEAD_LETTER_QUEUE_NAME, (e, queueName) =>
+      queryDeadLetterQueue(e, fetch, queueName, ctx)
+    );
   } catch (err) {
     errors.push(new Error('enkrypt_dead_letter_queue evaluation', { cause: err }));
   }

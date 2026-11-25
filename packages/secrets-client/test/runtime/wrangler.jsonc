@@ -1,0 +1,6 @@
+// Test-only Worker that runtime.test.ts starts in local workerd; never deployed.
+{
+  "name": "secrets-client-runtime-test",
+  "main": "worker.ts",
+  "compatibility_date": "2026-02-01",
+}

@@ -436,6 +436,15 @@ export type GitTokenService = {
   getCloudAgentAuthForRepo?(
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
+  scopeCodeReviewCapability?(
+    params: import('@kilocode/worker-utils/scm-capability-contract').ScopeReviewCapabilityParams
+  ): Promise<string>;
+  forwardCodeReviewRequest?(
+    provider: 'github' | 'gitlab' | 'bitbucket',
+    capability: string,
+    containerId: string,
+    request: Request
+  ): Promise<Response>;
   issueGitHubSessionCapability(
     params: ManagedGitHubAuthParams & {
       outboundContainerId: string;

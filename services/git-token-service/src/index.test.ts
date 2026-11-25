@@ -1,3 +1,5 @@
+import * as databaseClient from '@kilocode/db/client';
+import type { CapabilityPurpose } from '@kilocode/worker-utils/scm-capability-contract';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
@@ -530,6 +532,7 @@ function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
     {} as ExecutionContext,
     {
+      HYPERDRIVE: { connectionString: 'unused' },
       GITHUB_APP_SLUG: 'kiloconnect',
       GITHUB_APP_CLIENT_ID: 'synthetic-app-id',
       GITHUB_APP_CLIENT_SECRET: 'synthetic-app-secret',
@@ -539,6 +542,50 @@ function createService(): GitTokenRPCEntrypoint {
   );
 }
 
+async function verifyReviewRpc(
+  provider: CapabilityPurpose,
+  capability: string,
+  gitUrl: string,
+  integrationId?: string
+) {
+  const repository = new URL(gitUrl).pathname.slice(1, -4);
+  const review = { number: 7, head: 'a'.repeat(40), repository, platform: provider, integrationId };
+  const db = vi.spyOn(databaseClient, 'getWorkerDb').mockReturnValue({
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [review] }) }) }),
+  } as never);
+  const upstream = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async () => new Response('served'));
+  upstream.mockClear();
+  try {
+    const service = createService();
+    const wrapped = await service.scopeCodeReviewCapability({
+      provider,
+      capability,
+      reviewId: 'review-1',
+      sessionId: 'workspace-1',
+      additional: false,
+    });
+    const send = (container: string, gitService: string) =>
+      service.forwardCodeReviewRequest(
+        provider,
+        wrapped,
+        container,
+        new Request(gitUrl + '/info/refs?service=' + gitService)
+      );
+    expect((await send('another-allocation', 'git-upload-pack')).status).toBe(403);
+    expect((await send(outboundContainerId, 'git-receive-pack')).status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(await (await send(outboundContainerId, 'git-upload-pack')).text()).toBe('served');
+    expect(upstream).toHaveBeenCalledOnce();
+    expect(new Headers(upstream.mock.calls[0]?.[1]?.headers).get('authorization')).toMatch(
+      /^Basic /
+    );
+  } finally {
+    upstream.mockRestore();
+    db.mockRestore();
+  }
+}
 describe('GitTokenRPCEntrypoint.getToken', () => {
   beforeEach(() => {
     serviceMocks.assertActiveAssociationForInstallation.mockReset().mockResolvedValue(undefined);
@@ -665,6 +712,15 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     if (!result.success) throw new Error(`issue failed: ${result.reason}`);
     return result.capability;
   }
+
+  it('forwards scoped fetch through actual Bitbucket redemption', async () => {
+    await verifyReviewRpc(
+      'bitbucket',
+      await issueCapability(),
+      issueParams.repositoryUrl,
+      subject.integrationId
+    );
+  });
 
   it('issues an opaque capability and the canonical git URL', async () => {
     const result = await createService().issueBitbucketSessionCapability(issueParams);
@@ -1726,6 +1782,17 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalled();
     }
   );
+
+  it('forwards scoped fetch through actual installation redemption', async () => {
+    const issued = await createService().issueGitHubSessionCapability({
+      githubRepo: 'o/r',
+      userId: 'user-1',
+      outboundContainerId,
+      allowUserAuthorization: false,
+    });
+    if (!issued.success) throw new Error('Expected installation capability');
+    await verifyReviewRpc('github', issued.capability, 'https://github.com/o/r.git');
+  });
 
   it('issues an opaque GitHub capability while preserving non-secret attribution metadata', async () => {
     const result = await createService().issueGitHubSessionCapability({
@@ -3089,6 +3156,12 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     expect(result.capability).toMatch(/^kgl2\./);
     expect(JSON.stringify(result)).not.toContain('project-access-token');
     expect(result).not.toHaveProperty('token');
+    await verifyReviewRpc(
+      'gitlab',
+      result.capability,
+      'https://gitlab.com/' + result.projectPath + '.git',
+      result.integrationId
+    );
   });
 
   it.each([
